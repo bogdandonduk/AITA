@@ -3065,7 +3065,6 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
                         if (index in indices) set(index, get(index).copy(selectedDomainId = instance.selectedId))
                     }
                 } catch (thr: Throwable) {
-                    if (thr is kotlinx.coroutines.CancellationException) throw thr
 
                 }
             }
@@ -3076,7 +3075,6 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
                             if (index in indices) set(index, get(index).copy(selectedSecondaryDomainId = it))
                         }
                     } catch (thr: Throwable) {
-                        if (thr is kotlinx.coroutines.CancellationException) throw thr
 
                     }
                 }
@@ -3239,7 +3237,6 @@ fun AppConfiguration.domainSelectionTextField(
             domains.find { it.id.equals(selectedId, true) } ?: try {
                 domains.first()
             } catch (thr: Throwable) {
-                if (thr is kotlinx.coroutines.CancellationException) throw thr
                 null
             }
         )
@@ -3256,7 +3253,6 @@ fun AppConfiguration.domainSelectionTextField(
         val initialDomainId = selectedInitial.takeIf { it.isNotEmpty() } ?: try {
             domains.first().id
         } catch (thr: Throwable) {
-            if (thr is kotlinx.coroutines.CancellationException) throw thr
             ""
         }
         selectedId = when {

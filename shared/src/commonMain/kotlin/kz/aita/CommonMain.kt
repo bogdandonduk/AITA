@@ -6806,7 +6806,6 @@ fun getSupplierContracts(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
                 return@launch
             }
@@ -12119,16 +12118,16 @@ private fun storeScopedCacheKey(name: String, storeId: String): String = "$name:
 private suspend inline fun <reified T> putJsonCache(key: String, value: T) {
     try {
         putLocalKv(CACHE_PREFIX + key, jsonBase.encodeToString(value))
-    } catch (_: Throwable) {
-        if (_ is kotlinx.coroutines.CancellationException) throw _
+    } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
     }
 }
 
 private suspend inline fun <reified T> getJsonCache(key: String): T? {
     return try {
         getLocalKv(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
-    } catch (_: Throwable) {
-        if (_ is kotlinx.coroutines.CancellationException) throw _
+    } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
         null
     }
 }
@@ -12136,8 +12135,8 @@ private suspend inline fun <reified T> getJsonCache(key: String): T? {
 private suspend fun deleteJsonCache(key: String) {
     try {
         deleteLocalKv(CACHE_PREFIX + key)
-    } catch (_: Throwable) {
-        if (_ is kotlinx.coroutines.CancellationException) throw _
+    } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
     }
 }
 

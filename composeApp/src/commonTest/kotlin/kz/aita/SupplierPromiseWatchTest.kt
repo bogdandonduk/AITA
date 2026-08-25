@@ -32,11 +32,12 @@ class SupplierPromiseWatchTest {
         assertEquals(listOf("late", "soon"), watch.attention.map { it.id })
         assertEquals(1, watch.overdueCount)
         assertEquals(1, watch.dueSoonCount)
+        assertEquals(now + 2_000L, watch.nextPromiseAtEpochMillis)
         assertTrue(watch.hasAttention)
     }
 
     @Test
-    fun terminalAndUnscheduledOrdersDoNotBecomeFalseAttention() {
+    fun terminalAndUnscheduledOrdersDoNotBecomeFalseAttentionOrNextPromise() {
         val now = 10_000L
         val deliveredLate = Order("done", now - 5_000L, "DELIVERED")
         val unscheduled = Order("open", null, "OPEN")
@@ -51,6 +52,26 @@ class SupplierPromiseWatchTest {
 
         assertTrue(watch.attention.isEmpty())
         assertFalse(watch.hasAttention)
+        assertEquals(null, watch.nextPromiseAtEpochMillis)
         assertEquals(listOf("done", "open"), watch.prioritized.map { it.id })
+    }
+
+    @Test
+    fun missingStableKeysNeverDropDistinctItemsBecauseOfHashCollisions() {
+        class SameHash(val label: String) {
+            override fun hashCode(): Int = 7
+        }
+
+        val first = SameHash("first")
+        val second = SameHash("second")
+        val watch = buildSupplierPromiseWatch(
+            values = listOf(first, second),
+            nowEpochMillis = 100L,
+            promisedAt = { null },
+            isTerminal = { false },
+            stableKey = { null },
+        )
+
+        assertEquals(listOf("first", "second"), watch.prioritized.map { it.label })
     }
 }

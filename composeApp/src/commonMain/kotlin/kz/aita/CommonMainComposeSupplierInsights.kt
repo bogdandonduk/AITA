@@ -1787,7 +1787,18 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
     val manufacturerBridgePriority = manufacturerBridgeItems.maxOfOrNull { it.priorityScore } ?: 0
     val backorderWatchCount = backorderWatchItems.size
     val backorderShortQuantity = backorderWatchItems.sumOf { it.missingQuantityTotal }.roundMoney()
-    val supplierBackorderNow = supplierDashboard?.generatedAtMillis?.takeIf { it > 0L } ?: getCurrentTimeMillis()
+    val supplierBackorderNow = rememberSupplierLiveNow {
+        getCurrentTimeMillis()
+    }
+    val supplierPromiseWatch = remember(visibleBackorderWatchItems, supplierBackorderNow) {
+        buildSupplierPromiseWatch(
+            values = visibleBackorderWatchItems,
+            nowEpochMillis = supplierBackorderNow,
+            promisedAt = { it.earliestDueAtMillis },
+            isTerminal = { false },
+            stableKey = { it.backorderId.ifBlank { it.goodsItemId } },
+        )
+    }
     val supplierStatusMixText = supplierDashboard?.statusBuckets
         ?.take(4)
         ?.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
@@ -1800,21 +1811,6 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
             iconRes = stateValues.drawableResIconSupplierDemandRadar.value
         )
 
-        val supplierPromiseNowEpochMillis2 = rememberSupplierLiveNow {
-            kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-        }
-        val supplierPromiseWatch2 = androidx.compose.runtime.remember(
-            visibleTermsGuardItems,
-            supplierPromiseNowEpochMillis2,
-        ) {
-            buildSupplierPromiseWatch(
-                values = visibleTermsGuardItems,
-                nowEpochMillis = supplierPromiseNowEpochMillis2,
-                promisedAt = { it.earliestDueAtMillis },
-                isTerminal = { false },
-                stableKey = { it.backorderId },
-            )
-        }
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -2108,7 +2104,7 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                     )
                 }
             } else {
-                items(supplierPromiseWatch2.prioritized, key = { it.contract.id }) { item ->
+                items(visibleTermsGuardItems, key = { it.contract.id }) { item ->
                     SupplierTermsGuardCard(item)
                 }
             }
@@ -2238,7 +2234,7 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                     )
                 }
             } else {
-                items(visibleBackorderWatchItems, key = { it.backorderId.ifBlank { it.goodsItemId } }) { item ->
+                items(supplierPromiseWatch.prioritized, key = { it.backorderId.ifBlank { it.goodsItemId } }) { item ->
                     SupplierBackorderWatchListItem(item)
                 }
             }

@@ -105,6 +105,20 @@ diagnose_build_log() {
   fi
 }
 
+show_compiler_diagnostics() {
+  local file="${1:?Build log is required}"
+  local diagnostics
+  diagnostics="$({
+    grep -nE \
+      '(^|[[:space:]])e: (file:|.*\.kts?:)|(^|[[:space:]])error:|Unresolved reference|Type mismatch|Compilation error' \
+      "$file" || true
+  } | head -n 80)"
+
+  if [[ -n "$diagnostics" ]]; then
+    printf '\nAITA: first relevant compiler diagnostics:\n%s\n\n' "$diagnostics" >&2
+  fi
+}
+
 run_logged_gradle() {
   local attempt_label="${1:?Attempt label is required}"
   shift
@@ -153,10 +167,12 @@ if ! run_logged_gradle "normal"; then
       -Pkotlin.incremental=false \
       -Pkotlin.compiler.execution.strategy=in-process; then
       diagnose_build_log "$log_file"
+      show_compiler_diagnostics "$log_file"
       aita_die "Server build failed after cache recovery. Full log: $log_file"
     fi
   else
     diagnose_build_log "$log_file"
+    show_compiler_diagnostics "$log_file"
     aita_die "Server build failed. Full log: $log_file"
   fi
 fi

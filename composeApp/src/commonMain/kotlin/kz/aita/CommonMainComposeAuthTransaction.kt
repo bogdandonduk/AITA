@@ -2,8 +2,6 @@
 @file:OptIn(ExperimentalTime::class, ExperimentalFoundationApi::class)
 package kz.aita
 
-import androidx.compose.runtime.remember
-
 import aita.composeapp.generated.resources.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
@@ -5514,8 +5512,8 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
         var newDebtorFirstName by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.firstName.orEmpty()) }
         var newDebtorLastName by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.lastName.orEmpty()) }
-        var newDebtorPhone by remember(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.phoneNumber.orEmpty()) }
-        var newDebtorEmail by remember(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.email.orEmpty()) }
+        var newDebtorPhone by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.phoneNumber.orEmpty()) }
+        var newDebtorEmail by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.email.orEmpty()) }
         var newDebtorType by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.debtorType?.ifBlank { "individual" } ?: "individual") }
         var newDebtorIdNumber by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.idNumber.orEmpty()) }
         var newDebtorCompanyName by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(persistedPaymentDraft?.debtor?.companyName.orEmpty()) }

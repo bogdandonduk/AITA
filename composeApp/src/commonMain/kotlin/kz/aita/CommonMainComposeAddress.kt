@@ -312,7 +312,6 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            if (_ is kotlinx.coroutines.CancellationException) throw _
             if (query == textField.value.text.trim().replace(Regex("\\s+"), " ")) {
                 if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.suggestions = emptyList()
                 state.providerMessage = localizedStringResource(2306, "Could not load address suggestions")
@@ -347,7 +346,6 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Throwable) {
-            if (_ is kotlinx.coroutines.CancellationException) throw _
             if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreview = null
             if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreviewFailed = true
         }

@@ -929,7 +929,6 @@ suspend inline fun <reified T> RoutingCall.genericResponse(
     val payloadText = try {
       payload?.let { jsonBase.encodeToString(it) }
     } catch (throwable: Throwable) {
-        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
       if (throwable.isClassLoadingFailure()) {
         refreshSharedRuntimeSerializersAfterClassLoadingFailure("response:${T::class.qualifiedName}", throwable)
       }
@@ -3211,7 +3210,7 @@ class TokenService(private val cfg: JwtConfig) {
       try {
         return newPairOnce(userId, metaParam)
       } catch (throwable: Throwable) {
-          if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
         if (!throwable.isRefreshSessionInsertCollision()) throw throwable
 
         revokeSameDeviceSessionsBeforeRefreshSessionRetry(userId, metaParam)
@@ -3289,7 +3288,7 @@ class TokenService(private val cfg: JwtConfig) {
       try {
         return rotateOnce(refreshPlain, metaParam)
       } catch (throwable: Throwable) {
-          if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
         if (throwable.isAlreadyRotatedOrRevokedRefreshToken()) {
           recoverRecentlyRotatedRefreshToken(refreshPlain, metaParam)?.let { return it }
         }
@@ -3305,7 +3304,7 @@ class TokenService(private val cfg: JwtConfig) {
     return try {
       rotateOnce(refreshPlain, metaParam)
     } catch (throwable: Throwable) {
-        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+      if (throwable is kotlinx.coroutines.CancellationException) throw throwable
       if (throwable.isAlreadyRotatedOrRevokedRefreshToken()) {
         recoverRecentlyRotatedRefreshToken(refreshPlain, metaParam)?.let { return it }
       }
@@ -4104,7 +4103,6 @@ fun main(args: Array<String>) {
   try {
     EngineMain.main(args)
   } catch (throwable: Throwable) {
-      if (throwable is kotlinx.coroutines.CancellationException) throw throwable
     System.err.println(
       "AITA server fatal startup failure before listen phase: ${throwable::class.qualifiedName}: ${throwable.message.orEmpty()}"
     )
@@ -17938,7 +17936,6 @@ fun Application.module() {
       jwtSecret = validatedJwtConfig.secret
     )
   } catch (throwable: Throwable) {
-      if (throwable is kotlinx.coroutines.CancellationException) throw throwable
     logStartupFailure("security configuration", throwable)
     throw throwable
   }
@@ -18724,7 +18721,7 @@ fun Application.module() {
             message = getResponse("3").message
           )
         } catch (throwable: Throwable) {
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+          if (throwable is kotlinx.coroutines.CancellationException) throw throwable
           call.safeGenericResponseNoPayload(
             status = HttpStatusCode.InternalServerError,
             message = getResponse("3").message,
@@ -18874,7 +18871,7 @@ fun Application.module() {
           try {
             tokenService.revoke(refreshToken)
           } catch (throwable: Throwable) {
-              if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             call.application.environment.log.error("Logout token revoke failed", throwable)
           }
         }
@@ -18888,7 +18885,7 @@ fun Application.module() {
           val newTokens = tokenService.rotate(body, metaFrom(call))
           call.genericTokenPairResponse(HttpStatusCode.OK, newTokens)
         } catch (throwable: Throwable) {
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+          if (throwable is kotlinx.coroutines.CancellationException) throw throwable
           if (throwable is IllegalAccessException) {
             call.genericResponseNoPayload(
               status = HttpStatusCode.Unauthorized,

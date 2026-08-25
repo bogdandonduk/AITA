@@ -13,8 +13,10 @@ internal enum class SupplierPromiseUrgency {
 
 internal data class SupplierPromiseWatchEntry<T>(
     val value: T,
+    val stableKey: String,
     val promisedAtEpochMillis: Long?,
     val urgency: SupplierPromiseUrgency,
+    val terminal: Boolean,
 )
 
 internal data class SupplierPromiseWatch<T>(
@@ -29,9 +31,11 @@ internal data class SupplierPromiseWatch<T>(
 }
 
 /**
- * Builds a stable, duplicate-free delivery-promise view without changing the authoritative
- * order objects. Near-term commitments are moved to the front; terminal orders stay out of
- * the attention slice but retain their relative position in the full list.
+ * Builds a stable delivery-promise view without changing authoritative domain objects.
+ *
+ * Entries with a real stable key are deduplicated so a newer aggregate cannot appear twice. When
+ * the caller cannot supply a key, each list position is deliberately treated as distinct rather
+ * than relying on hashCode, whose collisions could silently hide legitimate work.
  */
 internal fun <T> buildSupplierPromiseWatch(
     values: List<T>,
@@ -43,42 +47,40 @@ internal fun <T> buildSupplierPromiseWatch(
 ): SupplierPromiseWatch<T> {
     val safeWindow = dueSoonWindowMillis.coerceAtLeast(0L)
     val seenKeys = mutableSetOf<String>()
-    val entries = values.mapNotNull { value ->
-        val stableKeyValue = stableKey(value)?.toString()?.trim().orEmpty()
-        val fallbackKey = value.hashCode().toString()
-        val key = stableKeyValue.ifEmpty { fallbackKey }
-        if (!seenKeys.add(key)) return@mapNotNull null
+    val entries = values.mapIndexedNotNull { index, value ->
+        val suppliedKey = stableKey(value)?.toString()?.trim().orEmpty()
+        val resolvedKey = suppliedKey.ifBlank { "position:$index" }
+        if (suppliedKey.isNotBlank() && !seenKeys.add(suppliedKey)) return@mapIndexedNotNull null
 
+        val terminal = isTerminal(value)
         val promisedAtEpochMillis = supplierPromiseEpochMillis(promisedAt(value))
         val urgency = when {
-            isTerminal(value) -> SupplierPromiseUrgency.LATER
+            terminal -> SupplierPromiseUrgency.LATER
             promisedAtEpochMillis == null -> SupplierPromiseUrgency.UNSCHEDULED
             promisedAtEpochMillis < nowEpochMillis -> SupplierPromiseUrgency.OVERDUE
-            promisedAtEpochMillis <= nowEpochMillis + safeWindow ->
-                SupplierPromiseUrgency.DUE_SOON
+            promisedAtEpochMillis <= nowEpochMillis + safeWindow -> SupplierPromiseUrgency.DUE_SOON
             else -> SupplierPromiseUrgency.LATER
         }
-        SupplierPromiseWatchEntry(value, promisedAtEpochMillis, urgency)
+        SupplierPromiseWatchEntry(
+            value = value,
+            stableKey = resolvedKey,
+            promisedAtEpochMillis = promisedAtEpochMillis,
+            urgency = urgency,
+            terminal = terminal,
+        )
     }
 
     val attentionEntries = entries
-        .filter { it.urgency == SupplierPromiseUrgency.OVERDUE ||
-            it.urgency == SupplierPromiseUrgency.DUE_SOON }
+        .filter {
+            it.urgency == SupplierPromiseUrgency.OVERDUE ||
+                it.urgency == SupplierPromiseUrgency.DUE_SOON
+        }
         .sortedWith(
             compareBy<SupplierPromiseWatchEntry<T>> { it.urgency.ordinal }
                 .thenBy { it.promisedAtEpochMillis ?: Long.MAX_VALUE },
         )
-    val attentionKeys = attentionEntries
-        .map { stableKey(it.value)?.toString()?.trim().orEmpty().ifEmpty {
-            it.value.hashCode().toString()
-        } }
-        .toHashSet()
-    val remainder = entries.filterNot {
-        val key = stableKey(it.value)?.toString()?.trim().orEmpty().ifEmpty {
-            it.value.hashCode().toString()
-        }
-        key in attentionKeys
-    }
+    val attentionKeys = attentionEntries.mapTo(mutableSetOf()) { it.stableKey }
+    val remainder = entries.filterNot { it.stableKey in attentionKeys }
 
     return SupplierPromiseWatch(
         prioritized = (attentionEntries + remainder).map { it.value },
@@ -91,8 +93,9 @@ internal fun <T> buildSupplierPromiseWatch(
         },
         nextPromiseAtEpochMillis = entries
             .asSequence()
-            .filter { it.urgency != SupplierPromiseUrgency.OVERDUE }
+            .filterNot { it.terminal }
             .mapNotNull { it.promisedAtEpochMillis }
+            .filter { it >= nowEpochMillis }
             .minOrNull(),
     )
 }

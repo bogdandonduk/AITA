@@ -243,7 +243,6 @@ private suspend fun withPaymentAccess(
                 HttpStatusCode.BadRequest,
             )
         } catch (_: Throwable) {
-            if (_ is kotlinx.coroutines.CancellationException) throw _
             db.rollback()
             PaymentRouteResponse(
                 PaymentApiErrorDto("PAYMENT_OPERATION_FAILED", "Payment operation could not be completed", retryable = true),

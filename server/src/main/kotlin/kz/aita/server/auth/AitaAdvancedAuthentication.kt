@@ -975,7 +975,6 @@ private class AitaAdvancedAuthService(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (throwable: Throwable) {
-                    if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                     application.environment.log.error("AITA authentication email worker failed", throwable)
                     delay(5_000L)
                 }

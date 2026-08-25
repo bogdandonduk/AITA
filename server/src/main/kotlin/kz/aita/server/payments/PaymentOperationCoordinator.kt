@@ -1,5 +1,6 @@
 package kz.aita.server.payments
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,8 +29,10 @@ class PaymentOperationCoordinator {
             val value = operation()
             deferred.complete(Result.success(value as Any?))
             return value
+        } catch (cancelled: CancellationException) {
+            deferred.cancel(cancelled)
+            throw cancelled
         } catch (throwable: Throwable) {
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             deferred.complete(Result.failure(throwable))
             throw throwable
         } finally {

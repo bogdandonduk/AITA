@@ -247,7 +247,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
         )
 
         val supplierPromiseNowEpochMillis1 = rememberSupplierLiveNow {
-            kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+            getCurrentTimeMillis()
         }
         val supplierPromiseWatch1 = androidx.compose.runtime.remember(
             filteredRuns,
@@ -258,7 +258,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                 nowEpochMillis = supplierPromiseNowEpochMillis1,
                 promisedAt = { it.earliestDueAtMillis },
                 isTerminal = { false },
-                stableKey = { it.serverRunId },
+                stableKey = { it.key },
             )
         }
         LazyColumn(

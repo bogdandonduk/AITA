@@ -261,7 +261,6 @@ actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
 
         driver
     } catch (throwable: Throwable) {
-        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
         runCatching { driver.close() }
         throw throwable
     }
@@ -426,7 +425,6 @@ object ReceiptPlatformJvmBridge {
                 }
             }
         } catch (throwable: Throwable) {
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             throw IllegalStateException(
                 "Could not save receipt-printer selection '${file.absolutePath}': " +
                         (throwable.message ?: throwable::class.simpleName.orEmpty()),
@@ -1499,7 +1497,6 @@ actual object LocalAitaLanTransport {
                             }
                         }
                     } catch (threadFailure: Throwable) {
-                        if (threadFailure is kotlinx.coroutines.CancellationException) throw threadFailure
                         activeTcpClientSlots.release()
                         runCatching { client.close() }
                         if (running.get()) {
@@ -1519,7 +1516,6 @@ actual object LocalAitaLanTransport {
                     try {
                         preparedUdpSocket.receive(packet)
                     } catch (throwable: Throwable) {
-                        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
                         if (running.get() && !preparedUdpSocket.isClosed) {
                             System.err.println("AITA LAN UDP receive failed: ${throwable.message}")
                         }
@@ -1555,7 +1551,6 @@ actual object LocalAitaLanTransport {
             }
             true
         } catch (throwable: Throwable) {
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
             running.set(false)
             runCatching { preparedTcpServer.close() }
             runCatching { preparedUdpSocket.close() }
