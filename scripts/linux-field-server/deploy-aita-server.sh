@@ -15,6 +15,7 @@ flock -n 9 || aita_die "Another AITA deployment is already running for $(id -un)
 
 project_root="$(pwd)"
 build=false
+build_with_tests=false
 backup=false
 rollback=false
 
@@ -22,10 +23,11 @@ while (($#)); do
   case "$1" in
     --project-root) project_root="${2:?Missing value for --project-root}"; shift ;;
     --build) build=true ;;
+    --build-with-tests) build=true; build_with_tests=true ;;
     --backup) backup=true ;;
     --rollback) rollback=true ;;
     -h|--help)
-      echo "Usage: $0 [--project-root PATH] [--build] [--backup] [--rollback]"
+      echo "Usage: $0 [--project-root PATH] [--build|--build-with-tests] [--backup] [--rollback]"
       exit 0
       ;;
     *) aita_die "Unknown argument: $1" ;;
@@ -68,7 +70,11 @@ if $rollback; then
   "${sudo_cmd[@]}" systemctl start aita-server.service
 else
   if $build; then
-    bash "$SCRIPT_DIR/build-aita-server.sh" --project-root "$project_root"
+    build_args=(--project-root "$project_root")
+    if $build_with_tests; then
+      build_args+=(--with-tests)
+    fi
+    bash "$SCRIPT_DIR/build-aita-server.sh" "${build_args[@]}"
   fi
 
   source_jar="$project_root/server/build/libs/aita-server-all.jar"

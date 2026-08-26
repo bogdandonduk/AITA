@@ -50,6 +50,14 @@ internal fun AppConfiguration.SupplierDispatchFilterPanel(
             localizedStringResource(2473, "Store runs")
         ),
         SupplierOrdersQuickFilterUiModel(
+            SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE,
+            localizedStringResource(1664, "Overdue promises")
+        ),
+        SupplierOrdersQuickFilterUiModel(
+            SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE,
+            localizedStringResource(1812, "Due soon")
+        ),
+        SupplierOrdersQuickFilterUiModel(
             SUPPLIER_DISPATCH_FILTER_READY_TO_PACK,
             localizedStringResource(1689, "Ready to pack")
         ),

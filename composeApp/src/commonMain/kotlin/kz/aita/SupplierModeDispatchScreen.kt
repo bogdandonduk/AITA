@@ -54,6 +54,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
     var feedbackMessage by remember { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     var feedbackType by remember { mutableStateOf<NotificationType?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val mutationOwner = rememberAitaLatestUiRequestOwner()
 
     val localProfiles = stateValues.suppliers.orEmpty()
         .supplierProfilesOwnedBy(stateValues.userAccount?.id)
@@ -72,10 +73,18 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
     }
 
     LaunchedEffect(focusedSupplierId) {
+        mutationOwner.invalidate()
         selectedRunKey = null
         activeMutationKey = null
         feedbackMessage = null
         feedbackType = null
+    }
+
+    LaunchedEffect(selectedRunKey) {
+        // A response for a run that the user has already left must not attach its loading or
+        // feedback state to the next Store run opened in the same composition.
+        mutationOwner.invalidate()
+        activeMutationKey = null
     }
 
     // Orders, Partner stores, Catalogue, and Agreements can seed this workspace. Apply all three
@@ -139,10 +148,19 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
         )
     }
     val normalizedSearch = searchQuery.trim().lowercase()
-    val filteredRuns = remember(runs, normalizedSearch, filterId, sortId) {
+    val supplierPromiseNowEpochMillis = rememberSupplierLiveNow {
+        getCurrentTimeMillis()
+    }
+    val filteredRuns = remember(
+        runs,
+        normalizedSearch,
+        filterId,
+        sortId,
+        supplierPromiseNowEpochMillis
+    ) {
         runs
             .filter { run ->
-                run.matchesSupplierDispatchFilter(filterId) &&
+                run.matchesSupplierDispatchFilter(filterId, supplierPromiseNowEpochMillis) &&
                         (normalizedSearch.isBlank() || run.searchKey.contains(normalizedSearch))
             }
             .sortedForSupplierDispatch(sortId)
@@ -205,6 +223,8 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
     ) {
         if (activeMutationKey != null) return
         val mutationKey = "${run.key}:${status.name}"
+        val mutationTicket = mutationOwner.begin()
+        val requestAccountId = userAccountState.payloadValue?.id.orEmpty()
         activeMutationKey = mutationKey
         feedbackMessage = null
         feedbackType = null
@@ -219,15 +239,24 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                     outcome.partial -> NotificationType.Neutral
                     else -> NotificationType.Positive
                 }
-                feedbackMessage = outcome.message
-                feedbackType = type
-                postInAppNotification(
-                    outcome.message,
-                    type,
-                    transient = !outcome.negative
-                )
+                if (mutationOwner.owns(mutationTicket)) {
+                    feedbackMessage = outcome.message
+                    feedbackType = type
+                }
+                if (
+                    requestAccountId.isNotBlank() &&
+                    userAccountState.payloadValue?.id.orEmpty() == requestAccountId
+                ) {
+                    postInAppNotification(
+                        outcome.message,
+                        type,
+                        transient = !outcome.negative
+                    )
+                }
             } finally {
-                activeMutationKey = null
+                if (mutationOwner.owns(mutationTicket)) {
+                    activeMutationKey = null
+                }
             }
         }
     }
@@ -246,16 +275,13 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
             }
         )
 
-        val supplierPromiseNowEpochMillis1 = rememberSupplierLiveNow {
-            getCurrentTimeMillis()
-        }
-        val supplierPromiseWatch1 = androidx.compose.runtime.remember(
+        val supplierPromiseWatch = androidx.compose.runtime.remember(
             filteredRuns,
-            supplierPromiseNowEpochMillis1,
+            supplierPromiseNowEpochMillis,
         ) {
             buildSupplierPromiseWatch(
                 values = filteredRuns,
-                nowEpochMillis = supplierPromiseNowEpochMillis1,
+                nowEpochMillis = supplierPromiseNowEpochMillis,
                 promisedAt = { it.earliestDueAtMillis },
                 isTerminal = { false },
                 stableKey = { it.key },
@@ -391,7 +417,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                         }
 
                         else -> {
-                            items(supplierPromiseWatch1.prioritized, key = { it.key }) { run ->
+                            items(supplierPromiseWatch.prioritized, key = { it.key }) { run ->
                                 SupplierDispatchRunCompactCard(
                                     run = run,
                                     onOpen = {

@@ -6,6 +6,8 @@ internal const val SUPPLIER_DISPATCH_FILTER_READY_TO_DISPATCH = "ready_to_dispat
 internal const val SUPPLIER_DISPATCH_FILTER_IN_DELIVERY = "in_delivery"
 internal const val SUPPLIER_DISPATCH_FILTER_ATTENTION = "attention"
 internal const val SUPPLIER_DISPATCH_FILTER_CONTRACTS = "contracts"
+internal const val SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE = "overdue_promise"
+internal const val SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE = "due_soon_promise"
 
 internal const val SUPPLIER_DISPATCH_SORT_ACTION = "action"
 internal const val SUPPLIER_DISPATCH_SORT_DUE = "due"
@@ -121,12 +123,80 @@ internal fun SupplierDispatchWorkspaceRunUiModel.orderIdsForFilter(filterId: Str
     else -> orderIds
 }.let(::cleanSupplierDispatchOrderIds)
 
+private fun SupplierOrderDataModel.supplierDispatchPromiseUrgency(
+    nowEpochMillis: Long,
+    dueSoonWindowMillis: Long = SUPPLIER_PROMISE_WATCH_WINDOW_MILLIS,
+): SupplierPromiseUrgency {
+    if (status.isSupplierOrderClosed()) return SupplierPromiseUrgency.LATER
+    val promisedAt = supplierDueAtMillis() ?: return SupplierPromiseUrgency.UNSCHEDULED
+    val safeWindow = dueSoonWindowMillis.coerceAtLeast(0L)
+    return when {
+        promisedAt < nowEpochMillis -> SupplierPromiseUrgency.OVERDUE
+        promisedAt <= nowEpochMillis + safeWindow -> SupplierPromiseUrgency.DUE_SOON
+        else -> SupplierPromiseUrgency.LATER
+    }
+}
+
+/**
+ * Time-sensitive dispatch filters operate on the orders inside a Store run, not merely on the
+ * run's earliest date. This keeps the result counter honest when one run contains a late order and
+ * several later commitments. Server-only provisional runs fall back to their earliest promise until
+ * the detailed order payload arrives.
+ */
+internal fun SupplierDispatchWorkspaceRunUiModel.orderIdsForFilter(
+    filterId: String,
+    nowEpochMillis: Long,
+): List<String> = when (normalizedSupplierDispatchFilter(filterId)) {
+    SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE,
+    SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE -> {
+        val requiredUrgency = if (filterId == SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE) {
+            SupplierPromiseUrgency.OVERDUE
+        } else {
+            SupplierPromiseUrgency.DUE_SOON
+        }
+        val detailedMatches = bundles
+            .asSequence()
+            .map { it.order }
+            .filter { it.supplierDispatchPromiseUrgency(nowEpochMillis) == requiredUrgency }
+            .map { it.id }
+            .toList()
+
+        if (bundles.isNotEmpty()) {
+            detailedMatches
+        } else {
+            val provisionalUrgency = when {
+                earliestDueAtMillis == null -> SupplierPromiseUrgency.UNSCHEDULED
+                earliestDueAtMillis < nowEpochMillis -> SupplierPromiseUrgency.OVERDUE
+                earliestDueAtMillis <= nowEpochMillis + SUPPLIER_PROMISE_WATCH_WINDOW_MILLIS ->
+                    SupplierPromiseUrgency.DUE_SOON
+                else -> SupplierPromiseUrgency.LATER
+            }
+            orderIds.takeIf { provisionalUrgency == requiredUrgency }.orEmpty()
+        }
+    }
+
+    else -> orderIdsForFilter(filterId)
+}.let(::cleanSupplierDispatchOrderIds)
+
 internal fun SupplierDispatchWorkspaceRunUiModel.matchesSupplierDispatchFilter(filterId: String): Boolean =
     orderIdsForFilter(filterId).isNotEmpty()
+
+internal fun SupplierDispatchWorkspaceRunUiModel.matchesSupplierDispatchFilter(
+    filterId: String,
+    nowEpochMillis: Long,
+): Boolean = orderIdsForFilter(filterId, nowEpochMillis).isNotEmpty()
 
 internal fun List<SupplierDispatchWorkspaceRunUiModel>.distinctOrderCountForSupplierDispatchFilter(
     filterId: String
 ): Int = flatMap { run -> run.orderIdsForFilter(filterId) }
+    .map { it.lowercase() }
+    .distinct()
+    .size
+
+internal fun List<SupplierDispatchWorkspaceRunUiModel>.distinctOrderCountForSupplierDispatchFilter(
+    filterId: String,
+    nowEpochMillis: Long,
+): Int = flatMap { run -> run.orderIdsForFilter(filterId, nowEpochMillis) }
     .map { it.lowercase() }
     .distinct()
     .size
@@ -136,7 +206,9 @@ internal fun normalizedSupplierDispatchFilter(filterId: String): String = when (
     SUPPLIER_DISPATCH_FILTER_READY_TO_DISPATCH,
     SUPPLIER_DISPATCH_FILTER_IN_DELIVERY,
     SUPPLIER_DISPATCH_FILTER_ATTENTION,
-    SUPPLIER_DISPATCH_FILTER_CONTRACTS -> filterId
+    SUPPLIER_DISPATCH_FILTER_CONTRACTS,
+    SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE,
+    SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE -> filterId
     else -> SUPPLIER_DISPATCH_FILTER_ALL
 }
 

@@ -1175,6 +1175,70 @@ class ComposeAppCommonTest {
     }
 
     @Test
+    fun supplierDispatchPromiseFiltersCountOnlyOrdersInTheMatchingUrgencyLane() {
+        val now = 1_000_000L
+        fun bundle(id: String, dueAtMillis: Long?) = SupplierOrderWithLinesDataModel(
+            order = SupplierOrderDataModel(
+                id = id,
+                supplierId = "supplier",
+                storeId = "store",
+                status = SupplierOrderStatusDataModel.Confirmed,
+                confirmedDeliveryTimeMillis = dueAtMillis,
+                isActive = true,
+            ),
+            lines = emptyList(),
+        )
+
+        val run = SupplierDispatchWorkspaceRunUiModel(
+            key = "mixed-promises",
+            orderIds = listOf("late", "soon", "later"),
+            bundles = listOf(
+                bundle("late", now - 1L),
+                bundle("soon", now + 1_000L),
+                bundle("later", now + SUPPLIER_PROMISE_WATCH_WINDOW_MILLIS + 1L),
+            ),
+            earliestDueAtMillis = now - 1L,
+        )
+
+        assertEquals(
+            listOf("late"),
+            run.orderIdsForFilter(SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE, now),
+        )
+        assertEquals(
+            listOf("soon"),
+            run.orderIdsForFilter(SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE, now),
+        )
+        assertEquals(
+            1,
+            listOf(run).distinctOrderCountForSupplierDispatchFilter(
+                SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE,
+                now,
+            ),
+        )
+        assertTrue(run.matchesSupplierDispatchFilter(SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE, now))
+    }
+
+    @Test
+    fun supplierDispatchPromiseFilterUsesServerRunDueDateUntilOrdersLoad() {
+        val now = 2_000_000L
+        val provisional = SupplierDispatchWorkspaceRunUiModel(
+            key = "server-only",
+            orderIds = listOf("server-order"),
+            bundles = emptyList(),
+            earliestDueAtMillis = now - 5_000L,
+            serverPlanned = true,
+        )
+
+        assertEquals(
+            listOf("server-order"),
+            provisional.orderIdsForFilter(SUPPLIER_DISPATCH_FILTER_OVERDUE_PROMISE, now),
+        )
+        assertFalse(
+            provisional.matchesSupplierDispatchFilter(SUPPLIER_DISPATCH_FILTER_DUE_SOON_PROMISE, now),
+        )
+    }
+
+    @Test
     fun supplierDispatchLoadedOrdersOverrideStaleServerRunMembership() {
         val claimed = listOf("order-open", "order-closed", "order-missing")
 

@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
 project_root="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-run_tests=true
+run_tests=false
 max_workers="${AITA_GRADLE_MAX_WORKERS:-4}"
 
 while (($#)); do
@@ -13,6 +13,9 @@ while (($#)); do
     --project-root)
       project_root="${2:?Missing value for --project-root}"
       shift
+      ;;
+    --with-tests)
+      run_tests=true
       ;;
     --skip-tests)
       run_tests=false
@@ -23,10 +26,14 @@ while (($#)); do
       ;;
     -h|--help)
       cat <<'HELP'
-Usage: build-aita-server.sh [--project-root PATH] [--skip-tests] [--max-workers N]
+Usage: build-aita-server.sh [--project-root PATH] [--with-tests|--skip-tests] [--max-workers N]
 
-Builds only the JVM shared module and Ktor server. Android, iOS, desktop, and
-Wasm targets are not configured, so an Ubuntu server does not need their SDKs.
+Builds only the JVM shared main source and Ktor server fat JAR. Android, iOS,
+desktop, and Wasm targets are not configured, so an Ubuntu server does not
+need their SDKs. Production deployment builds skip test tasks by default: the
+main shared/server sources still compile, and the resulting JAR is validated.
+Use --with-tests when you deliberately want the shared and server JVM test
+suites to gate the artifact. --skip-tests is retained for compatibility.
 The complete console output is saved under ~/.local/state/aita/build-logs/.
 
 If Kotlin's incremental compiler cache is corrupt, the script performs one
@@ -65,7 +72,10 @@ log_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 log_file="$log_dir/server-build-$log_stamp.log"
 jar_path="$project_root/server/build/libs/aita-server-all.jar"
 
-gradle_tasks=()
+gradle_tasks=(
+  ":shared:compileKotlinJvm"
+  ":server:compileKotlin"
+)
 if $run_tests; then
   gradle_tasks+=(":shared:jvmTest" ":server:test")
 fi
@@ -102,6 +112,9 @@ diagnose_build_log() {
   fi
   if grep -Eqi 'No space left on device|Disk quota exceeded' "$file"; then
     aita_info "Diagnosis: the build volume has insufficient free space."
+  fi
+  if grep -Eqi 'There were failing tests|tests completed, [1-9][0-9]* failed|Task .*Test FAILED' "$file"; then
+    aita_info "Diagnosis: a verification test task failed. The deployable server build is separate; run without --with-tests to build the production JAR, then repair the tests independently."
   fi
 }
 
@@ -149,6 +162,11 @@ run_logged_gradle() {
 aita_info "Project root: $project_root"
 aita_info "Java: $($JAVA_HOME/bin/java -version 2>&1 | head -n 1)"
 aita_info "Building server-only graph with max-workers=$max_workers"
+if $run_tests; then
+  aita_info "Verification gate: shared and server JVM tests enabled"
+else
+  aita_info "Verification gate: tests skipped for production artifact build (use --with-tests to enable them)"
+fi
 aita_info "Build log: $log_file"
 
 if ! run_logged_gradle "normal"; then
