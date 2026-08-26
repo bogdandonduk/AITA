@@ -1,6 +1,5 @@
 package kz.aita.server.payments
 
-import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec

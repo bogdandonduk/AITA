@@ -5049,8 +5049,8 @@ private suspend fun emitSupplierContractsAndAwait(
     state: DataState.Success<List<SupplierPartnershipContractDataModel>>
 ) {
     supplierPartnershipContractsState.emit(state)
-    // MutableDataStateFlow applies emissions on its own coroutine. Keep the contract operation lock
-    // until the exact list is visible so a queued read/mutation cannot rebuild from stale state.
+    // Publication is synchronous. Retain this explicit visibility barrier at the operation boundary
+    // so a future state implementation change cannot quietly release the lock before the list is visible.
     supplierPartnershipContractsState.payload.first { current -> current == state.payload }
 }
 
@@ -5091,8 +5091,8 @@ private suspend fun emitSupplierGoodsPricesAndAwait(
     state: DataState.Success<List<SupplierGoodsPriceDataModel>>
 ) {
     supplierGoodsPricesState.emit(state)
-    // MutableDataStateFlow applies emissions on its own coroutine. Wait until the payload is visible
-    // before releasing the operation mutex; otherwise a queued operation could lose the prior save.
+    // Publication is synchronous. Keep the explicit payload barrier before releasing the operation
+    // mutex so a future state implementation change cannot let a queued operation lose the prior save.
     supplierGoodsPricesState.payload.first { current -> current == state.payload }
 }
 
@@ -6104,8 +6104,8 @@ private suspend fun emitSupplierOrderSnapshotAndAwait(
 ) {
     supplierOrdersState.emit(DataState.Success(orders, message))
     supplierOrderLinesState.emit(DataState.Success(lines, message))
-    // MutableDataStateFlow applies emissions on its own coroutine. Keep the operation lock until
-    // both matching payloads are visible so a queued read or mutation cannot rebuild from stale data.
+    // Publication is synchronous. Keep the two explicit visibility barriers at the operation
+    // boundary so a future state implementation change cannot expose a half-updated order snapshot.
     supplierOrdersState.payload.first { current -> current == orders }
     supplierOrderLinesState.payload.first { current -> current == lines }
 }
@@ -19408,7 +19408,7 @@ fun <From, To> DataState<From>.map(
 }
 
 class MutableDataStateFlowNonNull<T>(
-    private val coroutineScope: CoroutineScope,
+    @Suppress("UNUSED_PARAMETER") coroutineScope: CoroutineScope,
     initial: T
 ): DataStateFlowNonNull<T> {
 
@@ -19417,19 +19417,20 @@ class MutableDataStateFlowNonNull<T>(
     private val _payload = MutableStateFlow(initial)
     override val payload = _payload.asStateFlow()
 
-    init {
-        coroutineScope.launch(Dispatchers.ourIo) {
-            _state.collect {
-                if (it is DataState.Success)
-                    _payload.emit(it.payload)
-            }
-        }
-    }
-
+    /**
+     * Publishes the state and its payload in the caller's operation order.
+     *
+     * The previous implementation launched a new coroutine for every write and a second collector
+     * coroutine to mirror successful payloads. Two rapid writes could therefore become visible in
+     * the opposite order, and a write could disappear entirely when the construction scope had
+     * already been cancelled. MutableStateFlow is thread-safe, so these tiny synchronous assignments
+     * preserve sequential caller order and remove an unnecessary dependency on scope lifetime.
+     */
     fun emit(newValue: DataState<T>) {
-        coroutineScope.launch(Dispatchers.ourIo) {
-            _state.emit(newValue)
+        if (newValue is DataState.Success) {
+            _payload.value = newValue.payload
         }
+        _state.value = newValue
     }
 
     fun asDataStateFlow(): DataStateFlowNonNull<T> {
@@ -19457,7 +19458,7 @@ interface DataStateFlowNonNull<T> {
 }
 
 class MutableDataStateFlow<T>(
-    private val coroutineScope: CoroutineScope,
+    @Suppress("UNUSED_PARAMETER") coroutineScope: CoroutineScope,
     initial: T? = null
 ): DataStateFlow<T> {
 
@@ -19466,21 +19467,17 @@ class MutableDataStateFlow<T>(
     private val _payload = MutableStateFlow(initial)
     override val payload = _payload.asStateFlow()
 
-    init {
-        coroutineScope.launch(Dispatchers.ourIo) {
-            _state.collect {
-                if (it is DataState.Success)
-                    _payload.emit(it.payload)
-                else
-                    _payload.emit(null)
-            }
-        }
-    }
-
+    /**
+     * Publishes the nullable payload before the matching state in one synchronous call. Observers
+     * that react to the DataState can therefore already read its matching payload, and sequential
+     * writes cannot be reordered by independently scheduled fire-and-forget coroutines.
+     */
     fun emit(newValue: DataState<T>) {
-        coroutineScope.launch(Dispatchers.ourIo) {
-            _state.emit(newValue)
+        _payload.value = when (newValue) {
+            is DataState.Success -> newValue.payload
+            is DataState.Empty -> null
         }
+        _state.value = newValue
     }
 
     fun asDataStateFlow(): DataStateFlow<T> {

@@ -1,7 +1,7 @@
 package kz.aita.server.payments
 
 import com.auth0.jwt.interfaces.Claim
-import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.jwt.*
 import java.sql.Connection
 
 internal object PaymentStoreAccess {

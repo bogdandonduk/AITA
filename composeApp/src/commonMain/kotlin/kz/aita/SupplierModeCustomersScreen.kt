@@ -113,6 +113,9 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
     val focusedContracts = remember(contracts, focusedSupplierId) {
         contracts?.supplierContractsForIdentity(focusedSupplierId)
     }
+    // Partner attention includes overdue open orders. Re-evaluate it while this screen remains open
+    // instead of freezing the value at the last order/dashboard recomposition.
+    val supplierLiveNow = rememberSupplierLiveNow { getCurrentTimeMillis() }
 
     val relationshipDataPending = orders == null &&
             supplierPrices == null &&
@@ -127,14 +130,16 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
         supplierDashboard,
         stateValues.suppliers,
         stateValues.stores,
-        stateValues.appLanguage
+        stateValues.appLanguage,
+        supplierLiveNow
     ) {
         buildSupplierPartnerItems(
             orders = focusedOrders,
             lines = focusedLines,
             supplierPrices = focusedPrices,
             contracts = focusedContracts,
-            dashboard = supplierDashboard
+            dashboard = supplierDashboard,
+            nowMillis = supplierLiveNow
         )
     }
 

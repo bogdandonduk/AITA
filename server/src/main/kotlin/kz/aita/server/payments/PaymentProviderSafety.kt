@@ -5,7 +5,7 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URI
 import java.security.MessageDigest
-import java.util.Locale
+import java.util.*
 
 internal data class ProviderEndpointValidation(
     val accepted: Boolean,

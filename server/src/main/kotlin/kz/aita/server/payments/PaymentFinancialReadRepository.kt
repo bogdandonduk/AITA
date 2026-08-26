@@ -1,8 +1,8 @@
 package kz.aita.server.payments
 
-import java.sql.Connection
 import kz.aita.payments.management.PaymentBalanceDto
 import kz.aita.payments.management.PaymentTopUpInvoiceDto
+import java.sql.Connection
 
 internal object PaymentFinancialReadRepository {
     fun balance(connection: Connection, storeId: String): PaymentBalanceDto {

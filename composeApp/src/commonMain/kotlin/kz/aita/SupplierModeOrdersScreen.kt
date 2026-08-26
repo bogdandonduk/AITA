@@ -94,25 +94,45 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
         supplierPrices.orEmpty().supplierPricesForIdentity(focusedSupplierId)
     }
     val activeOrdersById = remember(activeOrders) { activeOrders.associateBy { it.id } }
-    val linesByOrder = remember(lines, activeOrdersById) {
-        lines.orEmpty()
-            .filter { line -> line.isActive && line.orderId in activeOrdersById }
-            .groupBy { it.orderId }
+    val activeLines = remember(lines, activeOrdersById) {
+        lines.orEmpty().filter { line -> line.isActive && line.orderId in activeOrdersById }
     }
+    val linesByOrder = remember(activeLines) { activeLines.groupBy { it.orderId } }
     val substituteOptionsByStore = remember(lines, activeOrdersById, stateValues.appLanguage) {
         lines.orEmpty()
             .filter { line -> line.isActive && line.orderId in activeOrdersById }
             .groupBy { line -> activeOrdersById[line.orderId]?.storeId.orEmpty() }
             .mapValues { (_, storeLines) -> buildSupplierSubstituteOptions(storeLines) }
     }
-    val supplierDashboardNow = supplierDashboard?.generatedAtMillis?.takeIf { it > 0L } ?: getCurrentTimeMillis()
+    // A dashboard timestamp records when the server snapshot was generated; it is not a clock.
+    // Keep due filters and the promise board moving while AITA stays open across a date boundary.
+    val supplierLiveNow = rememberSupplierLiveNow { getCurrentTimeMillis() }
+    val deliveryPromiseBuckets = remember(
+        activeOrders,
+        activeLines,
+        supplierDashboard?.deliveryBuckets,
+        supplierLiveNow,
+        orders,
+        lines
+    ) {
+        if (orders != null && lines != null) {
+            buildSupplierOrderPromiseBuckets(
+                orders = activeOrders,
+                lines = activeLines,
+                nowMillis = supplierLiveNow,
+                serverBuckets = supplierDashboard?.deliveryBuckets.orEmpty()
+            )
+        } else {
+            supplierDashboard?.deliveryBuckets.orEmpty()
+        }
+    }
     val filteredOrders = remember(
         activeOrders,
         linesByOrder,
         searchQuery,
         statusFilter,
         dueFilter,
-        supplierDashboardNow,
+        supplierLiveNow,
         stateValues.appLanguage
     ) {
         val normalizedSearch = searchQuery.trim().lowercase()
@@ -131,30 +151,60 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                 "ready_to_pack" -> order.isSupplierReadyToPackForSupplierDesk(orderLines)
                 else -> order.status.name == statusFilter
             }
-            val dueMatches = order.matchesSupplierDueFilter(dueFilter, supplierDashboardNow)
+            val dueMatches = order.matchesSupplierDueFilter(dueFilter, supplierLiveNow)
             val queryMatches = normalizedSearch.isBlank() ||
                     supplierDeskOrderSearchText(order, orderLines).contains(normalizedSearch)
             statusMatches && dueMatches && queryMatches
         }
     }
+    val prioritizedFilteredOrders = remember(filteredOrders, supplierLiveNow) {
+        buildSupplierPromiseWatch(
+            values = filteredOrders,
+            nowEpochMillis = supplierLiveNow,
+            promisedAt = { it.supplierDueAtMillis() },
+            isTerminal = { it.status.isSupplierOrderClosed() },
+            stableKey = { it.id },
+        ).prioritized
+    }
 
     val profileTitle = identityPresentation.title
     val profileSubtitle = identityPresentation.subtitle
     val hasSupplierProfile = identityPresentation.profileCount > 0
+    val orderDataPending = orders == null
+    val detailedLinesLoaded = lines != null
 
-    val openCount = activeOrders.count { !it.status.isSupplierOrderClosed() }
-    val attentionCount = activeOrders.count { order ->
-        val orderLines = linesByOrder[order.id].orEmpty()
-        supplierOrderNeedsAttentionInInbox(
-            status = order.status,
-            hasResponseGaps = SupplierOrderWithLinesDataModel(order, orderLines)
-                .hasSupplierResponseGapsForSupplierDesk()
-        )
+    // Use the focused dashboard as a provisional summary until the matching detailed payload lands.
+    // This avoids a row of misleading zeroes during refresh while still switching to line-aware local
+    // calculations as soon as the authoritative order snapshot is complete.
+    val openCount = if (orders != null) {
+        activeOrders.count { !it.status.isSupplierOrderClosed() }
+    } else {
+        supplierDashboard?.openOrderCount ?: 0
     }
-    val readyToPackCount = activeOrders.count { order ->
-        order.isSupplierReadyToPackForSupplierDesk(linesByOrder[order.id].orEmpty())
+    val attentionCount = if (orders != null && detailedLinesLoaded) {
+        activeOrders.count { order ->
+            val orderLines = linesByOrder[order.id].orEmpty()
+            supplierOrderNeedsAttentionInInbox(
+                status = order.status,
+                hasResponseGaps = SupplierOrderWithLinesDataModel(order, orderLines)
+                    .hasSupplierResponseGapsForSupplierDesk()
+            )
+        }
+    } else {
+        supplierDashboard?.actionRequiredOrderCount ?: 0
     }
-    val inDeliveryCount = activeOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery }
+    val readyToPackCount = if (orders != null && detailedLinesLoaded) {
+        activeOrders.count { order ->
+            order.isSupplierReadyToPackForSupplierDesk(linesByOrder[order.id].orEmpty())
+        }
+    } else {
+        supplierDashboard?.bulkPackableOrderIds?.size ?: 0
+    }
+    val inDeliveryCount = if (orders != null) {
+        activeOrders.count { it.status == SupplierOrderStatusDataModel.InDelivery }
+    } else {
+        supplierDashboard?.inDeliveryOrderCount ?: 0
+    }
 
     val metrics = listOf(
         SupplierOrdersMetricUiModel(
@@ -275,6 +325,21 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                     SupplierOrdersWorkflowLinks()
                 }
 
+                if (deliveryPromiseBuckets.isNotEmpty()) {
+                    item(key = "supplier-order-promise-radar") {
+                        SupplierDeliveryPromiseRadarCard(
+                            buckets = deliveryPromiseBuckets,
+                            selectedBucketId = dueFilter,
+                            onBucketSelected = { bucketId ->
+                                dueFilter = bucketId.ifBlank { "all" }
+                                if (dueFilter != "all") statusFilter = "open"
+                                searchQuery = ""
+                                expandedOrderId = null
+                            }
+                        )
+                    }
+                }
+
                 item {
                     SupplierOrdersFilterPanel(
                         searchQuery = searchQuery,
@@ -300,8 +365,15 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                     )
                 }
 
-                if (activeOrders.isEmpty()) {
-                    item {
+                if (orderDataPending) {
+                    item(key = "supplier-orders-loading") {
+                        MessageText(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = localizedStringResource(1141, "Please wait…")
+                        )
+                    }
+                } else if (activeOrders.isEmpty()) {
+                    item(key = "supplier-orders-empty") {
                         MessageText(
                             modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(1379, "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.")
@@ -366,7 +438,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                         )
                     }
                 } else {
-                    items(filteredOrders, key = { it.id }) { order ->
+                    items(prioritizedFilteredOrders, key = { it.id }) { order ->
                         SupplierOrdersCompactCard(
                             order = order,
                             lines = linesByOrder[order.id].orEmpty(),

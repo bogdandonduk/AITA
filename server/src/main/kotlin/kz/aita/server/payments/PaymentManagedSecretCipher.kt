@@ -1,14 +1,12 @@
 package kz.aita.server.payments
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.security.SecureRandom
-import java.util.Base64
+import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 @Serializable
 private data class ManagedSecretEnvelope(
