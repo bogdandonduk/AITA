@@ -5647,13 +5647,7 @@ internal fun AppConfiguration.SupplierReadinessBoardCard(
     onOpenAnswerGaps: () -> Unit,
     onOpenPackQueue: () -> Unit
 ) {
-    val hasAnySignal = readiness.openOrderCount > 0 ||
-            readiness.priceBookCoveredLineCount > 0 ||
-            readiness.answerNeededOrderCount > 0 ||
-            readiness.readyToPackOrderCount > 0 ||
-            readiness.responseLineCount > 0 ||
-            readiness.acceptedQuantityTotal > 0.0
-    if (!hasAnySignal) return
+    if (!readiness.hasSupplierReadinessSignal()) return
 
     val gapCount = readiness.missingAcceptedQuantityLineCount + readiness.missingOfferedPriceLineCount
     val responseFilledText = if (readiness.responseLineCount > 0) {

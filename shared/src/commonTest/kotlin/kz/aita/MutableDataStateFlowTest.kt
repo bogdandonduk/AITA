@@ -1,8 +1,13 @@
 package kz.aita
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -26,6 +31,24 @@ class MutableDataStateFlowTest {
 
         assertNull(state.payloadValue)
         assertTrue(state.value.value is DataState.Empty<*>)
+    }
+
+    @Test
+    fun concurrentWritesKeepNullableEnvelopeAndPayloadOnTheSameAtomicSnapshot() = runTest {
+        val state = MutableDataStateFlow<Int>(this)
+
+        coroutineScope {
+            (0 until 24).map { writer ->
+                async(Dispatchers.Default) {
+                    repeat(150) { step ->
+                        state.emit(DataState.Success(writer * 1_000 + step))
+                    }
+                }
+            }.awaitAll()
+        }
+
+        val envelope = assertIs<DataState.Success<Int>>(state.value.value)
+        assertEquals(envelope.payload, state.payloadValue)
     }
 
     @Test

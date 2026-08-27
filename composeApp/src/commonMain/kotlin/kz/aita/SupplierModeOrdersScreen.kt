@@ -205,6 +205,9 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
     } else {
         supplierDashboard?.inDeliveryOrderCount ?: 0
     }
+    val supplierReadiness = supplierDashboard?.readiness?.takeIf {
+        it.hasSupplierReadinessSignal()
+    }
 
     val metrics = listOf(
         SupplierOrdersMetricUiModel(
@@ -319,6 +322,26 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                             expandedOrderId = null
                         }
                     )
+                }
+
+                supplierReadiness?.let { readiness ->
+                    item(key = "supplier-order-readiness-board") {
+                        SupplierReadinessBoardCard(
+                            readiness = readiness,
+                            onOpenAnswerGaps = {
+                                statusFilter = "answer_gaps"
+                                dueFilter = "all"
+                                searchQuery = ""
+                                expandedOrderId = null
+                            },
+                            onOpenPackQueue = {
+                                statusFilter = "ready_to_pack"
+                                dueFilter = "all"
+                                searchQuery = ""
+                                expandedOrderId = null
+                            }
+                        )
+                    }
                 }
 
                 item {

@@ -48,6 +48,14 @@ internal data class SupplierOrdersQuickFilterUiModel(
     val title: String
 )
 
+internal fun SupplierDashboardReadinessDataModel.hasSupplierReadinessSignal(): Boolean =
+    openOrderCount > 0 ||
+            priceBookCoveredLineCount > 0 ||
+            answerNeededOrderCount > 0 ||
+            readyToPackOrderCount > 0 ||
+            responseLineCount > 0 ||
+            acceptedQuantityTotal > 0.0
+
 @Composable
 internal fun AppConfiguration.SupplierOrdersWorkspaceHeader(
     profileTitle: String,
