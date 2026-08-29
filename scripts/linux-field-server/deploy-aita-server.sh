@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
+aita_require_command curl
 aita_require_command flock
 aita_require_command sha256sum
 aita_require_command unzip
@@ -44,6 +45,23 @@ fi
 
 current_jar=/opt/aita/app/aita-server-all.jar
 previous_jar=/opt/aita/app/aita-server-all.previous.jar
+stage=""
+
+cleanup_staged_jar() {
+  if [[ -n "$stage" ]]; then
+    "${sudo_cmd[@]}" rm -f -- "$stage" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_staged_jar EXIT
+
+show_service_failure() {
+  "${sudo_cmd[@]}" systemctl --no-pager --full status aita-server.service || true
+  "${sudo_cmd[@]}" journalctl -u aita-server.service -n 160 --no-pager || true
+  if "${sudo_cmd[@]}" test -f "$previous_jar"; then
+    aita_info "Previous JAR is preserved at $previous_jar"
+    aita_info "Manual rollback command: bash $SCRIPT_DIR/deploy-aita-server.sh --rollback"
+  fi
+}
 
 verify_server_jar() {
   local jar="${1:?Server JAR path is required}"
@@ -67,7 +85,10 @@ if $rollback; then
   "${sudo_cmd[@]}" systemctl stop aita-server.service
   "${sudo_cmd[@]}" cp -a "$current_jar" "${current_jar}.failed.$(date -u +%Y%m%dT%H%M%SZ)" 2>/dev/null || true
   "${sudo_cmd[@]}" install -o aita -g aita -m 0640 "$previous_jar" "$current_jar"
-  "${sudo_cmd[@]}" systemctl start aita-server.service
+  if ! "${sudo_cmd[@]}" systemctl start aita-server.service; then
+    show_service_failure
+    aita_die "AITA failed to start after rollback"
+  fi
 else
   if $build; then
     build_args=(--project-root "$project_root")
@@ -97,9 +118,13 @@ else
     "${sudo_cmd[@]}" cp -a "$current_jar" "$previous_jar"
   fi
   "${sudo_cmd[@]}" mv -f "$stage" "$current_jar"
+  stage=""
   "${sudo_cmd[@]}" chown aita:aita "$current_jar"
   "${sudo_cmd[@]}" chmod 0640 "$current_jar"
-  "${sudo_cmd[@]}" systemctl start aita-server.service
+  if ! "${sudo_cmd[@]}" systemctl start aita-server.service; then
+    show_service_failure
+    aita_die "AITA systemd service failed to start"
+  fi
 fi
 
 for _ in $(seq 1 60); do
@@ -111,6 +136,5 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 
-"${sudo_cmd[@]}" systemctl --no-pager --full status aita-server.service || true
-"${sudo_cmd[@]}" journalctl -u aita-server.service -n 120 --no-pager || true
-aita_die "AITA did not become ready within 120 seconds; no automatic rollback was attempted"
+show_service_failure
+aita_die "AITA did not become ready within 120 seconds; no automatic rollback was attempted because Flyway schema changes may make a blind JAR rollback unsafe"

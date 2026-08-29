@@ -3418,7 +3418,13 @@ internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreen
     }
 }
 
-internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean = false
+/**
+ * App-mode switching is intentionally kept implemented but hidden from the public Menu for the
+ * current release. Keeping the gate here also prevents restored navigation or indirect callers
+ * from reopening the selector until the feature is deliberately enabled again.
+ */
+internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
+    this == NavigationScreenModel.Menu.AppMode && !APP_MODE_SELECTION_PUBLICLY_ENABLED
 
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
     val restoredCurrent = orEmpty()

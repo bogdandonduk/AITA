@@ -4,6 +4,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
+AITA_SERVER_BUILD_SCRIPT_VERSION="2026-08-27-main-only-v3"
+
 project_root="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 run_tests=false
 max_workers="${AITA_GRADLE_MAX_WORKERS:-4}"
@@ -159,6 +161,7 @@ run_logged_gradle() {
   return "$gradle_status"
 }
 
+aita_info "Build script profile: $AITA_SERVER_BUILD_SCRIPT_VERSION"
 aita_info "Project root: $project_root"
 aita_info "Java: $($JAVA_HOME/bin/java -version 2>&1 | head -n 1)"
 aita_info "Building server-only graph with max-workers=$max_workers"

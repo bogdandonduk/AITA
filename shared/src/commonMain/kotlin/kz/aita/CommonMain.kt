@@ -7119,11 +7119,22 @@ const val APP_MODE_BUYER = 1
 const val APP_MODE_SUPPLIER = 2
 const val APP_MODE_MANUFACTURER = 3
 
-private fun normalizeAppModePreference(modeId: Int?): Int = when (modeId) {
-    APP_MODE_BUYER -> APP_MODE_BUYER
-    APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
-    APP_MODE_MANUFACTURER -> APP_MODE_MANUFACTURER
-    else -> APP_MODE_STORE
+/**
+ * The non-Store workspaces remain implemented in source, but mode selection is deliberately
+ * disabled in the public release until those workspaces are reopened for users. Keeping the gate
+ * in shared state prevents a previously persisted Supplier/Buyer/Manufacturer mode from trapping
+ * a user in a workspace whose selector is hidden from the Menu.
+ */
+const val APP_MODE_SELECTION_PUBLICLY_ENABLED = false
+
+private fun normalizeAppModePreference(modeId: Int?): Int {
+    if (!APP_MODE_SELECTION_PUBLICLY_ENABLED) return APP_MODE_STORE
+    return when (modeId) {
+        APP_MODE_BUYER -> APP_MODE_BUYER
+        APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
+        APP_MODE_MANUFACTURER -> APP_MODE_MANUFACTURER
+        else -> APP_MODE_STORE
+    }
 }
 
 val appModeState = MutableStateFlow(APP_MODE_STORE)
@@ -19381,30 +19392,80 @@ fun <From, To> DataState<From>.map(
     }
 }
 
+private data class AitaDataStateSnapshot<T>(
+    val state: DataState<T>,
+    val payload: T?
+)
+
+private data class AitaNonNullDataStateSnapshot<T>(
+    val state: DataState<T>,
+    val payload: T
+)
+
+private inline fun <T> MutableStateFlow<T>.aitaAtomicUpdate(transform: (T) -> T) {
+    while (true) {
+        val current = value
+        val next = transform(current)
+        if (compareAndSet(current, next)) return
+    }
+}
+
+/**
+ * A read-only StateFlow projection backed by one authoritative snapshot flow.
+ *
+ * AITA exposes both a DataState envelope and a convenient payload flow. Keeping those as two
+ * independently mutable StateFlows allows concurrent writers to interleave their assignments and
+ * leave a final impossible pair (for example, Success(A) beside payload B). This projection lets
+ * both public views read and collect from the same atomic MutableStateFlow snapshot instead.
+ */
+@OptIn(InternalCoroutinesApi::class)
+private class AitaMappedStateFlow<Source, Value>(
+    private val source: StateFlow<Source>,
+    private val transform: (Source) -> Value
+) : StateFlow<Value> {
+    override val value: Value
+        get() = transform(source.value)
+
+    override val replayCache: List<Value>
+        get() = listOf(value)
+
+    override suspend fun collect(collector: FlowCollector<Value>): Nothing {
+        source
+            .map(transform)
+            .distinctUntilChanged()
+            .collect(collector)
+        error("AITA StateFlow projection completed unexpectedly")
+    }
+}
+
 class MutableDataStateFlowNonNull<T>(
     @Suppress("UNUSED_PARAMETER") coroutineScope: CoroutineScope,
     initial: T
 ): DataStateFlowNonNull<T> {
 
-    private val _state = MutableStateFlow<DataState<T>>(DataState.Success(initial))
-    override val value = _state.asStateFlow()
-    private val _payload = MutableStateFlow(initial)
-    override val payload = _payload.asStateFlow()
+    private val snapshot = MutableStateFlow(
+        AitaNonNullDataStateSnapshot<T>(
+            state = DataState.Success(initial),
+            payload = initial
+        )
+    )
+    override val value: StateFlow<DataState<T>> = AitaMappedStateFlow(snapshot) { it.state }
+    override val payload: StateFlow<T> = AitaMappedStateFlow(snapshot) { it.payload }
 
     /**
-     * Publishes the state and its payload in the caller's operation order.
-     *
-     * The previous implementation launched a new coroutine for every write and a second collector
-     * coroutine to mirror successful payloads. Two rapid writes could therefore become visible in
-     * the opposite order, and a write could disappear entirely when the construction scope had
-     * already been cancelled. MutableStateFlow is thread-safe, so these tiny synchronous assignments
-     * preserve sequential caller order and remove an unnecessary dependency on scope lifetime.
+     * Atomically publishes the envelope together with its matching last successful payload.
+     * Empty is still allowed to change the envelope without erasing the non-null payload contract.
      */
     fun emit(newValue: DataState<T>) {
-        if (newValue is DataState.Success) {
-            _payload.value = newValue.payload
+        snapshot.aitaAtomicUpdate { current ->
+            AitaNonNullDataStateSnapshot(
+                state = newValue,
+                payload = when (newValue) {
+                    is DataState.Success -> newValue.payload
+                    is DataState.Empty -> current.payload
+                }
+            )
         }
-        _state.value = newValue
     }
 
     fun asDataStateFlow(): DataStateFlowNonNull<T> {
@@ -19436,22 +19497,29 @@ class MutableDataStateFlow<T>(
     initial: T? = null
 ): DataStateFlow<T> {
 
-    private val _state = MutableStateFlow<DataState<T>>(initial?.run { DataState.Success(initial) } ?: DataState.Empty())
-    override val value = _state.asStateFlow()
-    private val _payload = MutableStateFlow(initial)
-    override val payload = _payload.asStateFlow()
+    private val snapshot = MutableStateFlow(
+        AitaDataStateSnapshot<T>(
+            state = initial?.let { DataState.Success(it) } ?: DataState.Empty(),
+            payload = initial
+        )
+    )
+    override val value: StateFlow<DataState<T>> = AitaMappedStateFlow(snapshot) { it.state }
+    override val payload: StateFlow<T?> = AitaMappedStateFlow(snapshot) { it.payload }
 
     /**
-     * Publishes the nullable payload before the matching state in one synchronous call. Observers
-     * that react to the DataState can therefore already read its matching payload, and sequential
-     * writes cannot be reordered by independently scheduled fire-and-forget coroutines.
+     * Atomically publishes one nullable payload/envelope snapshot. Concurrent reads and writes can
+     * no longer leave the two public views permanently describing different operations.
      */
     fun emit(newValue: DataState<T>) {
-        _payload.value = when (newValue) {
-            is DataState.Success -> newValue.payload
-            is DataState.Empty -> null
+        snapshot.aitaAtomicUpdate {
+            AitaDataStateSnapshot(
+                state = newValue,
+                payload = when (newValue) {
+                    is DataState.Success -> newValue.payload
+                    is DataState.Empty -> null
+                }
+            )
         }
-        _state.value = newValue
     }
 
     fun asDataStateFlow(): DataStateFlow<T> {

@@ -73,8 +73,15 @@ class ComposeAppCommonTest {
     }
 
     @Test
-    fun appModeMenuDestinationIsVisibleAgain() {
-        assertFalse(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+    fun appModeMenuDestinationIsHiddenAndCannotBeRestoredForThisRelease() {
+        assertFalse(APP_MODE_SELECTION_PUBLICLY_ENABLED)
+        assertTrue(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+        assertEquals(
+            NavigationScreenModel.Menu.UserAccount,
+            listOf(NavigationScreenModel.Menu.AppMode.route)
+                .toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount)
+                .single()
+        )
     }
 
     @Test

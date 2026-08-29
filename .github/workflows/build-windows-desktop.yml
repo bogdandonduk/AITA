@@ -2,6 +2,11 @@ name: Build AITA for Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Numeric release version (MAJOR.MINOR.PATCH)
+        required: true
+        default: "1.0.0"
   push:
     tags:
       - "v*"
@@ -9,11 +14,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: aita-windows-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-windows-desktop:
-    name: Build Windows MSI and EXE
-    runs-on: windows-latest
-    timeout-minutes: 60
+    name: Build Windows portable, MSI and EXE
+    runs-on: windows-2022
+    timeout-minutes: 75
 
     steps:
       - name: Check out repository
@@ -28,22 +37,136 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Resolve release version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          AITA_REF_TYPE: ${{ github.ref_type }}
+          AITA_REF_NAME: ${{ github.ref_name }}
+        run: |
+          $version = "$env:INPUT_VERSION".Trim()
+          if ($env:AITA_REF_TYPE -eq "tag") {
+            $version = $env:AITA_REF_NAME -replace '^v', ''
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version must use numeric MAJOR.MINOR.PATCH form, for example 1.0.0. Received: $version"
+          }
+          "AITA_RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "AITA Windows release version: $version"
+
+      - name: Put WiX Toolset 3 on PATH
+        shell: pwsh
+        run: |
+          $preferred = "${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin"
+          if (Test-Path "$preferred\candle.exe") {
+            $wix = $preferred
+          } else {
+            $candle = Get-ChildItem "${env:ProgramFiles(x86)}" -Filter candle.exe -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match 'WiX Toolset v3\.' } |
+              Select-Object -First 1
+            if (-not $candle) {
+              throw "WiX Toolset 3 was not found on the GitHub Windows runner."
+            }
+            $wix = $candle.Directory.FullName
+          }
+          $wix | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "WiX path: $wix"
+          & "$wix\candle.exe" -?
+          & "$wix\light.exe" -?
+
+      - name: Prepare jpackage temporary directory
+        shell: pwsh
+        run: |
+          $temp = Join-Path $env:RUNNER_TEMP "aita-jpackage"
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+          "TEMP=$temp" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TMP=$temp" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "jpackage TEMP/TMP: $temp"
+
       - name: Build AITA Windows packages
         shell: pwsh
-        run: >-
-          .\gradlew.bat
-          :composeApp:packageMsi
-          :composeApp:packageExe
-          --no-daemon
-          --no-configuration-cache
-          --stacktrace
+        run: |
+          .\gradlew.bat `
+            :composeApp:compileKotlinJvm `
+            :composeApp:createDistributable `
+            :composeApp:packageMsi `
+            :composeApp:packageExe `
+            "-Paita.release.version=$env:AITA_RELEASE_VERSION" `
+            --no-daemon `
+            --no-configuration-cache `
+            --stacktrace
 
-      - name: Upload Windows installers
+      - name: Collect Windows release artifacts
+        shell: pwsh
+        run: |
+          $releaseDir = "composeApp/build/release/windows"
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
+          $msi = Get-ChildItem "composeApp/build/compose/binaries/main/msi" -Filter *.msi -File -Recurse
+          $exe = Get-ChildItem "composeApp/build/compose/binaries/main/exe" -Filter *.exe -File -Recurse
+          if (-not $msi) { throw "Compose did not produce an MSI installer." }
+          if (-not $exe) { throw "Compose did not produce an EXE installer." }
+          $msi | Copy-Item -Destination $releaseDir
+          $exe | Copy-Item -Destination $releaseDir
+
+          $appRoot = "composeApp/build/compose/binaries/main/app"
+          $appDir = Get-ChildItem $appRoot -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $appDir) { throw "Compose did not produce a portable application image under $appRoot." }
+          $portable = Join-Path $releaseDir "AITA-$env:AITA_RELEASE_VERSION-windows-x64-portable.zip"
+          Compress-Archive -Path (Join-Path $appDir.FullName '*') -DestinationPath $portable -Force
+
+      - name: Optionally sign Windows installers
+        shell: pwsh
+        env:
+          AITA_WINDOWS_PFX_BASE64: ${{ secrets.AITA_WINDOWS_PFX_BASE64 }}
+          AITA_WINDOWS_PFX_PASSWORD: ${{ secrets.AITA_WINDOWS_PFX_PASSWORD }}
+        run: |
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:AITA_WINDOWS_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:AITA_WINDOWS_PFX_PASSWORD)
+          if (-not $hasCertificate -and -not $hasPassword) {
+            Write-Warning "Windows signing secrets are not configured; installers will be unsigned."
+            exit 0
+          }
+          if (-not $hasCertificate -or -not $hasPassword) {
+            throw "Configure both AITA_WINDOWS_PFX_BASE64 and AITA_WINDOWS_PFX_PASSWORD, or neither."
+          }
+
+          $pfx = Join-Path $env:RUNNER_TEMP "aita-windows-signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:AITA_WINDOWS_PFX_BASE64))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe was not found." }
+
+          Get-ChildItem `
+            "composeApp/build/release/windows/*.msi", `
+            "composeApp/build/release/windows/*.exe" `
+            -File | ForEach-Object {
+            & $signtool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $pfx /p $env:AITA_WINDOWS_PFX_PASSWORD $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $($_.FullName)" }
+            & $signtool.FullName verify /pa /v $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $($_.FullName)" }
+          }
+          Remove-Item $pfx -Force
+
+      - name: Create SHA-256 checksums
+        shell: pwsh
+        run: |
+          $releaseDir = "composeApp/build/release/windows"
+          Get-ChildItem $releaseDir -File |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            } |
+            Set-Content (Join-Path $releaseDir "SHA256SUMS.txt") -Encoding ascii
+          Get-Content (Join-Path $releaseDir "SHA256SUMS.txt")
+
+      - name: Upload Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: AITA-Windows-${{ github.ref_name }}-${{ github.run_number }}
+          name: AITA-Windows-${{ env.AITA_RELEASE_VERSION }}-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 30
-          path: |
-            composeApp/build/compose/binaries/main/msi/*.msi
-            composeApp/build/compose/binaries/main/exe/*.exe
+          path: composeApp/build/release/windows/*

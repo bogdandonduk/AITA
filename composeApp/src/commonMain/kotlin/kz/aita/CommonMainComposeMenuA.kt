@@ -5248,7 +5248,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return when (model) {
-        NavigationScreenModel.Menu.AppMode -> true
+        NavigationScreenModel.Menu.AppMode -> !model.isTemporarilyHiddenFromUi()
         NavigationScreenModel.Menu.TransactionHistory -> activeOwnerFallback || currentUserCanViewTransactionHistory(activeStoreId)
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
@@ -5936,8 +5936,10 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
-            item(key = "app-mode-quick-switch") {
-                AppModeQuickSwitchMenuTile()
+            if (!NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi()) {
+                item(key = "app-mode-quick-switch") {
+                    AppModeQuickSwitchMenuTile()
+                }
             }
 
             items(
