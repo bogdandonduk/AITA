@@ -3186,11 +3186,13 @@ sealed class NavigationScreenModel(
         }
         data object Security: Menu("MenuSecurityNavigationScreenModelRoute") {
             override val iconPath: String
-                get() = AppConfiguration.stateValues.drawablePathIconPassword
+                get() = AppConfiguration.stateValues.drawablePathIconSecurity
             override val name: String
-                get() = with(AppConfiguration) { localizedStringResource(209, "Security") }
+                get() = with(AppConfiguration) {
+                    authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік")
+                }
             override val iconRes: DrawableResource
-                get() = AppConfiguration.stateValues.drawableResIconPassword.value
+                get() = AppConfiguration.stateValues.drawableResIconSecurity.value
         }
         data object Support: Menu("MenuSupportNavigationScreenModelRoute") {
             override val iconPath: String
@@ -6239,6 +6241,7 @@ object Navigation {
 
         val listScreens = listOf(
             NavigationScreenModel.Menu.UserAccount,
+            NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Notifications,
             NavigationScreenModel.Menu.AppMode,
             NavigationScreenModel.Menu.Finances,
@@ -6251,7 +6254,6 @@ object Navigation {
             NavigationScreenModel.Menu.Suppliers,
             NavigationScreenModel.Menu.Debtors,
             NavigationScreenModel.Menu.Devices,
-            NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Support,
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,

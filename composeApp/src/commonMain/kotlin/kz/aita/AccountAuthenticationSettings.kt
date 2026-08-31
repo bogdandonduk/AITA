@@ -1,29 +1,38 @@
 package kz.aita
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kz.aita.auth.*
+import org.jetbrains.compose.resources.DrawableResource
 
 private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, RECOVERY_CODES, PHONE }
 
 @Composable
-internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
-    var expanded by remember { mutableStateOf(false) }
+internal fun AppConfiguration.AccountAuthenticationSettingsCard(
+    initiallyExpanded: Boolean = false,
+    collapsible: Boolean = true,
+) {
+    var expanded by remember(initiallyExpanded) { mutableStateOf(initiallyExpanded) }
     var loading by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf<AitaAuthenticationSettingsDataModel?>(null) }
+    var capabilities by remember { mutableStateOf<AitaAuthCapabilitiesDataModel?>(null) }
+    var capabilitiesError by remember { mutableStateOf("") }
     var editor by remember { mutableStateOf(AccountAuthEditor.NONE) }
     var setup by remember { mutableStateOf<AitaTotpSetupDataModel?>(null) }
     var setupCode by remember { mutableStateOf("") }
@@ -36,8 +45,10 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
     var recoveryCodes by remember { mutableStateOf<List<String>>(emptyList()) }
     var error by remember { mutableStateOf("") }
     var info by remember { mutableStateOf("") }
+    val screenScope = rememberCoroutineScope()
 
     fun clearSensitive() {
+        setup = null
         setupCode = ""
         currentPassword = ""
         secondFactor = ""
@@ -48,27 +59,94 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
         info = ""
     }
 
+    fun beginAction() {
+        loading = true
+        error = ""
+        info = ""
+    }
+
+    fun launchSecurityAction(action: suspend () -> Unit) {
+        if (loading) return
+        beginAction()
+        screenScope.launch {
+            try {
+                action()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = authUiText(
+                    "AITA could not complete this security request. Check your connection and try again.",
+                    "AITA не удалось выполнить запрос безопасности. Проверьте соединение и повторите попытку.",
+                    "AITA қауіпсіздік сұрауын орындай алмады. Байланысты тексеріп, қайталап көріңіз."
+                )
+            } finally {
+                loading = false
+            }
+        }
+    }
+
     fun load() {
         if (loading) return
-        coroutineScope.launch {
-            loading = true
-            val response = AitaAdvancedAuthenticationClient.settings()
-            response.payload?.let {
-                settings = it
-                phoneAlias = it.phoneLoginAlias.orEmpty()
-            } ?: run { error = authResponseText(response) }
-            loading = false
+        loading = true
+        error = ""
+        capabilitiesError = ""
+        screenScope.launch {
+            try {
+                val capabilitiesResponse = AitaAdvancedAuthenticationClient.capabilities()
+                capabilitiesResponse.payload?.let {
+                    capabilities = it
+                } ?: run {
+                    if (capabilities == null) capabilitiesError = authResponseText(capabilitiesResponse)
+                }
+                val settingsResponse = AitaAdvancedAuthenticationClient.settings()
+                settingsResponse.payload?.let {
+                    settings = it
+                    phoneAlias = it.phoneLoginAlias.orEmpty()
+                } ?: run { error = authResponseText(settingsResponse) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = authUiText(
+                    "AITA could not load your security settings. Check your connection and try again.",
+                    "AITA не удалось загрузить настройки безопасности. Проверьте соединение и повторите попытку.",
+                    "AITA қауіпсіздік баптауларын жүктей алмады. Байланысты тексеріп, қайталап көріңіз."
+                )
+            } finally {
+                loading = false
+            }
         }
     }
 
     LaunchedEffect(expanded) { if (expanded && settings == null) load() }
 
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextFieldGroup),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    val authAvailability = resolveAitaAuthUiAvailability(capabilities, loading && capabilities == null)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                CpImage(
+                    modifier = Modifier.size(stateValues.iconSize),
+                    url = stateValues.drawablePathIconSecurity,
+                    fallbackRes = stateValues.drawableResIconSecurity.value,
+                    contentDescription = authUiText("Sign-in and security", "Вход и безопасность", "Кіру және қауіпсіздік"),
+                    tintColor = stateValues.AccentColor
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = authUiText("Sign-in and two-factor authentication", "Вход и двухфакторная аутентификация", "Кіру және екі факторлы аутентификация"),
@@ -86,8 +164,10 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                         fontSize = stateValues.smallTextSize
                     )
                 }
-                TextButton(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; clearSensitive() } }) {
-                    Text(if (expanded) authUiText("Close", "Закрыть", "Жабу") else authUiText("Manage", "Управлять", "Басқару"))
+                if (collapsible) {
+                    TextButton(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; clearSensitive() } }) {
+                        Text(if (expanded) authUiText("Close", "Закрыть", "Жабу") else authUiText("Manage", "Управлять", "Басқару"))
+                    }
                 }
             }
 
@@ -119,6 +199,12 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                         }
                     }
 
+                    AuthMethodAvailabilityPanel(
+                        availability = authAvailability,
+                        settings = settings,
+                        lookupError = capabilitiesError
+                    )
+
                     if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     if (info.isNotBlank()) Text(info, color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
 
@@ -131,7 +217,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                 } else {
                                     authUiText("Enable authenticator", "Включить аутентификатор", "Аутентификаторды қосу")
                                 },
-                                enabled = !loading && settings != null
+                                iconPath = stateValues.drawablePathIconSecurity,
+                                enabled = !loading &&
+                                    settings != null &&
+                                    authAvailability.authenticator == AitaAuthFeatureAvailability.AVAILABLE,
+                                onDisabledClick = {
+                                    if (authAvailability.authenticator != AitaAuthFeatureAvailability.AVAILABLE) {
+                                        info = authUiText(
+                                            "Authenticator protection is not enabled on this server yet.",
+                                            "Защита аутентификатором пока не включена на этом сервере.",
+                                            "Аутентификатор қорғанысы бұл серверде әзірге қосылмаған."
+                                        )
+                                    }
+                                }
                             ) {
                                 clearSensitive()
                                 if (settings?.authenticatorEnabled == true) {
@@ -144,13 +242,34 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
                                     text = authUiText("Generate new recovery codes", "Создать новые резервные коды", "Жаңа қалпына келтіру кодтарын жасау"),
-                                    enabled = !loading
+                                    iconPath = stateValues.drawablePathIconPassword,
+                                    enabled = !loading &&
+                                        authAvailability.authenticator == AitaAuthFeatureAvailability.AVAILABLE,
+                                    onDisabledClick = {
+                                        info = authUiText(
+                                            "Recovery codes are managed together with authenticator protection.",
+                                            "Резервные коды управляются вместе с защитой аутентификатором.",
+                                            "Қалпына келтіру кодтары аутентификатор қорғанысымен бірге басқарылады."
+                                        )
+                                    }
                                 ) { clearSensitive(); editor = AccountAuthEditor.RECOVERY_CODES }
                             }
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = authUiText("Manage phone login alias", "Управлять номером для входа", "Кіру телефон нөмірін басқару"),
-                                enabled = !loading
+                                iconPath = stateValues.drawablePathIconPhone,
+                                enabled = !loading &&
+                                    settings != null &&
+                                    authAvailability.phoneLoginAlias == AitaAuthFeatureAvailability.AVAILABLE,
+                                onDisabledClick = {
+                                    if (authAvailability.phoneLoginAlias != AitaAuthFeatureAvailability.AVAILABLE) {
+                                        info = authUiText(
+                                            "Phone login aliases become available when secure email confirmation is enabled on the server.",
+                                            "Номер для входа станет доступен после включения защищённого подтверждения по email на сервере.",
+                                            "Кіру телефон нөмірі серверде қауіпсіз email растауы қосылғанда қолжетімді болады."
+                                        )
+                                    }
+                                }
                             ) { clearSensitive(); phoneAlias = settings?.phoneLoginAlias.orEmpty(); editor = AccountAuthEditor.PHONE }
                             TextButton(onClick = ::load, enabled = !loading) { Text(authUiText("Refresh security settings", "Обновить настройки безопасности", "Қауіпсіздік баптауларын жаңарту")) }
                         }
@@ -183,8 +302,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                     (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()),
                                 loading = loading
                             ) {
-                                loading = true
-                                coroutineScope.launch {
+                                launchSecurityAction {
                                     val response = AitaAdvancedAuthenticationClient.startTotpSetup(
                                         AitaSensitiveSecurityActionRequestDataModel(currentPassword, secondFactor)
                                     )
@@ -194,7 +312,6 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                         secondFactor = ""
                                         editor = AccountAuthEditor.TOTP_SETUP
                                     } ?: run { error = authResponseText(response) }
-                                    loading = false
                                 }
                             }
                             TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) {
@@ -214,22 +331,80 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                 fontSize = stateValues.smallTextSize
                             )
                             data?.let {
-                                SelectionContainer {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                                        .background(stateValues.AccentColor.copy(alpha = 0.05f))
+                                        .border(
+                                            stateValues.unfocusedBorderWidth,
+                                            stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
+                                            RoundedCornerShape(stateValues.cornerRadius)
+                                        )
+                                        .padding(stateValues.marginTextFieldGroup),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        SelectionContainer(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = it.secret,
+                                                color = stateValues.TextColor,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                        ClipboardCopyButton(
+                                            textToCopy = it.secret,
+                                            contentDescription = authUiText(
+                                                "Copy manual setup key",
+                                                "Скопировать ключ ручной настройки",
+                                                "Қолмен баптау кілтін көшіру"
+                                            )
+                                        )
+                                    }
                                     Text(
-                                        text = it.secret,
-                                        color = stateValues.TextColor,
-                                        fontWeight = FontWeight.Bold,
+                                        text = authUiText(
+                                            "Manual setup key. Keep it private.",
+                                            "Ключ ручной настройки. Не сообщайте его никому.",
+                                            "Қолмен баптау кілті. Оны ешкімге бермеңіз."
+                                        ),
+                                        color = stateValues.PlaceholderTextColor,
+                                        fontSize = stateValues.smallTextSize,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.fillMaxWidth()
                                     )
+                                    if (it.otpauthUri.isNotBlank()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = authUiText(
+                                                    "Authenticator setup link",
+                                                    "Ссылка настройки аутентификатора",
+                                                    "Аутентификаторды баптау сілтемесі"
+                                                ),
+                                                color = stateValues.PlaceholderTextColor,
+                                                fontSize = stateValues.smallTextSize,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            ClipboardCopyButton(
+                                                textToCopy = it.otpauthUri,
+                                                contentDescription = authUiText(
+                                                    "Copy authenticator setup link",
+                                                    "Скопировать ссылку настройки аутентификатора",
+                                                    "Аутентификаторды баптау сілтемесін көшіру"
+                                                )
+                                            )
+                                        }
+                                    }
                                 }
-                                Text(
-                                    text = authUiText("Manual setup key. Keep it private.", "Ключ ручной настройки. Не сообщайте его никому.", "Қолмен баптау кілті. Оны ешкімге бермеңіз."),
-                                    color = stateValues.PlaceholderTextColor,
-                                    fontSize = stateValues.smallTextSize,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
                             }
                             aitaFormTextField(
                                 modifier = Modifier.fillMaxWidth(),
@@ -251,16 +426,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                 enabled = !loading && data != null && setupCode.length == 6,
                                 loading = loading
                             ) {
-                                loading = true
-                                coroutineScope.launch {
+                                launchSecurityAction {
                                     val response = AitaAdvancedAuthenticationClient.confirmTotpSetup(AitaTotpSetupConfirmRequestDataModel(data!!.setupId, setupCode))
                                     response.payload?.let {
                                         recoveryCodes = it.recoveryCodes
+                                        settings = settings?.copy(
+                                            authenticatorEnabled = true,
+                                            recoveryCodesRemaining = it.recoveryCodes.size
+                                        )
                                         info = authUiText("Authenticator enabled. Save the recovery codes now.", "Аутентификатор включён. Сохраните резервные коды сейчас.", "Аутентификатор қосылды. Қалпына келтіру кодтарын қазір сақтаңыз.")
                                         editor = AccountAuthEditor.NONE
-                                        load()
+                                        setup = null
+                                        setupCode = ""
                                     } ?: run { error = authResponseText(response) }
-                                    loading = false
                                 }
                             }
                             TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
@@ -284,27 +462,27 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                 loading = loading,
                                 enabledColor = if (editor == AccountAuthEditor.TOTP_DISABLE) stateValues.ErrorColor else stateValues.AccentColor
                             ) {
-                                loading = true
-                                coroutineScope.launch {
+                                launchSecurityAction {
                                     val request = AitaSensitiveSecurityActionRequestDataModel(currentPassword, secondFactor)
                                     if (editor == AccountAuthEditor.TOTP_DISABLE) {
                                         val response = AitaAdvancedAuthenticationClient.disableTotp(request)
                                         response.payload?.let {
+                                            clearSensitive()
                                             settings = it
                                             info = authUiText("Authenticator disabled", "Аутентификатор отключён", "Аутентификатор өшірілді")
                                             editor = AccountAuthEditor.NONE
-                                            clearSensitive()
                                         } ?: run { error = authResponseText(response) }
                                     } else {
                                         val response = AitaAdvancedAuthenticationClient.regenerateRecoveryCodes(request)
                                         response.payload?.let {
                                             recoveryCodes = it.recoveryCodes
+                                            settings = settings?.copy(recoveryCodesRemaining = it.recoveryCodes.size)
                                             info = authUiText("New recovery codes generated. The previous codes no longer work.", "Новые резервные коды созданы. Старые коды больше не работают.", "Жаңа қалпына келтіру кодтары жасалды. Ескі кодтар енді жұмыс істемейді.")
                                             editor = AccountAuthEditor.NONE
-                                            load()
+                                            currentPassword = ""
+                                            secondFactor = ""
                                         } ?: run { error = authResponseText(response) }
                                     }
-                                    loading = false
                                 }
                             }
                             TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
@@ -361,8 +539,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                         (phoneAction == AitaPhoneAliasAction.REMOVE || normalizeAitaPhoneAlias(phoneAlias) != null),
                                     loading = loading
                                 ) {
-                                    loading = true
-                                    coroutineScope.launch {
+                                    launchSecurityAction {
                                         val response = AitaAdvancedAuthenticationClient.requestPhoneAlias(
                                             AitaPhoneAliasRequestDataModel(phoneAction, phoneAlias, currentPassword, secondFactor, stateValues.appLanguage)
                                         )
@@ -370,7 +547,6 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                             ?: run { error = authResponseText(response) }
                                         currentPassword = ""
                                         secondFactor = ""
-                                        loading = false
                                     }
                                 }
                             } else {
@@ -394,17 +570,15 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                                     enabled = !loading && phoneCode.length == 6,
                                     loading = loading
                                 ) {
-                                    loading = true
-                                    coroutineScope.launch {
+                                    launchSecurityAction {
                                         val response = AitaAdvancedAuthenticationClient.confirmPhoneAlias(AitaPhoneAliasConfirmRequestDataModel(phoneFlowId, phoneCode))
                                         response.payload?.let {
+                                            clearSensitive()
                                             settings = it
                                             phoneAlias = it.phoneLoginAlias.orEmpty()
                                             info = authUiText("Phone login alias updated", "Номер для входа обновлён", "Кіру телефон нөмірі жаңартылды")
                                             editor = AccountAuthEditor.NONE
-                                            clearSensitive()
                                         } ?: run { error = authResponseText(response) }
-                                        loading = false
                                     }
                                 }
                             }
@@ -417,6 +591,206 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard() {
                     }
                 }
             }
+        }
+}
+
+@Composable
+private fun AppConfiguration.AuthMethodAvailabilityPanel(
+    availability: AitaAuthUiAvailability,
+    settings: AitaAuthenticationSettingsDataModel?,
+    lookupError: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.AccentColor.copy(alpha = 0.05f))
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                text = authUiText("Your ways to sign in", "Ваши способы входа", "Кіру тәсілдеріңіз"),
+                color = stateValues.TextColor,
+                fontSize = stateValues.accentTextSize,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = authUiText(
+                    "Code sign-in and password recovery are available from the login screen. Manage account-only methods here.",
+                    "Вход по коду и восстановление пароля доступны на экране входа. Здесь настраиваются способы, связанные с аккаунтом.",
+                    "Кодпен кіру және құпия сөзді қалпына келтіру кіру экранында қолжетімді. Аккаунтқа қатысты тәсілдерді осы жерден басқарыңыз."
+                ),
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+
+        AuthMethodAvailabilityRow(
+            title = authUiText("Password", "Пароль", "Құпия сөз"),
+            detail = authUiText(
+                "Use your email or phone login name with your password.",
+                "Используйте email или номер для входа вместе с паролем.",
+                "Email немесе кіру телефон нөмірін құпия сөзбен бірге пайдаланыңыз."
+            ),
+            availability = AitaAuthFeatureAvailability.AVAILABLE,
+            active = true,
+            activeLabel = authUiText("Ready", "Готов", "Дайын"),
+            iconPath = stateValues.drawablePathIconPassword,
+            iconRes = stateValues.drawableResIconPassword.value
+        )
+
+        AuthMethodAvailabilityRow(
+            title = authUiText("Email sign-in code", "Код для входа из письма", "Email арқылы кіру коды"),
+            detail = authUiText(
+                "A one-time code is sent to the verified email on the account.",
+                "Одноразовый код отправляется на подтверждённый email аккаунта.",
+                "Бір реттік код аккаунттың расталған email мекенжайына жіберіледі."
+            ),
+            availability = availability.emailCodeLogin,
+            iconPath = stateValues.drawablePathIconEmail,
+            iconRes = stateValues.drawableResIconEmail.value
+        )
+
+        AuthMethodAvailabilityRow(
+            title = authUiText("Password recovery", "Восстановление пароля", "Құпия сөзді қалпына келтіру"),
+            detail = authUiText(
+                "Restore access through a confirmation code sent to your verified email.",
+                "Восстановите доступ с помощью кода, отправленного на подтверждённый email.",
+                "Расталған email-ға жіберілген код арқылы қолжетімділікті қалпына келтіріңіз."
+            ),
+            availability = availability.passwordRecovery,
+            iconPath = stateValues.drawablePathIconPassword,
+            iconRes = stateValues.drawableResIconPassword.value
+        )
+
+        AuthMethodAvailabilityRow(
+            title = authUiText("Authenticator protection", "Защита аутентификатором", "Аутентификатор қорғанысы"),
+            detail = if (settings?.authenticatorEnabled == true) {
+                authUiText(
+                    "A current authenticator or recovery code is required after primary sign-in.",
+                    "После основного входа требуется действующий код аутентификатора или резервный код.",
+                    "Негізгі кіруден кейін ағымдағы аутентификатор немесе қалпына келтіру коды қажет."
+                )
+            } else {
+                authUiText(
+                    "Optional two-factor protection with any standard authenticator app.",
+                    "Дополнительная двухфакторная защита через любое стандартное приложение-аутентификатор.",
+                    "Кез келген стандартты аутентификатор қолданбасы арқылы қосымша екі факторлы қорғаныс."
+                )
+            },
+            availability = availability.authenticator,
+            active = settings?.authenticatorEnabled == true,
+            activeLabel = authUiText("On", "Включён", "Қосулы"),
+            iconPath = stateValues.drawablePathIconSecurity,
+            iconRes = stateValues.drawableResIconSecurity.value
+        )
+
+        AuthMethodAvailabilityRow(
+            title = authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі"),
+            detail = settings?.phoneLoginAlias?.takeIf { it.isNotBlank() }?.let { alias ->
+                authUiText(
+                    "Use $alias as an alternate login name. Confirmation changes go to email.",
+                    "Используйте $alias как дополнительный логин. Изменения подтверждаются по email.",
+                    "$alias нөмірін қосымша логин ретінде пайдаланыңыз. Өзгерістер email арқылы расталады."
+                )
+            } ?: authUiText(
+                "Add a phone number as an alternate login name; confirmation is sent by email, not SMS.",
+                "Добавьте номер как дополнительный логин; подтверждение приходит по email, а не по SMS.",
+                "Телефон нөмірін қосымша логин ретінде қосыңыз; растау SMS емес, email арқылы келеді."
+            ),
+            availability = availability.phoneLoginAlias,
+            active = settings?.phoneLoginAlias?.isNotBlank() == true,
+            activeLabel = authUiText("Set", "Настроен", "Бапталған"),
+            iconPath = stateValues.drawablePathIconPhone,
+            iconRes = stateValues.drawableResIconPhone.value
+        )
+
+        if (lookupError.isNotBlank()) {
+            Text(
+                text = lookupError,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppConfiguration.AuthMethodAvailabilityRow(
+    title: String,
+    detail: String,
+    availability: AitaAuthFeatureAvailability,
+    iconPath: String,
+    iconRes: DrawableResource,
+    active: Boolean = false,
+    activeLabel: String = authUiText("Enabled", "Включено", "Қосулы"),
+) {
+    val statusText = when {
+        active && availability == AitaAuthFeatureAvailability.AVAILABLE -> activeLabel
+        availability == AitaAuthFeatureAvailability.AVAILABLE -> authUiText("Available", "Доступно", "Қолжетімді")
+        availability == AitaAuthFeatureAvailability.CHECKING -> authUiText("Checking", "Проверяем", "Тексерілуде")
+        availability == AitaAuthFeatureAvailability.UNKNOWN -> authUiText("Check", "Проверить", "Тексеру")
+        else -> authUiText("Off", "Недоступно", "Өшірулі")
+    }
+    val statusColor = when {
+        availability == AitaAuthFeatureAvailability.AVAILABLE -> stateValues.AccentColor
+        availability == AitaAuthFeatureAvailability.UNAVAILABLE -> stateValues.ErrorColor
+        else -> stateValues.PlaceholderTextColor
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        CpImage(
+            modifier = Modifier.size(stateValues.iconSize),
+            url = iconPath,
+            fallbackRes = iconRes,
+            contentDescription = title,
+            tintColor = statusColor
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = detail,
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(stateValues.cornerRadius))
+                .background(statusColor.copy(alpha = 0.12f))
+                .border(
+                    stateValues.unfocusedBorderWidth,
+                    statusColor.copy(alpha = 0.55f),
+                    RoundedCornerShape(stateValues.cornerRadius)
+                )
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = statusText,
+                color = statusColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -469,8 +843,26 @@ private fun AppConfiguration.SensitiveAuthConfirmationFields(
 
 @Composable
 private fun AppConfiguration.RecoveryCodesPanel(codes: List<String>) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.AccentColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 authUiText("Save these recovery codes now", "Сохраните резервные коды сейчас", "Қалпына келтіру кодтарын қазір сақтаңыз"),
                 color = stateValues.TextColor,
@@ -481,9 +873,18 @@ private fun AppConfiguration.RecoveryCodesPanel(codes: List<String>) {
                 color = stateValues.PlaceholderTextColor,
                 fontSize = stateValues.smallTextSize
             )
-            SelectionContainer {
-                Text(codes.joinToString("\n"), color = stateValues.TextColor, fontWeight = FontWeight.SemiBold)
             }
+            ClipboardCopyButton(
+                textToCopy = codes.joinToString("\n"),
+                contentDescription = authUiText(
+                    "Copy all recovery codes",
+                    "Скопировать все резервные коды",
+                    "Барлық қалпына келтіру кодтарын көшіру"
+                )
+            )
+        }
+        SelectionContainer {
+            Text(codes.joinToString("\n"), color = stateValues.TextColor, fontWeight = FontWeight.SemiBold)
         }
     }
 }

@@ -2431,6 +2431,14 @@ fun AppConfiguration.MenuUserAccountScreen() {
             iconPath = stateValues.drawablePathIconUserAccount,
             trailingIcons = listOf(
                 Triple(
+                    stateValues.drawablePathIconSecurity,
+                    stateValues.drawableResIconSecurity.value
+                ) {
+                    coroutineScope.launch {
+                        Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
+                    }
+                },
+                Triple(
                     stateValues.drawablePathIconExit,
                     stateValues.drawableResIconExit.value
                 ) {
@@ -2465,12 +2473,35 @@ fun AppConfiguration.MenuUserAccountScreen() {
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.UserAccount),
             modifier = Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(0.5f)
-                .padding(vertical = 24.dp)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .padding(horizontal = stateValues.marginTextField, vertical = 24.dp)
         ) {
             item {
                 val outerSpace = 16.dp
                 val innerSpace = 8.dp
+
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
+                    subText = authUiText(
+                        "Email code, password recovery, authenticator, phone login and active sessions",
+                        "Код из письма, восстановление пароля, аутентификатор, вход по номеру и активные сессии",
+                        "Email коды, құпия сөзді қалпына келтіру, аутентификатор, телефонмен кіру және белсенді сессиялар"
+                    ),
+                    iconPath = stateValues.drawablePathIconSecurity,
+                    enabledColor = stateValues.BackgroundColor,
+                    textColor = stateValues.AccentColor,
+                    subTextColor = stateValues.PlaceholderTextColor,
+                    iconTintColor = stateValues.AccentColor,
+                    autoLoading = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(outerSpace))
 
                 stateValues.userAccount?.let { account ->
                     Row(
@@ -5266,10 +5297,10 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
 internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationScreenModel.Menu> = when (stateValues.appModeId) {
     APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
+        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
         NavigationScreenModel.Menu.Finances,
-        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
@@ -5277,10 +5308,10 @@ internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationS
     )
     APP_MODE_BUYER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
+        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
         NavigationScreenModel.Menu.Finances,
-        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
