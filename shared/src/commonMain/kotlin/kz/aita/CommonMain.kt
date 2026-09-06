@@ -504,22 +504,22 @@ fun getDebtors(
     onCompleted: ((DataState<List<DebtorDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getDebtorsMutex.withLock {
-                val response = networkRequest<List<DebtorDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getDebtorsPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getDebtorsMutex.withLock {
+            val response = networkRequest<List<DebtorDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getDebtorsPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    debtorsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                debtorsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun addDebtor(
@@ -528,29 +528,29 @@ fun addDebtor(
     onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            addDebtorMutex.withLock {
-                val response = networkRequest<DebtorDataModel, DebtorDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.addDebtorPath.first,
-                    headers = mapOf("store_id" to storeId),
-                    body = debtor
-                )
+        addDebtorMutex.withLock {
+            val response = networkRequest<DebtorDataModel, DebtorDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.addDebtorPath.first,
+                headers = mapOf("store_id" to storeId),
+                body = debtor
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    debtorsState.emit(
-                        DataState.Success(
-                            debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                debtorsState.emit(
+                    DataState.Success(
+                        debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+                        response.message
                     )
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun updateDebtor(
@@ -559,29 +559,29 @@ fun updateDebtor(
     onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateDebtorMutex.withLock {
-                val response = networkRequest<DebtorDataModel, DebtorDataModel>(
-                    method = HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateDebtorPath.first,
-                    headers = mapOf("store_id" to storeId),
-                    body = debtor
-                )
+        updateDebtorMutex.withLock {
+            val response = networkRequest<DebtorDataModel, DebtorDataModel>(
+                method = HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateDebtorPath.first,
+                headers = mapOf("store_id" to storeId),
+                body = debtor
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    debtorsState.emit(
-                        DataState.Success(
-                            debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                debtorsState.emit(
+                    DataState.Success(
+                        debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+                        response.message
                     )
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun deleteDebtor(
@@ -590,29 +590,29 @@ fun deleteDebtor(
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            deleteDebtorMutex.withLock {
-                val response = networkRequest<String, String>(
-                    method = HttpMethod.Delete,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteDebtorPath.first,
-                    headers = mapOf("store_id" to storeId),
-                    body = debtorId
-                )
+        deleteDebtorMutex.withLock {
+            val response = networkRequest<String, String>(
+                method = HttpMethod.Delete,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteDebtorPath.first,
+                headers = mapOf("store_id" to storeId),
+                body = debtorId
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    debtorsState.emit(
-                        DataState.Success(
-                            debtorsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                debtorsState.emit(
+                    DataState.Success(
+                        debtorsState.payloadValue.orEmpty().filterNot { it.id == response.payload },
+                        response.message
                     )
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun payDebtorDebt(
@@ -620,29 +620,29 @@ fun payDebtorDebt(
     onCompleted: ((DataState<DebtorDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            payDebtorDebtMutex.withLock {
-                val response = networkRequest<DebtorDataModel, DebtPaymentRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.payDebtorDebtPath.first,
-                    headers = mapOf("store_id" to request.storeId),
-                    body = request
-                )
+        payDebtorDebtMutex.withLock {
+            val response = networkRequest<DebtorDataModel, DebtPaymentRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.payDebtorDebtPath.first,
+                headers = mapOf("store_id" to request.storeId),
+                body = request
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    debtorsState.emit(
-                        DataState.Success(
-                            debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                debtorsState.emit(
+                    DataState.Success(
+                        debtorsState.payloadValue.orEmpty().upsertDebtor(response.payload),
+                        response.message
                     )
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 private val completeTransactionMutex = Mutex()
@@ -2584,11 +2584,11 @@ fun QuantityDataModel.isWeightQuantityUnit(): Boolean {
     return immutableUnitName.any { localized ->
         val value = localized.value.trim().lowercase()
         value == "kg" ||
-                value == "kg." ||
-                value == "кг" ||
-                value == "кг." ||
-                value.contains("kilogram") ||
-                value.contains("килограмм")
+            value == "kg." ||
+            value == "кг" ||
+            value == "кг." ||
+            value.contains("kilogram") ||
+            value.contains("килограмм")
     }
 }
 
@@ -2965,10 +2965,10 @@ fun GoodsItemDataModel.matchesEmbeddedWeightBarcode(
         val storedBarcode = barcode.toStoredGoodsItemBarcode().normalizedBarcodeToken()
 
         normalized in lookupCodes ||
-                storedBarcode == productBarcode ||
-                barcode.parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
-                    .any { it.productBarcode.normalizedBarcodeToken() == productBarcode } ||
-                (normalized.length in setOf(12, 13, 14) && normalized.startsWith(productBarcode))
+            storedBarcode == productBarcode ||
+            barcode.parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+                .any { it.productBarcode.normalizedBarcodeToken() == productBarcode } ||
+            (normalized.length in setOf(12, 13, 14) && normalized.startsWith(productBarcode))
     }
 }
 
@@ -3041,11 +3041,11 @@ fun List<StockPromotionDataModel>.sanitizedStockPromotions(): List<StockPromotio
     map { it.normalized() }
         .filter { promo ->
             promo.isActive ||
-                    promo.title.isNotEmpty() ||
-                    promo.note?.isNotBlank() == true ||
-                    promo.noteLocalized.any { it.value.isNotBlank() } ||
-                    promo.value.toMoneyDouble() > 0.0 ||
-                    promo.minQuantity != null
+                promo.title.isNotEmpty() ||
+                promo.note?.isNotBlank() == true ||
+                promo.noteLocalized.any { it.value.isNotBlank() } ||
+                promo.value.toMoneyDouble() > 0.0 ||
+                promo.minQuantity != null
         }
         .distinctBy { it.id }
 
@@ -3236,41 +3236,41 @@ fun addGoodsItemToTransactionCart(
 
 fun getTransactions(storeId: String) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getTransactionsMutex.withLock {
-                val response = networkRequest<List<TransactionDataModel>, Unit>(
-                    HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getTransactionsPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getTransactionsMutex.withLock {
+            val response = networkRequest<List<TransactionDataModel>, Unit>(
+                HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getTransactionsPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                } else {
-                    transactionsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
-                }
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+            } else {
+                transactionsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
             }
         }
+    }
 }
 
 fun getUserFinanceDashboard(
     onCompleted: ((DataState<UserFinanceDashboardDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getUserFinanceDashboardMutex.withLock {
-                val response = networkRequest<UserFinanceDashboardDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getUserFinanceDashboardPath.first
-                )
+        getUserFinanceDashboardMutex.withLock {
+            val response = networkRequest<UserFinanceDashboardDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getUserFinanceDashboardPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    applyUserFinanceDashboard(response.payload, response.message)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                applyUserFinanceDashboard(response.payload, response.message)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 private suspend fun applyUserFinanceDashboard(
@@ -3289,28 +3289,28 @@ fun createTopUpPayment(
     onCompleted: ((DataState<TopUpPaymentIntentDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            createTopUpPaymentMutex.withLock {
-                val response = networkRequest<TopUpPaymentIntentDataModel, TopUpCreateRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.createTopUpPaymentPath.first,
-                    body = request
-                )
+        createTopUpPaymentMutex.withLock {
+            val response = networkRequest<TopUpPaymentIntentDataModel, TopUpCreateRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.createTopUpPaymentPath.first,
+                body = request
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    paymentIntentsState.emit(
-                        DataState.Success(
-                            paymentIntentsState.payloadValue.orEmpty().upsertById(response.payload) { it.id },
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                paymentIntentsState.emit(
+                    DataState.Success(
+                        paymentIntentsState.payloadValue.orEmpty().upsertById(response.payload) { it.id },
+                        response.message
                     )
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun confirmDevelopmentTopUpPayment(
@@ -3318,44 +3318,44 @@ fun confirmDevelopmentTopUpPayment(
     onCompleted: ((DataState<UserFinanceDashboardDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            confirmDevelopmentTopUpMutex.withLock {
-                val response = networkRequest<UserFinanceDashboardDataModel, TopUpConfirmDevelopmentRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.confirmDevelopmentTopUpPath.first,
-                    body = TopUpConfirmDevelopmentRequestDataModel(paymentIntentId)
-                )
+        confirmDevelopmentTopUpMutex.withLock {
+            val response = networkRequest<UserFinanceDashboardDataModel, TopUpConfirmDevelopmentRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.confirmDevelopmentTopUpPath.first,
+                body = TopUpConfirmDevelopmentRequestDataModel(paymentIntentId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    applyUserFinanceDashboard(response.payload, response.message)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                applyUserFinanceDashboard(response.payload, response.message)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getSubscriptionPlans(
     onCompleted: ((DataState<List<StoreSubscriptionPlanDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getSubscriptionPlansMutex.withLock {
-                val response = networkRequest<List<StoreSubscriptionPlanDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSubscriptionPlansPath.first
-                )
+        getSubscriptionPlansMutex.withLock {
+            val response = networkRequest<List<StoreSubscriptionPlanDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getSubscriptionPlansPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    subscriptionPlansState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                subscriptionPlansState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getStoreSubscription(
@@ -3363,24 +3363,24 @@ fun getStoreSubscription(
     onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStoreSubscriptionMutex.withLock {
-                val response = networkRequest<SubscriptionDashboardDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getStoreSubscriptionMutex.withLock {
+            val response = networkRequest<SubscriptionDashboardDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
-                    activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
-                    subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
+                activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
+                subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun updateStoreSubscription(
@@ -3388,27 +3388,27 @@ fun updateStoreSubscription(
     onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateStoreSubscriptionMutex.withLock {
-                val response = networkRequest<SubscriptionDashboardDataModel, StoreSubscriptionUpdateRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateStoreSubscriptionPath.first,
-                    body = request,
-                    headers = mapOf("store_id" to request.storeId)
-                )
+        updateStoreSubscriptionMutex.withLock {
+            val response = networkRequest<SubscriptionDashboardDataModel, StoreSubscriptionUpdateRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateStoreSubscriptionPath.first,
+                body = request,
+                headers = mapOf("store_id" to request.storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
-                    activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
-                    subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
-                    getUserFinanceDashboard()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
+                activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
+                subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
+                getUserFinanceDashboard()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 private suspend fun applyCashRegisterStatePayload(
@@ -3433,22 +3433,22 @@ fun getCashRegister(
     onCompleted: ((DataState<StoreCashRegisterDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getCashRegisterMutex.withLock {
-                val response = networkRequest<CashRegisterStateDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getCashRegisterPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getCashRegisterMutex.withLock {
+            val response = networkRequest<CashRegisterStateDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getCashRegisterPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    applyCashRegisterStatePayload(response.payload, response.message)
-                    onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                applyCashRegisterStatePayload(response.payload, response.message)
+                onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
             }
         }
+    }
 }
 
 fun extractCashRegister(
@@ -3456,24 +3456,24 @@ fun extractCashRegister(
     onCompleted: ((DataState<StoreCashRegisterDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            extractCashRegisterMutex.withLock {
-                val response = networkRequest<CashRegisterStateDataModel, CashRegisterExtractionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.extractCashRegisterPath.first,
-                    body = request,
-                    headers = mapOf("store_id" to request.storeId)
-                )
+        extractCashRegisterMutex.withLock {
+            val response = networkRequest<CashRegisterStateDataModel, CashRegisterExtractionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.extractCashRegisterPath.first,
+                body = request,
+                headers = mapOf("store_id" to request.storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    applyCashRegisterStatePayload(response.payload, response.message)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                applyCashRegisterStatePayload(response.payload, response.message)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
             }
         }
+    }
 }
 
 fun getStoreWorkers(
@@ -3481,43 +3481,43 @@ fun getStoreWorkers(
     onCompleted: ((DataState<List<StoreWorkerDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStoreWorkersMutex.withLock {
-                val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkersPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getStoreWorkersMutex.withLock {
+            val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkersPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    storeWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                storeWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getMyWorkerMemberships(
     onCompleted: ((DataState<List<StoreWorkerDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getMyWorkerMembershipsMutex.withLock {
-                val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerMembershipsPath.first
-                )
+        getMyWorkerMembershipsMutex.withLock {
+            val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerMembershipsPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    myWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                myWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getIncomingWorkerRequests(
@@ -3525,43 +3525,43 @@ fun getIncomingWorkerRequests(
     onCompleted: ((DataState<List<StoreWorkerRequestDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getIncomingWorkerRequestsMutex.withLock {
-                val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getIncomingWorkerRequestsPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getIncomingWorkerRequestsMutex.withLock {
+            val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getIncomingWorkerRequestsPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    incomingWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                incomingWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getMyWorkerRequests(
     onCompleted: ((DataState<List<StoreWorkerRequestDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getMyWorkerRequestsMutex.withLock {
-                val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerRequestsPath.first
-                )
+        getMyWorkerRequestsMutex.withLock {
+            val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerRequestsPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    myWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                myWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getStoreWorkerRoleTemplates(
@@ -3575,22 +3575,22 @@ fun getStoreWorkerRoleTemplates(
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStoreWorkerRoleTemplatesMutex.withLock {
-                val response = networkRequest<List<StoreWorkerRoleTemplateDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkerRoleTemplatesPath.first,
-                    headers = mapOf("store_id" to cleanStoreId)
-                )
+        getStoreWorkerRoleTemplatesMutex.withLock {
+            val response = networkRequest<List<StoreWorkerRoleTemplateDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkerRoleTemplatesPath.first,
+                headers = mapOf("store_id" to cleanStoreId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    storeWorkerRoleTemplatesState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                storeWorkerRoleTemplatesState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun upsertStoreWorkerRoleTemplate(
@@ -3608,36 +3608,36 @@ fun upsertStoreWorkerRoleTemplate(
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            upsertStoreWorkerRoleTemplateMutex.withLock {
-                val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateUpsertRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.upsertStoreWorkerRoleTemplatePath.first,
-                    body = StoreWorkerRoleTemplateUpsertRequestDataModel(
-                        id = templateId.trim(),
-                        storeId = cleanStoreId,
-                        name = name,
-                        description = description,
-                        permissions = permissions
-                    ),
-                    headers = mapOf("store_id" to cleanStoreId)
-                )
+        upsertStoreWorkerRoleTemplateMutex.withLock {
+            val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateUpsertRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.upsertStoreWorkerRoleTemplatePath.first,
+                body = StoreWorkerRoleTemplateUpsertRequestDataModel(
+                    id = templateId.trim(),
+                    storeId = cleanStoreId,
+                    name = name,
+                    description = description,
+                    permissions = permissions
+                ),
+                headers = mapOf("store_id" to cleanStoreId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    storeWorkerRoleTemplatesState.emit(
-                        DataState.Success(
-                            storeWorkerRoleTemplatesState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                storeWorkerRoleTemplatesState.emit(
+                    DataState.Success(
+                        storeWorkerRoleTemplatesState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
-                    getStoreWorkerRoleTemplates(cleanStoreId)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                getStoreWorkerRoleTemplates(cleanStoreId)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun deleteStoreWorkerRoleTemplate(
@@ -3653,30 +3653,30 @@ fun deleteStoreWorkerRoleTemplate(
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            deleteStoreWorkerRoleTemplateMutex.withLock {
-                val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateDeleteRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteStoreWorkerRoleTemplatePath.first,
-                    body = StoreWorkerRoleTemplateDeleteRequestDataModel(templateId = cleanTemplateId),
-                    headers = mapOf("store_id" to cleanStoreId)
-                )
+        deleteStoreWorkerRoleTemplateMutex.withLock {
+            val response = networkRequest<StoreWorkerRoleTemplateDataModel, StoreWorkerRoleTemplateDeleteRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteStoreWorkerRoleTemplatePath.first,
+                body = StoreWorkerRoleTemplateDeleteRequestDataModel(templateId = cleanTemplateId),
+                headers = mapOf("store_id" to cleanStoreId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    storeWorkerRoleTemplatesState.emit(
-                        DataState.Success(
-                            storeWorkerRoleTemplatesState.payloadValue.orEmpty().filterNot { it.id == response.payload.id },
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                storeWorkerRoleTemplatesState.emit(
+                    DataState.Success(
+                        storeWorkerRoleTemplatesState.payloadValue.orEmpty().filterNot { it.id == response.payload.id },
+                        response.message
                     )
-                    getStoreWorkerRoleTemplates(cleanStoreId)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                getStoreWorkerRoleTemplates(cleanStoreId)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun requestStoreEmployment(
@@ -3685,34 +3685,34 @@ fun requestStoreEmployment(
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            requestStoreEmploymentMutex.withLock {
-                val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentRequestCreateDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.requestStoreEmploymentPath.first,
-                    body = WorkerEmploymentRequestCreateDataModel(
-                        storeId = storeId.trim(),
-                        note = cleanNote,
-                        noteLocalized = cleanNote.toLocalizedUserNote()
+        requestStoreEmploymentMutex.withLock {
+            val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentRequestCreateDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.requestStoreEmploymentPath.first,
+                body = WorkerEmploymentRequestCreateDataModel(
+                    storeId = storeId.trim(),
+                    note = cleanNote,
+                    noteLocalized = cleanNote.toLocalizedUserNote()
+                )
+            )
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                myWorkerRequestsState.emit(
+                    DataState.Success(
+                        myWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    myWorkerRequestsState.emit(
-                        DataState.Success(
-                            myWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
-                    )
-                    getNotifications()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                getNotifications()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun inviteStoreWorker(
@@ -3729,42 +3729,42 @@ fun inviteStoreWorker(
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            inviteStoreWorkerMutex.withLock {
-                val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInviteCreateDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.inviteStoreWorkerPath.first,
-                    body = WorkerStoreInviteCreateDataModel(
-                        userId = userId.trim(),
-                        roleId = roleId,
-                        permissions = permissions,
-                        jobTitle = jobTitle.trim(),
-                        jobTitleLocalized = jobTitleLocalized,
-                        salary = salary.trim(),
-                        salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
-                        note = cleanNote,
-                        workerPassword = workerPassword,
-                        noteLocalized = cleanNote.toLocalizedUserNote()
-                    ),
-                    headers = mapOf("store_id" to storeId)
-                )
+        inviteStoreWorkerMutex.withLock {
+            val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInviteCreateDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.inviteStoreWorkerPath.first,
+                body = WorkerStoreInviteCreateDataModel(
+                    userId = userId.trim(),
+                    roleId = roleId,
+                    permissions = permissions,
+                    jobTitle = jobTitle.trim(),
+                    jobTitleLocalized = jobTitleLocalized,
+                    salary = salary.trim(),
+                    salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
+                    note = cleanNote,
+                    workerPassword = workerPassword,
+                    noteLocalized = cleanNote.toLocalizedUserNote()
+                ),
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    incomingWorkerRequestsState.emit(
-                        DataState.Success(
-                            incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                incomingWorkerRequestsState.emit(
+                    DataState.Success(
+                        incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
-                    getNotifications()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                getNotifications()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun acceptMyStoreWorkerInvitation(
@@ -3773,37 +3773,37 @@ fun acceptMyStoreWorkerInvitation(
     onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            decideStoreEmploymentMutex.withLock {
-                val response = networkRequest<StoreWorkerDataModel, WorkerStoreInvitationDecisionDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreWorkerInvitationPath.first,
-                    body = WorkerStoreInvitationDecisionDataModel(
-                        requestId = requestId,
-                        note = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNote = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNoteLocalized = note.toLocalizedUserNote()
+        decideStoreEmploymentMutex.withLock {
+            val response = networkRequest<StoreWorkerDataModel, WorkerStoreInvitationDecisionDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreWorkerInvitationPath.first,
+                body = WorkerStoreInvitationDecisionDataModel(
+                    requestId = requestId,
+                    note = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNote = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNoteLocalized = note.toLocalizedUserNote()
+                )
+            )
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                myWorkerMembershipsState.emit(
+                    DataState.Success(
+                        myWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    myWorkerMembershipsState.emit(
-                        DataState.Success(
-                            myWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
-                    )
-                    getMyWorkerRequests()
-                    getMyWorkerMemberships()
-                    getNotifications()
-                    getStores()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                getMyWorkerRequests()
+                getMyWorkerMemberships()
+                getNotifications()
+                getStores()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun declineMyStoreWorkerInvitation(
@@ -3812,29 +3812,29 @@ fun declineMyStoreWorkerInvitation(
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            decideStoreEmploymentMutex.withLock {
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInvitationDecisionDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.declineStoreWorkerInvitationPath.first,
-                    body = WorkerStoreInvitationDecisionDataModel(
-                        requestId = requestId,
-                        note = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNote = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNoteLocalized = note.toLocalizedUserNote()
-                    )
+        decideStoreEmploymentMutex.withLock {
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerStoreInvitationDecisionDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.declineStoreWorkerInvitationPath.first,
+                body = WorkerStoreInvitationDecisionDataModel(
+                    requestId = requestId,
+                    note = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNote = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNoteLocalized = note.toLocalizedUserNote()
                 )
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    getMyWorkerRequests()
-                    getNotifications()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                getMyWorkerRequests()
+                getNotifications()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun acceptStoreEmploymentRequest(
@@ -3851,49 +3851,49 @@ fun acceptStoreEmploymentRequest(
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            decideStoreEmploymentMutex.withLock {
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreEmploymentPath.first,
-                    body = WorkerEmploymentDecisionRequestDataModel(
-                        requestId = requestId,
-                        roleId = roleId,
-                        permissions = permissions,
-                        jobTitle = jobTitle.trim(),
-                        jobTitleLocalized = jobTitleLocalized,
-                        salary = salary.trim(),
-                        salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
-                        note = note?.trim()?.takeIf { it.isNotBlank() },
-                        workerPassword = workerPassword,
-                        responseNote = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNoteLocalized = note.toLocalizedUserNote()
-                    ),
-                    headers = mapOf("store_id" to storeId)
-                )
+        decideStoreEmploymentMutex.withLock {
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.acceptStoreEmploymentPath.first,
+                body = WorkerEmploymentDecisionRequestDataModel(
+                    requestId = requestId,
+                    roleId = roleId,
+                    permissions = permissions,
+                    jobTitle = jobTitle.trim(),
+                    jobTitleLocalized = jobTitleLocalized,
+                    salary = salary.trim(),
+                    salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
+                    note = note?.trim()?.takeIf { it.isNotBlank() },
+                    workerPassword = workerPassword,
+                    responseNote = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNoteLocalized = note.toLocalizedUserNote()
+                ),
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    incomingWorkerRequestsState.emit(
-                        DataState.Success(
-                            incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                incomingWorkerRequestsState.emit(
+                    DataState.Success(
+                        incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
-                    val realStoreId = response.payload.storeId.ifBlank { storeId }
-                    val visibleStoreId = activeStoreIdState.value?.takeIf { it.isNotBlank() } ?: realStoreId
-                    getIncomingWorkerRequests(visibleStoreId)
-                    if (visibleStoreId != realStoreId) {
-                        getIncomingWorkerRequests(realStoreId)
-                    }
-                    getMyWorkerRequests()
-                    getNotifications()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                )
+                val realStoreId = response.payload.storeId.ifBlank { storeId }
+                val visibleStoreId = activeStoreIdState.value?.takeIf { it.isNotBlank() } ?: realStoreId
+                getIncomingWorkerRequests(visibleStoreId)
+                if (visibleStoreId != realStoreId) {
+                    getIncomingWorkerRequests(realStoreId)
                 }
+                getMyWorkerRequests()
+                getNotifications()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun declineStoreEmploymentRequest(
@@ -3903,39 +3903,39 @@ fun declineStoreEmploymentRequest(
     onCompleted: ((DataState<StoreWorkerRequestDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            decideStoreEmploymentMutex.withLock {
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.declineStoreEmploymentPath.first,
-                    body = WorkerEmploymentDecisionRequestDataModel(
-                        requestId = requestId,
-                        roleId = WORKER_ROLE_STANDARD,
-                        permissions = emptyList(),
-                        note = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNote = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNoteLocalized = note.toLocalizedUserNote()
-                    ),
-                    headers = mapOf("store_id" to storeId)
-                )
+        decideStoreEmploymentMutex.withLock {
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerEmploymentDecisionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.declineStoreEmploymentPath.first,
+                body = WorkerEmploymentDecisionRequestDataModel(
+                    requestId = requestId,
+                    roleId = WORKER_ROLE_STANDARD,
+                    permissions = emptyList(),
+                    note = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNote = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNoteLocalized = note.toLocalizedUserNote()
+                ),
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    val realStoreId = response.payload.storeId.ifBlank { storeId }
-                    val visibleStoreId = activeStoreIdState.value?.takeIf { it.isNotBlank() } ?: realStoreId
-                    getIncomingWorkerRequests(visibleStoreId)
-                    getStoreWorkers(visibleStoreId)
-                    if (visibleStoreId != realStoreId) {
-                        getIncomingWorkerRequests(realStoreId)
-                    }
-                    getMyWorkerRequests()
-                    getNotifications()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                val realStoreId = response.payload.storeId.ifBlank { storeId }
+                val visibleStoreId = activeStoreIdState.value?.takeIf { it.isNotBlank() } ?: realStoreId
+                getIncomingWorkerRequests(visibleStoreId)
+                getStoreWorkers(visibleStoreId)
+                if (visibleStoreId != realStoreId) {
+                    getIncomingWorkerRequests(realStoreId)
                 }
+                getMyWorkerRequests()
+                getNotifications()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun updateStoreWorkerPermissions(
@@ -3951,38 +3951,38 @@ fun updateStoreWorkerPermissions(
     onCompleted: ((DataState<StoreWorkerDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateStoreWorkerPermissionsMutex.withLock {
-                val response = networkRequest<StoreWorkerDataModel, WorkerPermissionsUpdateRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateStoreWorkerPermissionsPath.first,
-                    body = WorkerPermissionsUpdateRequestDataModel(
-                        workerId = workerId,
-                        roleId = roleId,
-                        permissions = permissions,
-                        jobTitle = jobTitle.trim(),
-                        jobTitleLocalized = jobTitleLocalized,
-                        salary = salary.trim(),
-                        salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
-                        workerPassword = workerPassword
-                    ),
-                    headers = mapOf("store_id" to storeId)
-                )
+        updateStoreWorkerPermissionsMutex.withLock {
+            val response = networkRequest<StoreWorkerDataModel, WorkerPermissionsUpdateRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateStoreWorkerPermissionsPath.first,
+                body = WorkerPermissionsUpdateRequestDataModel(
+                    workerId = workerId,
+                    roleId = roleId,
+                    permissions = permissions,
+                    jobTitle = jobTitle.trim(),
+                    jobTitleLocalized = jobTitleLocalized,
+                    salary = salary.trim(),
+                    salaryCurrencyCode = salaryCurrencyCode.trim().uppercase(),
+                    workerPassword = workerPassword
+                ),
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    storeWorkerMembershipsState.emit(
-                        DataState.Success(
-                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                storeWorkerMembershipsState.emit(
+                    DataState.Success(
+                        storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun removeStoreWorker(
@@ -4005,37 +4005,37 @@ fun removeStoreWorker(
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            removeStoreWorkerMutex.withLock {
-                val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.removeStoreWorkerPath.first,
-                    body = WorkerRemovalRequestDataModel(
-                        workerId = cleanWorkerId,
-                        note = cleanNote,
-                        noteLocalized = cleanNote.toLocalizedUserNote()
-                    ),
-                    headers = mapOf("store_id" to cleanStoreId)
-                )
+        removeStoreWorkerMutex.withLock {
+            val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.removeStoreWorkerPath.first,
+                body = WorkerRemovalRequestDataModel(
+                    workerId = cleanWorkerId,
+                    note = cleanNote,
+                    noteLocalized = cleanNote.toLocalizedUserNote()
+                ),
+                headers = mapOf("store_id" to cleanStoreId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    incomingWorkerRequestsState.emit(
-                        DataState.Success(
-                            incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                incomingWorkerRequestsState.emit(
+                    DataState.Success(
+                        incomingWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
-                    getIncomingWorkerRequests(cleanStoreId)
-                    getStoreWorkers(cleanStoreId)
-                    getNotifications()
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                )
+                getIncomingWorkerRequests(cleanStoreId)
+                getStoreWorkers(cleanStoreId)
+                getNotifications()
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun acceptMyStoreWorkerRemovalRequest(
@@ -4056,49 +4056,49 @@ fun acceptMyStoreWorkerRemovalRequest(
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            decideStoreWorkerRemovalMutex.withLock {
-                val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
-                val response = networkRequest<StoreWorkerDataModel, WorkerRemovalDecisionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.confirmStoreWorkerRemovalPath.first,
-                    body = WorkerRemovalDecisionRequestDataModel(
-                        requestId = cleanRequestId,
-                        note = cleanNote,
-                        responseNote = cleanNote,
-                        responseNoteLocalized = cleanNote.toLocalizedUserNote()
+        decideStoreWorkerRemovalMutex.withLock {
+            val cleanNote = note?.trim()?.takeIf { it.isNotBlank() }
+            val response = networkRequest<StoreWorkerDataModel, WorkerRemovalDecisionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.confirmStoreWorkerRemovalPath.first,
+                body = WorkerRemovalDecisionRequestDataModel(
+                    requestId = cleanRequestId,
+                    note = cleanNote,
+                    responseNote = cleanNote,
+                    responseNoteLocalized = cleanNote.toLocalizedUserNote()
+                )
+            )
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                val removedWorker = response.payload
+                myWorkerMembershipsState.emit(
+                    DataState.Success(
+                        myWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
+                        response.message
                     )
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    val removedWorker = response.payload
-                    myWorkerMembershipsState.emit(
-                        DataState.Success(
-                            myWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
-                            response.message
-                        )
+                storeWorkerMembershipsState.emit(
+                    DataState.Success(
+                        storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
+                        response.message
                     )
-                    storeWorkerMembershipsState.emit(
-                        DataState.Success(
-                            storeWorkerMembershipsState.payloadValue.orEmpty().filterNot { it.id == removedWorker.id },
-                            response.message
-                        )
-                    )
-                    getMyWorkerRequests()
-                    getMyWorkerMemberships()
-                    getNotifications()
-                    getStores()
-                    removedWorker.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
-                        getStoreWorkers(storeId)
-                        getIncomingWorkerRequests(storeId)
-                    }
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(removedWorker, response.message))
+                )
+                getMyWorkerRequests()
+                getMyWorkerMemberships()
+                getNotifications()
+                getStores()
+                removedWorker.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
+                    getStoreWorkers(storeId)
+                    getIncomingWorkerRequests(storeId)
                 }
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(removedWorker, response.message))
             }
         }
+    }
 }
 
 
@@ -4120,37 +4120,37 @@ fun declineMyStoreWorkerRemovalRequest(
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            decideStoreWorkerRemovalMutex.withLock {
-                val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalDecisionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.declineStoreWorkerRemovalPath.first,
-                    body = WorkerRemovalDecisionRequestDataModel(
-                        requestId = cleanRequestId,
-                        note = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNote = note?.trim()?.takeIf { it.isNotBlank() },
-                        responseNoteLocalized = note.toLocalizedUserNote()
+        decideStoreWorkerRemovalMutex.withLock {
+            val response = networkRequest<StoreWorkerRequestDataModel, WorkerRemovalDecisionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.declineStoreWorkerRemovalPath.first,
+                body = WorkerRemovalDecisionRequestDataModel(
+                    requestId = cleanRequestId,
+                    note = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNote = note?.trim()?.takeIf { it.isNotBlank() },
+                    responseNoteLocalized = note.toLocalizedUserNote()
+                )
+            )
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                myWorkerRequestsState.emit(
+                    DataState.Success(
+                        myWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
+                        response.message
                     )
                 )
-
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    myWorkerRequestsState.emit(
-                        DataState.Success(
-                            myWorkerRequestsState.payloadValue.orEmpty().filterNot { it.id == response.payload.id } + response.payload,
-                            response.message
-                        )
-                    )
-                    getMyWorkerRequests()
-                    getMyWorkerMemberships()
-                    getNotifications()
-                    response.payload.storeId.takeIf { it.isNotBlank() }?.let { getStoreWorkers(it) }
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                getMyWorkerRequests()
+                getMyWorkerMemberships()
+                getNotifications()
+                response.payload.storeId.takeIf { it.isNotBlank() }?.let { getStoreWorkers(it) }
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 
@@ -4237,23 +4237,23 @@ fun getOperationLogs(
     onCompleted: ((DataState<List<OperationLogDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getOperationLogsMutex.withLock {
-                val response = networkRequest<List<OperationLogDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getOperationLogsPath.first,
-                    headers = mapOf("store_id" to storeId),
-                    query = mapOf("scope" to scope)
-                )
+        getOperationLogsMutex.withLock {
+            val response = networkRequest<List<OperationLogDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getOperationLogsPath.first,
+                headers = mapOf("store_id" to storeId),
+                query = mapOf("scope" to scope)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    operationLogsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                operationLogsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getStockItemHistory(
@@ -4262,34 +4262,34 @@ fun getStockItemHistory(
     onCompleted: ((DataState<List<OperationLogDataModel>>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStockItemHistoryMutex.withLock {
-                val cleanStoreId = storeId.trim()
-                val cleanGoodsItemId = goodsItemId.trim()
-                if (cleanStoreId.isBlank() || cleanGoodsItemId.isBlank()) {
-                    stockItemHistoryState.emit(DataState.Empty())
-                    onCompleted?.invoke(DataState.Empty())
-                    return@withLock
-                }
+        getStockItemHistoryMutex.withLock {
+            val cleanStoreId = storeId.trim()
+            val cleanGoodsItemId = goodsItemId.trim()
+            if (cleanStoreId.isBlank() || cleanGoodsItemId.isBlank()) {
+                stockItemHistoryState.emit(DataState.Empty())
+                onCompleted?.invoke(DataState.Empty())
+                return@withLock
+            }
 
-                val response = networkRequest<List<OperationLogDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStockItemHistoryPath.first,
-                    headers = mapOf(
-                        "store_id" to cleanStoreId,
-                        "goods_item_id" to cleanGoodsItemId
-                    )
+            val response = networkRequest<List<OperationLogDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStockItemHistoryPath.first,
+                headers = mapOf(
+                    "store_id" to cleanStoreId,
+                    "goods_item_id" to cleanGoodsItemId
                 )
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    stockItemHistoryState.emit(DataState.Empty(response.message))
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    stockItemHistoryState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                stockItemHistoryState.emit(DataState.Empty(response.message))
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                stockItemHistoryState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getStoreAnalytics(
@@ -4302,28 +4302,28 @@ fun getStoreAnalytics(
     onCompleted: ((DataState<StoreAnalyticsDashboardDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStoreAnalyticsMutex.withLock {
-                val response = networkRequest<StoreAnalyticsDashboardDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreAnalyticsPath.first,
-                    headers = mapOf("store_id" to storeId),
-                    query = buildMap<String, Any?> {
-                        put("startMillis", startMillis)
-                        put("endMillisExclusive", endMillisExclusive)
-                        goodsItemIdFilter.cleanAnalyticsFilterId()?.let { put("goodsItemId", it) }
-                        supplierIdFilter.cleanAnalyticsFilterId()?.let { put("supplierId", it) }
-                        categoryIdFilter.cleanAnalyticsFilterId()?.let { put("categoryId", it) }
-                    }
-                )
-
-                if (response.negative || response.payload == null) {
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    storeAnalyticsDashboardState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+        getStoreAnalyticsMutex.withLock {
+            val response = networkRequest<StoreAnalyticsDashboardDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStoreAnalyticsPath.first,
+                headers = mapOf("store_id" to storeId),
+                query = buildMap<String, Any?> {
+                    put("startMillis", startMillis)
+                    put("endMillisExclusive", endMillisExclusive)
+                    goodsItemIdFilter.cleanAnalyticsFilterId()?.let { put("goodsItemId", it) }
+                    supplierIdFilter.cleanAnalyticsFilterId()?.let { put("supplierId", it) }
+                    categoryIdFilter.cleanAnalyticsFilterId()?.let { put("categoryId", it) }
                 }
+            )
+
+            if (response.negative || response.payload == null) {
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                storeAnalyticsDashboardState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun currentUserOwnsStore(storeId: String?): Boolean {
@@ -4369,24 +4369,24 @@ fun getCurrentWorkshift(
 ) {
     val id = storeId?.takeIf { it.isNotBlank() } ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
-            getCurrentWorkshiftMutex.withLock {
-                val response = networkRequest<WorkshiftDataModel, Unit>(
-                    endpointUrl = globalAppConfigurationState.payloadValue.getCurrentWorkshiftPath.first,
-                    method = HttpMethod.Get,
-                    headers = mapOf("store_id" to id)
-                )
+        getCurrentWorkshiftMutex.withLock {
+            val response = networkRequest<WorkshiftDataModel, Unit>(
+                endpointUrl = globalAppConfigurationState.payloadValue.getCurrentWorkshiftPath.first,
+                method = HttpMethod.Get,
+                headers = mapOf("store_id" to id)
+            )
 
-                if (response.negative || response.payload == null) {
-                    if (!response.transportFailure && response.httpStatusCode != HttpStatusCode.Unauthorized.value) {
-                        activeWorkshiftState.emit(DataState.Empty(response.message))
-                    }
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            if (response.negative || response.payload == null) {
+                if (!response.transportFailure && response.httpStatusCode != HttpStatusCode.Unauthorized.value) {
+                    activeWorkshiftState.emit(DataState.Empty(response.message))
                 }
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun startWorkshift(
@@ -4396,32 +4396,32 @@ fun startWorkshift(
     onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            startWorkshiftMutex.withLock {
-                workshiftLoginInProgressState.emit(true)
-                try {
-                    val response = networkRequest<WorkshiftDataModel, WorkshiftStartRequestDataModel>(
-                        method = HttpMethod.Post,
-                        endpointUrl = globalAppConfigurationState.payloadValue.startWorkshiftPath.first,
-                        body = WorkshiftStartRequestDataModel(workerIdentifier.trim(), password.trim()),
-                        headers = mapOf("store_id" to storeId)
-                    )
+        startWorkshiftMutex.withLock {
+            workshiftLoginInProgressState.emit(true)
+            try {
+                val response = networkRequest<WorkshiftDataModel, WorkshiftStartRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.startWorkshiftPath.first,
+                    body = WorkshiftStartRequestDataModel(workerIdentifier.trim(), password.trim()),
+                    headers = mapOf("store_id" to storeId)
+                )
 
-                    if (response.negative || response.payload == null) {
-                        postInAppNotification(response.message, NotificationType.Negative)
-                        if (!response.transportFailure && response.httpStatusCode != HttpStatusCode.Unauthorized.value) {
-                            activeWorkshiftState.emit(DataState.Empty(response.message))
-                        }
-                        onCompleted?.invoke(DataState.Empty(response.message))
-                    } else {
-                        activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
-                        postInAppNotification(response.message, NotificationType.Positive)
-                        onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (response.negative || response.payload == null) {
+                    postInAppNotification(response.message, NotificationType.Negative)
+                    if (!response.transportFailure && response.httpStatusCode != HttpStatusCode.Unauthorized.value) {
+                        activeWorkshiftState.emit(DataState.Empty(response.message))
                     }
-                } finally {
-                    workshiftLoginInProgressState.emit(false)
+                    onCompleted?.invoke(DataState.Empty(response.message))
+                } else {
+                    activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
+                    postInAppNotification(response.message, NotificationType.Positive)
+                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
                 }
+            } finally {
+                workshiftLoginInProgressState.emit(false)
             }
         }
+    }
 }
 
 fun endCurrentWorkshift(
@@ -4430,55 +4430,55 @@ fun endCurrentWorkshift(
 ) {
     val id = storeId?.takeIf { it.isNotBlank() } ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
-            endWorkshiftMutex.withLock {
-                val activeWorkshift = activeWorkshiftState.payloadValue
-                    ?.takeIf { it.storeId == id && it.isActive && it.endedAtMillis == null }
-                val endedAtMillis = getCurrentTimeMillis()
-                val operationId = activeWorkshift?.let { workshift ->
-                    createClientOperationId(
-                        prefix = "wse",
-                        seed = listOf(workshift.id, workshift.storeId, endedAtMillis.toString()).joinToString(":")
-                    )
-                }.orEmpty()
-
-                val response = networkRequest<WorkshiftDataModel, WorkshiftEndRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.endWorkshiftPath.first,
-                    headers = mapOf("store_id" to id),
-                    body = WorkshiftEndRequestDataModel(
-                        workshiftId = activeWorkshift?.id,
-                        endedAtMillis = endedAtMillis,
-                        clientOperationId = operationId,
-                        deviceInfo = buildCurrentClientDeviceInfo()
-                    )
+        endWorkshiftMutex.withLock {
+            val activeWorkshift = activeWorkshiftState.payloadValue
+                ?.takeIf { it.storeId == id && it.isActive && it.endedAtMillis == null }
+            val endedAtMillis = getCurrentTimeMillis()
+            val operationId = activeWorkshift?.let { workshift ->
+                createClientOperationId(
+                    prefix = "wse",
+                    seed = listOf(workshift.id, workshift.storeId, endedAtMillis.toString()).joinToString(":")
                 )
+            }.orEmpty()
 
-                if (response.negative || response.payload == null) {
-                    val shouldQueueWorkshiftEnd = response.transportFailure ||
-                            response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
-                            response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
-                            (response.httpStatusCode ?: 0) >= 500
+            val response = networkRequest<WorkshiftDataModel, WorkshiftEndRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.endWorkshiftPath.first,
+                headers = mapOf("store_id" to id),
+                body = WorkshiftEndRequestDataModel(
+                    workshiftId = activeWorkshift?.id,
+                    endedAtMillis = endedAtMillis,
+                    clientOperationId = operationId,
+                    deviceInfo = buildCurrentClientDeviceInfo()
+                )
+            )
 
-                    if (shouldQueueWorkshiftEnd && activeWorkshift != null) {
-                        val ended = endWorkshiftLocallyAndQueue(
-                            workshift = activeWorkshift,
-                            endedAtMillis = endedAtMillis,
-                            clientOperationId = operationId
-                        )
-                        onCompleted?.invoke(DataState.Success(ended, pendingWorkshiftEndMessage()))
-                        return@withLock
-                    }
+            if (response.negative || response.payload == null) {
+                val shouldQueueWorkshiftEnd = response.transportFailure ||
+                    response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
+                    response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
+                    (response.httpStatusCode ?: 0) >= 500
 
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    activeWorkshiftState.emit(DataState.Empty(response.message))
-                    dropPendingWorkshiftEnd(operationId)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                if (shouldQueueWorkshiftEnd && activeWorkshift != null) {
+                    val ended = endWorkshiftLocallyAndQueue(
+                        workshift = activeWorkshift,
+                        endedAtMillis = endedAtMillis,
+                        clientOperationId = operationId
+                    )
+                    onCompleted?.invoke(DataState.Success(ended, pendingWorkshiftEndMessage()))
+                    return@withLock
                 }
+
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                activeWorkshiftState.emit(DataState.Empty(response.message))
+                dropPendingWorkshiftEnd(operationId)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 
@@ -4503,9 +4503,9 @@ fun currentUserAssignableStorePermissions(storeId: String?): Set<String> {
     val permissions = currentUserStorePermissions(storeId)
     return permissions.takeIf {
         STORE_PERMISSION_WORKERS_INVITE in it ||
-                STORE_PERMISSION_WORKERS_DECIDE_REQUESTS in it ||
-                STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS in it ||
-                STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE in it
+            STORE_PERMISSION_WORKERS_DECIDE_REQUESTS in it ||
+            STORE_PERMISSION_WORKERS_EDIT_PERMISSIONS in it ||
+            STORE_PERMISSION_WORKER_ROLE_TEMPLATES_MANAGE in it
     }.orEmpty()
 }
 
@@ -4570,8 +4570,8 @@ fun currentUserCanViewStock(storeId: String?): Boolean {
 
 fun currentUserCanViewStockHistory(storeId: String?): Boolean {
     return currentUserOwnsStore(storeId) ||
-            currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_HISTORY_VIEW) ||
-            currentUserHasStorePermission(storeId, STORE_PERMISSION_LOGS_VIEW)
+        currentUserHasStorePermission(storeId, STORE_PERMISSION_STOCK_HISTORY_VIEW) ||
+        currentUserHasStorePermission(storeId, STORE_PERMISSION_LOGS_VIEW)
 }
 
 fun currentUserCanEditStock(storeId: String?): Boolean {
@@ -4689,9 +4689,9 @@ fun completeTransaction(
 
             if (response.negative || response.payload == null) {
                 val shouldQueueForCloudRetry = response.transportFailure ||
-                        response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
-                        response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
-                        (response.httpStatusCode ?: 0) >= 500
+                    response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
+                    response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
+                    (response.httpStatusCode ?: 0) >= 500
 
                 if (shouldQueueForCloudRetry) {
                     val localCompleted = queueTransactionThroughLocalNetwork(transactionWithOperationId)
@@ -4955,10 +4955,10 @@ fun supplierGoodsOfferPriceGapCount(
         .toSet()
     val malformedInvalidCount = normalizedPrices.count {
         !it.supplyPrice.hasPositiveSupplierDeskPrice() &&
-                it.supplierGoodsOfferRelationshipKey() == null
+            it.supplierGoodsOfferRelationshipKey() == null
     }
     return ((requiredKeys - usableKeys) + (invalidKeys - usableKeys)).size +
-            malformedInvalidCount
+        malformedInvalidCount
 }
 
 fun List<SupplierGoodsPriceDataModel>.upsertSupplierGoodsPriceByIdentity(
@@ -4968,9 +4968,9 @@ fun List<SupplierGoodsPriceDataModel>.upsertSupplierGoodsPriceByIdentity(
     return (
         listOf(price) + filterNot { existing ->
             (existing.id.isNotBlank() && existing.id.trim().equals(price.id.trim(), ignoreCase = true)) ||
-                    existing.supplierPriceBookIdentity() == incomingIdentity
+                existing.supplierPriceBookIdentity() == incomingIdentity
         }
-    ).normalizedSupplierGoodsPriceBook()
+        ).normalizedSupplierGoodsPriceBook()
 }
 
 @Volatile
@@ -5117,7 +5117,7 @@ fun getSupplierGoodsPrices(
                         supplierGoodsPricesState.payloadValue.orEmpty().filterNot { price ->
                             price.storeId.trim().lowercase() == normalizedStoreId
                         } + scopedPrices
-                    ).normalizedSupplierGoodsPriceBook()
+                        ).normalizedSupplierGoodsPriceBook()
                     emitSupplierGoodsPricesAndAwait(DataState.Success(mergedPrices, response.message))
                     DataState.Success(scopedPrices, response.message)
                 }
@@ -5168,7 +5168,7 @@ fun getMySupplierGoodsPrices(
                             supplierGoodsPricesState.payloadValue.orEmpty().filterNot { price ->
                                 price.matchesSupplierProfileFocus(cleanSupplierId)
                             } + scopedPrices
-                        ).normalizedSupplierGoodsPriceBook()
+                            ).normalizedSupplierGoodsPriceBook()
                         emitSupplierGoodsPricesAndAwait(DataState.Success(mergedPrices, response.message))
                         DataState.Success(scopedPrices, response.message)
                     }
@@ -5295,7 +5295,7 @@ data class SupplierPartnershipContractDataModel(
 
 fun String.isPendingSupplierContractStatus(): Boolean =
     this == SUPPLIER_CONTRACT_STATUS_PENDING_STORE ||
-            this == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
+        this == SUPPLIER_CONTRACT_STATUS_PENDING_SUPPLIER
 
 fun SupplierPartnershipContractDataModel.requiresAcceptanceFrom(actorSide: String): Boolean =
     isActive && when (actorSide.trim().lowercase()) {
@@ -5366,9 +5366,9 @@ fun List<SupplierPartnershipContractDataModel>.mergedWithSupplierContractRead(
     } else {
         filterNot { contract ->
             val storeMatches = cleanStoreId.isBlank() ||
-                    contract.storeId.trim().lowercase() == cleanStoreId
+                contract.storeId.trim().lowercase() == cleanStoreId
             val supplierMatches = cleanSupplierId.isBlank() ||
-                    contract.supplierId.trim().lowercase() == cleanSupplierId
+                contract.supplierId.trim().lowercase() == cleanSupplierId
             storeMatches && supplierMatches
         }
     }
@@ -5384,8 +5384,8 @@ fun List<SupplierPartnershipContractDataModel>.mergedWithSupplierContractRead(
             if (current == null ||
                 contract.revision > current.revision ||
                 (contract.revision == current.revision &&
-                        maxOf(contract.updatedAtMillis, contract.createdAtMillis) >=
-                        maxOf(current.updatedAtMillis, current.createdAtMillis))
+                    maxOf(contract.updatedAtMillis, contract.createdAtMillis) >=
+                    maxOf(current.updatedAtMillis, current.createdAtMillis))
             ) {
                 keyed[key] = contract
             }
@@ -5453,9 +5453,9 @@ fun SupplierOrderLineDataModel.hasCompleteSupplierResponseLineForSupplierDesk():
 fun SupplierOrderDataModel.hasCompleteSupplierResponseForSupplierDesk(activeLines: List<SupplierOrderLineDataModel>): Boolean {
     val cleanLines = activeLines.filter { it.isActive }
     return cleanLines.isNotEmpty() &&
-            confirmedDeliveryTimeMillis != null &&
-            cleanLines.any { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 } &&
-            cleanLines.all { line -> line.hasCompleteSupplierResponseLineForSupplierDesk() }
+        confirmedDeliveryTimeMillis != null &&
+        cleanLines.any { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 } &&
+        cleanLines.all { line -> line.hasCompleteSupplierResponseLineForSupplierDesk() }
 }
 
 fun SupplierOrderDataModel.isSupplierReadyToPackForSupplierDesk(activeLines: List<SupplierOrderLineDataModel>): Boolean =
@@ -5470,9 +5470,9 @@ fun SupplierOrderWithLinesDataModel.isSupplierReadyToPackForSupplierDesk(): Bool
 fun SupplierOrderWithLinesDataModel.hasSupplierResponseGapsForSupplierDesk(): Boolean {
     val cleanLines = lines.filter { it.isActive }
     return cleanLines.isEmpty() ||
-            order.confirmedDeliveryTimeMillis == null ||
-            cleanLines.none { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 } ||
-            cleanLines.any { line -> !line.hasCompleteSupplierResponseLineForSupplierDesk() }
+        order.confirmedDeliveryTimeMillis == null ||
+        cleanLines.none { line -> (line.supplierDeskAcceptedQuantityTotal() ?: 0.0) > 0.0 } ||
+        cleanLines.any { line -> !line.hasCompleteSupplierResponseLineForSupplierDesk() }
 }
 
 /**
@@ -5486,10 +5486,10 @@ fun SupplierOrderStatusDataModel.isClosedForSupplierDesk(): Boolean =
 fun SupplierOrderStatusDataModel.needsSupplierActionForSupplierDesk(
     hasResponseGaps: Boolean
 ): Boolean = !isClosedForSupplierDesk() &&
-        (this == SupplierOrderStatusDataModel.Sent ||
-                this == SupplierOrderStatusDataModel.SeenBySupplier ||
-                this == SupplierOrderStatusDataModel.IssueReported ||
-                hasResponseGaps)
+    (this == SupplierOrderStatusDataModel.Sent ||
+        this == SupplierOrderStatusDataModel.SeenBySupplier ||
+        this == SupplierOrderStatusDataModel.IssueReported ||
+        hasResponseGaps)
 
 fun SupplierOrderDataModel.needsSupplierActionForSupplierDesk(
     activeLines: List<SupplierOrderLineDataModel>
@@ -6190,9 +6190,9 @@ private data class SupplierOrderReadScope(
         if (normalizedStoreId.isBlank() && normalizedSupplierId.isBlank()) return false
 
         val storeMatches = normalizedStoreId.isBlank() ||
-                order.storeId.trim().lowercase() == normalizedStoreId
+            order.storeId.trim().lowercase() == normalizedStoreId
         val supplierMatches = normalizedSupplierId.isBlank() ||
-                order.supplierId.trim().lowercase() == normalizedSupplierId
+            order.supplierId.trim().lowercase() == normalizedSupplierId
         return storeMatches && supplierMatches
     }
 }
@@ -6241,7 +6241,7 @@ private suspend fun applySupplierOrderReadResponse(
         val existingOrders = supplierOrdersState.payloadValue.orEmpty()
         val replacedOrderIds = (
             existingOrders.asSequence().filter(scope::contains).map { it.id } +
-                    incomingOrders.asSequence().map { it.id }
+                incomingOrders.asSequence().map { it.id }
             )
             .map { it.trim().lowercase() }
             .filter { it.isNotBlank() }
@@ -6425,32 +6425,32 @@ fun addSupplierOrder(
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            supplierOrderOperationMutex.withLock {
-                val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
-                    body = orderWithLines
+        supplierOrderOperationMutex.withLock {
+            val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
+                body = orderWithLines
+            )
+
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                emitSupplierOrderSnapshotAndAwait(
+                    orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                    lines = supplierOrderLinesState.payloadValue.orEmpty()
+                        .filterNot { line ->
+                            line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
+                        } + response.payload.lines,
+                    message = response.message
                 )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    emitSupplierOrderSnapshotAndAwait(
-                        orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                        lines = supplierOrderLinesState.payloadValue.orEmpty()
-                            .filterNot { line ->
-                                line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
-                            } + response.payload.lines,
-                        message = response.message
-                    )
-
-                    getSupplierModeDashboard(force = true)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                getSupplierModeDashboard(force = true)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun updateSupplierOrder(
@@ -6458,31 +6458,31 @@ fun updateSupplierOrder(
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            supplierOrderOperationMutex.withLock {
-                val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
-                    method = HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
-                    body = orderWithLines
-                )
+        supplierOrderOperationMutex.withLock {
+            val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                method = HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
+                body = orderWithLines
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    emitSupplierOrderSnapshotAndAwait(
-                        orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                        lines = supplierOrderLinesState.payloadValue.orEmpty()
-                            .filterNot { line ->
-                                line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
-                            } + response.payload.lines,
-                        message = response.message
-                    )
-                    getSupplierModeDashboard(force = true)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                emitSupplierOrderSnapshotAndAwait(
+                    orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                    lines = supplierOrderLinesState.payloadValue.orEmpty()
+                        .filterNot { line ->
+                            line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
+                        } + response.payload.lines,
+                    message = response.message
+                )
+                getSupplierModeDashboard(force = true)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 private suspend fun emitSupplierOrderBundlesFromServerResponse(
@@ -6689,32 +6689,32 @@ fun deleteSupplierOrder(
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            supplierOrderOperationMutex.withLock {
-                val response = networkRequest<String, String>(
-                    method = HttpMethod.Delete,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierOrdersPath.first,
-                    body = orderId
-                )
+        supplierOrderOperationMutex.withLock {
+            val response = networkRequest<String, String>(
+                method = HttpMethod.Delete,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierOrdersPath.first,
+                body = orderId
+            )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    emitSupplierOrderSnapshotAndAwait(
-                        orders = supplierOrdersState.payloadValue.orEmpty().filterNot {
-                            it.id.trim().equals(orderId.trim(), ignoreCase = true)
-                        },
-                        lines = supplierOrderLinesState.payloadValue.orEmpty().filterNot {
-                            it.orderId.trim().equals(orderId.trim(), ignoreCase = true)
-                        },
-                        message = response.message
-                    )
-                    getSupplierModeDashboard(force = true)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(orderId, response.message))
-                }
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                emitSupplierOrderSnapshotAndAwait(
+                    orders = supplierOrdersState.payloadValue.orEmpty().filterNot {
+                        it.id.trim().equals(orderId.trim(), ignoreCase = true)
+                    },
+                    lines = supplierOrderLinesState.payloadValue.orEmpty().filterNot {
+                        it.orderId.trim().equals(orderId.trim(), ignoreCase = true)
+                    },
+                    message = response.message
+                )
+                getSupplierModeDashboard(force = true)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(orderId, response.message))
             }
         }
+    }
 }
 
 fun receiveSupplierOrder(
@@ -6722,32 +6722,32 @@ fun receiveSupplierOrder(
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            supplierOrderOperationMutex.withLock {
-                val response = networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
-                    body = request
-                )
+        supplierOrderOperationMutex.withLock {
+            val response = networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
+                body = request
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    emitSupplierOrderSnapshotAndAwait(
-                        orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                        lines = supplierOrderLinesState.payloadValue.orEmpty()
-                            .filterNot { line ->
-                                line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
-                            } + response.payload.lines,
-                        message = response.message
-                    )
-                    response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
-                    getSupplierModeDashboard(force = true)
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                emitSupplierOrderSnapshotAndAwait(
+                    orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
+                    lines = supplierOrderLinesState.payloadValue.orEmpty()
+                        .filterNot { line ->
+                            line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
+                        } + response.payload.lines,
+                    message = response.message
+                )
+                response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
+                getSupplierModeDashboard(force = true)
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 
@@ -6913,7 +6913,7 @@ private fun mutateSupplierContract(
                 val response = networkRequest<
                     SupplierPartnershipContractDataModel,
                     SupplierContractRevisionActionRequestDataModel
-                >(
+                    >(
                     method = HttpMethod.Post,
                     endpointUrl = endpointUrl,
                     body = SupplierContractRevisionActionRequestDataModel(
@@ -7119,11 +7119,22 @@ const val APP_MODE_BUYER = 1
 const val APP_MODE_SUPPLIER = 2
 const val APP_MODE_MANUFACTURER = 3
 
-private fun normalizeAppModePreference(modeId: Int?): Int = when (modeId) {
-    APP_MODE_BUYER -> APP_MODE_BUYER
-    APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
-    APP_MODE_MANUFACTURER -> APP_MODE_MANUFACTURER
-    else -> APP_MODE_STORE
+/**
+ * The non-Store workspaces remain implemented in source, but mode selection is deliberately
+ * disabled in the public release until those workspaces are reopened for users. Keeping the gate
+ * in shared state prevents a previously persisted Supplier/Buyer/Manufacturer mode from trapping
+ * a user in a workspace whose selector is hidden from the Menu.
+ */
+const val APP_MODE_SELECTION_PUBLICLY_ENABLED = false
+
+private fun normalizeAppModePreference(modeId: Int?): Int {
+    if (!APP_MODE_SELECTION_PUBLICLY_ENABLED) return APP_MODE_STORE
+    return when (modeId) {
+        APP_MODE_BUYER -> APP_MODE_BUYER
+        APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
+        APP_MODE_MANUFACTURER -> APP_MODE_MANUFACTURER
+        else -> APP_MODE_STORE
+    }
 }
 
 val appModeState = MutableStateFlow(APP_MODE_STORE)
@@ -8298,10 +8309,10 @@ private val getStoreAnalyticsMutex = Mutex()
 
 fun String.checkAsEmail(): Boolean {
     return isNotEmpty() && isNotBlank() && !contains(" ") &&
-            contains("@") && contains(".") &&
-            Regex("^[a-zA-Z0-9]").matches(first().toString()) &&
-            filter { it == '@' }.length == 1 && lastIndexOf(".") > lastIndexOf("@") &&
-            lastIndexOf(".") != lastIndex
+        contains("@") && contains(".") &&
+        Regex("^[a-zA-Z0-9]").matches(first().toString()) &&
+        filter { it == '@' }.length == 1 && lastIndexOf(".") > lastIndexOf("@") &&
+        lastIndexOf(".") != lastIndex
 }
 
 fun String.checkAsPhoneNumber(country: CountryDataModel): Boolean {
@@ -8315,8 +8326,8 @@ fun String.filterAsPhoneNumber(country: CountryDataModel): Boolean {
 fun String.checkAsPassword(): Boolean {
     val value = trim()
     return value.length >= 8 &&
-            value.any { it.isDigit() } &&
-            value.any { !it.isLetterOrDigit() && !it.isWhitespace() }
+        value.any { it.isDigit() } &&
+        value.any { !it.isLetterOrDigit() && !it.isWhitespace() }
 }
 
 fun String.isNumericalString(): Boolean {
@@ -8762,94 +8773,94 @@ fun init() {
 
 fun getGlobalAppConfiguration(loadAll: Boolean = true) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getGlobalAppConfigurationMutex.withLock {
-                val response = networkRequest<GlobalAppConfigurationDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.globalAppConfigurationPath.first
+        getGlobalAppConfigurationMutex.withLock {
+            val response = networkRequest<GlobalAppConfigurationDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.globalAppConfigurationPath.first
+            )
+
+            if (!response.negative && response.payload != null) {
+                val currentConfiguration = globalAppConfigurationState.payloadValue
+                val anchoredPayload = response.payload.copy(
+                    serverUrl = chooseClientServerUrlPair(currentConfiguration.serverUrl, response.payload.serverUrl)
                 )
+                globalAppConfigurationState.emit(DataState.Success(anchoredPayload, response.message))
 
-                if (!response.negative && response.payload != null) {
-                    val currentConfiguration = globalAppConfigurationState.payloadValue
-                    val anchoredPayload = response.payload.copy(
-                        serverUrl = chooseClientServerUrlPair(currentConfiguration.serverUrl, response.payload.serverUrl)
-                    )
-                    globalAppConfigurationState.emit(DataState.Success(anchoredPayload, response.message))
-
-                    if (loadAll) {
-                        getStrings()
-                        getDimensions()
-                        getColors()
-                        getDrawables()
-                    }
+                if (loadAll) {
+                    getStrings()
+                    getDimensions()
+                    getColors()
+                    getDrawables()
                 }
             }
         }
+    }
 }
 
 fun getStrings() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStringsMutex.withLock {
-                val response = networkRequest<List<LocalizedStringGroupDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath.first
-                )
+        getStringsMutex.withLock {
+            val response = networkRequest<List<LocalizedStringGroupDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.stringResourcesPath.first
+            )
 
-                if (!response.negative && response.payload != null) {
-                    stringsState.emit(DataState.Success(response.payload, response.message))
-                } else {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                }
+            if (!response.negative && response.payload != null) {
+                stringsState.emit(DataState.Success(response.payload, response.message))
+            } else {
+                postInAppNotification(response.message, NotificationType.Negative)
             }
         }
+    }
 }
 
 fun getDimensions() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getDimensionsMutex.withLock {
-                val response = networkRequest<List<StylizedDimensionGroupDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath.first,
-                )
+        getDimensionsMutex.withLock {
+            val response = networkRequest<List<StylizedDimensionGroupDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.dimensionResourcesPath.first,
+            )
 
-                if (!response.negative && response.payload != null) {
-                    dimensionsState.emit(DataState.Success(response.payload, response.message))
-                }
+            if (!response.negative && response.payload != null) {
+                dimensionsState.emit(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getColors() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getColorsMutex.withLock {
-                val response = networkRequest<List<StylizedColorGroupDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath.first
-                )
+        getColorsMutex.withLock {
+            val response = networkRequest<List<StylizedColorGroupDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.colorResourcesPath.first
+            )
 
-                if (!response.negative && response.payload != null) {
-                    colorsState.emit(DataState.Success(response.payload, response.message))
-                } else {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                }
+            if (!response.negative && response.payload != null) {
+                colorsState.emit(DataState.Success(response.payload, response.message))
+            } else {
+                postInAppNotification(response.message, NotificationType.Negative)
             }
         }
+    }
 }
 
 fun getDrawables() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getDrawablesMutex.withLock {
-                val response = networkRequest<List<StylizedDrawablePathsGroupDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath.first
-                )
+        getDrawablesMutex.withLock {
+            val response = networkRequest<List<StylizedDrawablePathsGroupDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.drawableResourcesConfigurationPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    drawablesState.emit(DataState.Empty(response.message))
-                } else {
-                    drawablesState.emit(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                drawablesState.emit(DataState.Empty(response.message))
+            } else {
+                drawablesState.emit(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun setAppLocale(language: String, syncServer: Boolean = true) {
@@ -10512,9 +10523,9 @@ private fun normalizedHttpAbsoluteUrlOrNull(raw: String?): String? {
         ?: return null
 
     val hadExplicitHttpScheme = trimmed.startsWith("http://", ignoreCase = true) ||
-            trimmed.startsWith("https://", ignoreCase = true)
+        trimmed.startsWith("https://", ignoreCase = true)
     val hadExplicitWebSocketScheme = trimmed.startsWith("ws://", ignoreCase = true) ||
-            trimmed.startsWith("wss://", ignoreCase = true)
+        trimmed.startsWith("wss://", ignoreCase = true)
 
     val withHttpScheme = when {
         hadExplicitHttpScheme -> trimmed
@@ -10582,10 +10593,10 @@ private fun JsonElement.jsonStringOrNull(): String? = runCatching { jsonPrimitiv
 private fun bootstrapServerAddressOrNull(raw: String?): String? {
     val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val looksLikeAddress = value.startsWith("http://", ignoreCase = true) ||
-            value.startsWith("https://", ignoreCase = true) ||
-            value.startsWith("ws://", ignoreCase = true) ||
-            value.startsWith("wss://", ignoreCase = true) ||
-            (value.none { it.isWhitespace() } && ('.' in value || value.startsWith("localhost", ignoreCase = true)))
+        value.startsWith("https://", ignoreCase = true) ||
+        value.startsWith("ws://", ignoreCase = true) ||
+        value.startsWith("wss://", ignoreCase = true) ||
+        (value.none { it.isWhitespace() } && ('.' in value || value.startsWith("localhost", ignoreCase = true)))
     return value.takeIf { looksLikeAddress }?.let(::normalizedHttpServerUrlOrNull)
 }
 
@@ -10940,7 +10951,7 @@ internal suspend fun rememberReachableServerUrl(serverUrl: String) {
 
     lastKnownGoodServerUrlMutex.withLock {
         val shouldPersist = lastKnownGoodServerUrlMemory != normalized ||
-                now - lastKnownGoodServerUrlPersistedAtMillis !in 0L..AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS
+            now - lastKnownGoodServerUrlPersistedAtMillis !in 0L..AITA_BOOTSTRAP_SERVER_URL_REFRESH_INTERVAL_MILLIS
         lastKnownGoodServerUrlMemory = normalized
         lastKnownGoodServerUrlVerifiedAtMillis = now
         if (shouldPersist) {
@@ -11005,13 +11016,13 @@ internal fun rawBodyLooksLikeJson(rawBody: String): Boolean {
     if (trimmed.isBlank()) return false
 
     return trimmed.startsWith("{") ||
-            trimmed.startsWith("[") ||
-            trimmed.startsWith("\"") ||
-            trimmed == "null" ||
-            trimmed == "true" ||
-            trimmed == "false" ||
-            trimmed.firstOrNull()?.isDigit() == true ||
-            trimmed.firstOrNull() == '-'
+        trimmed.startsWith("[") ||
+        trimmed.startsWith("\"") ||
+        trimmed == "null" ||
+        trimmed == "true" ||
+        trimmed == "false" ||
+        trimmed.firstOrNull()?.isDigit() == true ||
+        trimmed.firstOrNull() == '-'
 }
 
 @PublishedApi
@@ -11043,7 +11054,7 @@ internal fun rawBodyLooksLikeAitaServerResponse(rawBody: String): Boolean {
 @PublishedApi
 internal fun HttpResponse.isAitaServerResponse(rawBody: String): Boolean =
     headers[AITA_SERVER_HEADER]?.equals(AITA_SERVER_HEADER_VALUE, ignoreCase = true) == true ||
-            rawBodyLooksLikeAitaServerResponse(rawBody)
+        rawBodyLooksLikeAitaServerResponse(rawBody)
 
 @PublishedApi
 internal fun nonAitaHttpResponseMessage(
@@ -11263,7 +11274,7 @@ private fun authenticatedSessionRefreshIsCurrent(
 ): Boolean {
     val current = getStoredUserAuthTokens?.invoke() ?: return false
     return authenticatedSessionGeneration == expectedGeneration &&
-            current.refreshToken == expectedRefreshToken
+        current.refreshToken == expectedRefreshToken
 }
 
 @PublishedApi
@@ -11335,8 +11346,8 @@ internal fun rememberRejectedAuthRefreshToken(
 internal fun currentCloudSessionIsReadyForBackgroundSync(): Boolean {
     val tokens = getStoredUserAuthTokens?.invoke() ?: return false
     return tokens.accessToken.isNotBlank() &&
-            validatedCloudAccessTokenMemory == tokens.accessToken &&
-            tokens.accessTokenIsStillUsableForNetwork()
+        validatedCloudAccessTokenMemory == tokens.accessToken &&
+        tokens.accessTokenIsStillUsableForNetwork()
 }
 
 @PublishedApi
@@ -11384,7 +11395,7 @@ internal fun rememberAuthRefreshNonAuthFailure(
     lastAuthRefreshNonAuthFailureWasTransportFailure = transportFailure
     logCloudConnectionDiagnostic(
         "auth refresh non-auth failure remembered transportFailure=$transportFailure " +
-                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+            "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
     )
 }
 
@@ -11507,7 +11518,7 @@ private suspend fun probeReachableAitaServerUrl(
             val aitaServerResponse = response.isAitaServerResponse(rawBody)
             logNetworkAttempt(
                 "RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} " +
-                        "aita=$aitaServerResponse probe=$reason"
+                    "aita=$aitaServerResponse probe=$reason"
             )
 
             if (!aitaServerResponse) {
@@ -11580,8 +11591,8 @@ internal suspend fun selectServerUrlForNonReplayableRequest(
         ?.let(::normalizedHttpServerUrlOrNull)
         ?.takeIf { candidate ->
             candidate in normalizedCandidates &&
-                    getCurrentTimeMillis() - lastKnownGoodServerUrlVerifiedAtMillis in
-                    0L..AITA_NON_REPLAYABLE_MUTATION_PROOF_MAX_AGE_MILLIS
+                getCurrentTimeMillis() - lastKnownGoodServerUrlVerifiedAtMillis in
+                0L..AITA_NON_REPLAYABLE_MUTATION_PROOF_MAX_AGE_MILLIS
         }
     if (recentlyVerified != null) {
         return ResponseDataModel(
@@ -11694,7 +11705,7 @@ private suspend fun performAuthTokenRefreshNetworkRequest(
                 rememberAuthRefreshNonAuthFailure(failureResponse.message, transportFailure = true)
                 logCloudConnectionDiagnostic(
                     "auth refresh response treated as unavailable http=${httpResponse.status.value} " +
-                            "aita=$aitaServerResponse negative=${failureResponse.negative}"
+                        "aita=$aitaServerResponse negative=${failureResponse.negative}"
                 )
                 return failureResponse
             }
@@ -11905,7 +11916,7 @@ private suspend fun performCloudAccessTokenValidation(
                 val aitaServerResponse = response.isAitaServerResponse(rawBody)
                 logNetworkAttempt(
                     "RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} " +
-                            "aita=$aitaServerResponse probe=auth_session"
+                        "aita=$aitaServerResponse probe=auth_session"
                 )
 
                 if (!aitaServerResponse) {
@@ -12331,13 +12342,13 @@ private suspend fun postPendingWorkshiftEndWithAccessToken(
                 val rawBody = httpResponse.bodyAsText()
                 val aitaServerResponse = httpResponse.isAitaServerResponse(rawBody)
                 val shouldRetryCandidate = index < candidates.lastIndex &&
-                        shouldRetryNetworkRequestOnNextServerUrl(
-                            method = HttpMethod.Post,
-                            endpointUrl = endpoint,
-                            status = httpResponse.status,
-                            rawBody = rawBody,
-                            aitaServerResponse = aitaServerResponse
-                        )
+                    shouldRetryNetworkRequestOnNextServerUrl(
+                        method = HttpMethod.Post,
+                        endpointUrl = endpoint,
+                        status = httpResponse.status,
+                        rawBody = rawBody,
+                        aitaServerResponse = aitaServerResponse
+                    )
 
                 if (!aitaServerResponse) {
                     val nonAitaResponse = nonAitaHttpResponseDataModel<WorkshiftDataModel>(httpResponse.status, rawBody, resolvedServerUrl)
@@ -12356,7 +12367,7 @@ private suspend fun postPendingWorkshiftEndWithAccessToken(
                     markCloudTransportUnavailableForNotifications()
                     logCloudConnectionDiagnostic(
                         "pending workshift end response treated as unavailable http=${httpResponse.status.value} " +
-                                "negative=${failureResponse.negative}"
+                            "negative=${failureResponse.negative}"
                     )
                     if (shouldRetryCandidate) continue
                     return failureResponse
@@ -12404,117 +12415,117 @@ suspend fun syncPendingWorkshiftEndsToServerNow(): Int {
         var syncedCount = 0
 
         while (true) {
-        val pending = syncPendingWorkshiftEndsMutex.withLock {
-            loadPendingWorkshiftEnds().firstOrNull()
-        } ?: break
+            val pending = syncPendingWorkshiftEndsMutex.withLock {
+                loadPendingWorkshiftEnds().firstOrNull()
+            } ?: break
 
-        var accessToken = pending.accessToken.ifBlank { getStoredUserAuthTokens?.invoke()?.accessToken.orEmpty() }
-        var refreshToken = pending.refreshToken.ifBlank { getStoredUserAuthTokens?.invoke()?.refreshToken.orEmpty() }
+            var accessToken = pending.accessToken.ifBlank { getStoredUserAuthTokens?.invoke()?.accessToken.orEmpty() }
+            var refreshToken = pending.refreshToken.ifBlank { getStoredUserAuthTokens?.invoke()?.refreshToken.orEmpty() }
 
-        if (accessToken.isBlank() && refreshToken.isNotBlank()) {
-            val refreshResponse = refreshAuthTokensWithServerFallback(refreshToken)
-            val refreshed = refreshResponse.payload
-            if (refreshed != null) {
-                accessToken = refreshed.accessToken
-                refreshToken = refreshed.refreshToken
-                markPendingWorkshiftEndAttempt(pending, null, accessToken, refreshToken)
-            } else if (refreshResponse.transportFailure) {
-                break
-            } else {
+            if (accessToken.isBlank() && refreshToken.isNotBlank()) {
+                val refreshResponse = refreshAuthTokensWithServerFallback(refreshToken)
+                val refreshed = refreshResponse.payload
+                if (refreshed != null) {
+                    accessToken = refreshed.accessToken
+                    refreshToken = refreshed.refreshToken
+                    markPendingWorkshiftEndAttempt(pending, null, accessToken, refreshToken)
+                } else if (refreshResponse.transportFailure) {
+                    break
+                } else {
+                    markPendingWorkshiftEndAttempt(
+                        pending,
+                        refreshResponse.message?.extractLocalizedString(appLanguageState.value)
+                    )
+                    break
+                }
+            }
+
+            if (accessToken.isNotBlank() &&
+                refreshToken.isNotBlank() &&
+                accessJwtExpiresBeforeOrAt(accessToken, getCurrentTimeMillis() + REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS)
+            ) {
+                val refreshResponse = refreshAuthTokensWithServerFallback(refreshToken)
+                val refreshed = refreshResponse.payload
+                if (refreshed != null) {
+                    accessToken = refreshed.accessToken
+                    refreshToken = refreshed.refreshToken
+                    markPendingWorkshiftEndAttempt(pending, null, accessToken, refreshToken)
+                } else if (refreshResponse.transportFailure) {
+                    break
+                } else {
+                    markPendingWorkshiftEndAttempt(
+                        pending,
+                        refreshResponse.message?.extractLocalizedString(appLanguageState.value)
+                    )
+                    break
+                }
+            }
+
+            if (accessToken.isBlank()) {
                 markPendingWorkshiftEndAttempt(
                     pending,
-                    refreshResponse.message?.extractLocalizedString(appLanguageState.value)
+                    localizedStringResourceText(
+                        id = 91,
+                        main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
+                        ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
+                        kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
+                    )
                 )
                 break
             }
-        }
 
-        if (accessToken.isNotBlank() &&
-            refreshToken.isNotBlank() &&
-            accessJwtExpiresBeforeOrAt(accessToken, getCurrentTimeMillis() + REALTIME_ACCESS_TOKEN_REFRESH_SKEW_MILLIS)
-        ) {
-            val refreshResponse = refreshAuthTokensWithServerFallback(refreshToken)
-            val refreshed = refreshResponse.payload
-            if (refreshed != null) {
-                accessToken = refreshed.accessToken
-                refreshToken = refreshed.refreshToken
-                markPendingWorkshiftEndAttempt(pending, null, accessToken, refreshToken)
-            } else if (refreshResponse.transportFailure) {
-                break
-            } else {
+            var response = postPendingWorkshiftEndWithAccessToken(pending, accessToken)
+
+            if (response.httpStatusCode == HttpStatusCode.Unauthorized.value && refreshToken.isNotBlank()) {
+                val refreshResponse = refreshAuthTokensWithServerFallback(refreshToken)
+                val refreshed = refreshResponse.payload
+                if (refreshed != null) {
+                    accessToken = refreshed.accessToken
+                    refreshToken = refreshed.refreshToken
+                    markPendingWorkshiftEndAttempt(pending, null, accessToken, refreshToken)
+                    response = postPendingWorkshiftEndWithAccessToken(
+                        pending.copy(accessToken = accessToken, refreshToken = refreshToken),
+                        accessToken
+                    )
+                } else if (refreshResponse.transportFailure) {
+                    break
+                } else {
+                    markPendingWorkshiftEndAttempt(
+                        pending,
+                        refreshResponse.message?.extractLocalizedString(appLanguageState.value)
+                    )
+                    break
+                }
+            }
+
+            if (response.transportFailure ||
+                response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
+                response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
+                (response.httpStatusCode ?: 0) >= 500
+            ) {
                 markPendingWorkshiftEndAttempt(
                     pending,
-                    refreshResponse.message?.extractLocalizedString(appLanguageState.value)
+                    response.message?.extractLocalizedString(appLanguageState.value)
                 )
                 break
             }
-        }
 
-        if (accessToken.isBlank()) {
-            markPendingWorkshiftEndAttempt(
-                pending,
-                localizedStringResourceText(
-                    id = 91,
-                    main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
-                    ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
-                    kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
-                )
-            )
-            break
-        }
-
-        var response = postPendingWorkshiftEndWithAccessToken(pending, accessToken)
-
-        if (response.httpStatusCode == HttpStatusCode.Unauthorized.value && refreshToken.isNotBlank()) {
-            val refreshResponse = refreshAuthTokensWithServerFallback(refreshToken)
-            val refreshed = refreshResponse.payload
-            if (refreshed != null) {
-                accessToken = refreshed.accessToken
-                refreshToken = refreshed.refreshToken
-                markPendingWorkshiftEndAttempt(pending, null, accessToken, refreshToken)
-                response = postPendingWorkshiftEndWithAccessToken(
-                    pending.copy(accessToken = accessToken, refreshToken = refreshToken),
-                    accessToken
-                )
-            } else if (refreshResponse.transportFailure) {
-                break
-            } else {
+            if (response.negative || response.payload == null) {
                 markPendingWorkshiftEndAttempt(
                     pending,
-                    refreshResponse.message?.extractLocalizedString(appLanguageState.value)
+                    response.message?.extractLocalizedString(appLanguageState.value)
                 )
                 break
             }
-        }
 
-        if (response.transportFailure ||
-            response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
-            response.httpStatusCode == HttpStatusCode.ServiceUnavailable.value ||
-            (response.httpStatusCode ?: 0) >= 500
-        ) {
-            markPendingWorkshiftEndAttempt(
-                pending,
-                response.message?.extractLocalizedString(appLanguageState.value)
-            )
-            break
-        }
+            dropPendingWorkshiftEnd(pending.clientOperationId)
+            syncedCount += 1
 
-        if (response.negative || response.payload == null) {
-            markPendingWorkshiftEndAttempt(
-                pending,
-                response.message?.extractLocalizedString(appLanguageState.value)
-            )
-            break
+            val active = activeWorkshiftState.payloadValue
+            if (active?.id == pending.workshiftId) {
+                activeWorkshiftState.emit(DataState.Empty(response.message))
+            }
         }
-
-        dropPendingWorkshiftEnd(pending.clientOperationId)
-        syncedCount += 1
-
-        val active = activeWorkshiftState.payloadValue
-        if (active?.id == pending.workshiftId) {
-            activeWorkshiftState.emit(DataState.Empty(response.message))
-        }
-    }
 
         syncedCount
     }
@@ -12840,7 +12851,7 @@ private suspend fun enqueueLocalNetworkOperation(operation: LocalNetworkQueuedOp
     persistLocalNetworkQueue()
     logLocalNetworkQueueDiagnostic(
         "queued id=${nextOperation.id} type=${nextOperation.operationType} " +
-                "createdAt=${nextOperation.createdAtMillis} size=${localNetworkQueuedOperationsState.value.count { it.status != LOCAL_NETWORK_QUEUE_SYNCED }}"
+            "createdAt=${nextOperation.createdAtMillis} size=${localNetworkQueuedOperationsState.value.count { it.status != LOCAL_NETWORK_QUEUE_SYNCED }}"
     )
 }
 
@@ -13474,7 +13485,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                     if (response.negative || response.payload == null) {
                         logCloudConnectionDiagnostic(
                             "local outbox sync failed id=${operation.id} type=${operation.operationType} " +
-                                    "http=${response.httpStatusCode ?: -1} negative=${response.negative}"
+                                "http=${response.httpStatusCode ?: -1} negative=${response.negative}"
                         )
                         updateQueuedLocalNetworkOperation(operation.id) {
                             it.copy(
@@ -13489,7 +13500,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                     val synced = response.payload
                     logCloudConnectionDiagnostic(
                         "local outbox sync success id=${operation.id} type=${operation.operationType} " +
-                                "http=${response.httpStatusCode ?: -1}"
+                            "http=${response.httpStatusCode ?: -1}"
                     )
                     updateQueuedLocalNetworkOperation(operation.id) {
                         it.copy(
@@ -13557,7 +13568,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                     if (response.negative || response.payload == null) {
                         logCloudConnectionDiagnostic(
                             "local outbox sync failed id=${operation.id} type=${operation.operationType} " +
-                                    "http=${response.httpStatusCode ?: -1} negative=${response.negative}"
+                                "http=${response.httpStatusCode ?: -1} negative=${response.negative}"
                         )
                         updateQueuedLocalNetworkOperation(operation.id) {
                             it.copy(
@@ -13571,7 +13582,7 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
 
                     logCloudConnectionDiagnostic(
                         "local outbox sync success id=${operation.id} type=${operation.operationType} " +
-                                "http=${response.httpStatusCode ?: -1}"
+                            "http=${response.httpStatusCode ?: -1}"
                     )
                     updateQueuedLocalNetworkOperation(operation.id) {
                         it.copy(
@@ -13933,20 +13944,20 @@ private fun cleanRealtimeReason(reason: String?): String = reason
 
 private fun String.isSupplierRealtimeEntity(): Boolean =
     this == "suppliers" ||
-            startsWith("suppliers/") ||
-            this == "supplierorders" ||
-            startsWith("supplierorders/") ||
-            this == "suppliergoodsprices" ||
-            startsWith("suppliergoodsprices/") ||
-            this == "suppliercontracts" ||
-            startsWith("suppliercontracts/")
+        startsWith("suppliers/") ||
+        this == "supplierorders" ||
+        startsWith("supplierorders/") ||
+        this == "suppliergoodsprices" ||
+        startsWith("suppliergoodsprices/") ||
+        this == "suppliercontracts" ||
+        startsWith("suppliercontracts/")
 
 private fun String.isSupplierProfileRealtimeEntity(): Boolean =
     this == "suppliers" ||
-            this == "suppliers/add" ||
-            this == "suppliers/update" ||
-            this == "suppliers/delete" ||
-            startsWith("suppliers/profiles")
+        this == "suppliers/add" ||
+        this == "suppliers/update" ||
+        this == "suppliers/delete" ||
+        startsWith("suppliers/profiles")
 
 internal fun supplierRealtimeEntityChangesProfiles(entity: String?): Boolean =
     cleanRealtimeEntity(entity).isSupplierProfileRealtimeEntity()
@@ -13989,11 +14000,11 @@ private fun rememberRealtimeUpdateIdLocked(updateId: String?): Boolean {
 
 private fun realtimeUpdateRequiresBroadRefresh(entity: String, reason: String): Boolean =
     entity == "all" ||
-            reason == "connected" ||
-            reason == "manual_reconnect" ||
-            reason == "manual reconnect" ||
-            reason == "connection_sync" ||
-            reason == "websocket_connected"
+        reason == "connected" ||
+        reason == "manual_reconnect" ||
+        reason == "manual reconnect" ||
+        reason == "connection_sync" ||
+        reason == "websocket_connected"
 
 private fun refreshEverythingFromServerAfterRealtimeUpdate() {
     lastRealtimeBroadRefreshAtMillis = getCurrentTimeMillis()
@@ -14065,7 +14076,7 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     val supplierContractsChanged = anyEntityMatches("suppliercontracts")
     val supplierDashboardChanged = anyEntityMatches("suppliers/dashboard")
     val supplierModeActive = appModeState.value == APP_MODE_SUPPLIER ||
-            appModeState.value == APP_MODE_MANUFACTURER
+        appModeState.value == APP_MODE_MANUFACTURER
 
     if (supplierModeActive) {
         val focusedSupplierId = effectiveActiveSupplierProfileId()
@@ -14738,7 +14749,7 @@ fun startRealtimeUpdates() {
                         if (throwable is CancellationException) throw throwable
                         logCloudConnectionDiagnostic(
                             "realtime connect failed base=$realtimeBaseUrl unauthorized=${throwable.isRealtimeUnauthorizedFailure()} " +
-                                    networkFailureSummary(throwable)
+                                networkFailureSummary(throwable)
                         )
 
                         if (throwable.isRealtimeUnauthorizedFailure()) {
@@ -15092,9 +15103,9 @@ private fun String.isCloudSessionRefreshNotificationText(): Boolean {
     // Do not classify positive text such as "Cloud session active" as an expiry warning merely
     // because it contains the generic words "cloud session".
     val legacyRussian = normalized.contains("облачный сеанс") &&
-            normalized.contains("сеанс нужно обновить")
+        normalized.contains("сеанс нужно обновить")
     val legacyKazakh = normalized.contains("бұлттық сеанс") &&
-            normalized.contains("сеансты жаңарту")
+        normalized.contains("сеансты жаңарту")
     return legacyRussian || legacyKazakh
 }
 
@@ -15279,8 +15290,8 @@ private fun NotificationDataModel.isConnectionStatusNotification(): Boolean {
     val normalizedCategory = category.normalizedNotificationText()
     val combined = notificationStatusCombinedText()
     return normalizedCategory == NOTIFICATION_CONNECTION_CATEGORY ||
-            combined.isCloudTransportFailureNotificationText() ||
-            combined.isCloudTransportRecoveryNotificationText()
+        combined.isCloudTransportFailureNotificationText() ||
+        combined.isCloudTransportRecoveryNotificationText()
 }
 
 private fun NotificationDataModel.isSessionStatusNotification(): Boolean {
@@ -15390,15 +15401,15 @@ private fun scheduleCloudTransportPresentationStatus(rawStatus: Int, reason: Str
     val transition = reserveCloudConnectionPresentationTransition(nextPresentationStatus) ?: return
     val settleMillis = when {
         nextPresentationStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
-                transition.displayedStatus == CLOUD_TRANSPORT_STATUS_UNKNOWN ->
+            transition.displayedStatus == CLOUD_TRANSPORT_STATUS_UNKNOWN ->
             CLOUD_CONNECTION_PRESENTATION_INITIAL_OFFLINE_SETTLE_MILLIS
         nextPresentationStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE ->
             CLOUD_CONNECTION_PRESENTATION_OFFLINE_SETTLE_MILLIS
         transition.displayedStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
-                nextPresentationStatus == CLOUD_TRANSPORT_STATUS_REACHABLE ->
+            nextPresentationStatus == CLOUD_TRANSPORT_STATUS_REACHABLE ->
             CLOUD_CONNECTION_PRESENTATION_RECOVERY_SETTLE_MILLIS
         transition.displayedStatus == CLOUD_TRANSPORT_STATUS_UNKNOWN &&
-                nextPresentationStatus == CLOUD_TRANSPORT_STATUS_REACHABLE ->
+            nextPresentationStatus == CLOUD_TRANSPORT_STATUS_REACHABLE ->
             CLOUD_CONNECTION_PRESENTATION_INITIAL_REACHABLE_SETTLE_MILLIS
         else -> 0L
     }
@@ -15426,7 +15437,7 @@ private fun scheduleCloudTransportPresentationStatus(rawStatus: Int, reason: Str
         if (cloudConnectionPresentationState.compareAndSet(transition, settled)) {
             logCloudConnectionDiagnostic(
                 "presentation ${cloudTransportStatusName(transition.displayedStatus)} -> " +
-                        "${cloudTransportStatusName(nextPresentationStatus)} reason=$reason settled=${settleMillis}ms"
+                    "${cloudTransportStatusName(nextPresentationStatus)} reason=$reason settled=${settleMillis}ms"
             )
         }
     }
@@ -15439,8 +15450,8 @@ private fun setCloudTransportStatusForDiagnostics(nextStatus: Int, reason: Strin
         if (!cloudTransportStatusState.compareAndSet(previousStatus, nextStatus)) continue
         logCloudConnectionDiagnostic(
             "status ${cloudTransportStatusName(previousStatus)} -> ${cloudTransportStatusName(nextStatus)} " +
-                    "reason=$reason realtime=${realtimeUpdatesConnectedState.value} " +
-                    "hasTokens=${getStoredUserAuthTokens?.invoke() != null} activeStore=${activeStoreIdState.value.orEmpty()}"
+                "reason=$reason realtime=${realtimeUpdatesConnectedState.value} " +
+                "hasTokens=${getStoredUserAuthTokens?.invoke() != null} activeStore=${activeStoreIdState.value.orEmpty()}"
         )
         break
     }
@@ -15451,9 +15462,9 @@ private fun recentCloudTransportFailureIsDominant(now: Long = getCurrentTimeMill
     val lastUnavailable = cloudTransportLastUnavailableAtMillis
     val lastReachable = cloudTransportLastReachableAtMillis
     return cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
-            lastUnavailable > 0L &&
-            lastUnavailable >= lastReachable &&
-            now - lastUnavailable <= CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS
+        lastUnavailable > 0L &&
+        lastUnavailable >= lastReachable &&
+        now - lastUnavailable <= CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS
 }
 
 private fun clearCloudTransportFailureSignalsForNotifications() {
@@ -15469,12 +15480,12 @@ private fun recordCloudTransportFailureSignalForNotifications(reason: String = "
 
     val now = getCurrentTimeMillis()
     val groundedHealthyNow = realtimeUpdatesConnectedState.value ||
-            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE ||
-            cloudTransportReachableForNotifications
+        cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE ||
+        cloudTransportReachableForNotifications
 
     val updated = cloudTransportFailureSignalWindowState.updateAndGet { current ->
         val expired = current.firstSignalAtMillis <= 0L ||
-                now - current.firstSignalAtMillis > CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS
+            now - current.firstSignalAtMillis > CLOUD_TRANSPORT_FAILURE_SIGNAL_RESET_MILLIS
         if (expired) {
             CloudTransportSignalWindow(
                 signalCount = 1,
@@ -15520,9 +15531,9 @@ private fun recordCloudTransportFailureSignalForNotifications(reason: String = "
         }
         logCloudConnectionDiagnostic(
             "transport failure signal held for confirmation reason=$reason " +
-                    "signals=${updated.signalCount}/$requiredSignals elapsed=${elapsed}ms/${requiredWindow}ms " +
-                    "minimumSpacing=${minimumSpacing}ms realtime=${realtimeUpdatesConnectedState.value} " +
-                    "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                "signals=${updated.signalCount}/$requiredSignals elapsed=${elapsed}ms/${requiredWindow}ms " +
+                "minimumSpacing=${minimumSpacing}ms realtime=${realtimeUpdatesConnectedState.value} " +
+                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
         )
     }
 
@@ -15533,7 +15544,7 @@ private fun recordCloudTransportRecoverySignalForNotifications(reason: String = 
     val now = getCurrentTimeMillis()
     val updated = cloudTransportRecoverySignalWindowState.updateAndGet { current ->
         val expired = current.firstSignalAtMillis <= 0L ||
-                now - current.firstSignalAtMillis > CLOUD_TRANSPORT_RECOVERY_SIGNAL_RESET_MILLIS
+            now - current.firstSignalAtMillis > CLOUD_TRANSPORT_RECOVERY_SIGNAL_RESET_MILLIS
         if (expired) {
             CloudTransportSignalWindow(
                 signalCount = 1,
@@ -15552,14 +15563,14 @@ private fun recordCloudTransportRecoverySignalForNotifications(reason: String = 
 
     val elapsed = (now - updated.firstSignalAtMillis).coerceAtLeast(0L)
     val confirmed = updated.signalCount >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS &&
-            elapsed >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS
+        elapsed >= CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS
 
     if (!confirmed && updated.lastCountedSignalAtMillis == now) {
         logCloudConnectionDiagnostic(
             "transport recovery signal held for confirmation reason=$reason " +
-                    "signals=${updated.signalCount}/$CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS " +
-                    "elapsed=${elapsed}ms/${CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS}ms " +
-                    "minimumSpacing=${CLOUD_TRANSPORT_RECOVERY_MIN_SIGNAL_SPACING_MILLIS}ms"
+                "signals=${updated.signalCount}/$CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_MIN_SIGNALS " +
+                "elapsed=${elapsed}ms/${CLOUD_TRANSPORT_RECOVERY_CONFIRMATION_WINDOW_MILLIS}ms " +
+                "minimumSpacing=${CLOUD_TRANSPORT_RECOVERY_MIN_SIGNAL_SPACING_MILLIS}ms"
         )
     }
 
@@ -15658,7 +15669,7 @@ internal fun markCloudTransportReachableForNotifications(
     cloudTransportFailureNoticePostedForCurrentOutage = false
     if (wasUnavailable) {
         cloudTransportRecoveryNotificationPending = hadVisibleOutage &&
-                nextStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
+            nextStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
     }
     return true
 }
@@ -15706,9 +15717,9 @@ private fun shouldPostNotificationConsideringCloudTransport(
 
     if (text.isUnreadableServerResponseNotificationText()) {
         val serverIsAlreadyReachable = realtimeUpdatesConnectedState.value ||
-                cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
+            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE
         val serverIsBeingProbed = activeNetworkOperationsState.value > 0 &&
-                cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNKNOWN
+            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNKNOWN
         if (serverIsAlreadyReachable || serverIsBeingProbed) return false
     }
 
@@ -15798,7 +15809,7 @@ private fun NotificationDataModel.dedupeKey(): String = when {
 
 private fun NotificationDataModel.isHistoryDuplicateOf(other: NotificationDataModel): Boolean =
     dedupeKey() == other.dedupeKey() &&
-            kotlin.math.abs(createdAtMillis - other.createdAtMillis) <= IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS
+        kotlin.math.abs(createdAtMillis - other.createdAtMillis) <= IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS
 
 private fun List<NotificationDataModel>.dedupeRecentNotificationHistory(): List<NotificationDataModel> {
     val kept = mutableListOf<NotificationDataModel>()
@@ -15897,11 +15908,11 @@ private suspend fun pushInAppNotificationNow(notification: NotificationDataModel
 
         val duplicateActive = activeInAppNotificationsState.value.firstOrNull { existing ->
             existing.dedupeKey() == key &&
-                    (preparedNotification.isConnectionStatusNotification() || now - existing.shownAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS)
+                (preparedNotification.isConnectionStatusNotification() || now - existing.shownAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS)
         }
         val duplicateRecent = notificationsState.payloadValue.orEmpty().firstOrNull { existing ->
             existing.dedupeKey() == key &&
-                    (preparedNotification.isConnectionStatusNotification() || now - existing.createdAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS)
+                (preparedNotification.isConnectionStatusNotification() || now - existing.createdAtMillis <= IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS)
         }
 
         if (duplicateActive != null) {
@@ -15919,8 +15930,8 @@ private suspend fun pushInAppNotificationNow(notification: NotificationDataModel
         val activeBeforeInsert = activeInAppNotificationsState.value.filterNot { existing ->
             val shouldRemoveConnectionPeer = replacingConnectionStatus && existing.isConnectionStatusNotification()
             val shouldRemoveLoading = preparedNotification.type != NotificationType.Neutral &&
-                    notificationPopupTransientById[existing.id] == true &&
-                    existing.type == NotificationType.Neutral
+                notificationPopupTransientById[existing.id] == true &&
+                existing.type == NotificationType.Neutral
             val shouldRemove = shouldRemoveConnectionPeer || shouldRemoveLoading
             if (shouldRemove) {
                 notificationPopupJobs.remove(existing.id)?.cancel()
@@ -16134,67 +16145,67 @@ fun syncPendingNotificationsToServer() {
 
 fun getNotifications() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getNotificationsMutex.withLock {
-                if (getStoredUserAuthTokens?.invoke() == null) return@withLock
+        getNotificationsMutex.withLock {
+            if (getStoredUserAuthTokens?.invoke() == null) return@withLock
 
-                val localPending = notificationsState.payloadValue.orEmpty()
-                    .filter { !it.isSavedOnServer && !it.isLocalOnlyNotification() }
+            val localPending = notificationsState.payloadValue.orEmpty()
+                .filter { !it.isSavedOnServer && !it.isLocalOnlyNotification() }
 
-                val response = networkRequest<List<NotificationDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = "notifications/get"
-                )
+            val response = networkRequest<List<NotificationDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = "notifications/get"
+            )
 
-                if (!response.negative) {
-                    val serverNotifications = response.payload.orEmpty().filterNot { it.isLocalOnlyNotification() }
-                    val currentNotifications = notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() }
-                    val previousIds = currentNotifications.map { it.id }.toSet()
-                    val now = getCurrentTimeMillis()
-                    val recentPreviousByKey = currentNotifications
-                        .filter { now - it.createdAtMillis <= IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS }
-                        .groupBy { it.dedupeKey() }
+            if (!response.negative) {
+                val serverNotifications = response.payload.orEmpty().filterNot { it.isLocalOnlyNotification() }
+                val currentNotifications = notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() }
+                val previousIds = currentNotifications.map { it.id }.toSet()
+                val now = getCurrentTimeMillis()
+                val recentPreviousByKey = currentNotifications
+                    .filter { now - it.createdAtMillis <= IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS }
+                    .groupBy { it.dedupeKey() }
 
-                    serverNotifications
-                        .asSequence()
-                        .filter { notification ->
-                            val recentDuplicates = recentPreviousByKey[notification.dedupeKey()].orEmpty()
-                            notification.isSavedOnServer &&
-                                    notification.id.isNotBlank() &&
-                                    notification.id !in previousIds &&
-                                    notification.id !in serverNotificationPopupIds &&
-                                    recentDuplicates.none { previous -> notification.isHistoryDuplicateOf(previous) } &&
-                                    notification.readAtMillis == null &&
-                                    notification.message.isNotBlank() &&
-                                    (notification.createdAtMillis >= notificationPopupBootMillis || now - notification.createdAtMillis <= SERVER_NOTIFICATION_POPUP_FRESH_WINDOW_MILLIS)
-                        }
-                        .sortedBy { it.createdAtMillis }
-                        .forEach { notification ->
-                            serverNotificationPopupIds += notification.id
-                            pushInAppNotification(notification.copy(shownAtMillis = now), transient = true)
-                        }
-
-                    if (serverNotificationPopupIds.size > LOCAL_NOTIFICATION_HISTORY_LIMIT * 4) {
-                        val visibleServerIds = serverNotifications.map { it.id }.toSet()
-                        serverNotificationPopupIds.retainAll(visibleServerIds)
+                serverNotifications
+                    .asSequence()
+                    .filter { notification ->
+                        val recentDuplicates = recentPreviousByKey[notification.dedupeKey()].orEmpty()
+                        notification.isSavedOnServer &&
+                            notification.id.isNotBlank() &&
+                            notification.id !in previousIds &&
+                            notification.id !in serverNotificationPopupIds &&
+                            recentDuplicates.none { previous -> notification.isHistoryDuplicateOf(previous) } &&
+                            notification.readAtMillis == null &&
+                            notification.message.isNotBlank() &&
+                            (notification.createdAtMillis >= notificationPopupBootMillis || now - notification.createdAtMillis <= SERVER_NOTIFICATION_POPUP_FRESH_WINDOW_MILLIS)
+                    }
+                    .sortedBy { it.createdAtMillis }
+                    .forEach { notification ->
+                        serverNotificationPopupIds += notification.id
+                        pushInAppNotification(notification.copy(shownAtMillis = now), transient = true)
                     }
 
-                    val merged = (localPending + serverNotifications)
-                        .distinctBy { it.id }
-                        .dedupeRecentNotificationHistory()
-                        .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
-                    notificationsState.emit(DataState.Success(merged, response.message))
-                    syncPendingNotificationsToServer()
-                } else if (response.transportFailure) {
-                    // Keep local notification history available offline.
-                    notificationsState.emit(
-                        DataState.Success(
-                            notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() },
-                            response.message
-                        )
-                    )
+                if (serverNotificationPopupIds.size > LOCAL_NOTIFICATION_HISTORY_LIMIT * 4) {
+                    val visibleServerIds = serverNotifications.map { it.id }.toSet()
+                    serverNotificationPopupIds.retainAll(visibleServerIds)
                 }
+
+                val merged = (localPending + serverNotifications)
+                    .distinctBy { it.id }
+                    .dedupeRecentNotificationHistory()
+                    .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
+                notificationsState.emit(DataState.Success(merged, response.message))
+                syncPendingNotificationsToServer()
+            } else if (response.transportFailure) {
+                // Keep local notification history available offline.
+                notificationsState.emit(
+                    DataState.Success(
+                        notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() },
+                        response.message
+                    )
+                )
             }
         }
+    }
 }
 
 fun saveNotificationToServer(notification: NotificationDataModel) {
@@ -16284,28 +16295,28 @@ private fun List<SupportMessageDataModel>.upsertSupportMessage(message: SupportM
 
 fun getSupportTickets(onCompleted: ((DataState<List<SupportTicketDataModel>>) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getSupportTicketsMutex.withLock {
-                if (getStoredUserAuthTokens?.invoke() == null) return@withLock
+        getSupportTicketsMutex.withLock {
+            if (getStoredUserAuthTokens?.invoke() == null) return@withLock
 
-                val response = networkRequest<List<SupportTicketDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSupportTicketsPath.first
+            val response = networkRequest<List<SupportTicketDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getSupportTicketsPath.first
+            )
+
+            if (response.negative || response.payload == null) {
+                if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                supportTicketsState.emit(DataState.Success(response.payload, response.message))
+                activeSupportTicketIdState.emit(
+                    activeSupportTicketIdState.value?.takeIf { activeId -> response.payload.any { it.id == activeId } }
+                        ?: response.payload.firstOrNull { it.status != "closed" }?.id
+                        ?: response.payload.firstOrNull()?.id
                 )
-
-                if (response.negative || response.payload == null) {
-                    if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supportTicketsState.emit(DataState.Success(response.payload, response.message))
-                    activeSupportTicketIdState.emit(
-                        activeSupportTicketIdState.value?.takeIf { activeId -> response.payload.any { it.id == activeId } }
-                            ?: response.payload.firstOrNull { it.status != "closed" }?.id
-                            ?: response.payload.firstOrNull()?.id
-                    )
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun createSupportTicket(
@@ -16361,33 +16372,33 @@ fun getSupportMessages(
 ) {
     if (ticketId.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
-            getSupportMessagesMutex.withLock {
-                activeSupportTicketIdState.emit(ticketId)
-                val response = networkRequest<List<SupportMessageDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSupportMessagesPath.first,
-                    headers = mapOf(
-                        "ticket_id" to ticketId,
-                        "mark_read" to markRead.toString()
-                    )
+        getSupportMessagesMutex.withLock {
+            activeSupportTicketIdState.emit(ticketId)
+            val response = networkRequest<List<SupportMessageDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getSupportMessagesPath.first,
+                headers = mapOf(
+                    "ticket_id" to ticketId,
+                    "mark_read" to markRead.toString()
                 )
+            )
 
-                if (response.negative || response.payload == null) {
-                    if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supportMessagesState.emit(DataState.Success(response.payload, response.message))
-                    if (markRead) {
-                        supportTicketsState.emit(
-                            DataState.Success(
-                                supportTicketsState.payloadValue.orEmpty().map { if (it.id == ticketId) it.copy(unreadForUserCount = 0) else it }
-                            )
+            if (response.negative || response.payload == null) {
+                if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                supportMessagesState.emit(DataState.Success(response.payload, response.message))
+                if (markRead) {
+                    supportTicketsState.emit(
+                        DataState.Success(
+                            supportTicketsState.payloadValue.orEmpty().map { if (it.id == ticketId) it.copy(unreadForUserCount = 0) else it }
                         )
-                    }
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    )
                 }
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun sendSupportMessage(
@@ -16434,117 +16445,117 @@ fun sendSupportMessage(
 fun closeSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
     if (ticketId.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
-            closeSupportTicketMutex.withLock {
-                val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.closeSupportTicketPath.first,
-                    body = SupportTicketActionRequestDataModel(ticketId)
-                )
+        closeSupportTicketMutex.withLock {
+            val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.closeSupportTicketPath.first,
+                body = SupportTicketActionRequestDataModel(ticketId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(response.payload), response.message))
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(response.payload), response.message))
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun reopenSupportTicket(ticketId: String, onCompleted: ((DataState<SupportTicketDataModel>) -> Unit)? = null) {
     if (ticketId.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
-            reopenSupportTicketMutex.withLock {
-                val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.reopenSupportTicketPath.first,
-                    body = SupportTicketActionRequestDataModel(ticketId)
-                )
+        reopenSupportTicketMutex.withLock {
+            val response = networkRequest<SupportTicketDataModel, SupportTicketActionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.reopenSupportTicketPath.first,
+                body = SupportTicketActionRequestDataModel(ticketId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(response.payload), response.message))
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                supportTicketsState.emit(DataState.Success(supportTicketsState.payloadValue.orEmpty().upsertSupportTicket(response.payload), response.message))
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun markSupportMessagesRead(ticketId: String) {
     if (ticketId.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
-            markSupportMessagesReadMutex.withLock {
-                networkRequest<List<SupportMessageDataModel>, SupportMessagesReadRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.markSupportMessagesReadPath.first,
-                    body = SupportMessagesReadRequestDataModel(ticketId)
-                ).takeIf { !it.negative && it.payload != null }?.payload?.let { messages ->
-                    supportMessagesState.emit(DataState.Success(messages))
-                    supportTicketsState.emit(
-                        DataState.Success(
-                            supportTicketsState.payloadValue.orEmpty().map { if (it.id == ticketId) it.copy(unreadForUserCount = 0) else it }
-                        )
+        markSupportMessagesReadMutex.withLock {
+            networkRequest<List<SupportMessageDataModel>, SupportMessagesReadRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.markSupportMessagesReadPath.first,
+                body = SupportMessagesReadRequestDataModel(ticketId)
+            ).takeIf { !it.negative && it.payload != null }?.payload?.let { messages ->
+                supportMessagesState.emit(DataState.Success(messages))
+                supportTicketsState.emit(
+                    DataState.Success(
+                        supportTicketsState.payloadValue.orEmpty().map { if (it.id == ticketId) it.copy(unreadForUserCount = 0) else it }
                     )
-                }
+                )
             }
         }
+    }
 }
 
 fun getSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getSecuritySessionsMutex.withLock {
-                val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSecuritySessionsPath.first
-                )
+        getSecuritySessionsMutex.withLock {
+            val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getSecuritySessionsPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    if (response.transportFailure) {
-                        postInAppNotification(
-                            localizedStringResourceMessage(
-                                id = 215,
-                                main = "Cannot reach server. Security sessions will refresh when connection returns.",
-                                ru = "Сервер недоступен. Сеансы безопасности обновятся после восстановления соединения.",
-                                kk = "Сервер қолжетімсіз. Қауіпсіздік сеанстары байланыс қалпына келгенде жаңартылады."
-                            ),
-                            NotificationType.Neutral
-                        )
-                    } else {
-                        postInAppNotification(response.message, NotificationType.Negative)
-                    }
-                    onCompleted?.invoke(DataState.Empty(response.message))
+            if (response.negative || response.payload == null) {
+                if (response.transportFailure) {
+                    postInAppNotification(
+                        localizedStringResourceMessage(
+                            id = 215,
+                            main = "Cannot reach server. Security sessions will refresh when connection returns.",
+                            ru = "Сервер недоступен. Сеансы безопасности обновятся после восстановления соединения.",
+                            kk = "Сервер қолжетімсіз. Қауіпсіздік сеанстары байланыс қалпына келгенде жаңартылады."
+                        ),
+                        NotificationType.Neutral
+                    )
                 } else {
-                    securitySessionsState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                    postInAppNotification(response.message, NotificationType.Negative)
                 }
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                securitySessionsState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun getSecuritySessionHistory(onCompleted: ((DataState<List<SecuritySessionHistoryDataModel>>) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getSecuritySessionHistoryMutex.withLock {
-                val response = networkRequest<List<SecuritySessionHistoryDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSecuritySessionHistoryPath.first
-                )
+        getSecuritySessionHistoryMutex.withLock {
+            val response = networkRequest<List<SecuritySessionHistoryDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getSecuritySessionHistoryPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    if (!response.transportFailure) {
-                        postInAppNotification(response.message, NotificationType.Negative)
-                    }
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    securitySessionHistoryState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            if (response.negative || response.payload == null) {
+                if (!response.transportFailure) {
+                    postInAppNotification(response.message, NotificationType.Negative)
                 }
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                securitySessionHistoryState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun revokeSecuritySession(
@@ -16554,55 +16565,55 @@ fun revokeSecuritySession(
     if (sessionId.isBlank()) return
 
     GlobalScope.launch(Dispatchers.ourIo) {
-            revokeSecuritySessionMutex.withLock {
-                val response = networkRequest<List<SecuritySessionDataModel>, SecuritySessionRevokeRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.revokeSecuritySessionPath.first,
-                    body = SecuritySessionRevokeRequestDataModel(sessionId)
-                )
+        revokeSecuritySessionMutex.withLock {
+            val response = networkRequest<List<SecuritySessionDataModel>, SecuritySessionRevokeRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.revokeSecuritySessionPath.first,
+                body = SecuritySessionRevokeRequestDataModel(sessionId)
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    securitySessionsState.emit(DataState.Success(response.payload, response.message))
-                    getSecuritySessionHistory()
-                    postInAppNotification(response.message ?: localizedStringResourceMessage(
-                        id = 216,
-                        main = "Session revoked",
-                        ru = "Сеанс завершён",
-                        kk = "Сеанс тоқтатылды"
-                    ), NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                securitySessionsState.emit(DataState.Success(response.payload, response.message))
+                getSecuritySessionHistory()
+                postInAppNotification(response.message ?: localizedStringResourceMessage(
+                    id = 216,
+                    main = "Session revoked",
+                    ru = "Сеанс завершён",
+                    kk = "Сеанс тоқтатылды"
+                ), NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun revokeOtherSecuritySessions(onCompleted: ((DataState<List<SecuritySessionDataModel>>) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            revokeOtherSecuritySessionsMutex.withLock {
-                val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.revokeOtherSecuritySessionsPath.first
-                )
+        revokeOtherSecuritySessionsMutex.withLock {
+            val response = networkRequest<List<SecuritySessionDataModel>, Unit>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.revokeOtherSecuritySessionsPath.first
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    securitySessionsState.emit(DataState.Success(response.payload, response.message))
-                    getSecuritySessionHistory()
-                    postInAppNotification(response.message ?: localizedStringResourceMessage(
-                        id = 217,
-                        main = "Other sessions revoked",
-                        ru = "Другие сеансы завершены",
-                        kk = "Басқа сеанстар тоқтатылды"
-                    ), NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, if (response.transportFailure) NotificationType.Neutral else NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                securitySessionsState.emit(DataState.Success(response.payload, response.message))
+                getSecuritySessionHistory()
+                postInAppNotification(response.message ?: localizedStringResourceMessage(
+                    id = 217,
+                    main = "Other sessions revoked",
+                    ru = "Другие сеансы завершены",
+                    kk = "Басқа сеанстар тоқтатылды"
+                ), NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? = null) {
@@ -17043,26 +17054,26 @@ fun updateUser(
     userAccountUpdate: UserAccountUpdateDataModel
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateUserMutex.withLock {
-                val response = networkRequest<UserAccountDataModel, UserAccountUpdateDataModel>(
-                    HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateUserPath.first,
-                    body = userAccountUpdate
+        updateUserMutex.withLock {
+            val response = networkRequest<UserAccountDataModel, UserAccountUpdateDataModel>(
+                HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateUserPath.first,
+                body = userAccountUpdate
+            )
+
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+            } else {
+                userAccountState.emit(DataState.Success(response.payload!!, response.message))
+
+                postInAppNotification(
+                    response.message,
+                    NotificationType.Positive
                 )
-
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                } else {
-                    userAccountState.emit(DataState.Success(response.payload!!, response.message))
-
-                    postInAppNotification(
-                        response.message,
-                        NotificationType.Positive
-                    )
-                    setStoredUserAccountDataModel?.invoke(response.payload)
-                }
+                setStoredUserAccountDataModel?.invoke(response.payload)
             }
         }
+    }
 }
 
 @kotlinx.serialization.Serializable
@@ -17270,13 +17281,13 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         "RESULT ${method.value} $requestUrl HTTP ${response.status.value} aita=$aitaServerResponse"
                     )
                     val shouldRetryCandidate = index < serverUrlCandidates.lastIndex &&
-                            shouldRetryNetworkRequestOnNextServerUrl(
-                                method = method,
-                                endpointUrl = endpointUrl,
-                                status = response.status,
-                                rawBody = rawBody,
-                                aitaServerResponse = aitaServerResponse
-                            )
+                        shouldRetryNetworkRequestOnNextServerUrl(
+                            method = method,
+                            endpointUrl = endpointUrl,
+                            status = response.status,
+                            rawBody = rawBody,
+                            aitaServerResponse = aitaServerResponse
+                        )
 
                     if (!aitaServerResponse) {
                         val nonAitaResponse = nonAitaHttpResponseDataModel<Response>(
@@ -17301,7 +17312,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                         markCloudTransportUnavailableForNotifications(reason = "server_unhealthy_${response.status.value}")
                         logCloudConnectionDiagnostic(
                             "server response treated as unavailable method=${method.value} endpoint=${endpointUrl.trim('/')} " +
-                                    "http=${response.status.value} aita=$aitaServerResponse negative=${failureResponse.negative}"
+                                "http=${response.status.value} aita=$aitaServerResponse negative=${failureResponse.negative}"
                         )
                         if (shouldRetryCandidate) break@retrySameServer
                         return failureResponse
@@ -17317,9 +17328,9 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     if (canMarkReachable) {
                         rememberReachableServerUrl(resolvedServerUrl)
                         val authenticatedResponse = protectedEndpoint &&
-                                response.status != HttpStatusCode.Unauthorized &&
-                                response.status.value < 500 &&
-                                getStoredUserAuthTokens?.invoke() != null
+                            response.status != HttpStatusCode.Unauthorized &&
+                            response.status.value < 500 &&
+                            getStoredUserAuthTokens?.invoke() != null
                         if (authenticatedResponse) {
                             getStoredUserAuthTokens?.invoke()?.accessToken?.let(::markCloudAccessTokenValidated)
                         }
@@ -17335,7 +17346,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     } else {
                         logCloudConnectionDiagnostic(
                             "reachable mark suppressed endpoint=$endpointUrl http=${response.status.value} " +
-                                    "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
+                                "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
                         )
                         if (response.status.value >= 500) {
                             markCloudTransportUnavailableForNotifications(reason = "suppressed_server_failure")
@@ -17434,7 +17445,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     )
                     logNetworkAttempt(
                         "FAILED ${method.value} ${networkTargetUrl(resolvedServerUrl, endpointUrl)} " +
-                                networkFailureSummary(throwable)
+                            networkFailureSummary(throwable)
                     )
                     break@retrySameServer
                 }
@@ -17807,95 +17818,95 @@ fun getStores() {
 
 fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            addStoreMutex.withLock {
-                val response = networkRequest<StoreDataModel, StoreDataModel>(
-                    HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.addStoresPath.first,
-                    body = store
+        addStoreMutex.withLock {
+            val response = networkRequest<StoreDataModel, StoreDataModel>(
+                HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.addStoresPath.first,
+                body = store
+            )
+
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+
+                onCompleted?.invoke(DataState.Empty())
+            } else {
+                postInAppNotification(response.message, NotificationType.Positive)
+
+                storesState.emit(
+                    DataState.Success(
+                        storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
+                    )
                 )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
+                getStores()
 
-                    onCompleted?.invoke(DataState.Empty())
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
-
-                    storesState.emit(
-                        DataState.Success(
-                            storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
-                        )
-                    )
-
-                    getStores()
-
-                    onCompleted?.invoke(DataState.Success(response.payload!!))
-                }
+                onCompleted?.invoke(DataState.Success(response.payload!!))
             }
         }
+    }
 }
 
 fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            updateStoreMutex.withLock {
-                val response = networkRequest<StoreDataModel, StoreDataModel>(
-                    HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateStoresPath.first,
-                    body = store
-                )
+        updateStoreMutex.withLock {
+            val response = networkRequest<StoreDataModel, StoreDataModel>(
+                HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateStoresPath.first,
+                body = store
+            )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
 
-                    onCompleted?.invoke(DataState.Empty())
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Empty())
+            } else {
+                postInAppNotification(response.message, NotificationType.Positive)
 
-                    storesState.emit(
-                        DataState.Success(
-                            storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
-                        )
+                storesState.emit(
+                    DataState.Success(
+                        storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
                     )
-                    getStores()
+                )
+                getStores()
 
-                    onCompleted?.invoke(DataState.Success(response.payload!!))
-                }
+                onCompleted?.invoke(DataState.Success(response.payload!!))
             }
         }
+    }
 }
 
 fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            deleteStoreMutex.withLock {
-                val response = networkRequest<Unit, String>(
-                    HttpMethod.Delete,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteStoresPath.first,
-                    body = store.id
+        deleteStoreMutex.withLock {
+            val response = networkRequest<Unit, String>(
+                HttpMethod.Delete,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteStoresPath.first,
+                body = store.id
+            )
+
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty())
+            } else {
+                postInAppNotification(response.message, NotificationType.Positive)
+
+                val removedIds = listOf(store).flattenStoresWithBranches().map { it.id }.toSet()
+
+                storesState.emit(
+                    DataState.Success(
+                        storesState.payloadValue.orEmpty().withoutStoreOrBranch(store.id)
+                    )
                 )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty())
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
-
-                    val removedIds = listOf(store).flattenStoresWithBranches().map { it.id }.toSet()
-
-                    storesState.emit(
-                        DataState.Success(
-                            storesState.payloadValue.orEmpty().withoutStoreOrBranch(store.id)
-                        )
-                    )
-
-                    if (activeStoreIdState.value in removedIds) {
-                        setActiveStoreId(null)
-                    }
-
-                    getStores()
-                    onCompleted?.invoke(DataState.Success(Unit, response.message))
+                if (activeStoreIdState.value in removedIds) {
+                    setActiveStoreId(null)
                 }
+
+                getStores()
+                onCompleted?.invoke(DataState.Success(Unit, response.message))
             }
         }
+    }
 }
 
 private val activeStoreSelectionGenerationState = MutableStateFlow(0L)
@@ -18186,16 +18197,16 @@ fun refreshGenericGoodsItems(
 
 fun getGenericGoodsCategories() {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getGenericGoodsCategoriesMutex.withLock {
-                val response = networkRequest<List<GenericGoodsCategoryDataModel>, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getGenericGoodsCategoriesPath.first
-                )
+        getGenericGoodsCategoriesMutex.withLock {
+            val response = networkRequest<List<GenericGoodsCategoryDataModel>, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getGenericGoodsCategoriesPath.first
+            )
 
-                if (!response.negative)
-                    genericGoodsCategoriesState.emit(DataState.Success(response.payload!!, response.message))
-            }
+            if (!response.negative)
+                genericGoodsCategoriesState.emit(DataState.Success(response.payload!!, response.message))
         }
+    }
 }
 
 fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<GoodsItemInCartDataModel>> {
@@ -18234,19 +18245,19 @@ fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<Goods
 
 fun getStock(storeId: String) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStockMutex.withLock {
-                val response = networkRequest<List<GoodsItemDataModel>, Unit>(
-                    HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getStockMutex.withLock {
+            val response = networkRequest<List<GoodsItemDataModel>, Unit>(
+                HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (!response.negative) {
-                    val cleanPayload = filterRecentlyDeletedStockItems(response.payload.orEmpty())
-                    stockState.emit(DataState.Success(cleanPayload, response.message))
-                }
+            if (!response.negative) {
+                val cleanPayload = filterRecentlyDeletedStockItems(response.payload.orEmpty())
+                stockState.emit(DataState.Success(cleanPayload, response.message))
             }
         }
+    }
 }
 
 fun getParentStoreStock(
@@ -18428,57 +18439,57 @@ fun addGoodsItem(
 
 fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            deleteGoodsItemMutex.withLock {
-                val response = networkRequest<String, String>(
-                    HttpMethod.Delete,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteGoodsItemPath.first,
-                    body = id,
-                    headers = mapOf("store_id" to storeId)
-                )
+        deleteGoodsItemMutex.withLock {
+            val response = networkRequest<String, String>(
+                HttpMethod.Delete,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteGoodsItemPath.first,
+                body = id,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
 
-                    onCompleted?.invoke()
-                } else {
-                    val deletedId = response.payload?.takeIf { it.isNotBlank() } ?: id
-                    rememberRecentlyDeletedStockItemId(deletedId)
-                    postInAppNotification(response.message, NotificationType.Positive, transient = true)
+                onCompleted?.invoke()
+            } else {
+                val deletedId = response.payload?.takeIf { it.isNotBlank() } ?: id
+                rememberRecentlyDeletedStockItemId(deletedId)
+                postInAppNotification(response.message, NotificationType.Positive, transient = true)
 
-                    stockState.payloadValue?.run {
-                        stockState.emit(DataState.Success(filter { it.id != deletedId }))
-                    }
-                    parentStoreStockState.payloadValue?.run {
-                        parentStoreStockState.emit(DataState.Success(filter { it.id != deletedId }))
-                    }
-                    stockBatchesState.payloadValue?.run {
-                        stockBatchesState.emit(DataState.Success(filter { it.goodsItemId != deletedId }))
-                    }
-
-                    deleteCartItemById(deletedId)
-
-                    onCompleted?.invoke()
+                stockState.payloadValue?.run {
+                    stockState.emit(DataState.Success(filter { it.id != deletedId }))
                 }
+                parentStoreStockState.payloadValue?.run {
+                    parentStoreStockState.emit(DataState.Success(filter { it.id != deletedId }))
+                }
+                stockBatchesState.payloadValue?.run {
+                    stockBatchesState.emit(DataState.Success(filter { it.goodsItemId != deletedId }))
+                }
+
+                deleteCartItemById(deletedId)
+
+                onCompleted?.invoke()
             }
         }
+    }
 }
 
 fun getStockBatches(storeId: String) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStockBatchesMutex.withLock {
-                val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
-                    HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
-                    headers = mapOf("store_id" to storeId)
-                )
+        getStockBatchesMutex.withLock {
+            val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
+                HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (!response.negative) {
-                    response.payload?.let { batches ->
-                        stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(batches), response.message))
-                    }
+            if (!response.negative) {
+                response.payload?.let { batches ->
+                    stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(batches), response.message))
                 }
             }
         }
+    }
 }
 
 fun getStockItemBranchAvailability(
@@ -18487,25 +18498,25 @@ fun getStockItemBranchAvailability(
     onCompleted: ((DataState<StockItemBranchAvailabilityDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            getStockItemBranchAvailabilityMutex.withLock {
-                val response = networkRequest<StockItemBranchAvailabilityDataModel, Unit>(
-                    method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStockItemBranchAvailabilityPath.first,
-                    headers = mapOf(
-                        "store_id" to storeId,
-                        "goods_item_id" to goodsItemId
-                    )
+        getStockItemBranchAvailabilityMutex.withLock {
+            val response = networkRequest<StockItemBranchAvailabilityDataModel, Unit>(
+                method = HttpMethod.Get,
+                endpointUrl = globalAppConfigurationState.payloadValue.getStockItemBranchAvailabilityPath.first,
+                headers = mapOf(
+                    "store_id" to storeId,
+                    "goods_item_id" to goodsItemId
                 )
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    stockItemBranchAvailabilityState.emit(DataState.Success(response.payload, response.message))
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
-                }
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                stockItemBranchAvailabilityState.emit(DataState.Success(response.payload, response.message))
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun moveStockBatchBetweenStores(
@@ -18513,32 +18524,32 @@ fun moveStockBatchBetweenStores(
     onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            moveStockBatchMutex.withLock {
-                val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.moveStockBatchPath.first,
-                    body = request.copy(actorStoreId = activeStoreIdState.value ?: request.actorStoreId ?: request.sourceStoreId),
-                    headers = mapOf("store_id" to (activeStoreIdState.value ?: request.sourceStoreId))
-                )
+        moveStockBatchMutex.withLock {
+            val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.moveStockBatchPath.first,
+                body = request.copy(actorStoreId = activeStoreIdState.value ?: request.actorStoreId ?: request.sourceStoreId),
+                headers = mapOf("store_id" to (activeStoreIdState.value ?: request.sourceStoreId))
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
-                    stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
+                stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
 
-                    val activeStoreId = activeStoreIdState.value
-                    if (!activeStoreId.isNullOrBlank()) {
-                        getStock(activeStoreId)
-                        getStockBatches(activeStoreId)
-                    }
-
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                val activeStoreId = activeStoreIdState.value
+                if (!activeStoreId.isNullOrBlank()) {
+                    getStock(activeStoreId)
+                    getStockBatches(activeStoreId)
                 }
+
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun decideStockBatchMove(
@@ -18546,32 +18557,32 @@ fun decideStockBatchMove(
     onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
-            moveStockBatchMutex.withLock {
-                val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveDecisionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.decideStockBatchMovePath.first,
-                    body = request,
-                    headers = mapOf("store_id" to (activeStoreIdState.value ?: ""))
-                )
+        moveStockBatchMutex.withLock {
+            val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveDecisionRequestDataModel>(
+                method = HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.decideStockBatchMovePath.first,
+                body = request,
+                headers = mapOf("store_id" to (activeStoreIdState.value ?: ""))
+            )
 
-                if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    onCompleted?.invoke(DataState.Empty(response.message))
-                } else {
-                    stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
-                    stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
+            if (response.negative || response.payload == null) {
+                postInAppNotification(response.message, NotificationType.Negative)
+                onCompleted?.invoke(DataState.Empty(response.message))
+            } else {
+                stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
+                stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
 
-                    val activeStoreId = activeStoreIdState.value
-                    if (!activeStoreId.isNullOrBlank()) {
-                        getStock(activeStoreId)
-                        getStockBatches(activeStoreId)
-                    }
-
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                val activeStoreId = activeStoreIdState.value
+                if (!activeStoreId.isNullOrBlank()) {
+                    getStock(activeStoreId)
+                    getStockBatches(activeStoreId)
                 }
+
+                postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
+    }
 }
 
 fun updateGoodsBatches(
@@ -18580,43 +18591,43 @@ fun updateGoodsBatches(
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
         updateGoodsBatchMutex.withLock {
-                val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
-                    HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
-                    body = goodsBatches
-                )
+            val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
+                HttpMethod.Put,
+                endpointUrl = globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
+                body = goodsBatches
+            )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
 
-                    onCompleted?.invoke(DataState.Empty())
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke(DataState.Empty())
+            } else {
+                postInAppNotification(response.message, NotificationType.Positive)
 
-                    stockBatchesState.emit(
-                        DataState.Success(
-                            mutableListOf<GoodsBatchDataModel>().also { newList ->
-                                (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
-                                    newList.addAll(this)
-                                }
+                stockBatchesState.emit(
+                    DataState.Success(
+                        mutableListOf<GoodsBatchDataModel>().also { newList ->
+                            (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
+                                newList.addAll(this)
+                            }
 
-                                response.payload!!.forEach { item ->
-                                    val index = newList.indexOfFirst { it.id == item.id }
+                            response.payload!!.forEach { item ->
+                                val index = newList.indexOfFirst { it.id == item.id }
 
-                                    if (index >= 0) {
-                                        newList[index] = item
-                                    } else {
-                                        newList.add(item)
-                                    }
+                                if (index >= 0) {
+                                    newList[index] = item
+                                } else {
+                                    newList.add(item)
                                 }
                             }
-                        )
+                        }
                     )
+                )
 
-                    onCompleted?.invoke(DataState.Success(response.payload!!))
-                }
+                onCompleted?.invoke(DataState.Success(response.payload!!))
             }
         }
+    }
 }
 
 fun addGoodsBatches(
@@ -18625,67 +18636,67 @@ fun addGoodsBatches(
 ) {
     GlobalScope.launch(Dispatchers.ourIo) {
         addGoodsBatchMutex.withLock {
-                val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
-                    HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.addStockBatchPath.first,
-                    body = goodsBatches
+            val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
+                HttpMethod.Post,
+                endpointUrl = globalAppConfigurationState.payloadValue.addStockBatchPath.first,
+                body = goodsBatches
+            )
+
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
+
+                onCompleted?.invoke(DataState.Empty())
+            } else {
+                postInAppNotification(response.message, NotificationType.Positive)
+
+                stockBatchesState.emit(
+                    DataState.Success(
+                        mutableListOf<GoodsBatchDataModel>().also { newList ->
+                            (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
+                                newList.addAll(this)
+                            }
+
+                            newList.addAll(response.payload!!)
+                        }
+                    )
                 )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-
-                    onCompleted?.invoke(DataState.Empty())
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
-
-                    stockBatchesState.emit(
-                        DataState.Success(
-                            mutableListOf<GoodsBatchDataModel>().also { newList ->
-                                (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
-                                    newList.addAll(this)
-                                }
-
-                                newList.addAll(response.payload!!)
-                            }
-                        )
-                    )
-
-                    onCompleted?.invoke(DataState.Success(response.payload!!))
-                }
+                onCompleted?.invoke(DataState.Success(response.payload!!))
             }
         }
+    }
 }
 
 fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> Unit)?) {
     GlobalScope.launch(Dispatchers.ourIo) {
         deleteGoodsBatchMutex.withLock {
-                val response = networkRequest<List<String>, List<String>>(
-                    HttpMethod.Delete,
-                    endpointUrl = globalAppConfigurationState.payloadValue.deleteStockBatchPath.first,
-                    body = ids,
-                    headers = mapOf("store_id" to storeId)
-                )
+            val response = networkRequest<List<String>, List<String>>(
+                HttpMethod.Delete,
+                endpointUrl = globalAppConfigurationState.payloadValue.deleteStockBatchPath.first,
+                body = ids,
+                headers = mapOf("store_id" to storeId)
+            )
 
-                if (response.negative) {
-                    postInAppNotification(response.message, NotificationType.Negative)
+            if (response.negative) {
+                postInAppNotification(response.message, NotificationType.Negative)
 
-                    onCompleted?.invoke()
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
+                onCompleted?.invoke()
+            } else {
+                postInAppNotification(response.message, NotificationType.Positive)
 
-                    val deletedIds = response.payload.orEmpty()
+                val deletedIds = response.payload.orEmpty()
 
-                    stockBatchesState.emit(
-                        DataState.Success(
-                            mutableListOf<GoodsBatchDataModel>().also { newList ->
-                                stockBatchesState.payloadValue?.let {
-                                    newList.addAll(it)
-                                    newList.removeAll { item -> item.id in deletedIds }
-                                }
-                            },
-                            response.message
-                        )
+                stockBatchesState.emit(
+                    DataState.Success(
+                        mutableListOf<GoodsBatchDataModel>().also { newList ->
+                            stockBatchesState.payloadValue?.let {
+                                newList.addAll(it)
+                                newList.removeAll { item -> item.id in deletedIds }
+                            }
+                        },
+                        response.message
                     )
+                )
 
 //          stockBatchesState.emit(
 //            DataState.Success(
@@ -18698,10 +18709,10 @@ fun deleteGoodsBatches(ids: List<String>, storeId: String, onCompleted: (() -> U
 //            )
 //          )
 
-                    onCompleted?.invoke()
-                }
+                onCompleted?.invoke()
             }
         }
+    }
 }
 
 fun addGoodsItems(
@@ -19381,30 +19392,80 @@ fun <From, To> DataState<From>.map(
     }
 }
 
+private data class AitaDataStateSnapshot<T>(
+    val state: DataState<T>,
+    val payload: T?
+)
+
+private data class AitaNonNullDataStateSnapshot<T>(
+    val state: DataState<T>,
+    val payload: T
+)
+
+private inline fun <T> MutableStateFlow<T>.aitaAtomicUpdate(transform: (T) -> T) {
+    while (true) {
+        val current = value
+        val next = transform(current)
+        if (compareAndSet(current, next)) return
+    }
+}
+
+/**
+ * A read-only StateFlow projection backed by one authoritative snapshot flow.
+ *
+ * AITA exposes both a DataState envelope and a convenient payload flow. Keeping those as two
+ * independently mutable StateFlows allows concurrent writers to interleave their assignments and
+ * leave a final impossible pair (for example, Success(A) beside payload B). This projection lets
+ * both public views read and collect from the same atomic MutableStateFlow snapshot instead.
+ */
+@OptIn(InternalCoroutinesApi::class)
+private class AitaMappedStateFlow<Source, Value>(
+    private val source: StateFlow<Source>,
+    private val transform: (Source) -> Value
+) : StateFlow<Value> {
+    override val value: Value
+        get() = transform(source.value)
+
+    override val replayCache: List<Value>
+        get() = listOf(value)
+
+    override suspend fun collect(collector: FlowCollector<Value>): Nothing {
+        source
+            .map(transform)
+            .distinctUntilChanged()
+            .collect(collector)
+        error("AITA StateFlow projection completed unexpectedly")
+    }
+}
+
 class MutableDataStateFlowNonNull<T>(
     @Suppress("UNUSED_PARAMETER") coroutineScope: CoroutineScope,
     initial: T
 ): DataStateFlowNonNull<T> {
 
-    private val _state = MutableStateFlow<DataState<T>>(DataState.Success(initial))
-    override val value = _state.asStateFlow()
-    private val _payload = MutableStateFlow(initial)
-    override val payload = _payload.asStateFlow()
+    private val snapshot = MutableStateFlow(
+        AitaNonNullDataStateSnapshot<T>(
+            state = DataState.Success(initial),
+            payload = initial
+        )
+    )
+    override val value: StateFlow<DataState<T>> = AitaMappedStateFlow(snapshot) { it.state }
+    override val payload: StateFlow<T> = AitaMappedStateFlow(snapshot) { it.payload }
 
     /**
-     * Publishes the state and its payload in the caller's operation order.
-     *
-     * The previous implementation launched a new coroutine for every write and a second collector
-     * coroutine to mirror successful payloads. Two rapid writes could therefore become visible in
-     * the opposite order, and a write could disappear entirely when the construction scope had
-     * already been cancelled. MutableStateFlow is thread-safe, so these tiny synchronous assignments
-     * preserve sequential caller order and remove an unnecessary dependency on scope lifetime.
+     * Atomically publishes the envelope together with its matching last successful payload.
+     * Empty is still allowed to change the envelope without erasing the non-null payload contract.
      */
     fun emit(newValue: DataState<T>) {
-        if (newValue is DataState.Success) {
-            _payload.value = newValue.payload
+        snapshot.aitaAtomicUpdate { current ->
+            AitaNonNullDataStateSnapshot(
+                state = newValue,
+                payload = when (newValue) {
+                    is DataState.Success -> newValue.payload
+                    is DataState.Empty -> current.payload
+                }
+            )
         }
-        _state.value = newValue
     }
 
     fun asDataStateFlow(): DataStateFlowNonNull<T> {
@@ -19436,22 +19497,29 @@ class MutableDataStateFlow<T>(
     initial: T? = null
 ): DataStateFlow<T> {
 
-    private val _state = MutableStateFlow<DataState<T>>(initial?.run { DataState.Success(initial) } ?: DataState.Empty())
-    override val value = _state.asStateFlow()
-    private val _payload = MutableStateFlow(initial)
-    override val payload = _payload.asStateFlow()
+    private val snapshot = MutableStateFlow(
+        AitaDataStateSnapshot<T>(
+            state = initial?.let { DataState.Success(it) } ?: DataState.Empty(),
+            payload = initial
+        )
+    )
+    override val value: StateFlow<DataState<T>> = AitaMappedStateFlow(snapshot) { it.state }
+    override val payload: StateFlow<T?> = AitaMappedStateFlow(snapshot) { it.payload }
 
     /**
-     * Publishes the nullable payload before the matching state in one synchronous call. Observers
-     * that react to the DataState can therefore already read its matching payload, and sequential
-     * writes cannot be reordered by independently scheduled fire-and-forget coroutines.
+     * Atomically publishes one nullable payload/envelope snapshot. Concurrent reads and writes can
+     * no longer leave the two public views permanently describing different operations.
      */
     fun emit(newValue: DataState<T>) {
-        _payload.value = when (newValue) {
-            is DataState.Success -> newValue.payload
-            is DataState.Empty -> null
+        snapshot.aitaAtomicUpdate {
+            AitaDataStateSnapshot(
+                state = newValue,
+                payload = when (newValue) {
+                    is DataState.Success -> newValue.payload
+                    is DataState.Empty -> null
+                }
+            )
         }
-        _state.value = newValue
     }
 
     fun asDataStateFlow(): DataStateFlow<T> {
@@ -20482,18 +20550,18 @@ interface Searchable {
 
     fun searchExact(query: String, vararg extraOperands: String): Boolean {
         return exactSearchOperands.any { it.equals(query, true) }
-                || extraOperands.any { it.equals(query, true) }
+            || extraOperands.any { it.equals(query, true) }
     }
 
     fun searchContains(query: String, vararg extraOperands: String): Boolean {
         return containsSearchOperands.any { it.contains(query, true) }
-                || extraOperands.any { it.contains(query, true) }
+            || extraOperands.any { it.contains(query, true) }
     }
 
     fun searchUnique(query: String, vararg extraOperands: String): Boolean {
         val cleanQuery = query.trim().takeIf { it.isNotBlank() } ?: return false
         return uniqueSearchOperands.any { it.equals(cleanQuery, true) }
-                || extraOperands.any { it.equals(cleanQuery, true) }
+            || extraOperands.any { it.equals(cleanQuery, true) }
     }
 }
 
@@ -21392,8 +21460,8 @@ fun buildStoreAnalyticsDashboard(
     val scopedStockIds = scopedStock.map { it.id }.toSet()
     val scopedBatches = batches.filter { batch ->
         (scopedStockIds.isEmpty() && goodsItemIdFilter.cleanAnalyticsFilterId() == null && supplierIdFilter.cleanAnalyticsFilterId() == null && categoryIdFilter.cleanAnalyticsFilterId() == null) ||
-                batch.goodsItemId in scopedStockIds ||
-                supplierIdFilter.cleanAnalyticsFilterId()?.let { supplierId -> batch.supplierId == supplierId } == true
+            batch.goodsItemId in scopedStockIds ||
+            supplierIdFilter.cleanAnalyticsFilterId()?.let { supplierId -> batch.supplierId == supplierId } == true
     }
     val scopedTransactions = analyticsScopedTransactions(
         transactions = baseTransactions,

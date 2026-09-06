@@ -303,7 +303,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         NavigationScreenModel.Stock.AddEditGoodsItem.setState("stock_add_edit_selected_tab" to "info")
         NavigationScreenModel.Stock.AddEditGoodsItem.setState(
             "stock_add_edit_add_session_id" to
-                    "${getCurrentTimeMillis()}_${Random.nextInt(0, Int.MAX_VALUE)}"
+                "${getCurrentTimeMillis()}_${Random.nextInt(0, Int.MAX_VALUE)}"
         )
         selectedTabId = "info"
         draft = newDraft()
@@ -368,9 +368,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF
     ).any { permission -> currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, permission) }
     val canWorkWithSupplierPrices = existing != null && (
-            currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE) ||
-                    currentUserCanViewSuppliers(activeStoreIdForStockAddEditPermissions)
-            )
+        currentUserHasStorePermission(activeStoreIdForStockAddEditPermissions, STORE_PERMISSION_SUPPLIER_PRICES_MANAGE) ||
+            currentUserCanViewSuppliers(activeStoreIdForStockAddEditPermissions)
+        )
     val canWorkWithSupplierOrders = existing != null && currentUserCanViewSupplierOrders(activeStoreIdForStockAddEditPermissions)
     val canViewStockItemHistory = existing != null && currentUserCanViewStockHistory(activeStoreIdForStockAddEditPermissions)
 
@@ -712,10 +712,10 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 loading = isSavingStockItem,
                 loadingText = localizedStringResource(1141, "Please wait…"),
                 enabled = !isSavingStockItem &&
-                        canSaveVisibleStockDraft &&
-                        (!isEditingStockItem || existing != null) &&
-                        draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
-                        stateValues.activeStoreId != null,
+                    canSaveVisibleStockDraft &&
+                    (!isEditingStockItem || existing != null) &&
+                    draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
+                    stateValues.activeStoreId != null,
                 onClick = {
                     if (isSavingStockItem) return@actionButton
                     if (!canSaveVisibleStockDraft) {
@@ -1322,8 +1322,8 @@ internal fun AppConfiguration.voiceInputLanguageDisplayName(languageTag: String)
     val configured = stateValues.globalAppConfiguration.languages.firstOrNull { language ->
         val configuredTag = language.language.toVoiceInputLanguageTag()
         configuredTag.equals(tag, ignoreCase = true) ||
-                configuredTag.substringBefore('-').equals(code, ignoreCase = true) ||
-                language.language.equals(code, ignoreCase = true)
+            configuredTag.substringBefore('-').equals(code, ignoreCase = true) ||
+            language.language.equals(code, ignoreCase = true)
     }
 
     return configured
@@ -1623,7 +1623,7 @@ fun AppConfiguration.BarcodeTextInput(
         if (candidate.isNotBlank()) {
             val now = getCurrentTimeMillis()
             val repeatedTooSoon = candidate.normalizedTransactionBarcode() == lastCameraBarcode.normalizedTransactionBarcode() &&
-                    now - lastCameraBarcodeMillis < 3_000L
+                now - lastCameraBarcodeMillis < 3_000L
 
             if (!repeatedTooSoon) {
                 lastCameraBarcode = candidate
@@ -2479,7 +2479,7 @@ fun AppConfiguration.searchTextField(
             if (candidate.isNotBlank()) {
                 val now = getCurrentTimeMillis()
                 val repeatedTooSoon = candidate.normalizedTransactionBarcode() == lastCameraBarcode.normalizedTransactionBarcode() &&
-                        now - lastCameraBarcodeMillis < 3_000L
+                    now - lastCameraBarcodeMillis < 3_000L
 
                 if (!repeatedTooSoon) {
                     lastCameraBarcode = candidate
@@ -3186,11 +3186,13 @@ sealed class NavigationScreenModel(
         }
         data object Security: Menu("MenuSecurityNavigationScreenModelRoute") {
             override val iconPath: String
-                get() = AppConfiguration.stateValues.drawablePathIconPassword
+                get() = AppConfiguration.stateValues.drawablePathIconSecurity
             override val name: String
-                get() = with(AppConfiguration) { localizedStringResource(209, "Security") }
+                get() = with(AppConfiguration) {
+                    authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік")
+                }
             override val iconRes: DrawableResource
-                get() = AppConfiguration.stateValues.drawableResIconPassword.value
+                get() = AppConfiguration.stateValues.drawableResIconSecurity.value
         }
         data object Support: Menu("MenuSupportNavigationScreenModelRoute") {
             override val iconPath: String
@@ -3418,7 +3420,13 @@ internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreen
     }
 }
 
-internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean = false
+/**
+ * App-mode switching is intentionally kept implemented but hidden from the public Menu for the
+ * current release. Keeping the gate here also prevents restored navigation or indirect callers
+ * from reopening the selector until the feature is deliberately enabled again.
+ */
+internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
+    this == NavigationScreenModel.Menu.AppMode && !APP_MODE_SELECTION_PUBLICLY_ENABLED
 
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
     val restoredCurrent = orEmpty()
@@ -3776,23 +3784,23 @@ object Navigation {
 
         fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
             return (
-                    if (isNarrowScreen)
-                        when (clientId) {
-                            0 -> _LeftClient1
-                            1 -> _LeftClient2
-                            2 -> _LeftClient3
-                            3 -> _LeftClient4
-                            else -> _LeftClient5
-                        }
-                    else
-                        when (clientId) {
-                            0 -> _RightClient1
-                            1 -> _RightClient2
-                            2 -> _RightClient3
-                            3 -> _RightClient4
-                            else -> _RightClient5
-                        }
-                    ).value.size == 1
+                if (isNarrowScreen)
+                    when (clientId) {
+                        0 -> _LeftClient1
+                        1 -> _LeftClient2
+                        2 -> _LeftClient3
+                        3 -> _LeftClient4
+                        else -> _LeftClient5
+                    }
+                else
+                    when (clientId) {
+                        0 -> _RightClient1
+                        1 -> _RightClient2
+                        2 -> _RightClient3
+                        3 -> _RightClient4
+                        else -> _RightClient5
+                    }
+                ).value.size == 1
         }
 
         fun isVeryFirstScreenLeft(clientId: Int): Boolean {
@@ -4558,23 +4566,23 @@ object Navigation {
 
         fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
             return (
-                    if (isNarrowScreen)
-                        when (clientId) {
-                            0 -> _LeftClient1
-                            1 -> _LeftClient2
-                            2 -> _LeftClient3
-                            3 -> _LeftClient4
-                            else -> _LeftClient5
-                        }
-                    else
-                        when (clientId) {
-                            0 -> _RightClient1
-                            1 -> _RightClient2
-                            2 -> _RightClient3
-                            3 -> _RightClient4
-                            else -> _RightClient5
-                        }
-                    ).value.size == 1
+                if (isNarrowScreen)
+                    when (clientId) {
+                        0 -> _LeftClient1
+                        1 -> _LeftClient2
+                        2 -> _LeftClient3
+                        3 -> _LeftClient4
+                        else -> _LeftClient5
+                    }
+                else
+                    when (clientId) {
+                        0 -> _RightClient1
+                        1 -> _RightClient2
+                        2 -> _RightClient3
+                        3 -> _RightClient4
+                        else -> _RightClient5
+                    }
+                ).value.size == 1
         }
 
         fun isVeryFirstScreenLeft(clientId: Int): Boolean {
@@ -5340,23 +5348,23 @@ object Navigation {
 
         fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int): Boolean {
             return (
-                    if (isNarrowScreen)
-                        when (clientId) {
-                            0 -> _LeftClient1
-                            1 -> _LeftClient2
-                            2 -> _LeftClient3
-                            3 -> _LeftClient4
-                            else -> _LeftClient5
-                        }
-                    else
-                        when (clientId) {
-                            0 -> _RightClient1
-                            1 -> _RightClient2
-                            2 -> _RightClient3
-                            3 -> _RightClient4
-                            else -> _RightClient5
-                        }
-                    ).value.size == 1
+                if (isNarrowScreen)
+                    when (clientId) {
+                        0 -> _LeftClient1
+                        1 -> _LeftClient2
+                        2 -> _LeftClient3
+                        3 -> _LeftClient4
+                        else -> _LeftClient5
+                    }
+                else
+                    when (clientId) {
+                        0 -> _RightClient1
+                        1 -> _RightClient2
+                        2 -> _RightClient3
+                        3 -> _RightClient4
+                        else -> _RightClient5
+                    }
+                ).value.size == 1
         }
 
         fun isVeryFirstScreenLeft(clientId: Int): Boolean {
@@ -6233,6 +6241,7 @@ object Navigation {
 
         val listScreens = listOf(
             NavigationScreenModel.Menu.UserAccount,
+            NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Notifications,
             NavigationScreenModel.Menu.AppMode,
             NavigationScreenModel.Menu.Finances,
@@ -6245,7 +6254,6 @@ object Navigation {
             NavigationScreenModel.Menu.Suppliers,
             NavigationScreenModel.Menu.Debtors,
             NavigationScreenModel.Menu.Devices,
-            NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Support,
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,

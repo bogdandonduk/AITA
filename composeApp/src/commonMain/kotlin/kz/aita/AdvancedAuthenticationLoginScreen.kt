@@ -1,22 +1,55 @@
 package kz.aita
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kz.aita.auth.*
 
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
 private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, NEW_PASSWORD, COMPLETE }
 private enum class AitaLoginIdentifierType { PHONE, EMAIL }
+
+internal enum class AitaAuthFeatureAvailability { CHECKING, AVAILABLE, UNAVAILABLE, UNKNOWN }
+
+internal data class AitaAuthUiAvailability(
+    val emailCodeLogin: AitaAuthFeatureAvailability,
+    val passwordRecovery: AitaAuthFeatureAvailability,
+    val authenticator: AitaAuthFeatureAvailability,
+    val phoneLoginAlias: AitaAuthFeatureAvailability,
+)
+
+internal fun resolveAitaAuthUiAvailability(
+    capabilities: AitaAuthCapabilitiesDataModel?,
+    loading: Boolean,
+): AitaAuthUiAvailability {
+    fun resolve(predicate: AitaAuthCapabilitiesDataModel.() -> Boolean): AitaAuthFeatureAvailability = when {
+        capabilities == null && loading -> AitaAuthFeatureAvailability.CHECKING
+        capabilities == null -> AitaAuthFeatureAvailability.UNKNOWN
+        capabilities?.let { predicate(it) } == true -> AitaAuthFeatureAvailability.AVAILABLE
+        else -> AitaAuthFeatureAvailability.UNAVAILABLE
+    }
+
+    return AitaAuthUiAvailability(
+        emailCodeLogin = resolve { emailCodeLoginEnabled },
+        passwordRecovery = resolve { passwordRecoveryEnabled },
+        authenticator = resolve { authenticatorTwoFactorEnabled },
+        phoneLoginAlias = resolve { phoneLoginAliasEnabled },
+    )
+}
 
 internal fun AppConfiguration.authUiText(en: String, ru: String, kk: String): String = when {
     stateValues.appLanguage.lowercase().startsWith("ru") -> ru
@@ -29,8 +62,93 @@ internal fun AppConfiguration.authResponseText(response: ResponseDataModel<*>): 
         .ifBlank { authUiText("Something went wrong. Try again.", "Что-то пошло не так. Попробуйте ещё раз.", "Бірдеңе дұрыс болмады. Қайталап көріңіз.") }
 
 @Composable
+private fun AppConfiguration.AuthCapabilityNotice(
+    availability: AitaAuthFeatureAvailability,
+    title: String,
+    unavailableText: String,
+    lookupError: String,
+    onRetry: () -> Unit,
+) {
+    if (availability == AitaAuthFeatureAvailability.AVAILABLE) return
+
+    val checking = availability == AitaAuthFeatureAvailability.CHECKING
+    val unknown = availability == AitaAuthFeatureAvailability.UNKNOWN
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+            .clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(
+                stateValues.unfocusedBorderWidth,
+                stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)
+            )
+            .padding(stateValues.marginTextFieldGroup),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            CpImage(
+                modifier = Modifier.size(stateValues.iconSize),
+                url = stateValues.drawablePathIconSecurity,
+                fallbackRes = stateValues.drawableResIconSecurity.value,
+                contentDescription = title,
+                tintColor = if (availability == AitaAuthFeatureAvailability.UNAVAILABLE) stateValues.ErrorColor else stateValues.PlaceholderTextColor
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.textSize,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = when {
+                        checking -> authUiText(
+                            "Checking what this server supports…",
+                            "Проверяем доступные возможности сервера…",
+                            "Сервердің қолжетімді мүмкіндіктерін тексеріп жатырмыз…"
+                        )
+                        unknown -> lookupError.takeIf { it.isNotBlank() } ?: authUiText(
+                            "AITA could not check this server yet. Check your connection and try again.",
+                            "AITA пока не удалось проверить сервер. Проверьте соединение и повторите попытку.",
+                            "AITA серверді әзірге тексере алмады. Байланысты тексеріп, қайталап көріңіз."
+                        )
+                        else -> unavailableText
+                    },
+                    color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize
+                )
+            }
+        }
+
+        if (checking) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = authUiText("Check again", "Проверить снова", "Қайта тексеру"),
+                iconPath = stateValues.drawablePathIconSearch,
+                enabledColor = stateValues.BackgroundColor,
+                textColor = stateValues.AccentColor,
+                iconTintColor = stateValues.AccentColor,
+                autoLoading = false,
+                onClick = onRetry
+            )
+        }
+    }
+}
+
+@Composable
 internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
-    var capabilities by remember { mutableStateOf(AitaAuthCapabilitiesDataModel()) }
+    var capabilities by remember { mutableStateOf<AitaAuthCapabilitiesDataModel?>(null) }
+    var capabilitiesLoading by remember { mutableStateOf(true) }
+    var capabilitiesError by remember { mutableStateOf("") }
+    var capabilitiesRefreshGeneration by remember { mutableIntStateOf(0) }
     var mode by remember { mutableStateOf(AitaLoginMode.PASSWORD) }
     var step by remember { mutableStateOf(AitaLoginStep.PRIMARY) }
     var identifierType by remember { mutableStateOf(AitaLoginIdentifierType.PHONE) }
@@ -58,11 +176,34 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var busy by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf("") }
     var infoText by remember { mutableStateOf("") }
+    val screenScope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        val response = AitaAdvancedAuthenticationClient.capabilities()
-        response.payload?.let { capabilities = it }
+    LaunchedEffect(capabilitiesRefreshGeneration) {
+        capabilitiesLoading = true
+        try {
+            val response = AitaAdvancedAuthenticationClient.capabilities()
+            response.payload?.let {
+                capabilities = it
+                capabilitiesError = ""
+            } ?: run {
+                if (capabilities == null) capabilitiesError = authResponseText(response)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            if (capabilities == null) {
+                capabilitiesError = authUiText(
+                    "AITA could not check the server. Check your connection and try again.",
+                    "AITA не удалось проверить сервер. Проверьте соединение и повторите попытку.",
+                    "AITA серверді тексере алмады. Байланысты тексеріп, қайталап көріңіз."
+                )
+            }
+        } finally {
+            capabilitiesLoading = false
+        }
     }
+
+    val authAvailability = resolveAitaAuthUiAvailability(capabilities, capabilitiesLoading)
 
     fun resolvedIdentifier(): String {
         val raw = when (identifierType) {
@@ -113,11 +254,19 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
 
     fun runAction(block: suspend () -> Unit) {
         if (busy) return
-        coroutineScope.launch {
-            busy = true
-            errorText = ""
+        busy = true
+        errorText = ""
+        screenScope.launch {
             try {
                 block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                errorText = authUiText(
+                    "AITA could not complete this request. Check your connection and try again.",
+                    "AITA не удалось выполнить запрос. Проверьте соединение и повторите попытку.",
+                    "AITA сұрауды орындай алмады. Байланысты тексеріп, қайталап көріңіз."
+                )
             } finally {
                 busy = false
             }
@@ -136,6 +285,14 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     }
 
     fun requestSignInCode() {
+        if (authAvailability.emailCodeLogin != AitaAuthFeatureAvailability.AVAILABLE) {
+            infoText = authUiText(
+                "Sign-in by code is not available on this server yet.",
+                "Вход по коду пока недоступен на этом сервере.",
+                "Кодпен кіру бұл серверде әзірге қолжетімсіз."
+            )
+            return
+        }
         val identifier = resolvedIdentifier()
         if (identifier.isBlank()) return
         runAction {
@@ -147,6 +304,14 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     }
 
     fun requestRecoveryCode() {
+        if (authAvailability.passwordRecovery != AitaAuthFeatureAvailability.AVAILABLE) {
+            infoText = authUiText(
+                "Password recovery is not available on this server yet.",
+                "Восстановление пароля пока недоступно на этом сервере.",
+                "Құпия сөзді қалпына келтіру бұл серверде әзірге қолжетімсіз."
+            )
+            return
+        }
         val identifier = resolvedIdentifier()
         if (identifier.isBlank()) return
         runAction {
@@ -181,7 +346,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (stateValues.isNarrowScreen) Spacer(Modifier.height(stateValues.screenHeight / 11))
@@ -218,22 +383,6 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
 
             if (stateValues.isNarrowScreen) AuthPreferencesChooser()
 
-            if (mode != AitaLoginMode.RECOVERY && step == AitaLoginStep.PRIMARY && capabilities.emailCodeLoginEnabled) {
-                val selected = tabRowWidget(
-                    modifier = Modifier.fillMaxWidth(),
-                    selectedIndexInitial = if (mode == AitaLoginMode.PASSWORD) "password" else "code",
-                    persistSelection = false,
-                    tabs = listOf(
-                        TabContent("password", authUiText("Password", "Пароль", "Құпия сөз")),
-                        TabContent("code", authUiText("Email code", "Код из письма", "Email коды"))
-                    )
-                )
-                LaunchedEffect(selected.id) {
-                    val newMode = if (selected.id == "code") AitaLoginMode.EMAIL_CODE else AitaLoginMode.PASSWORD
-                    if (newMode != mode) resetSensitiveState(newMode)
-                }
-            }
-
             if (step == AitaLoginStep.PRIMARY) {
                 val selectedIdentifierType = tabRowWidget(
                     modifier = Modifier.fillMaxWidth(),
@@ -258,6 +407,22 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                         errorText = ""
                         infoText = ""
                     }
+                }
+            }
+
+            if (mode != AitaLoginMode.RECOVERY && step == AitaLoginStep.PRIMARY) {
+                val selected = tabRowWidget(
+                    modifier = Modifier.fillMaxWidth(),
+                    selectedIndexInitial = if (mode == AitaLoginMode.PASSWORD) "password" else "code",
+                    persistSelection = false,
+                    tabs = listOf(
+                        TabContent("password", authUiText("Password", "Пароль", "Құпия сөз")),
+                        TabContent("code", authUiText("Sign-in code", "Код для входа", "Кіру коды"))
+                    )
+                )
+                LaunchedEffect(selected.id) {
+                    val newMode = if (selected.id == "code") AitaLoginMode.EMAIL_CODE else AitaLoginMode.PASSWORD
+                    if (newMode != mode) resetSensitiveState(newMode)
                 }
             }
 
@@ -345,6 +510,21 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     loadingText = stateValues.stringLoggingIn
                                 ) { submitPasswordLogin() }
                             } else {
+                                AuthCapabilityNotice(
+                                    availability = authAvailability.emailCodeLogin,
+                                    title = authUiText(
+                                        "Sign in with a code",
+                                        "Вход по коду",
+                                        "Кодпен кіру"
+                                    ),
+                                    unavailableText = authUiText(
+                                        "Email-code sign-in is not enabled on this server yet. Password sign-in remains available.",
+                                        "Вход по коду из письма пока не включён на этом сервере. Вход по паролю доступен.",
+                                        "Email коды арқылы кіру бұл серверде әзірге қосылмаған. Құпия сөзбен кіру қолжетімді."
+                                    ),
+                                    lookupError = capabilitiesError,
+                                    onRetry = { capabilitiesRefreshGeneration += 1 }
+                                )
                                 Text(
                                     text = authUiText(
                                         "We’ll send a one-time code to the verified email on this account.",
@@ -358,8 +538,19 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
                                     text = authUiText("Send sign-in code", "Отправить код входа", "Кіру кодын жіберу"),
-                                    enabled = !busy && resolvedIdentifier().isNotBlank(),
-                                    loading = busy
+                                    enabled = !busy &&
+                                        authAvailability.emailCodeLogin == AitaAuthFeatureAvailability.AVAILABLE &&
+                                        resolvedIdentifier().isNotBlank(),
+                                    loading = busy,
+                                    onDisabledClick = {
+                                        if (authAvailability.emailCodeLogin != AitaAuthFeatureAvailability.AVAILABLE) {
+                                            infoText = authUiText(
+                                                "This method becomes available when secure email delivery is enabled on the server.",
+                                                "Этот способ станет доступен после включения защищённой отправки писем на сервере.",
+                                                "Бұл тәсіл серверде қауіпсіз email жіберу қосылғанда қолжетімді болады."
+                                            )
+                                        }
+                                    }
                                 ) { requestSignInCode() }
                             }
                         }
@@ -499,13 +690,42 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 }
             }
 
-            if (step == AitaLoginStep.PRIMARY && mode != AitaLoginMode.RECOVERY && capabilities.passwordRecoveryEnabled) {
-                TextButton(enabled = !busy, onClick = { resetSensitiveState(AitaLoginMode.RECOVERY) }) {
-                    Text(authUiText("Forgot password?", "Забыли пароль?", "Құпия сөзді ұмыттыңыз ба?"))
-                }
+            if (step == AitaLoginStep.PRIMARY && mode != AitaLoginMode.RECOVERY) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = authUiText("Restore password", "Восстановить пароль", "Құпия сөзді қалпына келтіру"),
+                    subText = authUiText(
+                        "Get a confirmation code at the verified email on your account",
+                        "Получите код подтверждения на проверенный email аккаунта",
+                        "Аккаунттың расталған email мекенжайына растау кодын алыңыз"
+                    ),
+                    iconPath = stateValues.drawablePathIconPassword,
+                    enabled = !busy,
+                    enabledColor = stateValues.BackgroundColor,
+                    textColor = stateValues.AccentColor,
+                    subTextColor = stateValues.PlaceholderTextColor,
+                    iconTintColor = stateValues.AccentColor,
+                    autoLoading = false,
+                    onClick = { resetSensitiveState(AitaLoginMode.RECOVERY) }
+                )
             }
 
             if (step == AitaLoginStep.PRIMARY && mode == AitaLoginMode.RECOVERY) {
+                AuthCapabilityNotice(
+                    availability = authAvailability.passwordRecovery,
+                    title = authUiText(
+                        "Password recovery",
+                        "Восстановление пароля",
+                        "Құпия сөзді қалпына келтіру"
+                    ),
+                    unavailableText = authUiText(
+                        "Password recovery is not enabled on this server yet. You can return and sign in with your password.",
+                        "Восстановление пароля пока не включено на этом сервере. Можно вернуться и войти по паролю.",
+                        "Құпия сөзді қалпына келтіру бұл серверде әзірге қосылмаған. Артқа қайтып, құпия сөзбен кіруге болады."
+                    ),
+                    lookupError = capabilitiesError,
+                    onRetry = { capabilitiesRefreshGeneration += 1 }
+                )
                 Text(
                     text = authUiText(
                         "Enter your email or phone login alias. The recovery code will go to the verified email on the account.",
@@ -519,8 +739,19 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = authUiText("Send recovery code", "Отправить код восстановления", "Қалпына келтіру кодын жіберу"),
-                    enabled = !busy && resolvedIdentifier().isNotBlank(),
-                    loading = busy
+                    enabled = !busy &&
+                        authAvailability.passwordRecovery == AitaAuthFeatureAvailability.AVAILABLE &&
+                        resolvedIdentifier().isNotBlank(),
+                    loading = busy,
+                    onDisabledClick = {
+                        if (authAvailability.passwordRecovery != AitaAuthFeatureAvailability.AVAILABLE) {
+                            infoText = authUiText(
+                                "Password recovery becomes available when secure email delivery is enabled on the server.",
+                                "Восстановление станет доступно после включения защищённой отправки писем на сервере.",
+                                "Қалпына келтіру серверде қауіпсіз email жіберу қосылғанда қолжетімді болады."
+                            )
+                        }
+                    }
                 ) { requestRecoveryCode() }
                 TextButton(enabled = !busy, onClick = { resetSensitiveState(AitaLoginMode.PASSWORD) }) {
                     Text(authUiText("Back to sign in", "Назад ко входу", "Кіруге қайту"))

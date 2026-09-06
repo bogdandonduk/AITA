@@ -27,6 +27,63 @@ val aitaMacDesktopHost = System.getProperty("os.name")
     .orEmpty()
     .contains("mac", ignoreCase = true)
 
+fun aitaBuildValue(propertyName: String, environmentName: String) =
+    providers.gradleProperty(propertyName)
+        .orElse(providers.environmentVariable(environmentName))
+
+val aitaReleaseVersion = aitaBuildValue("aita.release.version", "AITA_RELEASE_VERSION")
+    .orElse("1.0.0")
+    .get()
+    .trim()
+require(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+$").matches(aitaReleaseVersion)) {
+    "AITA release version must use MAJOR.MINOR.PATCH numeric form, for example 1.0.0"
+}
+val aitaDesktopVersionParts = aitaReleaseVersion.split('.').map(String::toInt)
+require(
+    aitaDesktopVersionParts[0] in 0..255 &&
+        aitaDesktopVersionParts[1] in 0..255 &&
+        aitaDesktopVersionParts[2] in 0..65_535
+) {
+    "Windows package version requires major/minor in 0..255 and patch in 0..65535"
+}
+
+val aitaAndroidVersionName = aitaBuildValue("aita.android.versionName", "AITA_ANDROID_VERSION_NAME")
+    .orElse(aitaReleaseVersion)
+    .get()
+    .trim()
+val aitaAndroidVersionCode = aitaBuildValue("aita.android.versionCode", "AITA_ANDROID_VERSION_CODE")
+    .orElse("1")
+    .get()
+    .trim()
+    .toIntOrNull()
+    ?.takeIf { it in 1..2_100_000_000 }
+    ?: error("AITA Android versionCode must be an integer from 1 to 2100000000")
+
+val aitaAndroidKeystorePath = aitaBuildValue("aita.android.keystorePath", "AITA_ANDROID_KEYSTORE_PATH")
+    .orNull
+    ?.trim()
+    .orEmpty()
+val aitaAndroidKeystorePassword = aitaBuildValue("aita.android.keystorePassword", "AITA_ANDROID_KEYSTORE_PASSWORD")
+    .orNull
+    .orEmpty()
+val aitaAndroidKeyAlias = aitaBuildValue("aita.android.keyAlias", "AITA_ANDROID_KEY_ALIAS")
+    .orNull
+    ?.trim()
+    .orEmpty()
+val aitaAndroidKeyPassword = aitaBuildValue("aita.android.keyPassword", "AITA_ANDROID_KEY_PASSWORD")
+    .orNull
+    .orEmpty()
+val aitaAndroidSigningValues = listOf(
+    aitaAndroidKeystorePath,
+    aitaAndroidKeystorePassword,
+    aitaAndroidKeyAlias,
+    aitaAndroidKeyPassword
+)
+val aitaAndroidSigningConfigured = aitaAndroidSigningValues.all { it.isNotBlank() }
+require(aitaAndroidSigningValues.none { it.isNotBlank() } || aitaAndroidSigningConfigured) {
+    "Android release signing is partially configured. Provide keystore path, store password, key alias, and key password together."
+}
+
 // Native packages already use packageName = AITA. These arguments also give Gradle/IntelliJ
 // desktop debug launches the same macOS menu-bar and Dock identity instead of JvmMainCompose.
 tasks.withType<JavaExec>().configureEach {
@@ -177,17 +234,30 @@ if (!aitaWebOnlyBuild) {
             applicationId = "kz.aita"
             minSdk = libs.versions.android.minSdk.get().toInt()
             targetSdk = libs.versions.android.targetSdk.get().toInt()
-            versionCode = 1
-            versionName = "1.0"
+            versionCode = aitaAndroidVersionCode
+            versionName = aitaAndroidVersionName
         }
         packaging {
             resources {
                 excludes += "/META-INF/{AL2.0,LGPL2.1}"
             }
         }
+        val aitaReleaseSigningConfig = if (aitaAndroidSigningConfigured) {
+            signingConfigs.create("aitaRelease") {
+                storeFile = project.file(aitaAndroidKeystorePath)
+                storePassword = aitaAndroidKeystorePassword
+                keyAlias = aitaAndroidKeyAlias
+                keyPassword = aitaAndroidKeyPassword
+            }
+        } else {
+            null
+        }
+
         buildTypes {
             getByName("release") {
+                isDebuggable = false
                 isMinifyEnabled = false
+                aitaReleaseSigningConfig?.let { signingConfig = it }
             }
         }
         compileOptions {
@@ -217,7 +287,7 @@ tasks.configureEach {
             lowerTaskName.contains("processresources") ||
                 lowerTaskName.contains("composeresources") ||
                 lowerTaskName.contains("resourceaccessors")
-        )
+            )
     ) {
         dependsOn(removeMisplacedCommonAndroidVectorDrawables)
     }
@@ -243,7 +313,7 @@ if (!aitaWebOnlyBuild) {
                     "jdk.charsets",
                     "jdk.unsupported"
                 )
-                packageVersion = "1.0.0"
+                packageVersion = aitaReleaseVersion
                 packageName = "AITA"
                 description = "AITA"
                 vendor = "AITA"
@@ -251,6 +321,11 @@ if (!aitaWebOnlyBuild) {
                 windows {
                     iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.ico"))
                     console = false
+                    dirChooser = true
+                    menuGroup = "AITA"
+                    // Never change after the first public Windows release: this stable identity
+                    // lets MSI/EXE installers recognize later AITA versions as upgrades.
+                    upgradeUuid = "f100f3af-cba2-42e5-928d-8165d1a271a5"
                 }
                 macOS {
                     iconFile.set(project.file("src/jvmMain/resources/drawable/app_icon.icns"))

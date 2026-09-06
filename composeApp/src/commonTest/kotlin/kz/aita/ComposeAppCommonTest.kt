@@ -1,5 +1,6 @@
 package kz.aita
 
+import kz.aita.auth.AitaAuthCapabilitiesDataModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -73,8 +74,62 @@ class ComposeAppCommonTest {
     }
 
     @Test
-    fun appModeMenuDestinationIsVisibleAgain() {
-        assertFalse(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+    fun appModeMenuDestinationIsHiddenAndCannotBeRestoredForThisRelease() {
+        assertFalse(APP_MODE_SELECTION_PUBLICLY_ENABLED)
+        assertTrue(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+        assertEquals(
+            NavigationScreenModel.Menu.UserAccount,
+            listOf(NavigationScreenModel.Menu.AppMode.route)
+                .toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount)
+                .single()
+        )
+    }
+
+    @Test
+    fun advancedAuthenticationMethodsRemainVisibleWhileCapabilityStateChanges() {
+        val checking = resolveAitaAuthUiAvailability(capabilities = null, loading = true)
+        assertEquals(AitaAuthFeatureAvailability.CHECKING, checking.emailCodeLogin)
+        assertEquals(AitaAuthFeatureAvailability.CHECKING, checking.passwordRecovery)
+        assertEquals(AitaAuthFeatureAvailability.CHECKING, checking.authenticator)
+        assertEquals(AitaAuthFeatureAvailability.CHECKING, checking.phoneLoginAlias)
+
+        val unknown = resolveAitaAuthUiAvailability(capabilities = null, loading = false)
+        assertEquals(AitaAuthFeatureAvailability.UNKNOWN, unknown.emailCodeLogin)
+        assertEquals(AitaAuthFeatureAvailability.UNKNOWN, unknown.passwordRecovery)
+        assertEquals(AitaAuthFeatureAvailability.UNKNOWN, unknown.authenticator)
+        assertEquals(AitaAuthFeatureAvailability.UNKNOWN, unknown.phoneLoginAlias)
+
+        val unavailable = resolveAitaAuthUiAvailability(
+            capabilities = AitaAuthCapabilitiesDataModel(),
+            loading = false
+        )
+        assertEquals(AitaAuthFeatureAvailability.UNAVAILABLE, unavailable.emailCodeLogin)
+        assertEquals(AitaAuthFeatureAvailability.UNAVAILABLE, unavailable.passwordRecovery)
+        assertEquals(AitaAuthFeatureAvailability.UNAVAILABLE, unavailable.authenticator)
+        assertEquals(AitaAuthFeatureAvailability.UNAVAILABLE, unavailable.phoneLoginAlias)
+
+        val available = resolveAitaAuthUiAvailability(
+            capabilities = AitaAuthCapabilitiesDataModel(
+                enabled = true,
+                emailCodeLoginEnabled = true,
+                passwordRecoveryEnabled = true,
+                authenticatorTwoFactorEnabled = true,
+                phoneLoginAliasEnabled = true
+            ),
+            loading = false
+        )
+        assertEquals(AitaAuthFeatureAvailability.AVAILABLE, available.emailCodeLogin)
+        assertEquals(AitaAuthFeatureAvailability.AVAILABLE, available.passwordRecovery)
+        assertEquals(AitaAuthFeatureAvailability.AVAILABLE, available.authenticator)
+        assertEquals(AitaAuthFeatureAvailability.AVAILABLE, available.phoneLoginAlias)
+    }
+
+    @Test
+    fun signInAndSecurityHubIsProminentWhileAppModeRemainsHidden() {
+        assertEquals(NavigationScreenModel.Menu.UserAccount, Navigation.Menu.listScreens[0])
+        assertEquals(NavigationScreenModel.Menu.Security, Navigation.Menu.listScreens[1])
+        assertFalse(NavigationScreenModel.Menu.Security.isTemporarilyHiddenFromUi())
+        assertTrue(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
     }
 
     @Test

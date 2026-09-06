@@ -1730,9 +1730,9 @@ fun AppConfiguration.MenuWorkersScreen() {
         .count { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
     val myInvitesCount = myRequestsPayload.orEmpty()
         .count { !it.isWorkerRemovalRequest() && it.status == WORKER_REQUEST_STATUS_INVITED } +
-            myRequestsPayload.orEmpty().count { it.isPendingWorkerRemovalRequest() }
+        myRequestsPayload.orEmpty().count { it.isPendingWorkerRemovalRequest() }
     val myResponsesCount = myRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() } +
-            incomingRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
+        incomingRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
     val storeWorkersCount = storeWorkersPayload.orEmpty().size
     val incomingEmploymentRequestsCount = incomingRequestsPayload.orEmpty()
         .count { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
@@ -2431,6 +2431,14 @@ fun AppConfiguration.MenuUserAccountScreen() {
             iconPath = stateValues.drawablePathIconUserAccount,
             trailingIcons = listOf(
                 Triple(
+                    stateValues.drawablePathIconSecurity,
+                    stateValues.drawableResIconSecurity.value
+                ) {
+                    coroutineScope.launch {
+                        Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
+                    }
+                },
+                Triple(
                     stateValues.drawablePathIconExit,
                     stateValues.drawableResIconExit.value
                 ) {
@@ -2465,12 +2473,35 @@ fun AppConfiguration.MenuUserAccountScreen() {
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.UserAccount),
             modifier = Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(0.5f)
-                .padding(vertical = 24.dp)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+                .padding(horizontal = stateValues.marginTextField, vertical = 24.dp)
         ) {
             item {
                 val outerSpace = 16.dp
                 val innerSpace = 8.dp
+
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
+                    subText = authUiText(
+                        "Email code, password recovery, authenticator, phone login and active sessions",
+                        "Код из письма, восстановление пароля, аутентификатор, вход по номеру и активные сессии",
+                        "Email коды, құпия сөзді қалпына келтіру, аутентификатор, телефонмен кіру және белсенді сессиялар"
+                    ),
+                    iconPath = stateValues.drawablePathIconSecurity,
+                    enabledColor = stateValues.BackgroundColor,
+                    textColor = stateValues.AccentColor,
+                    subTextColor = stateValues.PlaceholderTextColor,
+                    iconTintColor = stateValues.AccentColor,
+                    autoLoading = false,
+                    onClick = {
+                        coroutineScope.launch {
+                            Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(outerSpace))
 
                 stateValues.userAccount?.let { account ->
                     Row(
@@ -4127,19 +4158,19 @@ internal fun String.isTechnicalOperationLogText(): Boolean {
     if (value.isBlank()) return true
     val lower = value.lowercase()
     return lower in setOf("operation completed", "операция выполнена", "операция орындалды") ||
-            lower.startsWith("get /") ||
-            lower.startsWith("post /") ||
-            lower.startsWith("put /") ||
-            lower.startsWith("delete /") ||
-            lower.startsWith("patch /") ||
-            lower.startsWith("head /") ||
-            lower.startsWith("options /") ||
-            lower.contains("user-agent") ||
-            lower.contains("useragent") ||
-            lower.contains("x-forwarded-for") ||
-            lower.contains("http/") ||
-            lower.contains("ktor-client") ||
-            lower.contains("okhttp")
+        lower.startsWith("get /") ||
+        lower.startsWith("post /") ||
+        lower.startsWith("put /") ||
+        lower.startsWith("delete /") ||
+        lower.startsWith("patch /") ||
+        lower.startsWith("head /") ||
+        lower.startsWith("options /") ||
+        lower.contains("user-agent") ||
+        lower.contains("useragent") ||
+        lower.contains("x-forwarded-for") ||
+        lower.contains("http/") ||
+        lower.contains("ktor-client") ||
+        lower.contains("okhttp")
 }
 
 internal fun AppConfiguration.operationLogActionText(action: String): String = when (action) {
@@ -4518,7 +4549,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
             } else {
                 supplierContracts.orEmpty().count { contract ->
                     contract.isActive &&
-                            contract.storeId.trim().equals(cleanActiveStoreId, ignoreCase = true)
+                        contract.storeId.trim().equals(cleanActiveStoreId, ignoreCase = true)
                 }
             }
 
@@ -5248,7 +5279,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return when (model) {
-        NavigationScreenModel.Menu.AppMode -> true
+        NavigationScreenModel.Menu.AppMode -> !model.isTemporarilyHiddenFromUi()
         NavigationScreenModel.Menu.TransactionHistory -> activeOwnerFallback || currentUserCanViewTransactionHistory(activeStoreId)
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
@@ -5266,10 +5297,10 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
 internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationScreenModel.Menu> = when (stateValues.appModeId) {
     APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
+        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
         NavigationScreenModel.Menu.Finances,
-        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
@@ -5277,10 +5308,10 @@ internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationS
     )
     APP_MODE_BUYER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
+        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
         NavigationScreenModel.Menu.Finances,
-        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
@@ -5463,10 +5494,10 @@ internal fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMo
 @Composable
 internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
     val destinations = (Navigation.bottomNavBarScreensSupplier.filterNot { it is NavigationScreenModel.Menu } +
-            listOf(
-                NavigationScreenModel.Supplier.Analytics.Main,
-                NavigationScreenModel.Supplier.Identity.Main
-            ))
+        listOf(
+            NavigationScreenModel.Supplier.Analytics.Main,
+            NavigationScreenModel.Supplier.Identity.Main
+        ))
         .distinctBy { it.route }
     val currentRoute = stateValues.navigationScreensMain.last().route
     val manufacturerMode = stateValues.appModeId == APP_MODE_MANUFACTURER
@@ -5936,8 +5967,10 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
-            item(key = "app-mode-quick-switch") {
-                AppModeQuickSwitchMenuTile()
+            if (!NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi()) {
+                item(key = "app-mode-quick-switch") {
+                    AppModeQuickSwitchMenuTile()
+                }
             }
 
             items(

@@ -282,11 +282,15 @@ fun AppConfiguration.MenuSecurityScreen() {
     val sessions = (sessionsState as? DataState.Success<List<SecuritySessionDataModel>>)?.payload.orEmpty()
     val history = (historyState as? DataState.Success<List<SecuritySessionHistoryDataModel>>)?.payload.orEmpty()
     val currentSession = sessions.firstOrNull { it.current }
-    var selectedSecurityTab by rememberSaveable { mutableStateOf("sessions") }
+    val securityOwnerId = stateValues.userAccount?.id.orEmpty()
+    var selectedSecurityTab by rememberSaveable(securityOwnerId) { mutableStateOf("signin") }
 
-    LaunchedEffect(Unit) {
-        getSecuritySessions()
-        getSecuritySessionHistory()
+    LaunchedEffect(selectedSecurityTab, securityOwnerId) {
+        if (securityOwnerId.isBlank()) return@LaunchedEffect
+        when (selectedSecurityTab) {
+            "sessions" -> getSecuritySessions()
+            "history" -> getSecuritySessionHistory()
+        }
     }
 
     Column(
@@ -294,8 +298,8 @@ fun AppConfiguration.MenuSecurityScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ScreenAppBarWidget(
-            title = localizedStringResource(209, "Security"),
-            iconPath = stateValues.drawablePathIconPassword,
+            title = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
+            iconPath = stateValues.drawablePathIconSecurity,
             onBack = {
                 coroutineScope.launch {
                     Navigation.Menu.pop(stateValues.isNarrowScreen)
@@ -312,8 +316,9 @@ fun AppConfiguration.MenuSecurityScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 selectedIndexInitial = selectedSecurityTab,
                 tabs = listOf(
-                    TabContent("sessions", tabLabelWithCount(localizedStringResource(1121, "Active sessions"), sessions.size)),
-                    TabContent("history", tabLabelWithCount(localizedStringResource(1122, "Security history"), history.size))
+                    TabContent("signin", authUiText("Sign-in", "Вход", "Кіру")),
+                    TabContent("sessions", tabLabelWithCount(authUiText("Sessions", "Сессии", "Сессиялар"), sessions.size)),
+                    TabContent("history", tabLabelWithCount(authUiText("History", "История", "Тарих"), history.size))
                 ),
                 unselectedContainerColor = stateValues.BackgroundColor
             )
@@ -324,125 +329,135 @@ fun AppConfiguration.MenuSecurityScreen() {
         }
 
         LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Security, selectedSecurityTab),
+            state = rememberMenuScreenLazyListState(
+                NavigationScreenModel.Menu.Security,
+                "$securityOwnerId:$selectedSecurityTab"
+            ),
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
                 .weight(1f),
             contentPadding = PaddingValues(stateValues.marginTextFieldGroup),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup)
         ) {
-            item {
-                AccountAuthenticationSettingsCard()
-            }
-
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .foregroundTactileShadow(stateValues.cornerRadius)
-                        .clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .border(
-                            stateValues.unfocusedBorderWidth,
-                            stateValues.PlaceholderTextColor,
-                            RoundedCornerShape(stateValues.cornerRadius)
+            if (selectedSecurityTab == "signin") {
+                item {
+                    key(securityOwnerId) {
+                        AccountAuthenticationSettingsCard(
+                            initiallyExpanded = true,
+                            collapsible = false
                         )
-                        .padding(stateValues.marginTextFieldGroup)
-                ) {
-                    Text(
-                        text = localizedStringResource(226, "Account security"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.titleTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (selectedSecurityTab == "history") {
-                            localizedStringResource(1123, "All sign-ins, refreshes and revocations are stored here.")
-                        } else {
-                            localizedStringResource(227, "Review where your account is signed in. Revoke sessions you do not recognize.")
-                        },
-                        color = stateValues.PlaceholderTextColor,
-                        fontSize = stateValues.smallTextSize
-                    )
-                    currentSession?.takeIf { selectedSecurityTab == "sessions" }?.let {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        SecuritySessionInfoLine(
-                            localizedStringResource(228, "This device"),
-                            it.deviceName.ifBlank { it.platformName }.ifBlank { localizedStringResource(229, "Current session") },
-                            accent = true
-                        )
-                    }
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = localizedStringResource(237, "Refresh"),
-                        iconPath = stateValues.drawablePathIconSearch,
-                        onClick = {
-                            if (selectedSecurityTab == "history") getSecuritySessionHistory() else getSecuritySessions()
-                        }
-                    )
-                    if (selectedSecurityTab == "sessions") {
-                        actionButton(
-                            modifier = Modifier.weight(1f),
-                            text = localizedStringResource(238, "Revoke others"),
-                            iconPath = stateValues.drawablePathIconDelete,
-                            enabled = sessions.any { !it.current },
-                            enabledColor = stateValues.ErrorColor,
-                            confirmationRequired = true,
-                            onClick = { revokeOtherSecuritySessions() }
-                        )
-                    }
-                }
-            }
-
-            if (selectedSecurityTab == "sessions") {
-                if (sessions.isEmpty()) {
-                    item {
-                        Text(
-                            text = when (sessionsState) {
-                                is DataState.Empty -> localizedStringResource(239, "No active sessions loaded yet")
-                                else -> stateValues.stringNoMatches
-                            },
-                            color = stateValues.PlaceholderTextColor,
-                            fontSize = stateValues.textSize,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp)
-                        )
-                    }
-                } else {
-                    items(sessions, key = { it.id }) { session ->
-                        SecuritySessionCard(session)
                     }
                 }
             } else {
-                if (history.isEmpty()) {
-                    item {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .foregroundTactileShadow(stateValues.cornerRadius)
+                            .clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(stateValues.BackgroundColor)
+                            .border(
+                                stateValues.unfocusedBorderWidth,
+                                stateValues.PlaceholderTextColor,
+                                RoundedCornerShape(stateValues.cornerRadius)
+                            )
+                            .padding(stateValues.marginTextFieldGroup)
+                    ) {
                         Text(
-                            text = when (historyState) {
-                                is DataState.Empty -> localizedStringResource(1125, "No security history loaded yet")
-                                else -> stateValues.stringNoMatches
+                            text = localizedStringResource(226, "Account security"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.titleTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (selectedSecurityTab == "history") {
+                                localizedStringResource(1123, "All sign-ins, refreshes and revocations are stored here.")
+                            } else {
+                                localizedStringResource(227, "Review where your account is signed in. Revoke sessions you do not recognize.")
                             },
                             color = stateValues.PlaceholderTextColor,
-                            fontSize = stateValues.textSize,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp)
+                            fontSize = stateValues.smallTextSize
                         )
+                        currentSession?.takeIf { selectedSecurityTab == "sessions" }?.let {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            SecuritySessionInfoLine(
+                                localizedStringResource(228, "This device"),
+                                it.deviceName.ifBlank { it.platformName }.ifBlank { localizedStringResource(229, "Current session") },
+                                accent = true
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(237, "Refresh"),
+                            iconPath = stateValues.drawablePathIconSearch,
+                            onClick = {
+                                if (selectedSecurityTab == "history") getSecuritySessionHistory() else getSecuritySessions()
+                            }
+                        )
+                        if (selectedSecurityTab == "sessions") {
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                text = localizedStringResource(238, "Revoke others"),
+                                iconPath = stateValues.drawablePathIconDelete,
+                                enabled = sessions.any { !it.current },
+                                enabledColor = stateValues.ErrorColor,
+                                confirmationRequired = true,
+                                onClick = { revokeOtherSecuritySessions() }
+                            )
+                        }
+                    }
+                }
+
+                if (selectedSecurityTab == "sessions") {
+                    if (sessions.isEmpty()) {
+                        item {
+                            Text(
+                                text = when (sessionsState) {
+                                    is DataState.Empty -> localizedStringResource(239, "No active sessions loaded yet")
+                                    else -> stateValues.stringNoMatches
+                                },
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.textSize,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp)
+                            )
+                        }
+                    } else {
+                        items(sessions, key = { it.id }) { session ->
+                            SecuritySessionCard(session)
+                        }
                     }
                 } else {
-                    items(history, key = { it.id }) { event ->
-                        SecuritySessionHistoryCard(event)
+                    if (history.isEmpty()) {
+                        item {
+                            Text(
+                                text = when (historyState) {
+                                    is DataState.Empty -> localizedStringResource(1125, "No security history loaded yet")
+                                    else -> stateValues.stringNoMatches
+                                },
+                                color = stateValues.PlaceholderTextColor,
+                                fontSize = stateValues.textSize,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp)
+                            )
+                        }
+                    } else {
+                        items(history, key = { it.id }) { event ->
+                            SecuritySessionHistoryCard(event)
+                        }
                     }
                 }
             }
@@ -1240,10 +1255,10 @@ fun AppConfiguration.MenuSupportScreen() {
     val faqEntries = supportFaqEntries()
 
     val selectedTicket = if (composingNewTicket) null else (
-            tickets.firstOrNull { it.id == activeTicketId }
-                ?: tickets.firstOrNull { it.status != "closed" }
-                ?: tickets.firstOrNull()
-            )
+        tickets.firstOrNull { it.id == activeTicketId }
+            ?: tickets.firstOrNull { it.status != "closed" }
+            ?: tickets.firstOrNull()
+        )
 
     LaunchedEffect(Unit) { getSupportTickets() }
     LaunchedEffect(tickets.joinToString("|") { it.id }, composingNewTicket) {
@@ -3111,11 +3126,11 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         val analyticsDashboard = serverAnalyticsPayload
             ?.takeIf { dashboard ->
                 dashboard.storeId == activeStoreId &&
-                        dashboard.startMillis == analyticsStartMillis &&
-                        dashboard.endMillisExclusive == analyticsEndMillis &&
-                        dashboard.goodsItemIdFilter.orEmpty() == analyticsGoodsItemFilter.orEmpty() &&
-                        dashboard.supplierIdFilter.orEmpty() == analyticsSupplierFilter.orEmpty() &&
-                        dashboard.categoryIdFilter.orEmpty() == analyticsCategoryFilter.orEmpty()
+                    dashboard.startMillis == analyticsStartMillis &&
+                    dashboard.endMillisExclusive == analyticsEndMillis &&
+                    dashboard.goodsItemIdFilter.orEmpty() == analyticsGoodsItemFilter.orEmpty() &&
+                    dashboard.supplierIdFilter.orEmpty() == analyticsSupplierFilter.orEmpty() &&
+                    dashboard.categoryIdFilter.orEmpty() == analyticsCategoryFilter.orEmpty()
             }
             ?: localAnalyticsDashboard
 
@@ -5374,8 +5389,8 @@ internal fun AppConfiguration.LocalAppPreferencesPriorityEffect() {
             ?: return@LaunchedEffect
         val account = stateValues.userAccount ?: return@LaunchedEffect
         val accountMatchesLocal = normalizeAppLanguagePreference(account.appLanguage) == snapshot.language &&
-                normalizeAppThemePreference(account.appThemeId) == snapshot.themeId &&
-                normalizeAppSizeModePreference(account.appSizeModeId) == snapshot.sizeModeId
+            normalizeAppThemePreference(account.appThemeId) == snapshot.themeId &&
+            normalizeAppSizeModePreference(account.appSizeModeId) == snapshot.sizeModeId
         if (accountMatchesLocal) {
             setPersistentUiDraftValue?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY, null)
         }
@@ -5392,7 +5407,7 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
     val transportUnavailable = transportStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
     val localNetwork = stateValues.localNetworkState
     val localMode = userAccount != null && localNetwork.enabled &&
-            !transportReachable && !transportUnavailable
+        !transportReachable && !transportUnavailable
 
     // cloudTransportStatus is already a presentation-grade, hysteresis-controlled state. Keep the
     // banner itself deliberately still: no crossfade, slide, size motion or color interpolation can
@@ -5454,10 +5469,10 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
                 targetState = manualRefreshInProgress,
                 transitionSpec = {
                     (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
-                            scaleIn(initialScale = 0.72f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
+                        scaleIn(initialScale = 0.72f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
                         .togetherWith(
                             fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
-                                    scaleOut(targetScale = 0.82f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+                                scaleOut(targetScale = 0.82f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
                         )
                 },
                 label = "cloudConnectionRefreshState"
@@ -5770,7 +5785,7 @@ fun AppConfiguration.MainScreen() {
             }
 
             val blockingWorkshiftGate = shouldBlockAppForWorkshift() &&
-                    stateValues.navigationScreensMain.last() is NavigationScreenModel.Transaction
+                stateValues.navigationScreensMain.last() is NavigationScreenModel.Transaction
             if (blockingWorkshiftGate || workshiftStartDialogVisible) {
                 WorkshiftGateOverlay(blockingTransactionScreen = blockingWorkshiftGate)
             }
