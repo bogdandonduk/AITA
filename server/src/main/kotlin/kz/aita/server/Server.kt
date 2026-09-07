@@ -1,7 +1,6 @@
 // THIS IS Server.kt - in ktor server module of kmp compose app
 
 package kz.aita.server
-import kz.aita.server.security.AitaTokenLifetimeRules
 
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.auth0.jwt.JWT
@@ -15,7 +14,6 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.config.*
-import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.autohead.*
@@ -44,11 +42,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kz.aita.*
-import kz.aita.server.auth.AitaAuthUnavailableException
-import kz.aita.server.auth.advancedAuthSecondFactorEnabled
-import kz.aita.server.auth.authUnavailableMessage
-import kz.aita.server.auth.installAitaAdvancedAuthenticationRoutes
-import kz.aita.server.auth.resolveAdvancedAuthUser
+import kz.aita.server.auth.*
+import kz.aita.server.security.AitaTokenLifetimeRules
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*

@@ -1,7 +1,7 @@
 package kz.aita.server.security
 
 import java.time.Instant
-import java.util.Date
+import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

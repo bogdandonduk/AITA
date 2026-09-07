@@ -1,7 +1,5 @@
 // THIS IS build.gradle of composeApp module
 import com.android.build.api.dsl.ApplicationExtension
-import org.gradle.api.tasks.Delete
-import org.gradle.api.tasks.JavaExec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl

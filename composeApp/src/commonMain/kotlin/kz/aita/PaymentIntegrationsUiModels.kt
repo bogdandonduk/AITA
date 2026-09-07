@@ -1,11 +1,6 @@
 package kz.aita
 
-import kz.aita.payments.management.PaymentBalanceDto
-import kz.aita.payments.management.PaymentCapabilityDto
-import kz.aita.payments.management.PaymentIntegrationSummaryDto
-import kz.aita.payments.management.PaymentManagedEnvironment
-import kz.aita.payments.management.PaymentManagedProvider
-import kz.aita.payments.management.PaymentTopUpInvoiceDto
+import kz.aita.payments.management.*
 
 internal data class PaymentIntegrationsUiState(
     val loading: Boolean = false,

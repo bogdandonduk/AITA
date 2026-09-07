@@ -1,7 +1,7 @@
 package kz.aita.auth
 
-import io.ktor.client.plugins.auth.AuthCircuitBreaker
-import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.plugins.auth.*
+import io.ktor.client.request.*
 import kz.aita.cloudEndpointRequiresAuthentication
 
 /** A rejected public credential must never refresh/replay another account's stored session. */

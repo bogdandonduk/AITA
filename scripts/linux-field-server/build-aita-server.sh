@@ -4,7 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
-AITA_SERVER_BUILD_SCRIPT_VERSION="2026-08-27-main-only-v3"
+AITA_SERVER_BUILD_SCRIPT_VERSION="2026-09-07-jar-validation-v4"
 
 project_root="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 run_tests=false
@@ -61,6 +61,7 @@ project_root="$(cd -- "$project_root" && pwd)"
 
 aita_require_command sha256sum
 aita_require_command tee
+aita_require_command unzip
 java_bin="$(aita_require_java21)"
 if [[ -z "${JAVA_HOME-}" ]]; then
   resolved_java="$(readlink -f "$java_bin" 2>/dev/null || printf '%s' "$java_bin")"
@@ -127,7 +128,7 @@ show_compiler_diagnostics() {
     grep -nE \
       '(^|[[:space:]])e: (file:|.*\.kts?:)|(^|[[:space:]])error:|Unresolved reference|Type mismatch|Compilation error' \
       "$file" || true
-  } | head -n 80)"
+  } | sed -n '1,80p')"
 
   if [[ -n "$diagnostics" ]]; then
     printf '\nAITA: first relevant compiler diagnostics:\n%s\n\n' "$diagnostics" >&2
@@ -144,6 +145,7 @@ run_logged_gradle() {
     printf 'UTC: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'User: %s\n' "$(id -un)"
     printf 'Project: %s\n' "$project_root"
+    printf 'Source checkout: %s\n' "$(aita_describe_checkout "$project_root")"
     printf 'JAVA_HOME: %s\n' "$JAVA_HOME"
     "$JAVA_HOME/bin/java" -version
     printf 'Command:'
@@ -163,7 +165,8 @@ run_logged_gradle() {
 
 aita_info "Build script profile: $AITA_SERVER_BUILD_SCRIPT_VERSION"
 aita_info "Project root: $project_root"
-aita_info "Java: $($JAVA_HOME/bin/java -version 2>&1 | head -n 1)"
+aita_info "Source checkout: $(aita_describe_checkout "$project_root")"
+aita_info "Java: $("$JAVA_HOME/bin/java" -version 2>&1 | sed -n '1p')"
 aita_info "Building server-only graph with max-workers=$max_workers"
 if $run_tests; then
   aita_info "Verification gate: shared and server JVM tests enabled"
@@ -199,11 +202,11 @@ if ! run_logged_gradle "normal"; then
 fi
 
 [[ -s "$jar_path" ]] || aita_die "Server fat JAR was not produced at $jar_path; full log: $log_file"
-if command -v unzip >/dev/null 2>&1; then
-  unzip -tqq "$jar_path" || aita_die "Server fat JAR integrity check failed; full log: $log_file"
-fi
+aita_verify_server_jar "$jar_path" "$project_root"
 
 aita_info "Server fat JAR: $jar_path"
 aita_info "Size: $(du -h "$jar_path" | awk '{print $1}')"
 aita_info "SHA-256: $(sha256sum "$jar_path" | awk '{print $1}')"
 aita_info "Build log retained at: $log_file"
+
+aita_info "BUILD COMPLETE ONLY: the installed service is unchanged until deployment succeeds."

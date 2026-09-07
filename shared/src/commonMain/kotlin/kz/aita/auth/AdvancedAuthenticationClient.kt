@@ -1,6 +1,6 @@
 package kz.aita.auth
 
-import io.ktor.http.HttpMethod
+import io.ktor.http.*
 import kz.aita.*
 
 object AitaAdvancedAuthenticationClient {

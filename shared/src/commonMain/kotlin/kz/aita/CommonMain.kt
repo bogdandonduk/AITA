@@ -8,7 +8,6 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import app.cash.sqldelight.db.SqlDriver
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.auth.*
@@ -31,10 +30,9 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.*
-import kotlin.concurrent.Volatile
-import kotlin.getValue
-import kotlin.random.Random
 import kz.aita.auth.disableSessionAuthForPublicAuthRequest
+import kotlin.concurrent.Volatile
+import kotlin.random.Random
 
 @kotlinx.serialization.Serializable
 data class MoneyDataModel(

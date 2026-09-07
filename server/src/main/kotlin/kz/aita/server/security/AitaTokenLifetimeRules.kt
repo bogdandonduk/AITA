@@ -1,7 +1,7 @@
 package kz.aita.server.security
 
 import java.time.Instant
-import java.util.Date
+import java.util.*
 
 internal object AitaTokenLifetimeRules {
     const val ACCESS_TOKEN_TTL_SECONDS: Long = 10L * 60L

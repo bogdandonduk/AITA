@@ -4,21 +4,14 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
-aita_require_command curl
-aita_require_command flock
-aita_require_command sha256sum
-aita_require_command unzip
-
-deploy_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/aita"
-mkdir -p "$deploy_state_dir"
-exec 9>"$deploy_state_dir/deploy.lock"
-flock -n 9 || aita_die "Another AITA deployment is already running for $(id -un)"
-
-project_root="$(pwd)"
+AITA_SERVER_DEPLOY_SCRIPT_VERSION="2026-09-07-jar-validation-v4"
+project_root="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 build=false
 build_with_tests=false
 backup=false
 rollback=false
+verify_only=false
+ready_timeout=120
 
 while (($#)); do
   case "$1" in
@@ -27,8 +20,22 @@ while (($#)); do
     --build-with-tests) build=true; build_with_tests=true ;;
     --backup) backup=true ;;
     --rollback) rollback=true ;;
+    --verify-only) verify_only=true ;;
+    --ready-timeout) ready_timeout="${2:?Missing value for --ready-timeout}"; shift ;;
     -h|--help)
-      echo "Usage: $0 [--project-root PATH] [--build|--build-with-tests] [--backup] [--rollback]"
+      cat <<'HELP'
+Usage: deploy-aita-server.sh [--project-root PATH] [--build|--build-with-tests]
+                            [--backup] [--rollback] [--verify-only]
+                            [--ready-timeout SECONDS]
+
+--verify-only validates the built JAR against the checkout without touching
+systemd, the installed artifact, or the database. --build can be used with it.
+Normal deployment validates and stages the artifact before stopping AITA.
+Success requires the new service process to own port 8080, answer /readyz, and
+(if present in the JAR) answer /auth/capabilities. No email is sent by the check.
+The readiness window defaults to 120 seconds; use up to 900 for a planned
+migration. JAR rollback never reverses a database migration.
+HELP
       exit 0
       ;;
     *) aita_die "Unknown argument: $1" ;;
@@ -36,23 +43,48 @@ while (($#)); do
   shift
 done
 
-project_root="$(cd -- "$project_root" && pwd)"
-sudo_cmd=()
-if ((EUID != 0)); then
-  aita_require_command sudo
-  sudo_cmd=(sudo)
+[[ "$ready_timeout" =~ ^[1-9][0-9]{0,2}$ ]] && ((ready_timeout <= 900)) ||
+  aita_die "--ready-timeout must be between 1 and 900 seconds"
+if $rollback && { $build || $verify_only; }; then
+  aita_die "--rollback cannot be combined with --build or --verify-only"
 fi
+
+aita_require_command curl
+aita_require_command flock
+aita_require_command sha256sum
+aita_require_command unzip
+project_root="$(cd -- "$project_root" && pwd)"
+
+deploy_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/aita"
+mkdir -p "$deploy_state_dir"
+exec 9>"$deploy_state_dir/deploy.lock"
+flock -n 9 || aita_die "Another AITA deployment is already running for $(id -un)"
 
 current_jar=/opt/aita/app/aita-server-all.jar
 previous_jar=/opt/aita/app/aita-server-all.previous.jar
 stage=""
+deployment_phase=validation
+sudo_cmd=()
 
 cleanup_staged_jar() {
+  local status=$?
   if [[ -n "$stage" ]]; then
     "${sudo_cmd[@]}" rm -f -- "$stage" >/dev/null 2>&1 || true
   fi
+  if ((status != 0)); then
+    aita_info "DEPLOYMENT FAILED during $deployment_phase; no successful release was reported."
+    case "$deployment_phase" in
+      validation|backup|staging)
+        aita_info "This deploy attempt did not replace the installed JAR or stop the server."
+        ;;
+      *) aita_info "Check systemd/journal output before retrying; no automatic database or JAR rollback was attempted." ;;
+    esac
+  fi
 }
 trap cleanup_staged_jar EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 show_service_failure() {
   "${sudo_cmd[@]}" systemctl --no-pager --full status aita-server.service || true
@@ -60,36 +92,14 @@ show_service_failure() {
   if "${sudo_cmd[@]}" test -f "$previous_jar"; then
     aita_info "Previous JAR is preserved at $previous_jar"
     aita_info "Manual rollback command: bash $SCRIPT_DIR/deploy-aita-server.sh --rollback"
+    aita_info "A JAR rollback does not reverse Flyway migrations; check schema compatibility first."
   fi
 }
 
-verify_server_jar() {
-  local jar="${1:?Server JAR path is required}"
-  [[ -s "$jar" ]] || aita_die "Server fat JAR is missing or empty: $jar"
-  local size
-  size="$(stat -c '%s' "$jar")"
-  ((size >= 1024 * 1024)) || aita_die "Server JAR is suspiciously small ($size bytes): $jar"
-  unzip -tqq "$jar" || aita_die "Server JAR is not a valid ZIP/JAR: $jar"
-  unzip -Z1 "$jar" | grep -qx 'kz/aita/server/ServerKt.class' ||
-    aita_die "Server JAR does not contain kz/aita/server/ServerKt.class: $jar"
-  unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' |
-    grep -Eq '^Main-Class:[[:space:]]*kz\.aita\.server\.ServerKt[[:space:]]*$' ||
-    aita_die "Server JAR manifest does not point to kz.aita.server.ServerKt: $jar"
-}
+aita_info "Deploy script profile: $AITA_SERVER_DEPLOY_SCRIPT_VERSION"
+aita_info "Source checkout: $(aita_describe_checkout "$project_root")"
 
-if $rollback; then
-  [[ -f "$previous_jar" ]] || aita_die "No previous JAR is available at $previous_jar"
-  aita_info "WARNING: a JAR rollback does not reverse Flyway migrations. Confirm schema compatibility before continuing."
-  read -r -p "Type ROLLBACK to continue: " confirmation
-  [[ "$confirmation" == "ROLLBACK" ]] || aita_die "Rollback cancelled"
-  "${sudo_cmd[@]}" systemctl stop aita-server.service
-  "${sudo_cmd[@]}" cp -a "$current_jar" "${current_jar}.failed.$(date -u +%Y%m%dT%H%M%SZ)" 2>/dev/null || true
-  "${sudo_cmd[@]}" install -o aita -g aita -m 0640 "$previous_jar" "$current_jar"
-  if ! "${sudo_cmd[@]}" systemctl start aita-server.service; then
-    show_service_failure
-    aita_die "AITA failed to start after rollback"
-  fi
-else
+if ! $rollback; then
   if $build; then
     build_args=(--project-root "$project_root")
     if $build_with_tests; then
@@ -97,44 +107,124 @@ else
     fi
     bash "$SCRIPT_DIR/build-aita-server.sh" "${build_args[@]}"
   fi
-
   source_jar="$project_root/server/build/libs/aita-server-all.jar"
-  [[ -r "$source_jar" ]] || aita_die "Fat JAR is missing: $source_jar (run with --build)"
-  verify_server_jar "$source_jar"
-
-  if $backup; then
-    "${sudo_cmd[@]}" systemctl start --wait aita-backup.service
-  fi
-
-  checksum="$(sha256sum "$source_jar" | awk '{print $1}')"
-  stage="/opt/aita/app/.aita-server-all.jar.$$.new"
-  "${sudo_cmd[@]}" install -o aita -g aita -m 0640 "$source_jar" "$stage"
-  staged_checksum="$("${sudo_cmd[@]}" sha256sum "$stage" | awk '{print $1}')"
-  [[ "$checksum" == "$staged_checksum" ]] || aita_die "Staged JAR checksum mismatch"
-  "${sudo_cmd[@]}" unzip -tqq "$stage" || aita_die "Staged server JAR integrity check failed"
-
-  "${sudo_cmd[@]}" systemctl stop aita-server.service || true
-  if "${sudo_cmd[@]}" test -f "$current_jar"; then
-    "${sudo_cmd[@]}" cp -a "$current_jar" "$previous_jar"
-  fi
-  "${sudo_cmd[@]}" mv -f "$stage" "$current_jar"
-  stage=""
-  "${sudo_cmd[@]}" chown aita:aita "$current_jar"
-  "${sudo_cmd[@]}" chmod 0640 "$current_jar"
-  if ! "${sudo_cmd[@]}" systemctl start aita-server.service; then
-    show_service_failure
-    aita_die "AITA systemd service failed to start"
+  aita_verify_server_jar "$source_jar" "$project_root"
+  if $verify_only; then
+    aita_info "VERIFY ONLY PASSED. No installed files, services, or database records were changed."
+    exit 0
   fi
 fi
 
-for _ in $(seq 1 60); do
-  if curl --silent --fail --max-time 2 http://127.0.0.1:8080/readyz >/dev/null; then
-    deployed_checksum="$("${sudo_cmd[@]}" sha256sum "$current_jar" 2>/dev/null | awk '{print $1}' || true)"
-    aita_info "AITA is ready. Deployed SHA-256: $deployed_checksum"
-    exit 0
+aita_require_command systemctl
+aita_require_command ss
+if ((EUID != 0)); then
+  aita_require_command sudo
+  sudo_cmd=(sudo)
+  sudo -v
+fi
+
+if $rollback; then
+  source_jar="$previous_jar"
+  "${sudo_cmd[@]}" bash -c 'source "$1"; aita_verify_server_jar "$2"' \
+    _ "$SCRIPT_DIR/aita-linux-common.sh" "$source_jar"
+  aita_info "WARNING: a JAR rollback does not reverse Flyway migrations. Confirm schema compatibility before continuing."
+  read -r -p "Type ROLLBACK to continue: " confirmation
+  [[ "$confirmation" == "ROLLBACK" ]] || aita_die "Rollback cancelled"
+fi
+
+# Support both the historical package and the current auth package, so a
+# deliberately selected legacy rollback is not required to expose a new route.
+source_entries="$("${sudo_cmd[@]}" unzip -Z1 "$source_jar")"
+expect_auth=false
+if grep -Fxq 'kz/aita/server/auth/AitaAdvancedAuthenticationKt.class' <<< "$source_entries" ||
+   grep -Fxq 'kz/aita/server/AitaAdvancedAuthenticationKt.class' <<< "$source_entries"; then
+  expect_auth=true
+fi
+checksum="$("${sudo_cmd[@]}" sha256sum "$source_jar" | awk '{print $1}')"
+aita_info "Candidate JAR SHA-256: $checksum"
+
+if $backup; then
+  deployment_phase=backup
+  "${sudo_cmd[@]}" systemctl start --wait aita-backup.service || aita_die "Backup failed; deployment stopped before changing the server"
+fi
+
+deployment_phase=staging
+stage="/opt/aita/app/.aita-server-all.jar.$$.new"
+"${sudo_cmd[@]}" install -o aita -g aita -m 0640 "$source_jar" "$stage"
+staged_checksum="$("${sudo_cmd[@]}" sha256sum "$stage" | awk '{print $1}')"
+[[ "$checksum" == "$staged_checksum" ]] || aita_die "Staged JAR checksum mismatch"
+"${sudo_cmd[@]}" unzip -tqq "$stage" || aita_die "Staged server JAR integrity check failed"
+
+# Preserve the old artifact before any downtime; do not ignore a failed stop and
+# then mistake the still-running old server's /readyz for a successful release.
+if "${sudo_cmd[@]}" test -f "$current_jar"; then
+  if $rollback; then
+    "${sudo_cmd[@]}" cp -a "$current_jar" "${current_jar}.failed.$(date -u +%Y%m%dT%H%M%SZ)"
+  else
+    "${sudo_cmd[@]}" cp -a "$current_jar" "$previous_jar"
   fi
-  sleep 2
+fi
+before_invocation="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=InvocationID --value)"
+before_pid="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=MainPID --value)"
+aita_info "Previous service PID: ${before_pid:-unknown}"
+deployment_phase=stopping
+if ! "${sudo_cmd[@]}" systemctl stop aita-server.service; then
+  show_service_failure
+  aita_die "Could not stop the old service; the candidate JAR was NOT installed"
+fi
+stopped_pid="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=MainPID --value)"
+[[ "$stopped_pid" == 0 ]] || aita_die "Old service still has MainPID=$stopped_pid; refusing to replace its JAR"
+
+deployment_phase=installing
+"${sudo_cmd[@]}" mv -f "$stage" "$current_jar"
+stage=""
+"${sudo_cmd[@]}" chown aita:aita "$current_jar"
+"${sudo_cmd[@]}" chmod 0640 "$current_jar"
+deployment_phase=starting
+if ! "${sudo_cmd[@]}" systemctl start aita-server.service; then
+  show_service_failure
+  aita_die "AITA systemd service failed to start"
+fi
+
+deployment_phase=readiness
+deadline=$((SECONDS + ready_timeout))
+last_ready_status=not_checked
+last_auth_status=not_required
+$expect_auth && last_auth_status=not_checked
+while ((SECONDS < deadline)); do
+  main_pid="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=MainPID --value)"
+  invocation="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=InvocationID --value)"
+  if [[ "$main_pid" =~ ^[1-9][0-9]*$ && -n "$invocation" && "$invocation" != "$before_invocation" ]] &&
+     "${sudo_cmd[@]}" systemctl is-active --quiet aita-server.service; then
+    listeners="$("${sudo_cmd[@]}" ss -H -ltnp '( sport = :8080 )')"
+    if [[ "$listeners" == *"pid=$main_pid,"* ]]; then
+      last_ready_status="$(curl --noproxy '*' --silent --output /dev/null --write-out '%{http_code}' \
+        --connect-timeout 2 --max-time 2 http://127.0.0.1:8080/readyz || true)"
+      if $expect_auth; then
+        last_auth_status="$(curl --noproxy '*' --silent --output /dev/null --write-out '%{http_code}' \
+          --connect-timeout 2 --max-time 2 http://127.0.0.1:8080/auth/capabilities || true)"
+      fi
+      if [[ "$last_ready_status" == 200 && ( "$last_auth_status" == 200 || "$last_auth_status" == not_required ) ]]; then
+        # Do not report success across a concurrent restart or artifact change.
+        after_invocation="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=InvocationID --value)"
+        if [[ "$invocation" == "$after_invocation" ]] &&
+           "${sudo_cmd[@]}" systemctl is-active --quiet aita-server.service; then
+          deployed_checksum="$("${sudo_cmd[@]}" sha256sum "$current_jar" | awk '{print $1}')"
+          [[ "$deployed_checksum" == "$checksum" ]] || aita_die "Installed JAR changed during readiness verification"
+          deployment_phase=complete
+          aita_info "DEPLOYMENT COMPLETE. New service PID: $main_pid. /readyz: HTTP 200."
+          if $expect_auth; then
+            aita_info "/auth/capabilities: HTTP 200 (route verified; provider configuration and real email delivery still need their own test)."
+          fi
+          aita_info "Deployed SHA-256: $deployed_checksum"
+          exit 0
+        fi
+      fi
+    fi
+  fi
+  sleep 1
 done
 
+aita_info "Readiness results: /readyz=$last_ready_status; /auth/capabilities=$last_auth_status"
 show_service_failure
-aita_die "AITA did not become ready within 120 seconds; no automatic rollback was attempted because Flyway schema changes may make a blind JAR rollback unsafe"
+aita_die "AITA did not pass new-process readiness within the ${ready_timeout}s window; no automatic rollback was attempted because Flyway schema changes may make a blind JAR rollback unsafe"

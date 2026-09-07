@@ -60,7 +60,7 @@ if command -v pg_isready >/dev/null && command -v psql >/dev/null && [[ -n "${AI
   if [[ -n "${DB_USER-}" && -n "${DB_PASS-}" ]]; then
     if PGPASSWORD="$DB_PASS" psql -X -v ON_ERROR_STOP=1 -qAt \
       -h "$AITA_PARSED_DB_HOST" -p "$AITA_PARSED_DB_PORT" -U "$DB_USER" -d "$AITA_PARSED_DB_NAME" \
-      -c 'select 1' 2>/dev/null | grep -qx 1; then
+      -c 'select 1' 2>/dev/null | grep -Fx 1 >/dev/null; then
       pass "AITA database credentials work"
     else
       fail "AITA database credentials do not work"
@@ -115,7 +115,7 @@ else
     warn "AITA_BACKUP_RCLONE_REMOTE is malformed: expected remote:path"
   elif ((EUID == 0)) && command -v runuser >/dev/null 2>&1; then
     if runuser -u aita -- env HOME=/var/lib/aita rclone listremotes 2>/dev/null |
-       grep -qx "${backup_remote_name}:"; then
+       grep -Fx "${backup_remote_name}:" >/dev/null; then
       pass "rclone backup remote is available to the aita service user: ${backup_remote_name}:"
     else
       warn "rclone remote ${backup_remote_name}: is not configured for the aita service user"
@@ -138,7 +138,7 @@ root_free_kb="$(df -Pk / | awk 'NR==2 {print $4}')"
 ((root_free_kb >= 10 * 1024 * 1024)) && pass "root filesystem has at least 10 GiB free" || warn "root filesystem has less than 10 GiB free"
 
 if command -v ufw >/dev/null; then
-  ufw status | head -1 | grep -q 'Status: active' && pass "UFW is active" || warn "UFW is not active"
+  ufw status | sed -n '1p' | grep -F 'Status: active' >/dev/null && pass "UFW is active" || warn "UFW is not active"
 fi
 
 if $check_endpoints; then

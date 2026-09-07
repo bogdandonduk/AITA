@@ -2,7 +2,9 @@ package kz.aita.auth
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import kz.aita.*
+import kz.aita.LocalizedStringDataModel
+import kz.aita.ResponseDataModel
+import kz.aita.TokenPair
 import kotlin.test.*
 
 class PasswordLoginCompatibilityTest {

@@ -1,11 +1,10 @@
 package kz.aita.payments.management
 
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 class PaymentManagementClientTest {
     private val json = Json { encodeDefaults = true }

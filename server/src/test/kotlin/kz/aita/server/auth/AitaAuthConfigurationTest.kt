@@ -1,6 +1,6 @@
 package kz.aita.server.auth
 
-import java.util.Base64
+import java.util.*
 import kotlin.test.*
 
 class AitaAuthConfigurationTest {
