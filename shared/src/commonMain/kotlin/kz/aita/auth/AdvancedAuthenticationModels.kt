@@ -54,7 +54,8 @@ data class AitaAuthFlowDataModel(
     val resendAfterMillis: Long = 0L,
     val tokenPair: TokenPair? = null,
     val resetTicket: String = "",
-    val recoveryCodes: List<String> = emptyList()
+    val recoveryCodes: List<String> = emptyList(),
+    val serverTimeMillis: Long = 0L
 )
 
 @Serializable

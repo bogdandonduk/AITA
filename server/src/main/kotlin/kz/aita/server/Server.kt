@@ -18070,6 +18070,13 @@ fun Application.module() {
   }
 
   install(StatusPages) {
+    exception<AitaAuthUnavailableException> { call, cause ->
+      call.safeGenericResponseNoPayload(
+        status = HttpStatusCode.Conflict,
+        message = authUnavailableMessage(cause.reason)
+      )
+    }
+
     exception<BadRequestException> { call, cause ->
       call.safeGenericResponseNoPayload(
         status = HttpStatusCode.BadRequest,
@@ -18756,7 +18763,7 @@ fun Application.module() {
 
           val ok = Pw.verify(body.password.toCharArray(), user[Users.passwordHash])
 
-          if (!ok)
+          if (!ok || !user[Users.isActive])
             return@post call.genericResponseNoPayload(
               status = HttpStatusCode.Unauthorized,
               message = invalidCredentialsMessage
@@ -18778,6 +18785,7 @@ fun Application.module() {
 
           call.genericTokenPairResponse(HttpStatusCode.OK, tokenPair)
         } catch (throwable: Throwable) {
+          if (throwable is kotlinx.coroutines.CancellationException) throw throwable
           call.safeGenericResponseNoPayload(
             status = HttpStatusCode.InternalServerError,
             message = getResponse("3").message,

@@ -1,4 +1,4 @@
-package kz.aita.server
+package kz.aita.server.auth
 
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -6,7 +6,6 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.*
-import kotlinx.serialization.Serializable
 import kz.aita.LocalizedStringDataModel
 import kz.aita.auth.*
 import kz.aita.checkAsPassword
@@ -1081,15 +1080,17 @@ private class AitaAdvancedAuthService(
 
     private fun retryDelay(attempt: Int): Long = (2.0.pow(attempt.coerceIn(1, 8)) * 1_000L).toLong().coerceAtMost(15 * 60_000L) + random.nextLong(750L)
 
-    @Serializable private data class ResendBody(val from: String, val to: List<String>, val subject: String, val html: String, val reply_to: String? = null)
     private data class EmailPayload(val to: String, val purpose: String, val locale: String, val code: String, val attempts: Int, val maxAttempts: Int)
     private data class EmailResult(val success: Boolean, val messageId: String? = null, val errorCode: String? = null, val retry: Boolean = false)
 
     private fun sendResendEmail(workId: UUID, payload: EmailPayload): EmailResult {
         val (subject, body) = emailCopy(payload.purpose, payload.locale, payload.code)
-        val json = jsonBase.encodeToString(
-            ResendBody.serializer(),
-            ResendBody(config.fromEmail, listOf(payload.to), subject, body, config.replyTo.ifBlank { null })
+        val json = aitaResendEmailRequestJson(
+            from = config.fromEmail,
+            to = payload.to,
+            subject = subject,
+            html = body,
+            replyTo = config.replyTo
         )
         val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build()
         val request = HttpRequest.newBuilder(URI("https://api.resend.com/emails"))

@@ -34,6 +34,7 @@ import kotlinx.serialization.json.*
 import kotlin.concurrent.Volatile
 import kotlin.getValue
 import kotlin.random.Random
+import kz.aita.auth.disableSessionAuthForPublicAuthRequest
 
 @kotlinx.serialization.Serializable
 data class MoneyDataModel(
@@ -8005,7 +8006,7 @@ var httpClient =
             bearer {
                 sendWithoutRequest { request ->
                     val path = request.url.encodedPath.trimStart('/').lowercase()
-                    if (path.startsWith("auth/")) {
+                    if (!cloudEndpointRequiresAuthentication(path)) {
                         false
                     } else {
                         val scheme = request.url.protocol.name
@@ -17256,6 +17257,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     logNetworkAttempt("TRY ${method.value} $requestUrl")
                     val response = httpClient.request(requestUrl) {
                         this.method = method
+                        disableSessionAuthForPublicAuthRequest(endpointUrl)
                         this.headers.append(HttpHeaders.CacheControl, "no-cache")
                         this.headers.append(HttpHeaders.Pragma, "no-cache")
 
