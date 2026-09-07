@@ -44,6 +44,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kz.aita.*
+import kz.aita.server.auth.AitaAuthUnavailableException
+import kz.aita.server.auth.advancedAuthSecondFactorEnabled
+import kz.aita.server.auth.authUnavailableMessage
+import kz.aita.server.auth.installAitaAdvancedAuthenticationRoutes
+import kz.aita.server.auth.resolveAdvancedAuthUser
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.*

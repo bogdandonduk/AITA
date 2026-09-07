@@ -1,5 +1,6 @@
-package kz.aita.server
+package kz.aita.server.auth
 
+import kz.aita.LocalizedStringDataModel
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -91,3 +92,39 @@ internal class AdvancedAuthConfig(
 internal enum class AitaAuthUnavailableReason { DISABLED, SECURITY_CONFIGURATION, EMAIL_CONFIGURATION, RECOVERY_DISABLED }
 
 internal class AitaAuthUnavailableException(val reason: AitaAuthUnavailableReason) : IllegalStateException(reason.name)
+
+/**
+ * Keep the public-facing error mapper with its reason and exception in kz.aita.server.
+ * StatusPages must not depend on a private helper inside the authentication service.
+ */
+internal fun authUnavailableMessage(reason: AitaAuthUnavailableReason): List<LocalizedStringDataModel> {
+    fun localized(main: String, ru: String, kk: String): List<LocalizedStringDataModel> = listOf(
+        LocalizedStringDataModel("main", main),
+        LocalizedStringDataModel("en", main),
+        LocalizedStringDataModel("ru", ru),
+        LocalizedStringDataModel("kk", kk)
+    )
+
+    return when (reason) {
+        AitaAuthUnavailableReason.DISABLED -> localized(
+            "Code sign-in is not enabled. Use your password.",
+            "Вход по коду не включён. Используйте пароль.",
+            "Кодпен кіру қосылмаған. Құпия сөзді пайдаланыңыз."
+        )
+        AitaAuthUnavailableReason.SECURITY_CONFIGURATION -> localized(
+            "Account security needs server setup. Contact the administrator.",
+            "Безопасность аккаунта требует настройки сервера. Обратитесь к администратору.",
+            "Аккаунт қауіпсіздігі серверді баптауды қажет етеді. Әкімшіге хабарласыңыз."
+        )
+        AitaAuthUnavailableReason.EMAIL_CONFIGURATION -> localized(
+            "Email codes are not configured. Use your password.",
+            "Отправка кодов на email не настроена. Используйте пароль.",
+            "Email кодтарын жіберу бапталмаған. Құпия сөзді пайдаланыңыз."
+        )
+        AitaAuthUnavailableReason.RECOVERY_DISABLED -> localized(
+            "Password recovery is not enabled.",
+            "Восстановление пароля не включено.",
+            "Құпия сөзді қалпына келтіру қосылмаған."
+        )
+    }
+}
