@@ -1,6 +1,7 @@
 package kz.aita.server.auth
 
 import kz.aita.LocalizedStringDataModel
+import kz.aita.auth.AitaAuthCapabilitiesDataModel
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -30,6 +31,40 @@ internal class AdvancedAuthConfig(
 
     val advancedReady: Boolean get() = enabled && securityConfigured
     val emailReady: Boolean get() = advancedReady && emailConfigured
+
+    fun capabilities(): AitaAuthCapabilitiesDataModel = AitaAuthCapabilitiesDataModel(
+        enabled = advancedReady,
+        passwordLoginEnabled = true,
+        emailCodeLoginEnabled = emailReady,
+        passwordRecoveryEnabled = emailReady && passwordRecoveryEnabled,
+        authenticatorTwoFactorEnabled = advancedReady,
+        phoneLoginAliasEnabled = emailReady,
+        codeLength = 6,
+        codeTtlSeconds = codeTtlMillis / 1000L,
+        resendCooldownSeconds = resendCooldownMillis / 1000L
+    )
+
+    /** Existing second factors still apply when new enrollment or email delivery is disabled. */
+    fun requireSecurityConfigured() {
+        if (!securityConfigured) {
+            throw AitaAuthUnavailableException(AitaAuthUnavailableReason.SECURITY_CONFIGURATION)
+        }
+    }
+
+    fun requireAdvancedAuthentication(recovery: Boolean = false) {
+        if (!enabled) throw AitaAuthUnavailableException(AitaAuthUnavailableReason.DISABLED)
+        requireSecurityConfigured()
+        if (recovery && !passwordRecoveryEnabled) {
+            throw AitaAuthUnavailableException(AitaAuthUnavailableReason.RECOVERY_DISABLED)
+        }
+    }
+
+    fun requireEmailAuthentication(recovery: Boolean = false) {
+        requireAdvancedAuthentication(recovery)
+        if (!emailConfigured) {
+            throw AitaAuthUnavailableException(AitaAuthUnavailableReason.EMAIL_CONFIGURATION)
+        }
+    }
 
     companion object {
         fun load(
@@ -73,9 +108,9 @@ internal class AdvancedAuthConfig(
                 replyTo = value("AITA_AUTH_EMAIL_REPLY_TO").orEmpty(),
                 // With optional security unconfigured, password rate-limit/audit hashes use a
                 // process-local random key. It is NEVER used for persistent codes or encryption:
-                // every such operation is gated by securityConfigured/advancedReady below.
-                codePepper = if (pepperValid) pepperText!!.toByteArray(StandardCharsets.UTF_8)
-                    else ByteArray(64).also(SecureRandom()::nextBytes),
+                // every such operation must pass the guards above before using these values.
+                codePepper = pepperText?.takeIf { pepperValid }?.toByteArray(StandardCharsets.UTF_8)
+                    ?: ByteArray(64).also(SecureRandom()::nextBytes),
                 encryptionKey = decodedKey?.takeIf { keyValid } ?: ByteArray(0),
                 securityConfigured = pepperValid && keyValid,
                 configurationIssue = issue,
@@ -94,7 +129,7 @@ internal enum class AitaAuthUnavailableReason { DISABLED, SECURITY_CONFIGURATION
 internal class AitaAuthUnavailableException(val reason: AitaAuthUnavailableReason) : IllegalStateException(reason.name)
 
 /**
- * Keep the public-facing error mapper with its reason and exception in kz.aita.server.
+ * Keep the public-facing error mapper with its reason and exception in kz.aita.server.auth.
  * StatusPages must not depend on a private helper inside the authentication service.
  */
 internal fun authUnavailableMessage(reason: AitaAuthUnavailableReason): List<LocalizedStringDataModel> {

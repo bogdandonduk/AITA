@@ -1,4 +1,4 @@
-package kz.aita.server
+package kz.aita.server.auth
 
 import java.util.Base64
 import kotlin.test.*
@@ -95,5 +95,153 @@ class AitaAuthConfigurationTest {
         assertEquals(600_000L, high.resendCooldownMillis)
         val low = AdvancedAuthConfig.load(configured("AITA_AUTH_MAX_CODE_ATTEMPTS" to Long.MIN_VALUE.toString())::get)
         assertEquals(3, low.maxAttempts)
+    }
+
+    @Test
+    fun providerCredentialsCannotAdvertiseFeaturesWithoutSecurityKeys() {
+        val config = AdvancedAuthConfig.load(production(
+            "AITA_RESEND_API_KEY" to "re_test",
+            "AITA_AUTH_EMAIL_FROM" to "AITA <security@auth.example.com>"
+        )::get)
+        assertTrue(config.emailConfigured)
+        val capabilities = config.capabilities()
+        assertTrue(capabilities.passwordLoginEnabled)
+        assertFalse(capabilities.enabled)
+        assertFalse(capabilities.emailCodeLoginEnabled)
+        assertFalse(capabilities.passwordRecoveryEnabled)
+        assertFalse(capabilities.authenticatorTwoFactorEnabled)
+        assertFalse(capabilities.phoneLoginAliasEnabled)
+    }
+
+    @Test
+    fun missingProviderStillAdvertisesPasswordAndConfiguredAuthenticator() {
+        val config = AdvancedAuthConfig.load(configured()::get)
+        val capabilities = config.capabilities()
+        assertTrue(capabilities.enabled)
+        assertTrue(capabilities.passwordLoginEnabled)
+        assertTrue(capabilities.authenticatorTwoFactorEnabled)
+        assertFalse(capabilities.emailCodeLoginEnabled)
+        assertFalse(capabilities.passwordRecoveryEnabled)
+        assertFalse(capabilities.phoneLoginAliasEnabled)
+        config.requireAdvancedAuthentication()
+        config.requireSecurityConfigured()
+    }
+
+    @Test
+    fun configuredCapabilitiesUseTheSameLifetimeValuesAsTheService() {
+        val config = AdvancedAuthConfig.load(configured(
+            "AITA_RESEND_API_KEY" to "re_test",
+            "AITA_AUTH_EMAIL_FROM" to "AITA <security@auth.example.com>",
+            "AITA_AUTH_CODE_TTL_SECONDS" to "180",
+            "AITA_AUTH_RESEND_COOLDOWN_SECONDS" to "90"
+        )::get)
+        val capabilities = config.capabilities()
+        assertTrue(capabilities.enabled)
+        assertTrue(capabilities.passwordLoginEnabled)
+        assertTrue(capabilities.emailCodeLoginEnabled)
+        assertTrue(capabilities.passwordRecoveryEnabled)
+        assertTrue(capabilities.authenticatorTwoFactorEnabled)
+        assertTrue(capabilities.phoneLoginAliasEnabled)
+        assertEquals(6, capabilities.codeLength)
+        assertEquals(180L, capabilities.codeTtlSeconds)
+        assertEquals(90L, capabilities.resendCooldownSeconds)
+        config.requireEmailAuthentication()
+        config.requireEmailAuthentication(recovery = true)
+    }
+
+    @Test
+    fun invalidSecurityNeverFallsThroughToProviderOrEncryption() {
+        val config = AdvancedAuthConfig.load(configured(
+            "AITA_ACCOUNT_SECURITY_MASTER_KEY_B64" to "not-a-base64-key",
+            "AITA_RESEND_API_KEY" to "re_test",
+            "AITA_AUTH_EMAIL_FROM" to "AITA <security@auth.example.com>"
+        )::get)
+        assertEquals(AitaAuthUnavailableReason.SECURITY_CONFIGURATION,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireSecurityConfigured() }.reason)
+        assertEquals(AitaAuthUnavailableReason.SECURITY_CONFIGURATION,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireAdvancedAuthentication() }.reason)
+        assertEquals(AitaAuthUnavailableReason.SECURITY_CONFIGURATION,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireEmailAuthentication() }.reason)
+    }
+
+    @Test
+    fun disablingOptionalFeaturesDoesNotBypassExistingSecondFactors() {
+        val config = AdvancedAuthConfig.load(configured(
+            "AITA_ADVANCED_AUTH_ENABLED" to "false",
+            "AITA_RESEND_API_KEY" to "re_test",
+            "AITA_AUTH_EMAIL_FROM" to "AITA <security@auth.example.com>"
+        )::get)
+        // Existing TOTP verification needs keys, not permission to enroll a new factor.
+        config.requireSecurityConfigured()
+        assertEquals(AitaAuthUnavailableReason.DISABLED,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireAdvancedAuthentication() }.reason)
+        assertEquals(AitaAuthUnavailableReason.DISABLED,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireEmailAuthentication() }.reason)
+        assertTrue(config.capabilities().passwordLoginEnabled)
+        assertFalse(config.capabilities().enabled)
+    }
+
+    @Test
+    fun disablingOptionalFeaturesWithoutKeysDoesNotPermitSecondFactorVerification() {
+        val config = AdvancedAuthConfig.load(production("AITA_ADVANCED_AUTH_ENABLED" to "false")::get)
+        assertTrue(config.capabilities().passwordLoginEnabled)
+        assertEquals(AitaAuthUnavailableReason.SECURITY_CONFIGURATION,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireSecurityConfigured() }.reason)
+    }
+
+    @Test
+    fun disablingRecoveryDoesNotDisableSignInCodes() {
+        val config = AdvancedAuthConfig.load(configured(
+            "AITA_PASSWORD_RECOVERY_ENABLED" to "false",
+            "AITA_RESEND_API_KEY" to "re_test",
+            "AITA_AUTH_EMAIL_FROM" to "AITA <security@auth.example.com>"
+        )::get)
+        config.requireEmailAuthentication()
+        assertTrue(config.capabilities().emailCodeLoginEnabled)
+        assertFalse(config.capabilities().passwordRecoveryEnabled)
+        assertEquals(AitaAuthUnavailableReason.RECOVERY_DISABLED,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireEmailAuthentication(recovery = true) }.reason)
+        assertEquals(AitaAuthUnavailableReason.RECOVERY_DISABLED,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireAdvancedAuthentication(recovery = true) }.reason)
+    }
+
+    @Test
+    fun verificationDoesNotRequireAnEmailProviderAfterTheCodeWasDelivered() {
+        val config = AdvancedAuthConfig.load(configured()::get)
+        config.requireAdvancedAuthentication()
+        config.requireAdvancedAuthentication(recovery = true)
+        assertEquals(AitaAuthUnavailableReason.EMAIL_CONFIGURATION,
+            assertFailsWith<AitaAuthUnavailableException> { config.requireEmailAuthentication() }.reason)
+    }
+
+    @Test
+    fun emailConfigurationRequiresProviderKeyAndSender() {
+        val base = configured(
+            "AITA_RESEND_API_KEY" to "re_test",
+            "AITA_AUTH_EMAIL_FROM" to "AITA <security@auth.example.com>"
+        )
+        listOf(
+            base + ("AITA_AUTH_EMAIL_PROVIDER" to "unsupported"),
+            base + ("AITA_RESEND_API_KEY" to "  "),
+            base + ("AITA_AUTH_EMAIL_FROM" to "  ")
+        ).forEach { values ->
+            val config = AdvancedAuthConfig.load(values::get)
+            assertFalse(config.emailReady)
+            assertEquals(AitaAuthUnavailableReason.EMAIL_CONFIGURATION,
+                assertFailsWith<AitaAuthUnavailableException> { config.requireEmailAuthentication() }.reason)
+        }
+    }
+
+    @Test
+    fun environmentAndProviderNamesAreTrimmedAndCaseInsensitive() {
+        val config = AdvancedAuthConfig.load(configured(
+            "AITA_ENV" to " PrOdUcTiOn ",
+            "AITA_AUTH_EMAIL_PROVIDER" to " ReSeNd ",
+            "AITA_RESEND_API_KEY" to " re_test ",
+            "AITA_AUTH_EMAIL_FROM" to " AITA <security@auth.example.com> "
+        )::get)
+        assertTrue(config.emailReady)
+        assertEquals("re_test", config.resendApiKey)
+        assertEquals("AITA <security@auth.example.com>", config.fromEmail)
     }
 }

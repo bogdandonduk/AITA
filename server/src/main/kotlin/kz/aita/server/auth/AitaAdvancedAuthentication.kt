@@ -181,72 +181,8 @@ private fun authMessage(main: String, ru: String, kk: String): List<LocalizedStr
     LocalizedStringDataModel("kk", kk)
 )
 
-private fun authEnv(name: String): String? = System.getenv(name)?.trim()?.takeIf(String::isNotEmpty)
-    ?: System.getProperty(name)?.trim()?.takeIf(String::isNotEmpty)
-
-private fun authBoolean(name: String, default: Boolean): Boolean = when (authEnv(name)?.lowercase(Locale.ROOT)) {
-    "1", "true", "yes", "on" -> true
-    "0", "false", "no", "off" -> false
-    else -> default
-}
-
-private fun authLong(name: String, default: Long): Long = authEnv(name)?.toLongOrNull() ?: default
-
-private data class AdvancedAuthConfig(
-    val enabled: Boolean,
-    val passwordRecoveryEnabled: Boolean,
-    val emailProvider: String,
-    val resendApiKey: String,
-    val fromEmail: String,
-    val replyTo: String,
-    val codePepper: ByteArray,
-    val encryptionKey: ByteArray,
-    val codeTtlMillis: Long,
-    val resetTtlMillis: Long,
-    val resendCooldownMillis: Long,
-    val maxAttempts: Int,
-    val issuerName: String
-) {
-    val emailConfigured: Boolean
-        get() = emailProvider.equals("resend", true) && resendApiKey.isNotBlank() && fromEmail.isNotBlank()
-
-    companion object {
-        fun load(): AdvancedAuthConfig {
-            val production = authEnv("AITA_ENV")?.lowercase(Locale.ROOT) in setOf("production", "prod", "stage", "staging", "cloud")
-            val enabled = authBoolean("AITA_ADVANCED_AUTH_ENABLED", default = !production)
-            val pepperText = authEnv("AITA_AUTH_CODE_PEPPER")
-                ?: if (production && enabled) error("AITA_AUTH_CODE_PEPPER must be configured")
-                else "aita-local-development-auth-code-pepper-change-before-production-2026"
-            if (production && enabled) require(pepperText.length >= 64) { "AITA_AUTH_CODE_PEPPER must be at least 64 characters" }
-
-            val key = authEnv("AITA_ACCOUNT_SECURITY_MASTER_KEY_B64")?.let {
-                runCatching { Base64.getDecoder().decode(it) }.getOrNull()
-            } ?: if (production && enabled) {
-                error("AITA_ACCOUNT_SECURITY_MASTER_KEY_B64 must be configured")
-            } else {
-                MessageDigest.getInstance("SHA-256").digest("aita-local-development-account-security-key".toByteArray())
-            }
-            require(key.size == 32) { "AITA_ACCOUNT_SECURITY_MASTER_KEY_B64 must decode to 32 bytes" }
-
-            return AdvancedAuthConfig(
-                enabled = enabled,
-                passwordRecoveryEnabled = authBoolean("AITA_PASSWORD_RECOVERY_ENABLED", enabled),
-                emailProvider = authEnv("AITA_AUTH_EMAIL_PROVIDER") ?: "resend",
-                resendApiKey = authEnv("AITA_RESEND_API_KEY").orEmpty(),
-                fromEmail = authEnv("AITA_AUTH_EMAIL_FROM").orEmpty(),
-                replyTo = authEnv("AITA_AUTH_EMAIL_REPLY_TO").orEmpty(),
-                codePepper = pepperText.toByteArray(StandardCharsets.UTF_8),
-                encryptionKey = key,
-                codeTtlMillis = authLong("AITA_AUTH_CODE_TTL_SECONDS", 600L).coerceIn(120L, 1800L) * 1000L,
-                resetTtlMillis = authLong("AITA_AUTH_RESET_TTL_SECONDS", 600L).coerceIn(120L, 1800L) * 1000L,
-                resendCooldownMillis = authLong("AITA_AUTH_RESEND_COOLDOWN_SECONDS", 60L).coerceIn(20L, 600L) * 1000L,
-                maxAttempts = authLong("AITA_AUTH_MAX_CODE_ATTEMPTS", 5L).toInt().coerceIn(3, 10),
-                issuerName = authEnv("AITA_AUTH_TOTP_ISSUER") ?: "AITA"
-            )
-        }
-    }
-}
-
+// AdvancedAuthConfig is shared with the error handler and tests; its only declaration
+// and environment parser live in AitaAuthConfiguration.kt in this package.
 private class AuthCrypto(private val config: AdvancedAuthConfig) {
     private val random = SecureRandom()
 
@@ -265,6 +201,7 @@ private class AuthCrypto(private val config: AdvancedAuthConfig) {
     )
 
     fun encrypt(context: String, plaintext: String): String {
+        config.requireSecurityConfigured()
         val nonce = ByteArray(12).also(random::nextBytes)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(config.encryptionKey, "AES"), GCMParameterSpec(128, nonce))
@@ -274,6 +211,7 @@ private class AuthCrypto(private val config: AdvancedAuthConfig) {
     }
 
     fun decrypt(context: String, encoded: String): String {
+        config.requireSecurityConfigured()
         val parts = encoded.split('.')
         require(parts.size == 3 && parts[0] == "v1") { "Unsupported encrypted value" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -360,17 +298,7 @@ private class AitaAdvancedAuthService(
             .limit(1).singleOrNull()?.get(AuthSecurityProfiles.totpEnabledAtMillis) != null
     }
 
-    fun capabilities(): AitaAuthCapabilitiesDataModel = AitaAuthCapabilitiesDataModel(
-        enabled = config.enabled,
-        passwordLoginEnabled = true,
-        emailCodeLoginEnabled = config.enabled && config.emailConfigured,
-        passwordRecoveryEnabled = config.enabled && config.passwordRecoveryEnabled && config.emailConfigured,
-        authenticatorTwoFactorEnabled = config.enabled,
-        phoneLoginAliasEnabled = config.enabled && config.emailConfigured,
-        codeLength = 6,
-        codeTtlSeconds = config.codeTtlMillis / 1000L,
-        resendCooldownSeconds = config.resendCooldownMillis / 1000L
-    )
+    fun capabilities(): AitaAuthCapabilitiesDataModel = config.capabilities()
 
     suspend fun passwordLogin(request: AitaPasswordLoginRequestDataModel, meta: Map<String, String>): AitaAuthFlowDataModel? {
         val now = System.currentTimeMillis()
@@ -403,15 +331,13 @@ private class AitaAdvancedAuthService(
         locale: String,
         ip: String
     ): AitaAuthFlowDataModel {
+        config.requireEmailAuthentication(recovery = purpose == AUTH_PURPOSE_RECOVERY)
         val now = System.currentTimeMillis()
         val normalized = normalizeAitaLoginIdentifier(identifier)
         val identifierValue = normalized?.value.orEmpty()
         val identifierHash = crypto.hmac("identifier", identifierValue.ifBlank { "invalid" })
         val ipHash = crypto.hmac("ip", ip)
-        val featureEnabled = config.enabled &&
-            (purpose != AUTH_PURPOSE_RECOVERY || config.passwordRecoveryEnabled)
-        val processRateAllowed = featureEnabled &&
-            limiter.allow("id:$identifierHash", 5, now) &&
+        val processRateAllowed = limiter.allow("id:$identifierHash", 5, now) &&
             limiter.allow("ip:$ipHash", 30, now)
         val persistentRateAllowed = if (processRateAllowed) {
             newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
@@ -442,7 +368,7 @@ private class AitaAdvancedAuthService(
             expiresAtMillis = now + config.codeTtlMillis,
             resendAfterMillis = now + config.resendCooldownMillis
         )
-        if (user == null || !user.active || user.email.isBlank() || !config.emailConfigured) {
+        if (user == null || !user.active || user.email.isBlank()) {
             delay((80L..180L).random())
             return generic
         }
@@ -492,12 +418,14 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun resend(flowId: String, locale: String, ip: String): AitaAuthFlowDataModel? {
+        config.requireEmailAuthentication()
         val publicId = runCatching { UUID.fromString(flowId) }.getOrNull() ?: return null
         val now = System.currentTimeMillis()
         return newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
             val old = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq publicId }
                 .forUpdate().singleOrNull() ?: return@newSuspendedTransaction null
             val userId = old[AuthOneTimeChallenges.userId] ?: return@newSuspendedTransaction null
+            config.requireAdvancedAuthentication(recovery = old[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_RECOVERY)
             if (old[AuthOneTimeChallenges.consumedAtMillis] != null || old[AuthOneTimeChallenges.expiresAtMillis] <= now) return@newSuspendedTransaction null
             if (old[AuthOneTimeChallenges.resendAfterMillis] > now) {
                 return@newSuspendedTransaction AitaAuthFlowDataModel(
@@ -557,6 +485,7 @@ private class AitaAdvancedAuthService(
         expectedPurpose: String,
         meta: Map<String, String>
     ): AitaAuthFlowDataModel? {
+        config.requireAdvancedAuthentication(recovery = expectedPurpose == AUTH_PURPOSE_RECOVERY)
         val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
         val code = normalizeAitaOneTimeCode(request.code) ?: return null
         val now = System.currentTimeMillis()
@@ -621,6 +550,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun resetPassword(request: AitaPasswordRecoveryResetRequestDataModel): Boolean {
+        config.requireAdvancedAuthentication(recovery = true)
         if (!request.newPassword.checkAsPassword()) return false
         val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return false
         val now = System.currentTimeMillis()
@@ -650,6 +580,7 @@ private class AitaAdvancedAuthService(
     }
 
     private suspend fun createLoginChallenge(userId: UUID, method: String): AitaAuthFlowDataModel {
+        config.requireSecurityConfigured()
         val now = System.currentTimeMillis()
         val publicId = UUID.randomUUID()
         newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
@@ -672,6 +603,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun completeTotpLogin(request: AitaTotpLoginRequestDataModel, meta: Map<String, String>): AitaAuthFlowDataModel? {
+        config.requireSecurityConfigured()
         val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
         val now = System.currentTimeMillis()
         val userId = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
@@ -721,7 +653,8 @@ private class AitaAdvancedAuthService(
         userId: UUID,
         request: AitaSensitiveSecurityActionRequestDataModel
     ): AitaTotpSetupDataModel? {
-        if (!config.enabled || !verifySensitiveAction(userId, request)) return null
+        config.requireAdvancedAuthentication()
+        if (!verifySensitiveAction(userId, request)) return null
         val now = System.currentTimeMillis()
         val setupId = UUID.randomUUID()
         val secretBytes = ByteArray(20).also(random::nextBytes)
@@ -744,6 +677,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun confirmTotpSetup(userId: UUID, request: AitaTotpSetupConfirmRequestDataModel): AitaAuthFlowDataModel? {
+        config.requireAdvancedAuthentication()
         val setupId = runCatching { UUID.fromString(request.setupId) }.getOrNull() ?: return null
         val now = System.currentTimeMillis()
         val codes = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
@@ -772,6 +706,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun disableTotp(userId: UUID, request: AitaSensitiveSecurityActionRequestDataModel): AitaAuthenticationSettingsDataModel? {
+        config.requireSecurityConfigured()
         if (!verifySensitiveAction(userId, request)) return null
         val now = System.currentTimeMillis()
         newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
@@ -789,6 +724,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun regenerateRecoveryCodes(userId: UUID, request: AitaSensitiveSecurityActionRequestDataModel): List<String>? {
+        config.requireSecurityConfigured()
         if (!verifySensitiveAction(userId, request)) return null
         val now = System.currentTimeMillis()
         return newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
@@ -806,7 +742,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun requestPhoneAlias(userId: UUID, request: AitaPhoneAliasRequestDataModel, ip: String): AitaAuthFlowDataModel? {
-        if (!config.enabled || !config.emailConfigured) return null
+        config.requireEmailAuthentication()
         if (!verifySensitiveAction(userId, AitaSensitiveSecurityActionRequestDataModel(request.currentPassword, request.secondFactorCode))) return null
         val phone = when (request.action) {
             AitaPhoneAliasAction.ADD_OR_REPLACE -> normalizeAitaPhoneAlias(request.phoneNumber) ?: return null
@@ -851,6 +787,7 @@ private class AitaAdvancedAuthService(
     }
 
     suspend fun confirmPhoneAlias(userId: UUID, request: AitaPhoneAliasConfirmRequestDataModel): AitaAuthenticationSettingsDataModel? {
+        config.requireAdvancedAuthentication()
         val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
         val code = normalizeAitaOneTimeCode(request.code) ?: return null
         val now = System.currentTimeMillis()
@@ -908,6 +845,7 @@ private class AitaAdvancedAuthService(
         }
 
     private fun verifySecondFactorInside(userId: UUID, rawCode: String, now: Long): Boolean {
+        config.requireSecurityConfigured()
         val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull() ?: return false
         val encrypted = profile[AuthSecurityProfiles.totpSecretCiphertext] ?: return false
         val secret = runCatching { crypto.decrypt("totp-active:$userId", encrypted) }.getOrNull() ?: return false
@@ -925,6 +863,7 @@ private class AitaAdvancedAuthService(
     }
 
     private fun generateRecoveryCodesInside(userId: UUID, now: Long): List<String> {
+        config.requireSecurityConfigured()
         AuthRecoveryCodes.deleteWhere { AuthRecoveryCodes.userId eq userId }
         val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
         val codes = List(10) {
@@ -975,6 +914,9 @@ private class AitaAdvancedAuthService(
     }
 
     fun startEmailWorker(scope: CoroutineScope) {
+        // Do not claim or fail queued messages while optional delivery/security is unconfigured.
+        // Configuration is immutable for this service; a configured restart resumes the outbox.
+        if (!config.emailReady) return
         if (!workerStarted.compareAndSet(false, true)) return
         scope.launch {
             while (isActive) {
@@ -1030,6 +972,7 @@ private class AitaAdvancedAuthService(
     }
 
     private suspend fun processEmail(workId: UUID) {
+        config.requireEmailAuthentication()
         val payload = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
             val work = AuthEmailOutbox.selectAll().where { AuthEmailOutbox.id eq workId }.singleOrNull()
                 ?: return@newSuspendedTransaction null
@@ -1229,7 +1172,18 @@ private object AdvancedAuthRuntime {
     @Volatile private var service: AitaAdvancedAuthService? = null
     fun get(tokenService: TokenService, application: Application): AitaAdvancedAuthService =
         service ?: synchronized(this) {
-            service ?: AitaAdvancedAuthService(tokenService, AdvancedAuthConfig.load(), application).also { service = it }
+            service ?: run {
+                val config = AdvancedAuthConfig.load(
+                    environmentName = application.environment.config.propertyOrNull("app.environment")?.getString()
+                )
+                if (config.enabled && !config.securityConfigured) {
+                    application.environment.log.warn(
+                        "AITA optional account security is unavailable: ${config.configurationIssue}. " +
+                            "Ordinary password login remains available; existing second factors are not bypassed."
+                    )
+                }
+                AitaAdvancedAuthService(tokenService, config, application).also { service = it }
+            }
         }
 }
 
