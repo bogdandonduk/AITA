@@ -4,7 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/aita-linux-common.sh"
 
-AITA_SERVER_DEPLOY_SCRIPT_VERSION="2026-09-07-jar-validation-v4"
+AITA_SERVER_DEPLOY_SCRIPT_VERSION="2026-09-08-managed-update-v5"
 project_root="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 build=false
 build_with_tests=false
@@ -57,8 +57,19 @@ project_root="$(cd -- "$project_root" && pwd)"
 
 deploy_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/aita"
 mkdir -p "$deploy_state_dir"
-exec 9>"$deploy_state_dir/deploy.lock"
-flock -n 9 || aita_die "Another AITA deployment is already running for $(id -un)"
+if [[ -n "${AITA_DEPLOY_LOCK_FD-}" ]]; then
+  # The managed operator already owns this exact lock throughout tests/build.
+  # Validate the inherited descriptor rather than trusting an environment flag.
+  [[ "$AITA_DEPLOY_LOCK_FD" =~ ^[0-9]+$ ]] || aita_die "Invalid inherited deployment lock descriptor"
+  inherited_inode="$(stat -Lc '%d:%i' "/proc/$$/fd/$AITA_DEPLOY_LOCK_FD" 2>/dev/null || true)"
+  expected_inode="$(stat -Lc '%d:%i' "$deploy_state_dir/deploy.lock" 2>/dev/null || true)"
+  [[ -n "$expected_inode" && "$inherited_inode" == "$expected_inode" ]] ||
+    aita_die "Inherited deployment lock does not match this account's deployment lock"
+  flock -n "$AITA_DEPLOY_LOCK_FD" || aita_die "Inherited deployment lock could not be acquired"
+else
+  exec 9>"$deploy_state_dir/deploy.lock"
+  flock -n 9 || aita_die "Another AITA deployment is already running for $(id -un)"
+fi
 
 current_jar=/opt/aita/app/aita-server-all.jar
 previous_jar=/opt/aita/app/aita-server-all.previous.jar
@@ -88,7 +99,13 @@ trap 'exit 129' HUP
 
 show_service_failure() {
   "${sudo_cmd[@]}" systemctl --no-pager --full status aita-server.service || true
-  "${sudo_cmd[@]}" journalctl -u aita-server.service -n 160 --no-pager || true
+  local failure_invocation
+  failure_invocation="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=InvocationID --value 2>/dev/null || true)"
+  if [[ "$failure_invocation" =~ ^[0-9a-fA-F]{32}$ ]]; then
+    "${sudo_cmd[@]}" journalctl -u aita-server.service "_SYSTEMD_INVOCATION_ID=$failure_invocation" -n 120 --no-pager || true
+  else
+    "${sudo_cmd[@]}" journalctl -u aita-server.service -n 120 --no-pager || true
+  fi
   if "${sudo_cmd[@]}" test -f "$previous_jar"; then
     aita_info "Previous JAR is preserved at $previous_jar"
     aita_info "Manual rollback command: bash $SCRIPT_DIR/deploy-aita-server.sh --rollback"
@@ -161,7 +178,12 @@ if "${sudo_cmd[@]}" test -f "$current_jar"; then
   if $rollback; then
     "${sudo_cmd[@]}" cp -a "$current_jar" "${current_jar}.failed.$(date -u +%Y%m%dT%H%M%SZ)"
   else
-    "${sudo_cmd[@]}" cp -a "$current_jar" "$previous_jar"
+    current_checksum="$("${sudo_cmd[@]}" sha256sum "$current_jar" | awk '{print $1}')"
+    if [[ "$current_checksum" != "$checksum" ]]; then
+      "${sudo_cmd[@]}" cp -a "$current_jar" "$previous_jar"
+    else
+      aita_info "Candidate matches the installed JAR; preserving the existing previous-release JAR."
+    fi
   fi
 fi
 before_invocation="$("${sudo_cmd[@]}" systemctl show aita-server.service --property=InvocationID --value)"
@@ -188,6 +210,7 @@ fi
 
 deployment_phase=readiness
 deadline=$((SECONDS + ready_timeout))
+next_progress=$((SECONDS + 15))
 last_ready_status=not_checked
 last_auth_status=not_required
 $expect_auth && last_auth_status=not_checked
@@ -221,6 +244,10 @@ while ((SECONDS < deadline)); do
         fi
       fi
     fi
+  fi
+  if ((SECONDS >= next_progress)); then
+    aita_info "Waiting for startup: PID=${main_pid:-unknown}, /readyz=$last_ready_status, /auth/capabilities=$last_auth_status. Flyway may still be running; do not redeploy."
+    next_progress=$((SECONDS + 15))
   fi
   sleep 1
 done

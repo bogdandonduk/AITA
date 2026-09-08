@@ -28,24 +28,37 @@ install -d -m 0750 "$auto_backup_dir" "$auto_backup_dir/daily" "$auto_backup_dir
 lock_file="${AITA_BACKUP_LOCK_FILE:-/srv/aita/locks/postgres-backup.lock}"
 install -d -m 0750 "$(dirname "$lock_file")"
 exec 9>"$lock_file"
-flock -n 9 || aita_die "Another AITA backup is already running"
+# Briefly wait for a daily/latest run or a read-only cloud verification instead
+# of treating a harmless overlap as a silently skipped successful backup.
+lock_wait="${AITA_BACKUP_LOCK_WAIT_SECONDS:-300}"
+[[ "$lock_wait" =~ ^[0-9]+$ ]] && ((lock_wait <= 900)) || aita_die "AITA_BACKUP_LOCK_WAIT_SECONDS must be 0..900"
+aita_info "Waiting for the backup lock (at most ${lock_wait}s). The server stays online."
+flock -w "$lock_wait" 9 || aita_die "Another backup/check still owns the lock; no new backup was created by this attempt"
 
 aita_parse_jdbc_url "$AITA_DB_URL"
 backup_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 plain_tmp="$auto_backup_dir/.tmp/aita_${backup_stamp}_$$.dump"
 encrypted_tmp="$auto_backup_dir/.tmp/aita_${backup_stamp}_$$.dump.age"
+publish_tmp=""
 cleanup() {
   rm -f -- "$plain_tmp" "$encrypted_tmp"
+  [[ -z "$publish_tmp" ]] || rm -f -- "$publish_tmp"
   unset PGPASSWORD
 }
-trap cleanup EXIT INT TERM HUP
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 export PGPASSWORD="$DB_PASS"
+export PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-10}"
+aita_info "Creating a consistent PostgreSQL snapshot. Normal app reads/writes may continue."
 pg_dump \
   --host "$AITA_PARSED_DB_HOST" \
   --port "$AITA_PARSED_DB_PORT" \
   --username "$DB_USER" \
   --dbname "$AITA_PARSED_DB_NAME" \
+  --lock-wait-timeout=30s \
   --format custom \
   --compress 6 \
   --no-owner \
@@ -79,12 +92,23 @@ publish_tmp="${final_path}.new.$$"
 cp --reflink=auto --sparse=always "$source_for_publish" "$publish_tmp"
 chmod 0600 "$publish_tmp"
 mv -f "$publish_tmp" "$final_path"
+publish_tmp=""
+aita_info "Local backup saved: $final_path (this alone does not confirm cloud upload)"
 
 remote="${AITA_BACKUP_RCLONE_REMOTE-}"
 if [[ -n "$remote" ]]; then
   aita_require_command rclone
-  rclone copyto "$final_path" "${remote%/}/$(basename "$final_path")" \
-    --checksum --retries 3 --low-level-retries 10
+  if [[ -n "${AITA_BACKUP_RCLONE_CONFIG-}" ]]; then
+    export RCLONE_CONFIG="$AITA_BACKUP_RCLONE_CONFIG"
+  fi
+  aita_info "Uploading the backup as $(id -un) using that account's rclone configuration."
+  if ! rclone copyto "$final_path" "${remote%/}/$(basename "$final_path")" \
+    --checksum --retries 3 --low-level-retries 5 --contimeout 10s --timeout 60s --max-duration 10m; then
+    aita_die "Cloud upload failed. The encrypted LOCAL backup is preserved; offsite protection is NOT confirmed."
+  fi
+  aita_info "Cloud upload command succeeded (use aita-ops.py backups --download to verify remote bytes)."
+else
+  aita_info "WARNING: AITA_BACKUP_RCLONE_REMOTE is empty. This backup is LOCAL ONLY, not uploaded to Google Drive."
 fi
 
 retention_days="${AITA_BACKUP_RETENTION_DAYS:-30}"
