@@ -65,9 +65,13 @@ repo=$(cd "$repo_input" && pwd -P)
 git_root=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null || true)
 [[ "$git_root" == "$repo" ]] || die "Git root is '$git_root', not '$repo'. Refusing to update the wrong tree."
 
-if unzip -Z1 "$bundle" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+# Read the complete listing: grep -q on a live unzip pipe can mask an unsafe
+# path when pipefail observes SIGPIPE after the first match.
+bundle_listing="$(unzip -Z1 "$bundle")" || die "cannot read bundle directory"
+if grep -Eq '(^/|(^|/)\.\.(/|$))' <<< "$bundle_listing"; then
     die "bundle contains an unsafe absolute or parent-traversal path"
 fi
+unzip -tqq "$bundle" || die "bundle integrity check failed"
 
 repo_parent=$(dirname "$repo")
 repo_name=$(basename "$repo")
@@ -86,7 +90,10 @@ cleanup() {
     fi
     exit "$exit_code"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 mkdir -p "$stage/extracted"
 unzip -q "$bundle" -d "$stage/extracted"
@@ -108,6 +115,14 @@ fi
 [[ -f "$source_root/server/build.gradle.kts" ]] || die "bundle is missing server/build.gradle.kts"
 [[ ! -e "$source_root/.git" ]] || die "bundle unexpectedly contains .git metadata"
 
+# Some exports lose executable bits. Normalize the staging tree BEFORE copying
+# and verifying it; otherwise our own chmod makes verification fail and restores
+# the old tree, which looks like Git ignored the new files.
+[[ ! -f "$source_root/gradlew" ]] || chmod +x "$source_root/gradlew"
+if [[ -d "$source_root/scripts" ]]; then
+    find "$source_root/scripts" -type f -name '*.sh' -exec chmod +x {} +
+fi
+
 if command -v shasum >/dev/null 2>&1; then
     bundle_sha=$(shasum -a 256 "$bundle" | awk '{print $1}')
 else
@@ -127,15 +142,12 @@ installed=1
 
 # Preserve only machine-local Git metadata and Android SDK location. Everything
 # else is replaced exactly, and stale files are deleted from the active tree.
-rsync -a --delete \
+# --checksum matters: ZIP exports can preserve size AND timestamp for changed
+# bytes, which rsync's default quick check would incorrectly skip.
+rsync -a --checksum --delete \
     --exclude='/.git' \
     --exclude='/local.properties' \
     "$source_root/" "$repo/"
-
-chmod +x "$repo/gradlew" 2>/dev/null || true
-if [[ -d "$repo/scripts" ]]; then
-    find "$repo/scripts" -type f -name '*.sh' -exec chmod +x {} +
-fi
 
 # A file can be byte-different yet hidden from status when it carries one of
 # these index flags. Remove them only from paths that actually have a flag.
@@ -169,7 +181,7 @@ active_root=$(git -C "$repo" rev-parse --show-toplevel)
 [[ "$active_root" == "$repo" ]] || die "post-install Git root mismatch: $active_root"
 
 installed=2
-trap - EXIT INT TERM
+trap - EXIT INT TERM HUP
 rm -rf "$stage"
 
 info "bundle installed and byte-verified"
