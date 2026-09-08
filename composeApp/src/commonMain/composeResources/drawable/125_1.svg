@@ -1,9 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-  <path d="M25 11 H62 Q68 11 68 17 V65 L62 71 L56 66 L50 71 L44 66 L38 71 L32 66 L25 71 Z" fill="#2A3B45" stroke="#F5F1E9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M35 27 H57" fill="none" stroke="#7ED8FF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M35 39 H54" fill="none" stroke="#AFC2CB" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M35 50 H50" fill="none" stroke="#AFC2CB" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 48.000 65.000 C 48.000 55.059 56.059 47.000 66.000 47.000 C 75.941 47.000 84.000 55.059 84.000 65.000 C 84.000 74.941 75.941 83.000 66.000 83.000 C 56.059 83.000 48.000 74.941 48.000 65.000 Z" fill="#73E3B2" stroke="#F5F1E9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M57 65 L64 72 L76 57" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M 19.000 19.000 C 19.000 16.239 21.239 14.000 24.000 14.000 C 26.761 14.000 29.000 16.239 29.000 19.000 C 29.000 21.761 26.761 24.000 24.000 24.000 C 21.239 24.000 19.000 21.761 19.000 19.000 Z" fill="#FFC65D"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <path fill="#FFFFFF" fill-rule="evenodd" d="M9 16.2 4.8 12 3 13.8 9 19.8 22 6.8 20.2 5Z"/>
 </svg>

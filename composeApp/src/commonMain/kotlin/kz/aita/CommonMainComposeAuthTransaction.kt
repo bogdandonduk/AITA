@@ -41,6 +41,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -1408,19 +1411,18 @@ internal fun GoodsItemDataModel.transactionSelectionMatchesIdSet(ids: Collection
     return allBarcodeValues().any { barcode -> barcode in ids || barcode.toStoredGoodsItemBarcode() in ids }
 }
 
-internal fun AppConfiguration.buildTransactionSelectionSmartSets(
+internal fun buildTransactionSelectionSmartSets(
     storeId: String?,
     transactionTypeIndex: Int,
     transactions: List<TransactionDataModel>,
     stock: List<GoodsItemDataModel>,
-    batches: List<GoodsBatchDataModel>
+    batches: List<GoodsBatchDataModel>,
+    language: String
 ): TransactionSelectionSmartSets {
     if (stock.isEmpty()) return TransactionSelectionSmartSets()
 
-    val activeBatches = batches.filter { batch ->
-        batch.isSelectableActiveStockBatch() &&
-                (storeId.isNullOrBlank() || batchBelongsToInventoryStoreForUi(batch.storeId, storeId))
-    }
+    // Caller has already applied the account/store hierarchy filter on the UI thread.
+    val activeBatches = batches.filter { it.isSelectableActiveStockBatch() }
     val activeBatchesByItem = activeBatches.groupBy { it.goodsItemId }
     val quantityByItem = activeBatchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
     val inStockIds = quantityByItem
@@ -1465,7 +1467,7 @@ internal fun AppConfiguration.buildTransactionSelectionSmartSets(
             .groupBy({ it.first }, { it.second })
             .mapValues { (_, transactionIds) -> transactionIds.distinct().size }
             .entries
-            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { byId[it.key]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() })
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { byId[it.key]?.name?.extractLocalizedString(language).orEmpty().lowercase() })
             .map { it.key }
             .take(24)
     }
@@ -1549,7 +1551,7 @@ internal fun AppConfiguration.buildTransactionSelectionSmartSets(
             .distinct()
             .sortedWith(
                 compareBy<String> { id -> if (id in outOfStockIds) 0 else 1 }
-                    .thenBy { id -> byId[id]?.name?.extractLocalizedString(stateValues.appLanguage).orEmpty().lowercase() }
+                    .thenBy { id -> byId[id]?.name?.extractLocalizedString(language).orEmpty().lowercase() }
             )
             .take(32)
     } else {
@@ -1659,21 +1661,32 @@ fun AppConfiguration.TransactionSelectionScreen(
             transactionStockCandidatesForUi(sortForDisplay = false)
         }
 
-        val transactionSmartSets = remember(
-            context.transactionTypeIndex,
-            stateValues.activeStoreId,
-            transactionHistorySuggestionsReady,
-            transactionHistoryForSuggestions,
-            transactionScopedStock,
-            stateValues.stockBatches,
-            stateValues.appLanguage
-        ) {
-            buildTransactionSelectionSmartSets(
-                storeId = stateValues.activeStoreId,
-                transactionTypeIndex = context.transactionTypeIndex,
-                transactions = transactionHistoryForSuggestions,
-                stock = transactionScopedStock,
-                batches = stateValues.stockBatches.orEmpty()
+        val suggestionStoreId = stateValues.activeStoreId
+        val suggestionLanguage = stateValues.appLanguage
+        val suggestionBatches = remember(stateValues.stockBatches, stateValues.stores, suggestionStoreId) {
+            stateValues.stockBatches.orEmpty().filter {
+                batchBelongsToInventoryStoreForUi(it.storeId, suggestionStoreId)
+            }
+        }
+        val smartSetsState = remember(stateValues.userAccount?.id, suggestionStoreId, context.transactionTypeIndex) {
+            mutableStateOf<TransactionSelectionSmartSets?>(null)
+        }
+        LaunchedEffect(smartSetsState, transactionHistoryForSuggestions, transactionScopedStock, suggestionBatches, suggestionLanguage) {
+            smartSetsState.value = withContext(Dispatchers.Default) {
+                buildTransactionSelectionSmartSets(
+                    storeId = suggestionStoreId,
+                    transactionTypeIndex = context.transactionTypeIndex,
+                    transactions = transactionHistoryForSuggestions,
+                    stock = transactionScopedStock,
+                    batches = suggestionBatches,
+                    language = suggestionLanguage
+                )
+            }
+        }
+        val transactionSmartSets = smartSetsState.value ?: remember(transactionScopedStock) {
+            TransactionSelectionSmartSets(
+                totalStockCount = transactionScopedStock.size,
+                quickItemCount = transactionScopedStock.count { it.isQuickItem }
             )
         }
 
@@ -1756,7 +1769,8 @@ fun AppConfiguration.TransactionSelectionScreen(
         val scopeRowContent = tabRowWidget(
             modifier = Modifier.padding(horizontal = stateValues.marginTextField),
             tabs = transactionSelectionTabs,
-            selectedIndexInitial = "quick",
+            // A new/seeded catalogue often has no quick items; never open on an empty subset.
+            selectedIndexInitial = "all",
             persistSelection = false
         )
 
@@ -2573,9 +2587,10 @@ internal fun AppConfiguration.ReceiptPreviewHeader(
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    ReceiptPreviewRow(labels.receipt, snapshot.receiptNumberText(labels), bold = true)
-    if (snapshot.transaction.id.isNotBlank())
-        ReceiptPreviewRow(labels.transactionId, snapshot.transaction.id)
+    snapshot.transaction.serverReceiptIdOrNull()?.let { serverId ->
+        ReceiptPreviewRow(labels.receipt, snapshot.receiptNumberText(labels), bold = true)
+        ReceiptPreviewRow(labels.transactionId, serverId)
+    }
     ReceiptPreviewRow(labels.date, receiptUiDateTime(snapshot.transaction.timeMillis))
 
     snapshot.cashierName.takeIf { it.isNotBlank() }?.let {
@@ -2745,6 +2760,7 @@ internal fun AppConfiguration.buildTransactionReceiptLines(
     returnBatchSelections: Map<String, CartReturnBatchSelectionDataModel> = emptyMap(),
     clientId: Int = 0
 ): List<TransactionReceiptLineDataModel> {
+    if (cart.isEmpty()) return emptyList()
     val stockById = stock.associateBy { it.id }
     val batchesByGoodsItemId = stockBatches
         .filter { it.isActive }
@@ -2987,7 +3003,14 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         modifier = Modifier.fillMaxSize()
     ) {
         val context = rememberTransactionContext()
-        var printingReceipt by remember { mutableStateOf(false) }
+        val receiptScope = rememberCoroutineScope()
+        var activeReceiptAction by remember(stateValues.userAccount?.id, context.transactionTypeIndex, context.clientId) {
+            mutableStateOf<String?>(null)
+        }
+        val receiptLanguage = stateValues.appLanguage
+        val draftCreatedAt = remember(stateValues.userAccount?.id, stateValues.activeStoreId, context.transactionTypeIndex, context.clientId) {
+            getCurrentTimeMillis()
+        }
         val darkActionIcons = stateValues.appThemeId == 1L
         val completeReceiptIconPath = if (darkActionIcons) "svg/125_1.svg" else "svg/125_0.svg"
         val completeReceiptIconRes = if (darkActionIcons) Res.drawable._125_1 else Res.drawable._125_0
@@ -3061,13 +3084,14 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         val supplySupplierIds by getTransactionSupplySupplierIdsState().collectAsState()
         val currentSupplySupplierId = supplySupplierIds[transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)]
 
-        val invalidWholesaleReceiptItems = remember(goodsInCart, stateValues.stock, saleMethodIds, context.transactionTypeIndex, context.clientId) {
-            if (context.transactionTypeIndex != 0) {
+        val invalidWholesaleReceiptItems = remember(goodsInCart, stateValues.stock, saleMethodIds, context.transactionTypeIndex, context.clientId, receiptLanguage) {
+            if (context.transactionTypeIndex != 0 || goodsInCart.isEmpty()) {
                 emptyList()
             } else {
+                val stockById = stateValues.stock.orEmpty().associateBy { it.id }
                 goodsInCart.mapNotNull { cartItem ->
                     val selectedMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"]
-                    val goodsItem = stateValues.stock?.find { it.id == cartItem.id }
+                    val goodsItem = stockById[cartItem.id]
                     if (selectedMethodId == SALE_METHOD_WHOLESALE && goodsItem != null && !goodsItem.isWholesaleEligible(cartItem.quantity.total)) {
                         goodsItem.name.extractLocalizedString(stateValues.appLanguage) ?: goodsItem.firstBarcode().ifBlank { cartItem.id }
                     } else {
@@ -3111,7 +3135,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
             paidCard = draft.paidCard,
             cardPaymentOptionId = draft.cardPaymentOptionId,
             debtor = draft.debtor,
-            timeMillis = getCurrentTimeMillis()
+            timeMillis = draftCreatedAt
         )
 
         val cashierName = "${stateValues.userAccount?.firstName.orEmpty()} ${stateValues.userAccount?.lastName.orEmpty()}".trim()
@@ -3119,7 +3143,8 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         val snapshotForScreen =
             latestSnapshot?.takeIf {
                 it.transaction.type == transactionServerType(context.transactionTypeIndex) &&
-                        it.paymentDraft.clientId == context.clientId
+                        it.paymentDraft.clientId == context.clientId &&
+                        it.transaction.storeId == stateValues.activeStoreId
             } ?: TransactionReceiptSnapshotDataModel(
                 transaction = currentTransaction,
                 store = store,
@@ -3174,11 +3199,43 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         }
 
         val alreadyCompleted = snapshotForScreen.transaction.id.isNotBlank()
-        val pdfBytes = remember(snapshotForScreen, stateValues.appLanguage, labels) {
-            snapshotForScreen.buildReceiptPdfBytes(stateValues.appLanguage, labels)
+        // No PDF layout/encoding during composition. Generate on demand on a CPU worker,
+        // then reuse the same bytes for this immutable receipt and language.
+        val pdfCache = remember(snapshotForScreen, receiptLanguage, labels) {
+            mutableStateOf<ByteArray?>(null)
         }
         val fileName = remember(snapshotForScreen, labels) {
             snapshotForScreen.receiptPdfFileName(labels)
+        }
+
+        fun runReceiptAction(action: String, successMessage: String) {
+            if (activeReceiptAction != null) return
+            activeReceiptAction = action // reserve synchronously, before launching
+            receiptScope.launch {
+                try {
+                    val pdf = pdfCache.value ?: withContext(Dispatchers.Default) {
+                        snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
+                    }.also { pdfCache.value = it }
+                    val result = when (action) {
+                        "pdf" -> saveReceiptPdf(fileName, pdf, labels)
+                        "share" -> shareReceiptPdf(fileName, pdf, whatsappOnly = false, labels = labels)
+                        "whatsapp" -> shareReceiptPdf(fileName, pdf, whatsappOnly = true, labels = labels)
+                        else -> {
+                            val escPos = withContext(Dispatchers.Default) {
+                                snapshotForScreen.buildReceiptEscPosBytes(receiptLanguage, labels)
+                            }
+                            printReceipt(fileName, pdf, escPos, labels)
+                        }
+                    }
+                    receiptActionNotification(result, successMessage)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative)
+                } finally {
+                    activeReceiptAction = null
+                }
+            }
         }
 
         Column(
@@ -3205,10 +3262,11 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     enabled = snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
                     iconPath = completeReceiptIconPath,
                     iconRes = completeReceiptIconRes,
-                    iconTintColor = null,
+                    iconTintColor = Color.White,
+                    iconSizeOverride = 22.dp,
                     onClick = {
                         completeTransaction(
-                            transaction = currentTransaction,
+                            transaction = currentTransaction.copy(timeMillis = getCurrentTimeMillis()),
                             transactionTypeIndex = context.transactionTypeIndex,
                             clientId = context.clientId,
                             receiptSnapshot = snapshotForScreen
@@ -3244,15 +3302,12 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                         text = stateValues.stringPdf,
                         iconPath = savePdfIconPath,
                         iconRes = savePdfIconRes,
-                        iconTintColor = null,
-                        onClick = {
-                            coroutineScope.launch {
-                                receiptActionNotification(
-                                    saveReceiptPdf(fileName, pdfBytes, labels),
-                                    stateValues.stringReceiptPdfSaved
-                                )
-                            }
-                        }
+                        iconTintColor = Color.White,
+                        iconSizeOverride = 22.dp,
+                        enabled = activeReceiptAction == null,
+                        loading = activeReceiptAction == "pdf",
+                        autoLoading = false,
+                        onClick = { runReceiptAction("pdf", stateValues.stringReceiptPdfSaved) }
                     )
 
                     actionButton(
@@ -3260,15 +3315,12 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                         text = stateValues.stringShare,
                         iconPath = shareReceiptIconPath,
                         iconRes = shareReceiptIconRes,
-                        iconTintColor = null,
-                        onClick = {
-                            coroutineScope.launch {
-                                receiptActionNotification(
-                                    shareReceiptPdf(fileName, pdfBytes, whatsappOnly = false, labels = labels),
-                                    stateValues.stringReceiptShared
-                                )
-                            }
-                        }
+                        iconTintColor = Color.White,
+                        iconSizeOverride = 22.dp,
+                        enabled = activeReceiptAction == null,
+                        loading = activeReceiptAction == "share",
+                        autoLoading = false,
+                        onClick = { runReceiptAction("share", stateValues.stringReceiptShared) }
                     )
 
                     actionButton(
@@ -3276,15 +3328,12 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                         text = stateValues.stringWhatsApp,
                         iconPath = whatsappReceiptIconPath,
                         iconRes = whatsappReceiptIconRes,
-                        iconTintColor = null,
-                        onClick = {
-                            coroutineScope.launch {
-                                receiptActionNotification(
-                                    shareReceiptPdf(fileName, pdfBytes, whatsappOnly = true, labels = labels),
-                                    stateValues.stringReceiptSentToWhatsApp
-                                )
-                            }
-                        }
+                        iconTintColor = Color.White,
+                        iconSizeOverride = 22.dp,
+                        enabled = activeReceiptAction == null,
+                        loading = activeReceiptAction == "whatsapp",
+                        autoLoading = false,
+                        onClick = { runReceiptAction("whatsapp", stateValues.stringReceiptSentToWhatsApp) }
                     )
                 }
 
@@ -3297,40 +3346,27 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     actionButton(
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringPrint,
-                        loading = printingReceipt,
+                        loading = activeReceiptAction == "print",
                         loadingText = localizedStringResource(2298, "Printing receipt…"),
-                        enabled = !printingReceipt,
+                        enabled = activeReceiptAction == null,
                         autoLoading = false,
                         iconPath = printReceiptIconPath,
                         iconRes = printReceiptIconRes,
-                        iconTintColor = null,
-                        onClick = {
-                            printingReceipt = true
-                            coroutineScope.launch {
-                                try {
-                                    receiptActionNotification(
-                                        printReceipt(
-                                            fileName,
-                                            pdfBytes,
-                                            snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage, labels),
-                                            labels
-                                        ),
-                                        stateValues.stringReceiptSentToPrinter
-                                    )
-                                } finally {
-                                    printingReceipt = false
-                                }
-                            }
-                        }
+                        iconTintColor = Color.White,
+                        iconSizeOverride = 22.dp,
+                        onClick = { runReceiptAction("print", stateValues.stringReceiptSentToPrinter) }
                     )
 
                     actionButton(
                         modifier = Modifier.weight(1f),
                         text = stateValues.stringQuit,
+                        enabled = activeReceiptAction == null,
+                        autoLoading = false,
                         enabledColor = stateValues.DisabledColor,
                         iconPath = finishReceiptIconPath,
                         iconRes = finishReceiptIconRes,
-                        iconTintColor = null,
+                        iconTintColor = Color.White,
+                        iconSizeOverride = 22.dp,
                         onClick = {
                             coroutineScope.launch {
                                 latestTransactionReceiptSnapshotState.emit(null)

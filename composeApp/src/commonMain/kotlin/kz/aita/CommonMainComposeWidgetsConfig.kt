@@ -56,6 +56,7 @@ import io.kamel.image.config.svgDecoder
 import io.ktor.client.plugins.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -5871,6 +5872,7 @@ fun AppConfiguration.actionButton(
     iconRes: DrawableResource? = null,
     iconContentDescription: String = text,
     iconTintColor: Color? = textColor,
+    iconSizeOverride: Dp? = null,
 
     confirmationRequired: Boolean? = null,
 
@@ -5878,16 +5880,10 @@ fun AppConfiguration.actionButton(
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ): ActionButtonContent {
-    var isEnabled by rememberSaveable {
-        mutableStateOf(enabled)
-    }
-
-    LaunchedEffect(enabled) {
-        isEnabled = enabled
-    }
-
+    val isEnabled = enabled
     val actionButtonScope = rememberCoroutineScope()
-    val activeNetworkOperations by activeNetworkOperationsState.collectAsState()
+    val latestLoading by rememberUpdatedState(loading)
+    var autoLoadingGeneration by remember { mutableStateOf(0L) }
     var autoLoadingActive by remember {
         mutableStateOf(false)
     }
@@ -5906,11 +5902,13 @@ fun AppConfiguration.actionButton(
         }
     }
 
-    LaunchedEffect(activeNetworkOperations, autoLoadingStartNetworkOperations) {
-        val startedAt = autoLoadingStartNetworkOperations
-        if (startedAt != null) {
-            if (activeNetworkOperations > startedAt) autoLoadingNetworkObserved = true
-            if (autoLoadingNetworkObserved && activeNetworkOperations <= startedAt && !loading) {
+    LaunchedEffect(autoLoadingStartNetworkOperations) {
+        val startedAt = autoLoadingStartNetworkOperations ?: return@LaunchedEffect
+        // Only a clicked auto-loading button observes this global counter. Idle stock-row buttons
+        // no longer recompose twice for every request in a reconnect/realtime refresh burst.
+        activeNetworkOperationsState.collect { operations ->
+            if (operations > startedAt) autoLoadingNetworkObserved = true
+            if (autoLoadingNetworkObserved && operations <= startedAt && !latestLoading) {
                 autoLoadingActive = false
                 autoLoadingStartNetworkOperations = null
                 autoLoadingNetworkObserved = false
@@ -5920,13 +5918,14 @@ fun AppConfiguration.actionButton(
 
     fun startAutoLoadingPulse() {
         if (!autoLoading || text.isBlank() || !fillMaxWidthIfTextPresent) return
-        val startedAt = activeNetworkOperations
+        val startedAt = activeNetworkOperationsState.value
+        val generation = ++autoLoadingGeneration
         autoLoadingActive = true
         autoLoadingStartNetworkOperations = startedAt
         autoLoadingNetworkObserved = false
         actionButtonScope.launch {
             delay(1_400)
-            if (autoLoadingStartNetworkOperations == startedAt && !autoLoadingNetworkObserved && !loading) {
+            if (autoLoadingGeneration == generation && autoLoadingStartNetworkOperations == startedAt && !autoLoadingNetworkObserved && !latestLoading) {
                 autoLoadingActive = false
                 autoLoadingStartNetworkOperations = null
             }
@@ -5989,7 +5988,7 @@ fun AppConfiguration.actionButton(
 
     val resolvedIconRes = iconRes
     val iconPresent = effectiveLoading || icon != null || inferredIconPath != null
-    val iconSize = when {
+    val iconSize = iconSizeOverride ?: when {
         inferredIconPath == stateValues.drawablePathIconBackArrow -> 18.dp
         textPresent -> 20.dp
         else -> 22.dp

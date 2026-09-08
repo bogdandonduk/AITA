@@ -6,6 +6,10 @@ import aita.composeapp.generated.resources._0_0
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Application
+import android.app.UiModeManager
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.util.DisplayMetrics
 import android.bluetooth.BluetoothAdapter
 import android.content.*
 import android.content.pm.PackageManager
@@ -1386,6 +1390,7 @@ class MainActivity: ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         instance = this
+        updatePhoneOrientationPolicy()
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         installAndroidSoftKeyboardHider(this)
         installReceiptPlatformAndroid(this)
@@ -1563,11 +1568,47 @@ class MainActivity: ComponentActivity() {
     override fun onResume() {
         super.onResume()
         instance = this
+        updatePhoneOrientationPolicy()
         installAndroidSoftKeyboardHider(this)
         installReceiptPlatformAndroid(this)
         installAndroidVectorDrawableRenderer()
         installAndroidCameraBarcodeScanner()
         installAndroidVoiceInput(this)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun updatePhoneOrientationPolicy(configuration: Configuration = resources.configuration) {
+        val smallestDisplayWidthDp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.maximumWindowMetrics.bounds
+            (minOf(bounds.width(), bounds.height()) / resources.displayMetrics.density).toInt()
+        } else {
+            val metrics = DisplayMetrics()
+            windowManager.defaultDisplay.getRealMetrics(metrics)
+            (minOf(metrics.widthPixels, metrics.heightPixels) / metrics.density).toInt()
+        }
+        val mode = (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)?.currentModeType
+            ?: (configuration.uiMode and Configuration.UI_MODE_TYPE_MASK)
+        val lockPortrait = shouldLockPhoneToPortrait(
+            displaySmallestWidthDp = smallestDisplayWidthDp,
+            configurationSmallestWidthDp = configuration.smallestScreenWidthDp,
+            normalUiMode = mode == Configuration.UI_MODE_TYPE_NORMAL,
+            multiWindow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode,
+            pictureInPicture = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode,
+            largeScreenConfiguration = (configuration.screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_LARGE
+        )
+        val orientation = if (lockPortrait) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        if (requestedOrientation != orientation) requestedOrientation = orientation
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updatePhoneOrientationPolicy(newConfig)
+    }
+
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        updatePhoneOrientationPolicy(newConfig)
     }
 
     override fun onStop() {

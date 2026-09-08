@@ -1784,9 +1784,9 @@ fun TransactionReceiptSnapshotDataModel.receiptTitle(labels: ReceiptTextLabelsDa
     }
 }
 
+@Suppress("UNUSED_PARAMETER") // retain the public signature; drafts no longer have a display number
 fun TransactionReceiptSnapshotDataModel.receiptNumberText(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
-    val id = transaction.id.takeIf { it.isNotBlank() } ?: labels.draft
-    return id.take(8).uppercase()
+    return transaction.serverReceiptIdOrNull()?.take(8)?.uppercase().orEmpty()
 }
 
 fun TransactionReceiptSnapshotDataModel.totalAmount(): Double {
@@ -1821,8 +1821,10 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, 
     builder.appendLine("--------------------------------")
     builder.appendLine(labels.goodsReceiptTitle)
     builder.appendLine(receiptTitle(labels))
-    builder.appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
-    if (transaction.id.isNotBlank()) builder.appendLine("${labels.transactionId}: ${transaction.id}")
+    transaction.serverReceiptIdOrNull()?.let { serverId ->
+        builder.appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
+        builder.appendLine("${labels.transactionId}: $serverId")
+    }
     builder.appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
     cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.cashier}: $it") }
     builder.appendLine("--------------------------------")
@@ -2095,8 +2097,9 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String
 }
 
 fun TransactionReceiptSnapshotDataModel.receiptPdfFileName(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
-    val safeId = receiptNumberText(labels).replace(Regex("[^A-Za-z0-9_-]"), "_")
-    return "receipt_${safeId}.pdf"
+    val safeId = receiptNumberText(labels).takeIf { it.isNotBlank() }
+        ?: "pending_${transaction.timeMillis}"
+    return "receipt_${safeId.replace(Regex("[^A-Za-z0-9_-]"), "_")}.pdf"
 }
 
 val latestTransactionReceiptSnapshotState =
@@ -3234,6 +3237,7 @@ fun addGoodsItemToTransactionCart(
 }
 
 fun getTransactions(storeId: String) {
+    val sessionGeneration = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
         getTransactionsMutex.withLock {
             val response = networkRequest<List<TransactionDataModel>, Unit>(
@@ -3245,7 +3249,11 @@ fun getTransactions(storeId: String) {
             if (response.negative) {
                 postInAppNotification(response.message, NotificationType.Negative)
             } else {
-                transactionsState.emit(DataState.Success(response.payload.orEmpty(), response.message))
+                if (authenticatedSessionGenerationIsCurrent(sessionGeneration) && activeStoreIdState.value == storeId) {
+                    val transactions = response.payload.orEmpty()
+                    transactionsState.emit(DataState.Success(transactions, response.message))
+                    transactions.forEach(::reconcileLatestReceiptIdentity)
+                }
             }
         }
     }
@@ -8626,7 +8634,7 @@ fun init() {
         observeLocalKv(KEY_ACTIVE_STORE_ID)
             .collect { storedActiveStoreId ->
                 val normalizedStoreId = storedActiveStoreId?.takeIf { it.isNotBlank() }
-                activeStoreIdState.emit(normalizedStoreId)
+                publishActiveInventoryStoreId(normalizedStoreId)
                 normalizedStoreId?.let { storeId ->
                     loadCachedStoreScopedData(storeId)
                     getStock(storeId)
@@ -12757,6 +12765,8 @@ private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
         storeId = storeId,
         stock = stockState.payloadValue.orEmpty(),
         stockBatches = stockBatchesState.payloadValue.orEmpty(),
+        stockLoaded = stockState.payloadValue != null,
+        stockBatchesLoaded = stockBatchesState.payloadValue != null,
         transactions = transactionsState.payloadValue.orEmpty(),
         debtors = debtorsState.payloadValue.orEmpty(),
         cashRegister = cashRegisterState.payloadValue,
@@ -12766,9 +12776,23 @@ private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
 
 private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotDataModel) {
     val message = localNetworkMessage(734, "Local branch state updated", "Локальное состояние филиала обновлено", "Филиалдың жергілікті күйі жаңартылды")
-    stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(snapshot.stock), message))
-    stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(snapshot.stockBatches), message))
+    val owner = inventoryOwners.current
+    if (snapshot.storeId != owner.storeId || !inventoryOwnerIsCurrent(owner)) return
+    val stock = if (snapshot.stockLoaded) filterRecentlyDeletedStockItems(snapshot.stock) else null
+    val batches = if (snapshot.stockBatchesLoaded) filterRecentlyDeletedStockBatches(snapshot.stockBatches) else null
+    inventoryStateMutex.withLock {
+        if (!inventoryOwnerIsCurrent(owner)) return
+        stock?.let {
+            stockState.emit(DataState.Success(it, message))
+            stockLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local)
+        }
+        batches?.let {
+            stockBatchesState.emit(DataState.Success(it, message))
+            stockBatchesLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local)
+        }
+    }
     transactionsState.emit(DataState.Success(snapshot.transactions, message))
+    snapshot.transactions.forEach(::reconcileLatestReceiptIdentity)
     debtorsState.emit(DataState.Success(snapshot.debtors, message))
     snapshot.cashRegister?.let {
         cashRegisterState.emit(DataState.Success(it, message))
@@ -13496,7 +13520,11 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
                         break
                     }
 
-                    val synced = response.payload
+                    val synced = response.payload.let { completed ->
+                        if (completed.clientOperationId.isBlank()) completed.copy(clientOperationId = operation.id)
+                        else completed
+                    }
+                    reconcileLatestReceiptIdentity(synced)
                     logCloudConnectionDiagnostic(
                         "local outbox sync success id=${operation.id} type=${operation.operationType} " +
                             "http=${response.httpStatusCode ?: -1}"
@@ -13685,13 +13713,34 @@ private val realtimeRefreshMutex = Mutex()
 private val cloudConnectionHealthProbeMutex = Mutex()
 val realtimeUpdatesConnectedState = MutableStateFlow(false)
 
+private suspend fun loadCachedInventory(storeId: String) {
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
+    getJsonCache<List<GoodsItemDataModel>>(inventoryCacheKey("stock", owner))?.let {
+        val cached = filterRecentlyDeletedStockItems(it)
+        inventoryStateMutex.withLock {
+            if (canHydrateInventory(stockState.payloadValue != null || stockLoadStatusState.value.accessDenied, inventoryOwnerIsCurrent(owner))) {
+                stockState.emit(DataState.Success(cached, cacheMessage()))
+                stockLoadStatusState.value = stockLoadStatusState.value.copy(source = InventoryLoadSource.Cache)
+            }
+        }
+    }
+    getJsonCache<List<GoodsBatchDataModel>>(inventoryCacheKey("stock_batches", owner))?.let {
+        val cached = filterRecentlyDeletedStockBatches(it)
+        inventoryStateMutex.withLock {
+            if (canHydrateInventory(stockBatchesState.payloadValue != null || stockBatchesLoadStatusState.value.accessDenied, inventoryOwnerIsCurrent(owner))) {
+                stockBatchesState.emit(DataState.Success(cached, cacheMessage()))
+                stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(source = InventoryLoadSource.Cache)
+            }
+        }
+    }
+}
+
 private suspend fun loadCachedStoreScopedData(storeId: String) {
-    getJsonCache<List<GoodsItemDataModel>>(storeScopedCacheKey("stock", storeId))?.let {
-        stockState.emit(DataState.Success(filterRecentlyDeletedStockItems(it), cacheMessage()))
-    }
-    getJsonCache<List<GoodsBatchDataModel>>(storeScopedCacheKey("stock_batches", storeId))?.let {
-        stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(it), cacheMessage()))
-    }
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
+    loadCachedInventory(storeId)
+    if (!inventoryOwnerIsCurrent(owner)) return
     getJsonCache<List<TransactionDataModel>>(storeScopedCacheKey("transactions", storeId))?.let {
         transactionsState.emit(DataState.Success(it, cacheMessage()))
     }
@@ -13802,7 +13851,7 @@ private suspend fun loadCachedApplicationData() {
 
     if (hasAuthenticatedSession) {
         getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() }?.let { storeId ->
-            activeStoreIdState.emit(storeId)
+            publishActiveInventoryStoreId(storeId)
             loadCachedStoreScopedData(storeId)
         }
     }
@@ -13855,14 +13904,26 @@ private fun startAppCacheCollectors() {
 
     GlobalScope.launch(Dispatchers.ourIo) {
         stockState.payload.collect { payload ->
-            val storeId = activeStoreIdState.value
-            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock", storeId), payload)
+            if (payload != null) {
+                val cacheKey = inventoryStateMutex.withLock {
+                    val owner = inventoryOwners.current
+                    if (inventoryOwnerIsCurrent(owner) && stockState.payloadValue === payload)
+                        inventoryCacheKey("stock", owner) else null
+                }
+                if (cacheKey != null) putJsonCache(cacheKey, payload)
+            }
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         stockBatchesState.payload.collect { payload ->
-            val storeId = activeStoreIdState.value
-            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("stock_batches", storeId), payload)
+            if (payload != null) {
+                val cacheKey = inventoryStateMutex.withLock {
+                    val owner = inventoryOwners.current
+                    if (inventoryOwnerIsCurrent(owner) && stockBatchesState.payloadValue === payload)
+                        inventoryCacheKey("stock_batches", owner) else null
+                }
+                if (cacheKey != null) putJsonCache(cacheKey, payload)
+            }
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
@@ -16791,7 +16852,7 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
     clearAuthenticatedAccountCaches()
     userAccountState.emit(DataState.Empty())
     storesState.emit(DataState.Empty())
-    activeStoreIdState.emit(null)
+    publishActiveInventoryStoreId(null)
 
     stockState.emit(DataState.Empty())
     parentStoreStockState.emit(DataState.Empty())
@@ -16987,6 +17048,8 @@ fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true)
                 getStoredUserAccountDataModel?.invoke()?.run {
                     if (authenticatedSessionGenerationIsCurrent(sessionGeneration)) {
                         userAccountState.emit(DataState.Success(this))
+                        publishActiveInventoryStoreId(activeStoreIdState.value)
+                        activeStoreIdState.value?.let { loadCachedInventory(it) }
                     }
                 }
 
@@ -17030,12 +17093,17 @@ fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true)
                             else -> {
                                 putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, null)
                                 putLocalKv(KEY_ACTIVE_STORE_ID, savedStoreId)
-                                activeStoreIdState.emit(savedStoreId)
+                                publishActiveInventoryStoreId(savedStoreId)
                                 logCloudConnectionDiagnostic("getUser applied server active store $savedStoreId")
                             }
                         }
                     }
 
+                    publishActiveInventoryStoreId(activeStoreIdState.value)
+                    activeStoreIdState.value?.let { storeId ->
+                        if (stockState.payloadValue == null || stockLoadStatusState.value.failure != null) getStock(storeId)
+                        if (stockBatchesState.payloadValue == null || stockBatchesLoadStatusState.value.failure != null) getStockBatches(storeId)
+                    }
                     getGlobalAppConfiguration()
                     getNotifications()
                     syncPendingNotificationsToServer()
@@ -17937,7 +18005,7 @@ fun setActiveStoreId(
 
         putLocalKv(KEY_ACTIVE_STORE_ID, normalizedId)
         putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, if (explicitNone) "1" else null)
-        activeStoreIdState.emit(normalizedId)
+        publishActiveInventoryStoreId(normalizedId)
         logCloudConnectionDiagnostic(
             "active store set local id=${normalizedId.orEmpty()} syncServer=$syncServer explicitNone=$explicitNone generation=$generation"
         )
@@ -17961,7 +18029,7 @@ fun setActiveStoreId(
         if (response.negative) {
             putLocalKv(KEY_ACTIVE_STORE_ID, previousId)
             putLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE, if (previousExplicitNone) "1" else null)
-            activeStoreIdState.emit(previousId)
+            publishActiveInventoryStoreId(previousId)
             postInAppNotification(response.message, NotificationType.Negative, transient = false)
             logCloudConnectionDiagnostic(
                 "active store sync rolled back id=${normalizedId.orEmpty()} previous=${previousId.orEmpty()} generation=$generation"
@@ -18244,17 +18312,59 @@ fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<Goods
 }
 
 fun getStock(storeId: String) {
+    val owner = inventoryOwners.current
+    val cleanStoreId = storeId.trim()
+    if (owner.storeId != cleanStoreId) return
     GlobalScope.launch(Dispatchers.ourIo) {
         getStockMutex.withLock {
-            val response = networkRequest<List<GoodsItemDataModel>, Unit>(
-                HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
-                headers = mapOf("store_id" to storeId)
-            )
-
-            if (!response.negative) {
-                val cleanPayload = filterRecentlyDeletedStockItems(response.payload.orEmpty())
-                stockState.emit(DataState.Success(cleanPayload, response.message))
+            val started = inventoryStateMutex.withLock startRead@{
+                if (!inventoryOwnerIsCurrent(owner)) return@startRead false
+                stockLoadStatusState.value = stockLoadStatusState.value.copy(loading = true, failure = null)
+                true
+            }
+            if (!started) return@withLock
+            try {
+                val response = networkRequest<List<GoodsItemDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
+                    headers = mapOf("store_id" to cleanStoreId)
+                )
+                val cleanPayload = response.payload?.let { filterRecentlyDeletedStockItems(it) }
+                inventoryStateMutex.withLock publish@{
+                    if (!inventoryOwnerIsCurrent(owner)) return@publish
+                    if (!response.negative && cleanPayload != null) {
+                        stockState.emit(DataState.Success(cleanPayload, response.message))
+                        stockLoadStatusState.value = InventoryLoadStatus(cleanStoreId, source = InventoryLoadSource.Cloud)
+                    } else {
+                        val failure = response.message?.takeIf { it.isNotEmpty() } ?: inventoryLoadFailureMessage()
+                        // A transport failure retains same-account cached stock. Revoked access does not.
+                        if (response.httpStatusCode == 401 || response.httpStatusCode == 403) {
+                            stockState.emit(DataState.Empty(failure))
+                        }
+                        stockLoadStatusState.value = stockLoadStatusState.value.copy(
+                            loading = false, failure = failure,
+                            accessDenied = stockLoadStatusState.value.accessDenied || response.httpStatusCode == 401 || response.httpStatusCode == 403
+                        )
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                inventoryStateMutex.withLock {
+                    if (inventoryOwnerIsCurrent(owner)) {
+                        stockLoadStatusState.value = stockLoadStatusState.value.copy(
+                            loading = false, failure = inventoryLoadFailureMessage()
+                        )
+                    }
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    inventoryStateMutex.withLock {
+                        if (inventoryOwnerIsCurrent(owner)) {
+                            stockLoadStatusState.value = stockLoadStatusState.value.copy(loading = false)
+                        }
+                    }
+                }
             }
         }
     }
@@ -18342,18 +18452,18 @@ private fun stockItemSaveFailureMessage(): List<LocalizedStringDataModel> = list
 
 private suspend fun applySavedGoodsItemToStockState(
     savedGoodsItem: GoodsItemDataModel,
-    responseMessage: List<LocalizedStringDataModel>?
+    responseMessage: List<LocalizedStringDataModel>?,
+    owner: InventoryOwner
 ) {
-    val current = stockState.payloadValue.orEmpty().toMutableList()
-    val existingIndex = current.indexOfFirst { it.id == savedGoodsItem.id }
-    if (existingIndex >= 0) {
-        current[existingIndex] = savedGoodsItem
-    } else {
-        current.add(savedGoodsItem)
+    inventoryStateMutex.withLock {
+        if (!inventoryOwnerIsCurrent(owner)) return
+        val current = stockState.payloadValue.orEmpty().toMutableList()
+        val existingIndex = current.indexOfFirst { it.id == savedGoodsItem.id }
+        if (existingIndex >= 0) current[existingIndex] = savedGoodsItem
+        else current.add(savedGoodsItem)
+        stockState.emit(DataState.Success(current, responseMessage))
     }
-    stockState.emit(DataState.Success(current, responseMessage))
-
-    savedGoodsItem.storeId.takeIf { it.isNotBlank() }?.let { storeId ->
+    owner.storeId?.let { storeId ->
         getStock(storeId)
         refreshParentStoreStock(storeId, limit = 32, appendToSharedState = false)
     }
@@ -18363,6 +18473,7 @@ fun updateGoodsItem(
     goodsItem: GoodsItemDataModel,
     onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
 ) {
+    val owner = inventoryOwners.current
     GlobalScope.launch(Dispatchers.ourIo) {
         val completion: DataState<GoodsItemDataModel> = updateGoodsItemMutex.withLock {
             try {
@@ -18381,7 +18492,8 @@ fun updateGoodsItem(
                     postInAppNotification(response.message, NotificationType.Positive)
                     applySavedGoodsItemToStockState(
                         savedGoodsItem = savedGoodsItem,
-                        responseMessage = response.message
+                        responseMessage = response.message,
+                        owner = owner
                     )
                     DataState.Success(savedGoodsItem, response.message)
                 }
@@ -18402,6 +18514,7 @@ fun addGoodsItem(
     goodsItem: GoodsItemDataModel,
     onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?
 ) {
+    val owner = inventoryOwners.current
     GlobalScope.launch(Dispatchers.ourIo) {
         val completion: DataState<GoodsItemDataModel> = addGoodsItemMutex.withLock {
             try {
@@ -18420,7 +18533,8 @@ fun addGoodsItem(
                     postInAppNotification(response.message, NotificationType.Positive)
                     applySavedGoodsItemToStockState(
                         savedGoodsItem = savedGoodsItem,
-                        responseMessage = response.message
+                        responseMessage = response.message,
+                        owner = owner
                     )
                     DataState.Success(savedGoodsItem, response.message)
                 }
@@ -18475,17 +18589,57 @@ fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
 }
 
 fun getStockBatches(storeId: String) {
+    val owner = inventoryOwners.current
+    val cleanStoreId = storeId.trim()
+    if (owner.storeId != cleanStoreId) return
     GlobalScope.launch(Dispatchers.ourIo) {
         getStockBatchesMutex.withLock {
-            val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
-                HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
-                headers = mapOf("store_id" to storeId)
-            )
-
-            if (!response.negative) {
-                response.payload?.let { batches ->
-                    stockBatchesState.emit(DataState.Success(filterRecentlyDeletedStockBatches(batches), response.message))
+            val started = inventoryStateMutex.withLock startRead@{
+                if (!inventoryOwnerIsCurrent(owner)) return@startRead false
+                stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(loading = true, failure = null)
+                true
+            }
+            if (!started) return@withLock
+            try {
+                val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
+                    HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
+                    headers = mapOf("store_id" to cleanStoreId)
+                )
+                val cleanPayload = response.payload?.let { filterRecentlyDeletedStockBatches(it) }
+                inventoryStateMutex.withLock publish@{
+                    if (!inventoryOwnerIsCurrent(owner)) return@publish
+                    if (!response.negative && cleanPayload != null) {
+                        stockBatchesState.emit(DataState.Success(cleanPayload, response.message))
+                        stockBatchesLoadStatusState.value = InventoryLoadStatus(cleanStoreId, source = InventoryLoadSource.Cloud)
+                    } else {
+                        val failure = response.message?.takeIf { it.isNotEmpty() } ?: inventoryLoadFailureMessage()
+                        if (response.httpStatusCode == 401 || response.httpStatusCode == 403) {
+                            stockBatchesState.emit(DataState.Empty(failure))
+                        }
+                        stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(
+                            loading = false, failure = failure,
+                            accessDenied = stockBatchesLoadStatusState.value.accessDenied || response.httpStatusCode == 401 || response.httpStatusCode == 403
+                        )
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                inventoryStateMutex.withLock {
+                    if (inventoryOwnerIsCurrent(owner)) {
+                        stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(
+                            loading = false, failure = inventoryLoadFailureMessage()
+                        )
+                    }
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    inventoryStateMutex.withLock {
+                        if (inventoryOwnerIsCurrent(owner)) {
+                            stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(loading = false)
+                        }
+                    }
                 }
             }
         }
@@ -20469,7 +20623,9 @@ data class LocalNetworkSnapshotDataModel(
     val transactions: List<TransactionDataModel> = emptyList(),
     val debtors: List<DebtorDataModel> = emptyList(),
     val cashRegister: StoreCashRegisterDataModel? = null,
-    val updatedAtMillis: Long = 0L
+    val updatedAtMillis: Long = 0L,
+    val stockLoaded: Boolean = true,
+    val stockBatchesLoaded: Boolean = true
 )
 
 @kotlinx.serialization.Serializable
