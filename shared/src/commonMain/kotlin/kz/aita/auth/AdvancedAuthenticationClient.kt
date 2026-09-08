@@ -65,6 +65,9 @@ object AitaAdvancedAuthenticationClient {
     suspend fun requestPhoneAlias(request: AitaPhoneAliasRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaPhoneAliasRequestDataModel>(HttpMethod.Post, "auth/security/phone/request", request)
 
+    suspend fun resendPhoneAlias(request: AitaEmailCodeResendRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/security/phone/resend", request)
+
     suspend fun confirmPhoneAlias(request: AitaPhoneAliasConfirmRequestDataModel) =
         authRequest<AitaAuthenticationSettingsDataModel, AitaPhoneAliasConfirmRequestDataModel>(HttpMethod.Post, "auth/security/phone/confirm", request)
 
@@ -112,6 +115,7 @@ internal fun <T> ResponseDataModel<T>.withAuthFailureMessage(): ResponseDataMode
             "Обновите сервер AITA для этого способа входа.",
             "Бұл кіру тәсілі үшін AITA серверін жаңартыңыз."
         )
+        httpStatusCode == 429 && !message.isNullOrEmpty() -> return this
         httpStatusCode == 429 -> arrayOf(
             "Too many attempts. Try again later.",
             "Слишком много попыток. Попробуйте позже.",

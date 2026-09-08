@@ -75,6 +75,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -682,50 +684,16 @@ private class ReceiptPdfPrintDocumentAdapter(
 }
 
 object ReceiptPlatformAndroidBridge {
-    /**
-     * Optional direct ESC/POS writer. Use this when a real Bluetooth/USB manager owns the connection.
-     */
     var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
-
-    /**
-     * Temporary built-in Bluetooth SPP path for common ESC/POS receipt printers.
-     * Configure it later from the devices/settings screen with a paired printer MAC address.
-     */
-    var bluetoothPrinterMacAddress: String? = null
-
-    private val bluetoothSerialPortProfileUuid: UUID =
-        UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    @Volatile var bluetoothPrinterMacAddress: String? = null
 
     fun configureBluetoothPrinter(macAddress: String?) {
-        bluetoothPrinterMacAddress = macAddress
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
+        bluetoothPrinterMacAddress = macAddress?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.isNotBlank() }
     }
 
-    @SuppressLint("MissingPermission")
-    private suspend fun writeEscPosBytesToConfiguredBluetoothPrinter(printerBytes: ByteArray): Boolean =
-        withContext(Dispatchers.IO) {
-            val address = bluetoothPrinterMacAddress?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext false
-            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@withContext false
-            val device = runCatching { adapter.getRemoteDevice(address) }.getOrNull() ?: return@withContext false
-            runCatching { adapter.cancelDiscovery() }
-            val socket = device.createRfcommSocketToServiceRecord(bluetoothSerialPortProfileUuid)
-            try {
-                socket.connect()
-                socket.outputStream.write(printerBytes)
-                socket.outputStream.flush()
-                true
-            } finally {
-                runCatching { socket.close() }
-            }
-        }
-
-    suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean {
-        writeEscPosBytes?.let { customWriter ->
-            return customWriter(printerBytes)
-        }
-        return writeEscPosBytesToConfiguredBluetoothPrinter(printerBytes)
-    }
+    suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean =
+        writeEscPosBytes?.let { it(printerBytes.copyOf()) }
+            ?: BluetoothPrinterTransport.write(bluetoothPrinterMacAddress, printerBytes)
 }
 
 
@@ -748,23 +716,8 @@ object LabelPrinterAndroidBridge {
         labelPrinterProtocol = normalizeLabelPrinterProtocol(protocol)
     }
 
-    @SuppressLint("MissingPermission")
     private suspend fun writeLabelBytesToConfiguredBluetoothPrinter(labelBytes: ByteArray): Boolean =
-        withContext(Dispatchers.IO) {
-            val address = bluetoothLabelPrinterMacAddress?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext false
-            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@withContext false
-            val device = runCatching { adapter.getRemoteDevice(address) }.getOrNull() ?: return@withContext false
-            runCatching { adapter.cancelDiscovery() }
-            val socket = device.createRfcommSocketToServiceRecord(bluetoothSerialPortProfileUuid)
-            try {
-                socket.connect()
-                socket.outputStream.write(labelBytes)
-                socket.outputStream.flush()
-                true
-            } finally {
-                runCatching { socket.close() }
-            }
-        }
+        BluetoothPrinterTransport.write(bluetoothLabelPrinterMacAddress, labelBytes)
 
     suspend fun writeLabelBytesToConfiguredPrinter(labelBytes: ByteArray): Boolean {
         writeLabelBytes?.let { customWriter -> return customWriter(labelBytes) }
@@ -795,6 +748,7 @@ fun installReceiptPlatformAndroid(context: Context) {
     ReceiptPlatformAndroidBridge.configureBluetoothPrinter(receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
     LabelPrinterAndroidBridge.configureBluetoothLabelPrinter(labelPrinterPreferences.getString("bluetooth_label_printer_mac_address", null))
     LabelPrinterAndroidBridge.configureProtocol(labelPrinterPreferences.getString("label_printer_protocol", LABEL_PRINTER_PROTOCOL_AUTO))
+    configuredReceiptPrinterDeviceIdState.value = ReceiptPlatformAndroidBridge.bluetoothPrinterMacAddress
     configuredLabelPrinterProtocolState.value = LabelPrinterAndroidBridge.labelPrinterProtocol
     val activePrintWebViews = mutableListOf<WebView>()
 
@@ -939,15 +893,12 @@ fun installReceiptPlatformAndroid(context: Context) {
     @SuppressLint("MissingPermission")
     fun listBluetoothReceiptPrinterDevices(): List<PlatformReceiptPrinterDataModel> {
         val configuredAddress = ReceiptPlatformAndroidBridge.bluetoothPrinterMacAddress?.trim().orEmpty()
-        val discovered = runCatching {
-            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@runCatching emptyList()
-            adapter.bondedDevices
-                .orEmpty()
+        val discovered = BluetoothPrinterTransport.pairedDevices()
                 .mapNotNull { device ->
                     val address = runCatching { device.address }.getOrNull()?.trim().orEmpty()
                     val name = runCatching { device.name }.getOrNull()?.trim().orEmpty()
-                    val id = address.ifBlank { name }
-                    if (id.isBlank()) return@mapNotNull null
+                    val id = address
+                    if (!BluetoothAdapter.checkBluetoothAddress(id)) return@mapNotNull null
                     val probable = likelyReceiptPrinterName(name)
                     PlatformReceiptPrinterDataModel(
                         id = id,
@@ -960,7 +911,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                         available = true
                     )
                 }
-        }.getOrElse { emptyList() }
+
 
         val withSavedConfiguredPrinter = if (configuredAddress.isNotBlank() && discovered.none { it.configured || it.id.equals(configuredAddress, ignoreCase = true) }) {
             discovered + PlatformReceiptPrinterDataModel(
@@ -1100,6 +1051,14 @@ fun installReceiptPlatformAndroid(context: Context) {
         }
     }
 
+    preparePlatformReceiptPrinterAction = {
+        try {
+            BluetoothPrinterTransport.requestConnectPermission()
+            ReceiptPlatformActionResult(true)
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (exception: Exception) { ReceiptPlatformActionResult(false, exception.message ?: "Bluetooth permission unavailable") }
+    }
+
     listPlatformReceiptPrinterDevicesAction = {
         withContext(Dispatchers.IO) {
             listBluetoothReceiptPrinterDevices()
@@ -1107,12 +1066,14 @@ fun installReceiptPlatformAndroid(context: Context) {
     }
 
     configurePlatformReceiptPrinterDeviceAction = { deviceId ->
-        ReceiptPlatformAndroidBridge.configureBluetoothPrinter(deviceId)
-        if (deviceId.isNullOrBlank()) {
-            receiptPrinterPreferences.edit().remove("bluetooth_printer_mac_address").apply()
-        } else {
-            receiptPrinterPreferences.edit().putString("bluetooth_printer_mac_address", deviceId.trim()).apply()
-        }
+        val cleanAddress = deviceId?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.isNotBlank() }
+        require(cleanAddress == null || BluetoothAdapter.checkBluetoothAddress(cleanAddress)) { "Select a paired Bluetooth printer" }
+        if (cleanAddress != null) BluetoothPrinterTransport.requestConnectPermission()
+        // Commit durable selection before publishing it to the process.
+        val edit = receiptPrinterPreferences.edit()
+        if (cleanAddress == null) edit.remove("bluetooth_printer_mac_address") else edit.putString("bluetooth_printer_mac_address", cleanAddress)
+        check(edit.commit()) { "Could not save receipt printer selection" }
+        ReceiptPlatformAndroidBridge.configureBluetoothPrinter(cleanAddress)
         ReceiptPlatformActionResult(
             true,
             if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
@@ -1156,6 +1117,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                     ReceiptPlatformActionResult(false, "Android Bluetooth sticky label printer is not configured")
                 }
             }.getOrElse { throwable ->
+                if (throwable is CancellationException) throw throwable
                 ReceiptPlatformActionResult(false, throwable.message ?: "Could not print sticky label")
             }
         }
@@ -1170,6 +1132,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                     ReceiptPlatformActionResult(false, "Android Bluetooth ESC/POS receipt printer is not configured")
                 }
             }.getOrElse { throwable ->
+                if (throwable is CancellationException) throw throwable
                 ReceiptPlatformActionResult(false, throwable.message ?: "Could not print receipt")
             }
         }
@@ -1184,6 +1147,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                     ReceiptPlatformActionResult(false, "Android Bluetooth ESC/POS receipt printer is not configured")
                 }
             }.getOrElse {
+                if (it is CancellationException) throw it
                 ReceiptPlatformActionResult(false, it.message ?: "Could not print receipt")
             }
         }
@@ -1378,6 +1342,23 @@ private fun getOrCreateKey(): SecretKey {
 class MainActivity: ComponentActivity() {
 
     val viewModel: MainActivityViewModel by viewModels()
+
+    private var pendingPrinterPermission: CompletableDeferred<Boolean>? = null
+    private val printerPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingPrinterPermission?.complete(granted)
+        pendingPrinterPermission = null
+    }
+
+    suspend fun awaitPrinterBluetoothPermission(): Boolean = withContext(Dispatchers.Main.immediate) {
+        if (BluetoothPrinterTransport.hasConnectPermission()) return@withContext true
+        if (isFinishing || isDestroyed) return@withContext false
+        val pending = pendingPrinterPermission ?: CompletableDeferred<Boolean>().also {
+            pendingPrinterPermission = it
+            try { printerPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT) }
+            catch (exception: Exception) { pendingPrinterPermission = null; it.complete(false) }
+        }
+        pending.await()
+    }
 
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     var permissionGrantedResultAction: ((String) -> Unit)? = null
@@ -1617,6 +1598,8 @@ class MainActivity: ComponentActivity() {
     }
 
     override fun onDestroy() {
+        pendingPrinterPermission?.complete(false)
+        pendingPrinterPermission = null
         if (instance === this) instance = null
         super.onDestroy()
     }

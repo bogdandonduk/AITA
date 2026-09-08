@@ -436,6 +436,12 @@ fun AppConfiguration.MenuDevicesScreen() {
     val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
     val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
     var refreshingReceiptPrinters by remember { mutableStateOf(false) }
+    var printingReceipt by remember { mutableStateOf(false) }
+    var savingReceiptPrinter by remember { mutableStateOf(false) }
+    var receiptPrinterError by remember { mutableStateOf("") }
+    var manualReceiptTarget by remember { mutableStateOf("") }
+    var showManualReceiptTarget by remember { mutableStateOf(false) }
+    val devicesScope = rememberCoroutineScope()
     var refreshingLabelPrinters by remember { mutableStateOf(false) }
 
     val refreshButtonText = localizedStringResource(1259, "Refresh printers")
@@ -454,12 +460,50 @@ fun AppConfiguration.MenuDevicesScreen() {
     val labelPrintersRefreshedText = localizedStringResource(1302, "Label printers refreshed")
 
     fun refreshReceiptPrinters(showNotification: Boolean) {
+        if (refreshingReceiptPrinters || printingReceipt || savingReceiptPrinter) return
         refreshingReceiptPrinters = true
-        refreshReceiptPrinterDevices { result ->
-            coroutineScope.launch {
+        receiptPrinterError = ""
+        refreshReceiptPrinterDevices(requestPermission = showNotification) { result ->
+            devicesScope.launch {
                 refreshingReceiptPrinters = false
+                receiptPrinterError = if (result.success) "" else result.message
                 if (showNotification) receiptActionNotification(result, refreshSuccessText)
             }
+        }
+    }
+
+    fun selectReceiptPrinter(id: String?) {
+        if (savingReceiptPrinter || printingReceipt || refreshingReceiptPrinters) return
+        savingReceiptPrinter = true
+        receiptPrinterError = ""
+        configureReceiptPrinterDevice(id) { result ->
+            devicesScope.launch {
+                savingReceiptPrinter = false
+                if (!result.success) receiptPrinterError = result.message
+                else showManualReceiptTarget = false
+                receiptActionNotification(result, if (id == null) printerClearedText else printerSelectedText)
+            }
+        }
+    }
+
+    fun sendTestReceipt() {
+        if (printingReceipt || savingReceiptPrinter || configuredReceiptPrinterId.isNullOrBlank()) return
+        printingReceipt = true
+        receiptPrinterError = ""
+        devicesScope.launch {
+            try {
+                val result = withContext(Dispatchers.Default) {
+                    printReceiptEscPos(
+                        buildReceiptPrinterTestEscPosBytes(title = testReceiptTitle, dateText = receiptUiDateTime(getCurrentTimeMillis())),
+                        ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
+                    )
+                }
+                if (!result.success) receiptPrinterError = result.message
+                receiptActionNotification(result, result.message.ifBlank { testReceiptSentText })
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (exception: Exception) {
+                receiptPrinterError = exception.message ?: localizedStringResource(1254, "Thermal receipt printer")
+            } finally { printingReceipt = false }
         }
     }
 
@@ -544,46 +588,32 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 iconPath = stateValues.drawablePathIconRefresh,
                                 iconRes = stateValues.drawableResIconRefresh.value,
                                 loading = refreshingReceiptPrinters,
+                                enabled = !refreshingReceiptPrinters && !printingReceipt && !savingReceiptPrinter,
+                                autoLoading = false,
                                 confirmationRequired = false,
                                 onClick = { refreshReceiptPrinters(showNotification = true) }
                             )
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = testReceiptButtonText,
+                                loading = printingReceipt,
                                 iconPath = stateValues.drawablePathIconReceipt,
                                 iconRes = stateValues.drawableResIconReceipt.value,
-                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                autoLoading = false,
                                 onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
                                 confirmationRequired = false,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        receiptActionNotification(
-                                            printReceiptEscPos(
-                                                buildReceiptPrinterTestEscPosBytes(
-                                                    title = testReceiptTitle,
-                                                    dateText = receiptUiDateTime(getCurrentTimeMillis())
-                                                ),
-                                                ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
-                                            ),
-                                            testReceiptSentText
-                                        )
-                                    }
-                                }
+                                onClick = ::sendTestReceipt
                             )
                             actionButton(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = localizedStringResource(1265, "Clear receipt printer"),
                                 iconPath = stateValues.drawablePathIconCancel,
                                 iconRes = stateValues.drawableResIconCancel.value,
-                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                autoLoading = false,
                                 confirmationRequired = false,
-                                onClick = {
-                                    configureReceiptPrinterDevice(null) { result ->
-                                        coroutineScope.launch {
-                                            receiptActionNotification(result, printerClearedText)
-                                        }
-                                    }
-                                }
+                                onClick = { selectReceiptPrinter(null) }
                             )
                         }
                     } else {
@@ -598,46 +628,32 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 iconPath = stateValues.drawablePathIconRefresh,
                                 iconRes = stateValues.drawableResIconRefresh.value,
                                 loading = refreshingReceiptPrinters,
+                                enabled = !refreshingReceiptPrinters && !printingReceipt && !savingReceiptPrinter,
+                                autoLoading = false,
                                 confirmationRequired = false,
                                 onClick = { refreshReceiptPrinters(showNotification = true) }
                             )
                             actionButton(
                                 modifier = Modifier.weight(1f),
                                 text = testReceiptButtonText,
+                                loading = printingReceipt,
                                 iconPath = stateValues.drawablePathIconReceipt,
                                 iconRes = stateValues.drawableResIconReceipt.value,
-                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                autoLoading = false,
                                 onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
                                 confirmationRequired = false,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        receiptActionNotification(
-                                            printReceiptEscPos(
-                                                buildReceiptPrinterTestEscPosBytes(
-                                                    title = testReceiptTitle,
-                                                    dateText = receiptUiDateTime(getCurrentTimeMillis())
-                                                ),
-                                                ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
-                                            ),
-                                            testReceiptSentText
-                                        )
-                                    }
-                                }
+                                onClick = ::sendTestReceipt
                             )
                             actionButton(
                                 modifier = Modifier.weight(1f),
                                 text = localizedStringResource(1265, "Clear receipt printer"),
                                 iconPath = stateValues.drawablePathIconCancel,
                                 iconRes = stateValues.drawableResIconCancel.value,
-                                enabled = !configuredReceiptPrinterId.isNullOrBlank(),
+                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                autoLoading = false,
                                 confirmationRequired = false,
-                                onClick = {
-                                    configureReceiptPrinterDevice(null) { result ->
-                                        coroutineScope.launch {
-                                            receiptActionNotification(result, printerClearedText)
-                                        }
-                                    }
-                                }
+                                onClick = { selectReceiptPrinter(null) }
                             )
                         }
                     }
@@ -653,7 +669,27 @@ fun AppConfiguration.MenuDevicesScreen() {
 
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                    if (receiptPrinters.isEmpty()) {
+                    if (receiptPrinterError.isNotBlank()) Text(receiptPrinterError,
+                        color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                    if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…"),
+                        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    if (getPlatformName().startsWith("jvm", ignoreCase = true)) {
+                        AuthQuietAction(authUiText("Enter printer address", "Ввести адрес принтера", "Принтер мекенжайын енгізу"),
+                            !printingReceipt && !savingReceiptPrinter) { showManualReceiptTarget = !showManualReceiptTarget }
+                        if (showManualReceiptTarget) {
+                            aitaFormTextField(value = manualReceiptTarget, onValueChange = { manualReceiptTarget = it },
+                                titleText = authUiText("Queue or address", "Очередь или адрес", "Кезек немесе мекенжай"),
+                                placeholderText = "print-service:XP-58 (copy 1)", identityKey = "receipt-manual-target",
+                                enabled = !savingReceiptPrinter && !printingReceipt, keyboardType = KeyboardType.Ascii)
+                            Text("print-service:XP-58 (copy 1) · tcp://192.168.1.50:9100 · serial:COM3",
+                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            actionButton(text = authUiText("Use this printer", "Выбрать принтер", "Осы принтерді таңдау"),
+                                enabled = !savingReceiptPrinter && !printingReceipt && manualReceiptTarget.isNotBlank(),
+                                loading = savingReceiptPrinter, autoLoading = false) { selectReceiptPrinter(manualReceiptTarget) }
+                        }
+                    }
+
+                    if (receiptPrinters.isEmpty() && !refreshingReceiptPrinters && receiptPrinterError.isBlank()) {
                         MessageText(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -669,13 +705,8 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 ThermalReceiptPrinterCard(
                                     printer = printer,
                                     selected = printer.id == configuredReceiptPrinterId || printer.configured,
-                                    onSelect = {
-                                        configureReceiptPrinterDevice(printer.id) { result ->
-                                            coroutineScope.launch {
-                                                receiptActionNotification(result, printerSelectedText)
-                                            }
-                                        }
-                                    }
+                                    enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters,
+                                    onSelect = { selectReceiptPrinter(printer.id) }
                                 )
                             }
                         }
@@ -931,6 +962,7 @@ internal fun AppConfiguration.DeviceSettingsCard(
 internal fun AppConfiguration.ThermalReceiptPrinterCard(
     printer: PlatformReceiptPrinterDataModel,
     selected: Boolean,
+    enabled: Boolean = true,
     onSelect: () -> Unit
 ) {
     Row(
@@ -979,7 +1011,7 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
             text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1257, "Use this printer"),
             iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconDevices,
             iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconDevices.value,
-            enabled = !selected,
+            enabled = enabled && !selected,
             confirmationRequired = false,
             fillMaxWidthIfTextPresent = false,
             onClick = onSelect

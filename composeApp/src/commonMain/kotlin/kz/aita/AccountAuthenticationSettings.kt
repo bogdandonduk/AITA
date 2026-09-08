@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kz.aita.auth.*
-import org.jetbrains.compose.resources.DrawableResource
 
 private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, RECOVERY_CODES, PHONE }
 
@@ -43,11 +43,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
     var phoneAlias by remember { mutableStateOf("") }
     var phoneAction by remember { mutableStateOf(AitaPhoneAliasAction.ADD_OR_REPLACE) }
     var phoneFlowId by remember { mutableStateOf("") }
+    var phoneFlow by remember { mutableStateOf<AitaAuthFlowDataModel?>(null) }
     var phoneCode by remember { mutableStateOf("") }
     var recoveryCodes by remember { mutableStateOf<List<String>>(emptyList()) }
     var error by remember { mutableStateOf("") }
     var info by remember { mutableStateOf("") }
     val screenScope = rememberCoroutineScope()
+
+    @Composable
+    fun QuietAction(onClick: () -> Unit, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+        TextButton(onClick = onClick, enabled = enabled && !loading,
+            colors = ButtonDefaults.textButtonColors(contentColor = stateValues.AccentColor,
+                disabledContentColor = stateValues.PlaceholderTextColor), content = content)
+    }
 
     fun clearSensitive() {
         setup = null
@@ -56,6 +64,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
         secondFactor = ""
         phoneCode = ""
         phoneFlowId = ""
+        phoneFlow = null
         recoveryCodes = emptyList()
         error = ""
         info = ""
@@ -77,9 +86,9 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 throw cancelled
             } catch (_: Exception) {
                 error = authUiText(
-                    "AITA could not complete this security request. Check your connection and try again.",
-                    "AITA не удалось выполнить запрос безопасности. Проверьте соединение и повторите попытку.",
-                    "AITA қауіпсіздік сұрауын орындай алмады. Байланысты тексеріп, қайталап көріңіз."
+                    "Request failed. Try again.",
+                    "Запрос не выполнен. Повторите.",
+                    "Сұрау орындалмады. Қайталаңыз."
                 )
             } finally {
                 loading = false
@@ -109,9 +118,9 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 throw cancelled
             } catch (_: Exception) {
                 error = authUiText(
-                    "AITA could not load your security settings. Check your connection and try again.",
-                    "AITA не удалось загрузить настройки безопасности. Проверьте соединение и повторите попытку.",
-                    "AITA қауіпсіздік баптауларын жүктей алмады. Байланысты тексеріп, қайталап көріңіз."
+                    "Could not load settings. Retry.",
+                    "Не удалось загрузить настройки. Повторите.",
+                    "Баптаулар жүктелмеді. Қайталаңыз."
                 )
             } finally {
                 loading = false
@@ -151,7 +160,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = authUiText("Sign-in and two-factor authentication", "Вход и двухфакторная аутентификация", "Кіру және екі факторлы аутентификация"),
+                    text = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
                     color = stateValues.TextColor,
                     fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold
@@ -167,7 +176,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 )
             }
             if (collapsible) {
-                TextButton(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; clearSensitive() } }) {
+                QuietAction(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; clearSensitive() } }) {
                     Text(if (expanded) authUiText("Close", "Закрыть", "Жабу") else authUiText("Manage", "Управлять", "Басқару"))
                 }
             }
@@ -179,11 +188,11 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (loading && settings == null) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = stateValues.AccentColor, trackColor = stateValues.PlaceholderTextColor.copy(alpha = 0.12f))
                 }
 
                 settings?.let { current ->
-                    AuthSettingsInfoRow(authUiText("Verified email", "Подтверждённый email", "Расталған email"), current.email)
+                    AuthSettingsInfoRow(stateValues.stringEmail, current.email)
                     AuthSettingsInfoRow(
                         authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі"),
                         current.phoneLoginAlias ?: authUiText("Not configured", "Не настроен", "Бапталмаған")
@@ -203,7 +212,6 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
 
                 AuthMethodAvailabilityPanel(
                     availability = authAvailability,
-                    settings = settings,
                     lookupError = capabilitiesError
                 )
 
@@ -213,6 +221,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 when (editor) {
                     AccountAuthEditor.NONE -> {
                         actionButton(
+                            autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = if (settings?.authenticatorEnabled == true) {
                                 authUiText("Disable authenticator", "Отключить аутентификатор", "Аутентификаторды өшіру")
@@ -242,6 +251,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                         }
                         if (settings?.authenticatorEnabled == true) {
                             actionButton(
+                                autoLoading = false,
                                 modifier = Modifier.fillMaxWidth(),
                                 text = authUiText("Generate new recovery codes", "Создать новые резервные коды", "Жаңа қалпына келтіру кодтарын жасау"),
                                 iconPath = stateValues.drawablePathIconPassword,
@@ -257,6 +267,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             ) { clearSensitive(); editor = AccountAuthEditor.RECOVERY_CODES }
                         }
                         actionButton(
+                            autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = authUiText("Manage phone login alias", "Управлять номером для входа", "Кіру телефон нөмірін басқару"),
                             iconPath = stateValues.drawablePathIconPhone,
@@ -273,20 +284,21 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 }
                             }
                         ) { clearSensitive(); phoneAlias = settings?.phoneLoginAlias.orEmpty(); editor = AccountAuthEditor.PHONE }
-                        TextButton(onClick = ::load, enabled = !loading) { Text(authUiText("Refresh security settings", "Обновить настройки безопасности", "Қауіпсіздік баптауларын жаңарту")) }
+                        QuietAction(onClick = ::load, enabled = !loading) { Text(authUiText("Refresh", "Обновить", "Жаңарту")) }
                     }
 
                     AccountAuthEditor.TOTP_ENABLE -> {
                         Text(
                             text = authUiText(
-                                "Confirm your current password before adding an authenticator.",
-                                "Подтвердите текущий пароль перед подключением аутентификатора.",
-                                "Аутентификаторды қоспас бұрын ағымдағы құпия сөзді растаңыз."
+                                "Confirm your password.",
+                                "Подтвердите пароль.",
+                                "Құпия сөзіңізді растаңыз."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
                         )
                         SensitiveAuthConfirmationFields(
+                            enabled = !loading,
                             currentPassword = currentPassword,
                             secondFactor = secondFactor,
                             secondFactorRequired = settings?.authenticatorEnabled == true,
@@ -294,11 +306,12 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             onSecondFactorChange = { secondFactor = it }
                         )
                         actionButton(
+                            autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = authUiText(
-                                "Continue to authenticator setup",
-                                "Перейти к настройке аутентификатора",
-                                "Аутентификаторды баптауға өту"
+                                "Continue",
+                                "Продолжить",
+                                "Жалғастыру"
                             ),
                             enabled = !loading && currentPassword.isNotBlank() &&
                                 (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()),
@@ -316,7 +329,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 } ?: run { error = authResponseText(response) }
                             }
                         }
-                        TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) {
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) {
                             Text(stateValues.stringCancel)
                         }
                     }
@@ -423,6 +436,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             onTransformValue = { it.filter(Char::isDigit).take(6) }
                         )
                         actionButton(
+                            autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = authUiText("Confirm and enable", "Подтвердить и включить", "Растау және қосу"),
                             enabled = !loading && data != null && setupCode.length == 6,
@@ -443,17 +457,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 } ?: run { error = authResponseText(response) }
                             }
                         }
-                        TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
                     }
 
                     AccountAuthEditor.TOTP_DISABLE, AccountAuthEditor.RECOVERY_CODES -> {
                         SensitiveAuthConfirmationFields(
+                            enabled = !loading,
                             currentPassword = currentPassword,
                             secondFactor = secondFactor,
                             onPasswordChange = { currentPassword = it },
                             onSecondFactorChange = { secondFactor = it }
                         )
                         actionButton(
+                            autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = if (editor == AccountAuthEditor.TOTP_DISABLE) {
                                 authUiText("Disable authenticator", "Отключить аутентификатор", "Аутентификаторды өшіру")
@@ -487,31 +503,29 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 }
                             }
                         }
-                        TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
                     }
 
                     AccountAuthEditor.PHONE -> {
                         Text(
                             text = authUiText(
-                                "The phone number is an alternate login name. Confirmation goes to your verified email; AITA does not send an SMS.",
-                                "Номер — это дополнительный логин. Подтверждение придёт на email; AITA не отправляет SMS.",
-                                "Телефон нөмірі — қосымша логин. Растау email арқылы келеді; AITA SMS жібермейді."
+                                "Confirmation by email, not SMS.",
+                                "Подтверждение по email, не в SMS.",
+                                "Растау SMS емес, email арқылы."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
                         )
                         if (phoneFlowId.isBlank()) {
-                            val tabs = tabRowWidget(
+                            tabRowWidget(
                                 modifier = Modifier.fillMaxWidth(),
+                                enabled = !loading, persistSelection = false,
                                 selectedIndexInitial = if (phoneAction == AitaPhoneAliasAction.REMOVE) "remove" else "set",
                                 tabs = listOf(
-                                    TabContent("set", authUiText("Set or replace", "Установить или заменить", "Орнату немесе ауыстыру")),
-                                    TabContent("remove", authUiText("Remove", "Удалить", "Жою"))
+                                    TabContent("set", authUiText("Set or replace", "Установить или заменить", "Орнату немесе ауыстыру")) { phoneAction = AitaPhoneAliasAction.ADD_OR_REPLACE },
+                                    TabContent("remove", authUiText("Remove", "Удалить", "Жою")) { phoneAction = AitaPhoneAliasAction.REMOVE }
                                 )
                             )
-                            LaunchedEffect(tabs.id) {
-                                phoneAction = if (tabs.id == "remove") AitaPhoneAliasAction.REMOVE else AitaPhoneAliasAction.ADD_OR_REPLACE
-                            }
                             if (phoneAction == AitaPhoneAliasAction.ADD_OR_REPLACE) {
                                 aitaFormTextField(
                                     modifier = Modifier.fillMaxWidth(),
@@ -527,6 +541,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 )
                             }
                             SensitiveAuthConfirmationFields(
+                                enabled = !loading,
                                 currentPassword = currentPassword,
                                 secondFactor = secondFactor,
                                 secondFactorRequired = settings?.authenticatorEnabled == true,
@@ -534,57 +549,54 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 onSecondFactorChange = { secondFactor = it }
                             )
                             actionButton(
+                                autoLoading = false,
                                 modifier = Modifier.fillMaxWidth(),
-                                text = authUiText("Send email confirmation", "Отправить подтверждение на email", "Email растауын жіберу"),
+                                text = authUiText("Get code", "Получить код", "Код алу"),
                                 enabled = !loading && currentPassword.isNotBlank() &&
                                     (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()) &&
                                     (phoneAction == AitaPhoneAliasAction.REMOVE || normalizeAitaPhoneAlias(phoneAlias) != null),
                                 loading = loading
                             ) {
+                                val request = AitaPhoneAliasRequestDataModel(phoneAction, phoneAlias, currentPassword, secondFactor, stateValues.appLanguage)
                                 launchSecurityAction {
-                                    val response = AitaAdvancedAuthenticationClient.requestPhoneAlias(
-                                        AitaPhoneAliasRequestDataModel(phoneAction, phoneAlias, currentPassword, secondFactor, stateValues.appLanguage)
-                                    )
-                                    response.payload?.let { phoneFlowId = it.flowId; info = authUiText("Confirmation code sent to your email.", "Код подтверждения отправлен на email.", "Растау коды email-ға жіберілді.") }
+                                    val response = AitaAdvancedAuthenticationClient.requestPhoneAlias(request)
+                                    response.payload?.takeIf { !response.negative && it.nextStep == AitaAuthNextStep.EMAIL_CODE && it.flowId.isNotBlank() }?.let {
+                                        phoneFlow = it; phoneFlowId = it.flowId; phoneCode = ""
+                                    }
                                         ?: run { error = authResponseText(response) }
                                     currentPassword = ""
                                     secondFactor = ""
                                 }
                             }
                         } else {
-                            aitaFormTextField(
-                                modifier = Modifier.fillMaxWidth(),
-                                value = phoneCode,
-                                onValueChange = { phoneCode = it },
-                                titleText = authUiText("Email confirmation code", "Код подтверждения из письма", "Email растау коды"),
-                                placeholderText = "000000",
-                                identityKey = "account-phone-email-confirmation-code",
-                                enabled = !loading,
-                                keyboardType = KeyboardType.NumberPassword,
-                                imeAction = ImeAction.Done,
-                                leadingIconPath = stateValues.drawablePathIconEmail,
-                                sensitive = true,
-                                onTransformValue = { it.filter(Char::isDigit).take(6) }
-                            )
-                            actionButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау"),
-                                enabled = !loading && phoneCode.length == 6,
-                                loading = loading
-                            ) {
-                                launchSecurityAction {
-                                    val response = AitaAdvancedAuthenticationClient.confirmPhoneAlias(AitaPhoneAliasConfirmRequestDataModel(phoneFlowId, phoneCode))
-                                    response.payload?.let {
-                                        clearSensitive()
-                                        settings = it
-                                        phoneAlias = it.phoneLoginAlias.orEmpty()
-                                        info = authUiText("Phone login alias updated", "Номер для входа обновлён", "Кіру телефон нөмірі жаңартылды")
-                                        editor = AccountAuthEditor.NONE
-                                    } ?: run { error = authResponseText(response) }
+                            AuthEmailCodeEntry(
+                                value = phoneCode, flow = phoneFlow, busy = loading,
+                                onValueChange = { phoneCode = it; error = "" },
+                                confirmText = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау"),
+                                identity = "account-phone-email-confirmation-code",
+                                onSubmit = {
+                                    val request = AitaPhoneAliasConfirmRequestDataModel(phoneFlowId, phoneCode)
+                                    launchSecurityAction {
+                                        val response = AitaAdvancedAuthenticationClient.confirmPhoneAlias(request)
+                                        response.payload?.takeIf { !response.negative }?.let {
+                                            clearSensitive(); settings = it; phoneAlias = it.phoneLoginAlias.orEmpty()
+                                            info = authUiText("Phone updated", "Номер обновлён", "Нөмір жаңартылды")
+                                            editor = AccountAuthEditor.NONE
+                                        } ?: run { error = authResponseText(response) }
+                                    }
+                                },
+                                onResend = {
+                                    val request = AitaEmailCodeResendRequestDataModel(phoneFlowId, stateValues.appLanguage)
+                                    launchSecurityAction {
+                                        val response = AitaAdvancedAuthenticationClient.resendPhoneAlias(request)
+                                        response.payload?.takeIf { !response.negative && it.nextStep == AitaAuthNextStep.EMAIL_CODE && it.flowId.isNotBlank() }?.let {
+                                            phoneFlow = it; phoneFlowId = it.flowId; phoneCode = ""
+                                        } ?: run { error = authResponseText(response) }
+                                    }
                                 }
-                            }
+                            )
                         }
-                        TextButton(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
                     }
                 }
 
@@ -599,201 +611,18 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
 @Composable
 private fun AppConfiguration.AuthMethodAvailabilityPanel(
     availability: AitaAuthUiAvailability,
-    settings: AitaAuthenticationSettingsDataModel?,
     lookupError: String,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(stateValues.AccentColor.copy(alpha = 0.05f))
-            .border(
-                stateValues.unfocusedBorderWidth,
-                stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
-                RoundedCornerShape(stateValues.cornerRadius)
-            )
-            .padding(stateValues.marginTextFieldGroup),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                text = authUiText("Your ways to sign in", "Ваши способы входа", "Кіру тәсілдеріңіз"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.accentTextSize,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = authUiText(
-                    "Code sign-in and password recovery are available from the login screen. Manage account-only methods here.",
-                    "Вход по коду и восстановление пароля доступны на экране входа. Здесь настраиваются способы, связанные с аккаунтом.",
-                    "Кодпен кіру және құпия сөзді қалпына келтіру кіру экранында қолжетімді. Аккаунтқа қатысты тәсілдерді осы жерден басқарыңыз."
-                ),
-                color = stateValues.PlaceholderTextColor,
-                fontSize = stateValues.smallTextSize
-            )
-        }
-
-        AuthMethodAvailabilityRow(
-            title = authUiText("Password", "Пароль", "Құпия сөз"),
-            detail = authUiText(
-                "Use your email or phone login name with your password.",
-                "Используйте email или номер для входа вместе с паролем.",
-                "Email немесе кіру телефон нөмірін құпия сөзбен бірге пайдаланыңыз."
-            ),
-            availability = AitaAuthFeatureAvailability.AVAILABLE,
-            active = true,
-            activeLabel = authUiText("Ready", "Готов", "Дайын"),
-            iconPath = stateValues.drawablePathIconPassword,
-            iconRes = stateValues.drawableResIconPassword.value
-        )
-
-        AuthMethodAvailabilityRow(
-            title = authUiText("Email sign-in code", "Код для входа из письма", "Email арқылы кіру коды"),
-            detail = authUiText(
-                "A one-time code is sent to the verified email on the account.",
-                "Одноразовый код отправляется на подтверждённый email аккаунта.",
-                "Бір реттік код аккаунттың расталған email мекенжайына жіберіледі."
-            ),
-            availability = availability.emailCodeLogin,
-            iconPath = stateValues.drawablePathIconEmail,
-            iconRes = stateValues.drawableResIconEmail.value
-        )
-
-        AuthMethodAvailabilityRow(
-            title = authUiText("Password recovery", "Восстановление пароля", "Құпия сөзді қалпына келтіру"),
-            detail = authUiText(
-                "Restore access through a confirmation code sent to your verified email.",
-                "Восстановите доступ с помощью кода, отправленного на подтверждённый email.",
-                "Расталған email-ға жіберілген код арқылы қолжетімділікті қалпына келтіріңіз."
-            ),
-            availability = availability.passwordRecovery,
-            iconPath = stateValues.drawablePathIconPassword,
-            iconRes = stateValues.drawableResIconPassword.value
-        )
-
-        AuthMethodAvailabilityRow(
-            title = authUiText("Authenticator protection", "Защита аутентификатором", "Аутентификатор қорғанысы"),
-            detail = if (settings?.authenticatorEnabled == true) {
-                authUiText(
-                    "A current authenticator or recovery code is required after primary sign-in.",
-                    "После основного входа требуется действующий код аутентификатора или резервный код.",
-                    "Негізгі кіруден кейін ағымдағы аутентификатор немесе қалпына келтіру коды қажет."
-                )
-            } else {
-                authUiText(
-                    "Optional two-factor protection with any standard authenticator app.",
-                    "Дополнительная двухфакторная защита через любое стандартное приложение-аутентификатор.",
-                    "Кез келген стандартты аутентификатор қолданбасы арқылы қосымша екі факторлы қорғаныс."
-                )
-            },
-            availability = availability.authenticator,
-            active = settings?.authenticatorEnabled == true,
-            activeLabel = authUiText("On", "Включён", "Қосулы"),
-            iconPath = stateValues.drawablePathIconSecurity,
-            iconRes = stateValues.drawableResIconSecurity.value
-        )
-
-        AuthMethodAvailabilityRow(
-            title = authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі"),
-            detail = settings?.phoneLoginAlias?.takeIf { it.isNotBlank() }?.let { alias ->
-                authUiText(
-                    "Use $alias as an alternate login name. Confirmation changes go to email.",
-                    "Используйте $alias как дополнительный логин. Изменения подтверждаются по email.",
-                    "$alias нөмірін қосымша логин ретінде пайдаланыңыз. Өзгерістер email арқылы расталады."
-                )
-            } ?: authUiText(
-                "Add a phone number as an alternate login name; confirmation is sent by email, not SMS.",
-                "Добавьте номер как дополнительный логин; подтверждение приходит по email, а не по SMS.",
-                "Телефон нөмірін қосымша логин ретінде қосыңыз; растау SMS емес, email арқылы келеді."
-            ),
-            availability = availability.phoneLoginAlias,
-            active = settings?.phoneLoginAlias?.isNotBlank() == true,
-            activeLabel = authUiText("Set", "Настроен", "Бапталған"),
-            iconPath = stateValues.drawablePathIconPhone,
-            iconRes = stateValues.drawableResIconPhone.value
-        )
-
-        if (lookupError.isNotBlank()) {
-            Text(
-                text = lookupError,
-                color = stateValues.PlaceholderTextColor,
-                fontSize = stateValues.smallTextSize
-            )
-        }
+    fun label(state: AitaAuthFeatureAvailability): String = when (state) {
+        AitaAuthFeatureAvailability.AVAILABLE -> authUiText("Available", "Доступно", "Қолжетімді")
+        AitaAuthFeatureAvailability.UNAVAILABLE -> authUiText("Unavailable", "Недоступно", "Қолжетімсіз")
+        AitaAuthFeatureAvailability.CHECKING -> authUiText("Checking…", "Проверяем…", "Тексерілуде…")
+        AitaAuthFeatureAvailability.UNKNOWN -> authUiText("Not checked", "Не проверено", "Тексерілмеген")
     }
-}
-
-@Composable
-private fun AppConfiguration.AuthMethodAvailabilityRow(
-    title: String,
-    detail: String,
-    availability: AitaAuthFeatureAvailability,
-    iconPath: String,
-    iconRes: DrawableResource,
-    active: Boolean = false,
-    activeLabel: String = authUiText("Enabled", "Включено", "Қосулы"),
-) {
-    val statusText = when {
-        active && availability == AitaAuthFeatureAvailability.AVAILABLE -> activeLabel
-        availability == AitaAuthFeatureAvailability.AVAILABLE -> authUiText("Available", "Доступно", "Қолжетімді")
-        availability == AitaAuthFeatureAvailability.CHECKING -> authUiText("Checking", "Проверяем", "Тексерілуде")
-        availability == AitaAuthFeatureAvailability.UNKNOWN -> authUiText("Check", "Проверить", "Тексеру")
-        else -> authUiText("Off", "Недоступно", "Өшірулі")
-    }
-    val statusColor = when {
-        availability == AitaAuthFeatureAvailability.AVAILABLE -> stateValues.AccentColor
-        availability == AitaAuthFeatureAvailability.UNAVAILABLE -> stateValues.ErrorColor
-        else -> stateValues.PlaceholderTextColor
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        CpImage(
-            modifier = Modifier.size(stateValues.iconSize),
-            url = iconPath,
-            fallbackRes = iconRes,
-            contentDescription = title,
-            tintColor = statusColor
-        )
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = title,
-                color = stateValues.TextColor,
-                fontSize = stateValues.textSize,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = detail,
-                color = stateValues.PlaceholderTextColor,
-                fontSize = stateValues.smallTextSize
-            )
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                .background(statusColor.copy(alpha = 0.12f))
-                .border(
-                    stateValues.unfocusedBorderWidth,
-                    statusColor.copy(alpha = 0.55f),
-                    RoundedCornerShape(stateValues.cornerRadius)
-                )
-                .padding(horizontal = 8.dp, vertical = 5.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = statusText,
-                color = statusColor,
-                fontSize = stateValues.smallTextSize,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
-            )
-        }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AuthSettingsInfoRow(authUiText("Email code", "Код из письма", "Email коды"), label(availability.emailCodeLogin), availability.emailCodeLogin == AitaAuthFeatureAvailability.AVAILABLE)
+        AuthSettingsInfoRow(authUiText("Password recovery", "Восстановление пароля", "Құпия сөзді қалпына келтіру"), label(availability.passwordRecovery), availability.passwordRecovery == AitaAuthFeatureAvailability.AVAILABLE)
+        if (lookupError.isNotBlank()) Text(lookupError, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
     }
 }
 
@@ -807,6 +636,7 @@ private fun AppConfiguration.AuthSettingsInfoRow(label: String, value: String, a
 
 @Composable
 private fun AppConfiguration.SensitiveAuthConfirmationFields(
+    enabled: Boolean = true,
     currentPassword: String,
     secondFactor: String,
     secondFactorRequired: Boolean = true,
@@ -814,6 +644,7 @@ private fun AppConfiguration.SensitiveAuthConfirmationFields(
     onSecondFactorChange: (String) -> Unit
 ) {
     aitaFormTextField(
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         value = currentPassword,
         onValueChange = onPasswordChange,
@@ -828,6 +659,7 @@ private fun AppConfiguration.SensitiveAuthConfirmationFields(
     )
     if (secondFactorRequired) {
         aitaFormTextField(
+            enabled = enabled,
             modifier = Modifier.fillMaxWidth(),
             value = secondFactor,
             onValueChange = onSecondFactorChange,

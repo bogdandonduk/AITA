@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import okhttp3.*
 import java.io.File
 import java.io.IOException
@@ -283,6 +284,8 @@ object ReceiptPlatformJvmBridge {
     private const val RECEIPT_PRINTER_DEVICE_FILE_NAME = "aita_receipt_printer_device.txt"
     private const val DEFAULT_RECEIPT_PRINTER_SERIAL_BAUD_RATE = 9600
     private const val WINDOWS_PRINTER_NOT_READY_MARKER = "AITA_PRINTER_NOT_READY:"
+    private const val WINDOWS_RAW_PRINT_SUBMITTING_MARKER = "AITA_PRINT_SUBMITTING:"
+    private const val WINDOWS_RAW_PRINT_SAFE_FAILURE_MARKER = "AITA_PRINT_SAFE_FAILURE:"
     private const val WINDOWS_RAW_PRINT_JOB_STARTED_MARKER = "AITA_PRINT_JOB_STARTED:"
     private const val WINDOWS_RAW_PRINT_SUCCESS_MARKER = "AITA_PRINT_OK:"
     private const val WINDOWS_RAW_PRINT_TIMEOUT_SECONDS = 45L
@@ -317,7 +320,7 @@ object ReceiptPlatformJvmBridge {
     )
 
 
-    private fun throwWindowsRawPrintFailure(output: String, fallbackMessage: String): Nothing {
+    private fun throwWindowsRawPrintFailure(output: String, fallbackMessage: String, timedOut: Boolean = false): Nothing {
         val markerIndex = output.indexOf(WINDOWS_PRINTER_NOT_READY_MARKER)
         if (markerIndex >= 0) {
             val cleanMessage = output
@@ -342,7 +345,7 @@ object ReceiptPlatformJvmBridge {
             .take(2_000)
             .ifBlank { fallbackMessage }
 
-        if (!output.contains(WINDOWS_RAW_PRINT_JOB_STARTED_MARKER)) {
+        if (windowsRawFallbackIsSafe(output, timedOut)) {
             // PowerShell/Add-Type/policy failures that happen before StartDocPrinter are safe to hand
             // to Java's raw PrintService fallback: Windows has not accepted a spool job yet, so the
             // fallback cannot duplicate a partially submitted receipt.
@@ -354,7 +357,7 @@ object ReceiptPlatformJvmBridge {
         ).find(output)?.groupValues?.getOrNull(1)
         val acceptedJobText = startedJobId?.let { "Windows RAW job $it" } ?: "A Windows RAW print job"
         error(
-            "$cleanFailure $acceptedJobText was already accepted by the spooler. " +
+            "$cleanFailure $acceptedJobText may already have reached the spooler. " +
                     "Check the printer and Windows queue before retrying so the receipt is not printed twice."
         )
     }
@@ -374,6 +377,7 @@ object ReceiptPlatformJvmBridge {
         val cleanPath = path
             ?.trim()
             ?.takeIf { it.isNotBlank() }
+        if (cleanPath != null) parseReceiptPrinterTarget(cleanPath)
         val file = receiptPrinterDevicePreferenceFile()
         val parent = file.parentFile
 
@@ -682,16 +686,8 @@ object ReceiptPlatformJvmBridge {
     }
 
     private fun tcpTargetFrom(target: String): Pair<String, Int>? {
-        val clean = target.trim()
-        val hostPort = when {
-            clean.startsWith(TCP_PREFIX, ignoreCase = true) -> clean.substring(TCP_PREFIX.length)
-            clean.startsWith(TCP_SHORT_PREFIX, ignoreCase = true) -> clean.substring(TCP_SHORT_PREFIX.length)
-            else -> return null
-        }.trim().trim('/')
-        val host = hostPort.substringBefore(':').trim()
-        val port = hostPort.substringAfter(':', "9100").trim().toIntOrNull() ?: 9100
-        if (port !in 1..65_535) return null
-        return host.takeIf { it.isNotBlank() }?.let { it to port }
+        if (!target.trim().startsWith("tcp:", ignoreCase = true)) return null
+        return (parseReceiptPrinterTarget(target) as ReceiptPrinterTarget.Tcp).let { it.host to it.port }
     }
 
     fun knownEscPosDeviceCandidates(): List<String> {
@@ -779,7 +775,7 @@ object ReceiptPlatformJvmBridge {
     }
 
     private fun listConfiguredNetworkCandidate(configured: String): List<PlatformReceiptPrinterDataModel> {
-        val target = tcpTargetFrom(configured) ?: return emptyList()
+        val target = runCatching { tcpTargetFrom(configured) }.getOrNull() ?: return emptyList()
         return listOf(
             PlatformReceiptPrinterDataModel(
                 id = configured,
@@ -841,6 +837,7 @@ object ReceiptPlatformJvmBridge {
     }
 
     fun listConfiguredAndDetectedPrinters(): List<PlatformReceiptPrinterDataModel> {
+        loadPersistedEscPosDevicePath()
         val configured = configuredTarget()
         val detected = listConfiguredNetworkCandidate(configured) +
                 listDevicePathCandidates(configured) +
@@ -898,6 +895,14 @@ param(
     [Parameter(Mandatory=${d}true)][string]${d}DataPath
 )
 ${d}ErrorActionPreference = "Stop"
+${d}script:aitaSubmitting = ${d}false
+trap {
+    if (-not ${d}script:aitaSubmitting) {
+        [Console]::Out.WriteLine("${WINDOWS_RAW_PRINT_SAFE_FAILURE_MARKER}")
+        [Console]::Out.Flush()
+    }
+    throw
+}
 ${d}utf8 = New-Object System.Text.UTF8Encoding(${d}false)
 [Console]::OutputEncoding = ${d}utf8
 ${d}OutputEncoding = ${d}utf8
@@ -921,9 +926,9 @@ if (${d}null -ne ${d}getPrinterCommand) {
             Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as paused or stopped. Open its queue and choose Resume printing."
         }
         if (${d}statusText -match "offline|not\s*available|server\s*unknown") {
-            Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as offline or unavailable. Check USB and power, then refresh printers in AITA."
+            [Console]::Out.WriteLine("AITA printer status is advisory: offline/unavailable; checking the exact RAW queue.")
         }
-        if (${d}statusText -match "paper|jam|door|cover|output\s*bin") {
+        if (${d}statusText -match "paper\s*(out|problem)|paperout|paperjam|jam|door\s*open|cover\s*open|output\s*bin\s*full") {
             Fail-AitaPrinterNotReady "Windows reports a paper, jam, output-bin, or cover problem on printer '${d}PrinterName'. Check the roll and close the cover."
         }
         if (${d}statusText -match "error|user\s*intervention|out\s*of\s*memory") {
@@ -996,6 +1001,9 @@ try {
     ${d}doc.pDocName = "AITA ESC/POS receipt"
     ${d}doc.pOutputFile = ${d}null
     ${d}doc.pDataType = "RAW"
+    ${d}script:aitaSubmitting = ${d}true
+    [Console]::Out.WriteLine("${WINDOWS_RAW_PRINT_SUBMITTING_MARKER}")
+    [Console]::Out.Flush()
     ${d}jobId = [AitaRawPrinter]::StartDocPrinter(${d}hPrinter, 1, ${d}doc)
     if (${d}jobId -eq 0) {
         ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
@@ -1159,6 +1167,7 @@ finally {
                 }
                 throwWindowsRawPrintFailure(
                     output = finalOutput,
+                    timedOut = true,
                     fallbackMessage = buildString {
                         append("Windows RAW print timed out before the spooler confirmed the receipt")
                         if (finalOutput.isNotBlank()) append(": ").append(finalOutput.take(1_000))
@@ -1195,38 +1204,26 @@ finally {
     }
 
     private fun writeToPrintService(serviceName: String, printerBytes: ByteArray): Boolean {
-        val service = systemPrintServices()
-            .firstOrNull { it.name.equals(serviceName, ignoreCase = true) }
-            ?: error("Printer '$serviceName' is not installed")
-
-        val healthNotes = printServiceHealthNotes(service)
         if (isWindows()) {
-            if (healthNotes.isNotEmpty()) {
-                println(
-                    "AITA receipt printer Java status for '${service.name}' (advisory only): " +
-                            healthNotes.joinToString(", ")
-                )
-            }
+            // Win32 OpenPrinter accepts the exact saved queue even when Java enumeration is stale
+            // or the bundled JVM driver does not expose it. In particular, no COM-port scan belongs here.
             try {
-                printWithWindowsRawSpooler(service.name, printerBytes)
+                printWithWindowsRawSpooler(serviceName, printerBytes)
                 return true
-            } catch (throwable: WindowsRawSpoolerUnavailableException) {
-                // Safe fallback: the PowerShell bridge either could not start or failed before
-                // StartDocPrinter accepted a Win32 spool job. Never fall back after a started RAW job
-                // fails, because that could print the same receipt twice.
-                System.err.println(
-                    "AITA Windows RAW spooler bridge is unavailable; trying Java RAW PrintService: " +
-                            throwable.message
-                )
+            } catch (failure: WindowsRawSpoolerUnavailableException) {
+                System.err.println("AITA Windows RAW bridge failed before submission; checking Java RAW fallback")
+                val service = systemPrintServices().firstOrNull { it.name.equals(serviceName, ignoreCase = true) }
+                    ?: throw failure
+                printWithJavaPrintService(service, printerBytes)
+                return true
             }
         }
-
-        if (!printServiceCanAcceptImmediateJobs(healthNotes)) {
-            error(
-                "Printer '${service.name}' is not ready: ${healthNotes.joinToString(", ")}. " +
-                        "Check the system printer queue, resume it if paused, then refresh printers in AITA."
-            )
-        }
+        val service = systemPrintServices().firstOrNull { it.name.equals(serviceName, ignoreCase = true) }
+            ?: error("Printer '$serviceName' is not installed. Refresh printers and select its current queue.")
+        val healthNotes = printServiceHealthNotes(service)
+        if (!printServiceCanAcceptImmediateJobs(healthNotes)) error(
+            "Printer '${service.name}' is not ready: ${healthNotes.joinToString(", ")}. Check its queue, paper and cable."
+        )
         printWithJavaPrintService(service, printerBytes)
         return true
     }
@@ -1243,10 +1240,11 @@ finally {
         if (!port.openPort(5_000)) {
             error("Could not open serial printer port $cleanPortName. Close other POS software and reconnect the USB cable.")
         }
-        val output = port.outputStream
+        var output: java.io.OutputStream? = null
         return try {
-            output.write(printerBytes)
-            output.flush()
+            val stream = port.outputStream.also { output = it }
+            stream.write(printerBytes)
+            stream.flush()
 
             // jSerialComm's stream flush confirms the application buffer, not necessarily the USB
             // adapter's transmit queue. Keep the port open while the native queue drains.
@@ -1274,24 +1272,37 @@ finally {
             }
             true
         } finally {
-            runCatching { output.close() }
+            runCatching { output?.close() }
             runCatching { port.closePort() }
         }
     }
 
+    private val tcpWriteDeadline = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { task ->
+        Thread(task, "aita-printer-write-deadline").apply { isDaemon = true }
+    }
+
     private fun writeToTcpPrinter(target: Pair<String, Int>, printerBytes: ByteArray): Boolean {
         Socket().use { socket ->
-            socket.tcpNoDelay = true
-            socket.keepAlive = true
-            socket.soTimeout = TCP_PRINTER_SOCKET_TIMEOUT_MILLIS
-            socket.connect(
-                InetSocketAddress(target.first, target.second),
-                TCP_PRINTER_CONNECT_TIMEOUT_MILLIS
-            )
-            val output = socket.getOutputStream()
-            output.write(printerBytes)
-            output.flush()
-            runCatching { socket.shutdownOutput() }
+            val expired = java.util.concurrent.atomic.AtomicBoolean(false)
+            val deadline = tcpWriteDeadline.schedule({
+                expired.set(true)
+                runCatching { socket.close() }
+            }, 30L, TimeUnit.SECONDS)
+            var sending = false
+            try {
+                socket.tcpNoDelay = true
+                socket.connect(InetSocketAddress(target.first, target.second), TCP_PRINTER_CONNECT_TIMEOUT_MILLIS)
+                val output = socket.getOutputStream()
+                sending = true
+                output.write(printerBytes)
+                output.flush()
+                socket.shutdownOutput()
+            } catch (error: IOException) {
+                val prefix = if (expired.get()) "Printer write timed out" else "Could not send to network printer ${target.first}:${target.second}"
+                throw IOException(prefix + if (sending) ". Some bytes may have been received; check the receipt before retrying." else ". Check its address, power and local network.", error)
+            } finally {
+                deadline.cancel(false)
+            }
         }
         return true
     }
@@ -1332,34 +1343,33 @@ finally {
                 return customWriter(stablePrinterBytes)
             }
 
+            loadPersistedEscPosDevicePath()
             val target = configuredTarget().takeIf { it.isNotBlank() } ?: return false
             val startedAtNanos = System.nanoTime()
-
-            return withContext(Dispatchers.IO) {
-                val printServiceName = printServiceNameFromTarget(target)
-                val serialPortName = serialPortNameFromTarget(target)
-                val tcpTarget = tcpTargetFrom(target)
-                val targetKind = when {
-                    printServiceName != null -> "system-print-service"
-                    serialPortName != null -> "serial"
-                    tcpTarget != null -> "tcp"
-                    else -> "device-file"
+            val parsed = parseReceiptPrinterTarget(target)
+            return runInterruptible(Dispatchers.IO) {
+                println("AITA receipt printer write start targetKind=${parsed.javaClass.simpleName} bytes=${stablePrinterBytes.size}")
+                val result = when (parsed) {
+                    is ReceiptPrinterTarget.SystemQueue -> writeToPrintService(parsed.name, stablePrinterBytes)
+                    is ReceiptPrinterTarget.Serial -> try { writeToSerialPort(parsed.name, stablePrinterBytes) }
+                        catch (error: LinkageError) { throw IllegalStateException("Serial driver unavailable. A USB printer installed in Windows must be selected as a Windows printer queue, not a COM port.", error) }
+                    is ReceiptPrinterTarget.Tcp -> writeToTcpPrinter(parsed.host to parsed.port, stablePrinterBytes)
+                    is ReceiptPrinterTarget.DeviceFile -> writeToDeviceFile(parsed.path, stablePrinterBytes)
+                    is ReceiptPrinterTarget.LegacyName -> {
+                        // Old saved Windows queue names did not have the print-service: prefix.
+                        if (isWindows()) writeToPrintService(parsed.name, stablePrinterBytes)
+                        else {
+                            val queue = printServiceNameFromTarget(parsed.name)
+                            if (queue != null) writeToPrintService(queue, stablePrinterBytes)
+                            else {
+                                val serial = runCatching { serialPortNameFromTarget(parsed.name) }.getOrNull()
+                                if (serial != null) writeToSerialPort(serial, stablePrinterBytes)
+                                else writeToDeviceFile(parsed.name, stablePrinterBytes)
+                            }
+                        }
+                    }
                 }
-                println(
-                    "AITA receipt printer write start targetKind=$targetKind " +
-                            "bytes=${stablePrinterBytes.size}"
-                )
-                val result = when {
-                    printServiceName != null -> writeToPrintService(printServiceName, stablePrinterBytes)
-                    serialPortName != null -> writeToSerialPort(serialPortName, stablePrinterBytes)
-                    tcpTarget != null -> writeToTcpPrinter(tcpTarget, stablePrinterBytes)
-                    else -> writeToDeviceFile(target, stablePrinterBytes)
-                }
-                val elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)
-                println(
-                    "AITA receipt printer write finish targetKind=$targetKind " +
-                            "bytes=${stablePrinterBytes.size} elapsed=${elapsedMillis}ms"
-                )
+                println("AITA receipt printer write finish targetKind=${parsed.javaClass.simpleName} bytes=${stablePrinterBytes.size} elapsed=${TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos)}ms")
                 result
             }
         } finally {

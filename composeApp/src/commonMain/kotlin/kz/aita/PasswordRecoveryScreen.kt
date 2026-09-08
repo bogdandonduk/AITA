@@ -22,9 +22,9 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
         Text(
             text = authUiText(
-                "Choose a new password. It must contain at least 8 characters, a digit and a special character.",
-                "Выберите новый пароль: не менее 8 символов, цифра и специальный символ.",
-                "Жаңа құпия сөз таңдаңыз: кемінде 8 таңба, сан және арнайы таңба."
+                "8+ characters, a digit and a symbol",
+                "От 8 символов, цифра и спецсимвол",
+                "8+ таңба, сан және арнайы таңба"
             ),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
@@ -63,6 +63,7 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             text = authUiText("Restore password", "Восстановить пароль", "Құпия сөзді қалпына келтіру"),
             enabled = !busy && newPassword.isNotBlank() && repeatedPassword.isNotBlank(),
             loading = busy,
+            autoLoading = false,
             onClick = onSubmit
         )
     }

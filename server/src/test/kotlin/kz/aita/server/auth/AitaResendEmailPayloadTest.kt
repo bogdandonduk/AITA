@@ -1,4 +1,4 @@
-package kz.aita.server
+package kz.aita.server.auth
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -64,5 +64,14 @@ class AitaResendEmailPayloadTest {
     fun repeatedSerializationIsStableForProviderRetries() {
         assertEquals(body(), body())
         assertEquals(body("support@example.com"), body("support@example.com"))
+    }
+    @Test
+    fun plainTextAlternativeIsIncludedAndOptional() {
+        val text = "AITA\nКод: 001234\nEnter it in the app."
+        val request = Json.parseToJsonElement(
+            aitaResendEmailRequestJson("AITA <a@example.com>", "b@example.com", "Code", "<p>001234</p>", text = text)
+        ).jsonObject
+        assertEquals(text, request.getValue("text").jsonPrimitive.content)
+        assertFalse("text" in Json.parseToJsonElement(body()).jsonObject)
     }
 }

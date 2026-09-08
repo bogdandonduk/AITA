@@ -831,6 +831,8 @@ var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatfo
 var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray, printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printPdfDocumentPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printHtmlDocumentPlatformAction: (suspend (fileName: String, html: String) -> ReceiptPlatformActionResult)? = null
+/** Invoked only by a user-requested refresh/connection, never by startup polling. */
+var preparePlatformReceiptPrinterAction: (suspend () -> ReceiptPlatformActionResult)? = null
 var listPlatformReceiptPrinterDevicesAction: (suspend () -> List<PlatformReceiptPrinterDataModel>)? = null
 var configurePlatformReceiptPrinterDeviceAction: (suspend (deviceId: String?) -> ReceiptPlatformActionResult)? = null
 var printLabelPrinterBytes: (suspend (labelBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
@@ -890,39 +892,49 @@ suspend fun printHtmlDocument(fileName: String, html: String, notConfiguredMessa
         ?: ReceiptPlatformActionResult(false, notConfiguredMessage)
 }
 
-fun refreshReceiptPrinterDevices(onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
+private val receiptPrinterSelectionMutex = Mutex()
+
+private suspend fun reloadReceiptPrintersInside() {
+    val list = listPlatformReceiptPrinterDevicesAction ?: error("Printer discovery is unavailable on this platform")
+    val devices = list()
+    val selected = devices.firstOrNull { it.configured }?.id ?: configuredReceiptPrinterDeviceIdState.value
+    // Disappearance from discovery is not permission to forget the user's durable selection.
+    receiptPrinterDevicesState.emit(devices)
+    configuredReceiptPrinterDeviceIdState.emit(selected)
+}
+
+fun refreshReceiptPrinterDevices(requestPermission: Boolean = false, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-        val result = runCatching {
-            val devices = listPlatformReceiptPrinterDevicesAction?.invoke().orEmpty()
-            receiptPrinterDevicesState.emit(devices)
-            configuredReceiptPrinterDeviceIdState.emit(devices.firstOrNull { it.configured }?.id)
-            ReceiptPlatformActionResult(true, "Receipt printers refreshed")
-        }.getOrElse { throwable ->
-            ReceiptPlatformActionResult(false, throwable.message ?: "Could not refresh receipt printers")
-        }
+        val result = try {
+            receiptPrinterSelectionMutex.withLock {
+                val permission = if (requestPermission) preparePlatformReceiptPrinterAction?.invoke() else null
+                if (permission != null && !permission.success) permission
+                else { reloadReceiptPrintersInside(); ReceiptPlatformActionResult(true, "Receipt printers refreshed") }
+            }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (exception: Exception) { ReceiptPlatformActionResult(false, exception.message ?: "Could not refresh receipt printers") }
         onCompleted?.invoke(result)
     }
 }
 
 fun configureReceiptPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatformActionResult) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
-        val cleanDeviceId = deviceId?.trim()?.takeIf { it.isNotBlank() }
-        val result = runCatching {
-            configurePlatformReceiptPrinterDeviceAction?.invoke(cleanDeviceId)
-                ?: ReceiptPlatformActionResult(false, "Receipt printer configuration is not available on this platform")
-        }.getOrElse { throwable ->
-            ReceiptPlatformActionResult(false, throwable.message ?: "Could not configure receipt printer")
-        }
-
-        if (result.success) {
-            configuredReceiptPrinterDeviceIdState.emit(cleanDeviceId)
-            runCatching {
-                val devices = listPlatformReceiptPrinterDevicesAction?.invoke().orEmpty()
-                receiptPrinterDevicesState.emit(devices)
-                configuredReceiptPrinterDeviceIdState.emit(devices.firstOrNull { it.configured }?.id ?: cleanDeviceId)
+        val result = try {
+            receiptPrinterSelectionMutex.withLock {
+                val clean = deviceId?.trim()?.takeIf { it.isNotBlank() }
+                val configured = configurePlatformReceiptPrinterDeviceAction?.invoke(clean)
+                    ?: ReceiptPlatformActionResult(false, "Receipt printer configuration is not available on this platform")
+                if (configured.success) {
+                    configuredReceiptPrinterDeviceIdState.emit(clean)
+                    receiptPrinterDevicesState.emit(receiptPrinterDevicesState.value.map { it.copy(configured = it.id == clean) })
+                    try { reloadReceiptPrintersInside() }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { /* Discovery failure must not undo a successfully persisted selection. */ }
+                }
+                configured
             }
-        }
-
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (exception: Exception) { ReceiptPlatformActionResult(false, exception.message ?: "Could not configure receipt printer") }
         onCompleted?.invoke(result)
     }
 }

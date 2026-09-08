@@ -2632,11 +2632,13 @@ fun AppConfiguration.emailTextField(
     retainTextAcrossRecreation: Boolean = true,
     persistTextDraft: Boolean = true,
     autoFocus: Boolean = true,
+    enabled: Boolean = true,
     imeWithAction: ImeWithAction? = null,
     onValueChange: ((String, () -> Unit) -> Unit)? = null,
 ): GenericTextFieldContent {
 
     return genericTextField(
+        enabled = enabled,
         modifier = modifier,
         valueInitial = valueInitial,
         titleText = stateValues.stringEmail,
@@ -3162,6 +3164,7 @@ fun AppConfiguration.domainSelectionTextField(
     adaptiveMultiline: Boolean = false,
     isFocusedInitial: Boolean = false,
     autoFocus: Boolean = true,
+    enabled: Boolean = true,
     retainSelectionAcrossRecreation: Boolean = true,
     persistSelectionDraft: Boolean = true,
     secondaryDomainsShowId: Boolean = true,
@@ -3364,7 +3367,7 @@ fun AppConfiguration.domainSelectionTextField(
                     shape = RoundedCornerShape(cornerRadius)
                 )
         ) {
-            if (selectionSecondaryEnabled && !secondaryDomains.isNullOrEmpty() && lockedSecondaryDomainId == null) {
+            if (enabled && selectionSecondaryEnabled && !secondaryDomains.isNullOrEmpty() && lockedSecondaryDomainId == null) {
                 AnimatedVisibility(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -3445,6 +3448,7 @@ fun AppConfiguration.domainSelectionTextField(
             }
 
             textFieldContent = genericTextField(
+                enabled = enabled,
                 modifier = Modifier
                     .fillMaxWidth(),
                 valueInitial = valueInitial,
@@ -3465,7 +3469,7 @@ fun AppConfiguration.domainSelectionTextField(
                             showExpansion = lockedSecondaryDomainId == null,
                             showId = secondaryDomainsShowId,
                             showName = false,
-                            onClick = selectionSecondaryEnabled.takeIf { it }?.run {
+                            onClick = (enabled && selectionSecondaryEnabled).takeIf { it }?.run {
                                 {
                                     isSecondaryDomainSelectionDropdownExpandedState.targetState =
                                         !isSecondaryDomainSelectionDropdownExpandedState.targetState
@@ -3513,7 +3517,7 @@ fun AppConfiguration.domainSelectionTextField(
                     .height(stateValues.unfocusedBorderWidth)
             )
 
-            if (displayFullDomain && domains.isNotEmpty() && selected != null) {
+            if (enabled && displayFullDomain && domains.isNotEmpty() && selected != null) {
                 selectableDomainWidget(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -3527,7 +3531,7 @@ fun AppConfiguration.domainSelectionTextField(
                 }
             }
 
-            if (selectionEnabled && domains.isNotEmpty()) {
+            if (enabled && selectionEnabled && domains.isNotEmpty()) {
                 AnimatedVisibility(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -5554,6 +5558,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
     retainSelectionAcrossRecreation: Boolean = true,
     persistSelectionDraft: Boolean = true,
     autoFocus: Boolean = true,
+    enabled: Boolean = true,
     onSelectedCountryCodeChange: ((String?) -> Unit)? = null,
     onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
@@ -5571,6 +5576,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         ?: defaultCountry?.let { "+${it.phoneNumberCode}" }
 
     return domainSelectionTextField(
+        enabled = enabled,
         modifier = modifier,
         domains = emptyList(),
         secondaryDomains = phoneCountries

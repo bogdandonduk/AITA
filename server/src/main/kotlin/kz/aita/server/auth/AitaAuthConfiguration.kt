@@ -123,7 +123,7 @@ internal class AdvancedAuthConfig(
     }
 }
 
-internal enum class AitaAuthUnavailableReason { DISABLED, SECURITY_CONFIGURATION, EMAIL_CONFIGURATION, RECOVERY_DISABLED }
+internal enum class AitaAuthUnavailableReason { DISABLED, SECURITY_CONFIGURATION, EMAIL_CONFIGURATION, RECOVERY_DISABLED, EMAIL_DELIVERY }
 
 internal class AitaAuthUnavailableException(val reason: AitaAuthUnavailableReason) : IllegalStateException(reason.name)
 
@@ -140,6 +140,11 @@ internal fun authUnavailableMessage(reason: AitaAuthUnavailableReason): List<Loc
     )
 
     return when (reason) {
+        AitaAuthUnavailableReason.EMAIL_DELIVERY -> localized(
+            "Email delivery is temporarily unavailable. Try later or use your password.",
+            "Письма временно не отправляются. Попробуйте позже или войдите по паролю.",
+            "Хаттар уақытша жіберілмейді. Кейінірек қайталаңыз немесе құпия сөзбен кіріңіз."
+        )
         AitaAuthUnavailableReason.DISABLED -> localized(
             "Code sign-in is not enabled. Use your password.",
             "Вход по коду не включён. Используйте пароль.",

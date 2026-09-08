@@ -42,7 +42,9 @@ data class AitaAuthCapabilitiesDataModel(
     val phoneLoginAliasEnabled: Boolean = false,
     val codeLength: Int = 6,
     val codeTtlSeconds: Long = 600,
-    val resendCooldownSeconds: Long = 60
+    val resendCooldownSeconds: Long = 60,
+    // Provider-wide state only: never expose delivery/account existence for an anonymous flow.
+    val emailDeliveryUnavailable: Boolean = false
 )
 
 @Serializable
@@ -183,7 +185,12 @@ fun normalizeAitaPhoneAlias(raw: String): String? {
 }
 
 fun normalizeAitaOneTimeCode(raw: String, expectedLength: Int = 6): String? =
-    raw.filter(Char::isDigit).takeIf { it.length == expectedLength }
+    aitaAuthCodeDigits(raw).takeIf { it.length == expectedLength }
 
 fun normalizeAitaRecoveryCode(raw: String): String =
     raw.trim().uppercase().filter(Char::isLetterOrDigit)
+
+/** Accept pasted/localized decimal digits, but send the same ASCII digits used by the server HMAC. */
+fun aitaAuthCodeDigits(raw: String): String = buildString {
+    raw.forEach { character -> character.digitToIntOrNull()?.let { append(('0'.code + it).toChar()) } }
+}

@@ -1,4 +1,4 @@
-package kz.aita.server
+package kz.aita.server.auth
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,11 +15,13 @@ internal fun aitaResendEmailRequestJson(
     to: String,
     subject: String,
     html: String,
-    replyTo: String? = null
+    replyTo: String? = null,
+    text: String? = null
 ): String = buildJsonObject {
     put("from", from)
     put("to", JsonArray(listOf(JsonPrimitive(to))))
     put("subject", subject)
     put("html", html)
+    text?.takeIf { it.isNotBlank() }?.let { put("text", it) }
     replyTo?.trim()?.takeIf { it.isNotEmpty() }?.let { put("reply_to", it) }
 }.toString()

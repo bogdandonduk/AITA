@@ -18070,6 +18070,18 @@ fun Application.module() {
   }
 
   install(StatusPages) {
+    exception<AitaAuthRateLimitedException> { call, cause ->
+      call.response.headers.append(HttpHeaders.RetryAfter, cause.retryAfterSeconds.coerceIn(1L, 3600L).toString())
+      call.safeGenericResponseNoPayload(
+        status = HttpStatusCode.TooManyRequests,
+        message = simpleMessage(
+          main = "Too many code requests. Try again later.",
+          ru = "Слишком много запросов кода. Попробуйте позже.",
+          kk = "Код тым жиі сұралды. Кейінірек қайталаңыз."
+        )
+      )
+    }
+
     exception<AitaAuthUnavailableException> { call, cause ->
       call.safeGenericResponseNoPayload(
         status = HttpStatusCode.Conflict,

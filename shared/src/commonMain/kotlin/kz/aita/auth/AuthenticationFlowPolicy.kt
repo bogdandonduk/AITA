@@ -14,3 +14,10 @@ fun aitaAuthResendDelayMillis(resendAfterMillis: Long, serverTimeMillis: Long, l
 
 fun aitaAuthCountdownSeconds(remainingMillis: Long): Long =
     if (remainingMillis <= 0L) 0L else 1L + (remainingMillis - 1L) / 1000L
+
+/** Absolute expiry is server-authoritative; this is only a bounded UI countdown. */
+fun aitaAuthExpiryDelayMillis(expiresAtMillis: Long, serverTimeMillis: Long, localTimeMillis: Long): Long {
+    val reference = serverTimeMillis.takeIf { it > 0L } ?: localTimeMillis
+    if (expiresAtMillis <= reference || expiresAtMillis <= 0L) return 0L
+    return if (reference < expiresAtMillis - 3_600_000L) 3_600_000L else expiresAtMillis - reference
+}
