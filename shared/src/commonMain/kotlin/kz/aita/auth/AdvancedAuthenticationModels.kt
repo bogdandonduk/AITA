@@ -46,7 +46,8 @@ data class AitaAuthCapabilitiesDataModel(
     val resendCooldownSeconds: Long = 60,
     // Provider-wide state only: never expose delivery/account existence for an anonymous flow.
     val emailDeliveryUnavailable: Boolean = false,
-    val additionalEmailLoginEnabled: Boolean = false
+    val additionalEmailLoginEnabled: Boolean = false,
+    val authenticatorLoginPolicyEnabled: Boolean = false
 )
 
 @Serializable
@@ -112,7 +113,9 @@ data class AitaAuthenticationSettingsDataModel(
     val authenticatorEnabled: Boolean = false,
     val recoveryCodesRemaining: Int = 0,
     val securityRevision: Long = 0L,
-    val additionalLoginEmails: List<String> = emptyList()
+    val additionalLoginEmails: List<String> = emptyList(),
+    // Old servers only sent authenticatorEnabled: preserve their mandatory-login behavior.
+    val authenticatorRequiredForLogin: Boolean = authenticatorEnabled
 )
 
 @Serializable
@@ -127,8 +130,21 @@ data class AitaTotpSetupDataModel(
 @Serializable
 data class AitaTotpSetupConfirmRequestDataModel(
     val setupId: String,
-    val code: String
+    val code: String,
+    val requireForLogin: Boolean = true
 )
+
+@Serializable
+data class AitaTotpLoginPolicyRequestDataModel(
+    val requiredForLogin: Boolean,
+    val currentPassword: String,
+    val secondFactorCode: String,
+    val expectedSecurityRevision: Long
+)
+
+/** Enrollment still protects security changes even when login's second factor is optional. */
+fun aitaRequiresLoginSecondFactor(authenticatorEnabled: Boolean, requiredForLogin: Boolean): Boolean =
+    authenticatorEnabled && requiredForLogin
 
 @Serializable
 data class AitaSensitiveSecurityActionRequestDataModel(

@@ -448,12 +448,14 @@ def update(args: argparse.Namespace) -> int:
         remote_url = git_value(repo, "remote", "get-url", args.remote)
         if remote_url.startswith(("http://", "https://")) and urlsplit(remote_url).username:
             raise OpsError("The Git remote URL embeds credentials. Remove them and use a credential helper or SSH key.")
+        say("LOCAL COMMIT", git_value(repo, "rev-parse", "--verify", "HEAD"))
         say("1/9 FETCH", f"Fetching {args.remote}/{branch}. The running server is untouched.")
         say("GITHUB", "For HTTPS, the Git 'Password' prompt expects your GitHub token, not your Ubuntu password.")
         result = subprocess.run(["git", "-C", str(repo), "fetch", "--prune", args.remote])
         if result.returncode:
             raise OpsError("Git fetch failed. Check GitHub credentials or DNS/Internet. No build or deployment started.")
         target = git_value(repo, "rev-parse", "--verify", f"refs/remotes/{args.remote}/{branch}")
+        say("FETCHED COMMIT", f"{target} ({args.remote}/{branch}); compare this full ID with GitHub.")
         ancestor = capture(["git", "-C", str(repo), "merge-base", "--is-ancestor", "HEAD", target], check=False)
         if ancestor.returncode:
             raise OpsError("Local commits and the remote do not fast-forward cleanly. Review them; no reset was attempted.")
@@ -745,6 +747,7 @@ def worker(args: argparse.Namespace) -> int:
                 http_status("http://127.0.0.1:8080/readyz", local=True) == "200" and \
                 http_status("http://127.0.0.1:8080/auth/capabilities", local=True) == "200":
             say("UNCHANGED", "This exact release is already installed and locally ready. No build or restart is needed.")
+            say("VERIFIED INSTALLED COMMIT", f"{meta['commit']}; JAR SHA-256 {last['jar_sha256']}")
         else:
             step("tests", "Running offline deployment/operator regression checks before touching production files.")
             for test in ("test-deployment-scripts.py", "test-aita-ops.py"):
@@ -754,8 +757,14 @@ def worker(args: argparse.Namespace) -> int:
             if meta["with_tests"]:
                 build.append("--with-tests")
             stream_command(user_command(owner, build, {"JAVA_HOME": meta["java_home"],
+                           "AITA_BUILD_SOURCE_COMMIT": meta["commit"],
                            "PATH": str(Path(meta["java_home"]) / "bin") + ":" + SAFE_PATH}))
             verify_source(source, meta["source_hashes"])
+            candidate = source / "server/build/libs/aita-server-all.jar"
+            if not candidate.is_file() or candidate.is_symlink():
+                raise OpsError("Build reported success but the candidate JAR is missing or linked. No deployment occurred.")
+            candidate_hash = sha256(candidate)
+            say("BUILT COMMIT", f"{meta['commit']}; candidate JAR SHA-256 {candidate_hash}")
             step("helpers", "Refreshing installed scripts atomically; preserving originals. No secret or unit-file replacement.")
             sync_helpers(tools, run / "previous-helpers")
             step("backup", "Taking an encrypted database backup while the old server is still serving users.")
@@ -777,14 +786,21 @@ def worker(args: argparse.Namespace) -> int:
             # Prevent this host's scheduled pg_dump from competing with startup
             # DDL. Timers remain installed/active; their writers wait on the lock.
             with file_lock(backup_lock, wait=600, create=False):
+                # Recheck the exact artifact after backup/assets work, before any restart.
+                if candidate.is_symlink() or not candidate.is_file() or sha256(candidate) != candidate_hash:
+                    raise OpsError("Candidate JAR changed after build verification. Deployment stopped.")
                 touched = True
                 step("restart", "Switching the JAR now. Requests may reconnect until migrations/startup finish; no blind rollback.")
-                deploy_env = {**clean_user_env(owner), "AITA_DEPLOY_LOCK_FD": str(lock_file)}
+                deploy_env = {**clean_user_env(owner), "AITA_DEPLOY_LOCK_FD": str(lock_file),
+                              "AITA_BUILD_SOURCE_COMMIT": meta["commit"]}
                 # The inherited descriptor keeps legacy and managed deployments mutually exclusive.
                 cmd = ["bash", str(tools / "deploy-aita-server.sh"), "--project-root", str(source),
                        "--ready-timeout", str(meta["ready_timeout"])]
                 stream_command(cmd, env=deploy_env, pass_fds=(lock_file,))
             jar_hash = sha256(CURRENT_JAR)
+            if jar_hash != candidate_hash:
+                raise OpsError("Installed JAR does not match the built candidate. Inspect the server; no automatic rollback was attempted.")
+            say("DEPLOYED COMMIT", f"{meta['commit']}; installed JAR SHA-256 {jar_hash}; local readiness verified.")
             atomic_json(ROOT / "last-success.json", {"commit": meta["commit"], "jar_sha256": jar_hash,
                         "run_id": run.name, "completed_at": utc(), "env_sha256": sha256(ENV_FILE)})
         step("public-check", "Checking the public Worker-to-origin path separately from local readiness.")
@@ -816,7 +832,7 @@ def worker(args: argparse.Namespace) -> int:
         shutil.rmtree(source)
         result_name = "warning" if failures else "success"
     except (OpsError, OSError, subprocess.SubprocessError, KeyError, ValueError) as error:
-        say("STOP", str(error))
+        say("STOP", f"Phase={phase}; requested commit={meta['commit']}. {error}")
         try:
             text = (run / "update.log").read_text(errors="replace")[-50000:]
         except OSError:
@@ -825,14 +841,21 @@ def worker(args: argparse.Namespace) -> int:
         if touched:
             say("IMPORTANT", "No automatic JAR/database rollback or process kill was performed. Inspect the current server state before retrying.")
         else:
-            say("SAFE", "This job did not stop/restart AITA. Some helpers/assets or a backup may already have been updated.")
+            say("NOT DEPLOYED", f"Commit {meta['commit']} was NOT installed by this job (stopped in {phase}).")
+            say("SAFE", "Only means this job did not stop/restart AITA; it is NOT a successful deployment or health check. "
+                "Earlier helper/asset/backup steps may have completed. Read STOP / WHAT TO DO above.")
+            previous = load_json(ROOT / "last-success.json", {})
+            if isinstance(previous, dict) and previous.get("commit"):
+                say("LAST VERIFIED DEPLOYMENT", str(previous["commit"]) + " (historical record; use status to check current state)")
         result_name = "failed"
         code = 1
     finally:
         if lock_file is not None:
             os.close(lock_file)
     atomic_json(run / "state.json", {"result": result_name, "phase": phase, "exit_code": code,
-                "at": utc(), "server_touched": touched, "commit": meta["commit"]}, owner.pw_gid)
+                "at": utc(), "server_touched": touched, "commit": meta["commit"],
+                "requested_commit": meta["commit"],
+                "deployment_verified": result_name in {"success", "warning"}}, owner.pw_gid)
     return code
 
 
@@ -1040,6 +1063,18 @@ def backups(args: argparse.Namespace) -> int:
 def status() -> int:
     say("SERVER", str(properties(SERVICE, "ActiveState", "SubState", "MainPID", "NRestarts")))
     say("LOCAL", f"/readyz: {http_status('http://127.0.0.1:8080/readyz', local=True)}")
+    previous = load_json(ROOT / "last-success.json", {})
+    if isinstance(previous, dict) and previous.get("commit"):
+        say("LAST VERIFIED COMMIT", str(previous["commit"]))
+        try:
+            installed_hash = sha256(CURRENT_JAR)
+            say("INSTALLED JAR SHA-256", installed_hash)
+            if installed_hash == previous.get("jar_sha256"):
+                say("ARTIFACT MATCH", "Installed file matches that deployment. This does not independently identify a running process's in-memory JAR.")
+            else:
+                say("WARNING", "Installed JAR differs from the last verified deployment; its current commit is not established.")
+        except OSError:
+            say("WARNING", "Cannot read the installed JAR to check its deployment hash.")
     run = latest_run()
     if run:
         say("LAST UPDATE", str(load_json(run / "state.json", {})))

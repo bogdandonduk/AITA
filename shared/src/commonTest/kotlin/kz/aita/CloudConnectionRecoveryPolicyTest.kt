@@ -40,4 +40,22 @@ class CloudConnectionRecoveryPolicyTest {
         assertFalse(shouldDeferCloudHealthProbe(3, false, false, false, 500L, 1_000L))
         assertFalse(shouldDeferCloudHealthProbe(0, false, false, false, 5_000L, 1_000L))
     }
+    @Test fun activeHandshakeOrRetryLoopIsNotInterruptedByHealthProbes() {
+        repeat(20) { assertFalse(shouldRestartRealtimeForRecovery(forceRestart = false, jobActive = true)) }
+    }
+
+    @Test fun manualRefreshAndMissingLoopCanRestartRealtime() {
+        assertTrue(shouldRestartRealtimeForRecovery(forceRestart = true, jobActive = true))
+        assertTrue(shouldRestartRealtimeForRecovery(forceRestart = false, jobActive = false))
+        assertTrue(shouldRestartRealtimeForRecovery(forceRestart = true, jobActive = false))
+    }
+
+    @Test fun heartbeatWatchdogOnlyStartsForNegotiatedSupportedServers() {
+        assertTrue(aitaRealtimeUsesHeartbeat("connected", 30_000L))
+        assertFalse(aitaRealtimeUsesHeartbeat("connected", 0L))
+        assertFalse(aitaRealtimeUsesHeartbeat("connected", -1L))
+        assertFalse(aitaRealtimeUsesHeartbeat("connected", 60_000L))
+        assertFalse(aitaRealtimeUsesHeartbeat("heartbeat", 30_000L))
+        assertTrue(AITA_REALTIME_HEARTBEAT_TIMEOUT_MILLIS >= 3 * 30_000L)
+    }
 }

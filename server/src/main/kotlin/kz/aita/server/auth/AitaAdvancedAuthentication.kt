@@ -75,6 +75,7 @@ object AuthSecurityProfiles : Table("auth_security_profiles") {
     val totpPendingSetupId = uuid("totp_pending_setup_id").nullable()
     val totpPendingExpiresAtMillis = long("totp_pending_expires_at_millis").nullable()
     val totpEnabledAtMillis = long("totp_enabled_at_millis").nullable()
+    val totpRequiredForLogin = bool("totp_required_for_login").default(true)
     val securityRevision = long("security_revision").default(1L)
     val createdAtMillis = long("created_at_millis")
     val updatedAtMillis = long("updated_at_millis")
@@ -310,13 +311,11 @@ private class AitaAdvancedAuthService(
         }
     }
 
-    suspend fun totpEnabled(userId: UUID): Boolean = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
-        AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }
-            .limit(1).singleOrNull()?.get(AuthSecurityProfiles.totpEnabledAtMillis) != null
-    }
+    suspend fun totpRequiredForLogin(userId: UUID): Boolean = advancedAuthSecondFactorEnabled(userId)
 
     fun capabilities(): AitaAuthCapabilitiesDataModel = config.capabilities().copy(
-        emailDeliveryUnavailable = emailUnavailableUntil.get() > System.currentTimeMillis()
+        emailDeliveryUnavailable = emailUnavailableUntil.get() > System.currentTimeMillis(),
+        authenticatorLoginPolicyEnabled = config.securityConfigured
     )
 
     suspend fun passwordLogin(request: AitaPasswordLoginRequestDataModel, meta: Map<String, String>): AitaAuthFlowDataModel? {
@@ -334,7 +333,7 @@ private class AitaAdvancedAuthService(
         val user = resolveUser(normalized.value) ?: return null
         if (!user.active || !Pw.verify(request.password.toCharArray(), user.passwordHash)) return null
         audit(user.id, "PASSWORD_PRIMARY_VERIFIED", null, meta["ip"])
-        return if (totpEnabled(user.id)) {
+        return if (totpRequiredForLogin(user.id)) {
             createLoginChallenge(user.id, AUTH_LOGIN_CHALLENGE_PASSWORD)
         } else {
             AitaAuthFlowDataModel(
@@ -567,7 +566,7 @@ private class AitaAdvancedAuthService(
             userId to ticket
         } ?: return null
         return when (expectedPurpose) {
-            AUTH_PURPOSE_LOGIN -> if (totpEnabled(verified.first)) createLoginChallenge(verified.first, AUTH_LOGIN_CHALLENGE_EMAIL)
+            AUTH_PURPOSE_LOGIN -> if (totpRequiredForLogin(verified.first)) createLoginChallenge(verified.first, AUTH_LOGIN_CHALLENGE_EMAIL)
                 else AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.AUTHENTICATED, tokenPair = tokenService.newPair(verified.first, meta), serverTimeMillis = now)
             AUTH_PURPOSE_RECOVERY -> AitaAuthFlowDataModel(
                 flowId = publicId.toString(), nextStep = AitaAuthNextStep.PASSWORD_RESET,
@@ -643,6 +642,10 @@ private class AitaAdvancedAuthService(
         val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
         val now = System.currentTimeMillis()
         val userId = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
+            val peek = AuthLoginChallenges.selectAll().where { AuthLoginChallenges.publicId eq publicId }
+                .singleOrNull() ?: return@newSuspendedTransaction null
+            val user = lockSecurityUserInside(peek[AuthLoginChallenges.userId]) ?: return@newSuspendedTransaction null
+            if (!user[Users.isActive]) return@newSuspendedTransaction null
             val row = AuthLoginChallenges.selectAll().where { AuthLoginChallenges.publicId eq publicId }
                 .forUpdate().singleOrNull() ?: return@newSuspendedTransaction null
             if (row[AuthLoginChallenges.consumedAtMillis] != null || row[AuthLoginChallenges.expiresAtMillis] <= now ||
@@ -680,6 +683,10 @@ private class AitaAdvancedAuthService(
             phoneLoginAlias = profile[AuthSecurityProfiles.phoneLoginAlias],
             phoneLoginAliasVerified = profile[AuthSecurityProfiles.phoneAliasVerifiedAtMillis] != null,
             authenticatorEnabled = profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
+            authenticatorRequiredForLogin = aitaRequiresLoginSecondFactor(
+                profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
+                profile[AuthSecurityProfiles.totpRequiredForLogin]
+            ),
             recoveryCodesRemaining = remaining,
             securityRevision = profile[AuthSecurityProfiles.securityRevision],
             additionalLoginEmails = AuthLoginEmails.selectAll().where {
@@ -735,6 +742,7 @@ private class AitaAdvancedAuthService(
                 it[AuthSecurityProfiles.totpPendingSetupId] = null
                 it[AuthSecurityProfiles.totpPendingExpiresAtMillis] = null
                 it[AuthSecurityProfiles.totpEnabledAtMillis] = now
+                it[AuthSecurityProfiles.totpRequiredForLogin] = request.requireForLogin
                 it[AuthSecurityProfiles.securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L
                 it[AuthSecurityProfiles.updatedAtMillis] = now
             }
@@ -742,6 +750,33 @@ private class AitaAdvancedAuthService(
             recovery
         } ?: return null
         return AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.COMPLETE, recoveryCodes = codes)
+    }
+
+    suspend fun updateTotpLoginPolicy(userId: UUID, request: AitaTotpLoginPolicyRequestDataModel): AitaAuthenticationSettingsDataModel? {
+        config.requireSecurityConfigured()
+        val now = System.currentTimeMillis()
+        if (!limiter.allow("totp-policy:$userId", 12, now)) return null
+        val updated = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
+            // Match identity-management/password-reset lock order: user, profile, challenges.
+            // Verification and a recovery-code consumption commit with the policy change.
+            val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction false
+            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }
+                .forUpdate().singleOrNull() ?: return@newSuspendedTransaction false
+            if (profile[AuthSecurityProfiles.totpEnabledAtMillis] == null ||
+                profile[AuthSecurityProfiles.securityRevision] != request.expectedSecurityRevision) return@newSuspendedTransaction false
+            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, now)) return@newSuspendedTransaction false
+            AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
+                it[totpRequiredForLogin] = request.requiredForLogin
+                it[securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L
+                it[updatedAtMillis] = now
+            }
+            AuthLoginChallenges.update({ (AuthLoginChallenges.userId eq userId) and AuthLoginChallenges.consumedAtMillis.isNull() }) {
+                it[consumedAtMillis] = now
+            }
+            auditInside(userId, if (request.requiredForLogin) "TOTP_LOGIN_REQUIRED" else "TOTP_LOGIN_OPTIONAL", null, null, now)
+            true
+        }
+        return if (updated) settings(userId) else null
     }
 
     suspend fun disableTotp(userId: UUID, request: AitaSensitiveSecurityActionRequestDataModel): AitaAuthenticationSettingsDataModel? {
@@ -753,6 +788,7 @@ private class AitaAdvancedAuthService(
             AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
                 it[AuthSecurityProfiles.totpSecretCiphertext] = null
                 it[AuthSecurityProfiles.totpEnabledAtMillis] = null
+                it[AuthSecurityProfiles.totpRequiredForLogin] = true
                 it[AuthSecurityProfiles.securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L
                 it[AuthSecurityProfiles.updatedAtMillis] = now
             }
@@ -1427,10 +1463,13 @@ private fun ApplicationCall.authClientIp(): String = aitaAuthClientIp(
 private fun authMeta(call: ApplicationCall, deviceInfo: kz.aita.ClientDeviceInfoDataModel?): Map<String, String> =
     metaFrom(call, deviceInfo) + ("ip" to call.authClientIp())
 
+/** Also used by the legacy password route, so it cannot bypass an enabled login requirement. */
 suspend fun advancedAuthSecondFactorEnabled(userId: UUID): Boolean =
     newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
-        AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }
-            .limit(1).singleOrNull()?.get(AuthSecurityProfiles.totpEnabledAtMillis) != null
+        val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }
+            .limit(1).singleOrNull() ?: return@newSuspendedTransaction false
+        aitaRequiresLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
+            profile[AuthSecurityProfiles.totpRequiredForLogin])
     }
 
 suspend fun resolveAdvancedAuthUser(identifier: String): UUID? {
@@ -1578,6 +1617,17 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val request = call.receiveAita<AitaTotpSetupConfirmRequestDataModel>()
                     val result = service.confirmTotpSetup(userId, request)
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, authMessage("Authenticator code is invalid", "Код аутентификатора неверен", "Аутентификатор коды қате"))
+                    else call.genericResponse(HttpStatusCode.OK, result)
+                }
+
+                post("/totp/login-policy") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val request = call.receiveAita<AitaTotpLoginPolicyRequestDataModel>()
+                    val result = service.updateTotpLoginPolicy(userId, request)
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+                        authMessage("Security confirmation failed or settings changed. Refresh and try again.",
+                            "Подтверждение не выполнено или настройки изменились. Обновите их и повторите.",
+                            "Растау сәтсіз немесе баптаулар өзгерді. Жаңартып, қайталаңыз."))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 

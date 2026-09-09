@@ -212,6 +212,56 @@ class JarValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
 
 
+class SourceCommitDescriptionTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="aita-source-id-")
+        self.addCleanup(self.temp.cleanup)
+        self.repo = Path(self.temp.name)
+
+    def describe(self, commit=None):
+        env = os.environ.copy()
+        env.pop("AITA_BUILD_SOURCE_COMMIT", None)
+        if commit is not None:
+            env["AITA_BUILD_SOURCE_COMMIT"] = commit
+        return subprocess.run(["bash", "-c", 'source "$1"; aita_describe_checkout "$2"',
+            "_", str(COMMON), str(self.repo)], text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, env=env)
+
+    def git(self, *args):
+        return subprocess.check_output(["git", "-C", str(self.repo), *args], text=True).strip()
+
+    def initialize(self):
+        self.git("init", "-q")
+        self.git("config", "user.name", "AITA test")
+        self.git("config", "user.email", "fixture@example.test")
+        (self.repo / "source.kt").write_text("// pinned source\n")
+        self.git("add", "source.kt")
+        self.git("commit", "-qm", "fixture")
+        return self.git("rev-parse", "HEAD")
+
+    def test_archive_build_preserves_operator_commit(self):
+        commit = "b" * 40
+        result = self.describe(commit)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn(commit, result.stdout)
+        self.assertIn("operator-pinned source snapshot", result.stdout)
+
+    def test_malformed_commit_is_rejected(self):
+        self.assertNotEqual(self.describe("not-a-commit").returncode, 0)
+
+    def test_real_git_must_match_pinned_id(self):
+        current = self.initialize()
+        self.assertEqual(self.describe(current).returncode, 0)
+        self.assertNotEqual(self.describe("b" * 40).returncode, 0)
+
+    def test_dirty_checkout_cannot_claim_exact_pinned_source(self):
+        current = self.initialize()
+        (self.repo / "source.kt").write_text("// different source\n")
+        result = self.describe(current)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Tracked source differs", result.stdout)
+
+
 MOCK_TOOL = r'''#!/usr/bin/env python3
 import json, os, pathlib, shutil, sys
 name = pathlib.Path(sys.argv[0]).name

@@ -1527,6 +1527,7 @@ fun AppConfiguration.genericTextField(
     placeholderText: String = "",
     placeholderTextSize: TextUnit = stateValues.textSize,
     placeholderTextColor: Color = stateValues.PlaceholderTextColor,
+    placeholderContent: (@Composable () -> Unit)? = null,
 
     selectionFocusTextColor: Color = stateValues.AccentTextColor,
     selectionBackgroundColor: Color = stateValues.AccentColor,
@@ -2128,14 +2129,18 @@ fun AppConfiguration.genericTextField(
                                     .background(animatedTextInputHighlightColor),
                                 contentAlignment = if (!adaptiveMultiline || adaptiveVisualLineCount <= 1) Alignment.CenterStart else Alignment.TopStart
                             ) {
-                                Text(
-                                    text = if (textFieldValue.text.isEmpty()) placeholderText else "",
-                                    fontSize = placeholderTextSize,
-                                    color = placeholderTextColor,
-                                    textAlign = TextAlign.Start,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                if (placeholderContent != null && textFieldValue.text.isEmpty()) {
+                                    placeholderContent()
+                                } else {
+                                    Text(
+                                        text = if (textFieldValue.text.isEmpty()) placeholderText else "",
+                                        fontSize = placeholderTextSize,
+                                        color = placeholderTextColor,
+                                        textAlign = TextAlign.Start,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
 
                                 innerTextField()
                             }
@@ -2467,7 +2472,8 @@ internal fun AppConfiguration.aitaFormTextField(
     sensitive: Boolean = password,
     showClearButton: Boolean = true,
     autoFocus: Boolean = false,
-    onTransformValue: ((String) -> String)? = null
+    onTransformValue: ((String) -> String)? = null,
+    placeholderContent: (@Composable () -> Unit)? = null
 ): GenericTextFieldContent {
     var revealPassword by remember(identityKey) { mutableStateOf(false) }
     val effectiveTextColor = if (enabled) stateValues.TextColor else stateValues.DisabledColor
@@ -2483,6 +2489,7 @@ internal fun AppConfiguration.aitaFormTextField(
         textColor = effectiveTextColor,
         titleTextColor = effectiveTextColor,
         placeholderText = placeholderText,
+        placeholderContent = placeholderContent,
         placeholderTextColor = if (enabled) stateValues.PlaceholderTextColor else stateValues.DisabledColor,
         focusedBorderColor = if (enabled) stateValues.AccentColor else stateValues.DisabledColor,
         unfocusedBorderColor = effectiveTextColor,

@@ -12,12 +12,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kz.aita.auth.*
 
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
-private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, NEW_PASSWORD, COMPLETE }
+private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, NEW_PASSWORD, FINISHING, COMPLETE }
 private enum class AitaLoginIdentifierType { PHONE, EMAIL }
 
 internal enum class AitaAuthFeatureAvailability { CHECKING, AVAILABLE, UNAVAILABLE, UNKNOWN }
@@ -78,6 +81,10 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var newPassword by remember { mutableStateOf("") }
     var repeatPassword by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var actionJob by remember { mutableStateOf<Job?>(null) }
+    var actionGeneration by remember { mutableLongStateOf(0L) }
+    var installedSessionGeneration by remember { mutableStateOf<Long?>(null) }
+    var pendingTokens by remember { mutableStateOf<TokenPair?>(null) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val currentBusy by rememberUpdatedState(busy)
@@ -113,12 +120,26 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     )?.value.orEmpty()
 
     fun reset(target: AitaLoginMode = mode) {
-        if (busy) return
+        actionGeneration++
+        actionJob?.cancel(); actionJob = null; busy = false
         mode = target; step = AitaLoginStep.PRIMARY; flow = null
         password = ""; code = ""; newPassword = ""; repeatPassword = ""; error = ""
     }
 
+    suspend fun finishSignIn() {
+        val generation = installedSessionGeneration ?: pendingTokens?.let { tokens ->
+            adoptAdvancedAuthenticationTokens(tokens).also {
+                installedSessionGeneration = it
+                pendingTokens = null
+            }
+        } ?: return
+        val response = finishAdvancedAuthenticationSignIn(generation)
+        currentCoroutineContext().ensureActive()
+        if (response.negative || response.payload == null) error = authResponseText(response)
+    }
+
     suspend fun accept(response: ResponseDataModel<AitaAuthFlowDataModel>) {
+        currentCoroutineContext().ensureActive()
         val result = response.payload
         if (response.negative || result == null) { error = authResponseText(response); return }
         if (result.nextStep == AitaAuthNextStep.AUTHENTICATED) {
@@ -127,8 +148,12 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 error = authUiText("Sign-in could not be completed", "Не удалось завершить вход", "Кіруді аяқтау мүмкін болмады")
                 return
             }
-            adoptAdvancedAuthenticationTokens(tokens)
+            // The one-time factor has already been consumed. A profile/load failure must retry
+            // this stage, never submit the same TOTP/recovery challenge a second time.
+            step = AitaLoginStep.FINISHING
+            pendingTokens = tokens
             phone = ""; email = ""; password = ""; code = ""; flow = null
+            finishSignIn()
             return
         }
         val valid = when (result.nextStep) {
@@ -153,14 +178,17 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     fun runAction(action: suspend () -> Unit) {
         if (busy) return
         busy = true; error = ""
-        scope.launch {
+        val generation = ++actionGeneration
+        actionJob = scope.launch {
             try {
                 val completed = withTimeoutOrNull(60_000L) { action(); true } ?: false
                 if (!completed) error = authUiText("Request timed out. Try again.", "Время ожидания истекло. Повторите.", "Күту уақыты аяқталды. Қайталаңыз.")
             }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { error = authUiText("Request failed. Try again.", "Запрос не выполнен. Повторите.", "Сұрау орындалмады. Қайталаңыз.") }
-            finally { busy = false }
+            finally {
+                if (generation == actionGeneration) { busy = false; actionJob = null }
+            }
         }
     }
 
@@ -168,7 +196,14 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         val who = identifier()
         val pass = password
         val selectedMode = mode
-        if (who.isBlank() || (selectedMode == AitaLoginMode.PASSWORD && pass.isBlank())) return
+        if (busy) return
+        val kind = if (identifierType == AitaLoginIdentifierType.EMAIL) AitaAuthIdentifierKind.EMAIL else AitaAuthIdentifierKind.PHONE
+        if (!aitaPrimarySignInIsWellFormed(who, kind, pass, selectedMode == AitaLoginMode.PASSWORD)) {
+            error = if (selectedMode == AitaLoginMode.PASSWORD) {
+                authUiText("Invalid login or password", "Неверный логин или пароль", "Логин немесе құпиясөз қате")
+            } else authUiText("Enter a valid email or phone number", "Введите корректный email или номер телефона", "Дұрыс email немесе телефон нөмірін енгізіңіз")
+            return
+        }
         // Capabilities are advisory, not a per-account authorization gate. A stale/failed
         // lookup must not disable a valid form; the actual endpoint enforces availability.
         runAction {
@@ -257,7 +292,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 }
                             }
                             actionButton(modifier = Modifier.fillMaxWidth(), text = if (mode == AitaLoginMode.PASSWORD) stateValues.stringLogIn else authUiText("Get code", "Получить код", "Код алу"),
-                                enabled = !busy && identifier().isNotBlank() && (mode != AitaLoginMode.PASSWORD || password.isNotBlank()),
+                                enabled = !busy,
                                 loading = busy, autoLoading = false, onClick = ::submitPrimary)
                         }
                         AitaLoginStep.EMAIL_CODE -> {
@@ -274,17 +309,26 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                         }
                         AitaLoginStep.TOTP -> {
                             fun submit() {
-                                if (code.isBlank() || countdown.expired) return
+                                if (busy) return
+                                if (countdown.expired) {
+                                    error = authUiText("Sign in again", "Войдите заново", "Қайта кіріңіз")
+                                    return
+                                }
+                                if (!aitaSecondFactorIsWellFormed(code)) {
+                                    error = authUiText("Enter a 6-digit authenticator code or a recovery code", "Введите 6 цифр аутентификатора или резервный код", "Аутентификатордың 6 санын немесе қалпына келтіру кодын енгізіңіз")
+                                    return
+                                }
                                 val request = AitaTotpLoginRequestDataModel(flow?.flowId.orEmpty(), code, buildCurrentClientDeviceInfo())
                                 runAction { accept(AitaAdvancedAuthenticationClient.completeTotpLogin(request)) }
                             }
                             aitaFormTextField(modifier = Modifier.fillMaxWidth(), value = code, onValueChange = { code = it; error = "" },
                                 titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код"),
-                                placeholderText = "000000", identityKey = "auth_totp", enabled = !busy, sensitive = true,
+                                placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(!busy) },
+                                identityKey = "auth_totp", enabled = !busy, sensitive = true,
                                 keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go, onImeAction = ::submit,
                                 leadingIconPath = stateValues.drawablePathIconSecurity, onTransformValue = { it.take(32) })
                             if (countdown.expired) Text(authUiText("Sign in again", "Войдите заново", "Қайта кіріңіз"), color = stateValues.ErrorColor)
-                            actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringLogIn, enabled = !busy && !countdown.expired && code.isNotBlank(), loading = busy, autoLoading = false, onClick = ::submit)
+                            actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringLogIn, enabled = !busy, loading = busy, autoLoading = false, onClick = ::submit)
                         }
                         AitaLoginStep.NEW_PASSWORD -> PasswordRecoveryNewPasswordContent(newPassword, repeatPassword, busy,
                             { newPassword = it; error = "" }, { repeatPassword = it; error = "" }, onSubmit = {
@@ -298,6 +342,15 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     }
                                 }
                             })
+                        AitaLoginStep.FINISHING -> {
+                            Text(authUiText("Finishing sign-in", "Завершаем вход", "Кіру аяқталуда"),
+                                color = stateValues.TextColor, fontSize = stateValues.accentTextSize)
+                            Text(authUiText("Credentials accepted. Loading your account…", "Данные приняты. Загружаем аккаунт…", "Деректер қабылданды. Аккаунт жүктелуде…"),
+                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            actionButton(modifier = Modifier.fillMaxWidth(),
+                                text = authUiText("Continue", "Продолжить", "Жалғастыру"),
+                                enabled = !busy, loading = busy, autoLoading = false) { runAction { finishSignIn() } }
+                        }
                         AitaLoginStep.COMPLETE -> {
                             Text(authUiText("Password updated", "Пароль обновлён", "Құпия сөз жаңартылды"), color = stateValues.AccentColor, fontWeight = FontWeight.Bold)
                             actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringLogIn, enabled = !busy, autoLoading = false) { reset(AitaLoginMode.PASSWORD) }
@@ -308,7 +361,14 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
             if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize, textAlign = TextAlign.Center)
             when {
                 step == AitaLoginStep.COMPLETE -> Unit
-                step != AitaLoginStep.PRIMARY -> AuthQuietAction(authUiText("Back", "Назад", "Артқа"), !busy) { reset(mode) }
+                step == AitaLoginStep.FINISHING -> AuthQuietAction(authUiText("Back to sign in", "Назад ко входу", "Кіруге қайту"), !busy) {
+                    runAction {
+                        installedSessionGeneration?.let { discardAdvancedAuthenticationSignIn(it) }
+                        installedSessionGeneration = null; pendingTokens = null
+                        reset(AitaLoginMode.PASSWORD)
+                    }
+                }
+                step != AitaLoginStep.PRIMARY -> AuthQuietAction(authUiText("Back", "Назад", "Артқа"), true) { reset(mode) }
                 mode == AitaLoginMode.RECOVERY -> AuthQuietAction(authUiText("Back to sign in", "Назад ко входу", "Кіруге қайту"), !busy) { reset(AitaLoginMode.PASSWORD) }
                 else -> AuthQuietAction(authUiText("Forgot password?", "Забыли пароль?", "Құпия сөзді ұмыттыңыз ба?"), !busy) { reset(AitaLoginMode.RECOVERY) }
             }

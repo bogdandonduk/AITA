@@ -209,4 +209,5 @@ aita_info "Size: $(du -h "$jar_path" | awk '{print $1}')"
 aita_info "SHA-256: $(sha256sum "$jar_path" | awk '{print $1}')"
 aita_info "Build log retained at: $log_file"
 
+aita_info "BUILT SOURCE: $(aita_describe_checkout "$project_root")"
 aita_info "BUILD COMPLETE ONLY: the installed service is unchanged until deployment succeeds."

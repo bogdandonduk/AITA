@@ -11276,8 +11276,9 @@ internal suspend fun installRefreshedAuthenticatedSession(
 }
 
 @PublishedApi
-internal suspend fun clearAuthenticatedSessionStorage(): TokenPair? =
+internal suspend fun clearAuthenticatedSessionStorage(expectedGeneration: Long? = null): TokenPair? =
     authSessionMutationMutex.withLock {
+        if (expectedGeneration != null && authenticatedSessionGeneration != expectedGeneration) return@withLock null
         val tokenSnapshot = getStoredUserAuthTokens?.invoke()
         advanceAuthenticatedSessionGenerationLocked()
         setStoredUserAuthTokens?.invoke(null)
@@ -11465,6 +11466,7 @@ private suspend fun probeReachableAitaServerUrl(
                     connectTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
                     socketTimeoutMillis = AITA_BOOTSTRAP_HTTP_TIMEOUT_MILLIS
                 }
+                attributes.put(AuthCircuitBreaker, Unit)
                 header(AITA_CONNECTION_PROBE_HEADER, "1")
                 header(HttpHeaders.CacheControl, "no-cache")
                 header(HttpHeaders.Pragma, "no-cache")
@@ -14212,6 +14214,19 @@ private suspend fun scheduleRealtimeRefresh(
     }
 }
 
+// Independent unauthenticated transport: health cannot queue behind bearer refresh or a
+// half-open business/WebSocket request on the application's long-lived client.
+private val cloudHealthHttpClient: HttpClient by lazy {
+    HttpClient(getHttpClientEngine()) {
+        expectSuccess = false
+        install(HttpTimeout) {
+            requestTimeoutMillis = 15_000L
+            connectTimeoutMillis = 8_000L
+            socketTimeoutMillis = 15_000L
+        }
+    }
+}
+
 private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataModel<Unit> {
     ensureCachedGlobalConfigurationPrimedForNetwork()
     val endpointUrl = globalAppConfigurationState.payloadValue.connectionCheckPath.first
@@ -14232,7 +14247,7 @@ private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataMod
     }
 
     return probeReachableAitaServerUrl(
-        probeHttpClient = httpClient,
+        probeHttpClient = cloudHealthHttpClient,
         serverUrlCandidates = serverUrlCandidates,
         endpointUrl = endpointUrl,
         reason = reason
@@ -14358,9 +14373,7 @@ private suspend fun recoverCloudConnectionFast(
     )
 
     if (
-        forceRealtimeRestart ||
-        realtimeUpdatesJob?.isActive != true ||
-        !realtimeUpdatesConnectedState.value
+        shouldRestartRealtimeForRecovery(forceRealtimeRestart, realtimeUpdatesJob?.isActive == true)
     ) {
         restartRealtimeUpdates()
     }
@@ -14455,6 +14468,7 @@ private fun launchAutomaticCloudConnectionRecovery(
                 recoverCloudConnectionFast(
                     reason = "automatic_reconnect",
                     knownReachabilityResponse = knownReachabilityResponse,
+                    forcePresentationRecovery = true,
                     forceRealtimeRestart = forceRealtimeRestart
                 )
             }
@@ -14669,7 +14683,8 @@ fun startRealtimeUpdates() {
         var reconnectDelayMillis = 1_000L
         try {
             while (isActive) {
-                var accessToken = currentRealtimeAccessTokenOrNull()
+                // A token-validation mutex/refresh can stall too, not just the WebSocket handshake.
+                var accessToken = withTimeoutOrNull(60_000L) { currentRealtimeAccessTokenOrNull() }
 
                 if (accessToken.isNullOrBlank()) {
                     if (realtimeUpdatesJob === thisJob) realtimeUpdatesConnectedState.value = false
@@ -14703,6 +14718,7 @@ fun startRealtimeUpdates() {
                                         // Ktor opens this request in the client's scope. Cancelling only
                                         // the caller's await would leave a late/half-open socket alive.
                                         realtimeRequestJob = executionContext
+                                        attributes.put(AuthCircuitBreaker, Unit)
                                         url(realtimeUrl)
                                         header(HttpHeaders.Authorization, "Bearer $accessToken")
                                         timeout {
@@ -14727,7 +14743,8 @@ fun startRealtimeUpdates() {
                                 markCloudAccessTokenValidated(accessToken.orEmpty())
                                 markCloudTransportReachableForNotifications(
                                     authenticated = true,
-                                    authRefreshRequired = false
+                                    authRefreshRequired = false,
+                                    forceRecovery = true
                                 )
                                 realtimeUpdatesConnectedState.emit(true)
                                 reconnectDelayMillis = 1_000L
@@ -14751,17 +14768,33 @@ fun startRealtimeUpdates() {
                                                 activeStoreId = activeStoreIdState.value,
                                                 language = appLanguageState.value,
                                                 platform = getPlatformName(),
-                                                clientTimeMillis = getCurrentTimeMillis()
+                                                clientTimeMillis = getCurrentTimeMillis(),
+                                                heartbeatVersion = AITA_REALTIME_HEARTBEAT_VERSION
                                             )
                                         )
                                     )
                                 )
 
-                                for (frame in session.incoming) {
+                                var usesHeartbeat = false
+                                while (isActive) {
+                                    val received = if (usesHeartbeat) {
+                                        withTimeoutOrNull(AITA_REALTIME_HEARTBEAT_TIMEOUT_MILLIS) {
+                                            session.incoming.receiveCatching()
+                                        } ?: throw IllegalStateException("Realtime heartbeat timed out")
+                                    } else session.incoming.receiveCatching()
+                                    val frame = received.getOrNull() ?: break
                                     val text = (frame as? Frame.Text)?.readText() ?: continue
                                     val update = runCatching {
                                         jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
                                     }.getOrNull()
+                                    if (update != null && aitaRealtimeUsesHeartbeat(update.type, update.heartbeatIntervalMillis)) {
+                                        usesHeartbeat = true
+                                    }
+                                    if (update?.type == "heartbeat") {
+                                        if (realtimeUpdatesJob === thisJob) markCloudTransportReachableForNotifications(
+                                            authenticated = true, authRefreshRequired = false, forceRecovery = true)
+                                        continue // Heartbeats are not inventory mutations; never trigger entity reloads.
+                                    }
                                     if (
                                         update != null &&
                                         update.type != "connected" &&
@@ -17038,61 +17071,69 @@ fun logOutUser() {
 fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true) {
     val sessionGeneration = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
-        if (getStoredUserAuthTokens?.invoke() != null)
-            getUserAccountMutex.withLock {
-                if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock
-                getStoredUserAccountDataModel?.invoke()?.run {
-                    if (authenticatedSessionGenerationIsCurrent(sessionGeneration) && userAccountState.payloadValue == null) {
-                        userAccountState.emit(DataState.Success(this))
-                        ActiveStores.acceptAccount(this, applyServerActiveStore)
-                        activeStoreIdState.value?.let { loadCachedInventory(it) }
-                    }
-                }
-
-                val preferenceRevisionAtRequest = AppPreferences.revision
-                val response = networkRequest<UserAccountDataModel, Unit>(
-                    HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first,
-                    expectedSessionGeneration = sessionGeneration
-                )
-
-                if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock
-
-                if (response.negative) {
-                    when {
-                        response.transportFailure -> {
-                            // The persistent connection banner represents server outage; keep the cached account active.
-                        }
-                        response.httpStatusCode == HttpStatusCode.Unauthorized.value && forceLogOut -> {
-                            postInAppNotification(response.message, NotificationType.Neutral)
-                        }
-                        else -> postInAppNotification(response.message, NotificationType.Negative)
-                    }
-                } else {
-                    clearTransientOrNeutralInAppNotifications()
-                    val account = ActiveStores.mergeAccount(response.payload!!)
-                    userAccountState.emit(DataState.Success(account, response.message))
-                    ActiveStores.acceptAccount(response.payload!!, applyServerActiveStore)
-                    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock
-                    val currentAccount = ActiveStores.mergeAccount(account)
-                    setStoredUserAccountDataModel?.invoke(currentAccount)
-                    AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
-
-                    activeStoreIdState.value?.let { storeId ->
-                        if (stockState.payloadValue == null || stockLoadStatusState.value.failure != null) getStock(storeId)
-                        if (stockBatchesState.payloadValue == null || stockBatchesLoadStatusState.value.failure != null) getStockBatches(storeId)
-                    }
-                    getGlobalAppConfiguration()
-                    getNotifications()
-                    syncPendingNotificationsToServer()
-                    getSupportTickets()
-                    getStores()
-                    getSuppliers()
-                    getGenericGoodsCategories()
-                    startRealtimeUpdates()
-                }
-            }
+        refreshUserAccountNow(sessionGeneration, forceLogOut, applyServerActiveStore)
     }
+}
+
+/** Awaitable account hydration. Sign-in uses fresh account data, never an old cached identity. */
+internal suspend fun refreshUserAccountNow(
+    sessionGeneration: Long,
+    forceLogOut: Boolean = false,
+    applyServerActiveStore: Boolean = true,
+    restoreCachedAccount: Boolean = true,
+    postFailure: Boolean = true
+): ResponseDataModel<UserAccountDataModel> = getUserAccountMutex.withLock {
+    if (getStoredUserAuthTokens?.invoke() == null) return@withLock cloudSessionExpiredResponse()
+    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
+    if (restoreCachedAccount) {
+        getStoredUserAccountDataModel?.invoke()?.run {
+            if (authenticatedSessionGenerationIsCurrent(sessionGeneration) && userAccountState.payloadValue == null) {
+                userAccountState.emit(DataState.Success(this))
+                ActiveStores.acceptAccount(this, applyServerActiveStore)
+                activeStoreIdState.value?.let { loadCachedInventory(it) }
+            }
+        }
+    }
+    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
+    val preferenceRevisionAtRequest = AppPreferences.revision
+    val response = networkRequest<UserAccountDataModel, Unit>(
+        HttpMethod.Get,
+        endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first,
+        expectedSessionGeneration = sessionGeneration
+    )
+    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
+    val payload = response.payload
+    if (response.negative || payload == null) {
+        if (postFailure && !response.transportFailure) {
+            postInAppNotification(response.message,
+                if (response.httpStatusCode == HttpStatusCode.Unauthorized.value && forceLogOut) NotificationType.Neutral else NotificationType.Negative)
+        }
+        return@withLock response.copy(negative = true)
+    }
+
+    clearTransientOrNeutralInAppNotifications()
+    val account = ActiveStores.mergeAccount(payload)
+    userAccountState.emit(DataState.Success(account, response.message))
+    ActiveStores.acceptAccount(payload, applyServerActiveStore)
+    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
+    val currentAccount = ActiveStores.mergeAccount(account)
+    setStoredUserAccountDataModel?.invoke(currentAccount)
+    AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
+    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
+
+    activeStoreIdState.value?.let { storeId ->
+        if (stockState.payloadValue == null || stockLoadStatusState.value.failure != null) getStock(storeId)
+        if (stockBatchesState.payloadValue == null || stockBatchesLoadStatusState.value.failure != null) getStockBatches(storeId)
+    }
+    getGlobalAppConfiguration()
+    getNotifications()
+    syncPendingNotificationsToServer()
+    getSupportTickets()
+    getStores()
+    getSuppliers()
+    getGenericGoodsCategories()
+    startRealtimeUpdates()
+    response.copy(payload = currentAccount)
 }
 
 fun updateUser(
@@ -20421,7 +20462,8 @@ data class RealtimeUpdateDataModel(
     val storeId: String? = null,
     val userId: String? = null,
     val reason: String? = null,
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    val heartbeatIntervalMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -20429,7 +20471,8 @@ data class RealtimeClientHelloDataModel(
     val activeStoreId: String? = null,
     val language: String = "",
     val platform: String = "",
-    val clientTimeMillis: Long = 0L
+    val clientTimeMillis: Long = 0L,
+    val heartbeatVersion: Int = 0
 )
 
 const val LOCAL_NETWORK_ROLE_DISABLED = "disabled"

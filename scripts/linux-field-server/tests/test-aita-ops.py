@@ -617,6 +617,9 @@ class WorkerControlFlowTests(TempCase):
         self.events = []
         self.fail_on = None
         self.mutate_after_build = False
+        self.missing_candidate = False
+        self.tamper_candidate = False
+        self.wrong_installed_jar = False
         self.http_fail_public = False
         self.http_fail_local = False
         self.addCleanup(mock.patch.stopall)
@@ -656,15 +659,23 @@ class WorkerControlFlowTests(TempCase):
         if kind == "build":
             self.assertEqual(argv[:4], ["runuser", "-u", self.owner.pw_name, "--"])
             self.assertNotIn("fixture_password", str(argv))
+            self.assertIn("AITA_BUILD_SOURCE_COMMIT=" + self.meta["commit"], argv)
+            if not self.missing_candidate:
+                candidate = self.source / "server/build/libs/aita-server-all.jar"
+                candidate.parent.mkdir(parents=True, exist_ok=True)
+                candidate.write_bytes(b"new artifact")
             if self.mutate_after_build:
                 (self.source / "main.txt").write_text("oops changed")
+        if kind == "assets" and self.tamper_candidate:
+            (self.source / "server/build/libs/aita-server-all.jar").write_bytes(b"changed after build")
         if kind == "restart":
+            self.assertEqual(kwargs["env"]["AITA_BUILD_SOURCE_COMMIT"], self.meta["commit"])
             fd = kwargs["pass_fds"][0]
             self.assertEqual(str(fd), kwargs["env"]["AITA_DEPLOY_LOCK_FD"])
             # Parent still owns the scheduled-backup lock while the JAR switches.
             with self.assertRaises(ops.OpsError):
                 with ops.file_lock(self.lock): pass
-            self.jar.write_bytes(b"new artifact")
+            self.jar.write_bytes(b"wrong artifact" if self.wrong_installed_jar else b"new artifact")
         if kind == self.fail_on:
             raise ops.OpsError("injected " + kind + " failure")
 
@@ -685,6 +696,51 @@ class WorkerControlFlowTests(TempCase):
         record = json.loads((self.root / "last-success.json").read_text())
         self.assertEqual(record["commit"], "a" * 40)
         self.assertEqual(record["jar_sha256"], ops.sha256(self.jar))
+
+    def test_success_prints_the_built_and_installed_commit_and_hash(self):
+        self.assertEqual(self.work(), 0, self.output)
+        for label in ("BUILT COMMIT", "DEPLOYED COMMIT"):
+            self.assertIn(label, self.output)
+        self.assertIn(self.meta["commit"], self.output)
+        self.assertIn(ops.sha256(self.jar), self.output)
+        self.assertTrue(self.state["deployment_verified"])
+        self.assertEqual(self.state["requested_commit"], self.meta["commit"])
+        self.assertNotIn("NOT DEPLOYED", self.output)
+
+    def test_pre_restart_failure_is_explicitly_not_a_deployment(self):
+        self.fail_on = "backup"
+        self.assertEqual(self.work(), 1)
+        self.assertIn("NOT DEPLOYED", self.output)
+        self.assertIn("Phase=backup", self.output)
+        self.assertIn(self.meta["commit"], self.output)
+        self.assertIn("NOT a successful deployment", self.output)
+        self.assertNotIn("[DEPLOYED COMMIT]", self.output)
+        self.assertFalse(self.state["deployment_verified"])
+
+    def test_successful_build_command_without_candidate_is_not_success(self):
+        self.missing_candidate = True
+        self.assertEqual(self.work(), 1)
+        self.assertIn("candidate JAR is missing", self.output)
+        self.assertNotIn("restart", self.events)
+        self.assertFalse(self.state["server_touched"])
+
+    def test_candidate_changed_during_backup_or_assets_never_restarts(self):
+        self.tamper_candidate = True
+        self.assertEqual(self.work(), 1)
+        self.assertIn("Candidate JAR changed", self.output)
+        self.assertNotIn("restart", self.events)
+        self.assertFalse(self.state["server_touched"])
+        self.assertEqual(self.jar.read_bytes(), b"old artifact")
+
+    def test_wrong_installed_artifact_cannot_get_a_verified_commit(self):
+        self.wrong_installed_jar = True
+        self.assertEqual(self.work(), 1)
+        self.assertIn("Installed JAR does not match", self.output)
+        self.assertFalse(self.state["deployment_verified"])
+        self.assertFalse((self.root / "last-success.json").exists())
+        self.assertNotIn("[DEPLOYED COMMIT]", self.output)
+        self.assertTrue(self.state["server_touched"])
+        self.assertEqual(self.jar.read_bytes(), b"wrong artifact")
 
     def test_build_failure_never_stops_or_backs_up(self):
         self.fail_on = "build"

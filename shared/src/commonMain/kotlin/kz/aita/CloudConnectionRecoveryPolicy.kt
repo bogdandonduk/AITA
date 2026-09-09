@@ -24,3 +24,13 @@ internal fun shouldDeferCloudHealthProbe(
 ): Boolean = activeNetworkOperations > 0 && !transportUnavailable && !resumedAfterPause &&
     !previousProbeFailed && lastProbeAtMillis > 0L && nowMillis >= lastProbeAtMillis &&
     nowMillis - lastProbeAtMillis < CLOUD_HEALTH_MAX_BUSY_DEFER_MILLIS
+
+/** An active retry/handshake loop owns its socket. Health probes must not restart it every 4s. */
+internal fun shouldRestartRealtimeForRecovery(forceRestart: Boolean, jobActive: Boolean): Boolean =
+    forceRestart || !jobActive
+
+internal const val AITA_REALTIME_HEARTBEAT_VERSION = 1
+internal const val AITA_REALTIME_HEARTBEAT_TIMEOUT_MILLIS = 90_000L
+
+internal fun aitaRealtimeUsesHeartbeat(type: String, advertisedIntervalMillis: Long): Boolean =
+    type == "connected" && advertisedIntervalMillis in 1L..30_000L

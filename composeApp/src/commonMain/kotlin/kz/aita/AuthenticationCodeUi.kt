@@ -1,5 +1,8 @@
 package kz.aita
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -90,3 +93,23 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
 }
 
 private fun authClock(seconds: Long): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+
+/** Only composed while the field is empty. The editable field and focus identity never change. */
+@Composable
+internal fun AppConfiguration.AuthenticatorCodePlaceholder(enabled: Boolean = true) {
+    var recoveryHint by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(3_200L)
+            recoveryHint = !recoveryHint
+        }
+    }
+    Crossfade(targetState = recoveryHint, animationSpec = tween(450), label = "authCodeHint") { recovery ->
+        Text(
+            text = if (recovery) "xxxxxx-xxxxxx" else "000000",
+            color = if (enabled) stateValues.PlaceholderTextColor else stateValues.DisabledColor,
+            fontSize = stateValues.textSize,
+            maxLines = 1
+        )
+    }
+}

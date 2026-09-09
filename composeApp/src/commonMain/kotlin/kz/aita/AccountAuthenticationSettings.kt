@@ -8,12 +8,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -21,9 +25,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kz.aita.auth.*
 
-private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, RECOVERY_CODES, PHONE, EMAIL }
+private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, TOTP_POLICY, RECOVERY_CODES, PHONE, EMAIL }
 
 @Composable
 internal fun AppConfiguration.AccountAuthenticationSettingsCard(
@@ -38,6 +43,8 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
     var editor by remember { mutableStateOf(AccountAuthEditor.NONE) }
     var setup by remember { mutableStateOf<AitaTotpSetupDataModel?>(null) }
     var setupCode by remember { mutableStateOf("") }
+    var setupRequireForLogin by remember { mutableStateOf(true) }
+    var requestedLoginRequirement by remember { mutableStateOf(true) }
     var currentPassword by remember { mutableStateOf("") }
     var secondFactor by remember { mutableStateOf("") }
     var phoneAlias by remember { mutableStateOf("") }
@@ -81,7 +88,11 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
         beginAction()
         screenScope.launch {
             try {
-                action()
+                if (withTimeoutOrNull(45_000L) { action(); true } != true) {
+                    error = authUiText("Request timed out. Refresh settings before retrying.",
+                        "Время ожидания истекло. Обновите настройки перед повтором.",
+                        "Күту уақыты аяқталды. Қайталаудан бұрын баптауларды жаңартыңыз.")
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -167,7 +178,8 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 )
                 Text(
                     text = when {
-                        settings?.authenticatorEnabled == true -> authUiText("Authenticator protection is on", "Защита аутентификатором включена", "Аутентификатор қорғанысы қосулы")
+                        settings?.authenticatorRequiredForLogin == true -> authUiText("Two-factor sign-in is on", "Двухфакторный вход включён", "Екі факторлы кіру қосулы")
+                        settings?.authenticatorEnabled == true -> authUiText("Authenticator connected · login 2FA off", "Аутентификатор подключён · 2FA при входе выключена", "Аутентификатор қосылған · кіру 2FA өшірулі")
                         settings != null -> authUiText("Password, email code and recovery settings", "Пароль, код из письма и восстановление", "Құпия сөз, email коды және қалпына келтіру")
                         else -> authUiText("Manage secure ways to sign in", "Управление безопасными способами входа", "Қауіпсіз кіру тәсілдерін басқару")
                     },
@@ -199,7 +211,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                     )
                     AuthSettingsInfoRow(
                         authUiText("Authenticator", "Аутентификатор", "Аутентификатор"),
-                        if (current.authenticatorEnabled) authUiText("Enabled", "Включён", "Қосулы") else authUiText("Off", "Выключен", "Өшірулі"),
+                        if (current.authenticatorEnabled) authUiText("Connected", "Подключён", "Қосылған") else authUiText("Off", "Выключен", "Өшірулі"),
                         accent = current.authenticatorEnabled
                     )
                     if (current.authenticatorEnabled) {
@@ -207,6 +219,17 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             authUiText("Recovery codes remaining", "Осталось резервных кодов", "Қалған қалпына келтіру кодтары"),
                             current.recoveryCodesRemaining.toString()
                         )
+                        if (capabilities?.authenticatorLoginPolicyEnabled == true && editor == AccountAuthEditor.NONE) {
+                            AuthenticatorLoginRequirementToggle(
+                                checked = current.authenticatorRequiredForLogin,
+                                enabled = !loading,
+                                onCheckedChange = { required ->
+                                    clearSensitive()
+                                    requestedLoginRequirement = required
+                                    editor = AccountAuthEditor.TOTP_POLICY
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -443,6 +466,9 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 }
                             }
                         }
+                        if (capabilities?.authenticatorLoginPolicyEnabled == true) {
+                            AuthenticatorLoginRequirementToggle(setupRequireForLogin, !loading) { setupRequireForLogin = it }
+                        }
                         aitaFormTextField(
                             modifier = Modifier.fillMaxWidth(),
                             value = setupCode,
@@ -465,17 +491,51 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             loading = loading
                         ) {
                             launchSecurityAction {
-                                val response = AitaAdvancedAuthenticationClient.confirmTotpSetup(AitaTotpSetupConfirmRequestDataModel(data!!.setupId, setupCode))
+                                val response = AitaAdvancedAuthenticationClient.confirmTotpSetup(AitaTotpSetupConfirmRequestDataModel(data!!.setupId, setupCode, setupRequireForLogin))
                                 response.payload?.let {
                                     recoveryCodes = it.recoveryCodes
                                     settings = settings?.copy(
                                         authenticatorEnabled = true,
+                                        authenticatorRequiredForLogin = setupRequireForLogin,
+                                        securityRevision = (settings?.securityRevision ?: 0L) + 1L,
                                         recoveryCodesRemaining = it.recoveryCodes.size
                                     )
                                     info = authUiText("Authenticator enabled. Save the recovery codes now.", "Аутентификатор включён. Сохраните резервные коды сейчас.", "Аутентификатор қосылды. Қалпына келтіру кодтарын қазір сақтаңыз.")
                                     editor = AccountAuthEditor.NONE
                                     setup = null
                                     setupCode = ""
+                                } ?: run { error = authResponseText(response) }
+                            }
+                        }
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
+                    }
+
+                    AccountAuthEditor.TOTP_POLICY -> {
+                        AuthenticatorLoginRequirementToggle(requestedLoginRequirement, !loading) { requestedLoginRequirement = it }
+                        Text(
+                            authUiText("Confirm with your password and an authenticator or recovery code. The authenticator stays connected.",
+                                "Подтвердите паролем и кодом аутентификатора или резервным кодом. Аутентификатор останется подключён.",
+                                "Құпия сөзбен және аутентификатор не қалпына келтіру кодымен растаңыз. Аутентификатор қосулы қалады."),
+                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize
+                        )
+                        SensitiveAuthConfirmationFields(enabled = !loading,
+                            currentPassword = currentPassword, secondFactor = secondFactor,
+                            onPasswordChange = { currentPassword = it }, onSecondFactorChange = { secondFactor = it })
+                        actionButton(modifier = Modifier.fillMaxWidth(), autoLoading = false,
+                            text = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау"),
+                            enabled = !loading && currentPassword.isNotBlank() && secondFactor.isNotBlank(), loading = loading) {
+                            val current = settings
+                            if (current != null) launchSecurityAction {
+                                val request = AitaTotpLoginPolicyRequestDataModel(requestedLoginRequirement,
+                                    currentPassword, secondFactor, current.securityRevision)
+                                val response = AitaAdvancedAuthenticationClient.updateTotpLoginPolicy(request)
+                                response.payload?.takeIf { !response.negative }?.let {
+                                    clearSensitive(); settings = it; editor = AccountAuthEditor.NONE
+                                    info = if (it.authenticatorRequiredForLogin) {
+                                        authUiText("Two-factor sign-in enabled", "Двухфакторный вход включён", "Екі факторлы кіру қосылды")
+                                    } else authUiText("Authenticator connected. Login no longer requires a second factor.",
+                                        "Аутентификатор подключён. Второй фактор при входе больше не обязателен.",
+                                        "Аутентификатор қосылған. Кіру кезінде екінші фактор енді міндетті емес.")
                                 } ?: run { error = authResponseText(response) }
                             }
                         }
@@ -685,7 +745,7 @@ internal fun AppConfiguration.SensitiveAuthConfirmationFields(
             value = secondFactor,
             onValueChange = onSecondFactorChange,
             titleText = authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды"),
-            placeholderText = authUiText("Enter a current code", "Введите действующий код", "Ағымдағы кодты енгізіңіз"),
+            placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(enabled) },
             identityKey = "account-security-second-factor",
             keyboardType = KeyboardType.Ascii,
             imeAction = ImeAction.Done,
@@ -741,5 +801,30 @@ private fun AppConfiguration.RecoveryCodesPanel(codes: List<String>) {
         SelectionContainer {
             Text(codes.joinToString("\n"), color = stateValues.TextColor, fontWeight = FontWeight.SemiBold)
         }
+    }
+}
+
+@Composable
+private fun AppConfiguration.AuthenticatorLoginRequirementToggle(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету"),
+                color = stateValues.TextColor, fontSize = stateValues.textSize)
+            Text(if (checked) authUiText("Password or email code + authenticator", "Пароль или email-код + аутентификатор", "Құпия сөз не email коды + аутентификатор")
+                else authUiText("Authenticator still protects security changes", "Аутентификатор по-прежнему защищает настройки безопасности", "Аутентификатор қауіпсіздік баптауларын әлі де қорғайды"),
+                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        }
+        val label = authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету")
+        Switch(modifier = Modifier.semantics { contentDescription = label },
+            checked = checked, onCheckedChange = onCheckedChange, enabled = enabled,
+            colors = SwitchDefaults.colors(checkedTrackColor = stateValues.AccentColor,
+                checkedThumbColor = stateValues.BackgroundColor,
+                uncheckedThumbColor = stateValues.PlaceholderTextColor,
+                uncheckedTrackColor = stateValues.PlaceholderTextColor.copy(alpha = 0.15f)))
     }
 }

@@ -212,6 +212,18 @@ aita_verify_server_jar() {
 # or environment values here: either may contain credentials.
 aita_describe_checkout() {
   local project_root="${1:?Project root is required}" revision status
+  if [[ -n "${AITA_BUILD_SOURCE_COMMIT:-}" ]]; then
+    [[ "$AITA_BUILD_SOURCE_COMMIT" =~ ^([a-f0-9]{40}|[a-f0-9]{64})$ ]] || aita_die "Invalid pinned source commit"
+    if [[ -e "$project_root/.git" ]] && command -v git >/dev/null 2>&1; then
+      revision="$(git -C "$project_root" rev-parse --verify HEAD)" || return 1
+      [[ "$revision" == "$AITA_BUILD_SOURCE_COMMIT" ]] || aita_die "Git checkout differs from the pinned source commit"
+      status="$(git -C "$project_root" status --porcelain --untracked-files=no)" || return 1
+      [[ -z "$status" ]] || aita_die "Tracked source differs from the pinned source commit"
+    fi
+    # The managed updater builds a hash-verified git archive without a .git directory.
+    printf '%s (operator-pinned source snapshot)\n' "$AITA_BUILD_SOURCE_COMMIT"
+    return
+  fi
   if command -v git >/dev/null 2>&1 &&
      revision="$(git -C "$project_root" rev-parse --verify HEAD 2>/dev/null)"; then
     printf '%s' "$revision"

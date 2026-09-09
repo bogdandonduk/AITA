@@ -18543,7 +18543,8 @@ fun Application.module() {
               type = "connected",
               entity = "connection",
               reason = "websocket_connected",
-              createdAtMillis = now
+              createdAtMillis = now,
+              heartbeatIntervalMillis = 30_000L
             )
           )
 
@@ -18569,15 +18570,26 @@ fun Application.module() {
             }
           }
 
+          var heartbeat: Job? = null
           try {
             for (frame in incoming) {
               if (frame is Frame.Text) {
-                // The current protocol only needs the client hello to keep the connection warm.
-                // The client refreshes itself when the server broadcasts mutation notices.
-                frame.readText()
+                val hello = runCatching { jsonBase.decodeFromString<RealtimeClientHelloDataModel>(frame.readText()) }.getOrNull()
+                // Negotiated application heartbeat works on browser, Android and desktop. Older
+                // clients never receive it, so they cannot mistake it for an inventory change.
+                if (hello?.heartbeatVersion == 1 && heartbeat == null) {
+                  heartbeat = launch {
+                    while (isActive) {
+                      delay(30_000L)
+                      sendRealtimeUpdate(RealtimeUpdateDataModel(type = "heartbeat", entity = "connection",
+                        createdAtMillis = System.currentTimeMillis()))
+                    }
+                  }
+                }
               }
             }
           } finally {
+            heartbeat?.cancel()
             collector.cancel()
           }
         } catch (throwable: Throwable) {

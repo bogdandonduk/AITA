@@ -1,6 +1,7 @@
 package kz.aita.auth
 
 import io.ktor.http.*
+import kotlinx.coroutines.*
 import kz.aita.*
 
 object AitaAdvancedAuthenticationClient {
@@ -58,6 +59,9 @@ object AitaAdvancedAuthenticationClient {
 
     suspend fun disableTotp(request: AitaSensitiveSecurityActionRequestDataModel) =
         authRequest<AitaAuthenticationSettingsDataModel, AitaSensitiveSecurityActionRequestDataModel>(HttpMethod.Post, "auth/security/totp/disable", request)
+
+    suspend fun updateTotpLoginPolicy(request: AitaTotpLoginPolicyRequestDataModel) =
+        authRequest<AitaAuthenticationSettingsDataModel, AitaTotpLoginPolicyRequestDataModel>(HttpMethod.Post, "auth/security/totp/login-policy", request)
 
     suspend fun regenerateRecoveryCodes(request: AitaSensitiveSecurityActionRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaSensitiveSecurityActionRequestDataModel>(HttpMethod.Post, "auth/security/totp/recovery-codes/regenerate", request)
@@ -147,7 +151,44 @@ internal fun <T> ResponseDataModel<T>.withAuthFailureMessage(): ResponseDataMode
     ))
 }
 
-suspend fun adoptAdvancedAuthenticationTokens(tokenPair: TokenPair) {
-    installAuthenticatedSession(tokenPair)
-    getUser(forceLogOut = false)
+/** Persisting credentials and loading the account are separate, retryable stages. */
+suspend fun adoptAdvancedAuthenticationTokens(tokenPair: TokenPair): Long = withContext(Dispatchers.ourIo) {
+    checkNotNull(setStoredUserAuthTokens) { "Credential storage is not initialized" }
+    val generation = installAuthenticatedSession(tokenPair)
+    check(getStoredUserAuthTokens?.invoke()?.accessToken == tokenPair.accessToken) { "Credentials could not be saved" }
+    generation
+}
+
+private val authenticationCompletion = AuthenticationCompletionCoordinator<ResponseDataModel<UserAccountDataModel>>(
+    scope = CoroutineScope(SupervisorJob() + Dispatchers.ourIo),
+    complete = { generation ->
+        try {
+            withTimeoutOrNull(30_000L) {
+                refreshUserAccountNow(generation, restoreCachedAccount = false, postFailure = false)
+            } ?: ResponseDataModel(
+                negative = true, transportFailure = true,
+                message = authenticationCompletionFailureMessage()
+            )
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            ResponseDataModel(negative = true, message = authenticationCompletionFailureMessage())
+        }
+    }
+)
+
+private fun authenticationCompletionFailureMessage() = listOf(
+    LocalizedStringDataModel("main", "Sign-in was accepted, but your account could not be loaded. Press Continue to retry."),
+    LocalizedStringDataModel("en", "Sign-in was accepted, but your account could not be loaded. Press Continue to retry."),
+    LocalizedStringDataModel("ru", "Вход подтверждён, но аккаунт не загрузился. Нажмите «Продолжить», чтобы повторить."),
+    LocalizedStringDataModel("kk", "Кіру расталды, бірақ аккаунт жүктелмеді. Қайталау үшін «Жалғастыру» түймесін басыңыз.")
+)
+
+suspend fun finishAdvancedAuthenticationSignIn(generation: Long): ResponseDataModel<UserAccountDataModel> {
+    if (!authenticatedSessionGenerationIsCurrent(generation)) return cloudSessionExpiredResponse()
+    return authenticationCompletion.await(generation)
+}
+
+suspend fun discardAdvancedAuthenticationSignIn(generation: Long) {
+    authenticationCompletion.cancel(generation)
+    withContext(Dispatchers.ourIo) { clearAuthenticatedSessionStorage(expectedGeneration = generation) }
 }
