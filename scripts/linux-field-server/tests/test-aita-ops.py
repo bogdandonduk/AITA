@@ -50,6 +50,155 @@ class TempCase(unittest.TestCase):
         return path
 
 
+
+@contextmanager
+def temporary_umask(mask):
+    previous = os.umask(mask)
+    try:
+        yield
+    finally:
+        os.umask(previous)
+
+
+class ServerStartReportingTests(TempCase):
+    def setUp(self):
+        super().setUp()
+        self.values = {"ActiveState": "active", "SubState": "running", "MainPID": "2781579",
+                       "InvocationID": "a" * 32, "NRestarts": "0",
+                       "ExecMainStartTimestamp": "Tue 2026-09-08 21:37:00 +05",
+                       "ExecMainStartTimestampMonotonic": "2000000",
+                       "ActiveEnterTimestamp": "Tue 2026-09-08 21:37:01 +05"}
+        self.addCleanup(mock.patch.stopall)
+        self.properties = mock.patch.object(ops, "properties", side_effect=lambda *a: self.values.copy()).start()
+        mock.patch.object(ops.time, "monotonic_ns", return_value=5_000_000_000).start()
+
+    def report(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            result = ops.report_server_state()
+        self.output = out.getvalue()
+        return result
+
+    def test_current_start_and_uptime_come_from_backend_not_updater(self):
+        result = self.report()
+        self.assertEqual(result["uptime_seconds"], 3)
+        self.assertIn("Tue 2026-09-08 21:37:00 +05", self.output)
+        self.assertIn("00h 00m 03s", self.output)
+        self.assertIn("MainPID=2781579", self.output)
+        self.assertIn("not a lifetime/manual-restart total", self.output)
+        self.assertEqual(self.properties.call_args.args[0], "aita-server.service")
+        self.assertNotIn("aita-update.service", self.properties.call_args.args)
+        self.assertIn("ExecMainStartTimestamp", self.properties.call_args.args)
+
+    def test_snapshot_whitelists_fields_and_never_reads_service_environment(self):
+        self.values["Environment"] = "SECRET=do-not-log-this"
+        self.values["ExecStart"] = "do-not-log-this"
+        result = self.report()
+        self.assertNotIn("do-not-log-this", str(result) + self.output)
+        self.assertNotIn("Environment", self.properties.call_args.args)
+        self.assertNotIn("ExecStart", self.properties.call_args.args)
+
+    def test_missing_main_start_does_not_fall_back_to_service_activation(self):
+        self.values.pop("ExecMainStartTimestamp")
+        self.values.pop("ExecMainStartTimestampMonotonic")
+        result = self.report()
+        self.assertIsNone(result["uptime_seconds"])
+        self.assertIn("Unknown: no main-process start", self.output)
+        self.assertNotIn("21:37:01", self.output)
+        self.assertIn("not inferred from Git/update times", self.output)
+
+    def test_exited_process_is_not_reported_as_running_or_given_uptime(self):
+        self.values.update(ActiveState="failed", SubState="failed", MainPID="0")
+        result = self.report()
+        self.assertFalse(result["running"])
+        self.assertIsNone(result["uptime_seconds"])
+        self.assertIn("last recorded main-process launch", self.output)
+        self.assertIn("Not running", self.output)
+        self.assertNotIn("current main process;", self.output)
+
+    def test_missing_pid_means_unknown_not_stopped(self):
+        self.values.pop("MainPID")
+        result = self.report()
+        self.assertIsNone(result["running"])
+        self.assertNotIn("Not running", self.output)
+
+    def test_invalid_or_future_start_never_yields_invented_uptime(self):
+        for value in ("", "n/a", "0", "-1", "no-clock", "9000000"):
+            with self.subTest(value=value):
+                self.values["ExecMainStartTimestampMonotonic"] = value
+                self.assertIsNone(self.report()["uptime_seconds"])
+                self.assertIn("UPTIME] Unavailable", self.output)
+
+    def test_query_failure_is_explicit_and_nonfatal(self):
+        self.properties.side_effect = ops.OpsError("system bus unavailable")
+        result = self.report()
+        self.assertIn("error", result)
+        self.assertIn("UNAVAILABLE", self.output)
+        self.assertNotIn("START]", self.output)
+        self.assertNotIn("UPTIME]", self.output)
+
+    def test_empty_query_result_is_not_a_healthy_service(self):
+        self.values.clear()
+        result = self.report()
+        self.assertIn("error", result)
+        self.assertNotIn("running", result)
+        self.assertIn("UNAVAILABLE", self.output)
+
+    def test_zero_invocation_is_not_printed_as_a_real_identity(self):
+        self.values["InvocationID"] = "0" * 32
+        self.report()
+        self.assertNotIn("SERVER INVOCATION", self.output)
+
+    def test_uptime_format_including_multiple_days(self):
+        self.assertEqual(ops.format_uptime(0), "00h 00m 00s")
+        self.assertEqual(ops.format_uptime(90061), "1d 01h 01m 01s")
+
+    def test_process_identity_comparison(self):
+        before = self.report()
+        self.assertEqual(ops.server_process_change(before, before.copy()), "unchanged")
+        for changes, expected in (({"InvocationID": "b" * 32}, "changed"),
+                                  ({"MainPID": "2781580"}, "changed"),
+                                  ({"ExecMainStartTimestampMonotonic": "3000000"}, "changed"),
+                                  ({"InvocationID": ""}, "unknown"),
+                                  ({"InvocationID": "0" * 32}, "unknown"),
+                                  ({"ExecMainStartTimestampMonotonic": "0"}, "unknown"),
+                                  ({"service": ops.UPDATE_UNIT}, "unknown"),
+                                  ({"running": False}, "stopped")):
+            with self.subTest(changes=changes):
+                self.assertEqual(ops.server_process_change(before, {**before, **changes}), expected)
+        self.assertEqual(ops.server_process_change({**before, "running": False}, before), "started")
+        stopped = {**before, "running": False}
+        self.assertEqual(ops.server_process_change(stopped, stopped), "not-running")
+        for missing in (None, {}, {"error": "unavailable"}):
+            self.assertEqual(ops.server_process_change(missing, before), "unknown")
+
+    def test_status_keeps_update_time_distinct_and_snapshots_out_of_terminal_dict(self):
+        root = self.base / "ops"
+        run = root / "runs/fixture"
+        run.mkdir(parents=True)
+        before = self.report()
+        state = {"result": "failed", "phase": "tests", "at": "2026-09-09T16:39:57+00:00",
+                 "server_touched": False, "process_change": "unchanged",
+                 "server_before": {**before, "noise": "NOT-A-LIVE-SNAPSHOT"}, "server_after": before}
+        (run / "state.json").write_text(json.dumps(state))
+        with mock.patch.object(ops, "ROOT", root), mock.patch.object(ops, "latest_run", return_value=run), \
+                mock.patch.object(ops, "http_status", return_value="200"), redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(ops.status(), 0)
+        text = out.getvalue()
+        self.assertIn("SERVER START] Tue 2026-09-08 21:37:00 +05", text)
+        self.assertIn("2026-09-09T16:39:57+00:00", text)
+        self.assertNotIn("NOT-A-LIVE-SNAPSHOT", text)
+        self.assertIn("'process_change': 'unchanged'", text)
+
+    def test_log_viewer_shows_current_process_without_changing_the_service(self):
+        with mock.patch.object(ops, "sudo_prefix", return_value=[]), \
+                mock.patch.object(ops.subprocess, "run") as run, redirect_stdout(io.StringIO()) as out:
+            ops.show_server_logs()
+        self.assertIn("SERVER START]", out.getvalue())
+        run.assert_called_once_with(["journalctl", "-u", ops.SERVICE, "--no-pager", "-o", "short-iso",
+                                     "-n", "60", "--follow"])
+
+
 class ConfigurationTests(TempCase):
     def test_quotes_crlf_and_exports(self):
         path = self.file("settings", b'# comment\r\nA="value with spaces"\r\nexport B=abc\nC=\n')
@@ -834,7 +983,11 @@ class WorkerControlFlowTests(TempCase):
         mock.patch.object(ops, "require_tools").start()
         mock.patch.object(ops, "read_env", return_value=self.env).start()
         mock.patch.object(ops, "protect_secrets").start()
-        mock.patch.object(ops, "properties", return_value={"User": "aita", "Group": "aita", "ActiveState": "active"}).start()
+        self.server_values = {"User": "aita", "Group": "aita", "ActiveState": "active", "SubState": "running",
+                              "MainPID": "2781579", "InvocationID": "a" * 32, "NRestarts": "0",
+                              "ExecMainStartTimestamp": "Tue 2026-09-08 21:37:00 +05",
+                              "ExecMainStartTimestampMonotonic": "2000000"}
+        mock.patch.object(ops, "properties", side_effect=lambda *a: self.server_values.copy()).start()
         self.capture = mock.patch.object(ops, "capture", side_effect=self.capture_command).start()
         mock.patch.object(ops.shutil, "disk_usage", return_value=shutil._ntuple_diskusage(20*1024**3, 0, 20*1024**3)).start()
         self.remote_preflight = mock.patch.object(ops, "remote_preflight", wraps=ops.remote_preflight).start()
@@ -894,6 +1047,9 @@ class WorkerControlFlowTests(TempCase):
             with self.assertRaises(ops.OpsError):
                 with ops.file_lock(self.lock): pass
             self.jar.write_bytes(b"wrong artifact" if self.wrong_installed_jar else b"new artifact")
+            self.server_values.update(MainPID="2888888", InvocationID="b" * 32,
+                                      ExecMainStartTimestamp="Wed 2026-09-09 22:00:00 +05",
+                                      ExecMainStartTimestampMonotonic="3000000")
         if kind == self.fail_on:
             raise ops.OpsError("injected " + kind + " failure")
 
@@ -914,6 +1070,46 @@ class WorkerControlFlowTests(TempCase):
         record = json.loads((self.root / "last-success.json").read_text())
         self.assertEqual(record["commit"], "a" * 40)
         self.assertEqual(record["jar_sha256"], ops.sha256(self.jar))
+
+    def test_success_records_real_before_and_after_process_launch(self):
+        self.assertEqual(self.work(), 0, self.output)
+        self.assertEqual(self.state["process_change"], "changed")
+        self.assertEqual(self.state["server_before"]["MainPID"], "2781579")
+        self.assertEqual(self.state["server_after"]["MainPID"], "2888888")
+        self.assertEqual(self.state["server_after"]["ExecMainStartTimestamp"], "Wed 2026-09-09 22:00:00 +05")
+        self.assertIn("SERVER AFTER RESTART START] Wed 2026-09-09 22:00:00 +05", self.output)
+        record = json.loads((self.root / "last-success.json").read_text())
+        self.assertEqual(record["server_at_deploy"]["InvocationID"], "b" * 32)
+
+    def test_test_gate_failure_logs_unchanged_actual_backend_start(self):
+        self.fail_on = "tests"
+        self.assertEqual(self.work(), 1)
+        self.assertEqual(self.state["process_change"], "unchanged")
+        self.assertFalse(self.state["server_touched"])
+        self.assertFalse(self.state["deployment_verified"])
+        self.assertNotIn("build", self.events)
+        self.assertNotIn("restart", self.events)
+        self.assertIn("SERVER FINAL START] Tue 2026-09-08 21:37:00 +05", self.output)
+        self.assertIn("No new backend launch was observed", self.output)
+        self.assertNotIn("SERVER AFTER RESTART", self.output)
+
+    def test_read_only_reporting_failure_does_not_bypass_test_failure(self):
+        self.fail_on = "tests"
+        with mock.patch.object(ops, "server_snapshot", side_effect=ops.OpsError("snapshot unavailable")):
+            self.assertEqual(self.work(), 1)
+        self.assertEqual(self.state["result"], "failed")
+        self.assertEqual(self.state["process_change"], "unknown")
+        self.assertIn("UNAVAILABLE: snapshot unavailable", self.output)
+        self.assertNotIn("restart", self.events)
+
+    def test_unchanged_release_retains_its_original_start_timestamp(self):
+        (self.root / "last-success.json").write_text(json.dumps({"commit": self.meta["commit"],
+            "jar_sha256": ops.sha256(self.jar), "env_sha256": ops.sha256(self.envfile)}))
+        self.assertEqual(self.work(), 0, self.output)
+        self.assertEqual(self.state["process_change"], "unchanged")
+        self.assertIn("SERVER FINAL START] Tue 2026-09-08 21:37:00 +05", self.output)
+        self.assertNotIn("SERVER AFTER RESTART", self.output)
+        self.assertNotIn("restart", self.events)
 
     def test_default_update_skips_quota_failed_cloud_in_all_stages(self):
         self.env["AITA_BACKUP_RCLONE_REMOTE"] = "gdrive:fixture"
@@ -1138,6 +1334,7 @@ class ManagedLaunchTests(TempCase):
         mock.patch.object(ops, "ROOT", self.root).start()
         mock.patch.object(ops.os, "geteuid", return_value=0).start()
         mock.patch.object(ops.os, "chown").start()
+        self.fchown = mock.patch.object(ops.os, "fchown").start()
         mock.patch.object(ops.pwd, "getpwnam", return_value=self.owner).start()
         self.busy = mock.patch.object(ops, "unit_busy", return_value=False).start()
         self.capture = mock.patch.object(ops, "capture", side_effect=fake_capture).start()
@@ -1165,6 +1362,30 @@ class ManagedLaunchTests(TempCase):
         self.assertEqual(meta["owner"], self.owner.pw_name)
         ops.verify_source(run / "source", meta["source_hashes"])
         self.assertEqual((run / "tools/aita-ops.py").read_bytes(), (run / "source/scripts/linux-field-server/aita-ops.py").read_bytes())
+
+    def test_log_and_traversal_modes_are_exact_under_production_umask(self):
+        for mask in (0o000, 0o022, 0o027, 0o077):
+            with self.subTest(umask=oct(mask)), temporary_umask(mask):
+                self.assertEqual(self.launch(), 0)
+                run = ops.latest_run()
+                for path, mode in ((self.root, 0o755), (self.root / "runs", 0o755), (run, 0o711),
+                                   (run / "update.log", 0o640), (run / "meta.json", 0o600),
+                                   (run / "state.json", 0o640), (run / "source", 0o700)):
+                    self.assertEqual(path.stat().st_mode & 0o777, mode, str(path))
+                self.assertIn("--property=UMask=0077", self.commands[-1])
+                self.assertEqual(self.fchown.call_args.args[1:], (0, self.owner.pw_gid))
+                # The fix must not relax the ambient umask for other files.
+                probe = self.file("mask-probe-" + str(mask))
+                self.assertEqual(probe.stat().st_mode & 0o777, 0o666 & ~mask)
+
+    def test_operator_state_symlink_is_rejected_without_touching_target(self):
+        target = self.base / "outside-state"
+        target.mkdir(mode=0o700)
+        self.root.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(OSError):
+            self.launch()
+        self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+        self.assertFalse(self.commands)
 
     def test_default_policy_is_pinned_in_managed_metadata(self):
         self.assertEqual(self.launch(), 0)
@@ -1218,4 +1439,4 @@ class ManagedLaunchTests(TempCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main(verbosity=2, buffer=True)

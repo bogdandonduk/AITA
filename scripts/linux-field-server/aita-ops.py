@@ -39,7 +39,7 @@ from typing import Iterator, Mapping, Sequence
 from urllib.parse import urlsplit
 import uuid
 
-VERSION = "2026-09-09-local-backup-update-v2"
+VERSION = "2026-09-09-start-time-permissions-v3"
 SERVICE = "aita-server.service"
 UPDATE_UNIT = "aita-update.service"
 ROOT = Path("/var/lib/aita-ops")
@@ -215,6 +215,114 @@ def properties(unit: str, *names: str) -> dict[str, str]:
     return dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
 
 
+def positive_integer(value: object) -> int | None:
+    text = str(value)
+    if re.fullmatch(r"[0-9]{1,20}", text) and int(text) > 0:
+        return int(text)
+    return None
+
+
+def server_snapshot() -> dict:
+    """Read the backend, NOT the updater. No journal/env/command-line secrets."""
+    names = ("LoadState", "ActiveState", "SubState", "MainPID", "InvocationID", "NRestarts",
+             "ExecMainStartTimestamp", "ExecMainStartTimestampMonotonic",
+             "ActiveEnterTimestamp", "ExecMainExitTimestamp", "Result")
+    values = properties(SERVICE, *names)
+    if not values.get("ActiveState"):
+        raise OpsError("systemctl did not return the backend's state; its last start is unknown.")
+    # Whitelist both the query and stored data. Never persist Environment/ExecStart.
+    snapshot = {name: values[name] for name in names if name in values}
+    snapshot.update(service=SERVICE, observed_at=utc())
+    pid = positive_integer(values.get("MainPID"))
+    # An exited process may retain a last-start timestamp, but it has no uptime.
+    running = (pid is not None and values["ActiveState"] in ACTIVE_STATES) if "MainPID" in values else None
+    snapshot["running"] = running
+    snapshot["uptime_seconds"] = None
+    start = positive_integer(values.get("ExecMainStartTimestampMonotonic"))
+    now = time.monotonic_ns() // 1000  # Same CLOCK_MONOTONIC domain as systemd; microseconds.
+    if running and start is not None and start <= now:
+        snapshot["uptime_seconds"] = (now - start) // 1_000_000
+    return snapshot
+
+
+def format_uptime(seconds: int) -> str:
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return (f"{days}d " if days else "") + f"{hours:02d}h {minutes:02d}m {seconds:02d}s"
+
+
+def report_server_state(label: str = "SERVER") -> dict:
+    """Bounded, read-only diagnostics must not turn a deploy failure into success."""
+    try:
+        snapshot = server_snapshot()
+    except (OpsError, OSError, subprocess.SubprocessError, ValueError) as error:
+        message = redact(str(error))
+        say(label, "UNAVAILABLE: " + message)
+        return {"service": SERVICE, "observed_at": utc(), "error": message}
+    say(label, f"{SERVICE}: {snapshot.get('ActiveState', 'unknown')}/"
+        f"{snapshot.get('SubState', 'unknown')}; MainPID={snapshot.get('MainPID', 'unknown')}; "
+        f"observed at {snapshot['observed_at']}")
+    started = snapshot.get("ExecMainStartTimestamp", "")
+    if started and started not in {"n/a", "0"}:
+        description = "current main process" if snapshot["running"] else "last recorded main-process launch; not proof it is running"
+        say(label + " START", f"{started} ({description}; systemd ExecMainStartTimestamp, host time zone).")
+    else:
+        say(label + " START", "Unknown: no main-process start timestamp was returned; not inferred from Git/update times.")
+    seconds = snapshot["uptime_seconds"]
+    if seconds is not None:
+        say(label + " UPTIME", format_uptime(seconds) + " (monotonic elapsed time; excludes host suspend).")
+    elif snapshot["running"] is False:
+        say(label + " UPTIME", "Not running: no current backend main process.")
+    else:
+        say(label + " UPTIME", "Unavailable: a valid current main-process monotonic timestamp is required.")
+    invocation = snapshot.get("InvocationID", "")
+    if re.fullmatch(r"[a-fA-F0-9]{32}", invocation) and int(invocation, 16):
+        say(label + " INVOCATION", invocation)
+    restarts = snapshot.get("NRestarts", "unknown")
+    say(label + " AUTO-RESTARTS", f"{restarts} (systemd automatic-restart counter, not a lifetime/manual-restart total).")
+    return snapshot
+
+
+def server_process_change(before: object, after: object) -> str:
+    """Compare observed process identities; PID reuse alone cannot prove a restart."""
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return "unknown"
+    if before.get("service") != SERVICE or after.get("service") != SERVICE:
+        return "unknown"
+    was_running, is_running = before.get("running"), after.get("running")
+    if type(was_running) is not bool or type(is_running) is not bool:
+        return "unknown"
+    if not was_running or not is_running:
+        return "started" if is_running else ("stopped" if was_running else "not-running")
+    old_id, new_id = before.get("InvocationID", ""), after.get("InvocationID", "")
+    if not all(isinstance(value, str) and re.fullmatch(r"[a-fA-F0-9]{32}", value) and int(value, 16)
+               for value in (old_id, new_id)):
+        return "unknown"
+    if old_id.lower() != new_id.lower():
+        return "changed"
+    keys = ("MainPID", "ExecMainStartTimestampMonotonic")
+    old_values = tuple(positive_integer(before.get(key)) for key in keys)
+    new_values = tuple(positive_integer(after.get(key)) for key in keys)
+    if None in old_values or None in new_values:
+        return "unknown"
+    return "unchanged" if old_values == new_values else "changed"
+
+
+def report_process_change(before: object, after: object) -> str:
+    change = server_process_change(before, after)
+    messages = {
+        "unchanged": "Same main PID, invocation and start timestamp before/after this job. No new backend launch was observed.",
+        "changed": "A different backend process was observed after this job. See its actual systemd start timestamp above.",
+        "started": "No main process was running at the first observation; one is running now.",
+        "stopped": "A main process was running at the first observation; none is running now. Inspect service logs.",
+        "not-running": "No running main process at either observation.",
+        "unknown": "Insufficient systemd identity data to confirm a process change; no restart is inferred from the commit ID.",
+    }
+    say("SERVER PROCESS", messages[change])
+    return change
+
+
 def unit_busy(unit: str = UPDATE_UNIT) -> bool:
     return properties(unit, "ActiveState").get("ActiveState") in ACTIVE_STATES
 
@@ -371,6 +479,7 @@ def latest_run() -> Path | None:
 
 
 def show_server_logs(history: bool = False) -> None:
+    report_server_state()
     say("LOGS", "Live AITA server logs. Ctrl+C closes this viewer only; AITA keeps running.")
     args = sudo_prefix() + ["journalctl", "-u", SERVICE, "--no-pager", "-o", "short-iso"]
     if history:
@@ -518,14 +627,22 @@ def start_job(args: argparse.Namespace) -> int:
         raise OpsError("Refusing to build as root.")
     if not re.fullmatch(r"[a-f0-9]{40,64}", args.commit):
         raise OpsError("Invalid pinned commit.")
-    ROOT.mkdir(mode=0o755, exist_ok=True)
-    (ROOT / "runs").mkdir(mode=0o755, exist_ok=True)
+    # mkdir/touch creation modes are filtered by the caller's umask. Keep the
+    # worker's UMask=0077; explicitly set only the intended public traversal bits.
+    for directory in (ROOT, ROOT / "runs"):
+        directory.mkdir(mode=0o755, exist_ok=True)
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fchmod(fd, 0o755)
+        finally:
+            os.close(fd)
     with file_lock(ROOT / "launch.lock"):
         if unit_busy():
             raise OpsError("Another managed update started first. Use logs to follow it.")
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
         run = ROOT / "runs" / run_id
         run.mkdir(mode=0o711)
+        run.chmod(0o711)  # The build user must traverse this root-owned parent.
         stable_archive = run / "source.tar"
         shutil.copyfile(args.archive, stable_archive)
         stable_archive.chmod(0o600)
@@ -549,8 +666,12 @@ def start_job(args: argparse.Namespace) -> int:
         atomic_json(run / "meta.json", meta)
         atomic_json(run / "state.json", {"result": "starting", "phase": "preflight"}, owner.pw_gid)
         log = run / "update.log"
-        log.touch(mode=0o640)
-        os.chown(log, 0, owner.pw_gid)
+        fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            os.fchown(fd, 0, owner.pw_gid)
+            os.fchmod(fd, 0o640)  # Exact root:owner-group log access even under 0077.
+        finally:
+            os.close(fd)
         atomic_json(ROOT / "latest.json", {"run_id": run_id}, 0)
         os.chmod(ROOT / "latest.json", 0o644)
         cmd = ["systemd-run", "--unit", UPDATE_UNIT, "--collect", "--service-type=exec",
@@ -570,7 +691,8 @@ def start_job(args: argparse.Namespace) -> int:
             atomic_json(run / "state.json", {"result": "failed", "phase": "job launch", "exit_code": 1,
                         "server_touched": False}, owner.pw_gid)
             raise OpsError("systemd could not start the update job: " + redact(result.stderr[-1500:]))
-        say("DETACHED JOB", f"Started {UPDATE_UNIT}. An SSH disconnect will not stop the build/deployment.")
+        say("DETACHED JOB", f"Started {UPDATE_UNIT} (the updater, NOT the backend). "
+            "AITA has not been restarted by this launcher. An SSH disconnect will not stop the managed job.")
     return 0
 
 
@@ -705,6 +827,7 @@ def worker(args: argparse.Namespace) -> int:
     owner = pwd.getpwnam(meta["owner"])
     source, tools = run / "source", run / "tools"
     phase, touched, code = "preflight", False, 1
+    server_before = None
     # A previous launcher can fetch this newer worker. Missing metadata therefore
     # uses the new temporary default, not the former mandatory-cloud policy.
     require_offsite = meta.get("require_offsite_backup", False)
@@ -732,6 +855,7 @@ def worker(args: argparse.Namespace) -> int:
         except BlockingIOError:
             raise OpsError("Another low-level AITA deployment is running. This managed update stopped without changing the server.") from None
         say("RELEASE", f"AITA operator {VERSION}; pinned commit {meta['commit']}; build user {owner.pw_name}.")
+        server_before = report_server_state("SERVER BEFORE")
         step("preflight", "Checking service, Java, database access, storage and the selected backup policy.")
         require_tools("bash", "runuser", "rsync", "unzip", "sha256sum", "flock", "curl", "ss", "pg_dump", "pg_restore", "age")
         env = read_env(ENV_FILE)
@@ -831,9 +955,10 @@ def worker(args: argparse.Namespace) -> int:
             if jar_hash != candidate_hash:
                 raise OpsError("Installed JAR does not match the built candidate. Inspect the server; no automatic rollback was attempted.")
             say("DEPLOYED COMMIT", f"{meta['commit']}; installed JAR SHA-256 {jar_hash}; local readiness verified.")
+            server_at_deploy = report_server_state("SERVER AFTER RESTART")
             atomic_json(ROOT / "last-success.json", {"commit": meta["commit"], "jar_sha256": jar_hash,
                         "run_id": run.name, "completed_at": utc(), "env_sha256": sha256(ENV_FILE),
-                        "backup_policy": backup_policy})
+                        "backup_policy": backup_policy, "server_at_deploy": server_at_deploy})
         step("public-check", "Checking the public Worker-to-origin path separately from local readiness.")
         failures = []
         for path in ("/readyz", "/auth/capabilities"):
@@ -887,11 +1012,16 @@ def worker(args: argparse.Namespace) -> int:
     finally:
         if lock_file is not None:
             os.close(lock_file)
+    # Show the real backend even when tests/build/preflight failed before restart.
+    # These observations are diagnostic, not a replacement for readiness checks.
+    server_after = report_server_state("SERVER FINAL")
+    process_change = report_process_change(server_before, server_after)
     atomic_json(run / "state.json", {"result": result_name, "phase": phase, "exit_code": code,
                 "at": utc(), "server_touched": touched, "commit": meta["commit"],
                 "requested_commit": meta["commit"],
                 "deployment_verified": result_name in {"success", "warning"},
-                "backup_policy": backup_policy}, owner.pw_gid)
+                "backup_policy": backup_policy, "server_before": server_before,
+                "server_after": server_after, "process_change": process_change}, owner.pw_gid)
     return code
 
 
@@ -1102,11 +1232,17 @@ def backups(args: argparse.Namespace) -> int:
 
 
 def status() -> int:
-    say("SERVER", str(properties(SERVICE, "ActiveState", "SubState", "MainPID", "NRestarts")))
+    current_server = report_server_state()
     say("LOCAL", f"/readyz: {http_status('http://127.0.0.1:8080/readyz', local=True)}")
     previous = load_json(ROOT / "last-success.json", {})
     if isinstance(previous, dict) and previous.get("commit"):
         say("LAST VERIFIED COMMIT", str(previous["commit"]))
+        say("DEPLOYMENT RECORDED AT", str(previous.get("completed_at", "unknown")) +
+            " (deployment verification time, NOT the process launch time)")
+        if previous.get("server_at_deploy"):
+            change = server_process_change(previous["server_at_deploy"], current_server)
+            say("DEPLOYMENT PROCESS MATCH", change +
+                " compared with the process observed at that historical deployment; process identity alone does not prove which JAR it loaded.")
         try:
             installed_hash = sha256(CURRENT_JAR)
             say("INSTALLED JAR SHA-256", installed_hash)
@@ -1118,7 +1254,15 @@ def status() -> int:
             say("WARNING", "Cannot read the installed JAR to check its deployment hash.")
     run = latest_run()
     if run:
-        say("LAST UPDATE", str(load_json(run / "state.json", {})))
+        state = load_json(run / "state.json", {})
+        if isinstance(state, dict):
+            # Keep the two detailed snapshots in the saved record, not a huge dict
+            # in the terminal. The fresh live snapshot is already shown above.
+            summary = {key: state[key] for key in ("result", "phase", "exit_code", "at", "server_touched",
+                       "commit", "requested_commit", "deployment_verified", "backup_policy", "process_change") if key in state}
+            say("LAST UPDATE", str(summary))
+        else:
+            say("LAST UPDATE", "Record unreadable/invalid; no deployment result assumed.")
         say("LOG FILE", str(run / "update.log"))
     else:
         say("INFO", "No managed update record yet.")
