@@ -5325,6 +5325,11 @@ internal fun AppConfiguration.LocalAppPreferencesPriorityEffect() {
 
 @Composable
 internal fun AppConfiguration.CloudConnectionStatusBanner() {
+    // Resume a sleeping retry on all Compose targets, including after visiting an authenticator.
+    // This does not cancel a healthy socket or animate the connection banner.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        notifyCloudConnectionMayBeAvailable()
+    }
     val userAccount = stateValues.userAccount
     val manualRefreshInProgress = stateValues.cloudConnectionManualRefreshInProgress
     val refreshIconRes by stateValues.drawableResIconRefresh.collectAsState()

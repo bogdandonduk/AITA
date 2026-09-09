@@ -56,9 +56,9 @@ internal fun AppConfiguration.AdditionalLoginEmailsEditor(
         } else error = authResponseText(response)
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(authUiText("Additional sign-in emails", "Дополнительные email для входа", "Қосымша кіру email мекенжайлары"),
+        Text(authUiText("Extra emails", "Дополнительные email", "Қосымша email мекенжайлары"),
             color = stateValues.TextColor, fontSize = stateValues.accentTextSize)
-        Text(authUiText("Primary", "Основной", "Негізгі") + ": " + settings.email,
+        Text(authUiText("Main email", "Основной email", "Негізгі email") + ": " + settings.email,
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         if (flow == null && removeEmail == null) {
             settings.additionalLoginEmails.forEach { address ->
@@ -86,7 +86,7 @@ internal fun AppConfiguration.AdditionalLoginEmailsEditor(
                         val request = AitaEmailCodeResendRequestDataModel(currentFlow.flowId, stateValues.appLanguage)
                         launchAction { acceptFlow(AitaAdvancedAuthenticationClient.resendEmailAlias(request)) }
                     }, identity = "additional-email-code-${currentFlow.flowId}",
-                    confirmText = authUiText("Confirm email", "Подтвердить email", "Email растау"))
+                    confirmText = authUiText("Confirm extra email", "Подтвердить дополнительный email", "Қосымша email растау"))
                 AuthQuietAction(stateValues.stringCancel, !busy) { clear() }
             }
             removeEmail != null || settings.additionalLoginEmails.size < AITA_MAX_ADDITIONAL_LOGIN_EMAILS -> {
@@ -95,6 +95,8 @@ internal fun AppConfiguration.AdditionalLoginEmailsEditor(
                         emailTextField(modifier = Modifier.fillMaxWidth(), stateHost = form,
                             stateKey = "additional_login_email_$fieldEpoch", identityKey = "additional_login_email_$fieldEpoch",
                             valueInitial = email, enabled = !busy, autoFocus = false,
+                            titleText = authUiText("Extra email", "Дополнительный email", "Қосымша email"),
+                            placeholderText = authUiText("Enter an extra email", "Введите дополнительный email", "Қосымша email енгізіңіз"),
                             retainTextAcrossRecreation = false, persistTextDraft = false,
                             imeWithAction = ImeWithAction(ImeAction.Next),
                             onValueChange = { value, apply -> if (!busy) { email = value; error = ""; apply() } })
@@ -103,7 +105,7 @@ internal fun AppConfiguration.AdditionalLoginEmailsEditor(
                 SensitiveAuthConfirmationFields(enabled = !busy, currentPassword = password, secondFactor = factor,
                     secondFactorRequired = settings.authenticatorEnabled, onPasswordChange = { password = it }, onSecondFactorChange = { factor = it })
                 actionButton(modifier = Modifier.fillMaxWidth(), autoLoading = false, loading = busy,
-                    text = if (removeEmail == null) authUiText("Get code", "Получить код", "Код алу") else authUiText("Remove email", "Удалить email", "Email жою"),
+                    text = if (removeEmail == null) authUiText("Get code", "Получить код", "Код алу") else authUiText("Remove extra email", "Удалить дополнительный email", "Қосымша email жою"),
                     enabledColor = if (removeEmail == null) stateValues.AccentColor else stateValues.ErrorColor,
                     enabled = !busy && password.isNotBlank() && (!settings.authenticatorEnabled || factor.isNotBlank()) &&
                         (removeEmail != null || normalizeAitaEmail(email) != null)) {
@@ -118,7 +120,7 @@ internal fun AppConfiguration.AdditionalLoginEmailsEditor(
                 }
                 if (removeEmail != null) AuthQuietAction(stateValues.stringCancel, !busy) { clear() }
             }
-            else -> Text(authUiText("Five additional emails maximum", "Не более пяти дополнительных email", "Ең көбі бес қосымша email"),
+            else -> Text(authUiText("Five extra emails maximum", "Не более пяти дополнительных email", "Ең көбі бес қосымша email"),
                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         }
         AuthQuietAction(authUiText("Done", "Готово", "Дайын"), !busy) { clear(); onClose() }

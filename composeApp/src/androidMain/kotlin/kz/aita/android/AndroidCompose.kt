@@ -1341,6 +1341,8 @@ private fun getOrCreateKey(): SecretKey {
 @AndroidEntryPoint
 class MainActivity: ComponentActivity() {
 
+    private val cloudConnectionSignals by lazy { AndroidCloudConnectionSignals(this) }
+
     val viewModel: MainActivityViewModel by viewModels()
 
     private var pendingPrinterPermission: CompletableDeferred<Boolean>? = null
@@ -1401,6 +1403,7 @@ class MainActivity: ComponentActivity() {
 
 //    enableFullscreen()
 
+        cloudConnectionSignals.start()
         setContent {
             AppConfiguration(
                 {
@@ -1598,6 +1601,7 @@ class MainActivity: ComponentActivity() {
     }
 
     override fun onDestroy() {
+        cloudConnectionSignals.close()
         pendingPrinterPermission?.complete(false)
         pendingPrinterPermission = null
         if (instance === this) instance = null

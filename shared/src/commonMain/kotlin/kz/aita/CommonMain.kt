@@ -7907,14 +7907,13 @@ private const val CLOUD_CONNECTION_HEALTH_CHECK_LONG_PAUSE_MILLIS = 90_000L
 private const val CLOUD_CONNECTION_HEALTH_MONITOR_EXCEPTION_RETRY_MILLIS = 5_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS = 60_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS = 10_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 15_000L
-private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_MAX_INTERVAL_MILLIS = 30_000L
+private const val CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS = 2_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS = 10_000L
 private const val CLOUD_CONNECTION_HEALTH_CHECK_TIMEOUT_MILLIS = 20_000L
 private const val CLOUD_CONNECTION_AUTH_REFRESH_SUPPRESSION_AFTER_TRANSPORT_FAILURE_MILLIS = 15_000L
 private const val CLOUD_CONNECTION_PRESENTATION_INITIAL_OFFLINE_SETTLE_MILLIS = 3_000L
 private const val CLOUD_CONNECTION_PRESENTATION_OFFLINE_SETTLE_MILLIS = 8_000L
-private const val CLOUD_CONNECTION_PRESENTATION_RECOVERY_SETTLE_MILLIS = 3_000L
+private const val CLOUD_CONNECTION_PRESENTATION_RECOVERY_SETTLE_MILLIS = 1_500L
 private const val CLOUD_CONNECTION_PRESENTATION_INITIAL_REACHABLE_SETTLE_MILLIS = 1_000L
 @Volatile
 private var cloudTransportLastUnavailableAtMillis: Long = 0L
@@ -11994,7 +11993,8 @@ private fun currentCloudSessionFailureResponse(): ResponseDataModel<Unit> {
 
 @PublishedApi
 internal suspend fun ensureCloudSessionReadyForProtectedRequest(
-    forceRejectedRefreshRetry: Boolean = false
+    forceRejectedRefreshRetry: Boolean = false,
+    retryAfterTransportRecovery: Boolean = false
 ): ResponseDataModel<Unit> {
     val sessionGeneration = currentAuthenticatedSessionGeneration()
     val initialTokens = getStoredUserAuthTokens?.invoke() ?: return cloudSessionExpiredResponse()
@@ -12008,7 +12008,9 @@ internal suspend fun ensureCloudSessionReadyForProtectedRequest(
     ) {
         return successfulCloudSessionValidationResponse()
     }
-    recentCloudSessionValidationFailure(initialAccessToken)?.let { return it }
+    recentCloudSessionValidationFailure(initialAccessToken)?.let {
+        if (!retryAfterTransportRecovery || !it.transportFailure) return it
+    }
 
     return cloudSessionValidationMutex.withLock {
         if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
@@ -12023,7 +12025,9 @@ internal suspend fun ensureCloudSessionReadyForProtectedRequest(
         ) {
             return@withLock successfulCloudSessionValidationResponse()
         }
-        recentCloudSessionValidationFailure(current.accessToken)?.let { return@withLock it }
+        recentCloudSessionValidationFailure(current.accessToken)?.let {
+            if (!retryAfterTransportRecovery || !it.transportFailure) return@withLock it
+        }
 
         // Refresh is mandatory only after the access token is actually unusable. Refreshing merely
         // because a valid token is near its expiry created a fan-out at startup and made an otherwise
@@ -13667,6 +13671,18 @@ private fun realtimeRefreshingMessage(): List<LocalizedStringDataModel> = locali
 )
 
 private var appCacheCollectorsStarted = false
+private val cloudHealthRetryWakeup = ConnectionRetryWakeup()
+private val realtimeRetryWakeup = ConnectionRetryWakeup()
+private val cloudNetworkChangeRevision = MutableStateFlow(0L)
+
+/** Platform hints only wake probes; they do not assert reachability, rotate tokens or replay writes. */
+fun notifyCloudConnectionMayBeAvailable(networkChanged: Boolean = false) {
+    if (networkChanged) cloudNetworkChangeRevision.update { it + 1L }
+    cloudHealthRetryWakeup.request()
+    realtimeRetryWakeup.request()
+    if (appInitializationStartedState.value) startCloudConnectionHealthMonitor()
+}
+
 private val cloudConnectionHealthMonitorJob = OwnedConnectionJob()
 private val cloudConnectionRecoveryJob = OwnedConnectionJob()
 private val cloudConnectionReconciliationJob = OwnedConnectionJob()
@@ -13945,7 +13961,7 @@ private fun String.toRealtimeWebSocketUrl(path: String): String {
 private const val REALTIME_REFRESH_DEBOUNCE_MILLIS = 650L
 private const val REALTIME_BROAD_REFRESH_MIN_INTERVAL_MILLIS = 20_000L
 private const val REALTIME_CONNECTED_REFRESH_MIN_INTERVAL_MILLIS = 30_000L
-private const val REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS = 5_000L
+private const val REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS = 1_000L
 private const val REALTIME_RECENT_UPDATE_IDS_LIMIT = 512
 
 private val realtimeRefreshPlanMutex = Mutex()
@@ -14275,11 +14291,8 @@ private fun cancelRealtimeUpdatesSocketAfterReachabilityFailure() {
 }
 
 @PublishedApi
-internal fun cloudConnectionUnavailableProbeDelayMillis(unavailableRound: Int): Long {
-    val exponent = unavailableRound.coerceIn(0, 3)
-    return (CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS * (1L shl exponent))
-        .coerceAtMost(CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_MAX_INTERVAL_MILLIS)
-}
+internal fun cloudConnectionUnavailableProbeDelayMillis(unavailableRound: Int): Long =
+    cloudUnavailableRetryDelayMillis(unavailableRound)
 
 private data class CloudConnectionRecoveryResult(
     val success: Boolean,
@@ -14357,8 +14370,12 @@ private suspend fun recoverCloudConnectionFast(
     }
 
     val sessionGeneration = currentAuthenticatedSessionGeneration()
+    // A newly successful AITA probe supersedes a cached transport error, not a rejected refresh
+    // token or a server-side rate limit. Keep real authentication rejection remembered.
+    if (lastAuthRefreshNonAuthFailureWasTransportFailure) clearAuthRefreshNonAuthFailure()
     val validation = ensureCloudSessionReadyForProtectedRequest(
-        forceRejectedRefreshRetry = forceRejectedRefreshRetry
+        forceRejectedRefreshRetry = forceRejectedRefreshRetry,
+        retryAfterTransportRecovery = true
     )
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) {
         // A sign-in/logout took ownership while validation was waiting. Its socket must survive.
@@ -14392,6 +14409,9 @@ private suspend fun recoverCloudConnectionFast(
         shouldRestartRealtimeForRecovery(forceRealtimeRestart, realtimeUpdatesJob.isRunning)
     ) {
         restartRealtimeUpdates()
+    } else if (!realtimeUpdatesJob.isConnected) {
+        // The owner may be in backoff, not in a handshake. Wake only the wait; never cancel it.
+        realtimeRetryWakeup.request()
     }
 
     CloudConnectionRecoveryResult(
@@ -14468,6 +14488,11 @@ private fun launchCloudConnectionReconciliation(
 
 }
 
+private val automaticReconciliationClock = kotlin.time.TimeSource.Monotonic.markNow()
+private val automaticReconciliationGate = ConnectionReconciliationGate(
+    nowMillis = { automaticReconciliationClock.elapsedNow().inWholeMilliseconds }
+)
+
 private fun launchAutomaticCloudConnectionRecovery(
     knownReachabilityResponse: ResponseDataModel<Unit>,
     forceRealtimeRestart: Boolean
@@ -14487,7 +14512,8 @@ private fun launchAutomaticCloudConnectionRecovery(
                 logCloudConnectionDiagnostic("automatic recovery timed out; monitor will retry")
                 return@startIfIdle
             }
-            if (result.success && result.hasLocalAccount) {
+            if (result.success && result.hasLocalAccount &&
+                automaticReconciliationGate.claim(currentAuthenticatedSessionGeneration())) {
                 launchCloudConnectionReconciliation(
                     reason = "connection_sync",
                     forceBroadRefresh = false
@@ -14513,9 +14539,19 @@ fun startCloudConnectionHealthMonitor() {
         var lastRealtimeSanityProbeAtMillis = 0L
         var lastProbeAtMillis = 0L
         var previousProbeFailed = false
+        var observedNetworkRevision = cloudNetworkChangeRevision.value
+        var pendingNetworkRestart = false
+        var lastWakeRevision = cloudHealthRetryWakeup.revision
 
         try {
             while (isActive) {
+                val wakeRevision = cloudHealthRetryWakeup.revision
+                val explicitlyWoken = wakeRevision != lastWakeRevision
+                lastWakeRevision = wakeRevision
+                val networkRevision = cloudNetworkChangeRevision.value
+                val networkChanged = networkRevision != observedNetworkRevision
+                observedNetworkRevision = networkRevision
+                pendingNetworkRestart = pendingNetworkRestart || networkChanged
                 try {
                     val iterationStartedAt = getCurrentTimeMillis()
                     val resumedAfterLongPause =
@@ -14526,13 +14562,13 @@ fun startCloudConnectionHealthMonitor() {
                     val hasConfiguredServerUrl = normalizedHttpServerUrlOrNull(configuredServerUrl) != null
 
                     if (!hasConfiguredServerUrl) {
-                        delay(CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS)
+                        cloudHealthRetryWakeup.await(wakeRevision, CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS)
                         continue
                     }
 
-                    val realtimeReportedConnected = realtimeUpdatesJob.isConnected
+                    val realtimeReportedConnected = realtimeUpdatesJob.isConnected && !pendingNetworkRestart
                     val realtimeSanityProbeDue =
-                        resumedAfterLongPause ||
+                        explicitlyWoken || networkChanged || resumedAfterLongPause ||
                             iterationStartedAt - lastRealtimeSanityProbeAtMillis >=
                             CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_SANITY_INTERVAL_MILLIS
 
@@ -14545,7 +14581,7 @@ fun startCloudConnectionHealthMonitor() {
                             authenticated = true,
                             authRefreshRequired = false
                         )
-                        delay(CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS)
+                        cloudHealthRetryWakeup.await(wakeRevision, CLOUD_CONNECTION_HEALTH_CHECK_REALTIME_CONNECTED_INTERVAL_MILLIS)
                         continue
                     }
 
@@ -14557,7 +14593,7 @@ fun startCloudConnectionHealthMonitor() {
                     if (shouldDeferCloudHealthProbe(
                         activeNetworkOperations = foregroundNetworkOperations,
                         transportUnavailable = cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE,
-                        resumedAfterPause = resumedAfterLongPause,
+                        resumedAfterPause = resumedAfterLongPause || explicitlyWoken || networkChanged,
                         previousProbeFailed = previousProbeFailed,
                         nowMillis = iterationStartedAt,
                         lastProbeAtMillis = lastProbeAtMillis
@@ -14568,7 +14604,7 @@ fun startCloudConnectionHealthMonitor() {
                             "health probe deferred activeNetworkOperations=$foregroundNetworkOperations " +
                                 "status=${cloudTransportStatusName(cloudTransportStatusState.value)}"
                         )
-                        delay(CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS)
+                        cloudHealthRetryWakeup.await(wakeRevision, CLOUD_CONNECTION_HEALTH_CHECK_BUSY_DEFER_MILLIS)
                         continue
                     }
 
@@ -14597,12 +14633,22 @@ fun startCloudConnectionHealthMonitor() {
                     if (serverAvailable) {
                         unavailableRound = 0
                         if (hasLocalAccount) ActiveStores.retryPending()
+                        // A network-change hint must survive a failed first probe. Refresh the old
+                        // network's socket once, after AITA is reachable on the replacement network.
+                        if (pendingNetworkRestart) {
+                            if (getStoredUserAuthTokens?.invoke() != null) restartRealtimeUpdates()
+                            pendingNetworkRestart = false
+                        }
+                        val realtimeConnectedNow = realtimeUpdatesJob.isConnected && !resumedAfterLongPause
                         markCloudTransportReachableForNotifications(
-                            authenticated = realtimeReportedConnected && !resumedAfterLongPause,
-                            authRefreshRequired = if (realtimeReportedConnected && !resumedAfterLongPause) false else null
+                            authenticated = realtimeConnectedNow,
+                            authRefreshRequired = if (realtimeConnectedNow) false else null,
+                            // One fresh AITA probe proves transport. The banner keeps its own settle
+                            // window; account validation still runs separately and may reject login.
+                            forceRecovery = true
                         )
 
-                        if (hasLocalAccount && (!realtimeReportedConnected || resumedAfterLongPause)) {
+                        if (hasLocalAccount && !realtimeConnectedNow) {
                             launchAutomaticCloudConnectionRecovery(
                                 knownReachabilityResponse = response!!,
                                 forceRealtimeRestart = resumedAfterLongPause
@@ -14612,10 +14658,15 @@ fun startCloudConnectionHealthMonitor() {
                         cancelRealtimeUpdatesSocketAfterReachabilityFailure()
                     }
 
-                    val delayMillis = when (cloudTransportStatusState.value) {
+                    val delayMillis = if (!serverAvailable) {
+                        cloudConnectionUnavailableProbeDelayMillis(unavailableRound).also {
+                            unavailableRound = (unavailableRound + 1).coerceAtMost(3)
+                        }
+                    } else when (cloudTransportStatusState.value) {
                         CLOUD_TRANSPORT_STATUS_REACHABLE -> {
                             unavailableRound = 0
-                            CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
+                            if (hasLocalAccount && !realtimeUpdatesJob.isConnected) 5_000L
+                            else CLOUD_CONNECTION_HEALTH_CHECK_REACHABLE_INTERVAL_MILLIS
                         }
                         CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> {
                             unavailableRound = 0
@@ -14631,7 +14682,7 @@ fun startCloudConnectionHealthMonitor() {
                             CLOUD_CONNECTION_HEALTH_CHECK_UNKNOWN_INTERVAL_MILLIS
                         }
                     }
-                    delay(cloudRecoveryAwareProbeDelayMillis(
+                    cloudHealthRetryWakeup.await(wakeRevision, cloudRecoveryAwareProbeDelayMillis(
                         serverAvailable = serverAvailable,
                         awaitingRecoveryConfirmation = cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE,
                         ordinaryDelayMillis = delayMillis
@@ -14643,7 +14694,7 @@ fun startCloudConnectionHealthMonitor() {
                     logCloudConnectionDiagnostic(
                         "health monitor iteration failed ${throwable.message ?: throwable}"
                     )
-                    delay(CLOUD_CONNECTION_HEALTH_MONITOR_EXCEPTION_RETRY_MILLIS)
+                    cloudHealthRetryWakeup.await(wakeRevision, CLOUD_CONNECTION_HEALTH_MONITOR_EXCEPTION_RETRY_MILLIS)
                 }
             }
         } finally {
@@ -14684,6 +14735,7 @@ fun startRealtimeUpdates() {
         var reconnectDelayMillis = 1_000L
         try {
             while (isActive) {
+                val retryRevision = realtimeRetryWakeup.revision
                 // A token-validation mutex/refresh can stall too, not just the WebSocket handshake.
                 val sessionGeneration = currentAuthenticatedSessionGeneration()
                 var accessToken = withTimeoutOrNull(60_000L) { currentRealtimeAccessTokenOrNull() }
@@ -14696,7 +14748,7 @@ fun startRealtimeUpdates() {
                         CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
                         else -> 5_000L
                     }
-                    delay(retryDelay)
+                    realtimeRetryWakeup.await(retryRevision, retryDelay)
                     continue
                 }
 
@@ -14784,7 +14836,6 @@ fun startRealtimeUpdates() {
                                     forceRecovery = true
                                 )
                                 realtimeUpdatesJob.setConnected(thisJob, true)
-                                reconnectDelayMillis = 1_000L
 
                                 // Reconcile anything missed while the socket was reconnecting. The session
                                 // gate above has already validated this exact access token, so these jobs do
@@ -14881,7 +14932,7 @@ fun startRealtimeUpdates() {
                     realtimeUpdatesJob.setConnected(thisJob, false)
 
                     if (authenticationUnavailable) {
-                        delay(CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS)
+                        realtimeRetryWakeup.await(retryRevision, CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS)
                         continue
                     }
 
@@ -14889,13 +14940,11 @@ fun startRealtimeUpdates() {
                         // The HTTP server may still be reachable while only the WebSocket dropped. Do not
                         // add a REST ping after every normal socket close; reconnect with bounded backoff.
                         val livedMillis = (getCurrentTimeMillis() - openedRealtimeSessionAtMillis).coerceAtLeast(0L)
-                        val delayMillis = if (livedMillis < REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS) {
-                            REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS
-                        } else {
-                            reconnectDelayMillis.coerceAtLeast(REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS)
-                        }
-                        delay(delayMillis)
-                        reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(30_000L)
+                        if (livedMillis >= 30_000L) reconnectDelayMillis = 1_000L
+                        val delayMillis = reconnectDelayMillis.coerceAtLeast(REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS)
+                        realtimeRetryWakeup.await(retryRevision, realtimeRetryDelayMillis(
+                            delayMillis, cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE))
+                        reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(10_000L)
                         continue
                     }
 
@@ -14904,11 +14953,12 @@ fun startRealtimeUpdates() {
                     // separate prevents realtime reconnects from multiplying /auth/ping traffic.
                     val retryDelayMillis = when (cloudTransportStatusState.value) {
                         CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
-                        CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
-                        else -> reconnectDelayMillis.coerceAtLeast(5_000L)
+                        CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> realtimeRetryDelayMillis(reconnectDelayMillis, false)
+                        else -> realtimeRetryDelayMillis(reconnectDelayMillis,
+                            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE)
                     }
-                    delay(retryDelayMillis)
-                    reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(30_000L)
+                    realtimeRetryWakeup.await(retryRevision, retryDelayMillis)
+                    reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(10_000L)
                 }
             }
         } finally {
@@ -15692,6 +15742,7 @@ internal fun markCloudTransportUnavailableForNotifications(
     reason: String = "transport_failure"
 ): Boolean {
     clearCloudTransportRecoverySignalsForNotifications()
+    if (cloudTransportFailureSignalWindowState.value.signalCount == 0) cloudHealthRetryWakeup.request()
 
     if (
         cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE &&
@@ -15739,7 +15790,7 @@ internal fun markCloudTransportReachableForNotifications(
 ): Boolean {
     val wasUnavailable = cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_UNAVAILABLE
 
-    if (wasUnavailable && !forceRecovery) {
+    if (wasUnavailable && !forceRecovery && !authenticated) {
         // Even one authoritative server response is enough to stop a pending visual outage. Raw
         // diagnostics still require the full recovery quorum below, so operational state remains
         // conservative while the user-facing banner avoids a green→red→green flash.
@@ -15777,6 +15828,8 @@ internal fun markCloudTransportReachableForNotifications(
     cloudTransportFailureNotificationPending = false
     cloudTransportFailureNoticePostedForCurrentOutage = false
     if (wasUnavailable) {
+        cloudHealthRetryWakeup.request()
+        realtimeRetryWakeup.request()
         cloudTransportRecoveryNotificationPending = hadVisibleOutage &&
             nextStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
     }

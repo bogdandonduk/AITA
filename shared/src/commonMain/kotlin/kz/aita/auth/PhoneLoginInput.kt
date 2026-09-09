@@ -21,7 +21,7 @@ fun normalizeAitaPhoneFieldInput(raw: String, callingCode: String, nationalLengt
     return national.takeIf { it.length <= nationalLength }
 }
 
-/** Indexed compatibility lookup for primary phones stored by earlier sign-up screens without '+'.
+/** Compatibility keys for primary phones stored by earlier sign-up screens without '+'.
  * Never guess a national number's country. The caller must supply a complete phone identifier.
  */
 fun aitaPhoneLoginStorageCandidates(raw: String): Set<String> {
@@ -37,3 +37,22 @@ fun aitaPhoneLoginStorageCandidates(raw: String): Set<String> {
 /** Multiple representations owned by the same account are fine; two distinct owners fail closed. */
 fun <T> uniqueAitaPhoneLoginOwner(primaryOwners: Iterable<T>, verifiedAliasOwners: Iterable<T>): T? =
     (primaryOwners.toSet() + verifiedAliasOwners.toSet()).singleOrNull()
+
+/** A national-number editor is not a free-form international identifier. Do not silently submit
+ * a partly entered number (or the country code alone) as an unknown account to the code endpoint.
+ */
+fun aitaPhoneLoginFromNationalInput(raw: String, callingCode: String, nationalLength: Int): String? {
+    val national = normalizeAitaPhoneFieldInput(raw, callingCode, nationalLength)
+        ?.takeIf { it.length == nationalLength } ?: return null
+    return normalizeAitaPhoneAlias(callingCode + national)
+}
+
+/** SQL compatibility lookup is deliberately broad; validate each stored value before trusting it.
+ * In particular, stripping '+' for lookup must not turn an explicit +8 country into a +7 trunk.
+ */
+fun <T> aitaMatchingPhoneLoginOwners(raw: String, candidates: Iterable<Pair<String?, T>>): Set<T> {
+    val canonical = normalizeAitaPhoneAlias(raw) ?: return emptySet()
+    return candidates.mapNotNull { (stored, owner) ->
+        owner.takeIf { stored != null && normalizeAitaPhoneAlias(stored) == canonical }
+    }.toSet()
+}

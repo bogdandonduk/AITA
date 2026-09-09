@@ -407,8 +407,16 @@ private class AitaAdvancedAuthService(
         val identifierHash = crypto.hmac("identifier", normalized.value)
         val ipHash = crypto.hmac("ip", ip)
         if (!limiter.allow("code:ip:$ipHash", 120, now)) throw AitaAuthRateLimitedException(3600L)
-        val user = resolveUser(normalized.value)?.takeIf {
-            it.active && (normalized.kind == AitaAuthIdentifierKind.EMAIL || normalizeAitaEmail(it.email) != null)
+        val resolvedUser = resolveUser(normalized.value)
+        val destination = resolvedUser?.takeIf { it.active }?.let { aitaEmailCodeDestination(normalized, it.email) }
+        val user = resolvedUser?.takeIf { it.active && destination != null }
+        // Private operator diagnostics only: the anonymous response must not reveal an account,
+        // its address, or whether an email was queued. A 202 alone is not delivery evidence.
+        var requestDisposition = when {
+            resolvedUser == null -> "NO_UNIQUE_ACCOUNT"
+            !resolvedUser.active -> "INACTIVE_ACCOUNT"
+            user == null -> "NO_MAIN_EMAIL"
+            else -> "QUEUED"
         }
         val flow = newSuspendedTransaction(Dispatchers.IO) {
             lockEmailBucketsInside(identifierHash, ipHash, user?.id)
@@ -418,16 +426,20 @@ private class AitaAdvancedAuthService(
                     (AuthOneTimeChallenges.expiresAtMillis greater now)
             }.orderBy(AuthOneTimeChallenges.createdAtMillis to SortOrder.DESC).limit(1).forUpdate().singleOrNull()
             // A repeated tap/request during cooldown reuses the flow; it must not invalidate the code in transit.
-            if (latest != null && latest[AuthOneTimeChallenges.resendAfterMillis] > now) return@newSuspendedTransaction emailFlow(latest, now)
+            if (latest != null && latest[AuthOneTimeChallenges.resendAfterMillis] > now) {
+                requestDisposition = if (latest[AuthOneTimeChallenges.userId] == null) "REUSED_NEUTRAL_FLOW" else "REUSED_FLOW"
+                return@newSuspendedTransaction emailFlow(latest, now)
+            }
             checkEmailQuotaInside(identifierHash, ipHash, now)
             AuthOneTimeChallenges.update({
                 (AuthOneTimeChallenges.identifierHash eq identifierHash) and
                     (AuthOneTimeChallenges.purpose eq purpose) and AuthOneTimeChallenges.consumedAtMillis.isNull()
             }) { it[AuthOneTimeChallenges.consumedAtMillis] = now; it[AuthOneTimeChallenges.updatedAtMillis] = now }
-            createEmailChallengeInside(user?.id,
-                if (normalized.kind == AitaAuthIdentifierKind.EMAIL && user != null) normalized.value else user?.email,
-                purpose, locale, identifierHash, ipHash, now)
+            createEmailChallengeInside(user?.id, destination, purpose, locale, identifierHash, ipHash, now)
         }
+        // Log after commit, with neither the supplied phone nor the destination address/code.
+        application.log.info("AITA authentication email request flow={} purpose={} identifierKind={} outcome={}",
+            flow.flowId, purpose, normalized.kind, requestDisposition)
         // Only reflect the identifier the caller supplied. A phone request must not disclose the account email.
         return flow.copy(maskedDestination = normalized.takeIf { it.kind == AitaAuthIdentifierKind.EMAIL }?.value?.let(::maskEmail).orEmpty())
     }
@@ -1620,23 +1632,23 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.requestEmailAlias(userId, call.receiveAita<AitaEmailAliasRequestDataModel>(), call.authClientIp())
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage(
-                        "Could not add this email. Check your password, security code and address.",
-                        "Не удалось добавить email. Проверьте пароль, код безопасности и адрес.",
-                        "Email қосылмады. Құпия сөзді, қауіпсіздік кодын және мекенжайды тексеріңіз."))
+                        "Could not add this extra email. Check your password, security code and address.",
+                        "Не удалось добавить дополнительный email. Проверьте пароль, код безопасности и адрес.",
+                        "Қосымша email қосылмады. Құпия сөзді, қауіпсіздік кодын және мекенжайды тексеріңіз."))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
                 post("/email/resend") {
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
                     val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_EMAIL_ALIAS, userId)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Start email setup again", "Начните добавление email заново", "Email қосуды қайта бастаңыз"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Start extra email setup again", "Начните добавление дополнительного email заново", "Қосымша email қосуды қайта бастаңыз"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
                 post("/email/confirm") {
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.confirmEmailAlias(userId, call.receiveAita<AitaEmailAliasConfirmRequestDataModel>())
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage(
-                        "Code invalid, expired, or email unavailable", "Код неверен, истёк или email недоступен", "Код қате, мерзімі аяқталған немесе email қолжетімсіз"))
+                        "Code invalid, expired, or extra email unavailable", "Код неверен, истёк или дополнительный email недоступен", "Код қате, мерзімі аяқталған немесе қосымша email қолжетімсіз"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
                 post("/email/remove") {
@@ -1650,7 +1662,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaPhoneAliasRequestDataModel>()
                     val result = service.requestPhoneAlias(userId, request, call.authClientIp())
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Phone change could not be requested", "Не удалось запросить изменение номера", "Телефон өзгерісін сұрау мүмкін болмады"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Extra phone number change could not be requested", "Не удалось запросить изменение дополнительного номера", "Қосымша телефон нөмірінің өзгерісін сұрау мүмкін болмады"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
 

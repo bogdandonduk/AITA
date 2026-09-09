@@ -204,9 +204,9 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 }
 
                 settings?.let { current ->
-                    AuthSettingsInfoRow(stateValues.stringEmail, current.email)
+                    AuthSettingsInfoRow(authUiText("Main email", "Основной email", "Негізгі email"), current.email)
                     AuthSettingsInfoRow(
-                        authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі"),
+                        authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
                         current.phoneLoginAlias ?: authUiText("Not configured", "Не настроен", "Бапталмаған")
                     )
                     AuthSettingsInfoRow(
@@ -292,7 +292,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                         actionButton(
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
-                            text = authUiText("Phone for sign-in", "Телефон для входа", "Кіру телефоны"),
+                            text = authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
                             iconPath = stateValues.drawablePathIconPhone,
                             enabled = !loading &&
                                 settings != null &&
@@ -300,15 +300,15 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             onDisabledClick = {
                                 if (authAvailability.phoneLoginAlias != AitaAuthFeatureAvailability.AVAILABLE) {
                                     info = authUiText(
-                                        "Phone login aliases become available when secure email confirmation is enabled on the server.",
-                                        "Номер для входа станет доступен после включения защищённого подтверждения по email на сервере.",
-                                        "Кіру телефон нөмірі серверде қауіпсіз email растауы қосылғанда қолжетімді болады."
+                                        "An extra phone number becomes available when secure email confirmation is enabled on the server.",
+                                        "Дополнительный номер телефона станет доступен после включения защищённого подтверждения по email на сервере.",
+                                        "Қосымша телефон нөмірі серверде қауіпсіз email растауы қосылғанда қолжетімді болады."
                                     )
                                 }
                             }
                         ) { clearSensitive(); phoneAlias = settings?.phoneLoginAlias.orEmpty(); editor = AccountAuthEditor.PHONE }
                         actionButton(autoLoading = false, modifier = Modifier.fillMaxWidth(),
-                            text = authUiText("Additional sign-in emails", "Дополнительные email для входа", "Қосымша кіру email мекенжайлары"),
+                            text = authUiText("Extra emails", "Дополнительные email", "Қосымша email мекенжайлары"),
                             iconPath = stateValues.drawablePathIconEmail,
                             enabled = !loading && settings != null && capabilities?.additionalEmailLoginEnabled == true,
                             onDisabledClick = { info = authUiText("Update the server and enable email confirmation", "Обновите сервер и включите подтверждение email", "Серверді жаңартып, email растауын қосыңыз") }
@@ -591,9 +591,9 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                     AccountAuthEditor.PHONE -> {
                         Text(
                             text = authUiText(
-                                "Confirmation by email, not SMS.",
-                                "Подтверждение по email, не в SMS.",
-                                "Растау SMS емес, email арқылы."
+                                "An extra number for sign-in; your main number stays unchanged. Confirmation goes to your main email, not SMS.",
+                                "Дополнительный номер для входа; основной номер не изменится. Подтверждение придёт на основной email, не в SMS.",
+                                "Кіруге арналған қосымша нөмір; негізгі нөмір өзгермейді. Растау SMS емес, негізгі email арқылы келеді."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
@@ -612,6 +612,8 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             val phoneField = if (phoneAction == AitaPhoneAliasAction.ADD_OR_REPLACE) {
                                 countrySelectionPhoneNumberTextField(
                                     modifier = Modifier.fillMaxWidth(), valueInitial = phoneAlias,
+                                    titleText = authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
+                                    placeholderText = authUiText("Enter an extra phone number", "Введите дополнительный номер", "Қосымша телефон нөмірін енгізіңіз"),
                                     stateHost = phoneForm, stateKey = "account_phone_alias", identityKey = "account_phone_alias",
                                     enabled = !loading, autoFocus = false, imeWithAction = ImeWithAction(ImeAction.Next),
                                     retainTextAcrossRecreation = false, persistTextDraft = false,
@@ -661,7 +663,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                         val response = AitaAdvancedAuthenticationClient.confirmPhoneAlias(request)
                                         response.payload?.takeIf { !response.negative }?.let {
                                             clearSensitive(); settings = it; phoneAlias = it.phoneLoginAlias.orEmpty()
-                                            info = authUiText("Phone updated", "Номер обновлён", "Нөмір жаңартылды")
+                                            info = authUiText("Extra phone number updated", "Дополнительный номер обновлён", "Қосымша телефон нөмірі жаңартылды")
                                             editor = AccountAuthEditor.NONE
                                         } ?: run { error = authResponseText(response) }
                                     }
@@ -741,7 +743,7 @@ internal fun AppConfiguration.SensitiveAuthConfirmationFields(
     if (secondFactorRequired) {
         aitaFormTextField(
             enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             value = secondFactor,
             onValueChange = onSecondFactorChange,
             titleText = authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды"),

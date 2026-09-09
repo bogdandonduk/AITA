@@ -118,9 +118,13 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     val emailReady = emailAvailability == AitaAuthFeatureAvailability.AVAILABLE && capabilities?.emailDeliveryUnavailable != true
     val countdown = rememberAuthFlowCountdown(flow)
 
-    fun identifier(): String = normalizeAitaLoginIdentifier(
-        if (identifierType == AitaLoginIdentifierType.EMAIL) email else phoneCountry + phone
-    )?.value.orEmpty()
+    fun identifier(): String = if (identifierType == AitaLoginIdentifierType.EMAIL) {
+        normalizeAitaEmail(email).orEmpty()
+    } else {
+        countries.firstOrNull { "+${it.phoneNumberCode}" == phoneCountry }?.let { country ->
+            aitaPhoneLoginFromNationalInput(phone, phoneCountry, country.phoneNumberSize)
+        }.orEmpty()
+    }
 
     fun reset(target: AitaLoginMode = mode) {
         actionGeneration++
@@ -289,7 +293,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     password = true, sensitive = true
                                 ) else {
                                     if (identifierType == AitaLoginIdentifierType.PHONE) Text(
-                                        authUiText("Code by email, not SMS", "Код придёт на email, не в SMS", "Код SMS емес, email арқылы келеді"),
+                                        authUiText("Code goes to your main account email, not SMS", "Код придёт на основной email аккаунта, не в SMS", "Код SMS емес, аккаунттың негізгі email мекенжайына келеді"),
                                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                     if (!emailReady || capabilitiesError.isNotBlank()) {
                                         Text(when {
@@ -331,7 +335,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     val request = AitaTotpLoginRequestDataModel(flow?.flowId.orEmpty(), code, buildCurrentClientDeviceInfo())
                                     runAction { accept(AitaAdvancedAuthenticationClient.completeTotpLogin(request)) }
                                 }
-                                aitaFormTextField(modifier = Modifier.fillMaxWidth(), value = code, onValueChange = { code = it; error = "" },
+                                aitaFormTextField(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), value = code, onValueChange = { code = it; error = "" },
                                     titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код"),
                                     placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(!busy) },
                                     identityKey = "auth_totp", enabled = !busy, sensitive = true,
