@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kz.aita.auth.*
 
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
@@ -88,7 +89,8 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
             if (!currentBusy) {
                 capabilitiesLoading = capabilities == null
                 try {
-                    val response = AitaAdvancedAuthenticationClient.capabilities()
+                    val response = withTimeoutOrNull(15_000L) { AitaAdvancedAuthenticationClient.capabilities() }
+                        ?: throw IllegalStateException("Capabilities request timed out")
                     if (!response.negative && response.payload != null) {
                         capabilities = response.payload
                         capabilitiesError = ""
@@ -98,7 +100,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 finally { capabilitiesLoading = false }
             }
             kotlinx.coroutines.delay(10_000L)
-        } while (step == AitaLoginStep.EMAIL_CODE || capabilities == null || capabilities?.emailDeliveryUnavailable == true)
+        } while (step == AitaLoginStep.EMAIL_CODE || mode != AitaLoginMode.PASSWORD || capabilities == null || capabilities?.emailDeliveryUnavailable == true)
     }
 
     val availability = resolveAitaAuthUiAvailability(capabilities, capabilitiesLoading)
@@ -152,7 +154,10 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         if (busy) return
         busy = true; error = ""
         scope.launch {
-            try { action() }
+            try {
+                val completed = withTimeoutOrNull(60_000L) { action(); true } ?: false
+                if (!completed) error = authUiText("Request timed out. Try again.", "Время ожидания истекло. Повторите.", "Күту уақыты аяқталды. Қайталаңыз.")
+            }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { error = authUiText("Request failed. Try again.", "Запрос не выполнен. Повторите.", "Сұрау орындалмады. Қайталаңыз.") }
             finally { busy = false }
@@ -164,7 +169,8 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         val pass = password
         val selectedMode = mode
         if (who.isBlank() || (selectedMode == AitaLoginMode.PASSWORD && pass.isBlank())) return
-        if (selectedMode != AitaLoginMode.PASSWORD && !emailReady) return
+        // Capabilities are advisory, not a per-account authorization gate. A stale/failed
+        // lookup must not disable a valid form; the actual endpoint enforces availability.
         runAction {
             accept(when (selectedMode) {
                 AitaLoginMode.PASSWORD -> AitaAdvancedAuthenticationClient.passwordLogin(AitaPasswordLoginRequestDataModel(who, pass, buildCurrentClientDeviceInfo()))
@@ -217,6 +223,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                             when (identifierType) {
                                 AitaLoginIdentifierType.PHONE -> countrySelectionPhoneNumberTextField(
                                     modifier = Modifier.fillMaxWidth(), countries = countries, valueInitial = phone,
+                                    valueIsNationalNumber = true, selectedCountryCodeInitial = phoneCountry,
                                     stateHost = loginState, stateKey = "auth_phone", identityKey = "auth_phone", enabled = !busy,
                                     retainTextAcrossRecreation = false, persistTextDraft = false,
                                     retainSelectionAcrossRecreation = false, persistSelectionDraft = false, imeWithAction = ime,
@@ -250,7 +257,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 }
                             }
                             actionButton(modifier = Modifier.fillMaxWidth(), text = if (mode == AitaLoginMode.PASSWORD) stateValues.stringLogIn else authUiText("Get code", "Получить код", "Код алу"),
-                                enabled = !busy && identifier().isNotBlank() && (if (mode == AitaLoginMode.PASSWORD) password.isNotBlank() else emailReady),
+                                enabled = !busy && identifier().isNotBlank() && (mode != AitaLoginMode.PASSWORD || password.isNotBlank()),
                                 loading = busy, autoLoading = false, onClick = ::submitPrimary)
                         }
                         AitaLoginStep.EMAIL_CODE -> {
@@ -263,7 +270,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                 onResend = {
                                     val request = AitaEmailCodeResendRequestDataModel(flow?.flowId.orEmpty(), stateValues.appLanguage)
                                     runAction { accept(if (mode == AitaLoginMode.RECOVERY) AitaAdvancedAuthenticationClient.resendPasswordRecovery(request) else AitaAdvancedAuthenticationClient.resendLoginCode(request)) }
-                                }, resendEnabled = capabilities?.emailDeliveryUnavailable != true)
+                                }, resendEnabled = true)
                         }
                         AitaLoginStep.TOTP -> {
                             fun submit() {

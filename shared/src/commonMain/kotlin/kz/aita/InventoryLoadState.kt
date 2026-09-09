@@ -47,8 +47,9 @@ internal val inventoryStateMutex = Mutex()
 internal val inventoryOwners = InventoryOwnerTracker()
 
 /** All active-store publishers must go through this before exposing a new inventory scope. */
-internal suspend fun publishActiveInventoryStoreId(storeId: String?) {
+internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIsCurrent: () -> Boolean = { true }) {
     inventoryStateMutex.withLock {
+        if (!selectionIsCurrent()) return@withLock
         val cleanId = storeId?.trim()?.takeIf { it.isNotEmpty() }
         val previous = inventoryOwners.current
         val owner = inventoryOwners.select(

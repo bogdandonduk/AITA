@@ -302,13 +302,7 @@ private class AitaAdvancedAuthService(
                     .where { (AuthLoginEmails.emailNormalized eq normalized.value) and
                         ((AuthLoginEmails.isPrimary eq true) or AuthLoginEmails.verifiedAtMillis.isNotNull()) }
                     .singleOrNull()?.get(AuthLoginEmails.userId)
-                AitaAuthIdentifierKind.PHONE -> {
-                    AuthSecurityProfiles.selectAll()
-                        .where { AuthSecurityProfiles.phoneLoginAlias eq normalized.value }
-                        .limit(1).singleOrNull()?.get(AuthSecurityProfiles.userId)
-                        ?: Users.selectAll().where { Users.phoneNumber eq normalized.value }
-                            .limit(1).singleOrNull()?.get(Users.id)
-                }
+                AitaAuthIdentifierKind.PHONE -> resolvePhoneLoginUserInside(normalized.value)
             } ?: return@newSuspendedTransaction null
             Users.selectAll().where { Users.id eq userId }.limit(1).singleOrNull()?.let {
                 AuthUser(it[Users.id], it[Users.email], it[Users.passwordHash], it[Users.isActive])
@@ -795,13 +789,7 @@ private class AitaAdvancedAuthService(
         }
         if (phone != null) {
             val conflict = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
-                val profileConflict = AuthSecurityProfiles.selectAll().where {
-                    (AuthSecurityProfiles.phoneLoginAlias eq phone) and (AuthSecurityProfiles.userId neq userId)
-                }.limit(1).any()
-                val legacyUserConflict = Users.selectAll().where {
-                    (Users.phoneNumber eq phone) and (Users.id neq userId)
-                }.limit(1).any()
-                profileConflict || legacyUserConflict
+                phoneLoginIdentityHasOtherOwnerInside(phone, userId)
             }
             if (conflict) return null
         }
@@ -859,10 +847,14 @@ private class AitaAdvancedAuthService(
                 it[AuthOneTimeChallenges.updatedAtMillis] = now
             }
             if (!valid) return@newSuspendedTransaction false
-            ensureProfileInside(userId, now)
-            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
             val action = AitaPhoneAliasAction.valueOf(phone[AuthPhoneAliasChallenges.action])
             val alias = if (action == AitaPhoneAliasAction.REMOVE) null else phone[AuthPhoneAliasChallenges.requestedPhoneAlias]
+            if (alias != null) {
+                lockPhoneLoginIdentityInside(alias)
+                if (phoneLoginIdentityHasOtherOwnerInside(alias, userId)) return@newSuspendedTransaction false
+            }
+            ensureProfileInside(userId, now)
+            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
             try {
                 AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
                     it[AuthSecurityProfiles.phoneLoginAlias] = alias
@@ -1449,9 +1441,7 @@ suspend fun resolveAdvancedAuthUser(identifier: String): UUID? {
                 (AuthLoginEmails.emailNormalized eq normalized.value) and
                     ((AuthLoginEmails.isPrimary eq true) or AuthLoginEmails.verifiedAtMillis.isNotNull())
             }.singleOrNull()?.get(AuthLoginEmails.userId)
-            AitaAuthIdentifierKind.PHONE -> AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.phoneLoginAlias eq normalized.value }
-                .limit(1).singleOrNull()?.get(AuthSecurityProfiles.userId)
-                ?: Users.selectAll().where { Users.phoneNumber eq normalized.value }.limit(1).singleOrNull()?.get(Users.id)
+            AitaAuthIdentifierKind.PHONE -> resolvePhoneLoginUserInside(normalized.value)
         }
     }
 }

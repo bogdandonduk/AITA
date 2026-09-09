@@ -1756,8 +1756,6 @@ fun AppConfiguration.genericTextField(
 
     fun applyExternalTextReplacement(rawText: String, applyTransform: Boolean = true) {
         val nextText = if (applyTransform) onTransformValue?.invoke(rawText) ?: rawText else rawText
-        if (onFilterValue != null && !onFilterValue(nextText)) return
-
         val nextValue = TextFieldValue(nextText, selection = TextRange(nextText.length))
 
         val applyChange: () -> Unit = {
@@ -1774,11 +1772,7 @@ fun AppConfiguration.genericTextField(
             Unit
         }
 
-        if (onValueChange != null) {
-            onValueChange(nextText, applyChange)
-        } else {
-            applyChange()
-        }
+        dispatchAcceptedTextInput(nextText, onFilterValue, onValueChange, applyChange)
     }
 
     val voiceInputAvailable = enableVoiceInput &&
@@ -2038,31 +2032,13 @@ fun AppConfiguration.genericTextField(
                         return@onValueChange
                     }
 
-                    if (onValueChange != null) {
-                        onValueChange(nextText) {
-                            if (onFilterValue == null || onFilterValue(nextText)) {
-                                textFieldValue = nextValue
-
-                                stateKey?.run {
-                                    coroutineScope.launch {
-                                        stateHost?.setState(stateKey to nextText)
-                                    }
-                                }
-                                savePersistentTextDraft(nextText)
-                                savePersistentTextFieldMeta(nextValue, isFocused)
-                            }
+                    dispatchAcceptedTextInput(nextText, onFilterValue, onValueChange) {
+                        textFieldValue = nextValue
+                        stateKey?.let { key ->
+                            coroutineScope.launch { stateHost?.setState(key to nextText) }
                         }
-                    } else {
-                        if (onFilterValue == null || onFilterValue(nextText)) {
-                            textFieldValue = nextValue
-                            stateKey?.run {
-                                coroutineScope.launch {
-                                    stateHost?.setState(stateKey to nextText)
-                                }
-                            }
-                            savePersistentTextDraft(nextText)
-                            savePersistentTextFieldMeta(nextValue, isFocused)
-                        }
+                        savePersistentTextDraft(nextText)
+                        savePersistentTextFieldMeta(nextValue, isFocused)
                     }
                 },
                 enabled = enabled,
@@ -3195,6 +3171,7 @@ fun AppConfiguration.domainSelectionTextField(
     onFilterValue: ((String, String, String?) -> Boolean)? = null,
     onSelectedDomainChange: ((String) -> Unit)? = null,
     onSelectedSecondaryDomainChange: ((String?) -> Unit)? = null,
+    onTransformValue: ((String, String, String?) -> String)? = null,
     onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
     val primaryDomainIdsKey = remember(domains) { domains.joinToString("|") { it.id } }
@@ -3519,6 +3496,9 @@ fun AppConfiguration.domainSelectionTextField(
                     {
                         invoke(it, selectedId, selectedSecondaryId)
                     }
+                },
+                onTransformValue = onTransformValue?.let { transform ->
+                    { value -> transform(value, selectedId, selectedSecondaryId) }
                 },
                 onValueChange = onValueChange?.run {
                     { value, action ->
@@ -5552,15 +5532,18 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
     autoFocus: Boolean = true,
     enabled: Boolean = true,
     onSelectedCountryCodeChange: ((String?) -> Unit)? = null,
+    valueIsNationalNumber: Boolean = false,
+    selectedCountryCodeInitial: String? = null,
     onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
     val phoneCountries = countries.withTajikistanFallback()
-    val detectedCountry = valueInitial?.removePrefix("+")?.let { normalized ->
+    val detectedCountry = valueInitial?.takeUnless { valueIsNationalNumber }?.removePrefix("+")?.let { normalized ->
         phoneCountries
             .sortedByDescending { it.phoneNumberCode.length }
             .find { normalized.startsWith(it.phoneNumberCode) }
     }
-    val defaultCountry = detectedCountry
+    val defaultCountry = phoneCountries.find { "+${it.phoneNumberCode}" == selectedCountryCodeInitial }
+        ?: detectedCountry
         ?: phoneCountries.find { it.locale.equals("kz", true) }
         ?: phoneCountries.find { it.phoneNumberCode == "7" }
         ?: phoneCountries.firstOrNull()
@@ -5573,7 +5556,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         domains = emptyList(),
         secondaryDomains = phoneCountries
             .sortedWith(
-                compareBy<CountryDataModel> { it.locale != defaultCountry?.locale }
+                compareBy<CountryDataModel> { !it.locale.equals("kz", true) }
                     .thenBy { it.name.visibleLocalizedString(stateValues.appLanguage, it.locale) }
             )
             .map {
@@ -5587,7 +5570,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
             },
         selectedSecondaryInitial = selectedSecondaryInitial,
         lockedSecondaryDomainId = lockedId?.let { if (it.startsWith("+")) it else "+$it" },
-        valueInitial = valueInitial?.run {
+        valueInitial = if (valueIsNationalNumber) valueInitial else valueInitial?.run {
             phoneCountries
                 .sortedByDescending { it.phoneNumberCode.length }
                 .find { startsWith(it.phoneNumberCode) || startsWith("+${it.phoneNumberCode}") }
@@ -5621,6 +5604,11 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
             } == true
         },
         onSelectedSecondaryDomainChange = onSelectedCountryCodeChange,
+        onTransformValue = { text, _, selectedCountryCode ->
+            phoneCountries.find { "+${it.phoneNumberCode}" == selectedCountryCode }?.let { country ->
+                kz.aita.auth.normalizeAitaPhoneFieldInput(text, "+${country.phoneNumberCode}", country.phoneNumberSize)
+            } ?: text
+        },
         onValueChange = onValueChange
     )
 }

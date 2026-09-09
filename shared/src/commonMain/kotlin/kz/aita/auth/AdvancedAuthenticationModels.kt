@@ -198,8 +198,10 @@ fun normalizeAitaEmail(raw: String): String? {
 fun normalizeAitaPhoneAlias(raw: String): String? {
     val trimmed = raw.trim()
     if (trimmed.isBlank()) return null
+    if (trimmed.any { it.digitToIntOrNull() == null && !it.isWhitespace() && it !in "+()-./" }) return null
+    if (trimmed.count { it == '+' } > 1 || ('+' in trimmed && !trimmed.startsWith('+'))) return null
     val hasPlus = trimmed.startsWith('+')
-    val digits = trimmed.filter(Char::isDigit)
+    val digits = aitaAuthCodeDigits(trimmed)
     if (digits.length !in 7..15) return null
     val canonicalDigits = when {
         hasPlus -> digits

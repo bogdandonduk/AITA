@@ -18595,7 +18595,9 @@ fun Application.module() {
       post("/signUp") {
         try {
           val body = call.receiveAita<UserAuthSignUpDataModel>()
-          val phoneNumber = body.phoneNumber.trim().lowercase()
+          val phoneNumber = kz.aita.auth.normalizeAitaPhoneAlias(body.phoneNumber)?.removePrefix("+")
+            ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+              message = simpleMessage(main = "Invalid phone number", ru = "Некорректный номер телефона", kk = "Телефон нөмірі дұрыс емес"))
           val email = body.email.trim().lowercase()
           val cleanPassword = body.password.trim()
 
@@ -18607,11 +18609,7 @@ fun Application.module() {
           }
 
           val conflictResult = newSuspendedTransaction(aitaServerIoContext) {
-            val userWithPhoneNumberExists = Users
-              .select(Users.phoneNumber)
-              .where { Users.phoneNumber eq phoneNumber }
-              .empty()
-              .not()
+            val userWithPhoneNumberExists = phoneLoginIdentityHasOtherOwnerInside(phoneNumber)
 
             val userWithEmailExists = Users
               .select(Users.email)
@@ -18669,6 +18667,11 @@ fun Application.module() {
               id = UUID.randomUUID()
 
               newSuspendedTransaction(aitaServerIoContext) {
+                lockPhoneLoginIdentityInside(phoneNumber)
+                if (phoneLoginIdentityHasOtherOwnerInside(phoneNumber)) {
+                  lateUniqueConflictResult = 2
+                  return@newSuspendedTransaction false
+                }
                 Users.insert {
                   it[Users.id] = id
                   it[Users.publicId] = generateUniqueUserPublicIdInsideTransaction()
@@ -21760,7 +21763,13 @@ fun Application.module() {
               )
             )
 
-            else -> call.respondAitaUnauthorized()
+            else -> call.genericResponseNoPayload(HttpStatusCode.Forbidden,
+              message = simpleMessage(
+                main = "This store is no longer available to your account",
+                ru = "Этот магазин больше не доступен вашему аккаунту",
+                kk = "Бұл дүкен енді аккаунтыңызға қолжетімсіз"
+              )
+            )
           }
         }
 
@@ -24236,7 +24245,9 @@ fun Application.module() {
             )
           }
 
-          val phoneNumber = newAccount.phoneNumber.trim().lowercase()
+          val phoneNumber = kz.aita.auth.normalizeAitaPhoneAlias(newAccount.phoneNumber)?.removePrefix("+")
+            ?: return@put call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+              message = simpleMessage(main = "Invalid phone number", ru = "Некорректный номер телефона", kk = "Телефон нөмірі дұрыс емес"))
           val email = newAccount.email.trim().lowercase()
           val firstName = newAccount.firstName.trim()
           val lastName = newAccount.lastName.trim()
@@ -24244,6 +24255,7 @@ fun Application.module() {
           val isActive = newAccount.isActive
 
           val updated = newSuspendedTransaction(aitaServerIoContext) {
+            lockPhoneLoginIdentityInside(phoneNumber)
             val existingUser =
               Users
                 .selectAll()
@@ -24257,13 +24269,7 @@ fun Application.module() {
             if (!Pw.verify(body.password.toCharArray(), existingUser[Users.passwordHash]))
               return@newSuspendedTransaction "password_mismatch"
 
-            val phoneNumberClash = Users
-              .select(Users.id, Users.phoneNumber)
-              .where {
-                (Users.phoneNumber eq phoneNumber) and (Users.id neq uuid)
-              }
-              .empty()
-              .not()
+            val phoneNumberClash = phoneLoginIdentityHasOtherOwnerInside(phoneNumber, uuid)
 
 
             val emailClash = Users
