@@ -2629,8 +2629,8 @@ class ResponseTextContent(
 @Composable
 fun AppConfiguration.emailTextField(
     modifier: Modifier = Modifier,
-    stateHost: StateHost,
-    stateKey: String,
+    stateHost: StateHost? = null,
+    stateKey: String? = null,
     identityKey: String? = null,
     valueInitial: String? = null,
     retainTextAcrossRecreation: Boolean = true,
@@ -5525,8 +5525,8 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
     modifier: Modifier = Modifier,
     countries: List<CountryDataModel> = stateValues.globalAppConfiguration.countries.withTajikistanFallback(),
     valueInitial: String? = null,
-    stateHost: StateHost,
-    stateKey: String,
+    stateHost: StateHost? = null,
+    stateKey: String? = null,
     identityKey: String? = null,
     lockedId: String? = null,
     titleText: String = stateValues.stringPhoneNumber,

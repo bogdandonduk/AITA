@@ -13,6 +13,7 @@ import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
+import kz.aita.auth.allowsStoredSessionAuthorization
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -1458,7 +1459,7 @@ private suspend fun resetAitaFlowSharedState() {
     latestTransactionReceiptSnapshotState.emit(null)
     completeTransactionInProgressState.emit(false)
     cloudTransportStatusState.emit(CLOUD_TRANSPORT_STATUS_UNKNOWN)
-    realtimeUpdatesConnectedState.emit(false)
+    clearCloudAuthRequestMemory(getStoredUserAuthTokens?.invoke())
     latestInAppNotificationState.emit(null)
     activeInAppNotificationsState.emit(emptyList())
     for (transactionTypeIndex in 0..2) {
@@ -1896,7 +1897,7 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
     install(WebSockets)
     install(Auth) {
         bearer {
-            sendWithoutRequest { true }
+            sendWithoutRequest { it.allowsStoredSessionAuthorization() }
             loadTokens {
                 environment.storedTokens?.let { BearerTokens(it.accessToken, it.refreshToken) }
             }

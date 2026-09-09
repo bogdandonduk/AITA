@@ -34,3 +34,18 @@ internal const val AITA_REALTIME_HEARTBEAT_TIMEOUT_MILLIS = 90_000L
 
 internal fun aitaRealtimeUsesHeartbeat(type: String, advertisedIntervalMillis: Long): Boolean =
     type == "connected" && advertisedIntervalMillis in 1L..30_000L
+
+internal const val AITA_REALTIME_HELLO_TIMEOUT_MILLIS = 15_000L
+
+/** Expiry of our handshake is a retryable failure, not cancellation of the reconnect owner. */
+internal suspend fun <T : Any> awaitAitaRealtimeHello(
+    sendHello: suspend () -> Unit,
+    receiveHello: suspend () -> T,
+    timeoutMillis: Long = AITA_REALTIME_HELLO_TIMEOUT_MILLIS
+): T {
+    require(timeoutMillis > 0L)
+    return kotlinx.coroutines.withTimeoutOrNull(timeoutMillis) {
+        sendHello()
+        receiveHello()
+    } ?: throw IllegalStateException("Realtime greeting timed out")
+}

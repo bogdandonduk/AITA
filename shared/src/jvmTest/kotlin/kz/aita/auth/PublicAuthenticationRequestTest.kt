@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PublicAuthenticationRequestTest {
     @Test
@@ -29,8 +30,8 @@ class PublicAuthenticationRequestTest {
             expectSuccess = false
             install(Auth) {
                 bearer {
-                    // Deliberately allow preemptive auth: the public request itself must bypass it.
-                    sendWithoutRequest { true }
+                    // Exercise the same provider predicate as production, not a fake bearer.
+                    sendWithoutRequest { it.allowsStoredSessionAuthorization() }
                     loadTokens { BearerTokens("old-account-access", "old-account-refresh") }
                     refreshTokens {
                         refreshCalls++
@@ -63,7 +64,7 @@ class PublicAuthenticationRequestTest {
         val client = HttpClient(engine) {
             install(Auth) {
                 bearer {
-                    sendWithoutRequest { true }
+                    sendWithoutRequest { it.allowsStoredSessionAuthorization() }
                     loadTokens { BearerTokens("account-access", "account-refresh") }
                 }
             }
@@ -91,7 +92,7 @@ class PublicAuthenticationRequestTest {
             expectSuccess = false
             install(Auth) {
                 bearer {
-                    sendWithoutRequest { true }
+                    sendWithoutRequest { it.allowsStoredSessionAuthorization() }
                     loadTokens { loads++; BearerTokens("different-account", "different-refresh") }
                     refreshTokens { refreshes++; BearerTokens("different-account-new", "different-refresh-new") }
                 }
@@ -104,6 +105,85 @@ class PublicAuthenticationRequestTest {
             }
             assertEquals(HttpStatusCode.Unauthorized, response.status)
             assertEquals(1, requests)
+            assertEquals(0, loads)
+            assertEquals(0, refreshes)
+        } finally { client.close() }
+    }
+
+    @Test
+    fun accountStoreAndRealtimeRequestsKeepPinnedTokenWithWarmBearerCache() = runBlocking {
+        var loads = 0
+        var refreshes = 0
+        val headers = mutableListOf<Pair<String, String?>>()
+        val client = HttpClient(MockEngine { request ->
+            headers += request.url.encodedPath to request.headers[HttpHeaders.Authorization]
+            respond("{}", HttpStatusCode.OK)
+        }) {
+            install(Auth) { bearer {
+                sendWithoutRequest { it.allowsStoredSessionAuthorization() }
+                loadTokens { loads++; BearerTokens("previous-account", "previous-refresh") }
+                refreshTokens { refreshes++; null }
+            } }
+        }
+        try {
+            client.get("https://aita.test/warm-cache")
+            listOf("user/get", "stores/get", "rt/updates", "auth/security/settings").forEach { endpoint ->
+                client.get("https://aita.test/$endpoint") { pinSessionAuthorization("accepted-login") }
+            }
+            client.put("https://aita.test/user/update") { pinSessionAuthorization("accepted-login") }
+            assertEquals("Bearer previous-account", headers.first().second)
+            assertTrue(headers.drop(1).all { it.second == "Bearer accepted-login" })
+            assertEquals(1, loads)
+            assertEquals(0, refreshes)
+        } finally { client.close() }
+    }
+
+    @Test
+    fun ordinaryBearerRefreshStillWorksExactlyOnce() = runBlocking {
+        var refreshes = 0
+        val sent = mutableListOf<String?>()
+        val client = HttpClient(MockEngine { request ->
+            val token = request.headers[HttpHeaders.Authorization]
+            sent += token
+            if (token == "Bearer renewed") respond("{}", HttpStatusCode.OK)
+            else respond("{}", HttpStatusCode.Unauthorized, headersOf(HttpHeaders.WWWAuthenticate, "Bearer"))
+        }) {
+            expectSuccess = false
+            install(Auth) { bearer {
+                sendWithoutRequest { it.allowsStoredSessionAuthorization() }
+                loadTokens { BearerTokens("expired", "refresh") }
+                refreshTokens { refreshes++; BearerTokens("renewed", "new-refresh") }
+            } }
+        }
+        try {
+            assertEquals(HttpStatusCode.OK, client.get("https://aita.test/stock/get").status)
+            assertEquals(listOf("Bearer expired", "Bearer renewed"), sent)
+            assertEquals(1, refreshes)
+        } finally { client.close() }
+    }
+
+    @Test
+    fun publicLoginAfterPinnedRejectionDoesNotReuseTheOldSession() = runBlocking {
+        var loads = 0
+        var refreshes = 0
+        val sent = mutableListOf<String?>()
+        val client = HttpClient(MockEngine { request ->
+            sent += request.headers[HttpHeaders.Authorization]
+            respond("{}", HttpStatusCode.Unauthorized, headersOf(HttpHeaders.WWWAuthenticate, "Bearer"))
+        }) {
+            expectSuccess = false
+            install(Auth) { bearer {
+                sendWithoutRequest { it.allowsStoredSessionAuthorization() }
+                loadTokens { loads++; BearerTokens("stored-old", "refresh-old") }
+                refreshTokens { refreshes++; null }
+            } }
+        }
+        try {
+            client.get("https://aita.test/user/get") { pinSessionAuthorization("rejected-session") }
+            client.post("https://aita.test/auth/login/password") {
+                disableSessionAuthForPublicAuthRequest("auth/login/password")
+            }
+            assertEquals(listOf("Bearer rejected-session", null), sent)
             assertEquals(0, loads)
             assertEquals(0, refreshes)
         } finally { client.close() }

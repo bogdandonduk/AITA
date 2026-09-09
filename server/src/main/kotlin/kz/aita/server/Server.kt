@@ -18075,9 +18075,9 @@ fun Application.module() {
       call.safeGenericResponseNoPayload(
         status = HttpStatusCode.TooManyRequests,
         message = simpleMessage(
-          main = "Too many code requests. Try again later.",
-          ru = "Слишком много запросов кода. Попробуйте позже.",
-          kk = "Код тым жиі сұралды. Кейінірек қайталаңыз."
+          main = "Too many authentication attempts. Try again later.",
+          ru = "Слишком много попыток входа или запросов кода. Попробуйте позже.",
+          kk = "Кіру әрекеттері немесе код сұраулары тым көп. Кейінірек қайталаңыз."
         )
       )
     }

@@ -9,6 +9,7 @@ import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
+import kz.aita.auth.allowsStoredSessionAuthorization
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -249,6 +250,38 @@ class AitaSharedJvmFlowTest {
         assertTrue(installed)
         assertEquals(refreshedTokens, environment.storedTokens)
         assertEquals(generation, currentAuthenticatedSessionGeneration())
+    }
+
+    @Test
+    fun rejectedOldSessionCannotExpireReplacementLogin() = runBlocking {
+        val previous = aitaTestTokenPair("rejected-previous")
+        installAuthenticatedSession(previous)
+        val replacement = aitaTestTokenPair("accepted-replacement")
+        installAuthenticatedSession(replacement)
+        rememberRejectedAuthRefreshToken(previous.refreshToken)
+        assertEquals(replacement, environment.storedTokens)
+        assertFalse(rejectedAuthRefreshTokenMatches(replacement.refreshToken))
+        assertEquals(CLOUD_TRANSPORT_STATUS_REACHABLE, cloudTransportStatusState.value)
+    }
+
+    @Test
+    fun acceptedLoginClearsFailureFromAbandonedRefresh() = runBlocking {
+        rememberAuthRefreshNonAuthFailure(listOf(LocalizedStringDataModel("main", "old failure")), transportFailure = true)
+        assertNotNull(recentAuthRefreshNonAuthFailureMessage())
+        installAuthenticatedSession(aitaTestTokenPair("new-login"))
+        assertNull(recentAuthRefreshNonAuthFailureMessage())
+        assertFalse(recentAuthRefreshNonAuthFailureWasTransport())
+    }
+
+    @Test
+    fun retryForOldGenerationCannotRefreshNewAccountsCredentials() = runBlocking {
+        val previousGeneration = installAuthenticatedSession(aitaTestTokenPair("old-generation"))
+        val replacement = aitaTestTokenPair("new-generation")
+        installAuthenticatedSession(replacement)
+        assertFalse(refreshStoredAuthTokensOnceForNetworkRetry(
+            postNotification = false, expectedSessionGeneration = previousGeneration
+        ))
+        assertEquals(replacement, environment.storedTokens)
     }
 
     @Test
@@ -1488,7 +1521,7 @@ private suspend fun resetAitaFlowSharedState() {
     latestTransactionReceiptSnapshotState.emit(null)
     completeTransactionInProgressState.emit(false)
     cloudTransportStatusState.emit(CLOUD_TRANSPORT_STATUS_UNKNOWN)
-    realtimeUpdatesConnectedState.emit(false)
+    clearCloudAuthRequestMemory(getStoredUserAuthTokens?.invoke())
     latestInAppNotificationState.emit(null)
     activeInAppNotificationsState.emit(emptyList())
     for (transactionTypeIndex in 0..2) {
@@ -1926,7 +1959,7 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
     install(WebSockets)
     install(Auth) {
         bearer {
-            sendWithoutRequest { true }
+            sendWithoutRequest { it.allowsStoredSessionAuthorization() }
             loadTokens {
                 environment.storedTokens?.let { BearerTokens(it.accessToken, it.refreshToken) }
             }

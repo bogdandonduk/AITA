@@ -240,38 +240,6 @@ private class AuthCrypto(private val config: AdvancedAuthConfig) {
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 }
 
-private class AuthSlidingWindowLimiter(
-    private val maximumTrackedKeys: Int = 20_000
-) {
-    private val values = ConcurrentHashMap<String, ArrayDeque<Long>>()
-    private val calls = AtomicLong(0L)
-
-    fun allow(key: String, max: Int, now: Long, windowMillis: Long = 3_600_000L): Boolean {
-        if (calls.incrementAndGet() % 256L == 0L) cleanup(now, windowMillis)
-        val existing = values[key]
-        if (existing == null && values.size >= maximumTrackedKeys) {
-            cleanup(now, windowMillis)
-            if (values.size >= maximumTrackedKeys) return false
-        }
-        val queue = values.computeIfAbsent(key) { ArrayDeque() }
-        synchronized(queue) {
-            while (queue.isNotEmpty() && queue.first() < now - windowMillis) queue.removeFirst()
-            if (queue.size >= max) return false
-            queue.addLast(now)
-            return true
-        }
-    }
-
-    private fun cleanup(now: Long, windowMillis: Long) {
-        values.entries.removeIf { (_, queue) ->
-            synchronized(queue) {
-                while (queue.isNotEmpty() && queue.first() < now - windowMillis) queue.removeFirst()
-                queue.isEmpty()
-            }
-        }
-    }
-}
-
 private data class AuthUser(val id: UUID, val email: String, val passwordHash: String, val active: Boolean)
 
 private class AitaAdvancedAuthService(
@@ -323,12 +291,13 @@ private class AitaAdvancedAuthService(
         val normalized = normalizeAitaLoginIdentifier(request.identifier) ?: return null
         val identifierHash = crypto.hmac("password-login", normalized.value)
         val ipHash = crypto.hmac("ip", meta["ip"].orEmpty())
-        val rateAllowed = limiter.allow("password:id:$identifierHash", 12, now) &&
-            limiter.allow("password:ip:$ipHash", 60, now)
-        if (!rateAllowed) {
+        val identifierLimit = limiter.check("password:id:$identifierHash", 12, now)
+        val limit = if (!identifierLimit.allowed) identifierLimit else limiter.check("password:ip:$ipHash", 60, now)
+        if (!limit.allowed) {
             delay((120L..260L).random())
             audit(null, "PASSWORD_LOGIN_RATE_LIMITED", identifierHash, meta["ip"])
-            return null
+            // The password was not checked. Do not misreport a quota as invalid credentials.
+            throw AitaAuthRateLimitedException(limit.retryAfterSeconds)
         }
         val user = resolveUser(normalized.value) ?: return null
         if (!user.active || !Pw.verify(request.password.toCharArray(), user.passwordHash)) return null
