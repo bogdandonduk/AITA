@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kz.aita.auth.*
 
-private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, RECOVERY_CODES, PHONE }
+private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, RECOVERY_CODES, PHONE, EMAIL }
 
 @Composable
 internal fun AppConfiguration.AccountAuthenticationSettingsCard(
@@ -269,7 +269,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                         actionButton(
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
-                            text = authUiText("Manage phone login alias", "Управлять номером для входа", "Кіру телефон нөмірін басқару"),
+                            text = authUiText("Phone for sign-in", "Телефон для входа", "Кіру телефоны"),
                             iconPath = stateValues.drawablePathIconPhone,
                             enabled = !loading &&
                                 settings != null &&
@@ -284,7 +284,19 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 }
                             }
                         ) { clearSensitive(); phoneAlias = settings?.phoneLoginAlias.orEmpty(); editor = AccountAuthEditor.PHONE }
+                        actionButton(autoLoading = false, modifier = Modifier.fillMaxWidth(),
+                            text = authUiText("Additional sign-in emails", "Дополнительные email для входа", "Қосымша кіру email мекенжайлары"),
+                            iconPath = stateValues.drawablePathIconEmail,
+                            enabled = !loading && settings != null && capabilities?.additionalEmailLoginEnabled == true,
+                            onDisabledClick = { info = authUiText("Update the server and enable email confirmation", "Обновите сервер и включите подтверждение email", "Серверді жаңартып, email растауын қосыңыз") }
+                        ) { clearSensitive(); editor = AccountAuthEditor.EMAIL }
                         QuietAction(onClick = ::load, enabled = !loading) { Text(authUiText("Refresh", "Обновить", "Жаңарту")) }
+                    }
+
+                    AccountAuthEditor.EMAIL -> settings?.let { current ->
+                        AdditionalLoginEmailsEditor(current,
+                            onUpdated = { settings = it },
+                            onClose = { editor = AccountAuthEditor.NONE; clearSensitive() })
                     }
 
                     AccountAuthEditor.TOTP_ENABLE -> {
@@ -336,11 +348,21 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
 
                     AccountAuthEditor.TOTP_SETUP -> {
                         val data = setup
+                        val setupCountdown = rememberAuthFlowCountdown(data?.let {
+                            AitaAuthFlowDataModel(flowId = it.setupId, expiresAtMillis = it.expiresAtMillis, serverTimeMillis = it.serverTimeMillis)
+                        })
+                        LaunchedEffect(data?.setupId, setupCountdown.expired, loading) {
+                            if (data != null && setupCountdown.expired && !loading) {
+                                setup = null; setupCode = ""; editor = AccountAuthEditor.TOTP_ENABLE
+                                error = authUiText("Setup expired. Start again.", "Срок настройки истёк. Начните заново.", "Баптау мерзімі аяқталды. Қайта бастаңыз.")
+                            }
+                        }
+                        data?.let { AuthenticatorSetupQr(it) }
                         Text(
                             text = authUiText(
-                                "Add this account in your authenticator app, then enter its current six-digit code.",
-                                "Добавьте аккаунт в приложение-аутентификатор, затем введите текущий шестизначный код.",
-                                "Бұл аккаунтты аутентификатор қолданбасына қосып, ағымдағы алты таңбалы кодты енгізіңіз."
+                                "Scan the QR code, then enter the authenticator code.",
+                                "Отсканируйте QR-код и введите код аутентификатора.",
+                                "QR кодты сканерлеп, аутентификатор кодын енгізіңіз."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
@@ -384,9 +406,9 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 }
                                 Text(
                                     text = authUiText(
-                                        "Manual setup key. Keep it private.",
-                                        "Ключ ручной настройки. Не сообщайте его никому.",
-                                        "Қолмен баптау кілті. Оны ешкімге бермеңіз."
+                                        "Manual key · keep private",
+                                        "Ручной ключ · не сообщайте никому",
+                                        "Қолмен енгізу кілті · құпия сақтаңыз"
                                     ),
                                     color = stateValues.PlaceholderTextColor,
                                     fontSize = stateValues.smallTextSize,
@@ -439,7 +461,7 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = authUiText("Confirm and enable", "Подтвердить и включить", "Растау және қосу"),
-                            enabled = !loading && data != null && setupCode.length == 6,
+                            enabled = !loading && data != null && !setupCountdown.expired && setupCode.length == 6,
                             loading = loading
                         ) {
                             launchSecurityAction {
@@ -526,20 +548,16 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                     TabContent("remove", authUiText("Remove", "Удалить", "Жою")) { phoneAction = AitaPhoneAliasAction.REMOVE }
                                 )
                             )
-                            if (phoneAction == AitaPhoneAliasAction.ADD_OR_REPLACE) {
-                                aitaFormTextField(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    value = phoneAlias,
-                                    onValueChange = { phoneAlias = it },
-                                    titleText = authUiText("Phone login alias", "Номер для входа", "Кіру телефон нөмірі"),
-                                    placeholderText = authUiText("Enter a phone number", "Введите номер телефона", "Телефон нөмірін енгізіңіз"),
-                                    identityKey = "account-phone-login-alias",
-                                    enabled = !loading,
-                                    keyboardType = KeyboardType.Phone,
-                                    imeAction = ImeAction.Next,
-                                    leadingIconPath = stateValues.drawablePathIconPhone
+                            val phoneForm = remember { object : StateHost() {} }
+                            val phoneField = if (phoneAction == AitaPhoneAliasAction.ADD_OR_REPLACE) {
+                                countrySelectionPhoneNumberTextField(
+                                    modifier = Modifier.fillMaxWidth(), valueInitial = phoneAlias,
+                                    stateHost = phoneForm, stateKey = "account_phone_alias", identityKey = "account_phone_alias",
+                                    enabled = !loading, autoFocus = false, imeWithAction = ImeWithAction(ImeAction.Next),
+                                    retainTextAcrossRecreation = false, persistTextDraft = false,
+                                    retainSelectionAcrossRecreation = false, persistSelectionDraft = false
                                 )
-                            }
+                            } else null
                             SensitiveAuthConfirmationFields(
                                 enabled = !loading,
                                 currentPassword = currentPassword,
@@ -554,10 +572,13 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 text = authUiText("Get code", "Получить код", "Код алу"),
                                 enabled = !loading && currentPassword.isNotBlank() &&
                                     (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()) &&
-                                    (phoneAction == AitaPhoneAliasAction.REMOVE || normalizeAitaPhoneAlias(phoneAlias) != null),
+                                    (phoneAction == AitaPhoneAliasAction.REMOVE || phoneField?.value?.text?.isNotBlank() == true),
                                 loading = loading
                             ) {
-                                val request = AitaPhoneAliasRequestDataModel(phoneAction, phoneAlias, currentPassword, secondFactor, stateValues.appLanguage)
+                                phoneField?.checkContentValidity()
+                                if (phoneField != null && !phoneField.isContentValid) return@actionButton
+                                val requestedPhone = phoneField?.let { it.selectedSecondaryId.orEmpty() + it.value.text }.orEmpty()
+                                val request = AitaPhoneAliasRequestDataModel(phoneAction, requestedPhone, currentPassword, secondFactor, stateValues.appLanguage)
                                 launchSecurityAction {
                                     val response = AitaAdvancedAuthenticationClient.requestPhoneAlias(request)
                                     response.payload?.takeIf { !response.negative && it.nextStep == AitaAuthNextStep.EMAIL_CODE && it.flowId.isNotBlank() }?.let {
@@ -635,7 +656,7 @@ private fun AppConfiguration.AuthSettingsInfoRow(label: String, value: String, a
 }
 
 @Composable
-private fun AppConfiguration.SensitiveAuthConfirmationFields(
+internal fun AppConfiguration.SensitiveAuthConfirmationFields(
     enabled: Boolean = true,
     currentPassword: String,
     secondFactor: String,

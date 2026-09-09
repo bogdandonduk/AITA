@@ -62,6 +62,18 @@ object AitaAdvancedAuthenticationClient {
     suspend fun regenerateRecoveryCodes(request: AitaSensitiveSecurityActionRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaSensitiveSecurityActionRequestDataModel>(HttpMethod.Post, "auth/security/totp/recovery-codes/regenerate", request)
 
+    suspend fun requestEmailAlias(request: AitaEmailAliasRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaEmailAliasRequestDataModel>(HttpMethod.Post, "auth/security/email/request", request)
+
+    suspend fun resendEmailAlias(request: AitaEmailCodeResendRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/security/email/resend", request)
+
+    suspend fun confirmEmailAlias(request: AitaEmailAliasConfirmRequestDataModel) =
+        authRequest<AitaAuthenticationSettingsDataModel, AitaEmailAliasConfirmRequestDataModel>(HttpMethod.Post, "auth/security/email/confirm", request)
+
+    suspend fun removeEmailAlias(request: AitaEmailAliasRemoveRequestDataModel) =
+        authRequest<AitaAuthenticationSettingsDataModel, AitaEmailAliasRemoveRequestDataModel>(HttpMethod.Post, "auth/security/email/remove", request)
+
     suspend fun requestPhoneAlias(request: AitaPhoneAliasRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaPhoneAliasRequestDataModel>(HttpMethod.Post, "auth/security/phone/request", request)
 
@@ -80,7 +92,8 @@ object AitaAdvancedAuthenticationClient {
         method = method,
         serverUrl = serverUrl,
         endpointUrl = endpoint,
-        body = body
+        body = body,
+        expectedSessionGeneration = if (cloudEndpointRequiresAuthentication(endpoint)) currentAuthenticatedSessionGeneration() else null
     ).withAuthFailureMessage()
 }
 

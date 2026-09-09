@@ -38,6 +38,7 @@ internal class AdvancedAuthConfig(
         passwordRecoveryEnabled = emailReady && passwordRecoveryEnabled,
         authenticatorTwoFactorEnabled = advancedReady,
         phoneLoginAliasEnabled = emailReady,
+        additionalEmailLoginEnabled = emailReady,
         codeLength = 6,
         codeTtlSeconds = codeTtlMillis / 1000L,
         resendCooldownSeconds = resendCooldownMillis / 1000L

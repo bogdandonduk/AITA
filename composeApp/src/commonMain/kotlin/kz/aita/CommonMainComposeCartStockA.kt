@@ -1493,38 +1493,44 @@ internal fun encodeLazyListScrollState(index: Int, offset: Int): String =
 internal fun AppConfiguration.rememberPersistentLazyListState(
     stateHost: StateHost,
     stateKey: String
-): LazyListState {
-    val hostState by stateHost.state.collectAsState()
-    val persisted = hostState[stateKey]
-    val initial = remember(stateKey) { decodeLazyListScrollState(persisted) }
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = initial.first,
-        initialFirstVisibleItemScrollOffset = initial.second
-    )
-    var restoredKey by rememberSaveable(stateKey) { mutableStateOf("") }
+): LazyListState = key(stateHost, stateKey) {
+    // Read once, not collectAsState: this host also receives our saved positions. Reading
+    // those emissions back into scrollToItem cancels a fling and recomposes the whole list.
+    val initial = remember { decodeLazyListScrollState(stateHost.state.value[stateKey]) }
+    val listState = rememberLazyListState(initial.first, initial.second)
+    var touched by remember { mutableStateOf(false) }
+    var restored by remember { mutableStateOf(false) }
 
-    LaunchedEffect(stateKey, persisted) {
-        val encoded = persisted ?: return@LaunchedEffect
-        val restoreKey = "$stateKey|$encoded"
-        if (restoreKey == restoredKey) return@LaunchedEffect
-        val (index, offset) = decodeLazyListScrollState(encoded)
-        runCatching { listState.scrollToItem(index, offset) }
-        restoredKey = restoreKey
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            if (scrolling) touched = true
+        }
     }
-
-    LaunchedEffect(stateHost, stateKey, listState) {
-        var pendingSaveJob: kotlinx.coroutines.Job? = null
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) ->
-                pendingSaveJob?.cancel()
-                pendingSaveJob = launch {
-                    delay(220L)
-                    stateHost.setState(stateKey to encodeLazyListScrollState(index, offset))
-                }
-            }
+    LaunchedEffect(listState) {
+        Navigation.awaitAppNavigationRestore()
+        Navigation.awaitTransactionNavigationRestore()
+        // A late startup restore may supply a saved position. Never rewind a list the
+        // user has already moved, and never treat later persistence echoes as commands.
+        if (!touched && listState.firstVisibleItemIndex == initial.first &&
+            listState.firstVisibleItemScrollOffset == initial.second) {
+            val target = decodeLazyListScrollState(stateHost.state.value[stateKey])
+            if (target != initial) listState.scrollToItem(target.first, target.second)
+        }
+        restored = true
+        snapshotFlow {
+            Triple(listState.isScrollInProgress, listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset)
+        }.collect { (scrolling, index, offset) ->
+            if (!scrolling) stateHost.setState(stateKey to encodeLazyListScrollState(index, offset))
+        }
     }
-
-    return listState
+    DisposableEffect(listState) {
+        onDispose {
+            if (restored || touched) stateHost.setStateNow(stateKey to encodeLazyListScrollState(
+                listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset))
+        }
+    }
+    listState
 }
 
 internal fun menuPersistentScrollSuffix(raw: String): String =
@@ -2959,8 +2965,14 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             stateKey = scrollStateKey
                         )
 
-                        LaunchedEffect(page, appliedSearchQuery, selectedWarehouseFilterId, selectedSortMode, sortAscending) {
-                            warehouseListState.scrollToItem(0)
+                        val resetKey = listOf(page, appliedSearchQuery, selectedWarehouseFilterId, selectedSortMode, sortAscending)
+                        var previousResetKey by remember(warehouseListState) { mutableStateOf(resetKey) }
+                        LaunchedEffect(resetKey, warehouseListState) {
+                            // Opening a screen is a restore, not a filter change.
+                            if (previousResetKey != resetKey) {
+                                previousResetKey = resetKey
+                                warehouseListState.scrollToItem(0)
+                            }
                         }
 
                         var selectionDragShouldSelect by remember(selectionMode) { mutableStateOf<Boolean?>(null) }
@@ -3016,18 +3028,17 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                     }
                                 }
                         ) {
-                            items(visibleItems, key = { it.id }) { item ->
+                            items(visibleItems, key = { it.id }, contentType = { "stock_item" }) { item ->
                                 val itemBatches = displayBatchesByItem[item.id].orEmpty()
-                                val availableQuantity = itemBatches
-                                    .asSequence()
-                                    .filter { batch ->
+                                val availableQuantity = remember(itemBatches, transactionTypeIndex) {
+                                    itemBatches.asSequence().filter { batch ->
                                         if (transactionTypeIndex == null) {
                                             batch.status != StockBatchStatusDataModel.Deleted && batch.status != StockBatchStatusDataModel.WrittenOff
                                         } else {
                                             batch.isSelectableActiveStockBatch()
                                         }
-                                    }
-                                    .sumOf { it.quantity.total }
+                                    }.sumOf { it.quantity.total }
+                                }
                                 val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
 
                                 val canOperateThisStoreInventory = projectionCurrent && (

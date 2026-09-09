@@ -20,7 +20,8 @@ enum class AitaAuthNextStep {
 enum class AitaEmailCodePurpose {
     PASSWORDLESS_LOGIN,
     PASSWORD_RECOVERY,
-    PHONE_ALIAS
+    PHONE_ALIAS,
+    EMAIL_ALIAS
 }
 
 @Serializable
@@ -44,7 +45,8 @@ data class AitaAuthCapabilitiesDataModel(
     val codeTtlSeconds: Long = 600,
     val resendCooldownSeconds: Long = 60,
     // Provider-wide state only: never expose delivery/account existence for an anonymous flow.
-    val emailDeliveryUnavailable: Boolean = false
+    val emailDeliveryUnavailable: Boolean = false,
+    val additionalEmailLoginEnabled: Boolean = false
 )
 
 @Serializable
@@ -109,7 +111,8 @@ data class AitaAuthenticationSettingsDataModel(
     val phoneLoginAliasVerified: Boolean = false,
     val authenticatorEnabled: Boolean = false,
     val recoveryCodesRemaining: Int = 0,
-    val securityRevision: Long = 0L
+    val securityRevision: Long = 0L,
+    val additionalLoginEmails: List<String> = emptyList()
 )
 
 @Serializable
@@ -117,7 +120,8 @@ data class AitaTotpSetupDataModel(
     val setupId: String,
     val secret: String,
     val otpauthUri: String,
-    val expiresAtMillis: Long
+    val expiresAtMillis: Long,
+    val serverTimeMillis: Long = 0L
 )
 
 @Serializable
@@ -147,6 +151,27 @@ data class AitaPhoneAliasConfirmRequestDataModel(
     val code: String
 )
 
+/** New identity is pending until an authenticated confirmation succeeds. */
+@Serializable
+data class AitaEmailAliasRequestDataModel(
+    val email: String,
+    val currentPassword: String,
+    val secondFactorCode: String = "",
+    val locale: String = "en"
+)
+
+@Serializable
+data class AitaEmailAliasConfirmRequestDataModel(val flowId: String, val code: String)
+
+@Serializable
+data class AitaEmailAliasRemoveRequestDataModel(
+    val email: String,
+    val currentPassword: String,
+    val secondFactorCode: String = ""
+)
+
+const val AITA_MAX_ADDITIONAL_LOGIN_EMAILS = 5
+
 fun normalizeAitaLoginIdentifier(raw: String): AitaNormalizedLoginIdentifier? {
     val clean = raw.trim()
     if (clean.isBlank()) return null
@@ -166,7 +191,7 @@ fun normalizeAitaEmail(raw: String): String? {
     if (local.isBlank() || domain.isBlank() || '.' !in domain) return null
     if (local.startsWith('.') || local.endsWith('.') || ".." in local) return null
     if (domain.startsWith('.') || domain.endsWith('.') || ".." in domain) return null
-    if (value.any { it.isWhitespace() }) return null
+    if (value.any { it.isWhitespace() || it.isISOControl() }) return null
     return value
 }
 

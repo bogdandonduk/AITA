@@ -8,6 +8,7 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
     val kk = locale.startsWith("kk", ignoreCase = true) || locale.startsWith("kz", ignoreCase = true)
     val title = when (purpose) {
         "PASSWORD_RECOVERY" -> when { ru -> "Восстановление пароля"; kk -> "Құпия сөзді қалпына келтіру"; else -> "Reset your password" }
+        "EMAIL_ALIAS" -> when { ru -> "Подтвердите email для входа"; kk -> "Кіру email мекенжайын растаңыз"; else -> "Confirm your sign-in email" }
         "PHONE_ALIAS" -> when { ru -> "Подтвердите номер для входа"; kk -> "Кіру нөмірін растаңыз"; else -> "Confirm your sign-in number" }
         else -> when { ru -> "Ваш код входа"; kk -> "Кіру кодыңыз"; else -> "Your sign-in code" }
     }

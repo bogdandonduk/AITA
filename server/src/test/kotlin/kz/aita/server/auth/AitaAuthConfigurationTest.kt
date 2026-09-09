@@ -244,4 +244,16 @@ class AitaAuthConfigurationTest {
         assertEquals("re_test", config.resendApiKey)
         assertEquals("AITA <security@auth.example.com>", config.fromEmail)
     }
+    @Test
+    fun additionalEmailEnrollmentRequiresConfiguredDeliveryWithoutDisablingPassword() {
+        val missing = AdvancedAuthConfig.load(configured()::get).capabilities()
+        assertFalse(missing.additionalEmailLoginEnabled)
+        assertTrue(missing.passwordLoginEnabled)
+        val ready = AdvancedAuthConfig.load(configured(
+            "AITA_RESEND_API_KEY" to "re_test", "AITA_AUTH_EMAIL_FROM" to "AITA <security@example.com>"
+        )::get).capabilities()
+        assertTrue(ready.additionalEmailLoginEnabled)
+        assertTrue(ready.passwordLoginEnabled)
+    }
+
 }

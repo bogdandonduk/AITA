@@ -4,6 +4,10 @@ ktor:
     host: ${?AITA_HOST}
     port: ${?AITA_PORT}
     watch: []
+    # Bounded graceful shutdown, below systemd's 60-second stop deadline.
+    # This gives in-flight requests a chance to finish, not zero downtime.
+    shutdownGracePeriod: 5000
+    shutdownTimeout: 30000
   application:
     modules:
       - kz.aita.server.ServerKt.module

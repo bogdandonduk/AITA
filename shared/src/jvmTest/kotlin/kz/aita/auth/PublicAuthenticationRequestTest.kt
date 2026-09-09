@@ -78,4 +78,34 @@ class PublicAuthenticationRequestTest {
             assertEquals(endpoints.size, requests)
         } finally { client.close() }
     }
+    @Test
+    fun pinnedAccountRequestCannotLoadOrReplayAnotherAccountsToken() = runBlocking {
+        var loads = 0
+        var refreshes = 0
+        var requests = 0
+        val client = HttpClient(MockEngine { request ->
+            requests++
+            assertEquals(listOf("Bearer original-account"), request.headers.getAll(HttpHeaders.Authorization))
+            respond("{}", HttpStatusCode.Unauthorized, headersOf(HttpHeaders.WWWAuthenticate, "Bearer"))
+        }) {
+            expectSuccess = false
+            install(Auth) {
+                bearer {
+                    sendWithoutRequest { true }
+                    loadTokens { loads++; BearerTokens("different-account", "different-refresh") }
+                    refreshTokens { refreshes++; BearerTokens("different-account-new", "different-refresh-new") }
+                }
+            }
+        }
+        try {
+            val response = client.post("https://aita.test/auth/security/email/confirm") {
+                header(HttpHeaders.Authorization, "Bearer stale")
+                pinSessionAuthorization("original-account")
+            }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertEquals(1, requests)
+            assertEquals(0, loads)
+            assertEquals(0, refreshes)
+        } finally { client.close() }
+    }
 }

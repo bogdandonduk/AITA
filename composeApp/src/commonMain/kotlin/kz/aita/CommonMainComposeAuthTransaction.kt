@@ -396,7 +396,6 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                         iconRes = language.mapIconRes(),
                         contentDescription = language.name.visibleLocalizedString(stateValues.appLanguage, language.language.uppercase())
                     ) {
-                        markExplicitLocalAppPreferences(language = language.language)
                         setAuthScreenAppLocale(language.language)
                     }
                 }
@@ -422,7 +421,6 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                         iconRes = if (darkThemeChoice) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value,
                         contentDescription = theme.name.visibleLocalizedString(stateValues.appLanguage, theme.id.toString())
                     ) {
-                        markExplicitLocalAppPreferences(themeId = theme.id)
                         setAuthScreenAppTheme(theme.id)
                     }
                 }
@@ -445,7 +443,6 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                     iconRes = stateValues.drawableResIconAppScale.value,
                     contentDescription = label
                 ) {
-                    markExplicitLocalAppPreferences(sizeModeId = id)
                     setAuthScreenAppSizeMode(id)
                 }
             }

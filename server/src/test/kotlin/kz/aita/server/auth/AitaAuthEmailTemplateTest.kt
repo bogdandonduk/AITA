@@ -3,7 +3,7 @@ import kotlin.test.*
 class AitaAuthEmailTemplateTest {
     @Test fun everyPurposeHasPlainAndHtmlCode() {
         for (locale in listOf("en","ru","kk","kz","ru-RU","unknown"))
-            for (purpose in listOf("PASSWORDLESS_LOGIN","PASSWORD_RECOVERY","PHONE_ALIAS")) {
+            for (purpose in listOf("PASSWORDLESS_LOGIN","PASSWORD_RECOVERY","PHONE_ALIAS","EMAIL_ALIAS")) {
                 val copy=aitaAuthEmailCopy(purpose,locale,"001234",10)
                 assertTrue(copy.subject.startsWith("AITA"))
                 assertTrue(copy.text.contains("001234"));assertTrue(copy.html.contains("001234"))

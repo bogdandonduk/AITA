@@ -31,6 +31,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.*
 import kz.aita.auth.disableSessionAuthForPublicAuthRequest
+import kz.aita.auth.pinSessionAuthorization
 import kotlin.concurrent.Volatile
 import kotlin.random.Random
 
@@ -8600,36 +8601,7 @@ fun init() {
         if (getStoredUserAuthTokens?.invoke() != null) startRealtimeUpdates()
     }
 
-    GlobalScope.launch {
-        observeLocalKv(KEY_APP_LOCALE)
-            .collect {
-                it?.let { stored ->
-                    val normalized = normalizeAppLanguagePreference(stored)
-                    appLanguageState.emit(normalized)
-                    if (stored != normalized) putLocalKv(KEY_APP_LOCALE, normalized)
-                }
-            }
-    }
-
-    GlobalScope.launch {
-        observeLocalKv(KEY_APP_THEME)
-            .collect {
-                it?.let { stored ->
-                    appThemeIdState.emit(normalizeAppThemePreference(stored.toLongOrNull()))
-                }
-            }
-    }
-
-    GlobalScope.launch {
-        observeLocalKv(KEY_APP_SIZE_MODE)
-            .collect {
-                it?.let { stored ->
-                    val normalized = normalizeAppSizeModePreference(stored.toLongOrNull())
-                    appSizeModeIdState.emit(normalized)
-                    if (stored != normalized.toString()) putLocalKv(KEY_APP_SIZE_MODE, normalized.toString())
-                }
-            }
-    }
+    GlobalScope.launch(Dispatchers.ourIo) { AppPreferences.hydrate() }
 
     GlobalScope.launch {
         observeLocalKv(KEY_APP_MODE)
@@ -8882,24 +8854,11 @@ fun getDrawables() {
     }
 }
 
-fun setAppLocale(language: String, syncServer: Boolean = true) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val normalized = normalizeAppLanguagePreference(language)
-        appLanguageState.emit(normalized)
-        putLocalKv(KEY_APP_LOCALE, normalized)
-        if (syncServer) syncUserPreferencesToServer()
-    }
-}
+fun setAppLocale(language: String, syncServer: Boolean = true) =
+    AppPreferences.select(language = language, sync = syncServer)
 
-fun setAppTheme(themeId: Long, syncServer: Boolean = true) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val normalized = normalizeAppThemePreference(themeId)
-        // Emit immediately so UI changes now; local storage observer will keep it persistent.
-        appThemeIdState.emit(normalized)
-        putLocalKv(KEY_APP_THEME, normalized.toString())
-        if (syncServer) syncUserPreferencesToServer()
-    }
-}
+fun setAppTheme(themeId: Long, syncServer: Boolean = true) =
+    AppPreferences.select(theme = themeId, sync = syncServer)
 
 fun setAuthScreenAppLocale(language: String) {
     val normalized = normalizeAppLanguagePreference(language)
@@ -8928,14 +8887,8 @@ fun setAuthScreenAppSizeMode(sizeModeId: Long) {
     setAppSizeMode(normalized, syncServer = false)
 }
 
-fun setAppSizeMode(sizeModeId: Long, syncServer: Boolean = true) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val normalized = normalizeAppSizeModePreference(sizeModeId)
-        appSizeModeIdState.emit(normalized)
-        putLocalKv(KEY_APP_SIZE_MODE, normalized.toString())
-        if (syncServer) syncUserPreferencesToServer()
-    }
-}
+fun setAppSizeMode(sizeModeId: Long, syncServer: Boolean = true) =
+    AppPreferences.select(scale = sizeModeId, sync = syncServer)
 
 fun setAppMode(modeId: Int) {
     val safeModeId = normalizeAppModePreference(modeId)
@@ -8953,947 +8906,948 @@ fun updateGlobalAppConfiguration(
         globalAppConfigurationState.emit(DataState.Success(resourceConfiguration))
 }
 
-fun updateStrings(
+suspend fun updateStrings(
     strings: List<LocalizedStringGroupDataModel>,
     resourceStrings: List<LocalizedStringGroupDataModel>
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
+    withContext(Dispatchers.Default) {
+        val language = appLanguageState.value
         stringAppNameState.emit(
-            strings.extractString(0, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(0, language) ?: resourceStrings.extractString(
                 0,
-                appLanguageState.value
+                language
             )!!
         )
         stringLogInState.emit(
-            strings.extractString(1, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(1, language) ?: resourceStrings.extractString(
                 1,
-                appLanguageState.value
+                language
             )!!
         )
         stringPhoneNumberState.emit(
-            strings.extractString(2, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(2, language) ?: resourceStrings.extractString(
                 2,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterPhoneNumberState.emit(
-            strings.extractString(3, appLanguageState.value) ?: resourceStrings.extractString(3, appLanguageState.value)!!
+            strings.extractString(3, language) ?: resourceStrings.extractString(3, language)!!
         )
         stringEmailState.emit(
-            strings.extractString(4, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(4, language) ?: resourceStrings.extractString(
                 4,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterEmailAddressState.emit(
-            strings.extractString(5, appLanguageState.value) ?: resourceStrings.extractString(5, appLanguageState.value)!!
+            strings.extractString(5, language) ?: resourceStrings.extractString(5, language)!!
         )
         stringPasswordState.emit(
-            strings.extractString(6, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(6, language) ?: resourceStrings.extractString(
                 6,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterPasswordState.emit(
-            strings.extractString(7, appLanguageState.value) ?: resourceStrings.extractString(7, appLanguageState.value)!!
+            strings.extractString(7, language) ?: resourceStrings.extractString(7, language)!!
         )
         stringCancelState.emit(
-            strings.extractString(8, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(8, language) ?: resourceStrings.extractString(
                 8,
-                appLanguageState.value
+                language
             )!!
         )
         stringClearState.emit(
-            strings.extractString(9, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(9, language) ?: resourceStrings.extractString(
                 9,
-                appLanguageState.value
+                language
             )!!
         )
         stringAuthenticationFailedState.emit(
-            strings.extractString(10, appLanguageState.value) ?: resourceStrings.extractString(10, appLanguageState.value)!!
+            strings.extractString(10, language) ?: resourceStrings.extractString(10, language)!!
         )
         stringPhoneNumberMustBeState.emit(
-            strings.extractString(11, appLanguageState.value) ?: resourceStrings.extractString(11, appLanguageState.value)!!
+            strings.extractString(11, language) ?: resourceStrings.extractString(11, language)!!
         )
         stringEmailMustBeState.emit(
-            strings.extractString(12, appLanguageState.value) ?: resourceStrings.extractString(12, appLanguageState.value)!!
+            strings.extractString(12, language) ?: resourceStrings.extractString(12, language)!!
         )
         stringPasswordMustBeState.emit(
-            strings.extractString(13, appLanguageState.value) ?: resourceStrings.extractString(13, appLanguageState.value)!!
+            strings.extractString(13, language) ?: resourceStrings.extractString(13, language)!!
         )
         stringRepeatPasswordState.emit(
-            strings.extractString(14, appLanguageState.value) ?: resourceStrings.extractString(14, appLanguageState.value)!!
+            strings.extractString(14, language) ?: resourceStrings.extractString(14, language)!!
         )
         stringPasswordsMustMatchState.emit(
-            strings.extractString(15, appLanguageState.value) ?: resourceStrings.extractString(15, appLanguageState.value)!!
+            strings.extractString(15, language) ?: resourceStrings.extractString(15, language)!!
         )
         stringFirstNameState.emit(
-            strings.extractString(16, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(16, language) ?: resourceStrings.extractString(
                 16,
-                appLanguageState.value
+                language
             )!!
         )
         stringLastNameState.emit(
-            strings.extractString(17, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(17, language) ?: resourceStrings.extractString(
                 17,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterFirstNameState.emit(
-            strings.extractString(18, appLanguageState.value) ?: resourceStrings.extractString(18, appLanguageState.value)!!
+            strings.extractString(18, language) ?: resourceStrings.extractString(18, language)!!
         )
         stringEnterLastNameState.emit(
-            strings.extractString(19, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(19, language) ?: resourceStrings.extractString(
                 19,
-                appLanguageState.value
+                language
             )!!
         )
         stringUserWithThisPhoneNumberIsAlreadyRegisteredState.emit(
-            strings.extractString(20, appLanguageState.value) ?: resourceStrings.extractString(20, appLanguageState.value)!!
+            strings.extractString(20, language) ?: resourceStrings.extractString(20, language)!!
         )
         stringUserWithThisEmailAddressIsAlreadyRegisteredState.emit(
-            strings.extractString(21, appLanguageState.value) ?: resourceStrings.extractString(21, appLanguageState.value)!!
+            strings.extractString(21, language) ?: resourceStrings.extractString(21, language)!!
         )
         stringSignUpState.emit(
-            strings.extractString(22, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(22, language) ?: resourceStrings.extractString(
                 22,
-                appLanguageState.value
+                language
             )!!
         )
         stringConfirmState.emit(
-            strings.extractString(23, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(23, language) ?: resourceStrings.extractString(
                 23,
-                appLanguageState.value
+                language
             )!!
         )
         stringSaleState.emit(
-            strings.extractString(24, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(24, language) ?: resourceStrings.extractString(
                 24,
-                appLanguageState.value
+                language
             )!!
         )
         stringReturnState.emit(
-            strings.extractString(25, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(25, language) ?: resourceStrings.extractString(
                 25,
-                appLanguageState.value
+                language
             )!!
         )
         stringSupplyState.emit(
-            strings.extractString(26, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(26, language) ?: resourceStrings.extractString(
                 26,
-                appLanguageState.value
+                language
             )!!
         )
         stringStockState.emit(
-            strings.extractString(27, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(27, language) ?: resourceStrings.extractString(
                 27,
-                appLanguageState.value
+                language
             )!!
         )
         stringMenuState.emit(
-            strings.extractString(28, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(28, language) ?: resourceStrings.extractString(
                 28,
-                appLanguageState.value
+                language
             )!!
         )
         stringBackState.emit(
-            strings.extractString(29, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(29, language) ?: resourceStrings.extractString(
                 29,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddGoodsItemState.emit(
-            strings.extractString(30, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(30, language) ?: resourceStrings.extractString(
                 30,
-                appLanguageState.value
+                language
             )!!
         )
         stringEditGoodsItemState.emit(
-            strings.extractString(31, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(31, language) ?: resourceStrings.extractString(
                 31,
-                appLanguageState.value
+                language
             )!!
         )
         stringUserAccountState.emit(
-            strings.extractString(32, appLanguageState.value) ?: resourceStrings.extractString(32, appLanguageState.value)!!
+            strings.extractString(32, language) ?: resourceStrings.extractString(32, language)!!
         )
         stringGoodsCategoriesState.emit(
-            strings.extractString(33, appLanguageState.value) ?: resourceStrings.extractString(33, appLanguageState.value)!!
+            strings.extractString(33, language) ?: resourceStrings.extractString(33, language)!!
         )
         stringAddGoodsCategoryState.emit(
-            strings.extractString(34, appLanguageState.value) ?: resourceStrings.extractString(34, appLanguageState.value)!!
+            strings.extractString(34, language) ?: resourceStrings.extractString(34, language)!!
         )
         stringEditGoodsCategoryState.emit(
-            strings.extractString(35, appLanguageState.value) ?: resourceStrings.extractString(35, appLanguageState.value)!!
+            strings.extractString(35, language) ?: resourceStrings.extractString(35, language)!!
         )
         stringStoresState.emit(
-            strings.extractString(36, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(36, language) ?: resourceStrings.extractString(
                 36,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddStoreState.emit(
-            strings.extractString(37, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(37, language) ?: resourceStrings.extractString(
                 37,
-                appLanguageState.value
+                language
             )!!
         )
         stringEditStoreState.emit(
-            strings.extractString(38, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(38, language) ?: resourceStrings.extractString(
                 38,
-                appLanguageState.value
+                language
             )!!
         )
         stringSubscriptionState.emit(
-            strings.extractString(39, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(39, language) ?: resourceStrings.extractString(
                 39,
-                appLanguageState.value
+                language
             )!!
         )
         stringSubscriptionPlansState.emit(
-            strings.extractString(40, appLanguageState.value) ?: resourceStrings.extractString(40, appLanguageState.value)!!
+            strings.extractString(40, language) ?: resourceStrings.extractString(40, language)!!
         )
         stringTransactionHistoryState.emit(
-            strings.extractString(41, appLanguageState.value) ?: resourceStrings.extractString(41, appLanguageState.value)!!
+            strings.extractString(41, language) ?: resourceStrings.extractString(41, language)!!
         )
         stringReceiptState.emit(
-            strings.extractString(42, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(42, language) ?: resourceStrings.extractString(
                 42,
-                appLanguageState.value
+                language
             )!!
         )
         stringAnalyticsState.emit(
-            strings.extractString(43, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(43, language) ?: resourceStrings.extractString(
                 43,
-                appLanguageState.value
+                language
             )!!
         )
         stringWorkersState.emit(
-            strings.extractString(44, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(44, language) ?: resourceStrings.extractString(
                 44,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddWorkerState.emit(
-            strings.extractString(45, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(45, language) ?: resourceStrings.extractString(
                 45,
-                appLanguageState.value
+                language
             )!!
         )
         stringEditWorkerState.emit(
-            strings.extractString(46, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(46, language) ?: resourceStrings.extractString(
                 46,
-                appLanguageState.value
+                language
             )!!
         )
         stringSuppliersState.emit(
-            strings.extractString(47, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(47, language) ?: resourceStrings.extractString(
                 47,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddSupplierState.emit(
-            strings.extractString(48, appLanguageState.value) ?: resourceStrings.extractString(48, appLanguageState.value)!!
+            strings.extractString(48, language) ?: resourceStrings.extractString(48, language)!!
         )
         stringEditSupplierState.emit(
-            strings.extractString(49, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(49, language) ?: resourceStrings.extractString(
                 49,
-                appLanguageState.value
+                language
             )!!
         )
         stringDebtorsState.emit(
-            strings.extractString(50, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(50, language) ?: resourceStrings.extractString(
                 50,
-                appLanguageState.value
+                language
             )!!
         )
         stringCloseDebtState.emit(
-            strings.extractString(51, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(51, language) ?: resourceStrings.extractString(
                 51,
-                appLanguageState.value
+                language
             )!!
         )
         stringDevicesState.emit(
-            strings.extractString(52, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(52, language) ?: resourceStrings.extractString(
                 52,
-                appLanguageState.value
+                language
             )!!
         )
         stringAppLanguageState.emit(
-            strings.extractString(53, appLanguageState.value) ?: resourceStrings.extractString(53, appLanguageState.value)!!
+            strings.extractString(53, language) ?: resourceStrings.extractString(53, language)!!
         )
         stringAppThemeState.emit(
-            strings.extractString(54, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(54, language) ?: resourceStrings.extractString(
                 54,
-                appLanguageState.value
+                language
             )!!
         )
         stringSelectState.emit(
-            strings.extractString(55, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(55, language) ?: resourceStrings.extractString(
                 55,
-                appLanguageState.value
+                language
             )!!
         )
         stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.emit(
             strings.extractString(
                 56,
-                appLanguageState.value
-            ) ?: resourceStrings.extractString(56, appLanguageState.value)!!
+                language
+            ) ?: resourceStrings.extractString(56, language)!!
         )
         stringFirstNameCannotBeEmptyOrJustWhitespacesState.emit(
-            strings.extractString(57, appLanguageState.value) ?: resourceStrings.extractString(57, appLanguageState.value)!!
+            strings.extractString(57, language) ?: resourceStrings.extractString(57, language)!!
         )
         stringLastNameCannotBeEmptyOrJustWhitespacesState.emit(
-            strings.extractString(58, appLanguageState.value) ?: resourceStrings.extractString(58, appLanguageState.value)!!
+            strings.extractString(58, language) ?: resourceStrings.extractString(58, language)!!
         )
         stringSystemLanguageState.emit(
-            strings.extractString(59, appLanguageState.value) ?: resourceStrings.extractString(59, appLanguageState.value)!!
+            strings.extractString(59, language) ?: resourceStrings.extractString(59, language)!!
         )
         stringBluetoothPermissionRequiredState.emit(
-            strings.extractString(60, appLanguageState.value) ?: resourceStrings.extractString(60, appLanguageState.value)!!
+            strings.extractString(60, language) ?: resourceStrings.extractString(60, language)!!
         )
         stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(
             strings.extractString(
                 61,
-                appLanguageState.value
-            ) ?: resourceStrings.extractString(61, appLanguageState.value)!!
+                language
+            ) ?: resourceStrings.extractString(61, language)!!
         )
         stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.emit(
-            strings.extractString(62, appLanguageState.value) ?: resourceStrings.extractString(62, appLanguageState.value)!!
+            strings.extractString(62, language) ?: resourceStrings.extractString(62, language)!!
         )
         stringBluetoothDisabledState.emit(
-            strings.extractString(63, appLanguageState.value) ?: resourceStrings.extractString(63, appLanguageState.value)!!
+            strings.extractString(63, language) ?: resourceStrings.extractString(63, language)!!
         )
         stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.emit(
             strings.extractString(
                 64,
-                appLanguageState.value
-            ) ?: resourceStrings.extractString(64, appLanguageState.value)!!
+                language
+            ) ?: resourceStrings.extractString(64, language)!!
         )
         stringSearchByAnyDataState.emit(
-            strings.extractString(65, appLanguageState.value) ?: resourceStrings.extractString(65, appLanguageState.value)!!
+            strings.extractString(65, language) ?: resourceStrings.extractString(65, language)!!
         )
         stringListEmptyState.emit(
-            strings.extractString(66, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(66, language) ?: resourceStrings.extractString(
                 66,
-                appLanguageState.value
+                language
             )!!
         )
         stringNoMatchesState.emit(
-            strings.extractString(67, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(67, language) ?: resourceStrings.extractString(
                 67,
-                appLanguageState.value
+                language
             )!!
         )
         stringNameState.emit(
-            strings.extractString(68, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(68, language) ?: resourceStrings.extractString(
                 68,
-                appLanguageState.value
+                language
             )!!
         )
         stringBarcodeState.emit(
-            strings.extractString(69, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(69, language) ?: resourceStrings.extractString(
                 69,
-                appLanguageState.value
+                language
             )!!
         )
         stringSupplyPriceState.emit(
-            strings.extractString(70, appLanguageState.value) ?: resourceStrings.extractString(70, appLanguageState.value)!!
+            strings.extractString(70, language) ?: resourceStrings.extractString(70, language)!!
         )
         stringSalePriceState.emit(
-            strings.extractString(71, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(71, language) ?: resourceStrings.extractString(
                 71,
-                appLanguageState.value
+                language
             )!!
         )
         stringReturnPriceState.emit(
-            strings.extractString(72, appLanguageState.value) ?: resourceStrings.extractString(72, appLanguageState.value)!!
+            strings.extractString(72, language) ?: resourceStrings.extractString(72, language)!!
         )
         stringCategoryState.emit(
-            strings.extractString(73, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(73, language) ?: resourceStrings.extractString(
                 73,
-                appLanguageState.value
+                language
             )!!
         )
         stringSupplierState.emit(
-            strings.extractString(74, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(74, language) ?: resourceStrings.extractString(
                 74,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterBarcodeState.emit(
-            strings.extractString(75, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(75, language) ?: resourceStrings.extractString(
                 75,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterNameState.emit(
-            strings.extractString(76, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(76, language) ?: resourceStrings.extractString(
                 76,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterSupplyPriceState.emit(
-            strings.extractString(77, appLanguageState.value) ?: resourceStrings.extractString(77, appLanguageState.value)!!
+            strings.extractString(77, language) ?: resourceStrings.extractString(77, language)!!
         )
         stringEnterSalePriceState.emit(
-            strings.extractString(78, appLanguageState.value) ?: resourceStrings.extractString(78, appLanguageState.value)!!
+            strings.extractString(78, language) ?: resourceStrings.extractString(78, language)!!
         )
         stringEnterReturnPriceState.emit(
-            strings.extractString(79, appLanguageState.value) ?: resourceStrings.extractString(79, appLanguageState.value)!!
+            strings.extractString(79, language) ?: resourceStrings.extractString(79, language)!!
         )
         stringSelectCategoryState.emit(
-            strings.extractString(80, appLanguageState.value) ?: resourceStrings.extractString(80, appLanguageState.value)!!
+            strings.extractString(80, language) ?: resourceStrings.extractString(80, language)!!
         )
         stringSelectSupplierState.emit(
-            strings.extractString(81, appLanguageState.value) ?: resourceStrings.extractString(81, appLanguageState.value)!!
+            strings.extractString(81, language) ?: resourceStrings.extractString(81, language)!!
         )
         stringEditState.emit(
-            strings.extractString(82, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(82, language) ?: resourceStrings.extractString(
                 82,
-                appLanguageState.value
+                language
             )!!
         )
         stringChangePasswordState.emit(
-            strings.extractString(83, appLanguageState.value) ?: resourceStrings.extractString(83, appLanguageState.value)!!
+            strings.extractString(83, language) ?: resourceStrings.extractString(83, language)!!
         )
         stringNewPasswordState.emit(
-            strings.extractString(84, appLanguageState.value) ?: resourceStrings.extractString(84, appLanguageState.value)!!
+            strings.extractString(84, language) ?: resourceStrings.extractString(84, language)!!
         )
         stringEnterNewPasswordState.emit(
-            strings.extractString(85, appLanguageState.value) ?: resourceStrings.extractString(85, appLanguageState.value)!!
+            strings.extractString(85, language) ?: resourceStrings.extractString(85, language)!!
         )
         stringRepeatNewPasswordState.emit(
-            strings.extractString(86, appLanguageState.value) ?: resourceStrings.extractString(86, appLanguageState.value)!!
+            strings.extractString(86, language) ?: resourceStrings.extractString(86, language)!!
         )
         stringConfirmationPasswordState.emit(
-            strings.extractString(87, appLanguageState.value) ?: resourceStrings.extractString(87, appLanguageState.value)!!
+            strings.extractString(87, language) ?: resourceStrings.extractString(87, language)!!
         )
         stringRequiredToEditAccountState.emit(
-            strings.extractString(88, appLanguageState.value) ?: resourceStrings.extractString(88, appLanguageState.value)!!
+            strings.extractString(88, language) ?: resourceStrings.extractString(88, language)!!
         )
         stringAccountSuccessfullyUpdatedState.emit(
-            strings.extractString(89, appLanguageState.value) ?: resourceStrings.extractString(89, appLanguageState.value)!!
+            strings.extractString(89, language) ?: resourceStrings.extractString(89, language)!!
         )
         stringLoggingOutState.emit(
-            strings.extractString(90, appLanguageState.value) ?: resourceStrings.extractString(90, appLanguageState.value)!!
+            strings.extractString(90, language) ?: resourceStrings.extractString(90, language)!!
         )
         stringSessionTimeExpiredLoggingOutState.emit(
-            strings.extractString(91, appLanguageState.value) ?: resourceStrings.extractString(91, appLanguageState.value)!!
+            strings.extractString(91, language) ?: resourceStrings.extractString(91, language)!!
         )
         stringAliasState.emit(
-            strings.extractString(92, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(92, language) ?: resourceStrings.extractString(
                 92,
-                appLanguageState.value
+                language
             )!!
         )
         stringDescriptionState.emit(
-            strings.extractString(93, appLanguageState.value) ?: resourceStrings.extractString(93, appLanguageState.value)!!
+            strings.extractString(93, language) ?: resourceStrings.extractString(93, language)!!
         )
         stringEnterAliasState.emit(
-            strings.extractString(94, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(94, language) ?: resourceStrings.extractString(
                 94,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterDescriptionState.emit(
-            strings.extractString(95, appLanguageState.value) ?: resourceStrings.extractString(95, appLanguageState.value)!!
+            strings.extractString(95, language) ?: resourceStrings.extractString(95, language)!!
         )
         stringOptionalState.emit(
-            strings.extractString(96, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(96, language) ?: resourceStrings.extractString(
                 96,
-                appLanguageState.value
+                language
             )!!
         )
         stringLoggingInState.emit(
-            strings.extractString(97, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(97, language) ?: resourceStrings.extractString(
                 97,
-                appLanguageState.value
+                language
             )!!
         )
         stringSigningUpState.emit(
-            strings.extractString(98, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(98, language) ?: resourceStrings.extractString(
                 98,
-                appLanguageState.value
+                language
             )!!
         )
         stringCompanyFormState.emit(
-            strings.extractString(99, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(99, language) ?: resourceStrings.extractString(
                 99,
-                appLanguageState.value
+                language
             )!!
         )
         stringMeasurementUnitState.emit(
-            strings.extractString(100, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(100, language) ?: resourceStrings.extractString(
                 100,
-                appLanguageState.value
+                language
             )!!
         )
         stringNoActiveStoreState.emit(
-            strings.extractString(101, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(101, language) ?: resourceStrings.extractString(
                 101,
-                appLanguageState.value
+                language
             )!!
         )
         stringSelectInMenuState.emit(
-            strings.extractString(102, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(102, language) ?: resourceStrings.extractString(
                 102,
-                appLanguageState.value
+                language
             )!!
         )
         stringSupplyDataState.emit(
-            strings.extractString(103, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(103, language) ?: resourceStrings.extractString(
                 103,
-                appLanguageState.value
+                language
             )!!
         )
         stringSaleDataState.emit(
-            strings.extractString(104, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(104, language) ?: resourceStrings.extractString(
                 104,
-                appLanguageState.value
+                language
             )!!
         )
         stringReturnDataState.emit(
-            strings.extractString(105, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(105, language) ?: resourceStrings.extractString(
                 105,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddSupplyDataState.emit(
-            strings.extractString(106, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(106, language) ?: resourceStrings.extractString(
                 106,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddSaleDataState.emit(
-            strings.extractString(107, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(107, language) ?: resourceStrings.extractString(
                 107,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddReturnDataState.emit(
-            strings.extractString(108, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(108, language) ?: resourceStrings.extractString(
                 108,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddBarcodeState.emit(
-            strings.extractString(109, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(109, language) ?: resourceStrings.extractString(
                 109,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddNameState.emit(
-            strings.extractString(110, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(110, language) ?: resourceStrings.extractString(
                 110,
-                appLanguageState.value
+                language
             )!!
         )
         stringPaymentState.emit(
-            strings.extractString(111, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(111, language) ?: resourceStrings.extractString(
                 111,
-                appLanguageState.value
+                language
             )!!
         )
         stringAllState.emit(
-            strings.extractString(112, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(112, language) ?: resourceStrings.extractString(
                 112,
-                appLanguageState.value
+                language
             )!!
         )
         stringQuickState.emit(
-            strings.extractString(113, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(113, language) ?: resourceStrings.extractString(
                 113,
-                appLanguageState.value
+                language
             )!!
         )
         stringCategoriesState.emit(
-            strings.extractString(114, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(114, language) ?: resourceStrings.extractString(
                 114,
-                appLanguageState.value
+                language
             )!!
         )
         stringMainState.emit(
-            strings.extractString(115, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(115, language) ?: resourceStrings.extractString(
                 115,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddTranslationState.emit(
-            strings.extractString(116, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(116, language) ?: resourceStrings.extractString(
                 116,
-                appLanguageState.value
+                language
             )!!
         )
         stringSetActiveState.emit(
-            strings.extractString(117, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(117, language) ?: resourceStrings.extractString(
                 117,
-                appLanguageState.value
+                language
             )!!
         )
         stringOutOfStockState.emit(
-            strings.extractString(118, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(118, language) ?: resourceStrings.extractString(
                 118,
-                appLanguageState.value
+                language
             )!!
         )
         stringDeleteState.emit(
-            strings.extractString(119, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(119, language) ?: resourceStrings.extractString(
                 119,
-                appLanguageState.value
+                language
             )!!
         )
         stringCashState.emit(
-            strings.extractString(120, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(120, language) ?: resourceStrings.extractString(
                 120,
-                appLanguageState.value
+                language
             )!!
         )
         stringCashlessState.emit(
-            strings.extractString(121, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(121, language) ?: resourceStrings.extractString(
                 121,
-                appLanguageState.value
+                language
             )!!
         )
         stringMixedState.emit(
-            strings.extractString(122, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(122, language) ?: resourceStrings.extractString(
                 122,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddState.emit(
-            strings.extractString(123, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(123, language) ?: resourceStrings.extractString(
                 123,
-                appLanguageState.value
+                language
             )!!
         )
         stringSubtractState.emit(
-            strings.extractString(124, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(124, language) ?: resourceStrings.extractString(
                 124,
-                appLanguageState.value
+                language
             )!!
         )
         stringCurrentQuantityDataState.emit(
-            strings.extractString(125, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(125, language) ?: resourceStrings.extractString(
                 125,
-                appLanguageState.value
+                language
             )!!
         )
         stringEnterQuantityState.emit(
-            strings.extractString(126, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(126, language) ?: resourceStrings.extractString(
                 126,
-                appLanguageState.value
+                language
             )!!
         )
         stringAddQuantityDataState.emit(
-            strings.extractString(127, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(127, language) ?: resourceStrings.extractString(
                 127,
-                appLanguageState.value
+                language
             )!!
         )
         stringShelfBatchState.emit(
-            strings.extractString(128, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(128, language) ?: resourceStrings.extractString(
                 128,
-                appLanguageState.value
+                language
             )!!
         )
         stringActiveStoreState.emit(
-            strings.extractString(129, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(129, language) ?: resourceStrings.extractString(
                 129,
-                appLanguageState.value
+                language
             )!!
         )
         stringMakeInactiveState.emit(
-            strings.extractString(130, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(130, language) ?: resourceStrings.extractString(
                 130,
-                appLanguageState.value
+                language
             )!!
         )
         stringCartEmptyState.emit(
-            strings.extractString(131, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(131, language) ?: resourceStrings.extractString(
                 131,
-                appLanguageState.value
+                language
             )!!
         )
         stringCompleteState.emit(
-            strings.extractString(132, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(132, language) ?: resourceStrings.extractString(
                 132,
-                appLanguageState.value
+                language
             )!!
         )
         stringNoActiveWorkshiftState.emit(
-            strings.extractString(133, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(133, language) ?: resourceStrings.extractString(
                 133,
-                appLanguageState.value
+                language
             )!!
         )
         stringCartState.emit(
-            strings.extractString(134, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(134, language) ?: resourceStrings.extractString(
                 134,
-                appLanguageState.value
+                language
             )!!
         )
         stringAppModeState.emit(
-            strings.extractString(135, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(135, language) ?: resourceStrings.extractString(
                 135,
-                appLanguageState.value
+                language
             )!!
         )
         stringFinancesState.emit(
-            strings.extractString(136, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(136, language) ?: resourceStrings.extractString(
                 136,
-                appLanguageState.value
+                language
             )!!
         )
         stringItemsState.emit(
-            strings.extractString(137, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(137, language) ?: resourceStrings.extractString(
                 137,
-                appLanguageState.value
+                language
             )!!
         )
         stringBatchesState.emit(
-            strings.extractString(138, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(138, language) ?: resourceStrings.extractString(
                 138,
-                appLanguageState.value
+                language
             )!!
         )
         stringStandardPricesForSuppliersState.emit(
-            strings.extractString(139, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(139, language) ?: resourceStrings.extractString(
                 139,
-                appLanguageState.value
+                language
             )!!
         )
         stringEditableForIndividualBatchesState.emit(
-            strings.extractString(140, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(140, language) ?: resourceStrings.extractString(
                 140,
-                appLanguageState.value
+                language
             )!!
         )
         stringBatchesDataState.emit(
-            strings.extractString(141, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(141, language) ?: resourceStrings.extractString(
                 141,
-                appLanguageState.value
+                language
             )!!
         )
         stringReceiptNumberState.emit(
-            strings.extractString(142, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(142, language) ?: resourceStrings.extractString(
                 142,
-                appLanguageState.value
+                language
             ) ?: stringReceiptNumberState.value
         )
         stringTransactionIdState.emit(
-            strings.extractString(143, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(143, language) ?: resourceStrings.extractString(
                 143,
-                appLanguageState.value
+                language
             ) ?: stringTransactionIdState.value
         )
         stringDateState.emit(
-            strings.extractString(144, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(144, language) ?: resourceStrings.extractString(
                 144,
-                appLanguageState.value
+                language
             ) ?: stringDateState.value
         )
         stringCashierState.emit(
-            strings.extractString(145, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(145, language) ?: resourceStrings.extractString(
                 145,
-                appLanguageState.value
+                language
             ) ?: stringCashierState.value
         )
         stringStoreState.emit(
-            strings.extractString(146, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(146, language) ?: resourceStrings.extractString(
                 146,
-                appLanguageState.value
+                language
             ) ?: stringStoreState.value
         )
         stringAddressState.emit(
-            strings.extractString(147, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(147, language) ?: resourceStrings.extractString(
                 147,
-                appLanguageState.value
+                language
             ) ?: stringAddressState.value
         )
         stringPhoneState.emit(
-            strings.extractString(148, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(148, language) ?: resourceStrings.extractString(
                 148,
-                appLanguageState.value
+                language
             ) ?: stringPhoneState.value
         )
         stringTotalState.emit(
-            strings.extractString(149, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(149, language) ?: resourceStrings.extractString(
                 149,
-                appLanguageState.value
+                language
             ) ?: stringTotalState.value
         )
         stringPaidState.emit(
-            strings.extractString(150, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(150, language) ?: resourceStrings.extractString(
                 150,
-                appLanguageState.value
+                language
             ) ?: stringPaidState.value
         )
         stringDebtState.emit(
-            strings.extractString(151, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(151, language) ?: resourceStrings.extractString(
                 151,
-                appLanguageState.value
+                language
             ) ?: stringDebtState.value
         )
         stringDebtorState.emit(
-            strings.extractString(152, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(152, language) ?: resourceStrings.extractString(
                 152,
-                appLanguageState.value
+                language
             ) ?: stringDebtorState.value
         )
         stringDebtorPhoneState.emit(
-            strings.extractString(153, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(153, language) ?: resourceStrings.extractString(
                 153,
-                appLanguageState.value
+                language
             ) ?: stringDebtorPhoneState.value
         )
         stringChangeState.emit(
-            strings.extractString(154, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(154, language) ?: resourceStrings.extractString(
                 154,
-                appLanguageState.value
+                language
             ) ?: stringChangeState.value
         )
         stringVatState.emit(
-            strings.extractString(155, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(155, language) ?: resourceStrings.extractString(
                 155,
-                appLanguageState.value
+                language
             ) ?: stringVatState.value
         )
         stringVatNotSpecifiedState.emit(
-            strings.extractString(156, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(156, language) ?: resourceStrings.extractString(
                 156,
-                appLanguageState.value
+                language
             ) ?: stringVatNotSpecifiedState.value
         )
         stringFiscalStatusState.emit(
-            strings.extractString(157, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(157, language) ?: resourceStrings.extractString(
                 157,
-                appLanguageState.value
+                language
             ) ?: stringFiscalStatusState.value
         )
         stringNonFiscalSoftwareReceiptState.emit(
-            strings.extractString(158, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(158, language) ?: resourceStrings.extractString(
                 158,
-                appLanguageState.value
+                language
             ) ?: stringNonFiscalSoftwareReceiptState.value
         )
         stringThankYouState.emit(
-            strings.extractString(159, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(159, language) ?: resourceStrings.extractString(
                 159,
-                appLanguageState.value
+                language
             ) ?: stringThankYouState.value
         )
         stringNoItemsState.emit(
-            strings.extractString(160, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(160, language) ?: resourceStrings.extractString(
                 160,
-                appLanguageState.value
+                language
             ) ?: stringNoItemsState.value
         )
         stringPdfState.emit(
-            strings.extractString(161, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(161, language) ?: resourceStrings.extractString(
                 161,
-                appLanguageState.value
+                language
             ) ?: stringPdfState.value
         )
         stringShareState.emit(
-            strings.extractString(162, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(162, language) ?: resourceStrings.extractString(
                 162,
-                appLanguageState.value
+                language
             ) ?: stringShareState.value
         )
         stringWhatsAppState.emit(
-            strings.extractString(163, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(163, language) ?: resourceStrings.extractString(
                 163,
-                appLanguageState.value
+                language
             ) ?: stringWhatsAppState.value
         )
         stringPrintState.emit(
-            strings.extractString(164, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(164, language) ?: resourceStrings.extractString(
                 164,
-                appLanguageState.value
+                language
             ) ?: stringPrintState.value
         )
         stringQuitState.emit(
-            strings.extractString(165, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(165, language) ?: resourceStrings.extractString(
                 165,
-                appLanguageState.value
+                language
             ) ?: stringQuitState.value
         )
         stringReceiptPdfSavedState.emit(
-            strings.extractString(166, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(166, language) ?: resourceStrings.extractString(
                 166,
-                appLanguageState.value
+                language
             ) ?: stringReceiptPdfSavedState.value
         )
         stringReceiptSharedState.emit(
-            strings.extractString(167, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(167, language) ?: resourceStrings.extractString(
                 167,
-                appLanguageState.value
+                language
             ) ?: stringReceiptSharedState.value
         )
         stringReceiptSentToWhatsAppState.emit(
-            strings.extractString(168, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(168, language) ?: resourceStrings.extractString(
                 168,
-                appLanguageState.value
+                language
             ) ?: stringReceiptSentToWhatsAppState.value
         )
         stringReceiptSentToPrinterState.emit(
-            strings.extractString(169, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(169, language) ?: resourceStrings.extractString(
                 169,
-                appLanguageState.value
+                language
             ) ?: stringReceiptSentToPrinterState.value
         )
         stringReceiptActionFailedState.emit(
-            strings.extractString(170, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(170, language) ?: resourceStrings.extractString(
                 170,
-                appLanguageState.value
+                language
             ) ?: stringReceiptActionFailedState.value
         )
         stringGoodsReceiptTitleState.emit(
-            strings.extractString(171, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(171, language) ?: resourceStrings.extractString(
                 171,
-                appLanguageState.value
+                language
             ) ?: stringGoodsReceiptTitleState.value
         )
         stringSaleReceiptTitleState.emit(
-            strings.extractString(172, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(172, language) ?: resourceStrings.extractString(
                 172,
-                appLanguageState.value
+                language
             ) ?: stringSaleReceiptTitleState.value
         )
         stringReturnReceiptTitleState.emit(
-            strings.extractString(173, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(173, language) ?: resourceStrings.extractString(
                 173,
-                appLanguageState.value
+                language
             ) ?: stringReturnReceiptTitleState.value
         )
         stringSupplyReceiptTitleState.emit(
-            strings.extractString(174, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(174, language) ?: resourceStrings.extractString(
                 174,
-                appLanguageState.value
+                language
             ) ?: stringSupplyReceiptTitleState.value
         )
         stringDraftState.emit(
-            strings.extractString(175, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(175, language) ?: resourceStrings.extractString(
                 175,
-                appLanguageState.value
+                language
             ) ?: stringDraftState.value
         )
         stringNoNameState.emit(
-            strings.extractString(176, appLanguageState.value) ?: resourceStrings.extractString(
+            strings.extractString(176, language) ?: resourceStrings.extractString(
                 176,
-                appLanguageState.value
+                language
             ) ?: stringNoNameState.value
         )
 
     }
 }
 
-fun updateDrawables(
+suspend fun updateDrawables(
     drawables: List<StylizedDrawablePathsGroupDataModel>,
     resourceDrawables: List<StylizedDrawablePathsGroupDataModel>
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
+    withContext(Dispatchers.Default) {
         val themeId = appThemeIdState.value
         fun drawablePath(id: Long): String {
             val normalizedThemeId = if (themeId == 1L) 1L else 0L
@@ -17065,6 +17019,7 @@ fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true)
                     }
                 }
 
+                val preferenceRevisionAtRequest = AppPreferences.revision
                 val response = networkRequest<UserAccountDataModel, Unit>(
                     HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first
@@ -17087,7 +17042,7 @@ fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true)
                     val account = response.payload!!
                     setStoredUserAccountDataModel?.invoke(account)
                     userAccountState.emit(DataState.Success(account, response.message))
-                    applyUserAccountPreferencesAfterLogin(account)
+                    AppPreferences.acceptAccount(account, preferenceRevisionAtRequest)
 
                     if (applyServerActiveStore) {
                         val savedStoreId = account.activeStoreId?.takeIf { it.isNotBlank() }
@@ -17162,82 +17117,7 @@ data class UserPreferencesDataModel(
     val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID
 )
 
-private suspend fun applyUserPreferencesLocally(
-    appLanguage: String?,
-    appThemeId: Long?,
-    appSizeModeId: Long? = null
-) {
-    val normalizedLanguage = normalizeAppLanguagePreference(appLanguage)
-    val normalizedThemeId = normalizeAppThemePreference(appThemeId)
-    val normalizedSizeModeId = normalizeAppSizeModePreference(appSizeModeId)
-    appLanguageState.emit(normalizedLanguage)
-    appThemeIdState.emit(normalizedThemeId)
-    appSizeModeIdState.emit(normalizedSizeModeId)
-    putLocalKv(KEY_APP_LOCALE, normalizedLanguage)
-    putLocalKv(KEY_APP_THEME, normalizedThemeId.toString())
-    putLocalKv(KEY_APP_SIZE_MODE, normalizedSizeModeId.toString())
-}
-
-private suspend fun applyUserAccountPreferencesAfterLogin(account: UserAccountDataModel) {
-    val override = authScreenPreferenceOverrideState.value
-    if (override.touched) {
-        val preferredLanguage = if (override.languageTouched) {
-            normalizeAppLanguagePreference(override.appLanguage)
-        } else {
-            normalizeAppLanguagePreference(account.appLanguage)
-        }
-        val preferredThemeId = if (override.themeTouched) {
-            normalizeAppThemePreference(override.appThemeId)
-        } else {
-            normalizeAppThemePreference(account.appThemeId)
-        }
-        val preferredSizeModeId = if (override.sizeModeTouched) {
-            normalizeAppSizeModePreference(override.appSizeModeId)
-        } else {
-            normalizeAppSizeModePreference(account.appSizeModeId)
-        }
-
-        applyUserPreferencesLocally(preferredLanguage, preferredThemeId, preferredSizeModeId)
-        authScreenPreferenceOverrideState.emit(AuthScreenPreferenceOverrideDataModel())
-        syncUserPreferencesToServer(preferredLanguage, preferredThemeId, preferredSizeModeId, postFailure = false)
-    } else {
-        applyUserPreferencesLocally(account.appLanguage, account.appThemeId, account.appSizeModeId)
-    }
-}
-
-fun syncUserPreferencesToServer(
-    appLanguage: String = appLanguageState.value,
-    appThemeId: Long = appThemeIdState.value,
-    appSizeModeId: Long = appSizeModeIdState.value,
-    postFailure: Boolean = true
-) {
-    if (getStoredUserAuthTokens?.invoke() == null) return
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        updateUserPreferencesMutex.withLock {
-            val request = UserPreferencesDataModel(
-                appLanguage = normalizeAppLanguagePreference(appLanguage),
-                appThemeId = normalizeAppThemePreference(appThemeId),
-                appSizeModeId = normalizeAppSizeModePreference(appSizeModeId)
-            )
-
-            val response = networkRequest<UserAccountDataModel, UserPreferencesDataModel>(
-                method = HttpMethod.Put,
-                endpointUrl = globalAppConfigurationState.payloadValue.updateUserPreferencesPath.first,
-                body = request
-            )
-
-            if (response.negative || response.payload == null) {
-                if (postFailure) {
-                    postInAppNotification(response.message, NotificationType.Neutral, transient = true)
-                }
-            } else {
-                userAccountState.emit(DataState.Success(response.payload, response.message))
-                setStoredUserAccountDataModel?.invoke(response.payload)
-            }
-        }
-    }
-}
+fun syncUserPreferencesToServer(postFailure: Boolean = true) = AppPreferences.retryPending(postFailure)
 
 fun forceLogOutUser(
     message: List<LocalizedStringDataModel>? = null,
@@ -17272,12 +17152,17 @@ suspend inline fun <reified Response, reified Body> networkRequest(
     query: Map<String, Any?> = emptyMap(),
     headers: Map<String, String> = emptyMap(),
     body: Body? = null,
-    contentType: ContentType? = ContentType.Application.Json
+    contentType: ContentType? = ContentType.Application.Json,
+    expectedSessionGeneration: Long? = null
 ): ResponseDataModel<Response> {
     activeNetworkOperationsState.update { it + 1 }
 
     return try {
+        if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
+            return cloudSessionExpiredResponse()
         ensureCachedGlobalConfigurationPrimedForNetwork()
+        if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
+            return cloudSessionExpiredResponse()
 
         val protectedEndpoint = cloudEndpointRequiresAuthentication(endpointUrl)
         if (protectedEndpoint) {
@@ -17285,6 +17170,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             // A rejected refresh token is remembered, so later requests fail locally instead of creating
             // another /auth/ping -> /auth/refresh -> 401 storm.
             val validation = ensureCloudSessionReadyForProtectedRequest()
+            if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
+                return cloudSessionExpiredResponse()
             if (validation.negative) {
                 return cloudSessionValidationFailureForNetworkRequest(validation)
             }
@@ -17330,6 +17217,9 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
             retrySameServer@ while (true) {
                 val tokensBeforeRequest = getStoredUserAuthTokens?.invoke()
+                if (expectedSessionGeneration != null &&
+                    (!authenticatedSessionGenerationIsCurrent(expectedSessionGeneration) || tokensBeforeRequest == null))
+                    return cloudSessionExpiredResponse()
                 try {
                     val requestUrl = networkTargetUrl(resolvedServerUrl, endpointUrl)
                     logNetworkAttempt("TRY ${method.value} $requestUrl")
@@ -17345,6 +17235,11 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                             }
                         }
 
+                        if (expectedSessionGeneration != null) {
+                            // Use this request's account token, not the bearer's latest global token.
+                            pinSessionAuthorization(requireNotNull(tokensBeforeRequest).accessToken)
+                        }
+
                         query.forEach { (key, value) ->
                             value?.let { parameter(key, it) }
                         }
@@ -17356,6 +17251,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     }
 
                     val rawBody = response.bodyAsText()
+                    if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
+                        return cloudSessionExpiredResponse()
                     val aitaServerResponse = response.isAitaServerResponse(rawBody)
                     logNetworkAttempt(
                         "RESULT ${method.value} $requestUrl HTTP ${response.status.value} aita=$aitaServerResponse"
@@ -17480,6 +17377,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     return decodedResponse
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
+                    if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
+                        return cloudSessionExpiredResponse()
                     val status = (throwable as? ResponseException)?.response?.status
 
                     if (status == HttpStatusCode.Unauthorized && protectedEndpoint) {
@@ -20737,7 +20636,10 @@ abstract class StateHost {
     private val _state = MutableStateFlow(mapOf<String, String>())
     val state = _state.asStateFlow()
 
-    suspend fun setState(pair: Pair<String, String>) {
+    suspend fun setState(pair: Pair<String, String>) = setStateNow(pair)
+
+    /** Non-suspending atomic write for disposal callbacks; persistence remains in host collectors. */
+    fun setStateNow(pair: Pair<String, String>) {
         _state.update { current ->
             current.toMutableMap().apply {
                 this[pair.first] = pair.second

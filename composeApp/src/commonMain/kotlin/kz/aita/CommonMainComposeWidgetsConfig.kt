@@ -57,6 +57,8 @@ import io.ktor.client.plugins.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -805,22 +807,25 @@ fun AppConfiguration.GoodsItemInStockWidget(
     onAddBatch: ((GoodsItemDataModel) -> Unit)? = null,
     onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null
 ) {
-    val itemName = goodsItem.name.visibleLocalizedString(stateValues.appLanguage, "Unnamed item")
+    val language = stateValues.appLanguage
+    val itemName = remember(goodsItem.name, language) {
+        goodsItem.name.visibleLocalizedString(language, "Unnamed item")
+    }
     val restrictionBadges = transactionTypeIndex?.let { transactionRestrictionBadgesFor(goodsItem, it) }.orEmpty()
 
-    val standardBarcodesText = goodsItem.standardBarcodeValues()
+    val standardBarcodesText = remember(goodsItem) { goodsItem.standardBarcodeValues()
         .filter { it.isNotBlank() }
-        .joinToString(", ")
-    val internalBarcodesText = goodsItem.internalBarcodeValues()
+        .joinToString(", ") }
+    val internalBarcodesText = remember(goodsItem) { goodsItem.internalBarcodeValues()
         .filter { it.isNotBlank() }
-        .joinToString(", ")
+        .joinToString(", ") }
     val internalBarcodeLabel = localizedStringResource(1154, "Internal")
     val barcodesText = listOf(
         standardBarcodesText.takeIf { it.isNotBlank() },
         internalBarcodesText.takeIf { it.isNotBlank() }?.let { "$internalBarcodeLabel: $it" }
     ).filterNotNull().joinToString(" • ")
 
-    val categoriesText = goodsItem.categoryIds
+    val categoriesText = remember(goodsItem.categoryIds, stateValues.goodsCategories, language) { goodsItem.categoryIds
         .mapNotNull { categoryId ->
             stateValues.goodsCategories
                 .orEmpty()
@@ -829,9 +834,10 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 ?.visibleGoodsCategoryName(stateValues.appLanguage, categoryId)
         }
         .joinToString(", ")
+    }
 
-    val shelfBatches = batches.sortedForShelf(goodsItem)
-    val totalQuantity = shelfBatches.sumOf { it.quantity.total }
+    val shelfBatches = remember(batches, goodsItem) { batches.sortedForShelf(goodsItem) }
+    val totalQuantity = remember(shelfBatches) { shelfBatches.sumOf { it.quantity.total } }
     val quantityUnitText = shelfBatches
         .firstOrNull()
         ?.quantity
@@ -839,8 +845,9 @@ fun AppConfiguration.GoodsItemInStockWidget(
         ?.extractLocalizedString(stateValues.appLanguage)
         .orEmpty()
 
-    val activeBatch = shelfBatches.find { it.id == goodsItem.activeShelfBatchId }
-        ?: shelfBatches.bestBatchForSale(goodsItem)
+    val activeBatch = remember(shelfBatches, goodsItem) {
+        shelfBatches.find { it.id == goodsItem.activeShelfBatchId } ?: shelfBatches.bestBatchForSale(goodsItem)
+    }
 
     val expirationStatusText = activeBatch?.expirationDateMillis?.toStockDateInputText()?.let {
         "${localizedStringResource(234, "Expires")}: $it"
@@ -866,7 +873,12 @@ fun AppConfiguration.GoodsItemInStockWidget(
     val cardInteractionSource = remember { MutableInteractionSource() }
     val cardInteractionEnabled = onClick != null || onLongPress != null || onSelectionToggle != null
 
-    Row(
+    val showBatchStrip = showBatches && shelfBatches.isNotEmpty()
+    val showActions = !selectionMode && (
+        onAddBatch != null || onPrintLabel != null || onEdit != null || onDelete != null
+    )
+
+    Column(
         modifier
             .padding(bottom = 4.dp)
             .fillMaxWidth()
@@ -899,316 +911,325 @@ fun AppConfiguration.GoodsItemInStockWidget(
                 }
             )
     ) {
-        Column(
+        // Limit the action rail to the item header; batches must not inherit its width.
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 12.dp),
+                .fillMaxWidth()
+                .padding(bottom = if (showBatchStrip) 0.dp else 12.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, end = 12.dp, top = 14.dp),
             ) {
-                if (selectionMode) {
-                    AitaRoundCheckbox(
-                        checked = selected,
-                        onCheckedChange = { onSelectionToggle?.invoke(goodsItem) },
-                        containerSize = 34.dp,
-                        circleSize = 22.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (selectionMode) {
+                        AitaRoundCheckbox(
+                            checked = selected,
+                            onCheckedChange = { onSelectionToggle?.invoke(goodsItem) },
+                            containerSize = 34.dp,
+                            circleSize = 22.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
 
-                if (index != null) {
+                    if (index != null) {
+                        Text(
+                            text = "${index + 1}.",
+                            fontSize = stateValues.titleTextSize,
+                            fontWeight = FontWeight.Bold,
+                            color = textColor,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
+                    TransactionRestrictionBadges(restrictionBadges, textColor)
+                    if (restrictionBadges.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
                     Text(
-                        text = "${index + 1}.",
+                        modifier = Modifier.weight(1f),
+                        text = itemName,
                         fontSize = stateValues.titleTextSize,
                         fontWeight = FontWeight.Bold,
                         color = textColor,
-                        maxLines = 1
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+
+                    if (goodsItem.isQuickItem) {
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = stateValues.stringQuick,
+                            color = stateValues.AccentColor,
+                            fontSize = stateValues.smallTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
-                TransactionRestrictionBadges(restrictionBadges, textColor)
-                if (restrictionBadges.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                }
+                Spacer(modifier = Modifier.height(6.dp))
 
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = itemName,
-                    fontSize = stateValues.titleTextSize,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (goodsItem.isQuickItem) {
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = stateValues.stringQuick,
-                        color = stateValues.AccentColor,
-                        fontSize = stateValues.smallTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            if (barcodesText.isNotBlank()) {
-                StockCardInfoLine(
-                    title = stateValues.stringBarcode,
-                    value = barcodesText,
-                    textColor = textColor
-                )
-            }
-
-            if (categoriesText.isNotBlank()) {
-                StockCardInfoLine(
-                    title = stateValues.stringCategory,
-                    value = categoriesText,
-                    textColor = textColor
-                )
-            }
-
-            StockCardInfoLine(
-                title = stateValues.stringStock,
-                value = if (shelfBatches.isEmpty()) {
-                    localizedStringResource(199, "No batches yet")
-                } else {
-                    "$totalQuantity $quantityUnitText • ${shelfBatches.size} ${localizedStringResource(138, "Batches")}"
-                },
-                textColor = if (shelfBatches.isEmpty()) stateValues.ErrorColor else textColor
-            )
-
-            activeBatch?.let { batch ->
-                if (transactionTypeIndex == null) {
+                if (barcodesText.isNotBlank()) {
                     StockCardInfoLine(
-                        title = localizedStringResource(361, "Shelf"),
-                        value = listOfNotNull(
-                            if (batch.id == goodsItem.activeShelfBatchId) localizedStringResource(812, "active") else localizedStringResource(671, "Default"),
-                            "#${shelfBatches.indexOfFirst { candidate -> candidate.id == batch.id } + 1}",
-                            expirationStatusText
-                        ).joinToString(" • "),
+                        title = stateValues.stringBarcode,
+                        value = barcodesText,
+                        textColor = textColor
+                    )
+                }
+
+                if (categoriesText.isNotBlank()) {
+                    StockCardInfoLine(
+                        title = stateValues.stringCategory,
+                        value = categoriesText,
+                        textColor = textColor
+                    )
+                }
+
+                StockCardInfoLine(
+                    title = stateValues.stringStock,
+                    value = if (shelfBatches.isEmpty()) {
+                        localizedStringResource(199, "No batches yet")
+                    } else {
+                        "$totalQuantity $quantityUnitText • ${shelfBatches.size} ${localizedStringResource(138, "Batches")}"
+                    },
+                    textColor = if (shelfBatches.isEmpty()) stateValues.ErrorColor else textColor
+                )
+
+                activeBatch?.let { batch ->
+                    if (transactionTypeIndex == null) {
+                        StockCardInfoLine(
+                            title = localizedStringResource(361, "Shelf"),
+                            value = listOfNotNull(
+                                if (batch.id == goodsItem.activeShelfBatchId) localizedStringResource(812, "active") else localizedStringResource(671, "Default"),
+                                "#${shelfBatches.indexOfFirst { candidate -> candidate.id == batch.id } + 1}",
+                                expirationStatusText
+                            ).joinToString(" • "),
+                            textColor = stateValues.AccentColor
+                        )
+                    }
+
+                    val activeBatchSupplier = stateValues.suppliers
+                        .orEmpty()
+                        .find { it.id == batch.supplierId }
+                        ?.name
+                        ?.extractLocalizedString(stateValues.appLanguage)
+                        ?: batch.supplierId?.takeIf { it.isNotBlank() }
+                        ?: localizedStringResource(638, "No supplier selected")
+
+                    val activeBatchInfo = listOfNotNull(
+                        activeBatchSupplier,
+                        batch.quantity.quantityText(stateValues.appLanguage),
+                        batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
+                        batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" },
+                        batch.shelfPosition?.takeIf { transactionTypeIndex == null && it.isNotBlank() }?.let { "${localizedStringResource(344, "Shelf position")} $it" }
+                    )
+
+                    StockCardInfoLine(
+                        title = localizedStringResource(125, "Current batch data"),
+                        value = activeBatchInfo.joinToString(" • "),
                         textColor = stateValues.AccentColor
                     )
                 }
 
-                val activeBatchSupplier = stateValues.suppliers
-                    .orEmpty()
-                    .find { it.id == batch.supplierId }
-                    ?.name
-                    ?.extractLocalizedString(stateValues.appLanguage)
-                    ?: batch.supplierId?.takeIf { it.isNotBlank() }
-                    ?: localizedStringResource(638, "No supplier selected")
-
-                val activeBatchInfo = listOfNotNull(
-                    activeBatchSupplier,
-                    batch.quantity.quantityText(stateValues.appLanguage),
-                    batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
-                    batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" },
-                    batch.shelfPosition?.takeIf { transactionTypeIndex == null && it.isNotBlank() }?.let { "${localizedStringResource(344, "Shelf position")} $it" }
-                )
-
-                StockCardInfoLine(
-                    title = localizedStringResource(125, "Current batch data"),
-                    value = activeBatchInfo.joinToString(" • "),
-                    textColor = stateValues.AccentColor
-                )
-            }
-
-            expirationReminderTextForItem(goodsItem, shelfBatches)?.let { reminder ->
-                StockCardInfoLine(
-                    title = localizedStringResource(1309, "Expires very soon"),
-                    value = reminder.substringAfter(": ", reminder),
-                    textColor = stateValues.ErrorColor
-                )
-            }
-
-            val promoQuantityTotal = activeBatch?.quantity?.total?.takeIf { it > 0.0 } ?: 1.0
-
-            fun promotedStockPriceLineOrNull(
-                title: String,
-                typeIndex: Int,
-                saleMethodId: String = SALE_METHOD_RETAIL,
-                shouldShow: Boolean
-            ): StockPromotedPriceDisplayLine? {
-                val promotedPrice = goodsItem.promotedPriceForTransaction(
-                    transactionTypeIndex = typeIndex,
-                    saleMethodId = saleMethodId,
-                    quantityTotal = promoQuantityTotal,
-                    batch = activeBatch
-                )
-
-                return if (shouldShow || promotedPrice.hasPriceChange) {
-                    StockPromotedPriceDisplayLine(title, promotedPrice)
-                } else {
-                    null
+                expirationReminderTextForItem(goodsItem, shelfBatches)?.let { reminder ->
+                    StockCardInfoLine(
+                        title = localizedStringResource(1309, "Expires very soon"),
+                        value = reminder.substringAfter(": ", reminder),
+                        textColor = stateValues.ErrorColor
+                    )
                 }
-            }
 
-            when (transactionTypeIndex) {
-                0 -> promotedStockPriceLineOrNull(
-                    title = stateValues.stringSale,
-                    typeIndex = 0,
-                    saleMethodId = SALE_METHOD_RETAIL,
-                    shouldShow = goodsItem.salePrices.isNotEmpty() || activeBatch?.salePriceOverride != null
-                )?.let { StockCompactPromotionPriceInfoLines(listOf(it), textColor) }
+                val promoQuantityTotal = activeBatch?.quantity?.total?.takeIf { it > 0.0 } ?: 1.0
 
-                1 -> promotedStockPriceLineOrNull(
-                    title = stateValues.stringReturn,
-                    typeIndex = 1,
-                    shouldShow = goodsItem.returnPrices.isNotEmpty() || activeBatch?.returnPriceOverride != null
-                )?.let { StockCompactPromotionPriceInfoLines(listOf(it), textColor) }
+                fun promotedStockPriceLineOrNull(
+                    title: String,
+                    typeIndex: Int,
+                    saleMethodId: String = SALE_METHOD_RETAIL,
+                    shouldShow: Boolean
+                ): StockPromotedPriceDisplayLine? {
+                    val promotedPrice = goodsItem.promotedPriceForTransaction(
+                        transactionTypeIndex = typeIndex,
+                        saleMethodId = saleMethodId,
+                        quantityTotal = promoQuantityTotal,
+                        batch = activeBatch
+                    )
 
-                2 -> promotedStockPriceLineOrNull(
-                    title = stateValues.stringSupply,
-                    typeIndex = 2,
-                    shouldShow = goodsItem.supplyPrices.isNotEmpty() || activeBatch != null
-                )?.let { StockCompactPromotionPriceInfoLines(listOf(it), textColor) }
+                    return if (shouldShow || promotedPrice.hasPriceChange) {
+                        StockPromotedPriceDisplayLine(title, promotedPrice)
+                    } else {
+                        null
+                    }
+                }
 
-                else -> {
-                    StockCompactPromotionPriceInfoLines(
-                        listOfNotNull(
-                            promotedStockPriceLineOrNull(
-                                title = stateValues.stringSale,
-                                typeIndex = 0,
-                                saleMethodId = SALE_METHOD_RETAIL,
-                                shouldShow = goodsItem.salePrices.isNotEmpty() || activeBatch?.salePriceOverride != null
+                when (transactionTypeIndex) {
+                    0 -> promotedStockPriceLineOrNull(
+                        title = stateValues.stringSale,
+                        typeIndex = 0,
+                        saleMethodId = SALE_METHOD_RETAIL,
+                        shouldShow = goodsItem.salePrices.isNotEmpty() || activeBatch?.salePriceOverride != null
+                    )?.let { StockCompactPromotionPriceInfoLines(listOf(it), textColor) }
+
+                    1 -> promotedStockPriceLineOrNull(
+                        title = stateValues.stringReturn,
+                        typeIndex = 1,
+                        shouldShow = goodsItem.returnPrices.isNotEmpty() || activeBatch?.returnPriceOverride != null
+                    )?.let { StockCompactPromotionPriceInfoLines(listOf(it), textColor) }
+
+                    2 -> promotedStockPriceLineOrNull(
+                        title = stateValues.stringSupply,
+                        typeIndex = 2,
+                        shouldShow = goodsItem.supplyPrices.isNotEmpty() || activeBatch != null
+                    )?.let { StockCompactPromotionPriceInfoLines(listOf(it), textColor) }
+
+                    else -> {
+                        StockCompactPromotionPriceInfoLines(
+                            listOfNotNull(
+                                promotedStockPriceLineOrNull(
+                                    title = stateValues.stringSale,
+                                    typeIndex = 0,
+                                    saleMethodId = SALE_METHOD_RETAIL,
+                                    shouldShow = goodsItem.salePrices.isNotEmpty() || activeBatch?.salePriceOverride != null
+                                ),
+                                promotedStockPriceLineOrNull(
+                                    title = stateValues.stringReturn,
+                                    typeIndex = 1,
+                                    shouldShow = goodsItem.returnPrices.isNotEmpty() || activeBatch?.returnPriceOverride != null
+                                ),
+                                promotedStockPriceLineOrNull(
+                                    title = stateValues.stringSupply,
+                                    typeIndex = 2,
+                                    shouldShow = goodsItem.supplyPrices.isNotEmpty() || activeBatch != null
+                                )
                             ),
-                            promotedStockPriceLineOrNull(
-                                title = stateValues.stringReturn,
-                                typeIndex = 1,
-                                shouldShow = goodsItem.returnPrices.isNotEmpty() || activeBatch?.returnPriceOverride != null
-                            ),
-                            promotedStockPriceLineOrNull(
-                                title = stateValues.stringSupply,
-                                typeIndex = 2,
-                                shouldShow = goodsItem.supplyPrices.isNotEmpty() || activeBatch != null
-                            )
-                        ),
-                        textColor
+                            textColor
+                        )
+                    }
+                }
+
+                if (goodsItem.promotions.isNotEmpty()) {
+                    StockCardInfoLine(
+                        title = localizedStringResource(920, "Promos"),
+                        value = goodsItem.promotions.count { it.isActiveAt() }.takeIf { it > 0 }?.toString() ?: goodsItem.promotions.size.toString(),
+                        textColor = textColor
+                    )
+                }
+
+                goodsItem.note?.takeIf { it.isNotBlank() }?.let {
+                    StockCardInfoLine(
+                        title = localizedStringResource(266, "Note"),
+                        value = it,
+                        textColor = stateValues.TextColor
                     )
                 }
             }
 
-            if (goodsItem.promotions.isNotEmpty()) {
-                StockCardInfoLine(
-                    title = localizedStringResource(920, "Promos"),
-                    value = goodsItem.promotions.count { it.isActiveAt() }.takeIf { it > 0 }?.toString() ?: goodsItem.promotions.size.toString(),
-                    textColor = textColor
-                )
-            }
-
-            goodsItem.note?.takeIf { it.isNotBlank() }?.let {
-                StockCardInfoLine(
-                    title = localizedStringResource(266, "Note"),
-                    value = it,
-                    textColor = stateValues.TextColor
-                )
-            }
-
-            if (showBatches && shelfBatches.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-
-                var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
-                var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp),
+            if (showActions) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clipToBounds()
+                        .padding(end = 12.dp, top = 14.dp, start = 4.dp),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    itemsIndexed(shelfBatches, key = { _, batch -> batch.id }) { batchIndex, batch ->
-                        StockBatchShelfPreviewCard(
-                            batch = batch,
-                            goodsItem = goodsItem,
-                            batches = shelfBatches,
-                            index = batchIndex,
-                            draggedBatchId = draggedBatchId,
-                            dragTargetIndex = dragTargetIndex,
-                            onDragStart = { id ->
-                                draggedBatchId = id
-                                dragTargetIndex = batchIndex
-                            },
-                            onDragTargetChanged = { target ->
-                                dragTargetIndex = target
-                            },
-                            onDragFinished = { from, to ->
-                                draggedBatchId = null
-                                dragTargetIndex = null
-                                if (from != to) {
-                                    reorderShelfBatches(
-                                        goodsItem = goodsItem,
-                                        batches = shelfBatches,
-                                        fromIndex = from,
-                                        toIndex = to
-                                    )
-                                }
-                            },
-                            onDragCancelled = {
-                                draggedBatchId = null
-                                dragTargetIndex = null
-                            }
-                        )
+                    onAddBatch?.let {
+                        actionButton(
+                            text = "",
+                            iconPath = stateValues.drawablePathIconAdd,
+                            iconContentDescription = localizedStringResource(194, "Add batch"),
+                        ) {
+                            onAddBatch(goodsItem)
+                        }
+                    }
+
+                    onPrintLabel?.let {
+                        actionButton(
+                            text = "",
+                            iconPath = stateValues.drawablePathIconPrintTag,
+                            iconRes = stateValues.drawableResIconPrintTag.value,
+                            iconContentDescription = localizedStringResource(1288, "Print item label"),
+                            confirmationRequired = false,
+                        ) {
+                            onPrintLabel(goodsItem)
+                        }
+                    }
+
+                    onEdit?.let {
+                        actionButton(
+                            text = "",
+                            iconPath = stateValues.drawablePathIconEdit,
+                            iconContentDescription = stateValues.drawablePathIconEdit,
+                        ) {
+                            onEdit(goodsItem)
+                        }
+                    }
+
+                    onDelete?.let {
+                        actionButton(
+                            text = "",
+                            enabledColor = stateValues.ErrorColor,
+                            iconPath = stateValues.drawablePathIconDelete,
+                            iconContentDescription = stateValues.drawablePathIconDelete,
+                        ) {
+                            onDelete(goodsItem)
+                        }
                     }
                 }
             }
         }
 
-        Column(
-            modifier = Modifier
-                .padding(end = 12.dp, top = 14.dp, start = 4.dp, bottom = 12.dp),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            if (!selectionMode) {
-                onAddBatch?.let {
-                    actionButton(
-                        text = "",
-                        iconPath = stateValues.drawablePathIconAdd,
-                        iconContentDescription = localizedStringResource(194, "Add batch"),
-                    ) {
-                        onAddBatch(goodsItem)
-                    }
-                }
+        if (showBatchStrip) {
+            Spacer(modifier = Modifier.height(10.dp))
 
-                onPrintLabel?.let {
-                    actionButton(
-                        text = "",
-                        iconPath = stateValues.drawablePathIconPrintTag,
-                        iconRes = stateValues.drawableResIconPrintTag.value,
-                        iconContentDescription = localizedStringResource(1288, "Print item label"),
-                        confirmationRequired = false,
-                    ) {
-                        onPrintLabel(goodsItem)
-                    }
-                }
+            var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
+            var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
 
-                onEdit?.let {
-                    actionButton(
-                        text = "",
-                        iconPath = stateValues.drawablePathIconEdit,
-                        iconContentDescription = stateValues.drawablePathIconEdit,
-                    ) {
-                        onEdit(goodsItem)
-                    }
-                }
-
-                onDelete?.let {
-                    actionButton(
-                        text = "",
-                        enabledColor = stateValues.ErrorColor,
-                        iconPath = stateValues.drawablePathIconDelete,
-                        iconContentDescription = stateValues.drawablePathIconDelete,
-                    ) {
-                        onDelete(goodsItem)
-                    }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 12.dp, bottom = 12.dp)
+                    .clipToBounds()
+            ) {
+                itemsIndexed(shelfBatches, key = { _, batch -> batch.id }) { batchIndex, batch ->
+                    StockBatchShelfPreviewCard(
+                        batch = batch,
+                        goodsItem = goodsItem,
+                        batches = shelfBatches,
+                        index = batchIndex,
+                        draggedBatchId = draggedBatchId,
+                        dragTargetIndex = dragTargetIndex,
+                        onDragStart = { id ->
+                            draggedBatchId = id
+                            dragTargetIndex = batchIndex
+                        },
+                        onDragTargetChanged = { target ->
+                            dragTargetIndex = target
+                        },
+                        onDragFinished = { from, to ->
+                            draggedBatchId = null
+                            dragTargetIndex = null
+                            if (from != to) {
+                                reorderShelfBatches(
+                                    goodsItem = goodsItem,
+                                    batches = shelfBatches,
+                                    fromIndex = from,
+                                    toIndex = to
+                                )
+                            }
+                        },
+                        onDragCancelled = {
+                            draggedBatchId = null
+                            dragTargetIndex = null
+                        }
+                    )
                 }
             }
         }
@@ -4634,610 +4655,611 @@ object AppConfiguration {
             override val BorderlineBadColor: Color by _BorderlineBadColorState.collectAsState()
 
             override val drawablePathAITALogo: String by drawablePathAITALogoState.collectAsState()
-            private val _drawableResAITALogo = MutableStateFlow(Res.drawable._0_0)
+            private val _drawableResAITALogo = remember { MutableStateFlow(Res.drawable._0_0) }
             override val drawableResAITALogo = _drawableResAITALogo.asStateFlow()
 
             override val drawablePathIconPassword: String by drawablePathIconPasswordState.collectAsState()
-            private val _drawableResIconPassword = MutableStateFlow(Res.drawable._1_0)
+            private val _drawableResIconPassword = remember { MutableStateFlow(Res.drawable._1_0) }
             override val drawableResIconPassword = _drawableResIconPassword.asStateFlow()
 
             override val drawablePathIconSecurity: String by drawablePathIconSecurityState.collectAsState()
-            private val _drawableResIconSecurity = MutableStateFlow(Res.drawable._1_0)
+            private val _drawableResIconSecurity = remember { MutableStateFlow(Res.drawable._1_0) }
             override val drawableResIconSecurity: StateFlow<DrawableResource> = _drawableResIconSecurity.asStateFlow()
 
             override val drawablePathIconResponse: String by drawablePathIconResponseState.collectAsState()
-            private val _drawableResIconResponse = MutableStateFlow(Res.drawable._53_0)
+            private val _drawableResIconResponse = remember { MutableStateFlow(Res.drawable._53_0) }
             override val drawableResIconResponse: StateFlow<DrawableResource> = _drawableResIconResponse.asStateFlow()
 
             override val drawablePathIconCancel: String by drawablePathIconCancelState.collectAsState()
-            private val _drawableResIconCancel = MutableStateFlow(Res.drawable._2_0)
+            private val _drawableResIconCancel = remember { MutableStateFlow(Res.drawable._2_0) }
             override val drawableResIconCancel = _drawableResIconCancel.asStateFlow()
 
             override val drawablePathIconEyeHide: String by drawablePathIconEyeHideState.collectAsState()
-            private val _drawableResIconEyeHide = MutableStateFlow(Res.drawable._3_0)
+            private val _drawableResIconEyeHide = remember { MutableStateFlow(Res.drawable._3_0) }
             override val drawableResIconEyeHide = _drawableResIconEyeHide.asStateFlow()
 
             override val drawablePathIconEyeShow: String by drawablePathIconEyeShowState.collectAsState()
-            private val _drawableResIconEyeShow = MutableStateFlow(Res.drawable._4_0)
+            private val _drawableResIconEyeShow = remember { MutableStateFlow(Res.drawable._4_0) }
             override val drawableResIconEyeShow = _drawableResIconEyeShow.asStateFlow()
 
             override val drawablePathIconEmail: String by drawablePathIconEmailState.collectAsState()
-            private val _drawableResIconEmail = MutableStateFlow(Res.drawable._5_0)
+            private val _drawableResIconEmail = remember { MutableStateFlow(Res.drawable._5_0) }
             override val drawableResIconEmail = _drawableResIconEmail.asStateFlow()
 
             override val drawablePathIconPhone: String by drawablePathIconPhoneState.collectAsState()
-            private val _drawableResIconPhone = MutableStateFlow(Res.drawable._6_0)
+            private val _drawableResIconPhone = remember { MutableStateFlow(Res.drawable._6_0) }
             override val drawableResIconPhone: StateFlow<DrawableResource> = _drawableResIconPhone.asStateFlow()
 
             override val drawablePathIconExpandMore: String by drawablePathIconExpandMoreState.collectAsState()
-            private val _drawableResIconExpandMore = MutableStateFlow(Res.drawable._7_0)
+            private val _drawableResIconExpandMore = remember { MutableStateFlow(Res.drawable._7_0) }
             override val drawableResIconExpandMore: StateFlow<DrawableResource> = _drawableResIconExpandMore.asStateFlow()
 
             override val drawablePathIconExpandLess: String by drawablePathIconExpandLessState.collectAsState()
-            private val _drawableResIconExpandLess = MutableStateFlow(Res.drawable._8_0)
+            private val _drawableResIconExpandLess = remember { MutableStateFlow(Res.drawable._8_0) }
             override val drawableResIconExpandLess: StateFlow<DrawableResource> = _drawableResIconExpandLess.asStateFlow()
 
             override val drawablePathIconPerson: String by drawablePathIconPersonState.collectAsState()
-            private val _drawableResIconPerson = MutableStateFlow(Res.drawable._9_0)
+            private val _drawableResIconPerson = remember { MutableStateFlow(Res.drawable._9_0) }
             override val drawableResIconPerson: StateFlow<DrawableResource> = _drawableResIconPerson.asStateFlow()
 
             override val drawablePathIconTransactionSale: String by drawablePathIconTransactionSaleState.collectAsState()
-            private val _drawableResIconTransactionSale = MutableStateFlow(Res.drawable._10_0)
+            private val _drawableResIconTransactionSale = remember { MutableStateFlow(Res.drawable._10_0) }
             override val drawableResIconTransactionSale: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSale.asStateFlow()
 
             override val drawablePathIconTransactionReturn: String by drawablePathIconTransactionReturnState.collectAsState()
-            private val _drawableResIconTransactionReturn = MutableStateFlow(Res.drawable._11_0)
+            private val _drawableResIconTransactionReturn = remember { MutableStateFlow(Res.drawable._11_0) }
             override val drawableResIconTransactionReturn: StateFlow<DrawableResource> =
                 _drawableResIconTransactionReturn.asStateFlow()
 
             override val drawablePathIconTransactionSupply: String by drawablePathIconTransactionSupplyState.collectAsState()
-            private val _drawableResIconTransactionSupply = MutableStateFlow(Res.drawable._12_0)
+            private val _drawableResIconTransactionSupply = remember { MutableStateFlow(Res.drawable._12_0) }
             override val drawableResIconTransactionSupply: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSupply.asStateFlow()
 
             override val drawablePathIconTransactionSelection: String by drawablePathIconTransactionSelectionState.collectAsState()
-            private val _drawableResIconTransactionSelection = MutableStateFlow(Res.drawable._57_0)
+            private val _drawableResIconTransactionSelection = remember { MutableStateFlow(Res.drawable._57_0) }
             override val drawableResIconTransactionSelection: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSelection.asStateFlow()
 
             override val drawablePathIconStock: String by drawablePathIconStockState.collectAsState()
-            private val _drawableResIconStock = MutableStateFlow(Res.drawable._13_0)
+            private val _drawableResIconStock = remember { MutableStateFlow(Res.drawable._13_0) }
             override val drawableResIconStock: StateFlow<DrawableResource> = _drawableResIconStock.asStateFlow()
 
             override val drawablePathIconMenu: String by drawablePathIconMenuState.collectAsState()
-            private val _drawableResIconMenu = MutableStateFlow(Res.drawable._14_0)
+            private val _drawableResIconMenu = remember { MutableStateFlow(Res.drawable._14_0) }
             override val drawableResIconMenu: StateFlow<DrawableResource> = _drawableResIconMenu.asStateFlow()
 
             override val drawablePathIconBackArrow: String by drawablePathIconBackArrowState.collectAsState()
-            private val _drawableResIconBackArrow = MutableStateFlow(Res.drawable._15_0)
+            private val _drawableResIconBackArrow = remember { MutableStateFlow(Res.drawable._15_0) }
             override val drawableResIconBackArrow: StateFlow<DrawableResource> = _drawableResIconBackArrow.asStateFlow()
 
             override val drawablePathIconAdd: String by drawablePathIconAddState.collectAsState()
-            private val _drawableResIconAdd = MutableStateFlow(Res.drawable._16_0)
+            private val _drawableResIconAdd = remember { MutableStateFlow(Res.drawable._16_0) }
             override val drawableResIconAdd: StateFlow<DrawableResource> = _drawableResIconAdd.asStateFlow()
 
             override val drawablePathIconUserAccount: String by drawablePathIconUserAccountState.collectAsState()
-            private val _drawableResIconUserAccount = MutableStateFlow(Res.drawable._17_0)
+            private val _drawableResIconUserAccount = remember { MutableStateFlow(Res.drawable._17_0) }
             override val drawableResIconUserAccount: StateFlow<DrawableResource> = _drawableResIconUserAccount.asStateFlow()
 
             override val drawablePathIconGoodsCategories: String by drawablePathIconGoodsCategoriesState.collectAsState()
-            private val _drawableResIconGoodsCategories = MutableStateFlow(Res.drawable._18_0)
+            private val _drawableResIconGoodsCategories = remember { MutableStateFlow(Res.drawable._18_0) }
             override val drawableResIconGoodsCategories: StateFlow<DrawableResource> =
                 _drawableResIconGoodsCategories.asStateFlow()
 
             override val drawablePathIconStores: String by drawablePathIconStoresState.collectAsState()
-            private val _drawableResIconStores = MutableStateFlow(Res.drawable._19_0)
+            private val _drawableResIconStores = remember { MutableStateFlow(Res.drawable._19_0) }
             override val drawableResIconStores: StateFlow<DrawableResource> = _drawableResIconStores.asStateFlow()
 
             override val drawablePathIconTransactionHistory: String by drawablePathIconTransactionHistoryState.collectAsState()
-            private val _drawableResIconTransactionHistory = MutableStateFlow(Res.drawable._20_0)
+            private val _drawableResIconTransactionHistory = remember { MutableStateFlow(Res.drawable._20_0) }
             override val drawableResIconTransactionHistory: StateFlow<DrawableResource> =
                 _drawableResIconTransactionHistory.asStateFlow()
 
             override val drawablePathIconLog: String by drawablePathIconLogState.collectAsState()
-            private val _drawableResIconLog = MutableStateFlow(Res.drawable._49_0)
+            private val _drawableResIconLog = remember { MutableStateFlow(Res.drawable._49_0) }
             override val drawableResIconLog: StateFlow<DrawableResource> = _drawableResIconLog.asStateFlow()
 
             override val drawablePathIconPromos: String by drawablePathIconPromosState.collectAsState()
-            private val _drawableResIconPromos = MutableStateFlow(Res.drawable._50_0)
+            private val _drawableResIconPromos = remember { MutableStateFlow(Res.drawable._50_0) }
             override val drawableResIconPromos: StateFlow<DrawableResource> = _drawableResIconPromos.asStateFlow()
 
             override val drawablePathIconAnalytics: String by drawablePathIconAnalyticsState.collectAsState()
-            private val _drawableResIconAnalytics = MutableStateFlow(Res.drawable._21_0)
+            private val _drawableResIconAnalytics = remember { MutableStateFlow(Res.drawable._21_0) }
             override val drawableResIconAnalytics: StateFlow<DrawableResource> = _drawableResIconAnalytics.asStateFlow()
 
             override val drawablePathIconAnalyticsReport: String by drawablePathIconAnalyticsReportState.collectAsState()
-            private val _drawableResIconAnalyticsReport = MutableStateFlow(Res.drawable._62_0)
+            private val _drawableResIconAnalyticsReport = remember { MutableStateFlow(Res.drawable._62_0) }
             override val drawableResIconAnalyticsReport: StateFlow<DrawableResource> = _drawableResIconAnalyticsReport.asStateFlow()
 
             override val drawablePathIconLabelPrinter: String by drawablePathIconLabelPrinterState.collectAsState()
-            private val _drawableResIconLabelPrinter = MutableStateFlow(Res.drawable._63_0)
+            private val _drawableResIconLabelPrinter = remember { MutableStateFlow(Res.drawable._63_0) }
             override val drawableResIconLabelPrinter: StateFlow<DrawableResource> = _drawableResIconLabelPrinter.asStateFlow()
 
             override val drawablePathIconBarcodeGenerate: String by drawablePathIconBarcodeGenerateState.collectAsState()
-            private val _drawableResIconBarcodeGenerate = MutableStateFlow(Res.drawable._64_0)
+            private val _drawableResIconBarcodeGenerate = remember { MutableStateFlow(Res.drawable._64_0) }
             override val drawableResIconBarcodeGenerate: StateFlow<DrawableResource> = _drawableResIconBarcodeGenerate.asStateFlow()
 
             override val drawablePathIconPrintTag: String by drawablePathIconPrintTagState.collectAsState()
-            private val _drawableResIconPrintTag = MutableStateFlow(Res.drawable._65_0)
+            private val _drawableResIconPrintTag = remember { MutableStateFlow(Res.drawable._65_0) }
             override val drawableResIconPrintTag: StateFlow<DrawableResource> = _drawableResIconPrintTag.asStateFlow()
 
             override val drawablePathIconWorkerRoleTemplates: String by drawablePathIconWorkerRoleTemplatesState.collectAsState()
-            private val _drawableResIconWorkerRoleTemplates = MutableStateFlow(Res.drawable._66_0)
+            private val _drawableResIconWorkerRoleTemplates = remember { MutableStateFlow(Res.drawable._66_0) }
             override val drawableResIconWorkerRoleTemplates: StateFlow<DrawableResource> = _drawableResIconWorkerRoleTemplates.asStateFlow()
 
             override val drawablePathIconStockHistory: String by drawablePathIconStockHistoryState.collectAsState()
-            private val _drawableResIconStockHistory = MutableStateFlow(Res.drawable._67_0)
+            private val _drawableResIconStockHistory = remember { MutableStateFlow(Res.drawable._67_0) }
             override val drawableResIconStockHistory: StateFlow<DrawableResource> = _drawableResIconStockHistory.asStateFlow()
 
             override val drawablePathIconAppModeStore: String by drawablePathIconAppModeStoreState.collectAsState()
-            private val _drawableResIconAppModeStore = MutableStateFlow(Res.drawable._68_0)
+            private val _drawableResIconAppModeStore = remember { MutableStateFlow(Res.drawable._68_0) }
             override val drawableResIconAppModeStore: StateFlow<DrawableResource> = _drawableResIconAppModeStore.asStateFlow()
 
             override val drawablePathIconAppModeBuyer: String by drawablePathIconAppModeBuyerState.collectAsState()
-            private val _drawableResIconAppModeBuyer = MutableStateFlow(Res.drawable._69_0)
+            private val _drawableResIconAppModeBuyer = remember { MutableStateFlow(Res.drawable._69_0) }
             override val drawableResIconAppModeBuyer: StateFlow<DrawableResource> = _drawableResIconAppModeBuyer.asStateFlow()
 
             override val drawablePathIconAppModeSupplier: String by drawablePathIconAppModeSupplierState.collectAsState()
-            private val _drawableResIconAppModeSupplier = MutableStateFlow(Res.drawable._70_0)
+            private val _drawableResIconAppModeSupplier = remember { MutableStateFlow(Res.drawable._70_0) }
             override val drawableResIconAppModeSupplier: StateFlow<DrawableResource> = _drawableResIconAppModeSupplier.asStateFlow()
 
             override val drawablePathIconAppModeManufacturer: String by drawablePathIconAppModeManufacturerState.collectAsState()
-            private val _drawableResIconAppModeManufacturer = MutableStateFlow(Res.drawable._71_0)
+            private val _drawableResIconAppModeManufacturer = remember { MutableStateFlow(Res.drawable._71_0) }
             override val drawableResIconAppModeManufacturer: StateFlow<DrawableResource> = _drawableResIconAppModeManufacturer.asStateFlow()
 
             override val drawablePathIconSupplierCatalog: String by drawablePathIconSupplierCatalogState.collectAsState()
-            private val _drawableResIconSupplierCatalog = MutableStateFlow(Res.drawable._72_0)
+            private val _drawableResIconSupplierCatalog = remember { MutableStateFlow(Res.drawable._72_0) }
             override val drawableResIconSupplierCatalog: StateFlow<DrawableResource> = _drawableResIconSupplierCatalog.asStateFlow()
 
             override val drawablePathIconSupplierContracts: String by drawablePathIconSupplierContractsState.collectAsState()
-            private val _drawableResIconSupplierContracts = MutableStateFlow(Res.drawable._76_0)
+            private val _drawableResIconSupplierContracts = remember { MutableStateFlow(Res.drawable._76_0) }
             override val drawableResIconSupplierContracts: StateFlow<DrawableResource> = _drawableResIconSupplierContracts.asStateFlow()
 
             override val drawablePathIconSupplierPartners: String by drawablePathIconSupplierPartnersState.collectAsState()
-            private val _drawableResIconSupplierPartners = MutableStateFlow(Res.drawable._75_0)
+            private val _drawableResIconSupplierPartners = remember { MutableStateFlow(Res.drawable._75_0) }
             override val drawableResIconSupplierPartners: StateFlow<DrawableResource> = _drawableResIconSupplierPartners.asStateFlow()
 
             override val drawablePathIconSupplierDemandRadar: String by drawablePathIconSupplierDemandRadarState.collectAsState()
-            private val _drawableResIconSupplierDemandRadar = MutableStateFlow(Res.drawable._77_0)
+            private val _drawableResIconSupplierDemandRadar = remember { MutableStateFlow(Res.drawable._77_0) }
             override val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource> = _drawableResIconSupplierDemandRadar.asStateFlow()
 
             override val drawablePathIconSupplierBackorderRecovery: String by drawablePathIconSupplierBackorderRecoveryState.collectAsState()
-            private val _drawableResIconSupplierBackorderRecovery = MutableStateFlow(Res.drawable._91_0)
+            private val _drawableResIconSupplierBackorderRecovery = remember { MutableStateFlow(Res.drawable._91_0) }
             override val drawableResIconSupplierBackorderRecovery: StateFlow<DrawableResource> = _drawableResIconSupplierBackorderRecovery.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryOwner: String by drawablePathIconSupplierRecoveryOwnerState.collectAsState()
-            private val _drawableResIconSupplierRecoveryOwner = MutableStateFlow(Res.drawable._92_0)
+            private val _drawableResIconSupplierRecoveryOwner = remember { MutableStateFlow(Res.drawable._92_0) }
             override val drawableResIconSupplierRecoveryOwner: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryOwner.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryClock: String by drawablePathIconSupplierRecoveryClockState.collectAsState()
-            private val _drawableResIconSupplierRecoveryClock = MutableStateFlow(Res.drawable._93_0)
+            private val _drawableResIconSupplierRecoveryClock = remember { MutableStateFlow(Res.drawable._93_0) }
             override val drawableResIconSupplierRecoveryClock: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryClock.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryProof: String by drawablePathIconSupplierRecoveryProofState.collectAsState()
-            private val _drawableResIconSupplierRecoveryProof = MutableStateFlow(Res.drawable._94_0)
+            private val _drawableResIconSupplierRecoveryProof = remember { MutableStateFlow(Res.drawable._94_0) }
             override val drawableResIconSupplierRecoveryProof: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryProof.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryResolution: String by drawablePathIconSupplierRecoveryResolutionState.collectAsState()
-            private val _drawableResIconSupplierRecoveryResolution = MutableStateFlow(Res.drawable._95_0)
+            private val _drawableResIconSupplierRecoveryResolution = remember { MutableStateFlow(Res.drawable._95_0) }
             override val drawableResIconSupplierRecoveryResolution: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryResolution.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryContact: String by drawablePathIconSupplierRecoveryContactState.collectAsState()
-            private val _drawableResIconSupplierRecoveryContact = MutableStateFlow(Res.drawable._96_0)
+            private val _drawableResIconSupplierRecoveryContact = remember { MutableStateFlow(Res.drawable._96_0) }
             override val drawableResIconSupplierRecoveryContact: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryContact.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryRisk: String by drawablePathIconSupplierRecoveryRiskState.collectAsState()
-            private val _drawableResIconSupplierRecoveryRisk = MutableStateFlow(Res.drawable._97_0)
+            private val _drawableResIconSupplierRecoveryRisk = remember { MutableStateFlow(Res.drawable._97_0) }
             override val drawableResIconSupplierRecoveryRisk: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryRisk.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryConfidence: String by drawablePathIconSupplierRecoveryConfidenceState.collectAsState()
-            private val _drawableResIconSupplierRecoveryConfidence = MutableStateFlow(Res.drawable._98_0)
+            private val _drawableResIconSupplierRecoveryConfidence = remember { MutableStateFlow(Res.drawable._98_0) }
             override val drawableResIconSupplierRecoveryConfidence: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryConfidence.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryFollowUp: String by drawablePathIconSupplierRecoveryFollowUpState.collectAsState()
-            private val _drawableResIconSupplierRecoveryFollowUp = MutableStateFlow(Res.drawable._99_0)
+            private val _drawableResIconSupplierRecoveryFollowUp = remember { MutableStateFlow(Res.drawable._99_0) }
             override val drawableResIconSupplierRecoveryFollowUp: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryFollowUp.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryHandoff: String by drawablePathIconSupplierRecoveryHandoffState.collectAsState()
-            private val _drawableResIconSupplierRecoveryHandoff = MutableStateFlow(Res.drawable._100_0)
+            private val _drawableResIconSupplierRecoveryHandoff = remember { MutableStateFlow(Res.drawable._100_0) }
             override val drawableResIconSupplierRecoveryHandoff: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryHandoff.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryClosure: String by drawablePathIconSupplierRecoveryClosureState.collectAsState()
-            private val _drawableResIconSupplierRecoveryClosure = MutableStateFlow(Res.drawable._101_0)
+            private val _drawableResIconSupplierRecoveryClosure = remember { MutableStateFlow(Res.drawable._101_0) }
             override val drawableResIconSupplierRecoveryClosure: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryClosure.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryLedger: String by drawablePathIconSupplierRecoveryLedgerState.collectAsState()
-            private val _drawableResIconSupplierRecoveryLedger = MutableStateFlow(Res.drawable._102_0)
+            private val _drawableResIconSupplierRecoveryLedger = remember { MutableStateFlow(Res.drawable._102_0) }
             override val drawableResIconSupplierRecoveryLedger: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryLedger.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryTriage: String by drawablePathIconSupplierRecoveryTriageState.collectAsState()
-            private val _drawableResIconSupplierRecoveryTriage = MutableStateFlow(Res.drawable._103_0)
+            private val _drawableResIconSupplierRecoveryTriage = remember { MutableStateFlow(Res.drawable._103_0) }
             override val drawableResIconSupplierRecoveryTriage: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryTriage.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryCommand: String by drawablePathIconSupplierRecoveryCommandState.collectAsState()
-            private val _drawableResIconSupplierRecoveryCommand = MutableStateFlow(Res.drawable._104_0)
+            private val _drawableResIconSupplierRecoveryCommand = remember { MutableStateFlow(Res.drawable._104_0) }
             override val drawableResIconSupplierRecoveryCommand: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCommand.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryPromiseShield: String by drawablePathIconSupplierRecoveryPromiseShieldState.collectAsState()
-            private val _drawableResIconSupplierRecoveryPromiseShield = MutableStateFlow(Res.drawable._105_0)
+            private val _drawableResIconSupplierRecoveryPromiseShield = remember { MutableStateFlow(Res.drawable._105_0) }
             override val drawableResIconSupplierRecoveryPromiseShield: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryPromiseShield.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryDesk: String by drawablePathIconSupplierRecoveryDeskState.collectAsState()
-            private val _drawableResIconSupplierRecoveryDesk = MutableStateFlow(Res.drawable._106_0)
+            private val _drawableResIconSupplierRecoveryDesk = remember { MutableStateFlow(Res.drawable._106_0) }
             override val drawableResIconSupplierRecoveryDesk: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryDesk.asStateFlow()
 
             override val drawablePathIconSupplierRecoveryWave: String by drawablePathIconSupplierRecoveryWaveState.collectAsState()
-            private val _drawableResIconSupplierRecoveryWave = MutableStateFlow(Res.drawable._107_0)
+            private val _drawableResIconSupplierRecoveryWave = remember { MutableStateFlow(Res.drawable._107_0) }
             override val drawableResIconSupplierRecoveryWave: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryWave.asStateFlow()
             override val drawablePathIconSupplierRecoveryAging: String by drawablePathIconSupplierRecoveryAgingState.collectAsState()
-            private val _drawableResIconSupplierRecoveryAging = MutableStateFlow(Res.drawable._108_0)
+            private val _drawableResIconSupplierRecoveryAging = remember { MutableStateFlow(Res.drawable._108_0) }
             override val drawableResIconSupplierRecoveryAging: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAging.asStateFlow()
             override val drawablePathIconSupplierRecoveryBottleneck: String by drawablePathIconSupplierRecoveryBottleneckState.collectAsState()
-            private val _drawableResIconSupplierRecoveryBottleneck = MutableStateFlow(Res.drawable._109_0)
+            private val _drawableResIconSupplierRecoveryBottleneck = remember { MutableStateFlow(Res.drawable._109_0) }
             override val drawableResIconSupplierRecoveryBottleneck: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryBottleneck.asStateFlow()
             override val drawablePathIconSupplierRecoveryLoad: String by drawablePathIconSupplierRecoveryLoadState.collectAsState()
-            private val _drawableResIconSupplierRecoveryLoad = MutableStateFlow(Res.drawable._110_0)
+            private val _drawableResIconSupplierRecoveryLoad = remember { MutableStateFlow(Res.drawable._110_0) }
             override val drawableResIconSupplierRecoveryLoad: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryLoad.asStateFlow()
             override val drawablePathIconSupplierRecoveryImpact: String by drawablePathIconSupplierRecoveryImpactState.collectAsState()
-            private val _drawableResIconSupplierRecoveryImpact = MutableStateFlow(Res.drawable._111_0)
+            private val _drawableResIconSupplierRecoveryImpact = remember { MutableStateFlow(Res.drawable._111_0) }
             override val drawableResIconSupplierRecoveryImpact: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryImpact.asStateFlow()
             override val drawablePathIconSupplierRecoveryCommit: String by drawablePathIconSupplierRecoveryCommitState.collectAsState()
-            private val _drawableResIconSupplierRecoveryCommit = MutableStateFlow(Res.drawable._112_0)
+            private val _drawableResIconSupplierRecoveryCommit = remember { MutableStateFlow(Res.drawable._112_0) }
             override val drawableResIconSupplierRecoveryCommit: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCommit.asStateFlow()
             override val drawablePathIconSupplierRecoveryAllocation: String by drawablePathIconSupplierRecoveryAllocationState.collectAsState()
-            private val _drawableResIconSupplierRecoveryAllocation = MutableStateFlow(Res.drawable._113_0)
+            private val _drawableResIconSupplierRecoveryAllocation = remember { MutableStateFlow(Res.drawable._113_0) }
             override val drawableResIconSupplierRecoveryAllocation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAllocation.asStateFlow()
             override val drawablePathIconSupplierRecoveryException: String by drawablePathIconSupplierRecoveryExceptionState.collectAsState()
-            private val _drawableResIconSupplierRecoveryException = MutableStateFlow(Res.drawable._114_0)
+            private val _drawableResIconSupplierRecoveryException = remember { MutableStateFlow(Res.drawable._114_0) }
             override val drawableResIconSupplierRecoveryException: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryException.asStateFlow()
             override val drawablePathIconSupplierRecoveryCause: String by drawablePathIconSupplierRecoveryCauseState.collectAsState()
-            private val _drawableResIconSupplierRecoveryCause = MutableStateFlow(Res.drawable._115_0)
+            private val _drawableResIconSupplierRecoveryCause = remember { MutableStateFlow(Res.drawable._115_0) }
             override val drawableResIconSupplierRecoveryCause: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCause.asStateFlow()
             override val drawablePathIconSupplierRecoveryVerification: String by drawablePathIconSupplierRecoveryVerificationState.collectAsState()
-            private val _drawableResIconSupplierRecoveryVerification = MutableStateFlow(Res.drawable._116_0)
+            private val _drawableResIconSupplierRecoveryVerification = remember { MutableStateFlow(Res.drawable._116_0) }
             override val drawableResIconSupplierRecoveryVerification: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryVerification.asStateFlow()
             override val drawablePathIconSupplierRecoveryApproval: String by drawablePathIconSupplierRecoveryApprovalState.collectAsState()
-            private val _drawableResIconSupplierRecoveryApproval = MutableStateFlow(Res.drawable._117_0)
+            private val _drawableResIconSupplierRecoveryApproval = remember { MutableStateFlow(Res.drawable._117_0) }
             override val drawableResIconSupplierRecoveryApproval: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryApproval.asStateFlow()
             override val drawablePathIconSupplierRecoveryExecution: String by drawablePathIconSupplierRecoveryExecutionState.collectAsState()
-            private val _drawableResIconSupplierRecoveryExecution = MutableStateFlow(Res.drawable._118_0)
+            private val _drawableResIconSupplierRecoveryExecution = remember { MutableStateFlow(Res.drawable._118_0) }
             override val drawableResIconSupplierRecoveryExecution: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryExecution.asStateFlow()
             override val drawablePathIconSupplierRecoveryRelease: String by drawablePathIconSupplierRecoveryReleaseState.collectAsState()
-            private val _drawableResIconSupplierRecoveryRelease = MutableStateFlow(Res.drawable._119_0)
+            private val _drawableResIconSupplierRecoveryRelease = remember { MutableStateFlow(Res.drawable._119_0) }
             override val drawableResIconSupplierRecoveryRelease: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryRelease.asStateFlow()
             override val drawablePathIconSupplierRecoverySeal: String by drawablePathIconSupplierRecoverySealState.collectAsState()
-            private val _drawableResIconSupplierRecoverySeal = MutableStateFlow(Res.drawable._120_0)
+            private val _drawableResIconSupplierRecoverySeal = remember { MutableStateFlow(Res.drawable._120_0) }
             override val drawableResIconSupplierRecoverySeal: StateFlow<DrawableResource> = _drawableResIconSupplierRecoverySeal.asStateFlow()
             override val drawablePathIconSupplierRecoveryCloseout: String by drawablePathIconSupplierRecoveryCloseoutState.collectAsState()
-            private val _drawableResIconSupplierRecoveryCloseout = MutableStateFlow(Res.drawable._121_0)
+            private val _drawableResIconSupplierRecoveryCloseout = remember { MutableStateFlow(Res.drawable._121_0) }
             override val drawableResIconSupplierRecoveryCloseout: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCloseout.asStateFlow()
             override val drawablePathIconSupplierRecoveryReopen: String by drawablePathIconSupplierRecoveryReopenState.collectAsState()
-            private val _drawableResIconSupplierRecoveryReopen = MutableStateFlow(Res.drawable._122_0)
+            private val _drawableResIconSupplierRecoveryReopen = remember { MutableStateFlow(Res.drawable._122_0) }
             override val drawableResIconSupplierRecoveryReopen: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReopen.asStateFlow()
             override val drawablePathIconSupplierRecoveryReconciliation: String by drawablePathIconSupplierRecoveryReconciliationState.collectAsState()
-            private val _drawableResIconSupplierRecoveryReconciliation = MutableStateFlow(Res.drawable._123_0)
+            private val _drawableResIconSupplierRecoveryReconciliation = remember { MutableStateFlow(Res.drawable._123_0) }
             override val drawableResIconSupplierRecoveryReconciliation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReconciliation.asStateFlow()
             override val drawablePathIconSupplierRecoveryAudit: String by drawablePathIconSupplierRecoveryAuditState.collectAsState()
-            private val _drawableResIconSupplierRecoveryAudit = MutableStateFlow(Res.drawable._124_0)
+            private val _drawableResIconSupplierRecoveryAudit = remember { MutableStateFlow(Res.drawable._124_0) }
             override val drawableResIconSupplierRecoveryAudit: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAudit.asStateFlow()
 
             override val drawablePathIconSupplierDispatch: String by drawablePathIconSupplierDispatchState.collectAsState()
-            private val _drawableResIconSupplierDispatch = MutableStateFlow(Res.drawable._78_0)
+            private val _drawableResIconSupplierDispatch = remember { MutableStateFlow(Res.drawable._78_0) }
             override val drawableResIconSupplierDispatch: StateFlow<DrawableResource> = _drawableResIconSupplierDispatch.asStateFlow()
 
             override val drawablePathIconSupplierTermsGuard: String by drawablePathIconSupplierTermsGuardState.collectAsState()
-            private val _drawableResIconSupplierTermsGuard = MutableStateFlow(Res.drawable._89_0)
+            private val _drawableResIconSupplierTermsGuard = remember { MutableStateFlow(Res.drawable._89_0) }
             override val drawableResIconSupplierTermsGuard: StateFlow<DrawableResource> = _drawableResIconSupplierTermsGuard.asStateFlow()
 
             override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
-            private val _drawableResIconBuyerAgeRestriction = MutableStateFlow(Res.drawable._73_0)
+            private val _drawableResIconBuyerAgeRestriction = remember { MutableStateFlow(Res.drawable._73_0) }
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
 
             override val drawablePathIconTransactionTimeRestriction: String by drawablePathIconTransactionTimeRestrictionState.collectAsState()
-            private val _drawableResIconTransactionTimeRestriction = MutableStateFlow(Res.drawable._74_0)
+            private val _drawableResIconTransactionTimeRestriction = remember { MutableStateFlow(Res.drawable._74_0) }
             override val drawableResIconTransactionTimeRestriction: StateFlow<DrawableResource> = _drawableResIconTransactionTimeRestriction.asStateFlow()
 
             override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
-            private val _drawableResIconWorkers = MutableStateFlow(Res.drawable._22_0)
+            private val _drawableResIconWorkers = remember { MutableStateFlow(Res.drawable._22_0) }
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
 
             override val drawablePathIconSuppliers: String by drawablePathIconSuppliersState.collectAsState()
-            private val _drawableResIconSuppliers = MutableStateFlow(Res.drawable._23_0)
+            private val _drawableResIconSuppliers = remember { MutableStateFlow(Res.drawable._23_0) }
             override val drawableResIconSuppliers: StateFlow<DrawableResource> = _drawableResIconSuppliers.asStateFlow()
 
             override val drawablePathIconDebtors: String by drawablePathIconDebtorsState.collectAsState()
-            private val _drawableResIconDebtors = MutableStateFlow(Res.drawable._24_0)
+            private val _drawableResIconDebtors = remember { MutableStateFlow(Res.drawable._24_0) }
             override val drawableResIconDebtors: StateFlow<DrawableResource> = _drawableResIconDebtors.asStateFlow()
 
             override val drawablePathIconDevices: String by drawablePathIconDevicesState.collectAsState()
-            private val _drawableResIconDevices = MutableStateFlow(Res.drawable._25_0)
+            private val _drawableResIconDevices = remember { MutableStateFlow(Res.drawable._25_0) }
             override val drawableResIconDevices: StateFlow<DrawableResource> = _drawableResIconDevices.asStateFlow()
 
             override val drawablePathIconAppLanguage: String by drawablePathIconAppLanguageState.collectAsState()
-            private val _drawableResIconAppLanguage = MutableStateFlow(Res.drawable._26_0)
+            private val _drawableResIconAppLanguage = remember { MutableStateFlow(Res.drawable._26_0) }
             override val drawableResIconAppLanguage: StateFlow<DrawableResource> = _drawableResIconAppLanguage.asStateFlow()
 
             override val drawablePathIconAppTheme: String by drawablePathIconAppThemeState.collectAsState()
-            private val _drawableResIconAppTheme = MutableStateFlow(Res.drawable._27_0)
+            private val _drawableResIconAppTheme = remember { MutableStateFlow(Res.drawable._27_0) }
             override val drawableResIconAppTheme: StateFlow<DrawableResource> = _drawableResIconAppTheme.asStateFlow()
 
             override val drawablePathIconAppScale: String by drawablePathIconAppScaleState.collectAsState()
-            private val _drawableResIconAppScale = MutableStateFlow(Res.drawable._48_0)
+            private val _drawableResIconAppScale = remember { MutableStateFlow(Res.drawable._48_0) }
             override val drawableResIconAppScale: StateFlow<DrawableResource> = _drawableResIconAppScale.asStateFlow()
 
             override val drawablePathIconCheck: String by drawablePathIconCheckState.collectAsState()
-            private val _drawableResIconCheck = MutableStateFlow(Res.drawable._28_0)
+            private val _drawableResIconCheck = remember { MutableStateFlow(Res.drawable._28_0) }
             override val drawableResIconCheck: StateFlow<DrawableResource> = _drawableResIconCheck.asStateFlow()
 
             override val drawablePathIconEdit: String by drawablePathIconEditState.collectAsState()
-            private val _drawableResIconEdit = MutableStateFlow(Res.drawable._29_0)
+            private val _drawableResIconEdit = remember { MutableStateFlow(Res.drawable._29_0) }
             override val drawableResIconEdit: StateFlow<DrawableResource> = _drawableResIconEdit.asStateFlow()
 
             override val drawablePathIconSettings: String by drawablePathIconSettingsState.collectAsState()
-            private val _drawableResIconSettings = MutableStateFlow(Res.drawable._30_0)
+            private val _drawableResIconSettings = remember { MutableStateFlow(Res.drawable._30_0) }
             override val drawableResIconSettings: StateFlow<DrawableResource> = _drawableResIconSettings.asStateFlow()
 
             override val drawablePathIconSearch: String by drawablePathIconSearchState.collectAsState()
-            private val _drawableResIconSearch = MutableStateFlow(Res.drawable._31_0)
+            private val _drawableResIconSearch = remember { MutableStateFlow(Res.drawable._31_0) }
             override val drawableResIconSearch: StateFlow<DrawableResource> = _drawableResIconSearch.asStateFlow()
 
             override val drawablePathIconBarcodeCamScanner: String by drawablePathIconBarcodeCamScannerState.collectAsState()
-            private val _drawableResIconBarcodeCamScanner = MutableStateFlow(Res.drawable._32_0)
+            private val _drawableResIconBarcodeCamScanner = remember { MutableStateFlow(Res.drawable._32_0) }
             override val drawableResIconBarcodeCamScanner: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeCamScanner.asStateFlow()
 
             override val drawablePathIconBarcodeScanner: String by drawablePathIconBarcodeScannerState.collectAsState()
-            private val _drawableResIconBarcodeScanner = MutableStateFlow(Res.drawable._51_0)
+            private val _drawableResIconBarcodeScanner = remember { MutableStateFlow(Res.drawable._51_0) }
             override val drawableResIconBarcodeScanner: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeScanner.asStateFlow()
 
             override val drawablePathIconBarcodeType: String by drawablePathIconBarcodeTypeState.collectAsState()
-            private val _drawableResIconBarcodeType = MutableStateFlow(Res.drawable._55_0)
+            private val _drawableResIconBarcodeType = remember { MutableStateFlow(Res.drawable._55_0) }
             override val drawableResIconBarcodeType: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeType.asStateFlow()
 
             override val drawablePathIconVoiceInput: String by drawablePathIconVoiceInputState.collectAsState()
-            private val _drawableResIconVoiceInput = MutableStateFlow(Res.drawable._52_0)
+            private val _drawableResIconVoiceInput = remember { MutableStateFlow(Res.drawable._52_0) }
             override val drawableResIconVoiceInput: StateFlow<DrawableResource> =
                 _drawableResIconVoiceInput.asStateFlow()
 
             override val drawablePathIconDelete: String by drawablePathIconDeleteState.collectAsState()
-            private val _drawableResIconDelete = MutableStateFlow(Res.drawable._33_0)
+            private val _drawableResIconDelete = remember { MutableStateFlow(Res.drawable._33_0) }
             override val drawableResIconDelete: StateFlow<DrawableResource> = _drawableResIconDelete.asStateFlow()
 
             override val drawablePathIconExit: String by drawablePathIconExitState.collectAsState()
-            private val _drawableResIconExit = MutableStateFlow(Res.drawable._34_0)
+            private val _drawableResIconExit = remember { MutableStateFlow(Res.drawable._34_0) }
             override val drawableResIconExit: StateFlow<DrawableResource> = _drawableResIconExit.asStateFlow()
 
             override val drawablePathIconSwitch: String by drawablePathIconSwitchState.collectAsState()
-            private val _drawableResIconSwitch = MutableStateFlow(Res.drawable._35_0)
+            private val _drawableResIconSwitch = remember { MutableStateFlow(Res.drawable._35_0) }
             override val drawableResIconSwitch: StateFlow<DrawableResource> = _drawableResIconSwitch.asStateFlow()
 
             override val drawablePathIconSort: String by drawablePathIconSortState.collectAsState()
-            private val _drawableResIconSort = MutableStateFlow(Res.drawable._61_0)
+            private val _drawableResIconSort = remember { MutableStateFlow(Res.drawable._61_0) }
             override val drawableResIconSort: StateFlow<DrawableResource> = _drawableResIconSort.asStateFlow()
 
             override val drawablePathIconCart: String by drawablePathIconCartState.collectAsState()
-            private val _drawableResIconCart = MutableStateFlow(Res.drawable._36_0)
+            private val _drawableResIconCart = remember { MutableStateFlow(Res.drawable._36_0) }
             override val drawableResIconCart: StateFlow<DrawableResource> = _drawableResIconCart.asStateFlow()
 
             override val drawablePathIconAddCart: String by drawablePathIconAddCartState.collectAsState()
-            private val _drawableResIconAddCart = MutableStateFlow(Res.drawable._37_0)
+            private val _drawableResIconAddCart = remember { MutableStateFlow(Res.drawable._37_0) }
             override val drawableResIconAddCart: StateFlow<DrawableResource> = _drawableResIconAddCart.asStateFlow()
 
             override val drawablePathIconSubtract: String by drawablePathIconSubtractState.collectAsState()
-            private val _drawableResIconSubtract = MutableStateFlow(Res.drawable._38_0)
+            private val _drawableResIconSubtract = remember { MutableStateFlow(Res.drawable._38_0) }
             override val drawableResIconSubtract: StateFlow<DrawableResource> = _drawableResIconSubtract.asStateFlow()
 
             override val drawablePathIconReceipt: String by drawablePathIconReceiptState.collectAsState()
-            private val _drawableResIconReceipt = MutableStateFlow(Res.drawable._39_0)
+            private val _drawableResIconReceipt = remember { MutableStateFlow(Res.drawable._39_0) }
             override val drawableResIconReceipt: StateFlow<DrawableResource> = _drawableResIconReceipt.asStateFlow()
 
             override val drawablePathIconFinances: String by drawablePathIconFinancesState.collectAsState()
-            private val _drawableResIconFinances = MutableStateFlow(Res.drawable._40_0)
+            private val _drawableResIconFinances = remember { MutableStateFlow(Res.drawable._40_0) }
             override val drawableResIconFinances = _drawableResIconFinances.asStateFlow()
 
             override val drawablePathIconClipboard: String by drawablePathIconClipboardState.collectAsState()
-            private val _drawableResIconClipboard = MutableStateFlow(Res.drawable._41_0)
+            private val _drawableResIconClipboard = remember { MutableStateFlow(Res.drawable._41_0) }
             override val drawableResIconClipboard: StateFlow<DrawableResource> = _drawableResIconClipboard.asStateFlow()
 
             override val drawablePathIconSupport: String by drawablePathIconSupportState.collectAsState()
-            private val _drawableResIconSupport = MutableStateFlow(Res.drawable._42_0)
+            private val _drawableResIconSupport = remember { MutableStateFlow(Res.drawable._42_0) }
             override val drawableResIconSupport: StateFlow<DrawableResource> = _drawableResIconSupport.asStateFlow()
 
             override val drawablePathIconSubscription: String by drawablePathIconSubscriptionState.collectAsState()
-            private val _drawableResIconSubscription = MutableStateFlow(Res.drawable._43_0)
+            private val _drawableResIconSubscription = remember { MutableStateFlow(Res.drawable._43_0) }
             override val drawableResIconSubscription: StateFlow<DrawableResource> = _drawableResIconSubscription.asStateFlow()
 
             override val drawablePathIconThemeLight: String by drawablePathIconThemeLightState.collectAsState()
-            private val _drawableResIconThemeLight = MutableStateFlow(Res.drawable._44_0)
+            private val _drawableResIconThemeLight = remember { MutableStateFlow(Res.drawable._44_0) }
             override val drawableResIconThemeLight: StateFlow<DrawableResource> = _drawableResIconThemeLight.asStateFlow()
 
             override val drawablePathIconThemeDark: String by drawablePathIconThemeDarkState.collectAsState()
-            private val _drawableResIconThemeDark = MutableStateFlow(Res.drawable._45_0)
+            private val _drawableResIconThemeDark = remember { MutableStateFlow(Res.drawable._45_0) }
             override val drawableResIconThemeDark: StateFlow<DrawableResource> = _drawableResIconThemeDark.asStateFlow()
 
             override val drawablePathIconShare: String by drawablePathIconShareState.collectAsState()
-            private val _drawableResIconShare = MutableStateFlow(Res.drawable._46_0)
+            private val _drawableResIconShare = remember { MutableStateFlow(Res.drawable._46_0) }
             override val drawableResIconShare: StateFlow<DrawableResource> = _drawableResIconShare.asStateFlow()
 
             override val drawablePathIconWhatsApp: String by drawablePathIconWhatsAppState.collectAsState()
-            private val _drawableResIconWhatsApp = MutableStateFlow(Res.drawable._47_0)
+            private val _drawableResIconWhatsApp = remember { MutableStateFlow(Res.drawable._47_0) }
             override val drawableResIconWhatsApp: StateFlow<DrawableResource> = _drawableResIconWhatsApp.asStateFlow()
 
             override val drawablePathIconRefresh: String by drawablePathIconRefreshState.collectAsState()
-            private val _drawableResIconRefresh = MutableStateFlow(Res.drawable._54_0)
+            private val _drawableResIconRefresh = remember { MutableStateFlow(Res.drawable._54_0) }
             override val drawableResIconRefresh: StateFlow<DrawableResource> = _drawableResIconRefresh.asStateFlow()
 
 
             override suspend fun updateDrawableResources() {
-                _drawableResAITALogo.emit(if (stateValues.appThemeId == 1L) Res.drawable._0_1 else Res.drawable._0_0)
+                val themeId = appThemeIdState.value
+                _drawableResAITALogo.emit(if (themeId == 1L) Res.drawable._0_1 else Res.drawable._0_0)
 
-                _drawableResIconPassword.emit(if (stateValues.appThemeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
+                _drawableResIconPassword.emit(if (themeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
 
-                _drawableResIconSecurity.emit(if (stateValues.appThemeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
+                _drawableResIconSecurity.emit(if (themeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
 
-                _drawableResIconResponse.emit(if (stateValues.appThemeId == 1L) Res.drawable._53_1 else Res.drawable._53_0)
+                _drawableResIconResponse.emit(if (themeId == 1L) Res.drawable._53_1 else Res.drawable._53_0)
 
-                _drawableResIconCancel.emit(if (stateValues.appThemeId == 1L) Res.drawable._2_1 else Res.drawable._2_0)
+                _drawableResIconCancel.emit(if (themeId == 1L) Res.drawable._2_1 else Res.drawable._2_0)
 
-                _drawableResIconEyeHide.emit(if (stateValues.appThemeId == 1L) Res.drawable._3_1 else Res.drawable._3_0)
+                _drawableResIconEyeHide.emit(if (themeId == 1L) Res.drawable._3_1 else Res.drawable._3_0)
 
-                _drawableResIconEyeShow.emit(if (stateValues.appThemeId == 1L) Res.drawable._4_1 else Res.drawable._4_0)
+                _drawableResIconEyeShow.emit(if (themeId == 1L) Res.drawable._4_1 else Res.drawable._4_0)
 
-                _drawableResIconEmail.emit(if (stateValues.appThemeId == 1L) Res.drawable._5_1 else Res.drawable._5_0)
+                _drawableResIconEmail.emit(if (themeId == 1L) Res.drawable._5_1 else Res.drawable._5_0)
 
-                _drawableResIconPhone.emit(if (stateValues.appThemeId == 1L) Res.drawable._6_1 else Res.drawable._6_0)
+                _drawableResIconPhone.emit(if (themeId == 1L) Res.drawable._6_1 else Res.drawable._6_0)
 
-                _drawableResIconExpandMore.emit(if (stateValues.appThemeId == 1L) Res.drawable._7_1 else Res.drawable._7_0)
+                _drawableResIconExpandMore.emit(if (themeId == 1L) Res.drawable._7_1 else Res.drawable._7_0)
 
-                _drawableResIconExpandLess.emit(if (stateValues.appThemeId == 1L) Res.drawable._8_1 else Res.drawable._8_0)
+                _drawableResIconExpandLess.emit(if (themeId == 1L) Res.drawable._8_1 else Res.drawable._8_0)
 
-                _drawableResIconPerson.emit(if (stateValues.appThemeId == 1L) Res.drawable._9_1 else Res.drawable._9_0)
+                _drawableResIconPerson.emit(if (themeId == 1L) Res.drawable._9_1 else Res.drawable._9_0)
 
-                _drawableResIconTransactionSale.emit(if (stateValues.appThemeId == 1L) Res.drawable._10_1 else Res.drawable._10_0)
+                _drawableResIconTransactionSale.emit(if (themeId == 1L) Res.drawable._10_1 else Res.drawable._10_0)
 
-                _drawableResIconTransactionReturn.emit(if (stateValues.appThemeId == 1L) Res.drawable._11_1 else Res.drawable._11_0)
+                _drawableResIconTransactionReturn.emit(if (themeId == 1L) Res.drawable._11_1 else Res.drawable._11_0)
 
-                _drawableResIconTransactionSupply.emit(if (stateValues.appThemeId == 1L) Res.drawable._12_1 else Res.drawable._12_0)
+                _drawableResIconTransactionSupply.emit(if (themeId == 1L) Res.drawable._12_1 else Res.drawable._12_0)
 
-                _drawableResIconTransactionSelection.emit(if (stateValues.appThemeId == 1L) Res.drawable._57_1 else Res.drawable._57_0)
+                _drawableResIconTransactionSelection.emit(if (themeId == 1L) Res.drawable._57_1 else Res.drawable._57_0)
 
-                _drawableResIconStock.emit(if (stateValues.appThemeId == 1L) Res.drawable._13_1 else Res.drawable._13_0)
+                _drawableResIconStock.emit(if (themeId == 1L) Res.drawable._13_1 else Res.drawable._13_0)
 
-                _drawableResIconMenu.emit(if (stateValues.appThemeId == 1L) Res.drawable._14_1 else Res.drawable._14_0)
+                _drawableResIconMenu.emit(if (themeId == 1L) Res.drawable._14_1 else Res.drawable._14_0)
 
-                _drawableResIconBackArrow.emit(if (stateValues.appThemeId == 1L) Res.drawable._15_1 else Res.drawable._15_0)
+                _drawableResIconBackArrow.emit(if (themeId == 1L) Res.drawable._15_1 else Res.drawable._15_0)
 
-                _drawableResIconAdd.emit(if (stateValues.appThemeId == 1L) Res.drawable._16_1 else Res.drawable._16_0)
+                _drawableResIconAdd.emit(if (themeId == 1L) Res.drawable._16_1 else Res.drawable._16_0)
 
-                _drawableResIconUserAccount.emit(if (stateValues.appThemeId == 1L) Res.drawable._17_1 else Res.drawable._17_0)
+                _drawableResIconUserAccount.emit(if (themeId == 1L) Res.drawable._17_1 else Res.drawable._17_0)
 
-                _drawableResIconGoodsCategories.emit(if (stateValues.appThemeId == 1L) Res.drawable._18_1 else Res.drawable._18_0)
+                _drawableResIconGoodsCategories.emit(if (themeId == 1L) Res.drawable._18_1 else Res.drawable._18_0)
 
-                _drawableResIconStores.emit(if (stateValues.appThemeId == 1L) Res.drawable._19_1 else Res.drawable._19_0)
+                _drawableResIconStores.emit(if (themeId == 1L) Res.drawable._19_1 else Res.drawable._19_0)
 
-                _drawableResIconTransactionHistory.emit(if (stateValues.appThemeId == 1L) Res.drawable._20_1 else Res.drawable._20_0)
+                _drawableResIconTransactionHistory.emit(if (themeId == 1L) Res.drawable._20_1 else Res.drawable._20_0)
 
-                _drawableResIconLog.emit(if (stateValues.appThemeId == 1L) Res.drawable._49_1 else Res.drawable._49_0)
+                _drawableResIconLog.emit(if (themeId == 1L) Res.drawable._49_1 else Res.drawable._49_0)
 
-                _drawableResIconPromos.emit(if (stateValues.appThemeId == 1L) Res.drawable._50_1 else Res.drawable._50_0)
+                _drawableResIconPromos.emit(if (themeId == 1L) Res.drawable._50_1 else Res.drawable._50_0)
 
-                _drawableResIconAnalytics.emit(if (stateValues.appThemeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
-                _drawableResIconAnalyticsReport.emit(if (stateValues.appThemeId == 1L) Res.drawable._62_1 else Res.drawable._62_0)
-                _drawableResIconLabelPrinter.emit(if (stateValues.appThemeId == 1L) Res.drawable._63_1 else Res.drawable._63_0)
-                _drawableResIconBarcodeGenerate.emit(if (stateValues.appThemeId == 1L) Res.drawable._64_1 else Res.drawable._64_0)
-                _drawableResIconPrintTag.emit(if (stateValues.appThemeId == 1L) Res.drawable._65_1 else Res.drawable._65_0)
-                _drawableResIconWorkerRoleTemplates.emit(if (stateValues.appThemeId == 1L) Res.drawable._66_1 else Res.drawable._66_0)
-                _drawableResIconStockHistory.emit(if (stateValues.appThemeId == 1L) Res.drawable._67_1 else Res.drawable._67_0)
-                _drawableResIconAppModeStore.emit(if (stateValues.appThemeId == 1L) Res.drawable._68_1 else Res.drawable._68_0)
-                _drawableResIconAppModeBuyer.emit(if (stateValues.appThemeId == 1L) Res.drawable._69_1 else Res.drawable._69_0)
-                _drawableResIconAppModeSupplier.emit(if (stateValues.appThemeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
-                _drawableResIconAppModeManufacturer.emit(if (stateValues.appThemeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
-                _drawableResIconSupplierCatalog.emit(if (stateValues.appThemeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
-                _drawableResIconSupplierContracts.emit(if (stateValues.appThemeId == 1L) Res.drawable._76_1 else Res.drawable._76_0)
-                _drawableResIconSupplierPartners.emit(if (stateValues.appThemeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
-                _drawableResIconSupplierDemandRadar.emit(if (stateValues.appThemeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
-                _drawableResIconSupplierBackorderRecovery.emit(if (stateValues.appThemeId == 1L) Res.drawable._91_1 else Res.drawable._91_0)
-                _drawableResIconSupplierRecoveryOwner.emit(if (stateValues.appThemeId == 1L) Res.drawable._92_1 else Res.drawable._92_0)
-                _drawableResIconSupplierRecoveryClock.emit(if (stateValues.appThemeId == 1L) Res.drawable._93_1 else Res.drawable._93_0)
-                _drawableResIconSupplierRecoveryProof.emit(if (stateValues.appThemeId == 1L) Res.drawable._94_1 else Res.drawable._94_0)
-                _drawableResIconSupplierRecoveryResolution.emit(if (stateValues.appThemeId == 1L) Res.drawable._95_1 else Res.drawable._95_0)
-                _drawableResIconSupplierRecoveryContact.emit(if (stateValues.appThemeId == 1L) Res.drawable._96_1 else Res.drawable._96_0)
-                _drawableResIconSupplierRecoveryRisk.emit(if (stateValues.appThemeId == 1L) Res.drawable._97_1 else Res.drawable._97_0)
-                _drawableResIconSupplierRecoveryConfidence.emit(if (stateValues.appThemeId == 1L) Res.drawable._98_1 else Res.drawable._98_0)
-                _drawableResIconSupplierRecoveryFollowUp.emit(if (stateValues.appThemeId == 1L) Res.drawable._99_1 else Res.drawable._99_0)
-                _drawableResIconSupplierRecoveryHandoff.emit(if (stateValues.appThemeId == 1L) Res.drawable._100_1 else Res.drawable._100_0)
-                _drawableResIconSupplierRecoveryClosure.emit(if (stateValues.appThemeId == 1L) Res.drawable._101_1 else Res.drawable._101_0)
-                _drawableResIconSupplierRecoveryLedger.emit(if (stateValues.appThemeId == 1L) Res.drawable._102_1 else Res.drawable._102_0)
-                _drawableResIconSupplierRecoveryTriage.emit(if (stateValues.appThemeId == 1L) Res.drawable._103_1 else Res.drawable._103_0)
-                _drawableResIconSupplierRecoveryCommand.emit(if (stateValues.appThemeId == 1L) Res.drawable._104_1 else Res.drawable._104_0)
-                _drawableResIconSupplierRecoveryPromiseShield.emit(if (stateValues.appThemeId == 1L) Res.drawable._105_1 else Res.drawable._105_0)
-                _drawableResIconSupplierRecoveryDesk.emit(if (stateValues.appThemeId == 1L) Res.drawable._106_1 else Res.drawable._106_0)
-                _drawableResIconSupplierRecoveryWave.emit(if (stateValues.appThemeId == 1L) Res.drawable._107_1 else Res.drawable._107_0)
-                _drawableResIconSupplierRecoveryAging.emit(if (stateValues.appThemeId == 1L) Res.drawable._108_1 else Res.drawable._108_0)
-                _drawableResIconSupplierRecoveryBottleneck.emit(if (stateValues.appThemeId == 1L) Res.drawable._109_1 else Res.drawable._109_0)
-                _drawableResIconSupplierRecoveryLoad.emit(if (stateValues.appThemeId == 1L) Res.drawable._110_1 else Res.drawable._110_0)
-                _drawableResIconSupplierRecoveryImpact.emit(if (stateValues.appThemeId == 1L) Res.drawable._111_1 else Res.drawable._111_0)
-                _drawableResIconSupplierRecoveryCommit.emit(if (stateValues.appThemeId == 1L) Res.drawable._112_1 else Res.drawable._112_0)
-                _drawableResIconSupplierRecoveryAllocation.emit(if (stateValues.appThemeId == 1L) Res.drawable._113_1 else Res.drawable._113_0)
-                _drawableResIconSupplierRecoveryException.emit(if (stateValues.appThemeId == 1L) Res.drawable._114_1 else Res.drawable._114_0)
-                _drawableResIconSupplierRecoveryCause.emit(if (stateValues.appThemeId == 1L) Res.drawable._115_1 else Res.drawable._115_0)
-                _drawableResIconSupplierRecoveryVerification.emit(if (stateValues.appThemeId == 1L) Res.drawable._116_1 else Res.drawable._116_0)
-                _drawableResIconSupplierRecoveryApproval.emit(if (stateValues.appThemeId == 1L) Res.drawable._117_1 else Res.drawable._117_0)
-                _drawableResIconSupplierRecoveryExecution.emit(if (stateValues.appThemeId == 1L) Res.drawable._118_1 else Res.drawable._118_0)
-                _drawableResIconSupplierRecoveryRelease.emit(if (stateValues.appThemeId == 1L) Res.drawable._119_1 else Res.drawable._119_0)
-                _drawableResIconSupplierRecoverySeal.emit(if (stateValues.appThemeId == 1L) Res.drawable._120_1 else Res.drawable._120_0)
-                _drawableResIconSupplierRecoveryCloseout.emit(if (stateValues.appThemeId == 1L) Res.drawable._121_1 else Res.drawable._121_0)
-                _drawableResIconSupplierRecoveryReopen.emit(if (stateValues.appThemeId == 1L) Res.drawable._122_1 else Res.drawable._122_0)
-                _drawableResIconSupplierRecoveryReconciliation.emit(if (stateValues.appThemeId == 1L) Res.drawable._123_1 else Res.drawable._123_0)
-                _drawableResIconSupplierRecoveryAudit.emit(if (stateValues.appThemeId == 1L) Res.drawable._124_1 else Res.drawable._124_0)
-                _drawableResIconSupplierDispatch.emit(if (stateValues.appThemeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
-                _drawableResIconSupplierTermsGuard.emit(if (stateValues.appThemeId == 1L) Res.drawable._89_1 else Res.drawable._89_0)
-                _drawableResIconBuyerAgeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
-                _drawableResIconTransactionTimeRestriction.emit(if (stateValues.appThemeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
+                _drawableResIconAnalytics.emit(if (themeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
+                _drawableResIconAnalyticsReport.emit(if (themeId == 1L) Res.drawable._62_1 else Res.drawable._62_0)
+                _drawableResIconLabelPrinter.emit(if (themeId == 1L) Res.drawable._63_1 else Res.drawable._63_0)
+                _drawableResIconBarcodeGenerate.emit(if (themeId == 1L) Res.drawable._64_1 else Res.drawable._64_0)
+                _drawableResIconPrintTag.emit(if (themeId == 1L) Res.drawable._65_1 else Res.drawable._65_0)
+                _drawableResIconWorkerRoleTemplates.emit(if (themeId == 1L) Res.drawable._66_1 else Res.drawable._66_0)
+                _drawableResIconStockHistory.emit(if (themeId == 1L) Res.drawable._67_1 else Res.drawable._67_0)
+                _drawableResIconAppModeStore.emit(if (themeId == 1L) Res.drawable._68_1 else Res.drawable._68_0)
+                _drawableResIconAppModeBuyer.emit(if (themeId == 1L) Res.drawable._69_1 else Res.drawable._69_0)
+                _drawableResIconAppModeSupplier.emit(if (themeId == 1L) Res.drawable._70_1 else Res.drawable._70_0)
+                _drawableResIconAppModeManufacturer.emit(if (themeId == 1L) Res.drawable._71_1 else Res.drawable._71_0)
+                _drawableResIconSupplierCatalog.emit(if (themeId == 1L) Res.drawable._72_1 else Res.drawable._72_0)
+                _drawableResIconSupplierContracts.emit(if (themeId == 1L) Res.drawable._76_1 else Res.drawable._76_0)
+                _drawableResIconSupplierPartners.emit(if (themeId == 1L) Res.drawable._75_1 else Res.drawable._75_0)
+                _drawableResIconSupplierDemandRadar.emit(if (themeId == 1L) Res.drawable._77_1 else Res.drawable._77_0)
+                _drawableResIconSupplierBackorderRecovery.emit(if (themeId == 1L) Res.drawable._91_1 else Res.drawable._91_0)
+                _drawableResIconSupplierRecoveryOwner.emit(if (themeId == 1L) Res.drawable._92_1 else Res.drawable._92_0)
+                _drawableResIconSupplierRecoveryClock.emit(if (themeId == 1L) Res.drawable._93_1 else Res.drawable._93_0)
+                _drawableResIconSupplierRecoveryProof.emit(if (themeId == 1L) Res.drawable._94_1 else Res.drawable._94_0)
+                _drawableResIconSupplierRecoveryResolution.emit(if (themeId == 1L) Res.drawable._95_1 else Res.drawable._95_0)
+                _drawableResIconSupplierRecoveryContact.emit(if (themeId == 1L) Res.drawable._96_1 else Res.drawable._96_0)
+                _drawableResIconSupplierRecoveryRisk.emit(if (themeId == 1L) Res.drawable._97_1 else Res.drawable._97_0)
+                _drawableResIconSupplierRecoveryConfidence.emit(if (themeId == 1L) Res.drawable._98_1 else Res.drawable._98_0)
+                _drawableResIconSupplierRecoveryFollowUp.emit(if (themeId == 1L) Res.drawable._99_1 else Res.drawable._99_0)
+                _drawableResIconSupplierRecoveryHandoff.emit(if (themeId == 1L) Res.drawable._100_1 else Res.drawable._100_0)
+                _drawableResIconSupplierRecoveryClosure.emit(if (themeId == 1L) Res.drawable._101_1 else Res.drawable._101_0)
+                _drawableResIconSupplierRecoveryLedger.emit(if (themeId == 1L) Res.drawable._102_1 else Res.drawable._102_0)
+                _drawableResIconSupplierRecoveryTriage.emit(if (themeId == 1L) Res.drawable._103_1 else Res.drawable._103_0)
+                _drawableResIconSupplierRecoveryCommand.emit(if (themeId == 1L) Res.drawable._104_1 else Res.drawable._104_0)
+                _drawableResIconSupplierRecoveryPromiseShield.emit(if (themeId == 1L) Res.drawable._105_1 else Res.drawable._105_0)
+                _drawableResIconSupplierRecoveryDesk.emit(if (themeId == 1L) Res.drawable._106_1 else Res.drawable._106_0)
+                _drawableResIconSupplierRecoveryWave.emit(if (themeId == 1L) Res.drawable._107_1 else Res.drawable._107_0)
+                _drawableResIconSupplierRecoveryAging.emit(if (themeId == 1L) Res.drawable._108_1 else Res.drawable._108_0)
+                _drawableResIconSupplierRecoveryBottleneck.emit(if (themeId == 1L) Res.drawable._109_1 else Res.drawable._109_0)
+                _drawableResIconSupplierRecoveryLoad.emit(if (themeId == 1L) Res.drawable._110_1 else Res.drawable._110_0)
+                _drawableResIconSupplierRecoveryImpact.emit(if (themeId == 1L) Res.drawable._111_1 else Res.drawable._111_0)
+                _drawableResIconSupplierRecoveryCommit.emit(if (themeId == 1L) Res.drawable._112_1 else Res.drawable._112_0)
+                _drawableResIconSupplierRecoveryAllocation.emit(if (themeId == 1L) Res.drawable._113_1 else Res.drawable._113_0)
+                _drawableResIconSupplierRecoveryException.emit(if (themeId == 1L) Res.drawable._114_1 else Res.drawable._114_0)
+                _drawableResIconSupplierRecoveryCause.emit(if (themeId == 1L) Res.drawable._115_1 else Res.drawable._115_0)
+                _drawableResIconSupplierRecoveryVerification.emit(if (themeId == 1L) Res.drawable._116_1 else Res.drawable._116_0)
+                _drawableResIconSupplierRecoveryApproval.emit(if (themeId == 1L) Res.drawable._117_1 else Res.drawable._117_0)
+                _drawableResIconSupplierRecoveryExecution.emit(if (themeId == 1L) Res.drawable._118_1 else Res.drawable._118_0)
+                _drawableResIconSupplierRecoveryRelease.emit(if (themeId == 1L) Res.drawable._119_1 else Res.drawable._119_0)
+                _drawableResIconSupplierRecoverySeal.emit(if (themeId == 1L) Res.drawable._120_1 else Res.drawable._120_0)
+                _drawableResIconSupplierRecoveryCloseout.emit(if (themeId == 1L) Res.drawable._121_1 else Res.drawable._121_0)
+                _drawableResIconSupplierRecoveryReopen.emit(if (themeId == 1L) Res.drawable._122_1 else Res.drawable._122_0)
+                _drawableResIconSupplierRecoveryReconciliation.emit(if (themeId == 1L) Res.drawable._123_1 else Res.drawable._123_0)
+                _drawableResIconSupplierRecoveryAudit.emit(if (themeId == 1L) Res.drawable._124_1 else Res.drawable._124_0)
+                _drawableResIconSupplierDispatch.emit(if (themeId == 1L) Res.drawable._78_1 else Res.drawable._78_0)
+                _drawableResIconSupplierTermsGuard.emit(if (themeId == 1L) Res.drawable._89_1 else Res.drawable._89_0)
+                _drawableResIconBuyerAgeRestriction.emit(if (themeId == 1L) Res.drawable._73_1 else Res.drawable._73_0)
+                _drawableResIconTransactionTimeRestriction.emit(if (themeId == 1L) Res.drawable._74_1 else Res.drawable._74_0)
 
-                _drawableResIconWorkers.emit(if (stateValues.appThemeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
+                _drawableResIconWorkers.emit(if (themeId == 1L) Res.drawable._22_1 else Res.drawable._22_0)
 
-                _drawableResIconSuppliers.emit(if (stateValues.appThemeId == 1L) Res.drawable._23_1 else Res.drawable._23_0)
+                _drawableResIconSuppliers.emit(if (themeId == 1L) Res.drawable._23_1 else Res.drawable._23_0)
 
-                _drawableResIconDebtors.emit(if (stateValues.appThemeId == 1L) Res.drawable._24_1 else Res.drawable._24_0)
+                _drawableResIconDebtors.emit(if (themeId == 1L) Res.drawable._24_1 else Res.drawable._24_0)
 
-                _drawableResIconDevices.emit(if (stateValues.appThemeId == 1L) Res.drawable._25_1 else Res.drawable._25_0)
+                _drawableResIconDevices.emit(if (themeId == 1L) Res.drawable._25_1 else Res.drawable._25_0)
 
-                _drawableResIconAppLanguage.emit(if (stateValues.appThemeId == 1L) Res.drawable._26_1 else Res.drawable._26_0)
+                _drawableResIconAppLanguage.emit(if (themeId == 1L) Res.drawable._26_1 else Res.drawable._26_0)
 
-                _drawableResIconAppTheme.emit(if (stateValues.appThemeId == 1L) Res.drawable._27_1 else Res.drawable._27_0)
+                _drawableResIconAppTheme.emit(if (themeId == 1L) Res.drawable._27_1 else Res.drawable._27_0)
 
-                _drawableResIconAppScale.emit(if (stateValues.appThemeId == 1L) Res.drawable._48_1 else Res.drawable._48_0)
+                _drawableResIconAppScale.emit(if (themeId == 1L) Res.drawable._48_1 else Res.drawable._48_0)
 
-                _drawableResIconCheck.emit(if (stateValues.appThemeId == 1L) Res.drawable._28_1 else Res.drawable._28_0)
+                _drawableResIconCheck.emit(if (themeId == 1L) Res.drawable._28_1 else Res.drawable._28_0)
 
-                _drawableResIconEdit.emit(if (stateValues.appThemeId == 1L) Res.drawable._29_1 else Res.drawable._29_0)
+                _drawableResIconEdit.emit(if (themeId == 1L) Res.drawable._29_1 else Res.drawable._29_0)
 
-                _drawableResIconSettings.emit(if (stateValues.appThemeId == 1L) Res.drawable._30_1 else Res.drawable._30_0)
+                _drawableResIconSettings.emit(if (themeId == 1L) Res.drawable._30_1 else Res.drawable._30_0)
 
-                _drawableResIconSearch.emit(if (stateValues.appThemeId == 1L) Res.drawable._31_1 else Res.drawable._31_0)
+                _drawableResIconSearch.emit(if (themeId == 1L) Res.drawable._31_1 else Res.drawable._31_0)
 
-                _drawableResIconBarcodeCamScanner.emit(if (stateValues.appThemeId == 1L) Res.drawable._32_1 else Res.drawable._32_0)
+                _drawableResIconBarcodeCamScanner.emit(if (themeId == 1L) Res.drawable._32_1 else Res.drawable._32_0)
 
-                _drawableResIconBarcodeScanner.emit(if (stateValues.appThemeId == 1L) Res.drawable._51_1 else Res.drawable._51_0)
+                _drawableResIconBarcodeScanner.emit(if (themeId == 1L) Res.drawable._51_1 else Res.drawable._51_0)
 
-                _drawableResIconBarcodeType.emit(if (stateValues.appThemeId == 1L) Res.drawable._55_1 else Res.drawable._55_0)
+                _drawableResIconBarcodeType.emit(if (themeId == 1L) Res.drawable._55_1 else Res.drawable._55_0)
 
-                _drawableResIconVoiceInput.emit(if (stateValues.appThemeId == 1L) Res.drawable._52_1 else Res.drawable._52_0)
+                _drawableResIconVoiceInput.emit(if (themeId == 1L) Res.drawable._52_1 else Res.drawable._52_0)
 
-                _drawableResIconDelete.emit(if (stateValues.appThemeId == 1L) Res.drawable._33_1 else Res.drawable._33_0)
+                _drawableResIconDelete.emit(if (themeId == 1L) Res.drawable._33_1 else Res.drawable._33_0)
 
-                _drawableResIconExit.emit(if (stateValues.appThemeId == 1L) Res.drawable._34_1 else Res.drawable._34_0)
+                _drawableResIconExit.emit(if (themeId == 1L) Res.drawable._34_1 else Res.drawable._34_0)
 
-                _drawableResIconSwitch.emit(if (stateValues.appThemeId == 1L) Res.drawable._35_1 else Res.drawable._35_0)
-                _drawableResIconSort.emit(if (stateValues.appThemeId == 1L) Res.drawable._61_1 else Res.drawable._61_0)
+                _drawableResIconSwitch.emit(if (themeId == 1L) Res.drawable._35_1 else Res.drawable._35_0)
+                _drawableResIconSort.emit(if (themeId == 1L) Res.drawable._61_1 else Res.drawable._61_0)
 
-                _drawableResIconCart.emit(if (stateValues.appThemeId == 1L) Res.drawable._36_1 else Res.drawable._36_0)
+                _drawableResIconCart.emit(if (themeId == 1L) Res.drawable._36_1 else Res.drawable._36_0)
 
-                _drawableResIconAddCart.emit(if (stateValues.appThemeId == 1L) Res.drawable._37_1 else Res.drawable._37_0)
+                _drawableResIconAddCart.emit(if (themeId == 1L) Res.drawable._37_1 else Res.drawable._37_0)
 
-                _drawableResIconSubtract.emit(if (stateValues.appThemeId == 1L) Res.drawable._38_1 else Res.drawable._38_0)
+                _drawableResIconSubtract.emit(if (themeId == 1L) Res.drawable._38_1 else Res.drawable._38_0)
 
-                _drawableResIconReceipt.emit(if (stateValues.appThemeId == 1L) Res.drawable._39_1 else Res.drawable._39_0)
-                _drawableResIconFinances.emit(if (stateValues.appThemeId == 1L) Res.drawable._40_1 else Res.drawable._40_0)
-                _drawableResIconClipboard.emit(if (stateValues.appThemeId == 1L) Res.drawable._41_1 else Res.drawable._41_0)
-                _drawableResIconSupport.emit(if (stateValues.appThemeId == 1L) Res.drawable._42_1 else Res.drawable._42_0)
-                _drawableResIconSubscription.emit(if (stateValues.appThemeId == 1L) Res.drawable._43_1 else Res.drawable._43_0)
-                _drawableResIconThemeLight.emit(if (stateValues.appThemeId == 1L) Res.drawable._44_1 else Res.drawable._44_0)
-                _drawableResIconThemeDark.emit(if (stateValues.appThemeId == 1L) Res.drawable._45_1 else Res.drawable._45_0)
-                _drawableResIconShare.emit(if (stateValues.appThemeId == 1L) Res.drawable._46_1 else Res.drawable._46_0)
-                _drawableResIconWhatsApp.emit(if (stateValues.appThemeId == 1L) Res.drawable._47_1 else Res.drawable._47_0)
-                _drawableResIconRefresh.emit(if (stateValues.appThemeId == 1L) Res.drawable._54_1 else Res.drawable._54_0)
+                _drawableResIconReceipt.emit(if (themeId == 1L) Res.drawable._39_1 else Res.drawable._39_0)
+                _drawableResIconFinances.emit(if (themeId == 1L) Res.drawable._40_1 else Res.drawable._40_0)
+                _drawableResIconClipboard.emit(if (themeId == 1L) Res.drawable._41_1 else Res.drawable._41_0)
+                _drawableResIconSupport.emit(if (themeId == 1L) Res.drawable._42_1 else Res.drawable._42_0)
+                _drawableResIconSubscription.emit(if (themeId == 1L) Res.drawable._43_1 else Res.drawable._43_0)
+                _drawableResIconThemeLight.emit(if (themeId == 1L) Res.drawable._44_1 else Res.drawable._44_0)
+                _drawableResIconThemeDark.emit(if (themeId == 1L) Res.drawable._45_1 else Res.drawable._45_0)
+                _drawableResIconShare.emit(if (themeId == 1L) Res.drawable._46_1 else Res.drawable._46_0)
+                _drawableResIconWhatsApp.emit(if (themeId == 1L) Res.drawable._47_1 else Res.drawable._47_0)
+                _drawableResIconRefresh.emit(if (themeId == 1L) Res.drawable._54_1 else Res.drawable._54_0)
             }
         }
 
         softKeyboardController = LocalSoftwareKeyboardController.current
         coroutineScope = rememberCoroutineScope()
 
-        key(stateValues.appLanguage, stateValues.appThemeId, stateValues.appSizeModeId, *keys) {
+        key(*keys) {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
@@ -5338,64 +5360,23 @@ object AppConfiguration {
                         }
                     }
 
+                    // One owner per resource projection. Old configuration responses update
+                    // the data, not the chosen locale/theme/scale; collectLatest cancels obsolete work.
                     launch {
-                        stringsState.payload.collect { strings ->
-                            strings?.let { updateStrings(it, resourceStrings) }
-                        }
+                        combine(stringsState.payload, appLanguageState) { strings, _ -> strings }
+                            .collectLatest { strings -> updateStrings(strings ?: resourceStrings, resourceStrings) }
                     }
-
                     launch {
-                        appLanguageState.collect {
-                            updateStrings(
-                                strings = stringsState.payloadValue ?: resourceStrings,
-                                resourceStrings = resourceStrings
-                            )
-                        }
+                        combine(dimensionsState.payload, appSizeModeIdState) { dimensions, _ -> dimensions }
+                            .collectLatest { dimensions -> updateDimensions(dimensions ?: resourceDimensions, resourceDimensions) }
                     }
-
                     launch {
-                        dimensionsState.payload.collect { dimensions ->
-                            dimensions?.let { updateDimensions(it, resourceDimensions) }
-                        }
-                    }
-
-                    launch {
-                        colorsState.payload.collect { colors ->
-                            colors?.let { updateColors(it, resourceColors) }
-                        }
-                    }
-
-                    launch {
-                        drawablesState.payload.collect { drawables ->
-                            drawables?.let {
-                                updateDrawables(it, resourceDrawables)
-                                stateValues.updateDrawableResources()
-                            }
-                        }
-                    }
-
-                    launch {
-                        appThemeIdState.collect {
-                            updateColors(
-                                colors = colorsState.payloadValue ?: resourceColors,
-                                resourceColors = resourceColors
-                            )
-
-                            updateDrawables(
-                                drawables = drawablesState.payloadValue ?: resourceDrawables,
-                                resourceDrawables = resourceDrawables
-                            )
-
+                        combine(colorsState.payload, drawablesState.payload, appThemeIdState) { colors, drawables, _ ->
+                            colors to drawables
+                        }.collectLatest { (colors, drawables) ->
+                            updateColors(colors ?: resourceColors, resourceColors)
+                            updateDrawables(drawables ?: resourceDrawables, resourceDrawables)
                             stateValues.updateDrawableResources()
-                        }
-                    }
-
-                    launch {
-                        appSizeModeIdState.collect {
-                            updateDimensions(
-                                dimensions = dimensionsState.payloadValue ?: resourceDimensions,
-                                resourceDimensions = resourceDimensions
-                            )
                         }
                     }
                 }
@@ -5407,7 +5388,7 @@ object AppConfiguration {
         dimensions: List<StylizedDimensionGroupDataModel>,
         resourceDimensions: List<StylizedDimensionGroupDataModel>
     ) {
-        val sizeModeId = normalizeAppSizeModePreference(stateValues.appSizeModeId)
+        val sizeModeId = normalizeAppSizeModePreference(appSizeModeIdState.value)
 
         fun dimensionValue(id: Long, default: Float): Float {
             return dimensions.extractValue(id, sizeModeId)
@@ -5648,7 +5629,6 @@ fun AppConfiguration.AppSizeModeSettingsItemWidget(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.TextColor),
                 onClick = {
-                    markExplicitLocalAppPreferences(sizeModeId = id)
                     setAppSizeMode(id)
                 }
             )
@@ -5717,10 +5697,7 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
                 },
                 indication = ripple(color = stateValues.TextColor),
                 onClick = {
-                    markExplicitLocalAppPreferences(themeId = id)
-                    coroutineScope.launch {
-                        setAppTheme(id)
-                    }
+                    setAppTheme(id)
                 }
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -5793,10 +5770,7 @@ fun AppConfiguration.AppLanguageSettingsItemWidget(
                 },
                 indication = ripple(color = stateValues.TextColor),
                 onClick = {
-                    markExplicitLocalAppPreferences(language = language)
-                    coroutineScope.launch {
-                        setAppLocale(language)
-                    }
+                    setAppLocale(language)
                 }
             ),
         verticalAlignment = Alignment.CenterVertically,

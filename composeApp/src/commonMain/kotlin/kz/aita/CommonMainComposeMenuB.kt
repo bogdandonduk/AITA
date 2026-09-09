@@ -5313,81 +5313,13 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 fun MenuAddEditGoodsCategoryScreen() {
 }
 
-internal const val LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY = "app.preferences.last.explicit.local.v1"
-internal const val LOCAL_APP_PREFERENCES_SEPARATOR = "\u001F"
-
-internal data class LocalAppPreferencesSnapshot(
-    val language: String,
-    val themeId: Long,
-    val sizeModeId: Long,
-    val changedAtMillis: Long
-)
-
-internal fun LocalAppPreferencesSnapshot.toPersistentString(): String =
-    listOf(language, themeId.toString(), sizeModeId.toString(), changedAtMillis.toString())
-        .joinToString(LOCAL_APP_PREFERENCES_SEPARATOR)
-
-internal fun String?.toLocalAppPreferencesSnapshotOrNull(): LocalAppPreferencesSnapshot? {
-    val parts = this?.split(LOCAL_APP_PREFERENCES_SEPARATOR) ?: return null
-    if (parts.size < 4) return null
-    return LocalAppPreferencesSnapshot(
-        language = parts[0].ifBlank { DEFAULT_APP_LANGUAGE },
-        themeId = parts[1].toLongOrNull() ?: DEFAULT_APP_THEME_ID,
-        sizeModeId = parts[2].toLongOrNull() ?: DEFAULT_APP_SIZE_MODE_ID,
-        changedAtMillis = parts[3].toLongOrNull() ?: 0L
-    )
-}
-
-internal fun AppConfiguration.markExplicitLocalAppPreferences(
-    language: String = stateValues.appLanguage,
-    themeId: Long = stateValues.appThemeId,
-    sizeModeId: Long = stateValues.appSizeModeId
-) {
-    val snapshot = LocalAppPreferencesSnapshot(
-        language = normalizeAppLanguagePreference(language),
-        themeId = normalizeAppThemePreference(themeId),
-        sizeModeId = normalizeAppSizeModePreference(sizeModeId),
-        changedAtMillis = getCurrentTimeMillis()
-    )
-
-    coroutineScope.launch {
-        setPersistentUiDraftValue?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY, snapshot.toPersistentString())
-    }
-}
-
 @Composable
 internal fun AppConfiguration.LocalAppPreferencesPriorityEffect() {
     val userAccountId = stateValues.userAccount?.id
-    val serverGroundedReachable = stateValues.cloudTransportStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
-
-    LaunchedEffect(serverGroundedReachable, userAccountId) {
-        if (!serverGroundedReachable || userAccountId == null) return@LaunchedEffect
-        val snapshot = getPersistentUiDraftValue
-            ?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY)
-            .toLocalAppPreferencesSnapshotOrNull()
-            ?: return@LaunchedEffect
-
-        setAppLocale(snapshot.language)
-        setAppTheme(snapshot.themeId)
-        setAppSizeMode(snapshot.sizeModeId)
-    }
-
-    LaunchedEffect(
-        stateValues.userAccount?.appLanguage,
-        stateValues.userAccount?.appThemeId,
-        stateValues.userAccount?.appSizeModeId
-    ) {
-        val snapshot = getPersistentUiDraftValue
-            ?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY)
-            .toLocalAppPreferencesSnapshotOrNull()
-            ?: return@LaunchedEffect
-        val account = stateValues.userAccount ?: return@LaunchedEffect
-        val accountMatchesLocal = normalizeAppLanguagePreference(account.appLanguage) == snapshot.language &&
-            normalizeAppThemePreference(account.appThemeId) == snapshot.themeId &&
-            normalizeAppSizeModePreference(account.appSizeModeId) == snapshot.sizeModeId
-        if (accountMatchesLocal) {
-            setPersistentUiDraftValue?.invoke(LOCAL_APP_PREFERENCES_DIRTY_DRAFT_KEY, null)
-        }
+    val reachable = stateValues.cloudTransportStatus == CLOUD_TRANSPORT_STATUS_REACHABLE
+    LaunchedEffect(reachable, userAccountId) {
+        // Reconnect retries an account-owned pending write, never sets three old UI values.
+        if (reachable && userAccountId != null) syncUserPreferencesToServer(postFailure = false)
     }
 }
 
