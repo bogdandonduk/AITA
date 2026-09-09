@@ -3679,6 +3679,14 @@ class DomainSelectionTextFieldContent(
     }
 }
 
+/**
+ * One explicit key for the app content, including when the caller supplies no keys.
+ * List equality keeps equal inputs stable across recompositions. Take a snapshot with
+ * toList(), not asList(): mutating the source array must not change the previous key.
+ * Do not use just the array identity or a content hash; either loses key semantics.
+ */
+internal fun appConfigurationContentKey(keys: Array<out Any>): List<Any> = keys.toList()
+
 object AppConfiguration {
 
     interface StateValues {
@@ -5259,7 +5267,10 @@ object AppConfiguration {
         softKeyboardController = LocalSoftwareKeyboardController.current
         coroutineScope = rememberCoroutineScope()
 
-        key(*keys) {
+        // Compose's key lowering can discard a spread-only argument and reduce an empty
+        // key chain. Pass one explicit value, even for the normal no-extra-keys app root.
+        // Keep language/theme/scale out of this key so preference changes retain UI state.
+        key(appConfigurationContentKey(keys)) {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
