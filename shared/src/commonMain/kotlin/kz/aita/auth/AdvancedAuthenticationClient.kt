@@ -166,12 +166,13 @@ private val authenticationCompletion = AuthenticationCompletionCoordinator<Respo
             withTimeoutOrNull(30_000L) {
                 refreshUserAccountNow(generation, restoreCachedAccount = false, postFailure = false)
             } ?: ResponseDataModel(
+                payload = null,
                 negative = true, transportFailure = true,
                 message = authenticationCompletionFailureMessage()
             )
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
-            ResponseDataModel(negative = true, message = authenticationCompletionFailureMessage())
+            ResponseDataModel(payload = null, negative = true, message = authenticationCompletionFailureMessage())
         }
     }
 )
