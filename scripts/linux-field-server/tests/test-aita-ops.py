@@ -135,15 +135,47 @@ class ConfigurationTests(TempCase):
             with self.subTest(value=value), self.assertRaises(ops.OpsError):
                 ops.ensure_storage_path(Path(value))
 
-    def test_remote_required_by_default(self):
+    def test_strict_offsite_requires_destination(self):
         with self.assertRaisesRegex(ops.OpsError, "NOT configured"):
             ops.remote_preflight({}, allow_local=False)
 
-    def test_local_override_only_accepts_empty_remote(self):
-        with redirect_stdout(io.StringIO()):
-            self.assertEqual(ops.remote_preflight({}, allow_local=True), "")
-        with self.assertRaises(ops.OpsError):
-            ops.remote_preflight({"AITA_BACKUP_RCLONE_REMOTE": ":bad"}, allow_local=True)
+    def test_local_policy_skips_empty_and_broken_configured_remote_without_tools(self):
+        for remote in ("", "gdrive:fixture", ":bad", "https://not-a-remote"):
+            with self.subTest(remote=remote), redirect_stdout(io.StringIO()), \
+                    mock.patch.object(ops, "capture") as capture, \
+                    mock.patch.object(ops, "require_tools") as tools:
+                env = {"AITA_BACKUP_RCLONE_REMOTE": remote}
+                before = env.copy()
+                self.assertEqual(ops.remote_preflight(env, allow_local=True), "")
+                self.assertEqual(env, before)
+                capture.assert_not_called()
+                tools.assert_not_called()
+
+    def test_normal_update_defaults_to_local_policy(self):
+        with mock.patch.object(ops, "update", return_value=0) as update:
+            self.assertEqual(ops.main(["update"]), 0)
+        self.assertFalse(update.call_args.args[0].require_offsite_backup)
+
+    def test_explicit_strict_policy_and_legacy_local_alias_parse(self):
+        for flag, required in (("--require-offsite-backup", True), ("--allow-local-backup", False)):
+            with self.subTest(flag=flag), mock.patch.object(ops, "update", return_value=0) as update:
+                self.assertEqual(ops.main(["update", flag]), 0)
+                self.assertEqual(update.call_args.args[0].require_offsite_backup, required)
+
+    def test_old_launcher_start_arguments_receive_new_local_default(self):
+        argv = ["_start", "--archive", "/fixture/source.tar", "--digest", "a" * 64,
+                "--owner", "fixture", "--commit", "b" * 40,
+                "--java-home", "/fixture/java21", "--ready-timeout", "600"]
+        with mock.patch.object(ops, "start_job", return_value=0) as start:
+            self.assertEqual(ops.main(argv), 0)
+        self.assertFalse(start.call_args.args[0].require_offsite_backup)
+
+    def test_conflicting_policies_fail_before_launch(self):
+        with mock.patch.object(ops, "update") as update, mock.patch("sys.stderr", io.StringIO()):
+            with self.assertRaises(SystemExit) as ctx:
+                ops.main(["update", "--allow-local-backup", "--require-offsite-backup"])
+            self.assertEqual(ctx.exception.code, 2)
+            update.assert_not_called()
 
     def test_timeout_range_and_watch_minimum(self):
         for argv in (["update", "--ready-timeout", "0"], ["update", "--ready-timeout", "901"],
@@ -395,6 +427,21 @@ class AdviceTests(unittest.TestCase):
     def test_cloud_configuration_is_service_user_specific(self):
         self.assertIn("aita service account", ops.fault_advice("invalid_grant", "backup"))
 
+    def test_successful_java_line_does_not_mask_cloud_or_local_backup_failure(self):
+        prefix = "PASS Java 21 is available: /usr/lib/jvm/java-21/bin/java\n"
+        self.assertIn("Strict offsite", ops.fault_advice(prefix + "Cloud backup is NOT configured", "preflight"))
+        advice = ops.fault_advice(prefix + "injected backup failure", "backup")
+        self.assertNotIn("Use Java", advice)
+        self.assertIn("before restarting", advice)
+
+    def test_cloud_quota_message_is_not_java_advice(self):
+        advice = ops.fault_advice("PASS Java 21 is available\nfailed to create file system RATE_LIMIT_EXCEEDED", "preflight")
+        self.assertIn("cloud API", advice)
+        self.assertNotIn("Use Java", advice)
+
+    def test_actual_java_requirement_still_gets_java_advice(self):
+        self.assertIn("Use Java 21", ops.fault_advice("Java 21 is required; detected 17.0", "preflight"))
+
 
 @unittest.skipUnless(shutil.which("bash") and shutil.which("flock") and shutil.which("unzip"), "Linux deployment fixtures required")
 class InheritedDeployLockTests(unittest.TestCase):
@@ -472,13 +519,16 @@ class BackupShellTests(TempCase):
             "AITA_BACKUP_RCLONE_CONFIG=" + str(self.base / "service-rclone.conf"),
         ]) + "\n").encode())
 
-    def run_backup(self, mode="", remote="", daily=False):
-        with self.envfile.open("a") as f:
-            f.write("AITA_BACKUP_RCLONE_REMOTE=" + remote + "\n")
+    def run_backup(self, mode="", remote="", daily=False, local_only=False):
+        lines = [line for line in self.envfile.read_text().splitlines()
+                 if not line.startswith("AITA_BACKUP_RCLONE_REMOTE=")]
+        self.envfile.write_text("\n".join(lines + ["AITA_BACKUP_RCLONE_REMOTE=" + remote]) + "\n")
+        self.backup_input = self.envfile.read_bytes()
         env = dict(os.environ, PATH=str(self.bin) + ":" + os.environ["PATH"], FIXTURE_MODE=mode,
                    FIXTURE_EVENTS=str(self.base / "events"))
         return subprocess.run(["bash", str(SCRIPTS / "backup-aita-postgres.sh"), "--env-file", str(self.envfile)]
-                              + (["--daily"] if daily else []), env=env, capture_output=True, text=True, timeout=15)
+                              + (["--daily"] if daily else []) + (["--local-only"] if local_only else []),
+                              env=env, capture_output=True, text=True, timeout=15)
 
     def test_local_only_is_explicit_not_cloud_success(self):
         result = self.run_backup()
@@ -487,6 +537,60 @@ class BackupShellTests(TempCase):
         self.assertNotIn("Cloud upload command succeeded", result.stdout)
         self.assertTrue((self.base / "backups/aita_latest.dump.age").is_file())
         self.assertFalse(list((self.base / "backups/.tmp").iterdir()))
+
+    def test_local_flag_skips_configured_failing_cloud_and_preserves_configuration(self):
+        result = self.run_backup(mode="cloud-fails", remote="gdrive:fixture", local_only=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("LOCAL ONLY: cloud upload skipped", result.stdout)
+        self.assertIn("offsite protection is NOT verified", result.stdout)
+        self.assertNotIn("Cloud upload command succeeded", result.stdout)
+        self.assertFalse((self.base / "events").exists())
+        self.assertEqual(self.envfile.read_bytes(), self.backup_input)
+        self.assertTrue((self.base / "backups/aita_latest.dump.age").read_bytes().startswith(b"age-encryption.org/v1"))
+        self.assertFalse(list((self.base / "backups/.tmp").iterdir()))
+
+    def test_local_flag_needs_no_rclone_binary(self):
+        (self.bin / "rclone").unlink()
+        result = self.run_backup(remote="gdrive:fixture", local_only=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("cloud upload skipped", result.stdout)
+
+    def test_subsequent_scheduled_style_run_still_attempts_upload(self):
+        result = self.run_backup(mode="cloud-fails", remote="gdrive:fixture", local_only=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.base / "events").exists())
+        result = self.run_backup(mode="cloud-fails", remote="gdrive:fixture")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Cloud upload failed", result.stderr)
+        self.assertIn("gdrive:fixture", (self.base / "events").read_text())
+
+    def test_local_flag_does_not_accept_plaintext_opt_in(self):
+        self.envfile.write_text(self.envfile.read_text().replace("AITA_BACKUP_AGE_RECIPIENT=age1fixture", "AITA_BACKUP_AGE_RECIPIENT=")
+                                + "AITA_BACKUP_ALLOW_PLAINTEXT=true\n")
+        result = self.run_backup(local_only=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("plaintext backups are disabled", result.stderr)
+        self.assertFalse((self.base / "backups/aita_latest.dump").exists())
+        self.assertFalse((self.base / "backups/aita_latest.dump.age").exists())
+        self.assertFalse(list((self.base / "backups/.tmp").iterdir()))
+
+    def test_local_backup_failures_preserve_previous_snapshot(self):
+        old = self.file("backups/aita_latest.dump.age", b"age-encryption.org/v1\nprevious backup")
+        before = old.read_bytes()
+        for mode in ("dump-fails", "invalid-dump", "age-fails"):
+            with self.subTest(mode=mode):
+                result = self.run_backup(mode=mode, remote="gdrive:fixture", local_only=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(old.read_bytes(), before)
+                self.assertFalse((self.base / "events").exists())
+                self.assertFalse(list((self.base / "backups/.tmp").iterdir()))
+
+    def test_local_flag_still_honors_shared_backup_lock(self):
+        with ops.file_lock(self.base / "backup.lock"):
+            result = self.run_backup(remote="gdrive:fixture", local_only=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no new backup was created", result.stderr)
+        self.assertFalse((self.base / "events").exists())
 
     def test_success_uses_explicit_service_config(self):
         result = self.run_backup(remote="gdrive:fixture")
@@ -564,6 +668,35 @@ class BackupDoctorTests(TempCase):
         self.assertTrue(any(f.name == "Offsite" and f.level == "FAIL" for f in findings))
         self.verify.assert_not_called()
 
+    def test_update_only_check_does_not_touch_cloud_even_with_broken_remote(self):
+        for remote in ("", "gdrive:fixture", ":invalid"):
+            with self.subTest(remote=remote), mock.patch.object(ops, "capture") as capture:
+                self.env["AITA_BACKUP_RCLONE_REMOTE"] = remote
+                findings = ops.backup_snapshot(check_offsite=False)
+                self.assertTrue(any(f.name == "Offsite" and f.level == "SKIPPED" for f in findings))
+                self.assertFalse(any(f.level == "FAIL" for f in findings))
+                self.verify.assert_not_called()
+                capture.assert_not_called()
+
+    def test_update_only_check_keeps_local_freshness_failures(self):
+        stale = time.time() - 901
+        os.utime(self.local, (stale, stale))
+        findings = ops.backup_snapshot(check_offsite=False)
+        self.assertTrue(any(f.name == self.local.name and f.level == "FAIL" for f in findings))
+        self.verify.assert_not_called()
+
+    def test_update_only_check_keeps_real_scheduled_service_failure_visible(self):
+        with mock.patch.object(ops, "properties", return_value={
+                "ActiveState": "failed", "User": "aita", "Result": "exit-code", "ExecMainStatus": "1"}):
+            findings = ops.backup_snapshot(check_offsite=False)
+        self.assertTrue(any(f.name == "aita-backup.service" and f.level == "FAIL" for f in findings))
+        self.verify.assert_not_called()
+
+    def test_download_cannot_silently_skip_cloud_verification(self):
+        with self.assertRaisesRegex(ops.OpsError, "requires offsite checks"):
+            ops.backup_snapshot(download=True, check_offsite=False)
+        self.verify.assert_not_called()
+
     def test_busy_writer_is_wait_not_hash_failure(self):
         with ops.file_lock(self.lock):
             findings = ops.backup_snapshot()
@@ -587,6 +720,72 @@ class BackupDoctorTests(TempCase):
         self.assertTrue(any(f.level == "FAIL" and f.name == "Service sandbox" for f in findings))
 
 
+class PredeployBackupTests(TempCase):
+    def setUp(self):
+        super().setUp()
+        self.local = self.file("backups/aita_latest.dump.age", b"age-encryption.org/v1\nfixture backup")
+        self.lock = self.file("backup.lock", b"")
+        self.run = self.base / "runs/20260909T000000Z-123456abcdef"
+        self.run.mkdir(parents=True)
+        self.env = {"AITA_BACKUP_DIR": str(self.local.parent), "AITA_BACKUP_LOCK_FILE": str(self.lock),
+                    "AITA_BACKUP_RCLONE_REMOTE": "gdrive:fixture"}
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(ops, "ensure_storage_path", side_effect=lambda p: p).start()
+        mock.patch.object(ops.pwd, "getpwnam", return_value=pwd.getpwuid(os.getuid())).start()
+        self.stream = mock.patch.object(ops, "stream_command").start()
+        self.verify = mock.patch.object(ops, "verify_remote_file", return_value="hash match").start()
+
+    def preserve(self, remote=""):
+        with redirect_stdout(io.StringIO()):
+            return ops.preserve_predeploy_backup(self.env, self.run, remote, time.time())
+
+    def test_local_restore_point_retains_exact_bytes_without_upload(self):
+        data = self.local.read_bytes()
+        env_before = self.env.copy()
+        target = self.preserve()
+        self.assertEqual(target.read_bytes(), data)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+        self.local.write_bytes(b"new latest backup")
+        self.assertEqual(target.read_bytes(), data)
+        self.assertEqual(self.env, env_before)
+        self.stream.assert_not_called()
+        self.verify.assert_not_called()
+
+    def test_empty_missing_and_unencrypted_restore_points_are_rejected(self):
+        for content in (b"", b"PGDMP not encrypted", None):
+            with self.subTest(content=content):
+                if content is None:
+                    self.local.unlink()
+                else:
+                    self.local.write_bytes(content)
+                with self.assertRaises(ops.OpsError):
+                    self.preserve()
+        self.stream.assert_not_called()
+        self.verify.assert_not_called()
+
+    def test_stale_or_future_restore_point_is_rejected(self):
+        now = time.time()
+        for timestamp in (now - 901, now + 120):
+            with self.subTest(timestamp=timestamp):
+                os.utime(self.local, (timestamp, timestamp))
+                with self.assertRaisesRegex(ops.OpsError, "stale or dated"):
+                    self.preserve()
+        self.stream.assert_not_called()
+
+    def test_strict_restore_point_still_requires_cloud_byte_verification(self):
+        target = self.preserve("gdrive:fixture")
+        self.stream.assert_called_once()
+        self.assertIn("copyto", self.stream.call_args.args[0])
+        self.verify.assert_called_once_with(self.env, target, "gdrive:fixture/deployments", download=True, timeout=300)
+
+    def test_strict_upload_failure_does_not_claim_offsite_success(self):
+        self.stream.side_effect = ops.OpsError("RATE_LIMIT_EXCEEDED")
+        with self.assertRaisesRegex(ops.OpsError, "RATE_LIMIT_EXCEEDED"):
+            self.preserve("gdrive:fixture")
+        self.assertTrue(self.local.is_file())
+        self.verify.assert_not_called()
+
+
 class WorkerControlFlowTests(TempCase):
     """Entire orchestrator order with all external service/build effects replaced."""
     def setUp(self):
@@ -601,6 +800,7 @@ class WorkerControlFlowTests(TempCase):
         self.home = self.base / "home"
         self.home.mkdir()
         self.owner = pwd.struct_passwd(("fixture_owner", "x", 12345, os.getgid(), "", str(self.home), "/bin/bash"))
+        self.service_user = pwd.struct_passwd(("aita", "x", 12346, os.getgid(), "", str(self.base / "aita-home"), "/usr/sbin/nologin"))
         self.jar = self.file("installed/aita-server-all.jar", b"old artifact")
         self.envfile = self.file("prod.env", b"DB_PASS=fixture_password\n")
         self.lock = self.file("backup.lock", b"")
@@ -610,7 +810,7 @@ class WorkerControlFlowTests(TempCase):
                     "DB_PASS": "fixture_password"}
         self.meta = {"owner": self.owner.pw_name, "gid": self.owner.pw_gid, "commit": "a" * 40,
                      "java_home": "/fixture/jdk", "ready_timeout": 600, "with_tests": False,
-                     "force": False, "allow_local_backup": False,
+                     "force": False, "allow_local_backup": False, "require_offsite_backup": False,
                      "source_hashes": {"main.txt": ops.sha256(self.source / "main.txt")}}
         (self.run / "meta.json").write_text(json.dumps(self.meta))
         (self.run / "update.log").write_text("")
@@ -622,6 +822,7 @@ class WorkerControlFlowTests(TempCase):
         self.wrong_installed_jar = False
         self.http_fail_public = False
         self.http_fail_local = False
+        self.cloud_failure = False
         self.addCleanup(mock.patch.stopall)
         mock.patch.object(ops, "ROOT", self.root).start()
         mock.patch.object(ops, "CURRENT_JAR", self.jar).start()
@@ -629,29 +830,36 @@ class WorkerControlFlowTests(TempCase):
         mock.patch.object(ops.os, "geteuid", return_value=0).start()
         mock.patch.object(ops.os, "chown").start()
         mock.patch.object(ops.os, "fchown").start()
-        mock.patch.object(ops.pwd, "getpwnam", return_value=self.owner).start()
+        mock.patch.object(ops.pwd, "getpwnam", side_effect=lambda name: self.service_user if name == "aita" else self.owner).start()
         mock.patch.object(ops, "require_tools").start()
         mock.patch.object(ops, "read_env", return_value=self.env).start()
         mock.patch.object(ops, "protect_secrets").start()
         mock.patch.object(ops, "properties", return_value={"User": "aita", "Group": "aita", "ActiveState": "active"}).start()
-        mock.patch.object(ops, "capture", return_value=subprocess.CompletedProcess([], 0, "", 'openjdk version "21.0.12"')).start()
+        self.capture = mock.patch.object(ops, "capture", side_effect=self.capture_command).start()
         mock.patch.object(ops.shutil, "disk_usage", return_value=shutil._ntuple_diskusage(20*1024**3, 0, 20*1024**3)).start()
-        mock.patch.object(ops, "remote_preflight", return_value="gdrive:fixture").start()
+        self.remote_preflight = mock.patch.object(ops, "remote_preflight", wraps=ops.remote_preflight).start()
         self.backup_findings = mock.patch.object(ops, "backup_snapshot", return_value=[]).start()
         mock.patch.object(ops, "ensure_storage_path", side_effect=lambda p: p).start()
         mock.patch.object(ops, "http_status", side_effect=lambda url, **kw:
                           "503" if (kw.get("local") and self.http_fail_local) or
                           (url.startswith("https") and self.http_fail_public) else "200").start()
         mock.patch.object(ops, "sync_helpers", side_effect=lambda *a: self.events.append("helpers")).start()
-        mock.patch.object(ops, "preserve_predeploy_backup", side_effect=lambda *a: self.events.append("preserved-backup")).start()
+        self.preserve = mock.patch.object(ops, "preserve_predeploy_backup", side_effect=lambda *a: self.events.append("preserved-backup")).start()
         mock.patch.object(ops, "stream_command", side_effect=self.stream).start()
+
+    def capture_command(self, argv, **kwargs):
+        if "rclone" in argv:
+            if self.cloud_failure:
+                raise ops.OpsError("RATE_LIMIT_EXCEEDED")
+            return subprocess.CompletedProcess(argv, 0, "gdrive:\n" if "listremotes" in argv else "", "")
+        return subprocess.CompletedProcess(argv, 0, "", 'openjdk version "21.0.12"')
 
     def stream(self, argv, **kwargs):
         argv = list(map(str, argv))
         if any("test-aita-readiness.sh" in a for a in argv): kind = "preflight"
         elif any("test-deployment-scripts.py" in a or "test-aita-ops.py" in a for a in argv): kind = "tests"
         elif any("build-aita-server.sh" in a for a in argv): kind = "build"
-        elif argv[:2] == ["systemctl", "start"]: kind = "backup"
+        elif argv[:2] == ["systemctl", "start"] or any("backup-aita-postgres.sh" in a for a in argv): kind = "backup"
         elif argv[0] == "rsync": kind = "assets"
         elif any("deploy-aita-server.sh" in a for a in argv): kind = "restart"
         else: raise AssertionError(argv)
@@ -666,6 +874,16 @@ class WorkerControlFlowTests(TempCase):
                 candidate.write_bytes(b"new artifact")
             if self.mutate_after_build:
                 (self.source / "main.txt").write_text("oops changed")
+        if kind == "backup":
+            if self.meta.get("require_offsite_backup", False):
+                self.assertEqual(argv, ["systemctl", "start", "--wait", "aita-backup.service"])
+            else:
+                self.assertEqual(argv[:6], ["runuser", "-u", "aita", "--", "env", "-i"])
+                self.assertIn("--local-only", argv)
+                self.assertIn(str(self.run / "tools/backup-aita-postgres.sh"), argv)
+                self.assertEqual(argv[argv.index("--env-file") + 1], str(self.envfile))
+                self.assertIn("HOME=" + self.service_user.pw_dir, argv)
+                self.assertNotIn("fixture_password", str(argv))
         if kind == "assets" and self.tamper_candidate:
             (self.source / "server/build/libs/aita-server-all.jar").write_bytes(b"changed after build")
         if kind == "restart":
@@ -696,6 +914,76 @@ class WorkerControlFlowTests(TempCase):
         record = json.loads((self.root / "last-success.json").read_text())
         self.assertEqual(record["commit"], "a" * 40)
         self.assertEqual(record["jar_sha256"], ops.sha256(self.jar))
+
+    def test_default_update_skips_quota_failed_cloud_in_all_stages(self):
+        self.env["AITA_BACKUP_RCLONE_REMOTE"] = "gdrive:fixture"
+        self.cloud_failure = True
+        self.assertEqual(self.work(), 0, self.output)
+        self.assertIn("restart", self.events)
+        self.assertFalse(any("rclone" in call.args[0] for call in self.capture.call_args_list))
+        self.assertEqual(self.preserve.call_args.args[2], "")
+        self.backup_findings.assert_called_once_with(check_offsite=False)
+        self.assertIn("LOCAL ONLY", self.output)
+        self.assertIn("OFFSITE SKIPPED", self.output)
+        self.assertNotIn("OPERATIONAL WARNING", self.output)
+        self.assertEqual(self.state["backup_policy"], "local-only")
+        self.assertEqual(json.loads((self.root / "last-success.json").read_text())["backup_policy"], "local-only")
+
+    def test_old_launcher_metadata_without_new_flag_uses_local_default(self):
+        del self.meta["require_offsite_backup"]
+        (self.run / "meta.json").write_text(json.dumps(self.meta))
+        self.env["AITA_BACKUP_RCLONE_REMOTE"] = "gdrive:fixture"
+        self.cloud_failure = True
+        self.assertEqual(self.work(), 0, self.output)
+        self.assertEqual(self.state["backup_policy"], "local-only")
+        self.backup_findings.assert_called_once_with(check_offsite=False)
+
+    def test_strict_policy_preserves_cloud_gate_and_service_backup(self):
+        self.meta["require_offsite_backup"] = True
+        (self.run / "meta.json").write_text(json.dumps(self.meta))
+        self.env["AITA_BACKUP_RCLONE_REMOTE"] = "gdrive:fixture"
+        self.assertEqual(self.work(), 0, self.output)
+        self.remote_preflight.assert_called_once_with(self.env, allow_local=False)
+        self.assertEqual(self.preserve.call_args.args[2], "gdrive:fixture")
+        self.backup_findings.assert_called_once_with(check_offsite=True)
+        self.assertEqual(self.state["backup_policy"], "offsite-required")
+        self.assertNotIn("OFFSITE SKIPPED", self.output)
+
+    def test_strict_missing_remote_blocks_before_build(self):
+        self.meta["require_offsite_backup"] = True
+        (self.run / "meta.json").write_text(json.dumps(self.meta))
+        self.assertEqual(self.work(), 1)
+        self.assertNotIn("build", self.events)
+        self.assertNotIn("restart", self.events)
+        self.assertIn("Cloud backup is NOT configured", self.output)
+        self.assertFalse(self.state["server_touched"])
+
+    def test_strict_quota_failure_blocks_before_build(self):
+        self.meta["require_offsite_backup"] = True
+        (self.run / "meta.json").write_text(json.dumps(self.meta))
+        self.env["AITA_BACKUP_RCLONE_REMOTE"] = "gdrive:fixture"
+        self.cloud_failure = True
+        self.assertEqual(self.work(), 1)
+        self.assertNotIn("build", self.events)
+        self.assertNotIn("restart", self.events)
+        self.assertIn("RATE_LIMIT_EXCEEDED", self.output)
+        self.assertIn("cloud API", self.output)
+        self.assertFalse(self.state["server_touched"])
+
+    def test_local_policy_still_refuses_plaintext_backup_configuration(self):
+        self.env["AITA_BACKUP_ALLOW_PLAINTEXT"] = "true"
+        self.assertEqual(self.work(), 1)
+        self.assertNotIn("build", self.events)
+        self.assertNotIn("restart", self.events)
+        self.assertIn("Disable plaintext backups", self.output)
+
+    def test_invalid_backup_policy_fails_closed(self):
+        self.meta["require_offsite_backup"] = "false"
+        (self.run / "meta.json").write_text(json.dumps(self.meta))
+        self.assertEqual(self.work(), 1)
+        self.assertNotIn("build", self.events)
+        self.assertFalse(self.state["server_touched"])
+        self.assertIn("Invalid managed backup policy", self.output)
 
     def test_success_prints_the_built_and_installed_commit_and_hash(self):
         self.assertEqual(self.work(), 0, self.output)
@@ -786,7 +1074,7 @@ class WorkerControlFlowTests(TempCase):
         self.assertTrue((self.root / "last-success.json").exists())
 
     def test_backup_warning_does_not_undo_successful_release(self):
-        self.backup_findings.return_value = [ops.Finding("FAIL", "Offsite", "missing")]
+        self.backup_findings.return_value = [ops.Finding("FAIL", "aita-backup.service", "Last scheduled run failed")]
         self.assertEqual(self.work(), 2)
         self.assertEqual(self.state["result"], "warning")
         self.assertEqual(self.jar.read_bytes(), b"new artifact")
@@ -841,7 +1129,7 @@ class ManagedLaunchTests(TempCase):
         self.owner = pwd.struct_passwd(("fixture-builder", "x", 12345, os.getgid(), "fixture", str(self.base / "home"), "/bin/bash"))
         self.args = argparse.Namespace(archive=str(self.archive), digest=ops.sha256(self.archive),
             owner=self.owner.pw_name, commit="a" * 40, java_home="/fixture/java21",
-            ready_timeout=600, with_tests=False, allow_local_backup=False, force=False)
+            ready_timeout=600, with_tests=False, allow_local_backup=False, require_offsite_backup=False, force=False)
         self.commands = []
         def fake_capture(argv, **kwargs):
             self.commands.append(list(argv))
@@ -877,6 +1165,19 @@ class ManagedLaunchTests(TempCase):
         self.assertEqual(meta["owner"], self.owner.pw_name)
         ops.verify_source(run / "source", meta["source_hashes"])
         self.assertEqual((run / "tools/aita-ops.py").read_bytes(), (run / "source/scripts/linux-field-server/aita-ops.py").read_bytes())
+
+    def test_default_policy_is_pinned_in_managed_metadata(self):
+        self.assertEqual(self.launch(), 0)
+        meta = json.loads((ops.latest_run() / "meta.json").read_text())
+        self.assertFalse(meta["require_offsite_backup"])
+        self.assertTrue(meta["allow_local_backup"])
+
+    def test_strict_policy_survives_detached_launcher(self):
+        self.args.require_offsite_backup = True
+        self.assertEqual(self.launch(), 0)
+        meta = json.loads((ops.latest_run() / "meta.json").read_text())
+        self.assertTrue(meta["require_offsite_backup"])
+        self.assertFalse(meta["allow_local_backup"])
 
     def test_changed_archive_never_starts_job(self):
         self.args.digest = "0" * 64

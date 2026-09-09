@@ -10,6 +10,9 @@ The update frontend fetches Git interactively as the repository owner. A pinned
 snapshot is then built as that user inside a detached, system-managed job. No
 production environment is passed to Gradle. Root is used for installation only.
 This is a single-origin controlled restart, NOT a zero-downtime deployment.
+Updates temporarily require only an encrypted LOCAL backup; cloud access is not
+attempted. Use update --require-offsite-backup to restore the strict cloud gate.
+Scheduled backups and the standalone backups command retain their cloud checks.
 """
 from __future__ import annotations
 
@@ -36,7 +39,7 @@ from typing import Iterator, Mapping, Sequence
 from urllib.parse import urlsplit
 import uuid
 
-VERSION = "2026-09-08-operator-v1"
+VERSION = "2026-09-09-local-backup-update-v2"
 SERVICE = "aita-server.service"
 UPDATE_UNIT = "aita-update.service"
 ROOT = Path("/var/lib/aita-ops")
@@ -490,7 +493,9 @@ def update(args: argparse.Namespace) -> int:
                       "--ready-timeout", str(args.ready_timeout), "--java-home", args.java_home]
             if args.with_tests:
                 launch.append("--with-tests")
-            if args.allow_local_backup:
+            if args.require_offsite_backup:
+                launch.append("--require-offsite-backup")
+            elif args.allow_local_backup:
                 launch.append("--allow-local-backup")
             if args.force:
                 launch.append("--force")
@@ -538,7 +543,8 @@ def start_job(args: argparse.Namespace) -> int:
         meta = {"run_id": run_id, "owner": owner.pw_name, "uid": owner.pw_uid, "gid": owner.pw_gid,
                 "commit": args.commit, "created_at": utc(), "java_home": args.java_home,
                 "ready_timeout": args.ready_timeout, "with_tests": args.with_tests,
-                "allow_local_backup": args.allow_local_backup, "force": args.force,
+                "allow_local_backup": not args.require_offsite_backup,
+                "require_offsite_backup": args.require_offsite_backup, "force": args.force,
                 "source_hashes": hashes}
         atomic_json(run / "meta.json", meta)
         atomic_json(run / "state.json", {"result": "starting", "phase": "preflight"}, owner.pw_gid)
@@ -575,10 +581,12 @@ def fault_advice(text: str, phase: str) -> str:
         (("unknownhostexception", "could not resolve", "temporary failure in name resolution", "name or service not known"), "Ubuntu could not reach a required hostname. Check outbound Internet/DNS; leave Cloudflare routing and database history alone."),
         (("unresolved reference", "compilation error", "compilation failed"), "The fetched Kotlin source does not compile. Keep the compiler errors; the old server was not stopped by the build."),
         (("there were failing tests", "failed (failures=", "failed (errors="), "A regression test failed. No test was silently skipped; review the named failing test before release."),
+        (("cloud backup is not configured",), "Strict offsite protection is enabled, but its destination is missing. Configure it for aita, or run the normal update command for the temporary encrypted-local-only policy."),
+        (("rate_limit_exceeded", "ratelimitexceeded", "quota exceeded for quota metric"), "The cloud API rejected the offsite check/upload. Normal update uses an encrypted local backup without cloud access; strict offsite deployment needs the cloud connection fixed first."),
         (("invalid_grant", "token has been expired", "failed to create file system", "didn't find section"), "rclone authentication/configuration failed for the aita service account. Its configuration is separate from your Mac, bogdan, and root."),
         (("checksum mismatch", "validate failed", "migration checksum", "flywayvalidateexception"), "Flyway detected a schema/history mismatch. Do not repair checksums, edit an applied migration, or roll back the JAR blindly."),
         (("permission denied", "accessdenied"), "A file/user permission check failed. Do not run Gradle as root or chmod everything to 777."),
-        (("java 21", "unsupported class file", "invalid source release"), "Use Java 21 for both the build and installed service. No Java upgrade was applied automatically."),
+        (("java 21 is required", "java is missing", "unsupported class file", "invalid source release"), "Use Java 21 for both the build and installed service. No Java upgrade was applied automatically."),
     ]
     for needles, advice in rules:
         if any(needle in lowered for needle in needles):
@@ -632,13 +640,21 @@ def ensure_storage_path(path: Path, base: Path = Path("/srv/aita")) -> Path:
 
 
 def remote_preflight(env: Mapping[str, str], *, allow_local: bool) -> str:
+    # Short-circuit BEFORE parsing the old destination or invoking rclone. An
+    # expired token, quota error, or missing rclone must not gate local-only updates.
+    if allow_local:
+        say("BACKUP POLICY", "LOCAL ONLY for this update: encrypted local backup remains mandatory. "
+            "Cloud checks/uploads are skipped; offsite protection is NOT verified. "
+            "A disk/machine loss can still lose the local backup. "
+            "Drive settings and scheduled backup jobs are unchanged.")
+        return ""
+    say("BACKUP POLICY", "OFFSITE REQUIRED: cloud access and a verified encrypted offsite restore point "
+        "must succeed before restarting AITA.")
     remote = env.get("AITA_BACKUP_RCLONE_REMOTE", "").strip()
     if not remote:
-        if not allow_local:
-            raise OpsError("Cloud backup is NOT configured. Set AITA_BACKUP_RCLONE_REMOTE after configuring "
-                           "rclone for aita, or explicitly use update --allow-local-backup to accept local-only protection.")
-        say("WARNING", "Local-only backup explicitly accepted. A disk/machine loss can still lose this backup.")
-        return ""
+        raise OpsError("Cloud backup is NOT configured. Strict mode (--require-offsite-backup) needs "
+                       "AITA_BACKUP_RCLONE_REMOTE and working rclone credentials for aita. "
+                       "Use the normal update command for temporary encrypted-local-only protection.")
     remote = validate_remote(remote)
     require_tools("rclone")
     result = capture(rclone_command(env, "listremotes"), timeout=45, env=rclone_environment(env))
@@ -689,14 +705,20 @@ def worker(args: argparse.Namespace) -> int:
     owner = pwd.getpwnam(meta["owner"])
     source, tools = run / "source", run / "tools"
     phase, touched, code = "preflight", False, 1
+    # A previous launcher can fetch this newer worker. Missing metadata therefore
+    # uses the new temporary default, not the former mandatory-cloud policy.
+    require_offsite = meta.get("require_offsite_backup", False)
+    backup_policy = "offsite-required" if require_offsite else "local-only"
     lock_file = None
     def step(name: str, text: str) -> None:
         nonlocal phase
         phase = name
         atomic_json(run / "state.json", {"result": "running", "phase": phase, "at": utc(),
-                    "server_touched": touched}, owner.pw_gid)
+                    "server_touched": touched, "backup_policy": backup_policy}, owner.pw_gid)
         say("STEP " + name.upper(), text)
     try:
+        if not isinstance(require_offsite, bool):
+            raise OpsError("Invalid managed backup policy; expected a boolean require_offsite_backup.")
         # Same lock as bogdan's existing lower-level deploy script; FD ownership is
         # explicitly handed to that child, never released between build and switch.
         state_dir = Path(owner.pw_dir) / ".local/state/aita"
@@ -710,7 +732,7 @@ def worker(args: argparse.Namespace) -> int:
         except BlockingIOError:
             raise OpsError("Another low-level AITA deployment is running. This managed update stopped without changing the server.") from None
         say("RELEASE", f"AITA operator {VERSION}; pinned commit {meta['commit']}; build user {owner.pw_name}.")
-        step("preflight", "Checking service, Java, database access, storage and offsite backup configuration.")
+        step("preflight", "Checking service, Java, database access, storage and the selected backup policy.")
         require_tools("bash", "runuser", "rsync", "unzip", "sha256sum", "flock", "curl", "ss", "pg_dump", "pg_restore", "age")
         env = read_env(ENV_FILE)
         protect_secrets(env)
@@ -735,7 +757,7 @@ def worker(args: argparse.Namespace) -> int:
         if service.get("ActiveState") in ACTIVE_STATES and http_status("http://127.0.0.1:8080/readyz", local=True) != "200":
             raise OpsError("The existing Java service is running but not ready. It may still be migrating. "
                            "Use status/logs first; this updater will not interrupt an unexplained startup.")
-        remote = remote_preflight(env, allow_local=meta["allow_local_backup"])
+        remote = remote_preflight(env, allow_local=not require_offsite)
         public_url = env.get("AITA_PUBLIC_HEALTH_URL") or env.get("AITA_PUBLIC_SERVER_URL", "")
         parsed = urlsplit(public_url)
         if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.query or parsed.fragment:
@@ -769,7 +791,15 @@ def worker(args: argparse.Namespace) -> int:
             sync_helpers(tools, run / "previous-helpers")
             step("backup", "Taking an encrypted database backup while the old server is still serving users.")
             started = time.time()
-            stream_command(["systemctl", "start", "--wait", "aita-backup.service"])
+            if require_offsite:
+                stream_command(["systemctl", "start", "--wait", "aita-backup.service"])
+            else:
+                # Do not invoke the scheduled service here: its configured upload
+                # may still fail/hang. Run the same root-owned helper as aita with
+                # an invocation-only cloud skip. No env file or timer is rewritten.
+                stream_command(user_command(pwd.getpwnam("aita"), [
+                    "bash", str(tools / "backup-aita-postgres.sh"),
+                    "--env-file", str(ENV_FILE), "--local-only"]))
             preserve_predeploy_backup(env, run, remote, started)
             step("assets", "Publishing matching assets with backups; production config and extra files are retained.")
             destination = ensure_storage_path(Path(env.get("AITA_ASSETS_ROOT") or
@@ -802,7 +832,8 @@ def worker(args: argparse.Namespace) -> int:
                 raise OpsError("Installed JAR does not match the built candidate. Inspect the server; no automatic rollback was attempted.")
             say("DEPLOYED COMMIT", f"{meta['commit']}; installed JAR SHA-256 {jar_hash}; local readiness verified.")
             atomic_json(ROOT / "last-success.json", {"commit": meta["commit"], "jar_sha256": jar_hash,
-                        "run_id": run.name, "completed_at": utc(), "env_sha256": sha256(ENV_FILE)})
+                        "run_id": run.name, "completed_at": utc(), "env_sha256": sha256(ENV_FILE),
+                        "backup_policy": backup_policy})
         step("public-check", "Checking the public Worker-to-origin path separately from local readiness.")
         failures = []
         for path in ("/readyz", "/auth/capabilities"):
@@ -814,9 +845,10 @@ def worker(args: argparse.Namespace) -> int:
         if public_failures:
             say("WARNING", "Local deployment is ready, but public access failed. Check Worker/Tunnel routing; "
                 "do not roll back the database or repeatedly deploy the same JAR.")
-        step("backup-status", "Checking backup timers, local freshness and cloud contents after the update.")
+        step("backup-status", "Checking backup timers and local freshness" +
+             (" and cloud contents." if require_offsite else "; cloud checks remain skipped for this update."))
         try:
-            for finding in backup_snapshot():
+            for finding in backup_snapshot(check_offsite=require_offsite):
                 say(finding.level, finding.name + ": " + finding.detail)
                 if finding.level == "FAIL":
                     failures.append("backup: " + finding.name)
@@ -827,6 +859,9 @@ def worker(args: argparse.Namespace) -> int:
         if failures:
             say("OPERATIONAL WARNING", "The local backend is ready, but one or more public/backup checks need attention. "
                 "Do not redeploy merely to clear this warning; use status/backups and the relevant log.")
+        if not require_offsite:
+            say("OFFSITE SKIPPED", "This update did not require or verify Google Drive. "
+                "No cloud success is claimed. Use update --require-offsite-backup after migrating the backup account.")
         say("DONE", "Release installed/verified locally. Real email login, receipt printing and customer workflows still need their own checks.")
         # Only our isolated build copy is discarded, never the user's repository, DB, keys or backups.
         shutil.rmtree(source)
@@ -855,7 +890,8 @@ def worker(args: argparse.Namespace) -> int:
     atomic_json(run / "state.json", {"result": result_name, "phase": phase, "exit_code": code,
                 "at": utc(), "server_touched": touched, "commit": meta["commit"],
                 "requested_commit": meta["commit"],
-                "deployment_verified": result_name in {"success", "warning"}}, owner.pw_gid)
+                "deployment_verified": result_name in {"success", "warning"},
+                "backup_policy": backup_policy}, owner.pw_gid)
     return code
 
 
@@ -961,7 +997,9 @@ def freshness(path: Path, maximum: int, now: float | None = None) -> Finding:
                    f"{path.stat().st_size:,} bytes. File time is not a restore test.")
 
 
-def backup_snapshot(download: bool = False) -> list[Finding]:
+def backup_snapshot(download: bool = False, *, check_offsite: bool = True) -> list[Finding]:
+    if download and not check_offsite:
+        raise OpsError("Cloud download verification requires offsite checks.")
     env = read_env(ENV_FILE)
     protect_secrets(env)
     findings: list[Finding] = []
@@ -991,7 +1029,10 @@ def backup_snapshot(download: bool = False) -> list[Finding]:
     else:
         findings.append(Finding("FAIL", "Daily archive", "No encrypted daily archive exists in the configured local folder."))
     remote = env.get("AITA_BACKUP_RCLONE_REMOTE", "").strip()
-    if not remote:
+    if not check_offsite:
+        findings.append(Finding("SKIPPED", "Offsite", "Cloud checks/uploads are disabled for this update only. "
+                                "Offsite protection is NOT verified. Run backups --download separately to diagnose it."))
+    elif not remote:
         findings.append(Finding("FAIL", "Offsite", "AITA_BACKUP_RCLONE_REMOTE is empty: backups remain on Ubuntu only."))
     elif not local.is_file():
         findings.append(Finding("FAIL", "Offsite", "No current local backup to compare with the cloud."))
@@ -1094,7 +1135,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--java-home", default=str(DEFAULT_JAVA))
     p.add_argument("--ready-timeout", type=int, default=600)
     p.add_argument("--with-tests", action="store_true", help="also run shared/server Kotlin tests")
-    p.add_argument("--allow-local-backup", action="store_true", help="explicitly accept an EMPTY offsite setting; configured upload failures still stop deployment")
+    policy = p.add_mutually_exclusive_group()
+    policy.add_argument("--require-offsite-backup", action="store_true",
+                        help="require working cloud access/upload/verification; default temporarily skips cloud and requires an encrypted LOCAL backup")
+    policy.add_argument("--allow-local-backup", action="store_true",
+                        help="compatibility alias for the default local-only update; configured cloud access is also skipped")
     p.add_argument("--force", action="store_true", help="rebuild/redeploy even if last successful commit and installed hash match")
     p.add_argument("--no-follow", action="store_true", help="return once the managed job starts; inspect later with logs/status")
     p = sub.add_parser("logs", help="reattach to update output; then view AITA server logs")
@@ -1109,8 +1154,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     for name in ("archive", "digest", "owner", "commit", "java-home"):
         p.add_argument("--" + name, required=True)
     p.add_argument("--ready-timeout", type=int, required=True)
-    for name in ("with-tests", "allow-local-backup", "force"):
+    for name in ("with-tests", "force"):
         p.add_argument("--" + name, action="store_true")
+    policy = p.add_mutually_exclusive_group()
+    for name in ("require-offsite-backup", "allow-local-backup"):
+        policy.add_argument("--" + name, action="store_true")
     p = sub.add_parser("_worker")
     p.add_argument("--run-dir", required=True)
     args = parser.parse_args(argv)

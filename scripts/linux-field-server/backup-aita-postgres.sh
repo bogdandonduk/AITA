@@ -7,16 +7,23 @@ source "$SCRIPT_DIR/aita-linux-common.sh"
 
 env_file="${AITA_ENV_FILE:-/etc/aita/aita-prod.env}"
 daily=false
+local_only=false
 while (($#)); do
   case "$1" in
     --daily) daily=true ;;
+    --local-only) local_only=true ;;
     --env-file) env_file="${2:?Missing value for --env-file}"; shift ;;
-    -h|--help) echo "Usage: $0 [--daily] [--env-file PATH]"; exit 0 ;;
+    -h|--help)
+      echo "Usage: $0 [--daily] [--env-file PATH] [--local-only]"
+      echo "--local-only requires encryption and skips cloud upload for this invocation only; scheduled defaults/configuration are unchanged."
+      exit 0 ;;
     *) aita_die "Unknown argument: $1" ;;
   esac
   shift
 done
 
+# The deployment flag cannot be overwritten by a production environment entry.
+readonly local_only
 aita_load_env "$env_file"
 aita_validate_production_env
 aita_require_command pg_dump
@@ -76,7 +83,7 @@ if [[ -n "$recipient" ]] && ! aita_is_placeholder "$recipient"; then
   [[ -s "$encrypted_tmp" ]] || aita_die "age produced an empty encrypted backup"
   final_extension="dump.age"
   source_for_publish="$encrypted_tmp"
-elif [[ "$allow_plaintext" == "true" ]]; then
+elif ! $local_only && [[ "$allow_plaintext" == "true" ]]; then
   final_extension="dump"
   source_for_publish="$plain_tmp"
 else
@@ -96,7 +103,9 @@ publish_tmp=""
 aita_info "Local backup saved: $final_path (this alone does not confirm cloud upload)"
 
 remote="${AITA_BACKUP_RCLONE_REMOTE-}"
-if [[ -n "$remote" ]]; then
+if $local_only; then
+  aita_info "LOCAL ONLY: cloud upload skipped for this invocation. Remote settings and scheduled backups are unchanged; offsite protection is NOT verified."
+elif [[ -n "$remote" ]]; then
   aita_require_command rclone
   if [[ -n "${AITA_BACKUP_RCLONE_CONFIG-}" ]]; then
     export RCLONE_CONFIG="$AITA_BACKUP_RCLONE_CONFIG"
