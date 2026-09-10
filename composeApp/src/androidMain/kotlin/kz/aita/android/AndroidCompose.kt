@@ -49,6 +49,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -551,23 +555,12 @@ private fun AppConfiguration.AndroidBarcodeCameraScannerPane(
 
             CameraScannerOverlayIconButton(
                 contentDescription = localizedStringResource(988, "Torch"),
-                enabled = camera?.cameraInfo?.hasFlashUnit() != false,
+                iconPath = cameraTorchIconPath(),
+                iconRes = cameraTorchIconFallback(),
+                enabled = camera?.cameraInfo?.hasFlashUnit() == true,
+                selected = torchOn,
                 onClick = { torchOn = !torchOn }
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (torchOn) "⚡" else "🔦",
-                        color = Color.White.copy(alpha = if (camera?.cameraInfo?.hasFlashUnit() != false) 0.96f else 0.38f),
-                        fontSize = 21.sp,
-                        lineHeight = 21.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            )
 
             CameraScannerOverlayIconButton(
                 contentDescription = localizedStringResource(989, "Close scanner"),
@@ -583,7 +576,9 @@ private fun AppConfiguration.AndroidBarcodeCameraScannerPane(
 private fun AppConfiguration.CameraScannerOverlayIconButton(
     contentDescription: String,
     iconPath: String? = null,
+    iconRes: org.jetbrains.compose.resources.DrawableResource = Res.drawable._0_0,
     enabled: Boolean = true,
+    selected: Boolean? = null,
     onClick: () -> Unit,
     content: (@Composable () -> Unit)? = null
 ) {
@@ -592,9 +587,12 @@ private fun AppConfiguration.CameraScannerOverlayIconButton(
         modifier = Modifier
             .size(40.dp)
             .clip(shape)
-            .background(Color.Black.copy(alpha = 0.20f))
+            .background(if (selected == true && enabled) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.20f))
             .border(1.dp, Color.White.copy(alpha = if (enabled) 0.78f else 0.28f), shape)
-            .aitaClickable(enabled = enabled, onClick = onClick)
+            .semantics {
+                if (selected != null) toggleableState = if (selected) ToggleableState.On else ToggleableState.Off
+            }
+            .aitaClickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(9.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -604,7 +602,7 @@ private fun AppConfiguration.CameraScannerOverlayIconButton(
             CpImage(
                 modifier = Modifier.fillMaxSize(),
                 url = iconPath,
-                fallbackRes = Res.drawable._0_0,
+                fallbackRes = iconRes,
                 contentDescription = contentDescription,
                 tintColor = Color.White.copy(alpha = if (enabled) 0.94f else 0.34f)
             )

@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -679,7 +680,7 @@ fun AppConfiguration.UserAuthScreen() {
                 if (stateValues.isNarrowScreen) {
                     AnimatedContent(
                         targetState = stateValues.navigationScreensUserAuthLeft,
-                        transitionSpec = { aitaStackContentTransform() },
+                        transitionSpec = aitaStackTransitionSpec(),
                         label = "userAuthNavigationNarrow"
                     ) { navigationStack ->
                         val model = navigationStack.last()
@@ -717,7 +718,7 @@ fun AppConfiguration.UserAuthScreen() {
                             modifier = Modifier
                                 .weight(1f),
                             targetState = stateValues.navigationScreensUserAuthLeft,
-                            transitionSpec = { aitaStackContentTransform() },
+                            transitionSpec = aitaStackTransitionSpec(),
                             label = "userAuthNavigationLeft"
                         ) { navigationStack ->
                             val model = navigationStack.last()
@@ -736,7 +737,7 @@ fun AppConfiguration.UserAuthScreen() {
                             modifier = Modifier
                                 .weight(1f),
                             targetState = stateValues.navigationScreensUserAuthRight,
-                            transitionSpec = { aitaStackContentTransform() },
+                            transitionSpec = aitaStackTransitionSpec(),
                             label = "userAuthNavigationRight"
                         ) { navigationStack ->
                             val model = navigationStack.last()
@@ -1980,9 +1981,10 @@ fun AppConfiguration.TransactionSelectionScreen(
 internal fun AppConfiguration.TransactionPaneContent(
     model: NavigationScreenModel.Transaction,
     modifier: Modifier = Modifier,
+    motionTarget: AitaSceneMotionTarget,
     onBarcodeCaptureFocusRequested: () -> Unit
 ) {
-    Box(modifier = modifier) {
+    Box(modifier = modifier.clipToBounds().aitaSceneMotion(motionTarget)) {
         when (model) {
             is NavigationScreenModel.Transaction.Cart -> TransactionCartScreen()
             is NavigationScreenModel.Transaction.Selection -> TransactionSelectionScreen(onBarcodeCaptureFocusRequested = onBarcodeCaptureFocusRequested)
@@ -2406,10 +2408,18 @@ fun AppConfiguration.TransactionScreen() {
                 navigationScreensRight.lastOrNull() as? NavigationScreenModel.Transaction
                     ?: NavigationScreenModel.Transaction.Cart
 
+            fun paneMotionTarget(stack: List<NavigationScreenModel>) = AitaSceneMotionTarget(
+                family = "transaction:$transactionTypeIndex",
+                selection = "$clientId",
+                stack = stack.map { it.route },
+                selectionIndex = clientId
+            )
+
             if (stateValues.isNarrowScreen) {
                 TransactionPaneContent(
                     modifier = Modifier.weight(1f),
                     model = leftTransactionPaneModel,
+                    motionTarget = paneMotionTarget(navigationScreensLeft),
                     onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
                 )
             } else {
@@ -2419,12 +2429,14 @@ fun AppConfiguration.TransactionScreen() {
                     TransactionPaneContent(
                         modifier = Modifier.weight(1f),
                         model = leftTransactionPaneModel,
+                        motionTarget = paneMotionTarget(navigationScreensLeft),
                         onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
                     )
 
                     TransactionPaneContent(
                         modifier = Modifier.weight(1f),
                         model = rightTransactionPaneModel,
+                        motionTarget = paneMotionTarget(navigationScreensRight),
                         onBarcodeCaptureFocusRequested = { requestTransactionBarcodeFocus() }
                     )
                 }

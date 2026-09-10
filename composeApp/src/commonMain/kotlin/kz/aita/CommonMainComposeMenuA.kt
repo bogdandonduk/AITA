@@ -4899,7 +4899,7 @@ fun AppConfiguration.MenuScreen() {
                 modifier = Modifier
                     .weight(1f),
                 targetState = stateValues.navigationScreensMenuLeft,
-                transitionSpec = { aitaStackContentTransform() },
+                transitionSpec = aitaStackTransitionSpec(),
                 label = "menuNavigationNarrow"
             ) { navigationStack ->
                 val model = navigationStack.last()
@@ -5000,7 +5000,7 @@ fun AppConfiguration.MenuScreen() {
                     modifier = Modifier
                         .weight(0.2f),
                     targetState = stateValues.navigationScreensMenuLeft,
-                    transitionSpec = { aitaStackContentTransform() },
+                    transitionSpec = aitaStackTransitionSpec(),
                     label = "menuNavigationLeft"
                 ) { navigationStack ->
                     val model = navigationStack.last()
@@ -5097,7 +5097,7 @@ fun AppConfiguration.MenuScreen() {
                     modifier = Modifier
                         .weight(1f),
                     targetState = stateValues.navigationScreensMenuRight,
-                    transitionSpec = { aitaStackContentTransform() },
+                    transitionSpec = aitaStackTransitionSpec(),
                     label = "menuNavigationRight"
                 ) { navigationStack ->
                     val model = navigationStack.last()

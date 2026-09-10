@@ -99,7 +99,6 @@ var forceHidePlatformSoftKeyboard: (() -> Unit)? = null
 
 internal const val AITA_MOTION_FAST_MILLIS = 125
 internal const val AITA_MOTION_NORMAL_MILLIS = 205
-internal const val AITA_MOTION_EMPHASIZED_MILLIS = 275
 internal const val AITA_PRESS_SCALE = 0.972f
 internal const val AITA_HOVER_SCALE = 1.006f
 
@@ -192,21 +191,15 @@ internal fun Modifier.aitaSelectionMotion(
 internal fun Modifier.aitaDialogEntrance(): Modifier {
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
-    val initialOffsetPx = with(LocalDensity.current) { 18.dp.toPx() }
+    val initialOffsetPx = with(LocalDensity.current) { 12.dp.toPx() }
     val scale by animateFloatAsState(
-        targetValue = if (entered) 1f else 0.94f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        targetValue = if (entered) 1f else 0.97f,
+        animationSpec = tween(durationMillis = AITA_NAV_ENTER_MILLIS, easing = AitaNavigationEasing),
         label = "aitaDialogScale"
     )
     val offsetY by animateFloatAsState(
         targetValue = if (entered) 0f else initialOffsetPx,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = tween(durationMillis = AITA_NAV_ENTER_MILLIS, easing = AitaNavigationEasing),
         label = "aitaDialogOffset"
     )
     val alpha by animateFloatAsState(
@@ -228,13 +221,10 @@ internal fun Modifier.aitaDialogEntrance(): Modifier {
 internal fun Modifier.aitaBottomSheetEntrance(): Modifier {
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
-    val offsetPx = with(LocalDensity.current) { 72.dp.toPx() }
+    val offsetPx = with(LocalDensity.current) { 40.dp.toPx() }
     val progress by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = tween(durationMillis = AITA_NAV_ENTER_MILLIS, easing = AitaNavigationEasing),
         label = "aitaBottomSheetProgress"
     )
     return Modifier
@@ -245,29 +235,6 @@ internal fun Modifier.aitaBottomSheetEntrance(): Modifier {
             alpha = progress
         }
         .then(this)
-}
-
-internal fun <T> AnimatedContentTransitionScope<List<T>>.aitaStackContentTransform(): ContentTransform {
-    val depthChange = targetState.size - initialState.size
-    if (depthChange == 0) {
-        return (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)) +
-                scaleIn(initialScale = 0.992f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
-            .togetherWith(
-                fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
-                        scaleOut(targetScale = 0.996f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
-            )
-    }
-
-    val movingForward = depthChange > 0
-    val enter = slideInHorizontally(
-        animationSpec = tween(durationMillis = AITA_MOTION_EMPHASIZED_MILLIS),
-        initialOffsetX = { fullWidth -> if (movingForward) fullWidth / 9 else -fullWidth / 9 }
-    ) + fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS))
-    val exit = slideOutHorizontally(
-        animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS),
-        targetOffsetX = { fullWidth -> if (movingForward) -fullWidth / 14 else fullWidth / 14 }
-    ) + fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
-    return enter.togetherWith(exit)
 }
 
 internal fun aitaVisibilityEnter(): EnterTransition =

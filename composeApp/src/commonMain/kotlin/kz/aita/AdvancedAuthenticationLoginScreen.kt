@@ -40,7 +40,7 @@ internal fun resolveAitaAuthUiAvailability(
     fun resolve(predicate: AitaAuthCapabilitiesDataModel.() -> Boolean): AitaAuthFeatureAvailability = when {
         capabilities == null && loading -> AitaAuthFeatureAvailability.CHECKING
         capabilities == null -> AitaAuthFeatureAvailability.UNKNOWN
-        capabilities?.let { predicate(it) } == true -> AitaAuthFeatureAvailability.AVAILABLE
+        predicate(capabilities) -> AitaAuthFeatureAvailability.AVAILABLE
         else -> AitaAuthFeatureAvailability.UNAVAILABLE
     }
 
@@ -118,12 +118,15 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     val emailReady = emailAvailability == AitaAuthFeatureAvailability.AVAILABLE && capabilities?.emailDeliveryUnavailable != true
     val countdown = rememberAuthFlowCountdown(flow)
 
-    fun identifier(): String = if (identifierType == AitaLoginIdentifierType.EMAIL) {
-        normalizeAitaEmail(email).orEmpty()
-    } else {
-        countries.firstOrNull { "+${it.phoneNumberCode}" == phoneCountry }?.let { country ->
-            aitaPhoneLoginFromNationalInput(phone, phoneCountry, country.phoneNumberSize)
-        }.orEmpty()
+    fun identifier(): String {
+        if (identifierType == AitaLoginIdentifierType.EMAIL) return normalizeAitaEmail(email).orEmpty()
+        val country = countries.firstOrNull { "+${it.phoneNumberCode}" == phoneCountry } ?: return ""
+        // Use the same normalizer as the phone editor, then require the whole national number.
+        // Neither an empty field nor a country code / partial number may request an email code.
+        val national = kz.aita.auth.normalizeAitaPhoneFieldInput(phone, phoneCountry, country.phoneNumberSize)
+            ?: return ""
+        if (national.length != country.phoneNumberSize) return ""
+        return normalizeAitaPhoneAlias(phoneCountry + national).orEmpty()
     }
 
     fun reset(target: AitaLoginMode = mode) {
@@ -264,7 +267,11 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
 
             // The parent owns vertical scrolling. Do not nest a scroll container in its LazyColumn item.
             key(formGeneration) {
-                AnimatedContent(targetState = step, label = "aitaAuthStep") { currentStep ->
+                AnimatedContent(
+                    targetState = step,
+                    transitionSpec = aitaOrderedTransitionSpec<AitaLoginStep> { it.ordinal },
+                    label = "aitaAuthStep"
+                ) { currentStep ->
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         when (currentStep) {
                             AitaLoginStep.PRIMARY -> {
@@ -385,11 +392,16 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 }
                 step != AitaLoginStep.PRIMARY -> AuthQuietAction(authUiText("Back", "Назад", "Артқа"), true) { reset(mode) }
                 mode == AitaLoginMode.RECOVERY -> AuthQuietAction(authUiText("Back to sign in", "Назад ко входу", "Кіруге қайту"), !busy) { reset(AitaLoginMode.PASSWORD) }
-                else -> AuthQuietAction(authUiText("Forgot password?", "Забыли пароль?", "Құпия сөзді ұмыттыңыз ба?"), !busy) { reset(AitaLoginMode.RECOVERY) }
+                else -> Unit
             }
             if (stateValues.isNarrowScreen && step == AitaLoginStep.PRIMARY && mode != AitaLoginMode.RECOVERY) {
                 actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringSignUp, enabled = !busy && !stateValues.signUpInProgress, autoLoading = false) {
                     scope.launch { Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp) }
+                }
+            }
+            if (step == AitaLoginStep.PRIMARY && mode != AitaLoginMode.RECOVERY) {
+                AuthQuietAction(authUiText("Forgot password?", "Забыли пароль?", "Құпия сөзді ұмыттыңыз ба?"), !busy) {
+                    reset(AitaLoginMode.RECOVERY)
                 }
             }
         }

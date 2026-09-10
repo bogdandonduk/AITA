@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -1195,35 +1196,34 @@ internal fun AppConfiguration.SupportFaqCard(entry: SupportFaqEntry) {
 internal fun AppConfiguration.SupportMessageBubble(message: SupportMessageDataModel) {
     val mine = message.senderRole == "customer"
     val alignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart
-    val bubbleColor = if (mine) stateValues.AccentColor.copy(alpha = 0.18f) else stateValues.BackgroundColor
-    val borderColor = if (mine) stateValues.AccentColor else stateValues.PlaceholderTextColor
+    val bubbleColor = if (mine) Color.Transparent else stateValues.AccentColor
+    val bodyColor = if (mine) stateValues.TextColor else stateValues.AccentTextColor
+    val metadataColor = if (mine) stateValues.PlaceholderTextColor else stateValues.AccentTextColor
 
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = alignment) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 0.86f else 0.68f)
-                .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
                 .clip(RoundedCornerShape(stateValues.cornerRadius))
                 .background(bubbleColor)
-                .border(stateValues.unfocusedBorderWidth, borderColor, RoundedCornerShape(stateValues.cornerRadius))
                 .padding(stateValues.marginTextField)
         ) {
             Text(
                 text = if (mine) localizedStringResource(834, "You") else message.senderDisplayName.ifBlank { localizedStringResource(835, "Support team") },
-                color = if (mine) stateValues.AccentColor else stateValues.TextColor,
+                color = if (mine) stateValues.AccentColor else stateValues.AccentTextColor,
                 fontSize = stateValues.smallTextSize,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = message.body,
-                color = stateValues.TextColor,
+                color = bodyColor,
                 fontSize = stateValues.textSize
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = receiptUiDateTime(message.createdAtMillis),
-                color = stateValues.PlaceholderTextColor,
+                color = metadataColor,
                 fontSize = stateValues.smallTextSize,
                 textAlign = TextAlign.End,
                 modifier = Modifier.fillMaxWidth()
@@ -1505,7 +1505,8 @@ fun AppConfiguration.MenuSupportScreen() {
                         )
                         actionButton(
                             text = "",
-                            iconPath = stateValues.drawablePathIconCheck,
+                            iconPath = supportSendIconPath(),
+                            iconRes = supportSendIconFallback(),
                             iconContentDescription = localizedStringResource(825, "Send"),
                             enabled = draftMessage.isNotBlank() && !sending && selectedTicket?.status != "closed",
                             loading = sending,
@@ -5578,23 +5579,35 @@ fun AppConfiguration.MainScreen() {
             }
         }
 
+        val bottomNavigationItems = when (stateValues.appModeId) {
+            APP_MODE_STORE -> filteredMainBottomDestinations()
+            APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> Navigation.bottomNavBarScreensSupplier
+            else -> Navigation.bottomNavBarScreensBuyer
+        }
+        val mainDestination = stateValues.navigationScreensMain.last()
+        val mainMotionTarget = AitaSceneMotionTarget(
+            family = "main:${stateValues.appModeId}",
+            selection = mainDestination.route,
+            stack = listOf(mainDestination.route),
+            selectionIndex = bottomNavigationItems.indexOfFirst { it.route == mainDestination.route }.takeIf { it >= 0 }
+        )
         Box(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds()
         ) {
-            AnimatedContent(
-                targetState = stateValues.navigationScreensMain,
-                transitionSpec = { aitaStackContentTransform() },
-                label = "mainNavigation"
-            ) { navigationStack ->
-                when (navigationStack.last()) {
-                    is NavigationScreenModel.Splash -> SplashScreen()
-                    is NavigationScreenModel.UserAuth -> UserAuthScreen()
-                    is NavigationScreenModel.Notifications -> NotificationsScreen()
-                    is NavigationScreenModel.Transaction.MainSale, NavigationScreenModel.Transaction.MainReturn, NavigationScreenModel.Transaction.MainSupply -> TransactionScreen()
-                    is NavigationScreenModel.Stock -> StockScreen()
-                    is NavigationScreenModel.Supplier -> SupplierScreen()
-                    is NavigationScreenModel.Menu -> MenuScreen()
-                    else -> {}
+            Box(Modifier.fillMaxSize().aitaSceneMotion(mainMotionTarget)) {
+                // Route-only identity: preferences and refreshed data never recreate this tree.
+                // Do not keep an outgoing live transaction/auth/supplier owner for animation.
+                key(mainDestination.route) {
+                    when (mainDestination) {
+                        is NavigationScreenModel.Splash -> SplashScreen()
+                        is NavigationScreenModel.UserAuth -> UserAuthScreen()
+                        is NavigationScreenModel.Notifications -> NotificationsScreen()
+                        is NavigationScreenModel.Transaction.MainSale, NavigationScreenModel.Transaction.MainReturn, NavigationScreenModel.Transaction.MainSupply -> TransactionScreen()
+                        is NavigationScreenModel.Stock -> StockScreen()
+                        is NavigationScreenModel.Supplier -> SupplierScreen()
+                        is NavigationScreenModel.Menu -> MenuScreen()
+                        else -> {}
+                    }
                 }
             }
 
@@ -5656,11 +5669,6 @@ fun AppConfiguration.MainScreen() {
             }
         }
 
-        val bottomNavigationItems = when (stateValues.appModeId) {
-            APP_MODE_STORE -> filteredMainBottomDestinations()
-            APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> Navigation.bottomNavBarScreensSupplier
-            else -> Navigation.bottomNavBarScreensBuyer
-        }
         val bottomNavigationCompact = stateValues.screenWidth < 390.dp || bottomNavigationItems.size >= 6
         val bottomNavigationIconSize = when {
             stateValues.screenWidth < 340.dp && bottomNavigationItems.size > 5 -> 20.dp

@@ -3127,7 +3127,7 @@ fun AppConfiguration.StockScreen() {
                     modifier = Modifier
                         .weight(1f),
                     targetState = stateValues.navigationScreensStockLeft,
-                    transitionSpec = { aitaStackContentTransform() },
+                    transitionSpec = aitaStackTransitionSpec(),
                     label = "stockNavigationNarrow"
                 ) { navigationStack ->
                     val model = navigationStack.last()
@@ -3150,7 +3150,7 @@ fun AppConfiguration.StockScreen() {
                         modifier = Modifier
                             .weight(1f),
                         targetState = stateValues.navigationScreensStockLeft,
-                        transitionSpec = { aitaStackContentTransform() },
+                        transitionSpec = aitaStackTransitionSpec(),
                         label = "stockNavigationLeft"
                     ) { navigationStack ->
                         val model = navigationStack.last()
@@ -3169,7 +3169,7 @@ fun AppConfiguration.StockScreen() {
                         modifier = Modifier
                             .weight(1f),
                         targetState = stateValues.navigationScreensStockRight,
-                        transitionSpec = { aitaStackContentTransform() },
+                        transitionSpec = aitaStackTransitionSpec(),
                         label = "stockNavigationRight"
                     ) { navigationStack ->
                         val model = navigationStack.last()
