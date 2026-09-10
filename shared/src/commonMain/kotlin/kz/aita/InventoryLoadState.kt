@@ -1,5 +1,7 @@
 package kz.aita
 
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -28,6 +30,7 @@ internal data class InventoryOwner(
 
 internal class InventoryOwnerTracker {
     private val owner = MutableStateFlow(InventoryOwner(null, null, -1L, 0L))
+    val state: StateFlow<InventoryOwner> = owner.asStateFlow()
     val current: InventoryOwner get() = owner.value
 
     fun select(storeId: String?, accountId: String?, sessionGeneration: Long): InventoryOwner {
@@ -58,6 +61,13 @@ internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIs
             currentAuthenticatedSessionGeneration()
         )
         if (owner != previous) {
+            AnalyticsWorkspace.invalidate()
+            storeAnalyticsDashboardState.emit(DataState.Empty())
+            transactionsState.emit(DataState.Empty())
+            cashRegisterState.emit(DataState.Empty())
+            cashRegisterEventsState.emit(DataState.Empty())
+            cashRegisterExtractionsState.emit(DataState.Empty())
+            cashRegisterAmountState.emit(0.0)
             stockState.emit(DataState.Empty())
             stockBatchesState.emit(DataState.Empty())
             parentStoreStockState.emit(DataState.Empty())

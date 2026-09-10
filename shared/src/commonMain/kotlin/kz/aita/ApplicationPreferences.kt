@@ -2,10 +2,16 @@ package kz.aita
 
 import io.ktor.http.HttpMethod
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+private val appAppearancePreferencesMutable = MutableStateFlow(UserPreferencesDataModel())
+/** Atomic UI choice; the older individual flows remain for non-Compose integrations. */
+val appAppearancePreferencesState: StateFlow<UserPreferencesDataModel> = appAppearancePreferencesMutable.asStateFlow()
 
 internal object AppPreferences {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.ourIo + CoroutineExceptionHandler { _, error ->
@@ -29,6 +35,7 @@ internal object AppPreferences {
         // concurrent hydration from finishing with an older value after a user's click.
         do {
             val current = intent.value
+            appAppearancePreferencesMutable.value = current.value
             appLanguageState.value = current.value.appLanguage
             appThemeIdState.value = current.value.appThemeId
             appSizeModeIdState.value = current.value.appSizeModeId
@@ -82,13 +89,14 @@ internal object AppPreferences {
     }
 
     suspend fun acceptAccount(account: UserAccountDataModel, requestRevision: Long) {
-        try { adoptAccount(account, requestRevision) }
+        // Capture before waiting for another adoption; an A -> B -> A login is a new owner.
+        val generation = currentAuthenticatedSessionGeneration()
+        try { adoptAccount(account, requestRevision, generation) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { logCloudConnectionDiagnostic("Account preference persistence unavailable; current selection retained") }
     }
 
-    private suspend fun adoptAccount(account: UserAccountDataModel, requestRevision: Long) = accountMutex.withLock {
-        val generation = currentAuthenticatedSessionGeneration()
+    private suspend fun adoptAccount(account: UserAccountDataModel, requestRevision: Long, generation: Long) = accountMutex.withLock {
         val session = account.id to generation
         if (!ownedBy(account.id, generation) || adoptedSession == session) return@withLock
         val saved = getLocalKv(journalKey(account.id))?.let {

@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothSocket
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import kz.aita.receiptPrinterWriteTimeoutMillis
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -78,7 +79,7 @@ internal object BluetoothPrinterTransport {
             val connected = checkNotNull(socket)
             // From here onward the outcome can be partial. Never reconnect and resend automatically.
             try {
-                operate(connected, 30_000L, "Printing timed out. Some data may have reached the printer; check the receipt before retrying") {
+                operate(connected, receiptPrinterWriteTimeoutMillis(stable.size), "Printing timed out. Some data may have reached the printer; check the receipt before retrying") {
                     val output = connected.outputStream
                     var offset = 0
                     while (offset < stable.size) {

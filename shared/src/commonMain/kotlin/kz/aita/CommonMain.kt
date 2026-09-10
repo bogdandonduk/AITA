@@ -1710,6 +1710,7 @@ private fun MutableList<Byte>.addEscPosWrappedLine(line: String, width: Int = RE
 
 private fun MutableList<Byte>.startReceiptEscPosDocument() {
     addEscPosCommand(0x1B, 0x40) // initialize printer
+    addEscPosCommand(0x1C, 0x2E) // leave multibyte mode before legacy single-byte text
     addEscPosCommand(0x1B, 0x74, RECEIPT_ESC_POS_CODE_PAGE_CP866) // CP866 Cyrillic table used by many XP-58/AOKIA-class ESC/POS printers
 }
 
@@ -1719,6 +1720,15 @@ private fun MutableList<Byte>.finishReceiptEscPosDocument() {
 }
 
 fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
+    renderReceiptRaster(listOf(
+        title.ifBlank { "AITA printer test" }, dateText,
+        "--------------------------------",
+        "AITA / ESC-POS / 58 mm",
+        "Кириллица: чек готов, Ёё № 123",
+        "Қазақша: Әә Ғғ Ққ Ңң Өө Ұұ Үү Һһ Іі",
+        "Итого / Total: 1 234.50 ₸",
+        "Unicode raster / 384 dots"
+    ))?.let { return it }
     val bytes = mutableListOf<Byte>()
     bytes.startReceiptEscPosDocument()
     bytes.addEscPosCommand(0x1B, 0x61, 0x01)
@@ -2091,6 +2101,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String
     val plainLines = buildReceiptPlainText(language, labels)
         .lines()
         .dropLastWhile { it.isBlank() }
+    renderReceiptRaster(plainLines)?.let { return it }
     val bytes = mutableListOf<Byte>()
     bytes.startReceiptEscPosDocument()
 
@@ -3251,22 +3262,25 @@ fun addGoodsItemToTransactionCart(
 }
 
 fun getTransactions(storeId: String) {
-    val sessionGeneration = currentAuthenticatedSessionGeneration()
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
     GlobalScope.launch(Dispatchers.ourIo) {
         getTransactionsMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) return@withLock
             val response = networkRequest<List<TransactionDataModel>, Unit>(
                 HttpMethod.Get,
                 endpointUrl = globalAppConfigurationState.payloadValue.getTransactionsPath.first,
-                headers = mapOf("store_id" to storeId)
+                headers = mapOf("store_id" to storeId),
+                expectedSessionGeneration = owner.sessionGeneration
             )
-
-            if (response.negative) {
-                postInAppNotification(response.message, NotificationType.Negative)
-            } else {
-                if (authenticatedSessionGenerationIsCurrent(sessionGeneration) && activeStoreIdState.value == storeId) {
-                    val transactions = response.payload.orEmpty()
-                    transactionsState.emit(DataState.Success(transactions, response.message))
-                    transactions.forEach(::reconcileLatestReceiptIdentity)
+            inventoryStateMutex.withLock {
+                if (inventoryOwnerIsCurrent(owner)) {
+                    if (response.negative) postInAppNotification(response.message, NotificationType.Negative)
+                    else {
+                        val transactions = response.payload.orEmpty()
+                        transactionsState.emit(DataState.Success(transactions, response.message))
+                        transactions.forEach(::reconcileLatestReceiptIdentity)
+                    }
                 }
             }
         }
@@ -3453,21 +3467,37 @@ fun getCashRegister(
     storeId: String,
     onCompleted: ((DataState<StoreCashRegisterDataModel>) -> Unit)? = null
 ) {
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) {
+        onCompleted?.invoke(DataState.Empty())
+        return
+    }
     GlobalScope.launch(Dispatchers.ourIo) {
         getCashRegisterMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) {
+                onCompleted?.invoke(DataState.Empty())
+                return@withLock
+            }
             val response = networkRequest<CashRegisterStateDataModel, Unit>(
                 method = HttpMethod.Get,
                 endpointUrl = globalAppConfigurationState.payloadValue.getCashRegisterPath.first,
-                headers = mapOf("store_id" to storeId)
+                headers = mapOf("store_id" to storeId),
+                expectedSessionGeneration = owner.sessionGeneration
             )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                applyCashRegisterStatePayload(response.payload, response.message)
-                onCompleted?.invoke(DataState.Success(response.payload.register, response.message))
+            val completed: DataState<StoreCashRegisterDataModel> = inventoryStateMutex.withLock {
+                when {
+                    !inventoryOwnerIsCurrent(owner) -> DataState.Empty<StoreCashRegisterDataModel>()
+                    response.negative || response.payload == null || response.payload.register.storeId != storeId -> {
+                        postInAppNotification(response.message, NotificationType.Negative)
+                        DataState.Empty(response.message)
+                    }
+                    else -> {
+                        applyCashRegisterStatePayload(response.payload, response.message)
+                        DataState.Success(response.payload.register, response.message)
+                    }
+                }
             }
+            onCompleted?.invoke(completed)
         }
     }
 }
@@ -8592,6 +8622,7 @@ fun init() {
         loadCachedApplicationData()
         startSupplierIdentityFocus()
         startAppCacheCollectors()
+        AnalyticsWorkspace.start()
         loadTransactionCartUiState()
         initializeLocalBranchNetwork()
         startCloudConnectionHealthMonitor()
@@ -13725,20 +13756,37 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
     if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
     loadCachedInventory(storeId)
     if (!inventoryOwnerIsCurrent(owner)) return
-    getJsonCache<List<TransactionDataModel>>(storeScopedCacheKey("transactions", storeId))?.let {
-        transactionsState.emit(DataState.Success(it, cacheMessage()))
+    // Capture store-scoped keys before I/O; late disk reads cannot replace a fresh cloud/local ledger.
+    val transactionKey = storeScopedCacheKey("transactions", storeId)
+    val cashKey = storeScopedCacheKey("cash_register", storeId)
+    val eventKey = storeScopedCacheKey("cash_register_events", storeId)
+    getJsonCache<List<TransactionDataModel>>(transactionKey)?.let { cached ->
+        inventoryStateMutex.withLock {
+            if (canHydrateInventory(transactionsState.payloadValue != null, inventoryOwnerIsCurrent(owner)))
+                transactionsState.emit(DataState.Success(cached, cacheMessage()))
+        }
     }
+    if (!inventoryOwnerIsCurrent(owner)) return
     getJsonCache<List<DebtorDataModel>>(storeScopedCacheKey("debtors", storeId))?.let {
-        debtorsState.emit(DataState.Success(it, cacheMessage()))
+        if (inventoryOwnerIsCurrent(owner)) debtorsState.emit(DataState.Success(it, cacheMessage()))
     }
-    getJsonCache<StoreCashRegisterDataModel>(storeScopedCacheKey("cash_register", storeId))?.let {
-        cashRegisterState.emit(DataState.Success(it, cacheMessage()))
-        cashRegisterAmountState.emit(it.currentAmount)
+    getJsonCache<StoreCashRegisterDataModel>(cashKey)?.let { cached ->
+        inventoryStateMutex.withLock {
+            if (cached.storeId == storeId && canHydrateInventory(cashRegisterState.payloadValue != null, inventoryOwnerIsCurrent(owner))) {
+                cashRegisterState.emit(DataState.Success(cached, cacheMessage()))
+                cashRegisterAmountState.emit(cached.currentAmount)
+            }
+        }
     }
-    getJsonCache<List<CashRegisterEventDataModel>>(storeScopedCacheKey("cash_register_events", storeId))?.let { events ->
-        cashRegisterEventsState.emit(DataState.Success(events, cacheMessage()))
-        cashRegisterExtractionsState.emit(DataState.Success(events.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.map { it.toExtractionEntry() }, cacheMessage()))
+    getJsonCache<List<CashRegisterEventDataModel>>(eventKey)?.let { events ->
+        inventoryStateMutex.withLock {
+            if (canHydrateInventory(cashRegisterEventsState.payloadValue != null, inventoryOwnerIsCurrent(owner))) {
+                cashRegisterEventsState.emit(DataState.Success(events, cacheMessage()))
+                cashRegisterExtractionsState.emit(DataState.Success(events.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.map { it.toExtractionEntry() }, cacheMessage()))
+            }
+        }
     }
+    if (!inventoryOwnerIsCurrent(owner)) return
     getJsonCache<List<StoreWorkerDataModel>>(storeScopedCacheKey("store_workers", storeId))?.let {
         storeWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
     }
@@ -13910,8 +13958,14 @@ private fun startAppCacheCollectors() {
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         transactionsState.payload.collect { payload ->
-            val storeId = activeStoreIdState.value
-            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("transactions", storeId), payload)
+            if (payload != null) {
+                val key = inventoryStateMutex.withLock {
+                    val owner = inventoryOwners.current
+                    if (inventoryOwnerIsCurrent(owner) && transactionsState.payloadValue === payload)
+                        storeScopedCacheKey("transactions", requireNotNull(owner.storeId)) else null
+                }
+                if (key != null) putJsonCache(key, payload)
+            }
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
@@ -13922,14 +13976,26 @@ private fun startAppCacheCollectors() {
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         cashRegisterState.payload.collect { payload ->
-            val storeId = activeStoreIdState.value
-            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register", storeId), payload)
+            if (payload != null) {
+                val key = inventoryStateMutex.withLock {
+                    val owner = inventoryOwners.current
+                    if (inventoryOwnerIsCurrent(owner) && cashRegisterState.payloadValue === payload)
+                        storeScopedCacheKey("cash_register", requireNotNull(owner.storeId)) else null
+                }
+                if (key != null) putJsonCache(key, payload)
+            }
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         cashRegisterEventsState.payload.collect { payload ->
-            val storeId = activeStoreIdState.value
-            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("cash_register_events", storeId), payload)
+            if (payload != null) {
+                val key = inventoryStateMutex.withLock {
+                    val owner = inventoryOwners.current
+                    if (inventoryOwnerIsCurrent(owner) && cashRegisterEventsState.payloadValue === payload)
+                        storeScopedCacheKey("cash_register_events", requireNotNull(owner.storeId)) else null
+                }
+                if (key != null) putJsonCache(key, payload)
+            }
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
@@ -14049,6 +14115,7 @@ private fun realtimeUpdateRequiresBroadRefresh(entity: String, reason: String): 
         reason == "websocket_connected"
 
 private fun refreshEverythingFromServerAfterRealtimeUpdate() {
+    AnalyticsWorkspace.refreshServerTotalsIfNeeded()
     lastRealtimeBroadRefreshAtMillis = getCurrentTimeMillis()
 
     getGlobalAppConfiguration(loadAll = false)
@@ -14176,6 +14243,7 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
             getStockBatches(storeId)
         }
 
+        if (anyEntityMatches("transactions", "stock", "stockbatches", "cashregister")) AnalyticsWorkspace.refreshServerTotalsIfNeeded()
         if (anyEntityMatches("transactions")) {
             getTransactions(storeId)
             getCashRegister(storeId)
@@ -21518,7 +21586,7 @@ private fun GoodsItemInTransactionDataModel.matchesAnalyticsLineScope(
     if (categoryId != null && item?.categoryIds?.contains(categoryId) != true) return false
     if (supplierId != null) {
         val directSupplier = supplierIdText?.trim()?.takeIf { it.isNotBlank() }
-        val legacySupplier = supplierId?.toString()?.takeIf { it.isNotBlank() }
+        val legacySupplier = this.supplierId?.toString()?.takeIf { it.isNotBlank() }
         val fromBatch = item?.let { goodsItem -> batchesByItem[goodsItem.id].orEmpty().any { batch -> batch.supplierId == supplierId } } == true
         if (directSupplier != supplierId && legacySupplier != supplierId && !fromBatch) return false
     }

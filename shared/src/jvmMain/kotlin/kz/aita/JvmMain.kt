@@ -1287,7 +1287,7 @@ finally {
             val deadline = tcpWriteDeadline.schedule({
                 expired.set(true)
                 runCatching { socket.close() }
-            }, 30L, TimeUnit.SECONDS)
+            }, receiptPrinterWriteTimeoutMillis(printerBytes.size), TimeUnit.MILLISECONDS)
             var sending = false
             try {
                 socket.tcpNoDelay = true

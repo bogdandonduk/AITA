@@ -6202,7 +6202,6 @@ object Navigation {
 
         val listScreens = listOf(
             NavigationScreenModel.Menu.UserAccount,
-            NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Notifications,
             NavigationScreenModel.Menu.AppMode,
             NavigationScreenModel.Menu.Finances,
@@ -6214,6 +6213,7 @@ object Navigation {
             NavigationScreenModel.Menu.Workers,
             NavigationScreenModel.Menu.Suppliers,
             NavigationScreenModel.Menu.Debtors,
+            NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Devices,
             NavigationScreenModel.Menu.Support,
             NavigationScreenModel.Menu.AppLanguage,

@@ -24,8 +24,8 @@ internal fun resolveAppPreferenceChoice(
 ): AppPreferenceDecision {
     val server = account.normalized()
     val changedDuringRequest = current.revision != requestRevision && current.isLocalSelection
-    val base = pending?.normalized() ?: if (changedDuringRequest) current.value.normalized() else server
-    val chosen = base.copy(
+    val base = if (changedDuringRequest) current.value.normalized() else pending?.normalized() ?: server
+    val chosen = if (changedDuringRequest) base else base.copy(
         appLanguage = if (override.languageTouched) normalizeAppLanguagePreference(override.appLanguage) else base.appLanguage,
         appThemeId = if (override.themeTouched) normalizeAppThemePreference(override.appThemeId) else base.appThemeId,
         appSizeModeId = if (override.sizeModeTouched) normalizeAppSizeModePreference(override.appSizeModeId) else base.appSizeModeId

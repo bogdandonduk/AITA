@@ -56,4 +56,15 @@ class AppPreferenceSelectionTest {
         assertEquals(normalizeAppThemePreference(-99), result.value.appThemeId)
         assertEquals(normalizeAppSizeModePreference(999), result.value.appSizeModeId)
     }
+    @Test fun aNewClickOutranksAnOlderPendingJournal() {
+        val result = resolveAppPreferenceChoice(AppPreferenceIntent(choice, 9L, true), server, 8L,
+            server.copy(appLanguage = "ru"), untouched)
+        assertEquals(choice, result.value); assertTrue(result.shouldSync)
+    }
+    @Test fun aNewClickOutranksTheLoginScreensStaleOverride() {
+        val result = resolveAppPreferenceChoice(AppPreferenceIntent(choice, 9L, true), server, 8L, null,
+            AuthScreenPreferenceOverrideDataModel(appLanguage = "ru", languageTouched = true,
+                appThemeId = 0, themeTouched = true, appSizeModeId = 0, sizeModeTouched = true))
+        assertEquals(choice, result.value); assertTrue(result.shouldSync)
+    }
 }

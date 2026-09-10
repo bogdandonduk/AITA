@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
@@ -2436,29 +2439,6 @@ fun AppConfiguration.MenuUserAccountScreen() {
                 val outerSpace = 16.dp
                 val innerSpace = 8.dp
 
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
-                    subText = authUiText(
-                        "Email code, password recovery, authenticator, phone login and active sessions",
-                        "Код из письма, восстановление пароля, аутентификатор, вход по номеру и активные сессии",
-                        "Email коды, құпия сөзді қалпына келтіру, аутентификатор, телефонмен кіру және белсенді сессиялар"
-                    ),
-                    iconPath = stateValues.drawablePathIconSecurity,
-                    enabledColor = stateValues.BackgroundColor,
-                    textColor = stateValues.AccentColor,
-                    subTextColor = stateValues.PlaceholderTextColor,
-                    iconTintColor = stateValues.AccentColor,
-                    autoLoading = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(outerSpace))
-
                 stateValues.userAccount?.let { account ->
                     Row(
                         modifier = Modifier
@@ -3781,6 +3761,8 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
     }
     val labels = receiptLabels()
     val snapshotForScreen = snapshot
+    val receiptScope = rememberCoroutineScope()
+    var activeReceiptAction by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenAppBarWidget(
@@ -3843,11 +3825,33 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
             }
         }
 
-        val pdfBytes = remember(snapshotForScreen, stateValues.appLanguage, labels) {
-            snapshotForScreen.buildReceiptPdfBytes(stateValues.appLanguage, labels)
-        }
-        val fileName = remember(snapshotForScreen, labels) {
-            snapshotForScreen.receiptPdfFileName(labels)
+        val receiptLanguage = stateValues.appLanguage
+        val pdfCache = remember(snapshotForScreen, receiptLanguage, labels) { mutableStateOf<ByteArray?>(null) }
+        val fileName = remember(snapshotForScreen, labels) { snapshotForScreen.receiptPdfFileName(labels) }
+        fun runReceiptAction(action: String, successMessage: String) {
+            if (activeReceiptAction != null) return
+            activeReceiptAction = action
+            receiptScope.launch {
+                try {
+                    val pdf = pdfCache.value ?: withContext(Dispatchers.Default) {
+                        snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
+                    }.also { pdfCache.value = it }
+                    val result = when (action) {
+                        "pdf" -> saveReceiptPdf(fileName, pdf, labels)
+                        "share" -> shareReceiptPdf(fileName, pdf, whatsappOnly = false, labels = labels)
+                        "whatsapp" -> shareReceiptPdf(fileName, pdf, whatsappOnly = true, labels = labels)
+                        else -> {
+                            val escPos = withContext(Dispatchers.Default) {
+                                snapshotForScreen.buildReceiptEscPosBytes(receiptLanguage, labels)
+                            }
+                            printReceipt(fileName, pdf, escPos, labels)
+                        }
+                    }
+                    receiptActionNotification(result, successMessage)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative) }
+                finally { activeReceiptAction = null }
+            }
         }
 
         Column(
@@ -3877,14 +3881,10 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
                     text = stateValues.stringPdf,
                     iconPath = stateValues.drawablePathIconReceipt,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(
-                                saveReceiptPdf(fileName, pdfBytes, labels),
-                                stateValues.stringReceiptPdfSaved
-                            )
-                        }
-                    }
+                    enabled = activeReceiptAction == null,
+                    loading = activeReceiptAction == "pdf",
+                    autoLoading = false,
+                    onClick = { runReceiptAction("pdf", stateValues.stringReceiptPdfSaved) }
                 )
 
                 actionButton(
@@ -3892,14 +3892,10 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
                     text = stateValues.stringShare,
                     iconPath = stateValues.drawablePathIconSwitch,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(
-                                shareReceiptPdf(fileName, pdfBytes, whatsappOnly = false, labels = labels),
-                                stateValues.stringReceiptShared
-                            )
-                        }
-                    }
+                    enabled = activeReceiptAction == null,
+                    loading = activeReceiptAction == "share",
+                    autoLoading = false,
+                    onClick = { runReceiptAction("share", stateValues.stringReceiptShared) }
                 )
 
                 actionButton(
@@ -3907,14 +3903,10 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
                     text = stateValues.stringWhatsApp,
                     iconPath = stateValues.drawablePathIconSwitch,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(
-                                shareReceiptPdf(fileName, pdfBytes, whatsappOnly = true, labels = labels),
-                                stateValues.stringReceiptSentToWhatsApp
-                            )
-                        }
-                    }
+                    enabled = activeReceiptAction == null,
+                    loading = activeReceiptAction == "whatsapp",
+                    autoLoading = false,
+                    onClick = { runReceiptAction("whatsapp", stateValues.stringReceiptSentToWhatsApp) }
                 )
             }
 
@@ -3925,14 +3917,10 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
                 text = stateValues.stringPrint,
                 iconPath = stateValues.drawablePathIconDevices,
                 confirmationRequired = false,
-                onClick = {
-                    coroutineScope.launch {
-                        receiptActionNotification(
-                            printReceipt(fileName, pdfBytes, snapshotForScreen.buildReceiptEscPosBytes(stateValues.appLanguage, labels), labels),
-                            stateValues.stringReceiptSentToPrinter
-                        )
-                    }
-                }
+                enabled = activeReceiptAction == null,
+                loading = activeReceiptAction == "print",
+                autoLoading = false,
+                onClick = { runReceiptAction("print", stateValues.stringReceiptSentToPrinter) }
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -5253,10 +5241,10 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
 internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationScreenModel.Menu> = when (stateValues.appModeId) {
     APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
-        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
         NavigationScreenModel.Menu.Finances,
+        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
@@ -5264,10 +5252,10 @@ internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationS
     )
     APP_MODE_BUYER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
-        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
         NavigationScreenModel.Menu.Finances,
+        NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,

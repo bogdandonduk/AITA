@@ -1272,7 +1272,9 @@ fun AppConfiguration.localizedStringResource(
 ): String {
     val language = stateValues.appLanguage
 
-    return stateValues.strings.extractString(id, language)
+    // Reading the selected language remains observable; the resource catalog itself is chosen
+    // by the root snapshot. Late network resource loads never carry an old selected language.
+    return stateValues.localizedString(id, language)
         ?: bundledLocalizedStringFallbacks[id]?.get(language)
         ?: stateValues.strings.extractString(id, "main")
         ?: bundledLocalizedStringFallbacks[id]?.get("main")

@@ -3679,6 +3679,7 @@ internal fun appConfigurationContentKey(keys: Array<out Any>): List<Any> = keys.
 object AppConfiguration {
 
     interface StateValues {
+        fun localizedString(id: Long, language: String): String? = strings.extractString(id, language)
         val latestNotification: NotificationDataModel?
         val activeNotifications: List<NotificationDataModel>
         val notificationsState: DataState<List<NotificationDataModel>>
@@ -4302,40 +4303,9 @@ object AppConfiguration {
 
     private val _screenWidthState = MutableStateFlow(0f.dp)
     private val _screenHeightState = MutableStateFlow(0f.dp)
-    private val _wideScreenMinWidthState = MutableStateFlow(600f)
-    private val _boundWidgetWidthState = MutableStateFlow(280f.dp)
 
     private val _isNarrowScreenState = MutableStateFlow(false)
 
-    private val _textSizeState = MutableStateFlow(14.sp)
-    private val _titleTextSizeState = MutableStateFlow(20.sp)
-    private val _accentTextSizeState = MutableStateFlow(16.sp)
-    private val _smallTextSizeState = MutableStateFlow(12.sp)
-    private val _focusedBorderWidthState = MutableStateFlow(1.dp)
-    private val _unfocusedBorderWidthState = MutableStateFlow(0.5.dp)
-    private val _cornerRadiusState = MutableStateFlow(14.dp)
-    private val _iconSizeState = MutableStateFlow(24.dp)
-    private val _textFieldHeightMultiplierRelativeToTextSizeState = MutableStateFlow(2.6f)
-    private val _textFieldHeightState =
-        MutableStateFlow(((_textSizeState.value.value * _textFieldHeightMultiplierRelativeToTextSizeState.value)).dp)
-    private val _wideTextFieldHeightState =
-        MutableStateFlow((((_textSizeState.value.value * 4) * _textFieldHeightMultiplierRelativeToTextSizeState.value)).dp)
-    private val _textFieldIconPaddingState = MutableStateFlow((9.dp))
-
-    private val _marginTextFieldState = MutableStateFlow((8.dp))
-    private val _marginTextFieldGroupState = MutableStateFlow((24.dp))
-
-    private val _AccentColorState = MutableStateFlow(Color(0xffffba24))
-    private val _BackgroundColorState = MutableStateFlow(Color(0xffffffff))
-    private val _TextColorState = MutableStateFlow(Color(0x00000000))
-    private val _AccentTextColorState = MutableStateFlow(Color(0xffffffff))
-    private val _PlaceholderTextColorState = MutableStateFlow(Color(0xaa000000))
-    private val _DisabledColorState = MutableStateFlow(Color(0xffa7a7a7))
-    private val _ErrorColorState = MutableStateFlow(Color(0xffff0000))
-    private val _IconTintColorState = MutableStateFlow(Color(0xffffffff))
-
-    private val _OkayColorState = MutableStateFlow(Color(0xff6bb522))
-    private val _BorderlineBadColorState = MutableStateFlow(Color(0xffffa500))
 
     lateinit var stateValues: StateValues
 
@@ -4350,6 +4320,9 @@ object AppConfiguration {
     ) {
 
         stateValues = object : StateValues {
+            private val appearance by appAppearancePreferencesState.collectAsState()
+            private val appearanceResources by uiAppearanceResourcesState.collectAsState()
+            override fun localizedString(id: Long, language: String): String? = appearanceResources.catalog.string(id, language)
             override val latestNotification: NotificationDataModel? by latestInAppNotificationState.collectAsState()
             override val activeNotifications: List<NotificationDataModel> by activeInAppNotificationsState.collectAsState()
             override val notificationsState: DataState<List<NotificationDataModel>> by kz.aita.notificationsState.value.collectAsState()
@@ -4438,653 +4411,653 @@ object AppConfiguration {
             override val drawables: List<StylizedDrawablePathsGroupDataModel>? by drawablesState.payload.collectAsState()
 
             override val appModeId: Int by appModeState.collectAsState()
-            override val appLanguage: String by appLanguageState.collectAsState()
-            override val appThemeId: Long by appThemeIdState.collectAsState()
-            override val appSizeModeId: Long by appSizeModeIdState.collectAsState()
+            override val appLanguage: String get() = appearance.appLanguage
+            override val appThemeId: Long get() = appearance.appThemeId
+            override val appSizeModeId: Long get() = appearance.appSizeModeId
 
-            override val stringAppName: String by stringAppNameState.collectAsState()
-            override val stringLogIn: String by stringLogInState.collectAsState()
-            override val stringPhoneNumber: String by stringPhoneNumberState.collectAsState()
-            override val stringEnterPhoneNumber: String by stringEnterPhoneNumberState.collectAsState()
-            override val stringEmail: String by stringEmailState.collectAsState()
-            override val stringEnterEmailAddress: String by stringEnterEmailAddressState.collectAsState()
-            override val stringPassword: String by stringPasswordState.collectAsState()
-            override val stringEnterPassword: String by stringEnterPasswordState.collectAsState()
-            override val stringCancel: String by stringCancelState.collectAsState()
-            override val stringClear: String by stringClearState.collectAsState()
-            override val stringAuthenticationFailed: String by stringAuthenticationFailedState.collectAsState()
-            override val stringPhoneNumberMustBe: String by stringPhoneNumberMustBeState.collectAsState()
-            override val stringEmailMustBe: String by stringEmailMustBeState.collectAsState()
-            override val stringPasswordMustBe: String by stringPasswordMustBeState.collectAsState()
-            override val stringRepeatPassword: String by stringRepeatPasswordState.collectAsState()
-            override val stringPasswordsMustMatch: String by stringPasswordsMustMatchState.collectAsState()
-            override val stringFirstName: String by stringFirstNameState.collectAsState()
-            override val stringLastName: String by stringLastNameState.collectAsState()
-            override val stringEnterFirstName: String by stringEnterFirstNameState.collectAsState()
-            override val stringEnterLastName: String by stringEnterLastNameState.collectAsState()
-            override val stringUserWithThisPhoneNumberIsAlreadyRegistered: String by stringUserWithThisPhoneNumberIsAlreadyRegisteredState.collectAsState()
-            override val stringUserWithThisEmailAddressIsAlreadyRegistered: String by stringUserWithThisEmailAddressIsAlreadyRegisteredState.collectAsState()
-            override val stringSignUp: String by stringSignUpState.collectAsState()
-            override val stringConfirm: String by stringConfirmState.collectAsState()
-            override val stringSale: String by stringSaleState.collectAsState()
-            override val stringReturn: String by stringReturnState.collectAsState()
-            override val stringSupply: String by stringSupplyState.collectAsState()
-            override val stringStock: String by stringStockState.collectAsState()
-            override val stringMenu: String by stringMenuState.collectAsState()
-            override val stringBack: String by stringBackState.collectAsState()
-            override val stringAddGoodsItem: String by stringAddGoodsItemState.collectAsState()
-            override val stringEditGoodsItem: String by stringEditGoodsItemState.collectAsState()
-            override val stringUserAccount: String by stringUserAccountState.collectAsState()
-            override val stringGoodsCategories: String by stringGoodsCategoriesState.collectAsState()
-            override val stringAddGoodsCategory: String by stringAddGoodsCategoryState.collectAsState()
-            override val stringEditGoodsCategory: String by stringEditGoodsCategoryState.collectAsState()
-            override val stringStores: String by stringStoresState.collectAsState()
-            override val stringAddStore: String by stringAddStoreState.collectAsState()
-            override val stringEditStore: String by stringEditStoreState.collectAsState()
-            override val stringSubscription: String by stringSubscriptionState.collectAsState()
-            override val stringSubscriptionPlans: String by stringSubscriptionPlansState.collectAsState()
-            override val stringTransactionHistory: String by stringTransactionHistoryState.collectAsState()
-            override val stringReceipt: String by stringReceiptState.collectAsState()
-            override val stringAnalytics: String by stringAnalyticsState.collectAsState()
-            override val stringWorkers: String by stringWorkersState.collectAsState()
-            override val stringAddWorker: String by stringAddWorkerState.collectAsState()
-            override val stringEditWorker: String by stringEditWorkerState.collectAsState()
-            override val stringSuppliers: String by stringSuppliersState.collectAsState()
-            override val stringAddSupplier: String by stringAddSupplierState.collectAsState()
-            override val stringEditSupplier: String by stringEditSupplierState.collectAsState()
-            override val stringDebtors: String by stringDebtorsState.collectAsState()
-            override val stringCloseDebt: String by stringCloseDebtState.collectAsState()
-            override val stringDevices: String by stringDevicesState.collectAsState()
-            override val stringAppLanguage: String by stringAppLanguageState.collectAsState()
-            override val stringAppTheme: String by stringAppThemeState.collectAsState()
-            override val stringSelect: String by stringSelectState.collectAsState()
-            override val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String by stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.collectAsState()
-            override val stringFirstNameCannotBeEmptyOrJustWhitespaces: String by stringFirstNameCannotBeEmptyOrJustWhitespacesState.collectAsState()
-            override val stringLastNameCannotBeEmptyOrJustWhitespaces: String by stringLastNameCannotBeEmptyOrJustWhitespacesState.collectAsState()
-            override val stringSystemLanguage: String by stringSystemLanguageState.collectAsState()
-            override val stringBluetoothPermissionRequired: String by stringBluetoothPermissionRequiredState.collectAsState()
-            override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String by stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.collectAsState()
-            override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings: String by stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.collectAsState()
-            override val stringBluetoothDisabled: String by stringBluetoothDisabledState.collectAsState()
-            override val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String by stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.collectAsState()
-            override val stringSearchByAnyData: String by stringSearchByAnyDataState.collectAsState()
-            override val stringListEmpty: String by stringListEmptyState.collectAsState()
-            override val stringNoMatches: String by stringNoMatchesState.collectAsState()
-            override val stringName: String by stringNameState.collectAsState()
-            override val stringBarcode: String by stringBarcodeState.collectAsState()
-            override val stringSupplyPrice: String by stringSupplyPriceState.collectAsState()
-            override val stringSalePrice: String by stringSalePriceState.collectAsState()
-            override val stringReturnPrice: String by stringReturnPriceState.collectAsState()
-            override val stringCategory: String by stringCategoryState.collectAsState()
-            override val stringSupplier: String by stringSupplierState.collectAsState()
-            override val stringEnterName: String by stringEnterNameState.collectAsState()
-            override val stringEnterBarcode: String by stringEnterBarcodeState.collectAsState()
-            override val stringEnterSupplyPrice: String by stringEnterSupplyPriceState.collectAsState()
-            override val stringEnterSalePrice: String by stringEnterSalePriceState.collectAsState()
-            override val stringEnterReturnPrice: String by stringEnterReturnPriceState.collectAsState()
-            override val stringSelectCategory: String by stringSelectCategoryState.collectAsState()
-            override val stringSelectSupplier: String by stringSelectSupplierState.collectAsState()
-            override val stringEdit: String by stringEditState.collectAsState()
-            override val stringChangePassword: String by stringChangePasswordState.collectAsState()
-            override val stringNewPassword: String by stringNewPasswordState.collectAsState()
-            override val stringEnterNewPassword: String by stringEnterNewPasswordState.collectAsState()
-            override val stringRepeatNewPassword: String by stringRepeatNewPasswordState.collectAsState()
-            override val stringConfirmationPassword: String by stringConfirmationPasswordState.collectAsState()
-            override val stringRequiredToEditAccount: String by stringRequiredToEditAccountState.collectAsState()
-            override val stringAccountSuccessfullyUpdated: String by stringAccountSuccessfullyUpdatedState.collectAsState()
-            override val stringLoggingOut: String by stringLoggingOutState.collectAsState()
-            override val stringSessionTimeExpiredLoggingOut: String by stringSessionTimeExpiredLoggingOutState.collectAsState()
-            override val stringAlias: String by stringAliasState.collectAsState()
-            override val stringDescription: String by stringDescriptionState.collectAsState()
-            override val stringEnterAlias: String by stringEnterAliasState.collectAsState()
-            override val stringEnterDescription: String by stringEnterDescriptionState.collectAsState()
-            override val stringOptional: String by stringOptionalState.collectAsState()
-            override val stringLoggingIn: String by stringLoggingInState.collectAsState()
-            override val stringSigningUp: String by stringSigningUpState.collectAsState()
-            override val stringCompanyForm: String by stringCompanyFormState.collectAsState()
-            override val stringMeasurementUnit: String by stringMeasurementUnitState.collectAsState()
-            override val stringNoActiveStore: String by stringNoActiveStoreState.collectAsState()
-            override val stringSelectInMenu: String by stringSelectInMenuState.collectAsState()
-            override val stringSupplyData: String by stringSupplyDataState.collectAsState()
-            override val stringSaleData: String by stringSaleDataState.collectAsState()
-            override val stringReturnData: String by stringReturnDataState.collectAsState()
-            override val stringAddSupplyData: String by stringAddSupplyDataState.collectAsState()
-            override val stringAddSaleData: String by stringAddSaleDataState.collectAsState()
-            override val stringAddReturnData: String by stringAddReturnDataState.collectAsState()
-            override val stringAddBarcode: String by stringAddBarcodeState.collectAsState()
-            override val stringAddName: String by stringAddNameState.collectAsState()
-            override val stringPayment: String by stringPaymentState.collectAsState()
-            override val stringAll: String by stringAllState.collectAsState()
-            override val stringQuick: String by stringQuickState.collectAsState()
-            override val stringCategories: String by stringCategoriesState.collectAsState()
-            override val stringMain: String by stringMainState.collectAsState()
-            override val stringAddTranslation: String by stringAddTranslationState.collectAsState()
-            override val stringSetActive: String by stringSetActiveState.collectAsState()
-            override val stringOutOfStock: String by stringOutOfStockState.collectAsState()
-            override val stringDelete: String by stringDeleteState.collectAsState()
-            override val stringCash: String by stringCashState.collectAsState()
-            override val stringCashless: String by stringCashlessState.collectAsState()
-            override val stringMixed: String by stringMixedState.collectAsState()
-            override val stringAdd: String by stringAddState.collectAsState()
-            override val stringSubtract: String by stringSubtractState.collectAsState()
-            override val stringCurrentBatchData: String by stringCurrentQuantityDataState.collectAsState()
-            override val stringEnterQuantity: String by stringEnterQuantityState.collectAsState()
-            override val stringAddQuantityData: String by stringAddQuantityDataState.collectAsState()
-            override val stringShelfBatch: String by stringShelfBatchState.collectAsState()
-            override val stringActiveStore: String by stringActiveStoreState.collectAsState()
-            override val stringMakeInactive: String by stringMakeInactiveState.collectAsState()
-            override val stringCartEmpty: String by stringCartEmptyState.collectAsState()
-            override val stringComplete: String by stringCompleteState.collectAsState()
-            override val stringNoActiveWorkshift: String by stringNoActiveWorkshiftState.collectAsState()
-            override val stringCart: String by stringCartState.collectAsState()
-            override val stringAppMode: String by stringAppModeState.collectAsState()
-            override val stringFinances: String by stringFinancesState.collectAsState()
-            override val stringItems: String by stringItemsState.collectAsState()
-            override val stringBatches: String by stringBatchesState.collectAsState()
-            override val stringStandardPricesForSuppliers: String by stringStandardPricesForSuppliersState.collectAsState()
-            override val stringEditableForIndividualBatches: String by stringEditableForIndividualBatchesState.collectAsState()
-            override val stringBatchesData: String by stringBatchesDataState.collectAsState()
-            override val stringReceiptNumber: String by stringReceiptNumberState.collectAsState()
-            override val stringTransactionId: String by stringTransactionIdState.collectAsState()
-            override val stringDate: String by stringDateState.collectAsState()
-            override val stringCashier: String by stringCashierState.collectAsState()
-            override val stringStore: String by stringStoreState.collectAsState()
-            override val stringAddress: String by stringAddressState.collectAsState()
-            override val stringPhone: String by stringPhoneState.collectAsState()
-            override val stringTotal: String by stringTotalState.collectAsState()
-            override val stringPaid: String by stringPaidState.collectAsState()
-            override val stringDebt: String by stringDebtState.collectAsState()
-            override val stringDebtor: String by stringDebtorState.collectAsState()
-            override val stringDebtorPhone: String by stringDebtorPhoneState.collectAsState()
-            override val stringChange: String by stringChangeState.collectAsState()
-            override val stringVat: String by stringVatState.collectAsState()
-            override val stringVatNotSpecified: String by stringVatNotSpecifiedState.collectAsState()
-            override val stringFiscalStatus: String by stringFiscalStatusState.collectAsState()
-            override val stringNonFiscalSoftwareReceipt: String by stringNonFiscalSoftwareReceiptState.collectAsState()
-            override val stringThankYou: String by stringThankYouState.collectAsState()
-            override val stringNoItems: String by stringNoItemsState.collectAsState()
-            override val stringNoName: String by stringNoNameState.collectAsState()
-            override val stringPdf: String by stringPdfState.collectAsState()
-            override val stringShare: String by stringShareState.collectAsState()
-            override val stringWhatsApp: String by stringWhatsAppState.collectAsState()
-            override val stringPrint: String by stringPrintState.collectAsState()
-            override val stringQuit: String by stringQuitState.collectAsState()
-            override val stringReceiptPdfSaved: String by stringReceiptPdfSavedState.collectAsState()
-            override val stringReceiptShared: String by stringReceiptSharedState.collectAsState()
-            override val stringReceiptSentToWhatsApp: String by stringReceiptSentToWhatsAppState.collectAsState()
-            override val stringReceiptSentToPrinter: String by stringReceiptSentToPrinterState.collectAsState()
-            override val stringReceiptActionFailed: String by stringReceiptActionFailedState.collectAsState()
-            override val stringGoodsReceiptTitle: String by stringGoodsReceiptTitleState.collectAsState()
-            override val stringSaleReceiptTitle: String by stringSaleReceiptTitleState.collectAsState()
-            override val stringReturnReceiptTitle: String by stringReturnReceiptTitleState.collectAsState()
-            override val stringSupplyReceiptTitle: String by stringSupplyReceiptTitleState.collectAsState()
-            override val stringDraft: String by stringDraftState.collectAsState()
+            override val stringAppName: String get() = appearanceResources.catalog.string(0L, appLanguage) ?: stringAppNameState.value
+            override val stringLogIn: String get() = appearanceResources.catalog.string(1L, appLanguage) ?: stringLogInState.value
+            override val stringPhoneNumber: String get() = appearanceResources.catalog.string(2L, appLanguage) ?: stringPhoneNumberState.value
+            override val stringEnterPhoneNumber: String get() = appearanceResources.catalog.string(3L, appLanguage) ?: stringEnterPhoneNumberState.value
+            override val stringEmail: String get() = appearanceResources.catalog.string(4L, appLanguage) ?: stringEmailState.value
+            override val stringEnterEmailAddress: String get() = appearanceResources.catalog.string(5L, appLanguage) ?: stringEnterEmailAddressState.value
+            override val stringPassword: String get() = appearanceResources.catalog.string(6L, appLanguage) ?: stringPasswordState.value
+            override val stringEnterPassword: String get() = appearanceResources.catalog.string(7L, appLanguage) ?: stringEnterPasswordState.value
+            override val stringCancel: String get() = appearanceResources.catalog.string(8L, appLanguage) ?: stringCancelState.value
+            override val stringClear: String get() = appearanceResources.catalog.string(9L, appLanguage) ?: stringClearState.value
+            override val stringAuthenticationFailed: String get() = appearanceResources.catalog.string(10L, appLanguage) ?: stringAuthenticationFailedState.value
+            override val stringPhoneNumberMustBe: String get() = appearanceResources.catalog.string(11L, appLanguage) ?: stringPhoneNumberMustBeState.value
+            override val stringEmailMustBe: String get() = appearanceResources.catalog.string(12L, appLanguage) ?: stringEmailMustBeState.value
+            override val stringPasswordMustBe: String get() = appearanceResources.catalog.string(13L, appLanguage) ?: stringPasswordMustBeState.value
+            override val stringRepeatPassword: String get() = appearanceResources.catalog.string(14L, appLanguage) ?: stringRepeatPasswordState.value
+            override val stringPasswordsMustMatch: String get() = appearanceResources.catalog.string(15L, appLanguage) ?: stringPasswordsMustMatchState.value
+            override val stringFirstName: String get() = appearanceResources.catalog.string(16L, appLanguage) ?: stringFirstNameState.value
+            override val stringLastName: String get() = appearanceResources.catalog.string(17L, appLanguage) ?: stringLastNameState.value
+            override val stringEnterFirstName: String get() = appearanceResources.catalog.string(18L, appLanguage) ?: stringEnterFirstNameState.value
+            override val stringEnterLastName: String get() = appearanceResources.catalog.string(19L, appLanguage) ?: stringEnterLastNameState.value
+            override val stringUserWithThisPhoneNumberIsAlreadyRegistered: String get() = appearanceResources.catalog.string(20L, appLanguage) ?: stringUserWithThisPhoneNumberIsAlreadyRegisteredState.value
+            override val stringUserWithThisEmailAddressIsAlreadyRegistered: String get() = appearanceResources.catalog.string(21L, appLanguage) ?: stringUserWithThisEmailAddressIsAlreadyRegisteredState.value
+            override val stringSignUp: String get() = appearanceResources.catalog.string(22L, appLanguage) ?: stringSignUpState.value
+            override val stringConfirm: String get() = appearanceResources.catalog.string(23L, appLanguage) ?: stringConfirmState.value
+            override val stringSale: String get() = appearanceResources.catalog.string(24L, appLanguage) ?: stringSaleState.value
+            override val stringReturn: String get() = appearanceResources.catalog.string(25L, appLanguage) ?: stringReturnState.value
+            override val stringSupply: String get() = appearanceResources.catalog.string(26L, appLanguage) ?: stringSupplyState.value
+            override val stringStock: String get() = appearanceResources.catalog.string(27L, appLanguage) ?: stringStockState.value
+            override val stringMenu: String get() = appearanceResources.catalog.string(28L, appLanguage) ?: stringMenuState.value
+            override val stringBack: String get() = appearanceResources.catalog.string(29L, appLanguage) ?: stringBackState.value
+            override val stringAddGoodsItem: String get() = appearanceResources.catalog.string(30L, appLanguage) ?: stringAddGoodsItemState.value
+            override val stringEditGoodsItem: String get() = appearanceResources.catalog.string(31L, appLanguage) ?: stringEditGoodsItemState.value
+            override val stringUserAccount: String get() = appearanceResources.catalog.string(32L, appLanguage) ?: stringUserAccountState.value
+            override val stringGoodsCategories: String get() = appearanceResources.catalog.string(33L, appLanguage) ?: stringGoodsCategoriesState.value
+            override val stringAddGoodsCategory: String get() = appearanceResources.catalog.string(34L, appLanguage) ?: stringAddGoodsCategoryState.value
+            override val stringEditGoodsCategory: String get() = appearanceResources.catalog.string(35L, appLanguage) ?: stringEditGoodsCategoryState.value
+            override val stringStores: String get() = appearanceResources.catalog.string(36L, appLanguage) ?: stringStoresState.value
+            override val stringAddStore: String get() = appearanceResources.catalog.string(37L, appLanguage) ?: stringAddStoreState.value
+            override val stringEditStore: String get() = appearanceResources.catalog.string(38L, appLanguage) ?: stringEditStoreState.value
+            override val stringSubscription: String get() = appearanceResources.catalog.string(39L, appLanguage) ?: stringSubscriptionState.value
+            override val stringSubscriptionPlans: String get() = appearanceResources.catalog.string(40L, appLanguage) ?: stringSubscriptionPlansState.value
+            override val stringTransactionHistory: String get() = appearanceResources.catalog.string(41L, appLanguage) ?: stringTransactionHistoryState.value
+            override val stringReceipt: String get() = appearanceResources.catalog.string(42L, appLanguage) ?: stringReceiptState.value
+            override val stringAnalytics: String get() = appearanceResources.catalog.string(43L, appLanguage) ?: stringAnalyticsState.value
+            override val stringWorkers: String get() = appearanceResources.catalog.string(44L, appLanguage) ?: stringWorkersState.value
+            override val stringAddWorker: String get() = appearanceResources.catalog.string(45L, appLanguage) ?: stringAddWorkerState.value
+            override val stringEditWorker: String get() = appearanceResources.catalog.string(46L, appLanguage) ?: stringEditWorkerState.value
+            override val stringSuppliers: String get() = appearanceResources.catalog.string(47L, appLanguage) ?: stringSuppliersState.value
+            override val stringAddSupplier: String get() = appearanceResources.catalog.string(48L, appLanguage) ?: stringAddSupplierState.value
+            override val stringEditSupplier: String get() = appearanceResources.catalog.string(49L, appLanguage) ?: stringEditSupplierState.value
+            override val stringDebtors: String get() = appearanceResources.catalog.string(50L, appLanguage) ?: stringDebtorsState.value
+            override val stringCloseDebt: String get() = appearanceResources.catalog.string(51L, appLanguage) ?: stringCloseDebtState.value
+            override val stringDevices: String get() = appearanceResources.catalog.string(52L, appLanguage) ?: stringDevicesState.value
+            override val stringAppLanguage: String get() = appearanceResources.catalog.string(53L, appLanguage) ?: stringAppLanguageState.value
+            override val stringAppTheme: String get() = appearanceResources.catalog.string(54L, appLanguage) ?: stringAppThemeState.value
+            override val stringSelect: String get() = appearanceResources.catalog.string(55L, appLanguage) ?: stringSelectState.value
+            override val stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegistered: String get() = appearanceResources.catalog.string(56L, appLanguage) ?: stringUserWithThisPhoneNumberAndEmailAddressIsAlreadyRegisteredState.value
+            override val stringFirstNameCannotBeEmptyOrJustWhitespaces: String get() = appearanceResources.catalog.string(57L, appLanguage) ?: stringFirstNameCannotBeEmptyOrJustWhitespacesState.value
+            override val stringLastNameCannotBeEmptyOrJustWhitespaces: String get() = appearanceResources.catalog.string(58L, appLanguage) ?: stringLastNameCannotBeEmptyOrJustWhitespacesState.value
+            override val stringSystemLanguage: String get() = appearanceResources.catalog.string(59L, appLanguage) ?: stringSystemLanguageState.value
+            override val stringBluetoothPermissionRequired: String get() = appearanceResources.catalog.string(60L, appLanguage) ?: stringBluetoothPermissionRequiredState.value
+            override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String get() = appearanceResources.catalog.string(61L, appLanguage) ?: stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.value
+            override val stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettings: String get() = appearanceResources.catalog.string(62L, appLanguage) ?: stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersYouCanGrantItInAppSettingsState.value
+            override val stringBluetoothDisabled: String get() = appearanceResources.catalog.string(63L, appLanguage) ?: stringBluetoothDisabledState.value
+            override val stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters: String get() = appearanceResources.catalog.string(64L, appLanguage) ?: stringEnableForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrintersState.value
+            override val stringSearchByAnyData: String get() = appearanceResources.catalog.string(65L, appLanguage) ?: stringSearchByAnyDataState.value
+            override val stringListEmpty: String get() = appearanceResources.catalog.string(66L, appLanguage) ?: stringListEmptyState.value
+            override val stringNoMatches: String get() = appearanceResources.catalog.string(67L, appLanguage) ?: stringNoMatchesState.value
+            override val stringName: String get() = appearanceResources.catalog.string(68L, appLanguage) ?: stringNameState.value
+            override val stringBarcode: String get() = appearanceResources.catalog.string(69L, appLanguage) ?: stringBarcodeState.value
+            override val stringSupplyPrice: String get() = appearanceResources.catalog.string(70L, appLanguage) ?: stringSupplyPriceState.value
+            override val stringSalePrice: String get() = appearanceResources.catalog.string(71L, appLanguage) ?: stringSalePriceState.value
+            override val stringReturnPrice: String get() = appearanceResources.catalog.string(72L, appLanguage) ?: stringReturnPriceState.value
+            override val stringCategory: String get() = appearanceResources.catalog.string(73L, appLanguage) ?: stringCategoryState.value
+            override val stringSupplier: String get() = appearanceResources.catalog.string(74L, appLanguage) ?: stringSupplierState.value
+            override val stringEnterName: String get() = appearanceResources.catalog.string(76L, appLanguage) ?: stringEnterNameState.value
+            override val stringEnterBarcode: String get() = appearanceResources.catalog.string(75L, appLanguage) ?: stringEnterBarcodeState.value
+            override val stringEnterSupplyPrice: String get() = appearanceResources.catalog.string(77L, appLanguage) ?: stringEnterSupplyPriceState.value
+            override val stringEnterSalePrice: String get() = appearanceResources.catalog.string(78L, appLanguage) ?: stringEnterSalePriceState.value
+            override val stringEnterReturnPrice: String get() = appearanceResources.catalog.string(79L, appLanguage) ?: stringEnterReturnPriceState.value
+            override val stringSelectCategory: String get() = appearanceResources.catalog.string(80L, appLanguage) ?: stringSelectCategoryState.value
+            override val stringSelectSupplier: String get() = appearanceResources.catalog.string(81L, appLanguage) ?: stringSelectSupplierState.value
+            override val stringEdit: String get() = appearanceResources.catalog.string(82L, appLanguage) ?: stringEditState.value
+            override val stringChangePassword: String get() = appearanceResources.catalog.string(83L, appLanguage) ?: stringChangePasswordState.value
+            override val stringNewPassword: String get() = appearanceResources.catalog.string(84L, appLanguage) ?: stringNewPasswordState.value
+            override val stringEnterNewPassword: String get() = appearanceResources.catalog.string(85L, appLanguage) ?: stringEnterNewPasswordState.value
+            override val stringRepeatNewPassword: String get() = appearanceResources.catalog.string(86L, appLanguage) ?: stringRepeatNewPasswordState.value
+            override val stringConfirmationPassword: String get() = appearanceResources.catalog.string(87L, appLanguage) ?: stringConfirmationPasswordState.value
+            override val stringRequiredToEditAccount: String get() = appearanceResources.catalog.string(88L, appLanguage) ?: stringRequiredToEditAccountState.value
+            override val stringAccountSuccessfullyUpdated: String get() = appearanceResources.catalog.string(89L, appLanguage) ?: stringAccountSuccessfullyUpdatedState.value
+            override val stringLoggingOut: String get() = appearanceResources.catalog.string(90L, appLanguage) ?: stringLoggingOutState.value
+            override val stringSessionTimeExpiredLoggingOut: String get() = appearanceResources.catalog.string(91L, appLanguage) ?: stringSessionTimeExpiredLoggingOutState.value
+            override val stringAlias: String get() = appearanceResources.catalog.string(92L, appLanguage) ?: stringAliasState.value
+            override val stringDescription: String get() = appearanceResources.catalog.string(93L, appLanguage) ?: stringDescriptionState.value
+            override val stringEnterAlias: String get() = appearanceResources.catalog.string(94L, appLanguage) ?: stringEnterAliasState.value
+            override val stringEnterDescription: String get() = appearanceResources.catalog.string(95L, appLanguage) ?: stringEnterDescriptionState.value
+            override val stringOptional: String get() = appearanceResources.catalog.string(96L, appLanguage) ?: stringOptionalState.value
+            override val stringLoggingIn: String get() = appearanceResources.catalog.string(97L, appLanguage) ?: stringLoggingInState.value
+            override val stringSigningUp: String get() = appearanceResources.catalog.string(98L, appLanguage) ?: stringSigningUpState.value
+            override val stringCompanyForm: String get() = appearanceResources.catalog.string(99L, appLanguage) ?: stringCompanyFormState.value
+            override val stringMeasurementUnit: String get() = appearanceResources.catalog.string(100L, appLanguage) ?: stringMeasurementUnitState.value
+            override val stringNoActiveStore: String get() = appearanceResources.catalog.string(101L, appLanguage) ?: stringNoActiveStoreState.value
+            override val stringSelectInMenu: String get() = appearanceResources.catalog.string(102L, appLanguage) ?: stringSelectInMenuState.value
+            override val stringSupplyData: String get() = appearanceResources.catalog.string(103L, appLanguage) ?: stringSupplyDataState.value
+            override val stringSaleData: String get() = appearanceResources.catalog.string(104L, appLanguage) ?: stringSaleDataState.value
+            override val stringReturnData: String get() = appearanceResources.catalog.string(105L, appLanguage) ?: stringReturnDataState.value
+            override val stringAddSupplyData: String get() = appearanceResources.catalog.string(106L, appLanguage) ?: stringAddSupplyDataState.value
+            override val stringAddSaleData: String get() = appearanceResources.catalog.string(107L, appLanguage) ?: stringAddSaleDataState.value
+            override val stringAddReturnData: String get() = appearanceResources.catalog.string(108L, appLanguage) ?: stringAddReturnDataState.value
+            override val stringAddBarcode: String get() = appearanceResources.catalog.string(109L, appLanguage) ?: stringAddBarcodeState.value
+            override val stringAddName: String get() = appearanceResources.catalog.string(110L, appLanguage) ?: stringAddNameState.value
+            override val stringPayment: String get() = appearanceResources.catalog.string(111L, appLanguage) ?: stringPaymentState.value
+            override val stringAll: String get() = appearanceResources.catalog.string(112L, appLanguage) ?: stringAllState.value
+            override val stringQuick: String get() = appearanceResources.catalog.string(113L, appLanguage) ?: stringQuickState.value
+            override val stringCategories: String get() = appearanceResources.catalog.string(114L, appLanguage) ?: stringCategoriesState.value
+            override val stringMain: String get() = appearanceResources.catalog.string(115L, appLanguage) ?: stringMainState.value
+            override val stringAddTranslation: String get() = appearanceResources.catalog.string(116L, appLanguage) ?: stringAddTranslationState.value
+            override val stringSetActive: String get() = appearanceResources.catalog.string(117L, appLanguage) ?: stringSetActiveState.value
+            override val stringOutOfStock: String get() = appearanceResources.catalog.string(118L, appLanguage) ?: stringOutOfStockState.value
+            override val stringDelete: String get() = appearanceResources.catalog.string(119L, appLanguage) ?: stringDeleteState.value
+            override val stringCash: String get() = appearanceResources.catalog.string(120L, appLanguage) ?: stringCashState.value
+            override val stringCashless: String get() = appearanceResources.catalog.string(121L, appLanguage) ?: stringCashlessState.value
+            override val stringMixed: String get() = appearanceResources.catalog.string(122L, appLanguage) ?: stringMixedState.value
+            override val stringAdd: String get() = appearanceResources.catalog.string(123L, appLanguage) ?: stringAddState.value
+            override val stringSubtract: String get() = appearanceResources.catalog.string(124L, appLanguage) ?: stringSubtractState.value
+            override val stringCurrentBatchData: String get() = appearanceResources.catalog.string(125L, appLanguage) ?: stringCurrentQuantityDataState.value
+            override val stringEnterQuantity: String get() = appearanceResources.catalog.string(126L, appLanguage) ?: stringEnterQuantityState.value
+            override val stringAddQuantityData: String get() = appearanceResources.catalog.string(127L, appLanguage) ?: stringAddQuantityDataState.value
+            override val stringShelfBatch: String get() = appearanceResources.catalog.string(128L, appLanguage) ?: stringShelfBatchState.value
+            override val stringActiveStore: String get() = appearanceResources.catalog.string(129L, appLanguage) ?: stringActiveStoreState.value
+            override val stringMakeInactive: String get() = appearanceResources.catalog.string(130L, appLanguage) ?: stringMakeInactiveState.value
+            override val stringCartEmpty: String get() = appearanceResources.catalog.string(131L, appLanguage) ?: stringCartEmptyState.value
+            override val stringComplete: String get() = appearanceResources.catalog.string(132L, appLanguage) ?: stringCompleteState.value
+            override val stringNoActiveWorkshift: String get() = appearanceResources.catalog.string(133L, appLanguage) ?: stringNoActiveWorkshiftState.value
+            override val stringCart: String get() = appearanceResources.catalog.string(134L, appLanguage) ?: stringCartState.value
+            override val stringAppMode: String get() = appearanceResources.catalog.string(135L, appLanguage) ?: stringAppModeState.value
+            override val stringFinances: String get() = appearanceResources.catalog.string(136L, appLanguage) ?: stringFinancesState.value
+            override val stringItems: String get() = appearanceResources.catalog.string(137L, appLanguage) ?: stringItemsState.value
+            override val stringBatches: String get() = appearanceResources.catalog.string(138L, appLanguage) ?: stringBatchesState.value
+            override val stringStandardPricesForSuppliers: String get() = appearanceResources.catalog.string(139L, appLanguage) ?: stringStandardPricesForSuppliersState.value
+            override val stringEditableForIndividualBatches: String get() = appearanceResources.catalog.string(140L, appLanguage) ?: stringEditableForIndividualBatchesState.value
+            override val stringBatchesData: String get() = appearanceResources.catalog.string(141L, appLanguage) ?: stringBatchesDataState.value
+            override val stringReceiptNumber: String get() = appearanceResources.catalog.string(142L, appLanguage) ?: stringReceiptNumberState.value
+            override val stringTransactionId: String get() = appearanceResources.catalog.string(143L, appLanguage) ?: stringTransactionIdState.value
+            override val stringDate: String get() = appearanceResources.catalog.string(144L, appLanguage) ?: stringDateState.value
+            override val stringCashier: String get() = appearanceResources.catalog.string(145L, appLanguage) ?: stringCashierState.value
+            override val stringStore: String get() = appearanceResources.catalog.string(146L, appLanguage) ?: stringStoreState.value
+            override val stringAddress: String get() = appearanceResources.catalog.string(147L, appLanguage) ?: stringAddressState.value
+            override val stringPhone: String get() = appearanceResources.catalog.string(148L, appLanguage) ?: stringPhoneState.value
+            override val stringTotal: String get() = appearanceResources.catalog.string(149L, appLanguage) ?: stringTotalState.value
+            override val stringPaid: String get() = appearanceResources.catalog.string(150L, appLanguage) ?: stringPaidState.value
+            override val stringDebt: String get() = appearanceResources.catalog.string(151L, appLanguage) ?: stringDebtState.value
+            override val stringDebtor: String get() = appearanceResources.catalog.string(152L, appLanguage) ?: stringDebtorState.value
+            override val stringDebtorPhone: String get() = appearanceResources.catalog.string(153L, appLanguage) ?: stringDebtorPhoneState.value
+            override val stringChange: String get() = appearanceResources.catalog.string(154L, appLanguage) ?: stringChangeState.value
+            override val stringVat: String get() = appearanceResources.catalog.string(155L, appLanguage) ?: stringVatState.value
+            override val stringVatNotSpecified: String get() = appearanceResources.catalog.string(156L, appLanguage) ?: stringVatNotSpecifiedState.value
+            override val stringFiscalStatus: String get() = appearanceResources.catalog.string(157L, appLanguage) ?: stringFiscalStatusState.value
+            override val stringNonFiscalSoftwareReceipt: String get() = appearanceResources.catalog.string(158L, appLanguage) ?: stringNonFiscalSoftwareReceiptState.value
+            override val stringThankYou: String get() = appearanceResources.catalog.string(159L, appLanguage) ?: stringThankYouState.value
+            override val stringNoItems: String get() = appearanceResources.catalog.string(160L, appLanguage) ?: stringNoItemsState.value
+            override val stringNoName: String get() = appearanceResources.catalog.string(176L, appLanguage) ?: stringNoNameState.value
+            override val stringPdf: String get() = appearanceResources.catalog.string(161L, appLanguage) ?: stringPdfState.value
+            override val stringShare: String get() = appearanceResources.catalog.string(162L, appLanguage) ?: stringShareState.value
+            override val stringWhatsApp: String get() = appearanceResources.catalog.string(163L, appLanguage) ?: stringWhatsAppState.value
+            override val stringPrint: String get() = appearanceResources.catalog.string(164L, appLanguage) ?: stringPrintState.value
+            override val stringQuit: String get() = appearanceResources.catalog.string(165L, appLanguage) ?: stringQuitState.value
+            override val stringReceiptPdfSaved: String get() = appearanceResources.catalog.string(166L, appLanguage) ?: stringReceiptPdfSavedState.value
+            override val stringReceiptShared: String get() = appearanceResources.catalog.string(167L, appLanguage) ?: stringReceiptSharedState.value
+            override val stringReceiptSentToWhatsApp: String get() = appearanceResources.catalog.string(168L, appLanguage) ?: stringReceiptSentToWhatsAppState.value
+            override val stringReceiptSentToPrinter: String get() = appearanceResources.catalog.string(169L, appLanguage) ?: stringReceiptSentToPrinterState.value
+            override val stringReceiptActionFailed: String get() = appearanceResources.catalog.string(170L, appLanguage) ?: stringReceiptActionFailedState.value
+            override val stringGoodsReceiptTitle: String get() = appearanceResources.catalog.string(171L, appLanguage) ?: stringGoodsReceiptTitleState.value
+            override val stringSaleReceiptTitle: String get() = appearanceResources.catalog.string(172L, appLanguage) ?: stringSaleReceiptTitleState.value
+            override val stringReturnReceiptTitle: String get() = appearanceResources.catalog.string(173L, appLanguage) ?: stringReturnReceiptTitleState.value
+            override val stringSupplyReceiptTitle: String get() = appearanceResources.catalog.string(174L, appLanguage) ?: stringSupplyReceiptTitleState.value
+            override val stringDraft: String get() = appearanceResources.catalog.string(175L, appLanguage) ?: stringDraftState.value
 
             override val screenWidth: Dp by _screenWidthState.collectAsState()
             override val screenHeight: Dp by _screenHeightState.collectAsState()
-            override val wideScreenMinWidth: Float by _wideScreenMinWidthState.collectAsState()
-            override val boundWidgetWidth: Dp by _boundWidgetWidthState.collectAsState()
+            override val wideScreenMinWidth: Float get() = appearanceResources.catalog.dimension(4L, appSizeModeId, 600f)
+            override val boundWidgetWidth: Dp get() = appearanceResources.catalog.dimension(9L, appSizeModeId, 300f).dp
             override val isNarrowScreen: Boolean by _isNarrowScreenState.collectAsState()
-            override val textSize: TextUnit by _textSizeState.collectAsState()
-            override val titleTextSize: TextUnit by _titleTextSizeState.collectAsState()
-            override val accentTextSize: TextUnit by _accentTextSizeState.collectAsState()
-            override val smallTextSize: TextUnit by _smallTextSizeState.collectAsState()
-            override val focusedBorderWidth: Dp by _focusedBorderWidthState.collectAsState()
-            override val unfocusedBorderWidth: Dp by _unfocusedBorderWidthState.collectAsState()
-            override val cornerRadius: Dp by _cornerRadiusState.collectAsState()
-            override val iconSize: Dp by _iconSizeState.collectAsState()
-            override val textFieldHeightMultiplierRelativeToTextSize: Float by _textFieldHeightMultiplierRelativeToTextSizeState.collectAsState()
-            override val textFieldHeight: Dp by _textFieldHeightState.collectAsState()
-            override val wideTextFieldHeight: Dp by _wideTextFieldHeightState.collectAsState()
-            override val textFieldIconPadding: Dp by _textFieldIconPaddingState.collectAsState()
-            override val marginTextField: Dp by _marginTextFieldState.collectAsState()
-            override val marginTextFieldGroup: Dp by _marginTextFieldGroupState.collectAsState()
+            override val textSize: TextUnit get() = appearanceResources.catalog.dimension(0L, appSizeModeId, 14f).sp
+            override val titleTextSize: TextUnit get() = appearanceResources.catalog.dimension(1L, appSizeModeId, 20f).sp
+            override val accentTextSize: TextUnit get() = appearanceResources.catalog.dimension(2L, appSizeModeId, 16f).sp
+            override val smallTextSize: TextUnit get() = appearanceResources.catalog.dimension(3L, appSizeModeId, 12f).sp
+            override val focusedBorderWidth: Dp get() = appearanceResources.catalog.dimension(5L, appSizeModeId, 1f).dp
+            override val unfocusedBorderWidth: Dp get() = appearanceResources.catalog.dimension(6L, appSizeModeId, 0.5f).dp
+            override val cornerRadius: Dp get() = appearanceResources.catalog.dimension(7L, appSizeModeId, 14f).dp
+            override val iconSize: Dp get() = appearanceResources.catalog.dimension(8L, appSizeModeId, 24f).dp
+            override val textFieldHeightMultiplierRelativeToTextSize: Float get() = appearanceResources.catalog.dimension(10L, appSizeModeId, 2.6f)
+            override val textFieldHeight: Dp get() = (textSize.value * textFieldHeightMultiplierRelativeToTextSize).dp
+            override val wideTextFieldHeight: Dp get() = (textSize.value * 4f * textFieldHeightMultiplierRelativeToTextSize).dp
+            override val textFieldIconPadding: Dp get() = appearanceResources.catalog.dimension(11L, appSizeModeId, 9f).dp
+            override val marginTextField: Dp get() = appearanceResources.catalog.dimension(12L, appSizeModeId, if (appSizeModeId == 1L) 10f else 8f).dp
+            override val marginTextFieldGroup: Dp get() = appearanceResources.catalog.dimension(13L, appSizeModeId, if (appSizeModeId == 1L) 28f else 24f).dp
 
-            override val AccentColor: Color by _AccentColorState.collectAsState()
-            override val BackgroundColor: Color by _BackgroundColorState.collectAsState()
-            override val TextColor: Color by _TextColorState.collectAsState()
-            override val AccentTextColor: Color by _AccentTextColorState.collectAsState()
-            override val PlaceholderTextColor: Color by _PlaceholderTextColorState.collectAsState()
-            override val DisabledColor: Color by _DisabledColorState.collectAsState()
-            override val ErrorColor: Color by _ErrorColorState.collectAsState()
-            override val IconTintColor: Color by _IconTintColorState.collectAsState()
-            override val OkayColor: Color by _OkayColorState.collectAsState()
-            override val BorderlineBadColor: Color by _BorderlineBadColorState.collectAsState()
+            override val AccentColor: Color get() = appearanceResources.color(0, appThemeId)
+            override val BackgroundColor: Color get() = appearanceResources.color(1, appThemeId)
+            override val TextColor: Color get() = appearanceResources.color(2, appThemeId)
+            override val AccentTextColor: Color get() = appearanceResources.color(3, appThemeId)
+            override val PlaceholderTextColor: Color get() = appearanceResources.color(4, appThemeId)
+            override val DisabledColor: Color get() = appearanceResources.color(5, appThemeId)
+            override val ErrorColor: Color get() = appearanceResources.color(6, appThemeId)
+            override val IconTintColor: Color get() = appearanceResources.color(7, appThemeId)
+            override val OkayColor: Color get() = appearanceResources.color(8, appThemeId)
+            override val BorderlineBadColor: Color get() = appearanceResources.color(9, appThemeId)
 
-            override val drawablePathAITALogo: String by drawablePathAITALogoState.collectAsState()
+            override val drawablePathAITALogo: String get() = appearanceResources.catalog.drawable(0L, appThemeId)
             private val _drawableResAITALogo = remember { MutableStateFlow(Res.drawable._0_0) }
             override val drawableResAITALogo = _drawableResAITALogo.asStateFlow()
 
-            override val drawablePathIconPassword: String by drawablePathIconPasswordState.collectAsState()
+            override val drawablePathIconPassword: String get() = appearanceResources.catalog.drawable(1L, appThemeId)
             private val _drawableResIconPassword = remember { MutableStateFlow(Res.drawable._1_0) }
             override val drawableResIconPassword = _drawableResIconPassword.asStateFlow()
 
-            override val drawablePathIconSecurity: String by drawablePathIconSecurityState.collectAsState()
+            override val drawablePathIconSecurity: String get() = appearanceResources.catalog.drawable(1L, appThemeId)
             private val _drawableResIconSecurity = remember { MutableStateFlow(Res.drawable._1_0) }
             override val drawableResIconSecurity: StateFlow<DrawableResource> = _drawableResIconSecurity.asStateFlow()
 
-            override val drawablePathIconResponse: String by drawablePathIconResponseState.collectAsState()
+            override val drawablePathIconResponse: String get() = appearanceResources.catalog.drawable(53L, appThemeId)
             private val _drawableResIconResponse = remember { MutableStateFlow(Res.drawable._53_0) }
             override val drawableResIconResponse: StateFlow<DrawableResource> = _drawableResIconResponse.asStateFlow()
 
-            override val drawablePathIconCancel: String by drawablePathIconCancelState.collectAsState()
+            override val drawablePathIconCancel: String get() = appearanceResources.catalog.drawable(2L, appThemeId)
             private val _drawableResIconCancel = remember { MutableStateFlow(Res.drawable._2_0) }
             override val drawableResIconCancel = _drawableResIconCancel.asStateFlow()
 
-            override val drawablePathIconEyeHide: String by drawablePathIconEyeHideState.collectAsState()
+            override val drawablePathIconEyeHide: String get() = appearanceResources.catalog.drawable(3L, appThemeId)
             private val _drawableResIconEyeHide = remember { MutableStateFlow(Res.drawable._3_0) }
             override val drawableResIconEyeHide = _drawableResIconEyeHide.asStateFlow()
 
-            override val drawablePathIconEyeShow: String by drawablePathIconEyeShowState.collectAsState()
+            override val drawablePathIconEyeShow: String get() = appearanceResources.catalog.drawable(4L, appThemeId)
             private val _drawableResIconEyeShow = remember { MutableStateFlow(Res.drawable._4_0) }
             override val drawableResIconEyeShow = _drawableResIconEyeShow.asStateFlow()
 
-            override val drawablePathIconEmail: String by drawablePathIconEmailState.collectAsState()
+            override val drawablePathIconEmail: String get() = appearanceResources.catalog.drawable(5L, appThemeId)
             private val _drawableResIconEmail = remember { MutableStateFlow(Res.drawable._5_0) }
             override val drawableResIconEmail = _drawableResIconEmail.asStateFlow()
 
-            override val drawablePathIconPhone: String by drawablePathIconPhoneState.collectAsState()
+            override val drawablePathIconPhone: String get() = appearanceResources.catalog.drawable(6L, appThemeId)
             private val _drawableResIconPhone = remember { MutableStateFlow(Res.drawable._6_0) }
             override val drawableResIconPhone: StateFlow<DrawableResource> = _drawableResIconPhone.asStateFlow()
 
-            override val drawablePathIconExpandMore: String by drawablePathIconExpandMoreState.collectAsState()
+            override val drawablePathIconExpandMore: String get() = appearanceResources.catalog.drawable(7L, appThemeId)
             private val _drawableResIconExpandMore = remember { MutableStateFlow(Res.drawable._7_0) }
             override val drawableResIconExpandMore: StateFlow<DrawableResource> = _drawableResIconExpandMore.asStateFlow()
 
-            override val drawablePathIconExpandLess: String by drawablePathIconExpandLessState.collectAsState()
+            override val drawablePathIconExpandLess: String get() = appearanceResources.catalog.drawable(8L, appThemeId)
             private val _drawableResIconExpandLess = remember { MutableStateFlow(Res.drawable._8_0) }
             override val drawableResIconExpandLess: StateFlow<DrawableResource> = _drawableResIconExpandLess.asStateFlow()
 
-            override val drawablePathIconPerson: String by drawablePathIconPersonState.collectAsState()
+            override val drawablePathIconPerson: String get() = appearanceResources.catalog.drawable(9L, appThemeId)
             private val _drawableResIconPerson = remember { MutableStateFlow(Res.drawable._9_0) }
             override val drawableResIconPerson: StateFlow<DrawableResource> = _drawableResIconPerson.asStateFlow()
 
-            override val drawablePathIconTransactionSale: String by drawablePathIconTransactionSaleState.collectAsState()
+            override val drawablePathIconTransactionSale: String get() = appearanceResources.catalog.drawable(10L, appThemeId)
             private val _drawableResIconTransactionSale = remember { MutableStateFlow(Res.drawable._10_0) }
             override val drawableResIconTransactionSale: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSale.asStateFlow()
 
-            override val drawablePathIconTransactionReturn: String by drawablePathIconTransactionReturnState.collectAsState()
+            override val drawablePathIconTransactionReturn: String get() = appearanceResources.catalog.drawable(11L, appThemeId)
             private val _drawableResIconTransactionReturn = remember { MutableStateFlow(Res.drawable._11_0) }
             override val drawableResIconTransactionReturn: StateFlow<DrawableResource> =
                 _drawableResIconTransactionReturn.asStateFlow()
 
-            override val drawablePathIconTransactionSupply: String by drawablePathIconTransactionSupplyState.collectAsState()
+            override val drawablePathIconTransactionSupply: String get() = appearanceResources.catalog.drawable(12L, appThemeId)
             private val _drawableResIconTransactionSupply = remember { MutableStateFlow(Res.drawable._12_0) }
             override val drawableResIconTransactionSupply: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSupply.asStateFlow()
 
-            override val drawablePathIconTransactionSelection: String by drawablePathIconTransactionSelectionState.collectAsState()
+            override val drawablePathIconTransactionSelection: String get() = appearanceResources.catalog.drawable(57L, appThemeId)
             private val _drawableResIconTransactionSelection = remember { MutableStateFlow(Res.drawable._57_0) }
             override val drawableResIconTransactionSelection: StateFlow<DrawableResource> =
                 _drawableResIconTransactionSelection.asStateFlow()
 
-            override val drawablePathIconStock: String by drawablePathIconStockState.collectAsState()
+            override val drawablePathIconStock: String get() = appearanceResources.catalog.drawable(13L, appThemeId)
             private val _drawableResIconStock = remember { MutableStateFlow(Res.drawable._13_0) }
             override val drawableResIconStock: StateFlow<DrawableResource> = _drawableResIconStock.asStateFlow()
 
-            override val drawablePathIconMenu: String by drawablePathIconMenuState.collectAsState()
+            override val drawablePathIconMenu: String get() = appearanceResources.catalog.drawable(14L, appThemeId)
             private val _drawableResIconMenu = remember { MutableStateFlow(Res.drawable._14_0) }
             override val drawableResIconMenu: StateFlow<DrawableResource> = _drawableResIconMenu.asStateFlow()
 
-            override val drawablePathIconBackArrow: String by drawablePathIconBackArrowState.collectAsState()
+            override val drawablePathIconBackArrow: String get() = appearanceResources.catalog.drawable(15L, appThemeId)
             private val _drawableResIconBackArrow = remember { MutableStateFlow(Res.drawable._15_0) }
             override val drawableResIconBackArrow: StateFlow<DrawableResource> = _drawableResIconBackArrow.asStateFlow()
 
-            override val drawablePathIconAdd: String by drawablePathIconAddState.collectAsState()
+            override val drawablePathIconAdd: String get() = appearanceResources.catalog.drawable(16L, appThemeId)
             private val _drawableResIconAdd = remember { MutableStateFlow(Res.drawable._16_0) }
             override val drawableResIconAdd: StateFlow<DrawableResource> = _drawableResIconAdd.asStateFlow()
 
-            override val drawablePathIconUserAccount: String by drawablePathIconUserAccountState.collectAsState()
+            override val drawablePathIconUserAccount: String get() = appearanceResources.catalog.drawable(17L, appThemeId)
             private val _drawableResIconUserAccount = remember { MutableStateFlow(Res.drawable._17_0) }
             override val drawableResIconUserAccount: StateFlow<DrawableResource> = _drawableResIconUserAccount.asStateFlow()
 
-            override val drawablePathIconGoodsCategories: String by drawablePathIconGoodsCategoriesState.collectAsState()
+            override val drawablePathIconGoodsCategories: String get() = appearanceResources.catalog.drawable(18L, appThemeId)
             private val _drawableResIconGoodsCategories = remember { MutableStateFlow(Res.drawable._18_0) }
             override val drawableResIconGoodsCategories: StateFlow<DrawableResource> =
                 _drawableResIconGoodsCategories.asStateFlow()
 
-            override val drawablePathIconStores: String by drawablePathIconStoresState.collectAsState()
+            override val drawablePathIconStores: String get() = appearanceResources.catalog.drawable(19L, appThemeId)
             private val _drawableResIconStores = remember { MutableStateFlow(Res.drawable._19_0) }
             override val drawableResIconStores: StateFlow<DrawableResource> = _drawableResIconStores.asStateFlow()
 
-            override val drawablePathIconTransactionHistory: String by drawablePathIconTransactionHistoryState.collectAsState()
+            override val drawablePathIconTransactionHistory: String get() = appearanceResources.catalog.drawable(20L, appThemeId)
             private val _drawableResIconTransactionHistory = remember { MutableStateFlow(Res.drawable._20_0) }
             override val drawableResIconTransactionHistory: StateFlow<DrawableResource> =
                 _drawableResIconTransactionHistory.asStateFlow()
 
-            override val drawablePathIconLog: String by drawablePathIconLogState.collectAsState()
+            override val drawablePathIconLog: String get() = appearanceResources.catalog.drawable(49L, appThemeId)
             private val _drawableResIconLog = remember { MutableStateFlow(Res.drawable._49_0) }
             override val drawableResIconLog: StateFlow<DrawableResource> = _drawableResIconLog.asStateFlow()
 
-            override val drawablePathIconPromos: String by drawablePathIconPromosState.collectAsState()
+            override val drawablePathIconPromos: String get() = appearanceResources.catalog.drawable(50L, appThemeId)
             private val _drawableResIconPromos = remember { MutableStateFlow(Res.drawable._50_0) }
             override val drawableResIconPromos: StateFlow<DrawableResource> = _drawableResIconPromos.asStateFlow()
 
-            override val drawablePathIconAnalytics: String by drawablePathIconAnalyticsState.collectAsState()
+            override val drawablePathIconAnalytics: String get() = appearanceResources.catalog.drawable(21L, appThemeId)
             private val _drawableResIconAnalytics = remember { MutableStateFlow(Res.drawable._21_0) }
             override val drawableResIconAnalytics: StateFlow<DrawableResource> = _drawableResIconAnalytics.asStateFlow()
 
-            override val drawablePathIconAnalyticsReport: String by drawablePathIconAnalyticsReportState.collectAsState()
+            override val drawablePathIconAnalyticsReport: String get() = appearanceResources.catalog.drawable(62L, appThemeId)
             private val _drawableResIconAnalyticsReport = remember { MutableStateFlow(Res.drawable._62_0) }
             override val drawableResIconAnalyticsReport: StateFlow<DrawableResource> = _drawableResIconAnalyticsReport.asStateFlow()
 
-            override val drawablePathIconLabelPrinter: String by drawablePathIconLabelPrinterState.collectAsState()
+            override val drawablePathIconLabelPrinter: String get() = appearanceResources.catalog.drawable(63L, appThemeId)
             private val _drawableResIconLabelPrinter = remember { MutableStateFlow(Res.drawable._63_0) }
             override val drawableResIconLabelPrinter: StateFlow<DrawableResource> = _drawableResIconLabelPrinter.asStateFlow()
 
-            override val drawablePathIconBarcodeGenerate: String by drawablePathIconBarcodeGenerateState.collectAsState()
+            override val drawablePathIconBarcodeGenerate: String get() = appearanceResources.catalog.drawable(64L, appThemeId)
             private val _drawableResIconBarcodeGenerate = remember { MutableStateFlow(Res.drawable._64_0) }
             override val drawableResIconBarcodeGenerate: StateFlow<DrawableResource> = _drawableResIconBarcodeGenerate.asStateFlow()
 
-            override val drawablePathIconPrintTag: String by drawablePathIconPrintTagState.collectAsState()
+            override val drawablePathIconPrintTag: String get() = appearanceResources.catalog.drawable(65L, appThemeId)
             private val _drawableResIconPrintTag = remember { MutableStateFlow(Res.drawable._65_0) }
             override val drawableResIconPrintTag: StateFlow<DrawableResource> = _drawableResIconPrintTag.asStateFlow()
 
-            override val drawablePathIconWorkerRoleTemplates: String by drawablePathIconWorkerRoleTemplatesState.collectAsState()
+            override val drawablePathIconWorkerRoleTemplates: String get() = appearanceResources.catalog.drawable(66L, appThemeId)
             private val _drawableResIconWorkerRoleTemplates = remember { MutableStateFlow(Res.drawable._66_0) }
             override val drawableResIconWorkerRoleTemplates: StateFlow<DrawableResource> = _drawableResIconWorkerRoleTemplates.asStateFlow()
 
-            override val drawablePathIconStockHistory: String by drawablePathIconStockHistoryState.collectAsState()
+            override val drawablePathIconStockHistory: String get() = appearanceResources.catalog.drawable(67L, appThemeId)
             private val _drawableResIconStockHistory = remember { MutableStateFlow(Res.drawable._67_0) }
             override val drawableResIconStockHistory: StateFlow<DrawableResource> = _drawableResIconStockHistory.asStateFlow()
 
-            override val drawablePathIconAppModeStore: String by drawablePathIconAppModeStoreState.collectAsState()
+            override val drawablePathIconAppModeStore: String get() = appearanceResources.catalog.drawable(68L, appThemeId)
             private val _drawableResIconAppModeStore = remember { MutableStateFlow(Res.drawable._68_0) }
             override val drawableResIconAppModeStore: StateFlow<DrawableResource> = _drawableResIconAppModeStore.asStateFlow()
 
-            override val drawablePathIconAppModeBuyer: String by drawablePathIconAppModeBuyerState.collectAsState()
+            override val drawablePathIconAppModeBuyer: String get() = appearanceResources.catalog.drawable(69L, appThemeId)
             private val _drawableResIconAppModeBuyer = remember { MutableStateFlow(Res.drawable._69_0) }
             override val drawableResIconAppModeBuyer: StateFlow<DrawableResource> = _drawableResIconAppModeBuyer.asStateFlow()
 
-            override val drawablePathIconAppModeSupplier: String by drawablePathIconAppModeSupplierState.collectAsState()
+            override val drawablePathIconAppModeSupplier: String get() = appearanceResources.catalog.drawable(70L, appThemeId)
             private val _drawableResIconAppModeSupplier = remember { MutableStateFlow(Res.drawable._70_0) }
             override val drawableResIconAppModeSupplier: StateFlow<DrawableResource> = _drawableResIconAppModeSupplier.asStateFlow()
 
-            override val drawablePathIconAppModeManufacturer: String by drawablePathIconAppModeManufacturerState.collectAsState()
+            override val drawablePathIconAppModeManufacturer: String get() = appearanceResources.catalog.drawable(71L, appThemeId)
             private val _drawableResIconAppModeManufacturer = remember { MutableStateFlow(Res.drawable._71_0) }
             override val drawableResIconAppModeManufacturer: StateFlow<DrawableResource> = _drawableResIconAppModeManufacturer.asStateFlow()
 
-            override val drawablePathIconSupplierCatalog: String by drawablePathIconSupplierCatalogState.collectAsState()
+            override val drawablePathIconSupplierCatalog: String get() = appearanceResources.catalog.drawable(72L, appThemeId)
             private val _drawableResIconSupplierCatalog = remember { MutableStateFlow(Res.drawable._72_0) }
             override val drawableResIconSupplierCatalog: StateFlow<DrawableResource> = _drawableResIconSupplierCatalog.asStateFlow()
 
-            override val drawablePathIconSupplierContracts: String by drawablePathIconSupplierContractsState.collectAsState()
+            override val drawablePathIconSupplierContracts: String get() = appearanceResources.catalog.drawable(76L, appThemeId)
             private val _drawableResIconSupplierContracts = remember { MutableStateFlow(Res.drawable._76_0) }
             override val drawableResIconSupplierContracts: StateFlow<DrawableResource> = _drawableResIconSupplierContracts.asStateFlow()
 
-            override val drawablePathIconSupplierPartners: String by drawablePathIconSupplierPartnersState.collectAsState()
+            override val drawablePathIconSupplierPartners: String get() = appearanceResources.catalog.drawable(75L, appThemeId)
             private val _drawableResIconSupplierPartners = remember { MutableStateFlow(Res.drawable._75_0) }
             override val drawableResIconSupplierPartners: StateFlow<DrawableResource> = _drawableResIconSupplierPartners.asStateFlow()
 
-            override val drawablePathIconSupplierDemandRadar: String by drawablePathIconSupplierDemandRadarState.collectAsState()
+            override val drawablePathIconSupplierDemandRadar: String get() = appearanceResources.catalog.drawable(77L, appThemeId)
             private val _drawableResIconSupplierDemandRadar = remember { MutableStateFlow(Res.drawable._77_0) }
             override val drawableResIconSupplierDemandRadar: StateFlow<DrawableResource> = _drawableResIconSupplierDemandRadar.asStateFlow()
 
-            override val drawablePathIconSupplierBackorderRecovery: String by drawablePathIconSupplierBackorderRecoveryState.collectAsState()
+            override val drawablePathIconSupplierBackorderRecovery: String get() = appearanceResources.catalog.drawable(91L, appThemeId)
             private val _drawableResIconSupplierBackorderRecovery = remember { MutableStateFlow(Res.drawable._91_0) }
             override val drawableResIconSupplierBackorderRecovery: StateFlow<DrawableResource> = _drawableResIconSupplierBackorderRecovery.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryOwner: String by drawablePathIconSupplierRecoveryOwnerState.collectAsState()
+            override val drawablePathIconSupplierRecoveryOwner: String get() = appearanceResources.catalog.drawable(92L, appThemeId)
             private val _drawableResIconSupplierRecoveryOwner = remember { MutableStateFlow(Res.drawable._92_0) }
             override val drawableResIconSupplierRecoveryOwner: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryOwner.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryClock: String by drawablePathIconSupplierRecoveryClockState.collectAsState()
+            override val drawablePathIconSupplierRecoveryClock: String get() = appearanceResources.catalog.drawable(93L, appThemeId)
             private val _drawableResIconSupplierRecoveryClock = remember { MutableStateFlow(Res.drawable._93_0) }
             override val drawableResIconSupplierRecoveryClock: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryClock.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryProof: String by drawablePathIconSupplierRecoveryProofState.collectAsState()
+            override val drawablePathIconSupplierRecoveryProof: String get() = appearanceResources.catalog.drawable(94L, appThemeId)
             private val _drawableResIconSupplierRecoveryProof = remember { MutableStateFlow(Res.drawable._94_0) }
             override val drawableResIconSupplierRecoveryProof: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryProof.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryResolution: String by drawablePathIconSupplierRecoveryResolutionState.collectAsState()
+            override val drawablePathIconSupplierRecoveryResolution: String get() = appearanceResources.catalog.drawable(95L, appThemeId)
             private val _drawableResIconSupplierRecoveryResolution = remember { MutableStateFlow(Res.drawable._95_0) }
             override val drawableResIconSupplierRecoveryResolution: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryResolution.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryContact: String by drawablePathIconSupplierRecoveryContactState.collectAsState()
+            override val drawablePathIconSupplierRecoveryContact: String get() = appearanceResources.catalog.drawable(96L, appThemeId)
             private val _drawableResIconSupplierRecoveryContact = remember { MutableStateFlow(Res.drawable._96_0) }
             override val drawableResIconSupplierRecoveryContact: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryContact.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryRisk: String by drawablePathIconSupplierRecoveryRiskState.collectAsState()
+            override val drawablePathIconSupplierRecoveryRisk: String get() = appearanceResources.catalog.drawable(97L, appThemeId)
             private val _drawableResIconSupplierRecoveryRisk = remember { MutableStateFlow(Res.drawable._97_0) }
             override val drawableResIconSupplierRecoveryRisk: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryRisk.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryConfidence: String by drawablePathIconSupplierRecoveryConfidenceState.collectAsState()
+            override val drawablePathIconSupplierRecoveryConfidence: String get() = appearanceResources.catalog.drawable(98L, appThemeId)
             private val _drawableResIconSupplierRecoveryConfidence = remember { MutableStateFlow(Res.drawable._98_0) }
             override val drawableResIconSupplierRecoveryConfidence: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryConfidence.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryFollowUp: String by drawablePathIconSupplierRecoveryFollowUpState.collectAsState()
+            override val drawablePathIconSupplierRecoveryFollowUp: String get() = appearanceResources.catalog.drawable(99L, appThemeId)
             private val _drawableResIconSupplierRecoveryFollowUp = remember { MutableStateFlow(Res.drawable._99_0) }
             override val drawableResIconSupplierRecoveryFollowUp: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryFollowUp.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryHandoff: String by drawablePathIconSupplierRecoveryHandoffState.collectAsState()
+            override val drawablePathIconSupplierRecoveryHandoff: String get() = appearanceResources.catalog.drawable(100L, appThemeId)
             private val _drawableResIconSupplierRecoveryHandoff = remember { MutableStateFlow(Res.drawable._100_0) }
             override val drawableResIconSupplierRecoveryHandoff: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryHandoff.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryClosure: String by drawablePathIconSupplierRecoveryClosureState.collectAsState()
+            override val drawablePathIconSupplierRecoveryClosure: String get() = appearanceResources.catalog.drawable(101L, appThemeId)
             private val _drawableResIconSupplierRecoveryClosure = remember { MutableStateFlow(Res.drawable._101_0) }
             override val drawableResIconSupplierRecoveryClosure: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryClosure.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryLedger: String by drawablePathIconSupplierRecoveryLedgerState.collectAsState()
+            override val drawablePathIconSupplierRecoveryLedger: String get() = appearanceResources.catalog.drawable(102L, appThemeId)
             private val _drawableResIconSupplierRecoveryLedger = remember { MutableStateFlow(Res.drawable._102_0) }
             override val drawableResIconSupplierRecoveryLedger: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryLedger.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryTriage: String by drawablePathIconSupplierRecoveryTriageState.collectAsState()
+            override val drawablePathIconSupplierRecoveryTriage: String get() = appearanceResources.catalog.drawable(103L, appThemeId)
             private val _drawableResIconSupplierRecoveryTriage = remember { MutableStateFlow(Res.drawable._103_0) }
             override val drawableResIconSupplierRecoveryTriage: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryTriage.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryCommand: String by drawablePathIconSupplierRecoveryCommandState.collectAsState()
+            override val drawablePathIconSupplierRecoveryCommand: String get() = appearanceResources.catalog.drawable(104L, appThemeId)
             private val _drawableResIconSupplierRecoveryCommand = remember { MutableStateFlow(Res.drawable._104_0) }
             override val drawableResIconSupplierRecoveryCommand: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCommand.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryPromiseShield: String by drawablePathIconSupplierRecoveryPromiseShieldState.collectAsState()
+            override val drawablePathIconSupplierRecoveryPromiseShield: String get() = appearanceResources.catalog.drawable(105L, appThemeId)
             private val _drawableResIconSupplierRecoveryPromiseShield = remember { MutableStateFlow(Res.drawable._105_0) }
             override val drawableResIconSupplierRecoveryPromiseShield: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryPromiseShield.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryDesk: String by drawablePathIconSupplierRecoveryDeskState.collectAsState()
+            override val drawablePathIconSupplierRecoveryDesk: String get() = appearanceResources.catalog.drawable(106L, appThemeId)
             private val _drawableResIconSupplierRecoveryDesk = remember { MutableStateFlow(Res.drawable._106_0) }
             override val drawableResIconSupplierRecoveryDesk: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryDesk.asStateFlow()
 
-            override val drawablePathIconSupplierRecoveryWave: String by drawablePathIconSupplierRecoveryWaveState.collectAsState()
+            override val drawablePathIconSupplierRecoveryWave: String get() = appearanceResources.catalog.drawable(107L, appThemeId)
             private val _drawableResIconSupplierRecoveryWave = remember { MutableStateFlow(Res.drawable._107_0) }
             override val drawableResIconSupplierRecoveryWave: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryWave.asStateFlow()
-            override val drawablePathIconSupplierRecoveryAging: String by drawablePathIconSupplierRecoveryAgingState.collectAsState()
+            override val drawablePathIconSupplierRecoveryAging: String get() = appearanceResources.catalog.drawable(108L, appThemeId)
             private val _drawableResIconSupplierRecoveryAging = remember { MutableStateFlow(Res.drawable._108_0) }
             override val drawableResIconSupplierRecoveryAging: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAging.asStateFlow()
-            override val drawablePathIconSupplierRecoveryBottleneck: String by drawablePathIconSupplierRecoveryBottleneckState.collectAsState()
+            override val drawablePathIconSupplierRecoveryBottleneck: String get() = appearanceResources.catalog.drawable(109L, appThemeId)
             private val _drawableResIconSupplierRecoveryBottleneck = remember { MutableStateFlow(Res.drawable._109_0) }
             override val drawableResIconSupplierRecoveryBottleneck: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryBottleneck.asStateFlow()
-            override val drawablePathIconSupplierRecoveryLoad: String by drawablePathIconSupplierRecoveryLoadState.collectAsState()
+            override val drawablePathIconSupplierRecoveryLoad: String get() = appearanceResources.catalog.drawable(110L, appThemeId)
             private val _drawableResIconSupplierRecoveryLoad = remember { MutableStateFlow(Res.drawable._110_0) }
             override val drawableResIconSupplierRecoveryLoad: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryLoad.asStateFlow()
-            override val drawablePathIconSupplierRecoveryImpact: String by drawablePathIconSupplierRecoveryImpactState.collectAsState()
+            override val drawablePathIconSupplierRecoveryImpact: String get() = appearanceResources.catalog.drawable(111L, appThemeId)
             private val _drawableResIconSupplierRecoveryImpact = remember { MutableStateFlow(Res.drawable._111_0) }
             override val drawableResIconSupplierRecoveryImpact: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryImpact.asStateFlow()
-            override val drawablePathIconSupplierRecoveryCommit: String by drawablePathIconSupplierRecoveryCommitState.collectAsState()
+            override val drawablePathIconSupplierRecoveryCommit: String get() = appearanceResources.catalog.drawable(112L, appThemeId)
             private val _drawableResIconSupplierRecoveryCommit = remember { MutableStateFlow(Res.drawable._112_0) }
             override val drawableResIconSupplierRecoveryCommit: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCommit.asStateFlow()
-            override val drawablePathIconSupplierRecoveryAllocation: String by drawablePathIconSupplierRecoveryAllocationState.collectAsState()
+            override val drawablePathIconSupplierRecoveryAllocation: String get() = appearanceResources.catalog.drawable(113L, appThemeId)
             private val _drawableResIconSupplierRecoveryAllocation = remember { MutableStateFlow(Res.drawable._113_0) }
             override val drawableResIconSupplierRecoveryAllocation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAllocation.asStateFlow()
-            override val drawablePathIconSupplierRecoveryException: String by drawablePathIconSupplierRecoveryExceptionState.collectAsState()
+            override val drawablePathIconSupplierRecoveryException: String get() = appearanceResources.catalog.drawable(114L, appThemeId)
             private val _drawableResIconSupplierRecoveryException = remember { MutableStateFlow(Res.drawable._114_0) }
             override val drawableResIconSupplierRecoveryException: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryException.asStateFlow()
-            override val drawablePathIconSupplierRecoveryCause: String by drawablePathIconSupplierRecoveryCauseState.collectAsState()
+            override val drawablePathIconSupplierRecoveryCause: String get() = appearanceResources.catalog.drawable(115L, appThemeId)
             private val _drawableResIconSupplierRecoveryCause = remember { MutableStateFlow(Res.drawable._115_0) }
             override val drawableResIconSupplierRecoveryCause: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCause.asStateFlow()
-            override val drawablePathIconSupplierRecoveryVerification: String by drawablePathIconSupplierRecoveryVerificationState.collectAsState()
+            override val drawablePathIconSupplierRecoveryVerification: String get() = appearanceResources.catalog.drawable(116L, appThemeId)
             private val _drawableResIconSupplierRecoveryVerification = remember { MutableStateFlow(Res.drawable._116_0) }
             override val drawableResIconSupplierRecoveryVerification: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryVerification.asStateFlow()
-            override val drawablePathIconSupplierRecoveryApproval: String by drawablePathIconSupplierRecoveryApprovalState.collectAsState()
+            override val drawablePathIconSupplierRecoveryApproval: String get() = appearanceResources.catalog.drawable(117L, appThemeId)
             private val _drawableResIconSupplierRecoveryApproval = remember { MutableStateFlow(Res.drawable._117_0) }
             override val drawableResIconSupplierRecoveryApproval: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryApproval.asStateFlow()
-            override val drawablePathIconSupplierRecoveryExecution: String by drawablePathIconSupplierRecoveryExecutionState.collectAsState()
+            override val drawablePathIconSupplierRecoveryExecution: String get() = appearanceResources.catalog.drawable(118L, appThemeId)
             private val _drawableResIconSupplierRecoveryExecution = remember { MutableStateFlow(Res.drawable._118_0) }
             override val drawableResIconSupplierRecoveryExecution: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryExecution.asStateFlow()
-            override val drawablePathIconSupplierRecoveryRelease: String by drawablePathIconSupplierRecoveryReleaseState.collectAsState()
+            override val drawablePathIconSupplierRecoveryRelease: String get() = appearanceResources.catalog.drawable(119L, appThemeId)
             private val _drawableResIconSupplierRecoveryRelease = remember { MutableStateFlow(Res.drawable._119_0) }
             override val drawableResIconSupplierRecoveryRelease: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryRelease.asStateFlow()
-            override val drawablePathIconSupplierRecoverySeal: String by drawablePathIconSupplierRecoverySealState.collectAsState()
+            override val drawablePathIconSupplierRecoverySeal: String get() = appearanceResources.catalog.drawable(120L, appThemeId)
             private val _drawableResIconSupplierRecoverySeal = remember { MutableStateFlow(Res.drawable._120_0) }
             override val drawableResIconSupplierRecoverySeal: StateFlow<DrawableResource> = _drawableResIconSupplierRecoverySeal.asStateFlow()
-            override val drawablePathIconSupplierRecoveryCloseout: String by drawablePathIconSupplierRecoveryCloseoutState.collectAsState()
+            override val drawablePathIconSupplierRecoveryCloseout: String get() = appearanceResources.catalog.drawable(121L, appThemeId)
             private val _drawableResIconSupplierRecoveryCloseout = remember { MutableStateFlow(Res.drawable._121_0) }
             override val drawableResIconSupplierRecoveryCloseout: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryCloseout.asStateFlow()
-            override val drawablePathIconSupplierRecoveryReopen: String by drawablePathIconSupplierRecoveryReopenState.collectAsState()
+            override val drawablePathIconSupplierRecoveryReopen: String get() = appearanceResources.catalog.drawable(122L, appThemeId)
             private val _drawableResIconSupplierRecoveryReopen = remember { MutableStateFlow(Res.drawable._122_0) }
             override val drawableResIconSupplierRecoveryReopen: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReopen.asStateFlow()
-            override val drawablePathIconSupplierRecoveryReconciliation: String by drawablePathIconSupplierRecoveryReconciliationState.collectAsState()
+            override val drawablePathIconSupplierRecoveryReconciliation: String get() = appearanceResources.catalog.drawable(123L, appThemeId)
             private val _drawableResIconSupplierRecoveryReconciliation = remember { MutableStateFlow(Res.drawable._123_0) }
             override val drawableResIconSupplierRecoveryReconciliation: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryReconciliation.asStateFlow()
-            override val drawablePathIconSupplierRecoveryAudit: String by drawablePathIconSupplierRecoveryAuditState.collectAsState()
+            override val drawablePathIconSupplierRecoveryAudit: String get() = appearanceResources.catalog.drawable(124L, appThemeId)
             private val _drawableResIconSupplierRecoveryAudit = remember { MutableStateFlow(Res.drawable._124_0) }
             override val drawableResIconSupplierRecoveryAudit: StateFlow<DrawableResource> = _drawableResIconSupplierRecoveryAudit.asStateFlow()
 
-            override val drawablePathIconSupplierDispatch: String by drawablePathIconSupplierDispatchState.collectAsState()
+            override val drawablePathIconSupplierDispatch: String get() = appearanceResources.catalog.drawable(78L, appThemeId)
             private val _drawableResIconSupplierDispatch = remember { MutableStateFlow(Res.drawable._78_0) }
             override val drawableResIconSupplierDispatch: StateFlow<DrawableResource> = _drawableResIconSupplierDispatch.asStateFlow()
 
-            override val drawablePathIconSupplierTermsGuard: String by drawablePathIconSupplierTermsGuardState.collectAsState()
+            override val drawablePathIconSupplierTermsGuard: String get() = appearanceResources.catalog.drawable(89L, appThemeId)
             private val _drawableResIconSupplierTermsGuard = remember { MutableStateFlow(Res.drawable._89_0) }
             override val drawableResIconSupplierTermsGuard: StateFlow<DrawableResource> = _drawableResIconSupplierTermsGuard.asStateFlow()
 
-            override val drawablePathIconBuyerAgeRestriction: String by drawablePathIconBuyerAgeRestrictionState.collectAsState()
+            override val drawablePathIconBuyerAgeRestriction: String get() = appearanceResources.catalog.drawable(73L, appThemeId)
             private val _drawableResIconBuyerAgeRestriction = remember { MutableStateFlow(Res.drawable._73_0) }
             override val drawableResIconBuyerAgeRestriction: StateFlow<DrawableResource> = _drawableResIconBuyerAgeRestriction.asStateFlow()
 
-            override val drawablePathIconTransactionTimeRestriction: String by drawablePathIconTransactionTimeRestrictionState.collectAsState()
+            override val drawablePathIconTransactionTimeRestriction: String get() = appearanceResources.catalog.drawable(74L, appThemeId)
             private val _drawableResIconTransactionTimeRestriction = remember { MutableStateFlow(Res.drawable._74_0) }
             override val drawableResIconTransactionTimeRestriction: StateFlow<DrawableResource> = _drawableResIconTransactionTimeRestriction.asStateFlow()
 
-            override val drawablePathIconWorkers: String by drawablePathIconWorkersState.collectAsState()
+            override val drawablePathIconWorkers: String get() = appearanceResources.catalog.drawable(22L, appThemeId)
             private val _drawableResIconWorkers = remember { MutableStateFlow(Res.drawable._22_0) }
             override val drawableResIconWorkers: StateFlow<DrawableResource> = _drawableResIconWorkers.asStateFlow()
 
-            override val drawablePathIconSuppliers: String by drawablePathIconSuppliersState.collectAsState()
+            override val drawablePathIconSuppliers: String get() = appearanceResources.catalog.drawable(23L, appThemeId)
             private val _drawableResIconSuppliers = remember { MutableStateFlow(Res.drawable._23_0) }
             override val drawableResIconSuppliers: StateFlow<DrawableResource> = _drawableResIconSuppliers.asStateFlow()
 
-            override val drawablePathIconDebtors: String by drawablePathIconDebtorsState.collectAsState()
+            override val drawablePathIconDebtors: String get() = appearanceResources.catalog.drawable(24L, appThemeId)
             private val _drawableResIconDebtors = remember { MutableStateFlow(Res.drawable._24_0) }
             override val drawableResIconDebtors: StateFlow<DrawableResource> = _drawableResIconDebtors.asStateFlow()
 
-            override val drawablePathIconDevices: String by drawablePathIconDevicesState.collectAsState()
+            override val drawablePathIconDevices: String get() = appearanceResources.catalog.drawable(25L, appThemeId)
             private val _drawableResIconDevices = remember { MutableStateFlow(Res.drawable._25_0) }
             override val drawableResIconDevices: StateFlow<DrawableResource> = _drawableResIconDevices.asStateFlow()
 
-            override val drawablePathIconAppLanguage: String by drawablePathIconAppLanguageState.collectAsState()
+            override val drawablePathIconAppLanguage: String get() = appearanceResources.catalog.drawable(26L, appThemeId)
             private val _drawableResIconAppLanguage = remember { MutableStateFlow(Res.drawable._26_0) }
             override val drawableResIconAppLanguage: StateFlow<DrawableResource> = _drawableResIconAppLanguage.asStateFlow()
 
-            override val drawablePathIconAppTheme: String by drawablePathIconAppThemeState.collectAsState()
+            override val drawablePathIconAppTheme: String get() = appearanceResources.catalog.drawable(27L, appThemeId)
             private val _drawableResIconAppTheme = remember { MutableStateFlow(Res.drawable._27_0) }
             override val drawableResIconAppTheme: StateFlow<DrawableResource> = _drawableResIconAppTheme.asStateFlow()
 
-            override val drawablePathIconAppScale: String by drawablePathIconAppScaleState.collectAsState()
+            override val drawablePathIconAppScale: String get() = appearanceResources.catalog.drawable(48L, appThemeId)
             private val _drawableResIconAppScale = remember { MutableStateFlow(Res.drawable._48_0) }
             override val drawableResIconAppScale: StateFlow<DrawableResource> = _drawableResIconAppScale.asStateFlow()
 
-            override val drawablePathIconCheck: String by drawablePathIconCheckState.collectAsState()
+            override val drawablePathIconCheck: String get() = appearanceResources.catalog.drawable(28L, appThemeId)
             private val _drawableResIconCheck = remember { MutableStateFlow(Res.drawable._28_0) }
             override val drawableResIconCheck: StateFlow<DrawableResource> = _drawableResIconCheck.asStateFlow()
 
-            override val drawablePathIconEdit: String by drawablePathIconEditState.collectAsState()
+            override val drawablePathIconEdit: String get() = appearanceResources.catalog.drawable(29L, appThemeId)
             private val _drawableResIconEdit = remember { MutableStateFlow(Res.drawable._29_0) }
             override val drawableResIconEdit: StateFlow<DrawableResource> = _drawableResIconEdit.asStateFlow()
 
-            override val drawablePathIconSettings: String by drawablePathIconSettingsState.collectAsState()
+            override val drawablePathIconSettings: String get() = appearanceResources.catalog.drawable(30L, appThemeId)
             private val _drawableResIconSettings = remember { MutableStateFlow(Res.drawable._30_0) }
             override val drawableResIconSettings: StateFlow<DrawableResource> = _drawableResIconSettings.asStateFlow()
 
-            override val drawablePathIconSearch: String by drawablePathIconSearchState.collectAsState()
+            override val drawablePathIconSearch: String get() = appearanceResources.catalog.drawable(31L, appThemeId)
             private val _drawableResIconSearch = remember { MutableStateFlow(Res.drawable._31_0) }
             override val drawableResIconSearch: StateFlow<DrawableResource> = _drawableResIconSearch.asStateFlow()
 
-            override val drawablePathIconBarcodeCamScanner: String by drawablePathIconBarcodeCamScannerState.collectAsState()
+            override val drawablePathIconBarcodeCamScanner: String get() = appearanceResources.catalog.drawable(32L, appThemeId)
             private val _drawableResIconBarcodeCamScanner = remember { MutableStateFlow(Res.drawable._32_0) }
             override val drawableResIconBarcodeCamScanner: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeCamScanner.asStateFlow()
 
-            override val drawablePathIconBarcodeScanner: String by drawablePathIconBarcodeScannerState.collectAsState()
+            override val drawablePathIconBarcodeScanner: String get() = appearanceResources.catalog.drawable(51L, appThemeId)
             private val _drawableResIconBarcodeScanner = remember { MutableStateFlow(Res.drawable._51_0) }
             override val drawableResIconBarcodeScanner: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeScanner.asStateFlow()
 
-            override val drawablePathIconBarcodeType: String by drawablePathIconBarcodeTypeState.collectAsState()
+            override val drawablePathIconBarcodeType: String get() = appearanceResources.catalog.drawable(55L, appThemeId)
             private val _drawableResIconBarcodeType = remember { MutableStateFlow(Res.drawable._55_0) }
             override val drawableResIconBarcodeType: StateFlow<DrawableResource> =
                 _drawableResIconBarcodeType.asStateFlow()
 
-            override val drawablePathIconVoiceInput: String by drawablePathIconVoiceInputState.collectAsState()
+            override val drawablePathIconVoiceInput: String get() = appearanceResources.catalog.drawable(52L, appThemeId)
             private val _drawableResIconVoiceInput = remember { MutableStateFlow(Res.drawable._52_0) }
             override val drawableResIconVoiceInput: StateFlow<DrawableResource> =
                 _drawableResIconVoiceInput.asStateFlow()
 
-            override val drawablePathIconDelete: String by drawablePathIconDeleteState.collectAsState()
+            override val drawablePathIconDelete: String get() = appearanceResources.catalog.drawable(33L, appThemeId)
             private val _drawableResIconDelete = remember { MutableStateFlow(Res.drawable._33_0) }
             override val drawableResIconDelete: StateFlow<DrawableResource> = _drawableResIconDelete.asStateFlow()
 
-            override val drawablePathIconExit: String by drawablePathIconExitState.collectAsState()
+            override val drawablePathIconExit: String get() = appearanceResources.catalog.drawable(34L, appThemeId)
             private val _drawableResIconExit = remember { MutableStateFlow(Res.drawable._34_0) }
             override val drawableResIconExit: StateFlow<DrawableResource> = _drawableResIconExit.asStateFlow()
 
-            override val drawablePathIconSwitch: String by drawablePathIconSwitchState.collectAsState()
+            override val drawablePathIconSwitch: String get() = appearanceResources.catalog.drawable(35L, appThemeId)
             private val _drawableResIconSwitch = remember { MutableStateFlow(Res.drawable._35_0) }
             override val drawableResIconSwitch: StateFlow<DrawableResource> = _drawableResIconSwitch.asStateFlow()
 
-            override val drawablePathIconSort: String by drawablePathIconSortState.collectAsState()
+            override val drawablePathIconSort: String get() = appearanceResources.catalog.drawable(61L, appThemeId)
             private val _drawableResIconSort = remember { MutableStateFlow(Res.drawable._61_0) }
             override val drawableResIconSort: StateFlow<DrawableResource> = _drawableResIconSort.asStateFlow()
 
-            override val drawablePathIconCart: String by drawablePathIconCartState.collectAsState()
+            override val drawablePathIconCart: String get() = appearanceResources.catalog.drawable(36L, appThemeId)
             private val _drawableResIconCart = remember { MutableStateFlow(Res.drawable._36_0) }
             override val drawableResIconCart: StateFlow<DrawableResource> = _drawableResIconCart.asStateFlow()
 
-            override val drawablePathIconAddCart: String by drawablePathIconAddCartState.collectAsState()
+            override val drawablePathIconAddCart: String get() = appearanceResources.catalog.drawable(37L, appThemeId)
             private val _drawableResIconAddCart = remember { MutableStateFlow(Res.drawable._37_0) }
             override val drawableResIconAddCart: StateFlow<DrawableResource> = _drawableResIconAddCart.asStateFlow()
 
-            override val drawablePathIconSubtract: String by drawablePathIconSubtractState.collectAsState()
+            override val drawablePathIconSubtract: String get() = appearanceResources.catalog.drawable(38L, appThemeId)
             private val _drawableResIconSubtract = remember { MutableStateFlow(Res.drawable._38_0) }
             override val drawableResIconSubtract: StateFlow<DrawableResource> = _drawableResIconSubtract.asStateFlow()
 
-            override val drawablePathIconReceipt: String by drawablePathIconReceiptState.collectAsState()
+            override val drawablePathIconReceipt: String get() = appearanceResources.catalog.drawable(39L, appThemeId)
             private val _drawableResIconReceipt = remember { MutableStateFlow(Res.drawable._39_0) }
             override val drawableResIconReceipt: StateFlow<DrawableResource> = _drawableResIconReceipt.asStateFlow()
 
-            override val drawablePathIconFinances: String by drawablePathIconFinancesState.collectAsState()
+            override val drawablePathIconFinances: String get() = appearanceResources.catalog.drawable(40L, appThemeId)
             private val _drawableResIconFinances = remember { MutableStateFlow(Res.drawable._40_0) }
             override val drawableResIconFinances = _drawableResIconFinances.asStateFlow()
 
-            override val drawablePathIconClipboard: String by drawablePathIconClipboardState.collectAsState()
+            override val drawablePathIconClipboard: String get() = appearanceResources.catalog.drawable(41L, appThemeId)
             private val _drawableResIconClipboard = remember { MutableStateFlow(Res.drawable._41_0) }
             override val drawableResIconClipboard: StateFlow<DrawableResource> = _drawableResIconClipboard.asStateFlow()
 
-            override val drawablePathIconSupport: String by drawablePathIconSupportState.collectAsState()
+            override val drawablePathIconSupport: String get() = appearanceResources.catalog.drawable(42L, appThemeId)
             private val _drawableResIconSupport = remember { MutableStateFlow(Res.drawable._42_0) }
             override val drawableResIconSupport: StateFlow<DrawableResource> = _drawableResIconSupport.asStateFlow()
 
-            override val drawablePathIconSubscription: String by drawablePathIconSubscriptionState.collectAsState()
+            override val drawablePathIconSubscription: String get() = appearanceResources.catalog.drawable(43L, appThemeId)
             private val _drawableResIconSubscription = remember { MutableStateFlow(Res.drawable._43_0) }
             override val drawableResIconSubscription: StateFlow<DrawableResource> = _drawableResIconSubscription.asStateFlow()
 
-            override val drawablePathIconThemeLight: String by drawablePathIconThemeLightState.collectAsState()
+            override val drawablePathIconThemeLight: String get() = appearanceResources.catalog.drawable(44L, appThemeId)
             private val _drawableResIconThemeLight = remember { MutableStateFlow(Res.drawable._44_0) }
             override val drawableResIconThemeLight: StateFlow<DrawableResource> = _drawableResIconThemeLight.asStateFlow()
 
-            override val drawablePathIconThemeDark: String by drawablePathIconThemeDarkState.collectAsState()
+            override val drawablePathIconThemeDark: String get() = appearanceResources.catalog.drawable(45L, appThemeId)
             private val _drawableResIconThemeDark = remember { MutableStateFlow(Res.drawable._45_0) }
             override val drawableResIconThemeDark: StateFlow<DrawableResource> = _drawableResIconThemeDark.asStateFlow()
 
-            override val drawablePathIconShare: String by drawablePathIconShareState.collectAsState()
+            override val drawablePathIconShare: String get() = appearanceResources.catalog.drawable(46L, appThemeId)
             private val _drawableResIconShare = remember { MutableStateFlow(Res.drawable._46_0) }
             override val drawableResIconShare: StateFlow<DrawableResource> = _drawableResIconShare.asStateFlow()
 
-            override val drawablePathIconWhatsApp: String by drawablePathIconWhatsAppState.collectAsState()
+            override val drawablePathIconWhatsApp: String get() = appearanceResources.catalog.drawable(47L, appThemeId)
             private val _drawableResIconWhatsApp = remember { MutableStateFlow(Res.drawable._47_0) }
             override val drawableResIconWhatsApp: StateFlow<DrawableResource> = _drawableResIconWhatsApp.asStateFlow()
 
-            override val drawablePathIconRefresh: String by drawablePathIconRefreshState.collectAsState()
+            override val drawablePathIconRefresh: String get() = appearanceResources.catalog.drawable(54L, appThemeId)
             private val _drawableResIconRefresh = remember { MutableStateFlow(Res.drawable._54_0) }
             override val drawableResIconRefresh: StateFlow<DrawableResource> = _drawableResIconRefresh.asStateFlow()
 
@@ -5317,36 +5290,17 @@ object AppConfiguration {
                     _isNarrowScreenState.emit(maxWidth.value < stateValues.wideScreenMinWidth)
                 }
 
-                LaunchedEffect(Unit) {
-                    val resourceStrings = loadResourceStrings()
-                    val resourceDimensions = loadResourceDimensions()
-                    val resourceColors = loadResourceColors()
-                    val resourceDrawables = loadResourceDrawablePaths()
-
-                    updateStrings(
-                        strings = stringsState.payloadValue ?: resourceStrings,
-                        resourceStrings = resourceStrings
-                    )
-
-                    updateDimensions(
-                        dimensions = dimensionsState.payloadValue ?: resourceDimensions,
-                        resourceDimensions = resourceDimensions
-                    )
-
-                    updateColors(
-                        colors = colorsState.payloadValue ?: resourceColors,
-                        resourceColors = resourceColors
-                    )
-
-                    updateDrawables(
-                        drawables = drawablesState.payloadValue ?: resourceDrawables,
-                        resourceDrawables = resourceDrawables
-                    )
-
+                LaunchedEffect(stateValues.appThemeId) {
                     stateValues.updateDrawableResources()
+                }
+
+                LaunchedEffect(Unit) {
+                    val resourceStrings = withContext(Dispatchers.Default) { loadResourceStrings() }
+                    val resourceDimensions = withContext(Dispatchers.Default) { loadResourceDimensions() }
+                    val resourceColors = withContext(Dispatchers.Default) { loadResourceColors() }
+                    val resourceDrawables = withContext(Dispatchers.Default) { loadResourceDrawablePaths() }
                     Navigation.startAppNavigationPersistence()
                     Navigation.startTransactionNavigationPersistence()
-
                     launch {
                         _isNarrowScreenState.collect { isNarrow ->
                             Navigation.awaitAppNavigationRestore()
@@ -5359,92 +5313,39 @@ object AppConfiguration {
                             Navigation.UserAuth.init(isNarrow)
                         }
                     }
-
-                    // One owner per resource projection. Old configuration responses update
-                    // the data, not the chosen locale/theme/scale; collectLatest cancels obsolete work.
+                    launch {
+                        combine(stringsState.payload, dimensionsState.payload, colorsState.payload, drawablesState.payload) { strings, dimensions, colors, drawables ->
+                            Unit
+                        }.collectLatest {
+                            // Capture the actual typed sources; all variants are built on a worker.
+                            val strings = stringsState.payloadValue
+                            val dimensions = dimensionsState.payloadValue
+                            val colors = colorsState.payloadValue
+                            val drawables = drawablesState.payloadValue
+                            val resources = withContext(Dispatchers.Default) {
+                                UiAppearanceResources(AppearanceCatalog.build(
+                                    strings.orEmpty(), resourceStrings, dimensions.orEmpty(), resourceDimensions,
+                                    colors.orEmpty(), resourceColors, drawables.orEmpty(), resourceDrawables
+                                ))
+                            }
+                            ensureActive()
+                            uiAppearanceResourcesState.value = resources
+                        }
+                    }
                     launch {
                         combine(stringsState.payload, appLanguageState) { strings, _ -> strings }
                             .collectLatest { strings -> updateStrings(strings ?: resourceStrings, resourceStrings) }
                     }
                     launch {
-                        combine(dimensionsState.payload, appSizeModeIdState) { dimensions, _ -> dimensions }
-                            .collectLatest { dimensions -> updateDimensions(dimensions ?: resourceDimensions, resourceDimensions) }
-                    }
-                    launch {
-                        combine(colorsState.payload, drawablesState.payload, appThemeIdState) { colors, drawables, _ ->
-                            colors to drawables
-                        }.collectLatest { (colors, drawables) ->
-                            updateColors(colors ?: resourceColors, resourceColors)
-                            updateDrawables(drawables ?: resourceDrawables, resourceDrawables)
-                            stateValues.updateDrawableResources()
-                        }
+                        combine(drawablesState.payload, appThemeIdState) { drawables, _ -> drawables }
+                            .collectLatest { drawables -> updateDrawables(drawables ?: resourceDrawables, resourceDrawables) }
                     }
                 }
             }
         }
     }
 
-    private suspend fun updateDimensions(
-        dimensions: List<StylizedDimensionGroupDataModel>,
-        resourceDimensions: List<StylizedDimensionGroupDataModel>
-    ) {
-        val sizeModeId = normalizeAppSizeModePreference(appSizeModeIdState.value)
 
-        fun dimensionValue(id: Long, default: Float): Float {
-            return dimensions.extractValue(id, sizeModeId)
-                ?: resourceDimensions.extractValue(id, sizeModeId)
-                ?: dimensions.extractValue(id, DEFAULT_APP_SIZE_MODE_ID)
-                ?: resourceDimensions.extractValue(id, DEFAULT_APP_SIZE_MODE_ID)
-                ?: default
-        }
-
-        _wideScreenMinWidthState.emit(dimensionValue(4L, 600f))
-        _boundWidgetWidthState.emit(dimensionValue(9L, if (sizeModeId == 1L) 340f else 300f).dp)
-
-        _textSizeState.emit(dimensionValue(0L, if (sizeModeId == 1L) 16f else 14f).sp)
-        _titleTextSizeState.emit(dimensionValue(1L, if (sizeModeId == 1L) 23f else 20f).sp)
-        _accentTextSizeState.emit(dimensionValue(2L, if (sizeModeId == 1L) 18f else 16f).sp)
-        _smallTextSizeState.emit(dimensionValue(3L, if (sizeModeId == 1L) 14f else 12f).sp)
-
-        _focusedBorderWidthState.emit(dimensionValue(5L, 1f).dp)
-        _unfocusedBorderWidthState.emit(dimensionValue(6L, 0.5f).dp)
-
-        _cornerRadiusState.emit(dimensionValue(7L, if (sizeModeId == 1L) 16f else 14f).dp)
-        _iconSizeState.emit(dimensionValue(8L, if (sizeModeId == 1L) 28f else 24f).dp)
-        _textFieldHeightMultiplierRelativeToTextSizeState.emit(dimensionValue(10L, if (sizeModeId == 1L) 2.75f else 2.6f))
-        _textFieldHeightState.emit((_textSizeState.value.value * _textFieldHeightMultiplierRelativeToTextSizeState.value).dp)
-        _wideTextFieldHeightState.emit((_textSizeState.value.value * 4f * _textFieldHeightMultiplierRelativeToTextSizeState.value).dp)
-        _textFieldIconPaddingState.emit(dimensionValue(11L, if (sizeModeId == 1L) 10f else 9f).dp)
-        _marginTextFieldState.emit(dimensionValue(12L, if (sizeModeId == 1L) 10f else 8f).dp)
-        _marginTextFieldGroupState.emit(dimensionValue(13L, if (sizeModeId == 1L) 28f else 24f).dp)
-    }
-
-
-    private suspend fun updateColors(
-        colors: List<StylizedColorGroupDataModel>,
-        resourceColors: List<StylizedColorGroupDataModel>
-    ) {
-        val themeId = appThemeIdState.value
-
-        fun colorHex(id: Long, fallback: String): String {
-            return colors.extractColor(id, themeId)
-                ?: resourceColors.extractColor(id, themeId)
-                ?: colors.extractColor(id, 0L)
-                ?: resourceColors.extractColor(id, 0L)
-                ?: fallback
-        }
-
-        _AccentColorState.emit(colorHex(0L, "#ffffba24").toColor())
-        _BackgroundColorState.emit(colorHex(1L, if (themeId == 1L) "#ff111111" else "#ffffffff").toColor())
-        _TextColorState.emit(colorHex(2L, if (themeId == 1L) "#ffffffff" else "#ff000000").toColor())
-        _AccentTextColorState.emit(colorHex(3L, "#ffffffff").toColor())
-        _PlaceholderTextColorState.emit(colorHex(4L, if (themeId == 1L) "#aaffffff" else "#aa000000").toColor())
-        _DisabledColorState.emit(colorHex(5L, "#ffa7a7a7").toColor())
-        _ErrorColorState.emit(colorHex(6L, "#ffff0000").toColor())
-        _IconTintColorState.emit(colorHex(7L, if (themeId == 1L) "#ffffffff" else "#ff000000").toColor())
-        _OkayColorState.emit(colorHex(8L, "#ff6bb522").toColor())
-        _BorderlineBadColorState.emit(colorHex(9L, "#ffffa500").toColor())
-    }
 }
 
 internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataModel> {

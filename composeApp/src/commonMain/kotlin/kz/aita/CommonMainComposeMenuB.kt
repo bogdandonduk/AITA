@@ -2654,6 +2654,7 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
     selectedAnalyticsSupplierId: String,
     selectedAnalyticsCategoryId: String,
     scopedTransactions: List<TransactionDataModel>,
+    preparedAnalytics: PreparedAnalytics,
     stock: List<GoodsItemDataModel>,
     batches: List<GoodsBatchDataModel>,
     suppliers: List<SupplierDataModel>,
@@ -2666,9 +2667,9 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
 ): AnalyticsReportSnapshotDataModel {
     fun row(title: String, value: String, note: String = "") = AnalyticsReportRowDataModel(title, value, note)
     val reportCurrency = dashboard?.currencyCode?.takeIf { it.isNotBlank() } ?: currencyCode
-    val sales = scopedTransactions.analyticsTyped("purchase")
-    val returns = scopedTransactions.analyticsTyped("return")
-    val supply = scopedTransactions.analyticsTyped("accept")
+    val sales = preparedAnalytics.type("purchase")
+    val returns = preparedAnalytics.type("return")
+    val supply = preparedAnalytics.type("accept")
     val periodText = if (periodPresetId == "all") localizedStringResource(425, "All period") else "$startDateText — $endDateText"
     val scopeText = analyticsReportScopeText(analyticsScopeType, selectedAnalyticsGoodsItemId, selectedAnalyticsSupplierId, selectedAnalyticsCategoryId)
     val storeName = stateValues.stores.orEmpty().findStoreOrBranchForUi(stateValues.activeStoreId)?.name?.visibleLocalizedString(stateValues.appLanguage, stateValues.activeStoreId.orEmpty().take(8))
@@ -2688,26 +2689,26 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
             row(stateValues.stringDebt, d.debtTotal.money(reportCurrency))
         )
     } ?: listOf(
-        row(localizedStringResource(694, "Gross sales"), sales.sumOf { it.analyticsTotal() }.money(reportCurrency)),
-        row(localizedStringResource(695, "Returns amount"), returns.sumOf { it.analyticsTotal() }.money(reportCurrency)),
-        row(localizedStringResource(706, "Transactions"), scopedTransactions.size.toString()),
-        row(stateValues.stringItems, scopedTransactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }.cleanNumber()),
-        row(stateValues.stringCash, scopedTransactions.sumOf { it.paidCash }.money(reportCurrency)),
-        row(localizedStringResource(357, "Cashless"), scopedTransactions.sumOf { it.paidCard }.money(reportCurrency))
+        row(localizedStringResource(694, "Gross sales"), sales.total.money(reportCurrency)),
+        row(localizedStringResource(695, "Returns amount"), returns.total.money(reportCurrency)),
+        row(localizedStringResource(706, "Transactions"), preparedAnalytics.dashboard.transactionCount.toString()),
+        row(stateValues.stringItems, preparedAnalytics.types.values.sumOf { it.quantity }.cleanNumber()),
+        row(stateValues.stringCash, preparedAnalytics.types.values.sumOf { it.cash }.money(reportCurrency)),
+        row(localizedStringResource(357, "Cashless"), preparedAnalytics.types.values.sumOf { it.card }.money(reportCurrency))
     )
 
-    fun transactionRows(transactions: List<TransactionDataModel>): List<AnalyticsReportRowDataModel> {
-        val total = transactions.sumOf { it.analyticsTotal() }
-        val cash = transactions.sumOf { it.paidCash }
-        val cashless = transactions.sumOf { it.paidCard }
+    fun transactionRows(transactions: AnalyticsTypeSummary): List<AnalyticsReportRowDataModel> {
+        val total = transactions.total
+        val cash = transactions.cash
+        val cashless = transactions.card
         val debt = (total - cash - cashless).coerceAtLeast(0.0)
         return listOf(
-            row(localizedStringResource(706, "Transactions"), transactions.size.toString()),
+            row(localizedStringResource(706, "Transactions"), transactions.count.toString()),
             row(stateValues.stringTotal, total.money(reportCurrency)),
-            row(stateValues.stringCash, cash.money(reportCurrency)),
-            row(localizedStringResource(357, "Cashless"), cashless.money(reportCurrency)),
-            row(stateValues.stringDebt, debt.money(reportCurrency)),
-            row(stateValues.stringItems, transactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }.cleanNumber())
+            row(stateValues.stringCash, if (transactions.paymentsKnown) cash.money(reportCurrency) else "—"),
+            row(localizedStringResource(357, "Cashless"), if (transactions.paymentsKnown) cashless.money(reportCurrency) else "—"),
+            row(stateValues.stringDebt, if (transactions.paymentsKnown) debt.money(reportCurrency) else "—"),
+            row(stateValues.stringItems, transactions.quantity.cleanNumber())
         )
     }
 
@@ -2719,32 +2720,32 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
         )
         MenuAnalyticsTab.Acceptance -> transactionRows(supply)
         MenuAnalyticsTab.Stock -> listOf(
-            row(stateValues.stringItems, stock.size.toString()),
-            row(localizedStringResource(280, "Active items"), stock.count { it.isActive }.toString()),
-            row(stateValues.stringBatches, batches.size.toString()),
-            row(localizedStringResource(284, "Active batches"), batches.count { it.isActive }.toString()),
+            row(stateValues.stringItems, if (preparedAnalytics.stock.available) preparedAnalytics.stock.items.toString() else "—"),
+            row(localizedStringResource(280, "Active items"), if (preparedAnalytics.stock.available) preparedAnalytics.stock.activeItems.toString() else "—"),
+            row(stateValues.stringBatches, if (preparedAnalytics.stock.available) preparedAnalytics.stock.batches.toString() else "—"),
+            row(localizedStringResource(284, "Active batches"), if (preparedAnalytics.stock.available) preparedAnalytics.stock.activeBatches.toString() else "—"),
             row(localizedStringResource(683, "Inventory value at sale price"), (dashboard?.stockValueAtSalePrice ?: 0.0).money(reportCurrency)),
             row(localizedStringResource(684, "Inventory value at supply cost"), (dashboard?.stockValueAtSupplyPrice ?: 0.0).money(reportCurrency)),
             row(localizedStringResource(685, "Low stock items"), (dashboard?.lowStockItemCount ?: 0).toString()),
             row(localizedStringResource(687, "Expired batches"), (dashboard?.expiredBatchCount ?: 0).toString())
         )
         MenuAnalyticsTab.Suppliers -> listOf(
-            row(stateValues.stringSuppliers, suppliers.count { it.isActive }.toString()),
-            row(localizedStringResource(706, "Transactions"), supply.size.toString()),
-            row(localizedStringResource(707, "Accepted goods value"), (dashboard?.supplyCost ?: supply.sumOf { it.analyticsTotal() }).money(reportCurrency))
+            row(stateValues.stringSuppliers, if (preparedAnalytics.remoteOnly) "—" else suppliers.count { it.isActive }.toString()),
+            row(localizedStringResource(706, "Transactions"), supply.count.toString()),
+            row(localizedStringResource(707, "Accepted goods value"), (dashboard?.supplyCost ?: supply.total).money(reportCurrency))
         )
         MenuAnalyticsTab.Workers -> listOf(
             row(stateValues.stringWorkers, workers.count { it.isActive }.toString()),
             row(localizedStringResource(654, "Admin"), workers.count { it.roleId == WORKER_ROLE_ADMIN || it.roleId == WORKER_ROLE_OWNER }.toString()),
             row(localizedStringResource(655, "Worker"), workers.count { it.roleId == WORKER_ROLE_STANDARD }.toString()),
-            row(localizedStringResource(706, "Transactions"), scopedTransactions.size.toString())
+            row(localizedStringResource(706, "Transactions"), preparedAnalytics.dashboard.transactionCount.toString())
         )
-        MenuAnalyticsTab.CashRegister -> listOf(
+        MenuAnalyticsTab.CashRegister -> if (!preparedAnalytics.cashAvailable) listOf(row(localizedStringResource(417, "Events"), "—")) else listOf(
             row(localizedStringResource(327, "Current amount"), (cashRegister?.currentAmount ?: 0.0).money(reportCurrency)),
             row(localizedStringResource(417, "Events"), cashRegisterEvents.size.toString()),
-            row(stateValues.stringSale, sales.sumOf { it.paidCash }.money(reportCurrency)),
-            row(stateValues.stringReturn, returns.sumOf { it.paidCash }.money(reportCurrency)),
-            row(localizedStringResource(662, "Cash extractions"), cashRegisterEvents.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.sumOf { it.amount }.money(reportCurrency))
+            row(stateValues.stringSale, preparedAnalytics.saleCash.money(reportCurrency)),
+            row(stateValues.stringReturn, preparedAnalytics.returnCash.money(reportCurrency)),
+            row(localizedStringResource(662, "Cash extractions"), preparedAnalytics.extractedCash.money(reportCurrency))
         )
     }
 
@@ -2965,32 +2966,39 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         )
 
         val activeStoreId = stateValues.activeStoreId
+        if (!currentUserCanViewAnalytics(activeStoreId)) {
+            MessageText(text = if (activeStoreId.isNullOrBlank())
+                authUiText("Select a store to view analytics", "Выберите магазин для просмотра аналитики", "Аналитиканы көру үшін дүкенді таңдаңыз")
+                else authUiText("Analytics access is not available", "Нет доступа к аналитике", "Аналитикаға қолжетімділік жоқ"))
+            return@Column
+        }
 
         LaunchedEffect(activeStoreId) {
+            AnalyticsWorkspace.refreshServerTotalsIfNeeded()
             activeStoreId?.let { storeId ->
-                getTransactions(storeId)
-                getStock(storeId)
-                getStockBatches(storeId)
-                getSuppliers()
-                getCashRegister(storeId)
-                getStoreWorkers(storeId)
-                getIncomingWorkerRequests(storeId)
+                if (currentUserCanViewTransactionHistory(storeId)) getTransactions(storeId)
+                if (currentUserCanViewStock(storeId)) { getStock(storeId); getStockBatches(storeId) }
+                if (currentUserCanViewSuppliers(storeId)) getSuppliers()
+                if (currentUserCanViewCashRegister(storeId)) getCashRegister(storeId)
+                if (currentUserCanViewWorkers(storeId)) getStoreWorkers(storeId)
+                if (currentUserCanDecideWorkerRequests(storeId)) getIncomingWorkerRequests(storeId)
                 getMyWorkerMemberships()
             }
         }
 
-        val transactionsPayload by transactionsState.payload.collectAsState()
-        val transactions = transactionsPayload.orEmpty()
         val cashRegisterPayload by cashRegisterState.payload.collectAsState()
-        val cashRegisterEventsPayload by cashRegisterEventsState.payload.collectAsState()
-        val cashRegister = cashRegisterPayload
-        val cashRegisterEvents = cashRegisterEventsPayload.orEmpty()
-        val serverAnalyticsPayload by storeAnalyticsDashboardState.payload.collectAsState()
+        val cashRegister = cashRegisterPayload?.takeIf { it.storeId == activeStoreId }
 
-        val initialPeriod = remember { transactionHistoryPresetDates("30") }
-        var periodPresetId by rememberSaveable { mutableStateOf("30") }
-        var startDateText by rememberSaveable { mutableStateOf(initialPeriod.first) }
-        var endDateText by rememberSaveable { mutableStateOf(initialPeriod.second) }
+        val initialSelection = remember(activeStoreId) { AnalyticsWorkspace.selectionForCurrentStore() }
+        val initialPeriod = remember(activeStoreId) {
+            if (initialSelection.periodId == "custom") {
+                initialSelection.customStartMillis.takeIf { it > 0L }?.toStockDateInputText().orEmpty() to
+                    initialSelection.customEndMillis.takeIf { it < Long.MAX_VALUE && it > 0L }?.let { (it - 1L).toStockDateInputText() }.orEmpty()
+            } else transactionHistoryPresetDates(initialSelection.periodId)
+        }
+        var periodPresetId by rememberSaveable(activeStoreId) { mutableStateOf(initialSelection.periodId) }
+        var startDateText by rememberSaveable(activeStoreId) { mutableStateOf(initialPeriod.first) }
+        var endDateText by rememberSaveable(activeStoreId) { mutableStateOf(initialPeriod.second) }
         var calendarTarget by rememberSaveable { mutableStateOf<String?>(null) }
 
         calendarTarget?.let { target ->
@@ -3019,14 +3027,19 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             )
         }
 
-        var analyticsScopeType by rememberSaveable { mutableStateOf(ANALYTICS_SCOPE_ALL) }
-        var selectedAnalyticsGoodsItemId by rememberSaveable { mutableStateOf("") }
-        var selectedAnalyticsSupplierId by rememberSaveable { mutableStateOf("") }
-        var selectedAnalyticsCategoryId by rememberSaveable { mutableStateOf("") }
+        var analyticsScopeType by rememberSaveable(activeStoreId) { mutableStateOf(when {
+            initialSelection.goodsItemId != null -> ANALYTICS_SCOPE_GOODS_ITEM
+            initialSelection.supplierId != null -> ANALYTICS_SCOPE_SUPPLIER
+            initialSelection.categoryId != null -> ANALYTICS_SCOPE_CATEGORY
+            else -> ANALYTICS_SCOPE_ALL
+        }) }
+        var selectedAnalyticsGoodsItemId by rememberSaveable(activeStoreId) { mutableStateOf(initialSelection.goodsItemId.orEmpty()) }
+        var selectedAnalyticsSupplierId by rememberSaveable(activeStoreId) { mutableStateOf(initialSelection.supplierId.orEmpty()) }
+        var selectedAnalyticsCategoryId by rememberSaveable(activeStoreId) { mutableStateOf(initialSelection.categoryId.orEmpty()) }
 
         val stockForAnalytics = stateValues.stock.orEmpty()
         val stockBatchesForAnalytics = stateValues.stockBatches.orEmpty()
-        val suppliersForAnalytics = stateValues.suppliers.orEmpty().filter { it.isActive }
+        val suppliersForAnalytics = stateValues.suppliers.orEmpty()
         val categoriesForAnalytics = stateValues.goodsCategories.orEmpty()
 
         val analyticsGoodsItemFilter = selectedAnalyticsGoodsItemId.takeIf { analyticsScopeType == ANALYTICS_SCOPE_GOODS_ITEM && it.isNotBlank() }
@@ -3037,96 +3050,30 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         val endExclusiveMillis = stockDateInputTextToLocalDate(endDateText)
             ?.let { transactionHistoryPlusDays(it, 1).atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds() }
 
-        val scopedTransactions = remember(transactions, activeStoreId, periodPresetId, startDateText, endDateText, stockForAnalytics, stockBatchesForAnalytics, analyticsGoodsItemFilter, analyticsSupplierFilter, analyticsCategoryFilter) {
-            val periodTransactions = transactions
-                .filter { transaction -> activeStoreId == null || transaction.storeId == activeStoreId }
-                .filter { transaction ->
-                    if (periodPresetId == "all") {
-                        true
-                    } else {
-                        val afterStart = startMillis?.let { transaction.timeMillis >= it } ?: true
-                        val beforeEnd = endExclusiveMillis?.let { transaction.timeMillis < it } ?: true
-                        afterStart && beforeEnd
-                    }
-                }
-            analyticsScopedTransactions(
-                transactions = periodTransactions,
-                stock = stockForAnalytics,
-                batches = stockBatchesForAnalytics,
-                goodsItemIdFilter = analyticsGoodsItemFilter,
-                supplierIdFilter = analyticsSupplierFilter,
-                categoryIdFilter = analyticsCategoryFilter
-            )
-        }
+        val analyticsSelection = AnalyticsSelection(
+            periodId = periodPresetId,
+            customStartMillis = if (periodPresetId == "custom") startMillis ?: 0L else 0L,
+            customEndMillis = if (periodPresetId == "custom") endExclusiveMillis ?: Long.MAX_VALUE else Long.MAX_VALUE,
+            goodsItemId = analyticsGoodsItemFilter, supplierId = analyticsSupplierFilter, categoryId = analyticsCategoryFilter
+        )
+        val preparedState by AnalyticsWorkspace.state.collectAsState()
+        val analyticsFailed by AnalyticsWorkspace.failure.collectAsState()
+        val prepared = preparedState?.takeIf { AnalyticsWorkspace.isCurrent(it, analyticsSelection) }
+        val scopedTransactions = prepared?.transactions.orEmpty()
+        val scopedCashRegisterEvents = prepared?.events.orEmpty()
+        val analyticsDashboard = prepared?.dashboard
 
-        val scopedCashRegisterEvents = remember(cashRegisterEvents, activeStoreId, periodPresetId, startDateText, endDateText) {
-            cashRegisterEvents
-                .filter { event -> activeStoreId == null || event.storeId == activeStoreId }
-                .filter { event ->
-                    if (periodPresetId == "all") {
-                        true
-                    } else {
-                        val afterStart = startMillis?.let { event.timeMillis >= it } ?: true
-                        val beforeEnd = endExclusiveMillis?.let { event.timeMillis < it } ?: true
-                        afterStart && beforeEnd
-                    }
-                }
-        }
-
-        val analyticsStartMillis = if (periodPresetId == "all") 0L else startMillis ?: 0L
-        val analyticsEndMillis = if (periodPresetId == "all") Long.MAX_VALUE else endExclusiveMillis ?: Long.MAX_VALUE
-
-        LaunchedEffect(activeStoreId, analyticsStartMillis, analyticsEndMillis, analyticsGoodsItemFilter, analyticsSupplierFilter, analyticsCategoryFilter) {
-            activeStoreId?.takeIf { currentUserCanViewAnalytics(it) }?.let { storeId ->
-                getStoreAnalytics(
-                    storeId = storeId,
-                    startMillis = analyticsStartMillis,
-                    endMillisExclusive = analyticsEndMillis,
-                    goodsItemIdFilter = analyticsGoodsItemFilter,
-                    supplierIdFilter = analyticsSupplierFilter,
-                    categoryIdFilter = analyticsCategoryFilter
-                )
+        LaunchedEffect(periodPresetId, prepared?.window) {
+            // Relative periods advance while the app stays open; keep their displayed dates in sync.
+            if (periodPresetId != "custom") {
+                val range = transactionHistoryPresetDates(periodPresetId)
+                startDateText = range.first
+                endDateText = range.second
             }
         }
-
-        val localAnalyticsDashboard = remember(
-            activeStoreId,
-            analyticsStartMillis,
-            analyticsEndMillis,
-            transactions,
-            stockForAnalytics,
-            stockBatchesForAnalytics,
-            cashRegister?.currencyCode,
-            analyticsGoodsItemFilter,
-            analyticsSupplierFilter,
-            analyticsCategoryFilter
-        ) {
-            activeStoreId?.let { storeId ->
-                buildStoreAnalyticsDashboard(
-                    storeId = storeId,
-                    startMillis = analyticsStartMillis,
-                    endMillisExclusive = analyticsEndMillis,
-                    transactions = transactions,
-                    stock = stockForAnalytics,
-                    batches = stockBatchesForAnalytics,
-                    fallbackCurrencyCode = cashRegister?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode(),
-                    goodsItemIdFilter = analyticsGoodsItemFilter,
-                    supplierIdFilter = analyticsSupplierFilter,
-                    categoryIdFilter = analyticsCategoryFilter
-                )
-            }
+        LaunchedEffect(activeStoreId, analyticsSelection) {
+            AnalyticsWorkspace.select(analyticsSelection)
         }
-
-        val analyticsDashboard = serverAnalyticsPayload
-            ?.takeIf { dashboard ->
-                dashboard.storeId == activeStoreId &&
-                    dashboard.startMillis == analyticsStartMillis &&
-                    dashboard.endMillisExclusive == analyticsEndMillis &&
-                    dashboard.goodsItemIdFilter.orEmpty() == analyticsGoodsItemFilter.orEmpty() &&
-                    dashboard.supplierIdFilter.orEmpty() == analyticsSupplierFilter.orEmpty() &&
-                    dashboard.categoryIdFilter.orEmpty() == analyticsCategoryFilter.orEmpty()
-            }
-            ?: localAnalyticsDashboard
 
         val selectedTabContent = tabRowWidget(
             modifier = Modifier
@@ -3233,57 +3180,21 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             textSize = stateValues.smallTextSize
         )
 
-        val analyticsGoodsItemDomains = remember(stockForAnalytics, stateValues.appLanguage) {
-            stockForAnalytics
-                .sortedBy { item -> item.name.extractLocalizedString(stateValues.appLanguage) ?: item.id }
-                .map { item ->
-                    SelectableDomain(
-                        id = item.id,
-                        displayId = item.allBarcodeValues().firstOrNull().orEmpty().ifBlank { item.id.take(8) }.toLocalizedSingleMain(),
-                        name = item.name.ifEmpty { listOf(LocalizedStringDataModel("main", item.id.take(8))) },
-                        iconPath = stateValues.drawablePathIconStock,
-                        iconRes = stateValues.drawableResIconStock.value
-                    )
-                }
-        }
-        val analyticsSupplierDomains = remember(suppliersForAnalytics, stateValues.appLanguage) {
-            suppliersForAnalytics
-                .sortedBy { supplier -> supplier.name.extractLocalizedString(stateValues.appLanguage) ?: supplier.id }
-                .map { supplier ->
-                    SelectableDomain(
-                        id = supplier.id,
-                        displayId = supplier.id.take(8).toLocalizedSingleMain(),
-                        name = supplier.name.ifEmpty { listOf(LocalizedStringDataModel("main", supplier.id.take(8))) },
-                        iconPath = stateValues.drawablePathIconSuppliers,
-                        iconRes = stateValues.drawableResIconSuppliers.value
-                    )
-                }
-        }
-        val analyticsCategoryDomains = remember(categoriesForAnalytics, stateValues.appLanguage) {
-            categoriesForAnalytics
-                .sortedBy { category -> category.name.extractLocalizedString(stateValues.appLanguage) ?: category.id }
-                .map { category ->
-                    SelectableDomain(
-                        id = category.id,
-                        displayId = category.id.take(8).toLocalizedSingleMain(),
-                        name = category.name.ifEmpty { listOf(LocalizedStringDataModel("main", category.id.take(8))) },
-                        iconPath = stateValues.drawablePathIconGoodsCategories,
-                        iconRes = stateValues.drawableResIconGoodsCategories.value
-                    )
-                }
+        val analyticsDomains = key(activeStoreId, analyticsScopeType, stateValues.appLanguage) {
+            analyticsScopeDomains(analyticsScopeType, stockForAnalytics, suppliersForAnalytics, categoriesForAnalytics)
         }
 
         when (analyticsScopeType) {
             ANALYTICS_SCOPE_GOODS_ITEM -> {
-                if (analyticsGoodsItemDomains.isNotEmpty()) {
-                    val selectedInitial = selectedAnalyticsGoodsItemId.takeIf { selected -> analyticsGoodsItemDomains.any { it.id == selected } }
-                        ?: analyticsGoodsItemDomains.first().id
+                if (analyticsDomains.isNotEmpty()) {
+                    val selectedInitial = selectedAnalyticsGoodsItemId.takeIf { selected -> analyticsDomains.any { it.id == selected } }
+                        ?: analyticsDomains.first().id
                     val selector = dropdownListWidget(
                         modifier = Modifier
                             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
-                        domains = analyticsGoodsItemDomains,
+                        domains = analyticsDomains,
                         selectedInitial = selectedInitial,
                         showId = true,
                         showName = true,
@@ -3293,15 +3204,15 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 }
             }
             ANALYTICS_SCOPE_SUPPLIER -> {
-                if (analyticsSupplierDomains.isNotEmpty()) {
-                    val selectedInitial = selectedAnalyticsSupplierId.takeIf { selected -> analyticsSupplierDomains.any { it.id == selected } }
-                        ?: analyticsSupplierDomains.first().id
+                if (analyticsDomains.isNotEmpty()) {
+                    val selectedInitial = selectedAnalyticsSupplierId.takeIf { selected -> analyticsDomains.any { it.id == selected } }
+                        ?: analyticsDomains.first().id
                     val selector = dropdownListWidget(
                         modifier = Modifier
                             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
-                        domains = analyticsSupplierDomains,
+                        domains = analyticsDomains,
                         selectedInitial = selectedInitial,
                         showId = true,
                         showName = true,
@@ -3311,15 +3222,15 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 }
             }
             ANALYTICS_SCOPE_CATEGORY -> {
-                if (analyticsCategoryDomains.isNotEmpty()) {
-                    val selectedInitial = selectedAnalyticsCategoryId.takeIf { selected -> analyticsCategoryDomains.any { it.id == selected } }
-                        ?: analyticsCategoryDomains.first().id
+                if (analyticsDomains.isNotEmpty()) {
+                    val selectedInitial = selectedAnalyticsCategoryId.takeIf { selected -> analyticsDomains.any { it.id == selected } }
+                        ?: analyticsDomains.first().id
                     val selector = dropdownListWidget(
                         modifier = Modifier
                             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
-                        domains = analyticsCategoryDomains,
+                        domains = analyticsDomains,
                         selectedInitial = selectedInitial,
                         showId = true,
                         showName = true,
@@ -3347,92 +3258,107 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             selectedAnalyticsSupplierId,
             selectedAnalyticsCategoryId
         ) { getCurrentTimeMillis() }
-        val analyticsReportSnapshot = buildAnalyticsReportSnapshotForUi(
-            selectedTab = selectedTab,
-            periodPresetId = periodPresetId,
-            startDateText = startDateText,
-            endDateText = endDateText,
-            analyticsScopeType = analyticsScopeType,
-            selectedAnalyticsGoodsItemId = selectedAnalyticsGoodsItemId,
-            selectedAnalyticsSupplierId = selectedAnalyticsSupplierId,
-            selectedAnalyticsCategoryId = selectedAnalyticsCategoryId,
-            scopedTransactions = scopedTransactions,
-            stock = stockForAnalytics,
-            batches = stockBatchesForAnalytics,
-            suppliers = suppliersForAnalytics,
-            workers = workers,
-            cashRegister = cashRegister,
-            cashRegisterEvents = scopedCashRegisterEvents,
-            dashboard = analyticsDashboard,
-            currencyCode = currencyCode,
-            generatedAtMillis = analyticsReportGeneratedAt
-        )
-
-        if (showAnalyticsReportSheet) {
-            AnalyticsReportBottomSheet(
-                snapshot = analyticsReportSnapshot,
-                onDismiss = { showAnalyticsReportSheet = false }
+        if (prepared == null) {
+            MessageText(
+                modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextFieldGroup),
+                text = if (analyticsFailed) authUiText("Could not prepare analytics", "Не удалось подготовить аналитику", "Аналитиканы дайындау мүмкін болмады")
+                    else authUiText("Preparing analytics…", "Подготавливаем аналитику…", "Аналитика дайындалуда…")
             )
-        }
-
-        when (selectedTab) {
-            MenuAnalyticsTab.Sales -> {
-                MenuAnalyticsTransactionScreen(
-                    title = stateValues.stringSale,
-                    transactionType = "purchase",
-                    transactions = scopedTransactions,
-                    currencyCode = currencyCode,
-                    emptyText = localizedStringResource(258, "No sales in this period"),
-                    analyticsDashboard = analyticsDashboard
-                )
-            }
-
-            MenuAnalyticsTab.Returns -> {
-                MenuAnalyticsTransactionScreen(
-                    title = stateValues.stringReturn,
-                    transactionType = "return",
-                    transactions = scopedTransactions,
-                    currencyCode = currencyCode,
-                    emptyText = localizedStringResource(275, "No returns in this period"),
-                    analyticsDashboard = analyticsDashboard
-                )
-            }
-
-            MenuAnalyticsTab.Acceptance -> {
-                MenuAnalyticsTransactionScreen(
-                    title = stateValues.stringSupply,
-                    transactionType = "accept",
-                    transactions = scopedTransactions,
-                    currencyCode = currencyCode,
-                    emptyText = localizedStringResource(276, "No supply transactions in this period"),
-                    analyticsDashboard = analyticsDashboard
-                )
-            }
-
-            MenuAnalyticsTab.Stock -> MenuAnalyticsStockScreen(analyticsDashboard)
-
-            MenuAnalyticsTab.Suppliers -> {
-                MenuAnalyticsSuppliersScreen(
-                    transactions = scopedTransactions,
-                    dashboard = analyticsDashboard,
-                    currencyCode = currencyCode
-                )
-            }
-
-            MenuAnalyticsTab.Workers -> {
-                MenuAnalyticsWorkersScreen(
+            if (analyticsFailed) actionButton(text = authUiText("Retry", "Повторить", "Қайталау"), onClick = { AnalyticsWorkspace.retry() })
+        } else {
+            if (prepared.remoteOnly) MessageText(
+                modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextField),
+                text = authUiText("Server totals; detailed records require additional access", "Итоги сервера; подробные записи требуют дополнительных прав", "Сервер қорытындылары; толық жазбаларға қосымша рұқсат қажет")
+            )
+            if (showAnalyticsReportSheet) {
+                val analyticsReportSnapshot = buildAnalyticsReportSnapshotForUi(
+                    selectedTab = selectedTab,
+                    periodPresetId = periodPresetId,
+                    startDateText = startDateText,
+                    endDateText = endDateText,
+                    analyticsScopeType = analyticsScopeType,
+                    selectedAnalyticsGoodsItemId = selectedAnalyticsGoodsItemId,
+                    selectedAnalyticsSupplierId = selectedAnalyticsSupplierId,
+                    selectedAnalyticsCategoryId = selectedAnalyticsCategoryId,
+                    scopedTransactions = scopedTransactions,
+                    preparedAnalytics = prepared,
+                    stock = stockForAnalytics,
+                    batches = stockBatchesForAnalytics,
+                    suppliers = suppliersForAnalytics,
                     workers = workers,
-                    transactions = scopedTransactions,
-                    currencyCode = currencyCode
+                    cashRegister = cashRegister,
+                    cashRegisterEvents = scopedCashRegisterEvents,
+                    dashboard = analyticsDashboard,
+                    currencyCode = currencyCode,
+                    generatedAtMillis = analyticsReportGeneratedAt
                 )
+                AnalyticsReportBottomSheet(snapshot = analyticsReportSnapshot, onDismiss = { showAnalyticsReportSheet = false })
             }
 
-            MenuAnalyticsTab.CashRegister -> {
-                MenuAnalyticsCashRegisterScreen(
-                    currentAmount = cashRegister?.currentAmount ?: 0.0,
-                    events = scopedCashRegisterEvents,
-                    currencyCode = currencyCode
-                )
+            when (selectedTab) {
+                MenuAnalyticsTab.Sales -> {
+                    MenuAnalyticsTransactionScreen(
+                        title = stateValues.stringSale,
+                        transactionType = "purchase",
+                        transactions = scopedTransactions,
+                        currencyCode = currencyCode,
+                        emptyText = localizedStringResource(258, "No sales in this period"),
+                        analyticsDashboard = analyticsDashboard,
+                        summary = prepared.type("purchase")
+                    )
+                }
+
+                MenuAnalyticsTab.Returns -> {
+                    MenuAnalyticsTransactionScreen(
+                        title = stateValues.stringReturn,
+                        transactionType = "return",
+                        transactions = scopedTransactions,
+                        currencyCode = currencyCode,
+                        emptyText = localizedStringResource(275, "No returns in this period"),
+                        analyticsDashboard = analyticsDashboard,
+                        summary = prepared.type("return")
+                    )
+                }
+
+                MenuAnalyticsTab.Acceptance -> {
+                    MenuAnalyticsTransactionScreen(
+                        title = stateValues.stringSupply,
+                        transactionType = "accept",
+                        transactions = scopedTransactions,
+                        currencyCode = currencyCode,
+                        emptyText = localizedStringResource(276, "No supply transactions in this period"),
+                        analyticsDashboard = analyticsDashboard,
+                        summary = prepared.type("accept")
+                    )
+                }
+
+                MenuAnalyticsTab.Stock -> MenuAnalyticsStockScreen(analyticsDashboard, prepared.stock)
+
+                MenuAnalyticsTab.Suppliers -> {
+                    MenuAnalyticsSuppliersScreen(
+                        prepared = prepared,
+                        dashboard = analyticsDashboard,
+                        currencyCode = currencyCode
+                    )
+                }
+
+                MenuAnalyticsTab.Workers -> {
+                    MenuAnalyticsWorkersScreen(
+                        workers = workers,
+                        prepared = prepared,
+                        currencyCode = currencyCode
+                    )
+                }
+
+                MenuAnalyticsTab.CashRegister -> {
+                    if (!prepared.cashAvailable || !currentUserCanViewCashRegister(activeStoreId)) MessageText(text = authUiText("Detailed cash records are not available", "Подробные записи кассы недоступны", "Кассаның толық жазбалары қолжетімсіз"))
+                    else MenuAnalyticsCashRegisterScreen(
+                        currentAmount = cashRegister?.currentAmount ?: 0.0,
+                        events = scopedCashRegisterEvents,
+                        currencyCode = currencyCode,
+                        prepared = prepared
+                    )
+                }
             }
         }
     }
@@ -3461,23 +3387,18 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
     transactions: List<TransactionDataModel>,
     currencyCode: String,
     emptyText: String,
-    analyticsDashboard: StoreAnalyticsDashboardDataModel? = null
+    analyticsDashboard: StoreAnalyticsDashboardDataModel? = null,
+    summary: AnalyticsTypeSummary
 ) {
-    val typedTransactions = remember(transactions, transactionType) {
-        transactions.filter { it.type == transactionType }
-    }
-
-    val totalCash = remember(typedTransactions) { typedTransactions.sumOf { it.paidCash } }
-    val totalCard = remember(typedTransactions) { typedTransactions.sumOf { it.paidCard } }
-    val total = remember(typedTransactions) { typedTransactions.sumOf { tx -> tx.goodsInTransaction.sumOf { it.quantity * it.pricePerUnit } } }
+    val totalCash = summary.cash
+    val totalCard = summary.card
+    val total = summary.total
     val paidTotal = totalCash + totalCard
-    val debtTotal = (total - paidTotal).coerceAtLeast(0.0)
-    val average = if (typedTransactions.isNotEmpty()) total / typedTransactions.size else 0.0
-    val totalGoodsQuantity = remember(typedTransactions) {
-        typedTransactions.flatMap { it.goodsInTransaction }.sumOf { it.quantity }
-    }
-    val averageItems = if (typedTransactions.isNotEmpty()) totalGoodsQuantity / typedTransactions.size else 0.0
-    val historyRows = remember(typedTransactions) { typedTransactions.toMonthlyAnalyticsHistoryRows() }
+    val debtTotal = summary.debt
+    val average = summary.average
+    val totalGoodsQuantity = summary.quantity
+    val averageItems = summary.averageItems
+    val historyRows = summary.history
 
     val dashboard = analyticsDashboard
     val salesDashboardCards = if (transactionType == "purchase" && dashboard != null) {
@@ -3560,10 +3481,10 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
                             value = total.money(currencyCode),
                             subtitle = localizedStringResource(357, "Cash + cashless")
                         ),
-                        AnalyticsSummaryCardData(title = stateValues.stringCash, value = totalCash.money(currencyCode)),
-                        AnalyticsSummaryCardData(title = stateValues.stringCashless, value = totalCard.money(currencyCode)),
-                        AnalyticsSummaryCardData(title = localizedStringResource(676, "Debt amount"), value = debtTotal.money(currencyCode)),
-                        AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = typedTransactions.size.toString()),
+                        AnalyticsSummaryCardData(title = stateValues.stringCash, value = if (summary.paymentsKnown) totalCash.money(currencyCode) else "—"),
+                        AnalyticsSummaryCardData(title = stateValues.stringCashless, value = if (summary.paymentsKnown) totalCard.money(currencyCode) else "—"),
+                        AnalyticsSummaryCardData(title = localizedStringResource(676, "Debt amount"), value = if (summary.paymentsKnown) debtTotal.money(currencyCode) else "—"),
+                        AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = summary.count.toString()),
                         AnalyticsSummaryCardData(title = localizedStringResource(359, "Average transaction"), value = average.money(currencyCode)),
                         AnalyticsSummaryCardData(title = localizedStringResource(710, "Average items"), value = averageItems.cleanNumber()),
                         AnalyticsSummaryCardData(title = stateValues.stringItems, value = totalGoodsQuantity.cleanNumber())
@@ -3659,18 +3580,18 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
             )
         }
 
-        if (typedTransactions.isEmpty()) {
+        if (!summary.historyKnown || summary.count == 0) {
             item {
                 MessageText(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = stateValues.marginTextFieldGroup),
-                    emptyText
+                    text = if (summary.historyKnown) emptyText else authUiText("Detailed history is not available", "Подробная история недоступна", "Толық тарих қолжетімсіз")
                 )
             }
         } else {
             items(historyRows) { row ->
-                AnalyticsHistoryRowWidget(row = row, currencyCode = currencyCode)
+                AnalyticsHistoryRowWidget(row = AnalyticsHistoryRow(row.title, row.count, row.total), currencyCode = currencyCode)
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
             }
         }
@@ -3679,16 +3600,14 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
 
 @Composable
 internal fun AppConfiguration.MenuAnalyticsStockScreen(
-    dashboard: StoreAnalyticsDashboardDataModel?
+    dashboard: StoreAnalyticsDashboardDataModel?,
+    summary: AnalyticsStockSummary
 ) {
-    val stock = stateValues.stock.orEmpty()
-    val batches = stateValues.stockBatches.orEmpty()
-
-    val activeItems = stock.count { it.isActive }
-    val inactiveItems = stock.size - activeItems
-    val quickItems = stock.count { it.isQuickItem }
-    val activeBatches = batches.count { it.isActive }
-    val inactiveBatches = batches.size - activeBatches
+    val activeItems = summary.activeItems
+    val inactiveItems = summary.items - activeItems
+    val quickItems = summary.quickItems
+    val activeBatches = summary.activeBatches
+    val inactiveBatches = summary.batches - activeBatches
     val currencyCode = dashboard?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
 
     LazyColumn(
@@ -3711,13 +3630,13 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
         item {
             AnalyticsCardsGrid(
                 cards = listOf(
-                    AnalyticsSummaryCardData(title = stateValues.stringItems, value = stock.size.toString(), subtitle = localizedStringResource(282, "All stock items")),
-                    AnalyticsSummaryCardData(title = localizedStringResource(280, "Active items"), value = activeItems.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(281, "Inactive items"), value = inactiveItems.toString()),
-                    AnalyticsSummaryCardData(title = stateValues.stringQuick, value = quickItems.toString(), subtitle = localizedStringResource(283, "Quick-sale items")),
-                    AnalyticsSummaryCardData(title = stateValues.stringBatches, value = batches.size.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(284, "Active batches"), value = activeBatches.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(285, "Inactive batches"), value = inactiveBatches.toString()),
+                    AnalyticsSummaryCardData(title = stateValues.stringItems, value = if (summary.available) summary.items.toString() else "—", subtitle = localizedStringResource(282, "All stock items")),
+                    AnalyticsSummaryCardData(title = localizedStringResource(280, "Active items"), value = if (summary.available) activeItems.toString() else "—"),
+                    AnalyticsSummaryCardData(title = localizedStringResource(281, "Inactive items"), value = if (summary.available) inactiveItems.toString() else "—"),
+                    AnalyticsSummaryCardData(title = stateValues.stringQuick, value = if (summary.available) quickItems.toString() else "—", subtitle = localizedStringResource(283, "Quick-sale items")),
+                    AnalyticsSummaryCardData(title = stateValues.stringBatches, value = if (summary.available) summary.batches.toString() else "—"),
+                    AnalyticsSummaryCardData(title = localizedStringResource(284, "Active batches"), value = if (summary.available) activeBatches.toString() else "—"),
+                    AnalyticsSummaryCardData(title = localizedStringResource(285, "Inactive batches"), value = if (summary.available) inactiveBatches.toString() else "—"),
                     AnalyticsSummaryCardData(title = localizedStringResource(683, "Inventory value at sale price"), value = (dashboard?.stockValueAtSalePrice ?: 0.0).money(currencyCode)),
                     AnalyticsSummaryCardData(title = localizedStringResource(684, "Inventory value at supply cost"), value = (dashboard?.stockValueAtSupplyPrice ?: 0.0).money(currencyCode)),
                     AnalyticsSummaryCardData(title = localizedStringResource(685, "Low stock items"), value = (dashboard?.lowStockItemCount ?: 0).toString()),
@@ -3749,31 +3668,14 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
 
 @Composable
 internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
-    transactions: List<TransactionDataModel>,
+    prepared: PreparedAnalytics,
     dashboard: StoreAnalyticsDashboardDataModel?,
     currencyCode: String
 ) {
-    val supplierMap = stateValues.suppliers.orEmpty().associateBy { it.id }
-    val acceptanceTransactions = remember(transactions) { transactions.filter { it.type == "accept" } }
-    val supplierRows = remember(acceptanceTransactions, supplierMap, stateValues.appLanguage) {
-        acceptanceTransactions
-            .flatMap { tx -> tx.goodsInTransaction.map { line -> tx to line } }
-            .groupBy { (_, line) -> line.supplierIdText?.takeIf { it.isNotBlank() } ?: line.supplierId?.toString().orEmpty().ifBlank { "unknown" } }
-            .map { (supplierId, pairs) ->
-                val supplier = supplierMap[supplierId]
-                AnalyticsRankedItemDataModel(
-                    id = supplierId,
-                    name = supplier?.name ?: listOf(LocalizedStringDataModel("main", if (supplierId == "unknown") localizedStringResource(156, "Not specified") else supplierId)),
-                    subtitle = "${localizedStringResource(706, "Transactions")}: ${pairs.map { it.first.id }.distinct().size}",
-                    quantity = pairs.sumOf { it.second.quantity },
-                    transactionCount = pairs.map { it.first.id }.distinct().size,
-                    amount = pairs.sumOf { it.second.quantity * it.second.pricePerUnit },
-                    currencyCode = currencyCode
-                )
-            }
-            .sortedByDescending { it.amount }
+    val supplierRows = prepared.suppliers.map { item ->
+        if (item.name.isNotEmpty()) item else item.copy(name = listOf(LocalizedStringDataModel("main",
+            if (item.id == "unknown") localizedStringResource(156, "Not specified") else item.id)))
     }
-
     LazyColumn(
         state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "suppliers"),
         modifier = Modifier
@@ -3794,10 +3696,10 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
         item {
             AnalyticsCardsGrid(
                 cards = listOf(
-                    AnalyticsSummaryCardData(title = localizedStringResource(300, "Acceptance total"), value = (dashboard?.supplyCost ?: supplierRows.sumOf { it.amount }).money(currencyCode)),
-                    AnalyticsSummaryCardData(title = stateValues.stringSuppliers, value = supplierRows.size.toString()),
-                    AnalyticsSummaryCardData(title = stateValues.stringItems, value = supplierRows.sumOf { it.quantity }.cleanNumber()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = acceptanceTransactions.size.toString())
+                    AnalyticsSummaryCardData(title = localizedStringResource(300, "Acceptance total"), value = (dashboard?.supplyCost ?: prepared.type("accept").total).money(currencyCode)),
+                    AnalyticsSummaryCardData(title = stateValues.stringSuppliers, value = if (prepared.remoteOnly) "—" else supplierRows.size.toString()),
+                    AnalyticsSummaryCardData(title = stateValues.stringItems, value = prepared.supplierQuantity.cleanNumber()),
+                    AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = prepared.type("accept").count.toString())
                 )
             )
         }
@@ -3810,7 +3712,7 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
                 valueTitle = localizedStringResource(300, "Acceptance total"),
                 currencyCode = currencyCode,
                 valueSelector = { it.amount },
-                subtitleSelector = { item -> "${localizedStringResource(271, "Quantity")}: ${item.quantity.cleanNumber()} · ${item.subtitle}" }
+                subtitleSelector = { item -> "${localizedStringResource(271, "Quantity")}: ${item.quantity.cleanNumber()} · ${localizedStringResource(706, "Transactions")}: ${item.transactionCount}" }
             )
         }
     }
@@ -3819,27 +3721,13 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
 @Composable
 internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
     workers: List<StoreWorkerDataModel>,
-    transactions: List<TransactionDataModel>,
+    prepared: PreparedAnalytics,
     currencyCode: String
 ) {
-    val salesByWorkshift = remember(transactions) {
-        transactions
-            .filter { it.type == "purchase" }
-            .groupBy { it.workshiftId }
-            .map { (workshiftId, txs) ->
-                AnalyticsRankedItemDataModel(
-                    id = workshiftId.toString(),
-                    name = listOf(LocalizedStringDataModel("main", "${localizedStringResource(661, "Active workshift")} #$workshiftId")),
-                    subtitle = "${localizedStringResource(706, "Transactions")}: ${txs.size}",
-                    quantity = txs.flatMap { it.goodsInTransaction }.sumOf { it.quantity },
-                    transactionCount = txs.size,
-                    amount = txs.sumOf { tx -> tx.goodsInTransaction.sumOf { it.quantity * it.pricePerUnit } },
-                    currencyCode = currencyCode
-                )
-            }
-            .sortedByDescending { it.amount }
-            .take(10)
-    }
+    val salesByWorkshift = prepared.workshifts.map { item -> item.copy(
+        name = listOf(LocalizedStringDataModel("main", "${localizedStringResource(661, "Active workshift")} #${item.id}")),
+        subtitle = "${localizedStringResource(706, "Transactions")}: ${item.transactionCount}"
+    ) }
 
     LazyColumn(
         state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "workers"),
@@ -3864,8 +3752,8 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
                     AnalyticsSummaryCardData(title = localizedStringResource(429, "Active workers"), value = workers.count { it.isActive }.toString(), subtitle = localizedStringResource(430, "Employees connected to this store")),
                     AnalyticsSummaryCardData(title = localizedStringResource(431, "Admins"), value = workers.count { it.roleId == WORKER_ROLE_ADMIN }.toString()),
                     AnalyticsSummaryCardData(title = localizedStringResource(432, "Standard workers"), value = workers.count { it.roleId == WORKER_ROLE_STANDARD }.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = transactions.count { it.type == "purchase" }.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(303, "Revenue / worker"), value = transactions.filter { it.type == "purchase" }.sumOf { tx -> tx.goodsInTransaction.sumOf { it.quantity * it.pricePerUnit } }.money(currencyCode), subtitle = localizedStringResource(302, "Use workshifts, sales per worker, and salary here"))
+                    AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = prepared.type("purchase").count.toString()),
+                    AnalyticsSummaryCardData(title = localizedStringResource(303, "Revenue / worker"), value = prepared.type("purchase").total.money(currencyCode), subtitle = localizedStringResource(302, "Use workshifts, sales per worker, and salary here"))
                 )
             )
         }
@@ -3888,17 +3776,12 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
 internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
     currentAmount: Double,
     events: List<CashRegisterEventDataModel>,
-    currencyCode: String
+    currencyCode: String,
+    prepared: PreparedAnalytics
 ) {
-    val saleCashTotal = remember(events) {
-        events.filter { it.type == CASH_REGISTER_EVENT_SALE_CASH_IN }.sumOf { it.amount }
-    }
-    val returnCashTotal = remember(events) {
-        events.filter { it.type == CASH_REGISTER_EVENT_RETURN_CASH_OUT }.sumOf { it.amount }
-    }
-    val extractedTotal = remember(events) {
-        events.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.sumOf { it.amount }
-    }
+    val saleCashTotal = prepared.saleCash
+    val returnCashTotal = prepared.returnCash
+    val extractedTotal = prepared.extractedCash
 
     var extractionAmountText by rememberSaveable { mutableStateOf("") }
     var extractionNoteLocalized by remember { mutableStateOf(emptyLocalizedItemForCurrentLanguage()) }
