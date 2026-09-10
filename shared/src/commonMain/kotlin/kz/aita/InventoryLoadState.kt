@@ -71,6 +71,8 @@ internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIs
             stockState.emit(DataState.Empty())
             stockBatchesState.emit(DataState.Empty())
             parentStoreStockState.emit(DataState.Empty())
+            stockItemBranchAvailabilityState.emit(DataState.Empty())
+            stockBatchMoveResultState.emit(DataState.Empty())
             stockLoadStatusState.value = InventoryLoadStatus(storeId = cleanId)
             stockBatchesLoadStatusState.value = InventoryLoadStatus(storeId = cleanId)
         }

@@ -393,7 +393,8 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun loadsBranchAvailabilityMovesBatchAndAcceptsMovementDecision() = runBlocking {
-        activeStoreIdState.emit(AITA_FLOW_SOURCE_STORE_ID)
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
         val sourceItem = aitaTestGoodsItem(id = "move-source-item", name = "Move source")
         val destinationItem = aitaTestGoodsItem(id = "move-destination-item", storeId = AITA_FLOW_DESTINATION_STORE_ID, name = "Move destination")
         val sourceBatch = aitaTestBatch(id = "move-source-batch", goodsItemId = sourceItem.id, quantityTotal = 6.0)

@@ -4,6 +4,7 @@
     python3 scripts/linux-field-server/aita-ops.py update
     python3 scripts/linux-field-server/aita-ops.py logs [--history]
     python3 scripts/linux-field-server/aita-ops.py status
+    python3 scripts/linux-field-server/aita-ops.py connection
     python3 scripts/linux-field-server/aita-ops.py backups [--watch] [--download]
 
 The update frontend fetches Git interactively as the repository owner. A pinned
@@ -39,7 +40,7 @@ from typing import Iterator, Mapping, Sequence
 from urllib.parse import urlsplit
 import uuid
 
-VERSION = "2026-09-09-start-time-permissions-v3"
+VERSION = "2026-09-11-connection-diagnostics-v4"
 SERVICE = "aita-server.service"
 UPDATE_UNIT = "aita-update.service"
 ROOT = Path("/var/lib/aita-ops")
@@ -353,6 +354,143 @@ def http_status(url: str, *, local: bool = False) -> str:
         args += ["--noproxy", "*"]
     result = capture(args + [url], timeout=12, check=False)
     return result.stdout.strip() if result.returncode == 0 else "unreachable"
+
+
+
+# Read-only diagnostics deliberately do not read the production environment, tunnel token,
+# service ExecStart, credentials, response cookies, arbitrary JSON or unfiltered journal lines.
+DEFAULT_PUBLIC_ORIGIN = "https://aita-api.bogdan-donduk.workers.dev"
+ORIGIN_ERROR_CODES = frozenset({
+    "connection_refused", "connection_terminated", "connection_timeout", "connection_limit_reached",
+    "destination_unavailable", "destination_not_found", "destination_ip_prohibited", "destination_ip_unroutable",
+    "proxy_loop_detected", "dns_error", "dns_timeout", "tls_protocol_error", "tls_certificate_error",
+    "http_request_error", "http_upgrade_failed", "http_request_denied", "http_protocol_error",
+    "http_response_incomplete", "connection_read_timeout", "connection_write_timeout", "rate_limited",
+    "proxy_internal_error", "origin_binding_missing", "origin_probe_timeout", "client_disconnected",
+    "origin_connection_failed",
+})
+
+
+def public_origin_url(raw: str) -> str:
+    parsed = urlsplit(raw.strip())
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or
+            parsed.query or parsed.fragment or any(c.isspace() or ord(c) < 32 for c in raw)):
+        raise OpsError("Public address must be HTTPS without credentials, query or whitespace.")
+    if parsed.path.rstrip("/") not in {"", "/readyz", "/healthz", "/auth/capabilities"}:
+        raise OpsError("Use the public HTTPS base address, not an API path.")
+    # AITA_PUBLIC_HEALTH_URL was sometimes a complete /readyz URL. Never append /readyz twice.
+    _ = parsed.port  # Validate port before a subprocess can see the address.
+    return f"https://{parsed.netloc}"
+
+
+def connection_response_summary(status: str, returncode: int, headers: str, body: str) -> dict:
+    result = {"status": status if re.fullmatch(r"[1-5][0-9]{2}", status) else "unreachable"}
+    if returncode:
+        result["failure"] = {6: "dns", 7: "connection", 28: "timeout", 35: "tls", 60: "certificate",
+                             63: "response_too_large"}.get(returncode, "curl_error")
+    for line in headers.splitlines():
+        name, _, value = line.partition(":")
+        name, value = name.strip().lower(), value.strip()
+        if name == "cf-ray" and re.fullmatch(r"[0-9a-fA-F]{8,32}-[A-Za-z]{3}", value):
+            result["cf_ray"] = value
+        elif name == "x-aita-origin-error" and value in ORIGIN_ERROR_CODES:
+            result["origin_error"] = value
+        elif name == "x-aita-gateway-version" and re.fullmatch(r"[A-Za-z0-9._-]{1,80}", value):
+            result["gateway_version"] = value
+        elif name == "content-type":
+            mime = value.split(";", 1)[0].lower()
+            if mime in {"application/json", "text/html", "text/plain"}: result["content_type"] = mime
+    try:
+        data = json.loads(body)
+        if isinstance(data, dict):
+            if data.get("error") == "origin_unavailable": result["origin_unavailable"] = True
+            if data.get("code") in ORIGIN_ERROR_CODES: result["origin_error"] = data["code"]
+            if data.get("gateway") == "aita-workers-vpc":
+                result["aita_gateway"] = True
+                if isinstance(data.get("originBindingConfigured"), bool): result["binding_configured"] = data["originBindingConfigured"]
+                version = data.get("version")
+                if isinstance(version, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,80}", version): result["gateway_version"] = version
+    except (ValueError, TypeError):
+        pass
+    return result
+
+
+def connection_http_probe(url: str) -> dict:
+    with tempfile.TemporaryDirectory(prefix="aita-connection-") as temp:
+        header_path, body_path = Path(temp) / "headers", Path(temp) / "body"
+        # --disable must be first: a per-user curlrc/proxy must not invisibly change this probe.
+        cmd = ["curl", "--disable", "--silent", "--show-error", "--noproxy", "*",
+               "--connect-timeout", "3", "--max-time", "8", "--max-filesize", "16384",
+               "--dump-header", str(header_path), "--output", str(body_path),
+               "--header", "Accept: application/json", "--header", "Cache-Control: no-cache",
+               "--write-out", "%{http_code}", url]
+        try:
+            reply = capture(cmd, timeout=12, check=False)
+        except (subprocess.TimeoutExpired, OpsError):
+            return {"status": "unreachable", "failure": "probe_timeout"}
+        def bounded_text(path):
+            try:
+                with path.open("rb") as f: return f.read(16384).decode("utf-8", errors="replace")
+            except OSError: return ""
+        return connection_response_summary(reply.stdout.strip(), reply.returncode,
+                                           bounded_text(header_path), bounded_text(body_path))
+
+
+def tunnel_journal_summary(text: str) -> dict:
+    protocols = re.findall(r"\bprotocol[=:](quic|http2)\b", text, re.IGNORECASE)
+    result = {"last_observed_protocol": protocols[-1].lower() if protocols else "unknown"}
+    for name, pattern in {"registered_connections": r"Registered tunnel connection",
+                          "errors": r"\b(?:ERR|ERROR)\b", "timeouts": r"\b(?:timeout|timed out)\b"}.items():
+        result[name] = len(re.findall(pattern, text, re.IGNORECASE))
+    return result
+
+
+def connection_diagnosis(local: dict, edge: dict, ready: dict, capabilities: dict) -> str:
+    if local.get("status") != "200":
+        return "Local /readyz is not healthy. Inspect backend/readiness first; no restart was requested."
+    if ready.get("status") == capabilities.get("status") == "200":
+        return "Public HTTP is reachable at this instant. This does NOT prove a long-lived authenticated WebSocket or rule out an intermittent outage."
+    origin_error = ready.get("origin_error") or capabilities.get("origin_error")
+    if origin_error:
+        return "Local backend is ready; the public gateway reports " + origin_error + ". Inspect the existing VPC service/tunnel, not the database or JAR."
+    if edge.get("aita_gateway") is True:
+        return "AITA Worker is reachable, but the origin API check failed. Check the existing AITA_ORIGIN binding, VPC target and cloudflared."
+    return "Local backend is ready, but the public route is not verified. Check the printed public address, DNS/TLS, Worker and tunnel. No precise origin cause is established."
+
+
+def connection_status(args: argparse.Namespace) -> int:
+    public = public_origin_url(args.public_url)
+    require_tools("curl", "systemctl")
+    say("CONNECTION", "Read-only: no restart, tunnel reconfiguration, database write, backup upload or credential dump.")
+    say("PUBLIC TARGET", public)
+    proxy_present = any(os.environ.get(k) for k in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy"))
+    say("PROBE ROUTE", "Direct HTTPS with certificate verification; curlrc and proxy variables ignored." +
+        (" Proxy variables are present, but their values are not displayed." if proxy_present else ""))
+    report_server_state()
+    local = connection_http_probe("http://127.0.0.1:8080/readyz")
+    edge = connection_http_probe(public + "/_edge/health")
+    ready = connection_http_probe(public + "/readyz")
+    capabilities = connection_http_probe(public + "/auth/capabilities")
+    for name, result in (("LOCAL /readyz", local), ("EDGE /_edge/health", edge),
+                         ("PUBLIC /readyz", ready), ("PUBLIC /auth/capabilities", capabilities)):
+        say(name, json.dumps(result, sort_keys=True))
+    tunnel = properties("cloudflared.service", "ActiveState", "SubState", "MainPID", "ExecMainStartTimestamp")
+    say("TUNNEL", str(tunnel))
+    if shutil.which("journalctl"):
+        try:
+            journal = capture(["journalctl", "--unit=cloudflared.service", "--since", "30 minutes ago",
+                               "--lines=120", "--output=cat", "--no-pager"], check=False, timeout=8)
+        except (subprocess.TimeoutExpired, OpsError):
+            journal = subprocess.CompletedProcess([], 1, "", "")
+        if journal.returncode == 0 and journal.stdout.strip() and "-- No entries --" not in journal.stdout:
+            summary = tunnel_journal_summary(journal.stdout)
+            say("TUNNEL JOURNAL", json.dumps(summary, sort_keys=True) + " (bounded recent sample, not a live connection test)")
+            if summary["last_observed_protocol"] == "http2":
+                say("WARNING", "Workers VPC requires QUIC. The journal last reports HTTP/2; check outbound UDP 7844 and the existing tunnel configuration. No protocol was changed.")
+        else:
+            say("TUNNEL JOURNAL", "Unavailable or empty for this user; no protocol is inferred.")
+    say("DIAGNOSIS", connection_diagnosis(local, edge, ready, capabilities))
+    return 0 if local.get("status") == ready.get("status") == capabilities.get("status") == "200" else 2
 
 
 def validate_remote(remote: str) -> str:
@@ -882,10 +1020,8 @@ def worker(args: argparse.Namespace) -> int:
             raise OpsError("The existing Java service is running but not ready. It may still be migrating. "
                            "Use status/logs first; this updater will not interrupt an unexplained startup.")
         remote = remote_preflight(env, allow_local=not require_offsite)
-        public_url = env.get("AITA_PUBLIC_HEALTH_URL") or env.get("AITA_PUBLIC_SERVER_URL", "")
-        parsed = urlsplit(public_url)
-        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.query or parsed.fragment:
-            raise OpsError("AITA_PUBLIC_HEALTH_URL/PUBLIC_SERVER_URL must be a plain HTTPS base URL without credentials or query.")
+        public_url = public_origin_url(env.get("AITA_PUBLIC_HEALTH_URL") or env.get("AITA_PUBLIC_SERVER_URL", ""))
+        say("PUBLIC TARGET", public_url)
         last = load_json(ROOT / "last-success.json", {})
         if not meta["force"] and last.get("commit") == meta["commit"] and CURRENT_JAR.exists() and \
                 sha256(CURRENT_JAR) == last.get("jar_sha256") and \
@@ -969,7 +1105,7 @@ def worker(args: argparse.Namespace) -> int:
         public_failures = bool(failures)
         if public_failures:
             say("WARNING", "Local deployment is ready, but public access failed. Check Worker/Tunnel routing; "
-                "do not roll back the database or repeatedly deploy the same JAR.")
+                "do not roll back the database or repeatedly deploy the same JAR. Run aita-ops.py connection for read-only edge/origin diagnostics.")
         step("backup-status", "Checking backup timers and local freshness" +
              (" and cloud contents." if require_offsite else "; cloud checks remain skipped for this update."))
         try:
@@ -1271,7 +1407,7 @@ def status() -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = parser.add_subparsers(dest="command", metavar="{update,logs,status,backups}")
+    sub = parser.add_subparsers(dest="command", metavar="{update,logs,status,connection,backups}")
     p = sub.add_parser("update", help="fetch, build, encrypted backup, deploy, health checks and logs")
     p.add_argument("--repo", default=str(Path.home() / "IdeaProjects/AITA"))
     p.add_argument("--remote", default="origin")
@@ -1289,6 +1425,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = sub.add_parser("logs", help="reattach to update output; then view AITA server logs")
     p.add_argument("--history", action="store_true", help="scroll/search the saved update log with less (q to quit)")
     sub.add_parser("status", help="read current server and last managed update state")
+    p = sub.add_parser("connection", help="read-only local, public Worker/origin and tunnel diagnostics")
+    p.add_argument("--public-url", default=DEFAULT_PUBLIC_ORIGIN)
     p = sub.add_parser("backups", help="check timers, local freshness and service-user cloud contents")
     p.add_argument("--watch", action="store_true")
     p.add_argument("--interval", type=int, default=60)
@@ -1321,6 +1459,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return worker(args)
     if args.command == "backups":
         return backups(args)
+    if args.command == "connection":
+        return connection_status(args)
     if args.command == "status":
         return status()
     if args.command == "logs":

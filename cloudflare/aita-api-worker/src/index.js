@@ -8,8 +8,49 @@ const FAVICON_PATHS = new Set(["/favicon.svg", "/favicon.ico"]);
 const ROBOTS_PATH = "/robots.txt";
 const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
 const BOOTSTRAP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const GATEWAY_VERSION = "2026-08-22";
+const GATEWAY_VERSION = "2026-09-11-connection-lifetime-v2";
 const CANONICAL_PUBLIC_ORIGIN = "https://aita-api.bogdan-donduk.workers.dev";
+
+// Only fixed health routes may be retried. In particular, NEVER replay a refresh token,
+// sale, movement, payment, DELETE, or even an arbitrary GET with possible side effects.
+const HEALTH_PATHS = new Set(["/healthz", "/readyz", "/auth/ping", "/auth/capabilities"]);
+const ORIGIN_CODES = new Set([
+  "connection_refused", "connection_terminated", "connection_timeout", "connection_limit_reached",
+  "destination_unavailable", "destination_not_found", "destination_ip_prohibited", "destination_ip_unroutable",
+  "proxy_loop_detected", "dns_error", "dns_timeout", "tls_protocol_error", "tls_certificate_error",
+  "http_request_error", "http_upgrade_failed", "http_request_denied", "http_protocol_error",
+  "http_response_incomplete", "connection_read_timeout", "connection_write_timeout", "rate_limited",
+  "proxy_internal_error", "origin_binding_missing", "origin_probe_timeout", "client_disconnected",
+]);
+const TRANSIENT_HEALTH_CODES = new Set(["connection_terminated", "proxy_internal_error"]);
+
+export function safeOriginErrorCode(error) {
+  // Raw exceptions may contain hostnames, credentials or query strings. Export only known codes.
+  const words = String(error?.code ?? "") + " " + String(error?.message ?? "");
+  return words.match(/[a-z_]+/g)?.find((word) => ORIGIN_CODES.has(word)) ?? "origin_connection_failed";
+}
+
+export async function fetchPrivateOrigin(env, request, timeoutMillis = 0) {
+  if (!env.AITA_ORIGIN || typeof env.AITA_ORIGIN.fetch !== "function") {
+    throw new Error("origin_binding_missing");
+  }
+  const controller = new AbortController();
+  const onAbort = () => controller.abort(new Error("client_disconnected"));
+  if (request.signal.aborted) onAbort();
+  else request.signal.addEventListener("abort", onAbort, { once: true });
+  const timer = timeoutMillis > 0
+    ? setTimeout(() => controller.abort(new Error("origin_probe_timeout")), timeoutMillis) : null;
+  try {
+    if (controller.signal.aborted) throw controller.signal.reason;
+    return await env.AITA_ORIGIN.fetch(new Request(request, { signal: controller.signal }));
+  } catch (error) {
+    if (controller.signal.aborted) throw controller.signal.reason;
+    throw error;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    request.signal.removeEventListener("abort", onAbort);
+  }
+}
 
 function commonSecurityHeaders(extra = {}) {
   return {
@@ -75,29 +116,16 @@ function statusLabel(result) {
 async function probeOrigin(env, path) {
   const startedAt = Date.now();
   try {
-    const response = await env.AITA_ORIGIN.fetch(
-      new Request(`http://localhost${path}`, {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-          "cache-control": "no-cache",
-          "x-aita-connection-probe": "1",
-          "x-forwarded-proto": "https",
-        },
-      }),
-    );
-    return {
-      ok: response.ok,
-      status: response.status,
-      elapsedMillis: Date.now() - startedAt,
-    };
+    const response = await fetchPrivateOrigin(env, new Request(`http://localhost${path}`, {
+      method: "GET",
+      headers: { accept: "application/json", "cache-control": "no-cache", "x-aita-connection-probe": "1", "x-forwarded-proto": "https" },
+    }), 5_000);
+    const result = { ok: response.ok, status: response.status, elapsedMillis: Date.now() - startedAt };
+    // This status-only consumer used to abandon the body, retaining an origin stream/connection.
+    await response.body?.cancel();
+    return result;
   } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      elapsedMillis: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return { ok: false, status: 0, elapsedMillis: Date.now() - startedAt, error: safeOriginErrorCode(error) };
   }
 }
 
@@ -240,8 +268,23 @@ async function proxyToOrigin(request, env) {
     // Cloudflare Workers accepts the half-duplex request-stream contract as well.
     init.duplex = "half";
   }
-  const upstreamRequest = new Request(targetUrl, init);
-  return env.AITA_ORIGIN.fetch(upstreamRequest);
+  init.signal = request.signal;
+  const health = BODYLESS_METHODS.has(request.method.toUpperCase()) && HEALTH_PATHS.has(incomingUrl.pathname);
+  const upgrading = request.headers.get("upgrade")?.toLowerCase() === "websocket";
+  const startedAt = Date.now();
+  const healthBudgetMillis = 6_000;
+  try {
+    // These are handshake/header deadlines, not the lifetime of an established WebSocket.
+    // A 101 response is returned intact; its live socket is never reconstructed or buffered.
+    return await fetchPrivateOrigin(env, new Request(targetUrl, init), health ? healthBudgetMillis : upgrading ? 15_000 : 0);
+  } catch (error) {
+    if (!health || request.signal.aborted || !TRANSIENT_HEALTH_CODES.has(safeOriginErrorCode(error))) throw error;
+    if (Date.now() - startedAt >= healthBudgetMillis - 150) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const remainingMillis = healthBudgetMillis - (Date.now() - startedAt);
+    if (remainingMillis <= 0) throw error;
+    return fetchPrivateOrigin(env, new Request(targetUrl, init), remainingMillis);
+  }
 }
 
 export default {
@@ -255,6 +298,7 @@ export default {
           status: "ok",
           gateway: "aita-workers-vpc",
           version: GATEWAY_VERSION,
+          originBindingConfigured: typeof env.AITA_ORIGIN?.fetch === "function",
           publicOrigin: CANONICAL_PUBLIC_ORIGIN,
         },
         200,
@@ -329,19 +373,23 @@ export default {
       console.error("AITA private origin unavailable", {
         method,
         path: requestUrl.pathname,
-        message: error instanceof Error ? error.message : String(error),
+        code: safeOriginErrorCode(error),
       });
       return jsonResponse(
         {
           error: "origin_unavailable",
           message: "The private AITA origin is temporarily unavailable.",
-          retryable: true,
+          code: safeOriginErrorCode(error),
+          retryable: BODYLESS_METHODS.has(method) && HEALTH_PATHS.has(requestUrl.pathname),
+          outcomeUnknown: !BODYLESS_METHODS.has(method),
         },
         503,
         method !== "HEAD",
         {
           "retry-after": "5",
           "x-aita-gateway": "AITA",
+          "x-aita-origin-error": safeOriginErrorCode(error),
+          "x-aita-gateway-version": GATEWAY_VERSION,
         },
       );
     }

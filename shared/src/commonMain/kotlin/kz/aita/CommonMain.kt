@@ -10826,14 +10826,16 @@ internal suspend fun rememberReachableServerUrl(serverUrl: String) {
         lastKnownGoodServerUrlMemory = normalized
         lastKnownGoodServerUrlVerifiedAtMillis = now
         if (shouldPersist) {
-            lastKnownGoodServerUrlPersistedAtMillis = now
-            putJsonCache(
-                CACHE_LAST_KNOWN_GOOD_SERVER_URL,
-                AitaLastKnownGoodServerUrlCacheDataModel(
-                    serverUrl = normalized,
-                    verifiedAtMillis = now
+            try {
+                putJsonCache(
+                    CACHE_LAST_KNOWN_GOOD_SERVER_URL,
+                    AitaLastKnownGoodServerUrlCacheDataModel(normalized, now)
                 )
-            )
+                lastKnownGoodServerUrlPersistedAtMillis = now
+            } catch (failure: Throwable) {
+                ensureConnectionOwnerActive(failure)
+                logNetworkAttempt("last-known-good URL cache write failed; retaining fresh in-memory reachability")
+            }
         }
     }
 
@@ -11424,7 +11426,7 @@ private suspend fun probeReachableAitaServerUrl(
                 forgetReachableServerUrlCandidate(resolvedServerUrl)
             }
         } catch (throwable: Throwable) {
-            if (throwable is CancellationException) throw throwable
+            ensureConnectionOwnerActive(throwable)
             logNetworkAttempt(
                 "FAILED ${HttpMethod.Get.value} $requestUrl probe=$reason ${networkFailureSummary(throwable)}"
             )
@@ -13914,6 +13916,8 @@ private const val REALTIME_RECENT_UPDATE_IDS_LIMIT = 512
 
 private val realtimeRefreshPlanMutex = Mutex()
 private val realtimePendingRefreshEntities = mutableSetOf<String>()
+private var realtimeRefreshScheduledAtMillis = 0L
+private var realtimeRefreshSessionGeneration = -1L
 private val realtimeRecentUpdateIds = ArrayDeque<String>()
 private val realtimeRecentUpdateIdSet = mutableSetOf<String>()
 
@@ -14153,43 +14157,56 @@ private suspend fun scheduleRealtimeRefresh(
     val cleanEntity = cleanRealtimeEntity(entity)
     val cleanReason = cleanRealtimeReason(reason)
     val now = getCurrentTimeMillis()
-
-    var shouldSchedule = false
-
+    val generation = currentAuthenticatedSessionGeneration()
     realtimeRefreshPlanMutex.withLock {
-        if (force || rememberRealtimeUpdateIdLocked(updateId)) {
-            val broad = realtimeUpdateRequiresBroadRefresh(cleanEntity, cleanReason)
-            val minInterval = if (cleanReason == "connected" || cleanReason == "websocket_connected" || cleanReason == "connection_sync") {
-                REALTIME_CONNECTED_REFRESH_MIN_INTERVAL_MILLIS
-            } else {
-                REALTIME_BROAD_REFRESH_MIN_INTERVAL_MILLIS
-            }
-
-            if (!broad || force || now - lastRealtimeBroadRefreshAtMillis >= minInterval) {
-                if (broad) {
-                    realtimePendingRefreshEntities.clear()
-                    realtimePendingRefreshEntities.add("all")
-                } else if ("all" !in realtimePendingRefreshEntities) {
-                    realtimePendingRefreshEntities.add(cleanEntity)
-                }
-                shouldSchedule = true
-            }
-        }
-
-        if (shouldSchedule) {
+        if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
+        if (realtimeRefreshSessionGeneration != generation) {
             realtimeRefreshJob?.cancel()
-            realtimeRefreshJob = GlobalScope.launch(Dispatchers.ourIo) {
-                delay(if (force) 75L else REALTIME_REFRESH_DEBOUNCE_MILLIS)
-                val entitiesToRefresh = realtimeRefreshPlanMutex.withLock {
+            realtimeRefreshJob = null
+            realtimePendingRefreshEntities.clear()
+            realtimeRecentUpdateIds.clear()
+            realtimeRecentUpdateIdSet.clear()
+            realtimeRefreshSessionGeneration = generation
+            lastRealtimeBroadRefreshAtMillis = 0L // A different sign-in does not inherit an old owner's cooldown.
+        }
+        if (!force && !rememberRealtimeUpdateIdLocked(updateId)) return@withLock
+        val hadBroad = "all" in realtimePendingRefreshEntities
+        val broad = realtimeUpdateRequiresBroadRefresh(cleanEntity, cleanReason)
+        val minInterval = if (cleanReason in setOf("connected", "websocket_connected", "connection_sync"))
+            REALTIME_CONNECTED_REFRESH_MIN_INTERVAL_MILLIS else REALTIME_BROAD_REFRESH_MIN_INTERVAL_MILLIS
+        if (broad) {
+            realtimePendingRefreshEntities.clear()
+            realtimePendingRefreshEntities.add("all")
+        } else if (!hadBroad) realtimePendingRefreshEntities.add(cleanEntity)
+
+        // A reconnect invalidation inside the throttle interval must run at its trailing edge,
+        // not be discarded forever. Repeated signals do not keep postponing the same job.
+        val pendingBroad = "all" in realtimePendingRefreshEntities
+        val waitMillis = if (force) 75L else maxOf(REALTIME_REFRESH_DEBOUNCE_MILLIS,
+            if (pendingBroad) realtimeCatchupDelayMillis(now, lastRealtimeBroadRefreshAtMillis, minInterval) else 0L)
+        val scheduledAt = now + waitMillis
+        val delayNewBroad = !hadBroad && pendingBroad && realtimeRefreshScheduledAtMillis < scheduledAt
+        if (!force && realtimeRefreshJob?.isActive == true &&
+            realtimeRefreshScheduledAtMillis <= scheduledAt && !delayNewBroad) return@withLock
+
+        realtimeRefreshJob?.cancel()
+        realtimeRefreshScheduledAtMillis = scheduledAt
+        realtimeRefreshJob = GlobalScope.launch(Dispatchers.ourIo, start = CoroutineStart.LAZY) {
+            val thisJob = coroutineContext[Job]
+            delay(waitMillis)
+            val entities = realtimeRefreshPlanMutex.withLock {
+                if (realtimeRefreshJob !== thisJob) emptySet() else {
+                    realtimeRefreshJob = null
+                    realtimeRefreshScheduledAtMillis = 0L
                     realtimePendingRefreshEntities.toSet().also { realtimePendingRefreshEntities.clear() }
                 }
-                if (entitiesToRefresh.isEmpty()) return@launch
-
-                realtimeRefreshMutex.withLock {
-                    refreshRealtimeEntitiesFromServer(entitiesToRefresh)
-                }
+            }
+            if (entities.isEmpty() || !authenticatedSessionGenerationIsCurrent(generation)) return@launch
+            realtimeRefreshMutex.withLock {
+                if (authenticatedSessionGenerationIsCurrent(generation)) refreshRealtimeEntitiesFromServer(entities)
             }
         }
+        realtimeRefreshJob?.start()
     }
 }
 
@@ -14379,7 +14396,7 @@ private suspend fun runCloudConnectionReconciliationStep(
     try {
         block()
     } catch (throwable: Throwable) {
-        if (throwable is CancellationException) throw throwable
+        ensureConnectionOwnerActive(throwable)
         logCloudConnectionDiagnostic(
             "connection reconciliation step=$name failed ${throwable.message ?: throwable}"
         )
@@ -14405,9 +14422,6 @@ private fun launchCloudConnectionReconciliation(
                 syncLocalNetworkOperationsToCloudNow()
             }
             runCloudConnectionReconciliationStep("active_store") { ActiveStores.retryPending() }
-            runCloudConnectionReconciliationStep("account") {
-                getUser(forceLogOut = false, applyServerActiveStore = false)
-            }
             runCloudConnectionReconciliationStep("entities") {
                 scheduleRealtimeRefresh(
                     reason = reason,
@@ -14428,7 +14442,7 @@ private fun launchCloudConnectionReconciliation(
                     force = forceBroadRefresh
                 )
             }.onFailure { throwable ->
-                if (throwable is CancellationException) throw throwable
+                ensureConnectionOwnerActive(throwable)
                 logCloudConnectionDiagnostic(
                     "connection reconciliation refresh merge failed ${throwable.message ?: throwable}"
                 )
@@ -14440,7 +14454,8 @@ private fun launchCloudConnectionReconciliation(
 
 private val automaticReconciliationClock = kotlin.time.TimeSource.Monotonic.markNow()
 private val automaticReconciliationGate = ConnectionReconciliationGate(
-    nowMillis = { automaticReconciliationClock.elapsedNow().inWholeMilliseconds }
+    nowMillis = { automaticReconciliationClock.elapsedNow().inWholeMilliseconds },
+    intervalMillis = 120_000L
 )
 
 private fun launchAutomaticCloudConnectionRecovery(
@@ -14470,7 +14485,7 @@ private fun launchAutomaticCloudConnectionRecovery(
                 )
             }
         } catch (throwable: Throwable) {
-            if (throwable is CancellationException) throw throwable
+            ensureConnectionOwnerActive(throwable)
             logCloudConnectionDiagnostic(
                 "automatic connection recovery failed ${throwable.message ?: throwable}"
             )
@@ -14638,7 +14653,7 @@ fun startCloudConnectionHealthMonitor() {
                         ordinaryDelayMillis = delayMillis
                     ))
                 } catch (throwable: Throwable) {
-                    if (throwable is CancellationException) throw throwable
+                    ensureConnectionOwnerActive(throwable)
                     // A single cache, token, callback, or reconciliation exception must never kill the
                     // only monitor capable of bringing an unattended client back online.
                     logCloudConnectionDiagnostic(
@@ -14686,43 +14701,39 @@ fun startRealtimeUpdates() {
         try {
             while (isActive) {
                 val retryRevision = realtimeRetryWakeup.revision
-                // A token-validation mutex/refresh can stall too, not just the WebSocket handshake.
-                val sessionGeneration = currentAuthenticatedSessionGeneration()
-                var accessToken = withTimeoutOrNull(60_000L) { currentRealtimeAccessTokenOrNull() }
-                if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) accessToken = null
+                try {
+                    // A token-validation mutex/refresh can stall too, not just the WebSocket handshake.
+                    val sessionGeneration = currentAuthenticatedSessionGeneration()
+                    var accessToken = withTimeoutOrNull(60_000L) { currentRealtimeAccessTokenOrNull() }
+                    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) accessToken = null
 
-                if (accessToken.isNullOrBlank()) {
-                    realtimeUpdatesJob.setConnected(thisJob, false)
-                    val retryDelay = when (cloudTransportStatusState.value) {
-                        CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
-                        CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
-                        else -> 5_000L
+                    if (accessToken.isNullOrBlank()) {
+                        realtimeUpdatesJob.setConnected(thisJob, false)
+                        val retryDelay = when (cloudTransportStatusState.value) {
+                            CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
+                            CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> CLOUD_CONNECTION_HEALTH_CHECK_UNAVAILABLE_INTERVAL_MILLIS
+                            else -> 5_000L
+                        }
+                        realtimeRetryWakeup.await(retryRevision, retryDelay)
+                        continue
                     }
-                    realtimeRetryWakeup.await(retryRevision, retryDelay)
-                    continue
-                }
 
-                var openedRealtimeSession = false
-                var openedRealtimeSessionAtMillis = 0L
-                var authenticationUnavailable = false
-                val serverUrlCandidates = resolvedServerUrlCandidates(null)
+                    var openedRealtimeSession = false
+                    var openedRealtimeSessionAtMillis = 0L
+                    var authenticationUnavailable = false
+                    val serverUrlCandidates = resolvedServerUrlCandidates(null)
 
-                candidateLoop@ for (realtimeBaseUrl in serverUrlCandidates) {
-                    var retriedAfterAuthRecovery = false
+                    candidateLoop@ for (realtimeBaseUrl in serverUrlCandidates) {
+                        var retriedAfterAuthRecovery = false
 
-                    while (isActive) {
-                        val realtimeUrl = realtimeBaseUrl.toRealtimeWebSocketUrl(
-                            globalAppConfigurationState.payloadValue.realtimeUpdatesPath
-                        )
+                        while (isActive) {
+                            val realtimeUrl = realtimeBaseUrl.toRealtimeWebSocketUrl(
+                                globalAppConfigurationState.payloadValue.realtimeUpdatesPath
+                            )
 
-                        try {
-                            var realtimeRequestJob: Job? = null
-                            val session = try {
-                                withTimeoutOrNull(15_000L) {
-                                    httpClient.webSocketSession {
-                                        // Ktor opens this request in the client's scope. Cancelling only
-                                        // the caller's await would leave a late/half-open socket alive.
-                                        realtimeRequestJob = executionContext
+                            try {
+                                withRealtimeHandshakeDeadline { handshakeCompleted ->
+                                    httpClient.webSocket(request = {
                                         url(realtimeUrl)
                                         pinSessionAuthorization(requireNotNull(accessToken))
                                         timeout {
@@ -14730,184 +14741,177 @@ fun startRealtimeUpdates() {
                                             requestTimeoutMillis = Long.MAX_VALUE
                                             socketTimeoutMillis = Long.MAX_VALUE
                                         }
-                                    }
-                                } ?: throw IllegalStateException("Realtime handshake timed out")
-                            } catch (failure: Throwable) {
-                                realtimeRequestJob?.cancel()
-                                throw failure
-                            }
-
-                            openedRealtimeSession = true
-                            openedRealtimeSessionAtMillis = getCurrentTimeMillis()
-
-                            try {
-                                ensureActive()
-                                if (!realtimeUpdatesJob.owns(thisJob)) return@startIfIdle
-                                val serverHello = awaitAitaRealtimeHello(
-                                    sendHello = {
-                                        session.outgoing.send(
-                                            Frame.Text(
-                                                jsonBase.encodeToString(
-                                                    RealtimeClientHelloDataModel(
-                                                        activeStoreId = activeStoreIdState.value,
-                                                        language = appLanguageState.value,
-                                                        platform = getPlatformName(),
-                                                        clientTimeMillis = getCurrentTimeMillis(),
-                                                        heartbeatVersion = AITA_REALTIME_HEARTBEAT_VERSION
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    },
-                                    receiveHello = {
-                                        var hello: RealtimeUpdateDataModel? = null
-                                        while (hello == null) {
+                                    }) {
+                                        val session = this
+                                        openedRealtimeSession = true
+                                        openedRealtimeSessionAtMillis = getCurrentTimeMillis()
+                                        try {
                                             currentCoroutineContext().ensureActive()
-                                            val frame = session.incoming.receiveCatching().getOrNull()
-                                                ?: throw IllegalStateException("Realtime closed before server greeting")
-                                            val text = (frame as? Frame.Text)?.readText() ?: continue
-                                            val update = runCatching {
-                                                jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
-                                            }.getOrNull()
-                                            if (update?.type == "connected") hello = update
+                                            if (!realtimeUpdatesJob.owns(thisJob)) return@webSocket
+                                            val serverHello = awaitAitaRealtimeHello(
+                                                sendHello = {
+                                                    session.outgoing.send(
+                                                        Frame.Text(
+                                                            jsonBase.encodeToString(
+                                                                RealtimeClientHelloDataModel(
+                                                                    activeStoreId = activeStoreIdState.value,
+                                                                    language = appLanguageState.value,
+                                                                    platform = getPlatformName(),
+                                                                    clientTimeMillis = getCurrentTimeMillis(),
+                                                                    heartbeatVersion = AITA_REALTIME_HEARTBEAT_VERSION
+                                                                )
+                                                            )
+                                                        )
+                                                    )
+                                                },
+                                                receiveHello = {
+                                                    var hello: RealtimeUpdateDataModel? = null
+                                                    while (hello == null) {
+                                                        currentCoroutineContext().ensureActive()
+                                                        val frame = session.incoming.receiveCatching().getOrNull()
+                                                            ?: throw IllegalStateException("Realtime closed before server greeting")
+                                                        val text = (frame as? Frame.Text)?.readText() ?: continue
+                                                        val update = runCatching {
+                                                            jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
+                                                        }.getOrNull()
+                                                        if (update?.type == "connected") hello = update
+                                                    }
+                                                    hello
+                                                }
+                                            )
+                                            ensureActive()
+                                            if (!realtimeUpdatesJob.owns(thisJob) ||
+                                                !authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@webSocket
+                                            handshakeCompleted()
+                                            val usesHeartbeat = aitaRealtimeUsesHeartbeat(serverHello.type, serverHello.heartbeatIntervalMillis)
+                                            rememberReachableServerUrl(realtimeBaseUrl)
+                                            markCloudAccessTokenValidated(accessToken.orEmpty())
+                                            markCloudTransportReachableForNotifications(
+                                                authenticated = true,
+                                                authRefreshRequired = false,
+                                                forceRecovery = true
+                                            )
+                                            realtimeUpdatesJob.setConnected(thisJob, true)
+
+                                            // Every completed reconnect requests a catch-up. The scheduler coalesces it
+                                            // at a bounded trailing edge rather than losing missed events under a cooldown.
+                                            launchCloudConnectionReconciliation("websocket_connected", false)
+
+                                            while (isActive) {
+                                                val received = if (usesHeartbeat) {
+                                                    withTimeoutOrNull(AITA_REALTIME_HEARTBEAT_TIMEOUT_MILLIS) {
+                                                        session.incoming.receiveCatching()
+                                                    } ?: throw IllegalStateException("Realtime heartbeat timed out")
+                                                } else session.incoming.receiveCatching()
+                                                ensureActive()
+                                                if (!realtimeUpdatesJob.owns(thisJob) ||
+                                                    !authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@webSocket
+                                                val frame = received.getOrNull() ?: break
+                                                val text = (frame as? Frame.Text)?.readText() ?: continue
+                                                val update = runCatching {
+                                                    jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
+                                                }.getOrNull()
+                                                if (update?.type == "heartbeat") {
+                                                    if (realtimeUpdatesJob.owns(thisJob)) markCloudTransportReachableForNotifications(
+                                                        authenticated = true, authRefreshRequired = false, forceRecovery = true)
+                                                    continue // Heartbeats are not inventory mutations; never trigger entity reloads.
+                                                }
+                                                if (
+                                                    update != null &&
+                                                    update.type != "connected" &&
+                                                    realtimeUpdateIsRelevantToCurrentContext(
+                                                        entity = update.entity,
+                                                        updateStoreId = update.storeId,
+                                                        activeStoreId = activeStoreIdState.value,
+                                                        appMode = appModeState.value
+                                                    )
+                                                ) {
+                                                    scheduleRealtimeRefresh(
+                                                        reason = update.reason ?: update.entity,
+                                                        entity = update.entity,
+                                                        updateId = update.id
+                                                    )
+                                                }
+                                            }
+                                        } finally {
+                                            // Do not leave a closed socket published as connected while its
+                                            // close handshake is waiting. Ktor also closes its incoming side.
+                                            realtimeUpdatesJob.setConnected(thisJob, false)
+                                            session.cancel()
                                         }
-                                        hello
-                                    }
-                                )
-                                ensureActive()
-                                if (!realtimeUpdatesJob.owns(thisJob) ||
-                                    !authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@startIfIdle
-                                val usesHeartbeat = aitaRealtimeUsesHeartbeat(serverHello.type, serverHello.heartbeatIntervalMillis)
-                                rememberReachableServerUrl(realtimeBaseUrl)
-                                markCloudAccessTokenValidated(accessToken.orEmpty())
-                                markCloudTransportReachableForNotifications(
-                                    authenticated = true,
-                                    authRefreshRequired = false,
-                                    forceRecovery = true
-                                )
-                                realtimeUpdatesJob.setConnected(thisJob, true)
-
-                                // Reconcile anything missed while the socket was reconnecting. The session
-                                // gate above has already validated this exact access token, so these jobs do
-                                // not each trigger their own ping/refresh sequence.
-                                GlobalScope.launch(Dispatchers.ourIo) {
-                                    if (currentCloudSessionIsReadyForBackgroundSync()) {
-                                        syncPendingSessionCleanupsToServerNow()
-                                        syncPendingNotificationsToServerNow()
-                                        syncLocalNetworkOperationsToCloudNow()
-                                        scheduleRealtimeRefresh(reason = "connected", entity = "all")
                                     }
                                 }
 
-                                while (isActive) {
-                                    val received = if (usesHeartbeat) {
-                                        withTimeoutOrNull(AITA_REALTIME_HEARTBEAT_TIMEOUT_MILLIS) {
-                                            session.incoming.receiveCatching()
-                                        } ?: throw IllegalStateException("Realtime heartbeat timed out")
-                                    } else session.incoming.receiveCatching()
-                                    ensureActive()
-                                    if (!realtimeUpdatesJob.owns(thisJob) ||
-                                        !authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@startIfIdle
-                                    val frame = received.getOrNull() ?: break
-                                    val text = (frame as? Frame.Text)?.readText() ?: continue
-                                    val update = runCatching {
-                                        jsonBase.decodeFromString<RealtimeUpdateDataModel>(text)
-                                    }.getOrNull()
-                                    if (update?.type == "heartbeat") {
-                                        if (realtimeUpdatesJob.owns(thisJob)) markCloudTransportReachableForNotifications(
-                                            authenticated = true, authRefreshRequired = false, forceRecovery = true)
-                                        continue // Heartbeats are not inventory mutations; never trigger entity reloads.
-                                    }
-                                    if (
-                                        update != null &&
-                                        update.type != "connected" &&
-                                        realtimeUpdateIsRelevantToCurrentContext(
-                                            entity = update.entity,
-                                            updateStoreId = update.storeId,
-                                            activeStoreId = activeStoreIdState.value,
-                                            appMode = appModeState.value
-                                        )
-                                    ) {
-                                        scheduleRealtimeRefresh(
-                                            reason = update.reason ?: update.entity,
-                                            entity = update.entity,
-                                            updateId = update.id
-                                        )
-                                    }
-                                }
-                            } finally {
-                                try {
-                                    withTimeoutOrNull(2_000L) { session.close() }
-                                } catch (_: Throwable) {
-                                    // Cancellation still has to release the underlying request below.
-                                } finally {
-                                    session.cancel()
-                                    realtimeRequestJob?.cancel()
-                                }
-                            }
-
-                            break@candidateLoop
-                        } catch (throwable: Throwable) {
-                            if (throwable is CancellationException) throw throwable
-                            logCloudConnectionDiagnostic(
-                                "realtime connect failed base=$realtimeBaseUrl unauthorized=${throwable.isRealtimeUnauthorizedFailure()} " +
-                                    networkFailureSummary(throwable)
-                            )
-
-                            if (throwable.isRealtimeUnauthorizedFailure()) {
-                                invalidateCloudAccessTokenValidation(accessToken)
-                                if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) break@candidateLoop
-                                if (!retriedAfterAuthRecovery) {
-                                    retriedAfterAuthRecovery = true
-                                    val validation = ensureCloudSessionReadyForProtectedRequest()
-                                    if (!validation.negative && authenticatedSessionGenerationIsCurrent(sessionGeneration)) {
-                                        accessToken = getStoredUserAuthTokens?.invoke()?.accessToken
-                                        if (!accessToken.isNullOrBlank()) continue
-                                    }
-                                }
-
-                                authenticationUnavailable = true
-                                accessToken = null
                                 break@candidateLoop
-                            }
+                            } catch (throwable: Throwable) {
+                                ensureConnectionOwnerActive(throwable)
+                                logCloudConnectionDiagnostic(
+                                    "realtime connect failed base=$realtimeBaseUrl unauthorized=${throwable.isRealtimeUnauthorizedFailure()} " +
+                                        networkFailureSummary(throwable)
+                                )
 
-                            // DNS, tunnel, timeout and ordinary WebSocket failures are transport failures,
-                            // not evidence that the refresh token should be rotated. Try the next alias once.
-                            break
+                                if (throwable.isRealtimeUnauthorizedFailure()) {
+                                    invalidateCloudAccessTokenValidation(accessToken)
+                                    if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) break@candidateLoop
+                                    if (!retriedAfterAuthRecovery) {
+                                        retriedAfterAuthRecovery = true
+                                        val validation = ensureCloudSessionReadyForProtectedRequest()
+                                        if (!validation.negative && authenticatedSessionGenerationIsCurrent(sessionGeneration)) {
+                                            accessToken = getStoredUserAuthTokens?.invoke()?.accessToken
+                                            if (!accessToken.isNullOrBlank()) continue
+                                        }
+                                    }
+
+                                    authenticationUnavailable = true
+                                    accessToken = null
+                                    break@candidateLoop
+                                }
+
+                                // DNS, tunnel, timeout and ordinary WebSocket failures are transport failures,
+                                // not evidence that the refresh token should be rotated. Try the next alias once.
+                                break
+                            }
                         }
                     }
-                }
 
-                if (isActive) {
-                    realtimeUpdatesJob.setConnected(thisJob, false)
+                    if (isActive) {
+                        realtimeUpdatesJob.setConnected(thisJob, false)
 
-                    if (authenticationUnavailable) {
-                        realtimeRetryWakeup.await(retryRevision, CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS)
-                        continue
-                    }
+                        if (authenticationUnavailable) {
+                            realtimeRetryWakeup.await(retryRevision, CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS)
+                            continue
+                        }
 
-                    if (openedRealtimeSession) {
-                        // The HTTP server may still be reachable while only the WebSocket dropped. Do not
-                        // add a REST ping after every normal socket close; reconnect with bounded backoff.
-                        val livedMillis = (getCurrentTimeMillis() - openedRealtimeSessionAtMillis).coerceAtLeast(0L)
-                        if (livedMillis >= 30_000L) reconnectDelayMillis = 1_000L
-                        val delayMillis = reconnectDelayMillis.coerceAtLeast(REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS)
-                        realtimeRetryWakeup.await(retryRevision, realtimeRetryDelayMillis(
-                            delayMillis, cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE))
+                        if (openedRealtimeSession) {
+                            // The HTTP server may still be reachable while only the WebSocket dropped. Do not
+                            // add a REST ping after every normal socket close; reconnect with bounded backoff.
+                            val livedMillis = (getCurrentTimeMillis() - openedRealtimeSessionAtMillis).coerceAtLeast(0L)
+                            if (livedMillis >= 30_000L) reconnectDelayMillis = 1_000L
+                            val delayMillis = reconnectDelayMillis.coerceAtLeast(REALTIME_AFTER_WEBSOCKET_CLOSE_MIN_DELAY_MILLIS)
+                            realtimeRetryWakeup.await(retryRevision, realtimeRetryDelayMillis(
+                                delayMillis, cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE))
+                            reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(10_000L)
+                            continue
+                        }
+
+                        // A failed WebSocket handshake is not enough evidence to launch another REST ping:
+                        // the single health-monitor loop already owns transport probing. Keeping those duties
+                        // separate prevents realtime reconnects from multiplying /auth/ping traffic.
+                        val retryDelayMillis = when (cloudTransportStatusState.value) {
+                            CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
+                            CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> realtimeRetryDelayMillis(reconnectDelayMillis, false)
+                            else -> realtimeRetryDelayMillis(reconnectDelayMillis,
+                                cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE)
+                        }
+                        realtimeRetryWakeup.await(retryRevision, retryDelayMillis)
                         reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(10_000L)
-                        continue
                     }
-
-                    // A failed WebSocket handshake is not enough evidence to launch another REST ping:
-                    // the single health-monitor loop already owns transport probing. Keeping those duties
-                    // separate prevents realtime reconnects from multiplying /auth/ping traffic.
-                    val retryDelayMillis = when (cloudTransportStatusState.value) {
-                        CLOUD_TRANSPORT_STATUS_AUTH_REFRESH_REQUIRED -> CLOUD_CONNECTION_HEALTH_CHECK_AUTH_REQUIRED_INTERVAL_MILLIS
-                        CLOUD_TRANSPORT_STATUS_UNAVAILABLE -> realtimeRetryDelayMillis(reconnectDelayMillis, false)
-                        else -> realtimeRetryDelayMillis(reconnectDelayMillis,
-                            cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE)
-                    }
-                    realtimeRetryWakeup.await(retryRevision, retryDelayMillis)
+                } catch (failure: Throwable) {
+                    ensureConnectionOwnerActive(failure)
+                    realtimeUpdatesJob.setConnected(thisJob, false)
+                    logCloudConnectionDiagnostic("realtime attempt failed " + networkFailureSummary(failure))
+                    realtimeRetryWakeup.await(retryRevision, realtimeRetryDelayMillis(
+                        reconnectDelayMillis, cloudTransportStatusState.value == CLOUD_TRANSPORT_STATUS_REACHABLE))
                     reconnectDelayMillis = (reconnectDelayMillis * 2).coerceAtMost(10_000L)
                 }
             }
@@ -14923,7 +14927,7 @@ fun refreshCloudConnectionManually() {
     val previousManualJob = manualCloudConnectionRefreshJob
     previousManualJob?.cancel()
 
-    manualCloudConnectionRefreshJob = GlobalScope.launch(Dispatchers.ourIo) {
+    manualCloudConnectionRefreshJob = GlobalScope.launch(Dispatchers.ourIo, start = CoroutineStart.LAZY) {
         val thisJob = coroutineContext[Job]
         try {
             // A second press supersedes a stale manual attempt instead of being silently ignored.
@@ -15000,7 +15004,7 @@ fun refreshCloudConnectionManually() {
                 )
             }
         } catch (throwable: Throwable) {
-            if (throwable is CancellationException) throw throwable
+            ensureConnectionOwnerActive(throwable)
             logCloudConnectionDiagnostic(
                 "manual refresh failed ${throwable.message ?: throwable}"
             )
@@ -15033,6 +15037,7 @@ fun refreshCloudConnectionManually() {
             }
         }
     }
+    manualCloudConnectionRefreshJob?.start()
 }
 
 fun upsertCart(
@@ -18588,29 +18593,137 @@ fun getStockBatches(storeId: String) {
     }
 }
 
+private val branchAvailabilityReadRevision = MutableStateFlow(0L)
+
+private fun stockMovementContextChangedMessage() = listOf(
+    LocalizedStringDataModel("main", "Store or account changed. Open the batch again."),
+    LocalizedStringDataModel("en", "Store or account changed. Open the batch again."),
+    LocalizedStringDataModel("ru", "Магазин или аккаунт изменился. Откройте партию заново."),
+    LocalizedStringDataModel("kk", "Дүкен немесе аккаунт өзгерді. Партияны қайта ашыңыз.")
+)
+
+private fun stockMovementBusyMessage() = listOf(
+    LocalizedStringDataModel("main", "A batch operation is already in progress. Please wait."),
+    LocalizedStringDataModel("en", "A batch operation is already in progress. Please wait."),
+    LocalizedStringDataModel("ru", "Операция с партией уже выполняется. Подождите."),
+    LocalizedStringDataModel("kk", "Партиямен операция орындалуда. Күте тұрыңыз.")
+)
+
+private fun stockMovementUnconfirmedMessage() = listOf(
+    LocalizedStringDataModel("main", "The batch result is not confirmed. Refresh branch stock before trying again; the operation may already have completed."),
+    LocalizedStringDataModel("en", "The batch result is not confirmed. Refresh branch stock before trying again; the operation may already have completed."),
+    LocalizedStringDataModel("ru", "Результат операции не подтверждён. Обновите остатки филиалов перед повтором: операция уже могла завершиться."),
+    LocalizedStringDataModel("kk", "Операция нәтижесі расталмады. Қайталаудан бұрын филиал қорын жаңартыңыз: операция аяқталған болуы мүмкін.")
+)
+
 fun getStockItemBranchAvailability(
     storeId: String,
     goodsItemId: String,
     onCompleted: ((DataState<StockItemBranchAvailabilityDataModel>) -> Unit)? = null
 ) {
+    val owner = inventoryOwners.current
+    val revision = branchAvailabilityReadRevision.updateAndGet { it + 1L }
+    fun isCurrent() = owner.storeId == storeId && inventoryOwnerIsCurrent(owner) &&
+        branchAvailabilityReadRevision.value == revision
     GlobalScope.launch(Dispatchers.ourIo) {
-        getStockItemBranchAvailabilityMutex.withLock {
-            val response = networkRequest<StockItemBranchAvailabilityDataModel, Unit>(
-                method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getStockItemBranchAvailabilityPath.first,
-                headers = mapOf(
-                    "store_id" to storeId,
-                    "goods_item_id" to goodsItemId
+        var completed: DataState<StockItemBranchAvailabilityDataModel> = DataState.Empty()
+        try {
+            getStockItemBranchAvailabilityMutex.withLock {
+                if (!isCurrent()) return@withLock
+                val response = networkRequest<StockItemBranchAvailabilityDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStockItemBranchAvailabilityPath.first,
+                    headers = mapOf("store_id" to storeId, "goods_item_id" to goodsItemId),
+                    expectedSessionGeneration = owner.sessionGeneration
                 )
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                stockItemBranchAvailabilityState.emit(DataState.Success(response.payload, response.message))
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                inventoryStateMutex.withLock publish@ {
+                    if (!isCurrent()) return@publish
+                    val payload = response.payload
+                    completed = if (response.negative || payload == null) DataState.Empty(response.message)
+                    else DataState.Success(payload, response.message)
+                    // Never show a previous item's branch balances after a failed replacement read.
+                    stockItemBranchAvailabilityState.emit(completed)
+                }
             }
+        } catch (failure: Throwable) {
+            ensureConnectionOwnerActive(failure)
+            inventoryStateMutex.withLock {
+                if (isCurrent()) {
+                    completed = DataState.Empty(inventoryLoadFailureMessage())
+                    stockItemBranchAvailabilityState.emit(completed)
+                }
+            }
+        } finally {
+            onCompleted?.invoke(if (isCurrent()) completed else DataState.Empty())
+        }
+    }
+}
+
+/** Claim before launch: a second press must not queue another irreversible stock movement.
+ * Actor, account and store epoch are immutable for the entire request, including the wait for auth.
+ */
+private inline fun <reified T : Any> submitStockBatchMutation(
+    owner: InventoryOwner,
+    endpoint: String,
+    body: T,
+    noinline onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)?
+) {
+    if (!inventoryOwnerIsCurrent(owner)) {
+        onCompleted?.invoke(DataState.Empty(stockMovementContextChangedMessage()))
+        return
+    }
+    if (!moveStockBatchMutex.tryLock()) {
+        onCompleted?.invoke(DataState.Empty(stockMovementBusyMessage()))
+        return
+    }
+    branchAvailabilityReadRevision.update { it + 1L }
+    GlobalScope.launch(Dispatchers.ourIo) {
+        var completed: DataState<StockBatchMoveResultDataModel> = DataState.Empty(stockMovementContextChangedMessage())
+        try {
+            if (!inventoryOwnerIsCurrent(owner)) return@launch
+            val response = networkRequest<StockBatchMoveResultDataModel, T>(
+                method = HttpMethod.Post,
+                endpointUrl = endpoint,
+                body = body,
+                headers = mapOf("store_id" to owner.storeId.orEmpty()),
+                expectedSessionGeneration = owner.sessionGeneration
+            )
+            inventoryStateMutex.withLock publish@ {
+                if (!inventoryOwnerIsCurrent(owner)) return@publish
+                // Reads issued before this mutation result must not restore old branch balances.
+                branchAvailabilityReadRevision.update { it + 1L }
+                val payload = response.payload
+                if (response.negative || payload == null) {
+                    val message = if (response.transportFailure || (response.httpStatusCode ?: 0) >= 500)
+                        stockMovementUnconfirmedMessage() else response.message
+                    completed = DataState.Empty(message)
+                    postInAppNotification(message, NotificationType.Negative)
+                } else {
+                    completed = DataState.Success(payload, response.message)
+                    stockBatchMoveResultState.emit(completed)
+                    val visible = stockItemBranchAvailabilityState.payloadValue
+                    if (visible != null && visible.currentStoreId == owner.storeId &&
+                        (visible.sourceGoodsItemId == payload.availability.sourceGoodsItemId ||
+                            payload.availability.locations.any { it.goodsItemId == visible.sourceGoodsItemId })) {
+                        stockItemBranchAvailabilityState.emit(DataState.Success(payload.availability, response.message))
+                    }
+                    postInAppNotification(response.message, NotificationType.Positive)
+                }
+            }
+            if (completed is DataState.Success && inventoryOwnerIsCurrent(owner)) {
+                getStock(owner.storeId.orEmpty())
+                getStockBatches(owner.storeId.orEmpty())
+            }
+        } catch (failure: Throwable) {
+            ensureConnectionOwnerActive(failure)
+            if (inventoryOwnerIsCurrent(owner) && completed !is DataState.Success) {
+                val message = stockMovementUnconfirmedMessage()
+                completed = DataState.Empty(message)
+                postInAppNotification(message, NotificationType.Negative)
+            }
+        } finally {
+            moveStockBatchMutex.unlock()
+            onCompleted?.invoke(if (inventoryOwnerIsCurrent(owner)) completed else DataState.Empty(stockMovementContextChangedMessage()))
         }
     }
 }
@@ -18619,66 +18732,22 @@ fun moveStockBatchBetweenStores(
     request: StockBatchMoveRequestDataModel,
     onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        moveStockBatchMutex.withLock {
-            val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveRequestDataModel>(
-                method = HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.moveStockBatchPath.first,
-                body = request.copy(actorStoreId = activeStoreIdState.value ?: request.actorStoreId ?: request.sourceStoreId),
-                headers = mapOf("store_id" to (activeStoreIdState.value ?: request.sourceStoreId))
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
-                stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
-
-                val activeStoreId = activeStoreIdState.value
-                if (!activeStoreId.isNullOrBlank()) {
-                    getStock(activeStoreId)
-                    getStockBatches(activeStoreId)
-                }
-
-                postInAppNotification(response.message, NotificationType.Positive)
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
-            }
-        }
+    val owner = inventoryOwners.current
+    if (request.actorStoreId != null && request.actorStoreId != owner.storeId) {
+        onCompleted?.invoke(DataState.Empty(stockMovementContextChangedMessage()))
+        return
     }
+    submitStockBatchMutation(owner, globalAppConfigurationState.payloadValue.moveStockBatchPath.first,
+        request.copy(actorStoreId = owner.storeId), onCompleted)
 }
 
 fun decideStockBatchMove(
     request: StockBatchMoveDecisionRequestDataModel,
     onCompleted: ((DataState<StockBatchMoveResultDataModel>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        moveStockBatchMutex.withLock {
-            val response = networkRequest<StockBatchMoveResultDataModel, StockBatchMoveDecisionRequestDataModel>(
-                method = HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.decideStockBatchMovePath.first,
-                body = request,
-                headers = mapOf("store_id" to (activeStoreIdState.value ?: ""))
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                stockBatchMoveResultState.emit(DataState.Success(response.payload, response.message))
-                stockItemBranchAvailabilityState.emit(DataState.Success(response.payload.availability, response.message))
-
-                val activeStoreId = activeStoreIdState.value
-                if (!activeStoreId.isNullOrBlank()) {
-                    getStock(activeStoreId)
-                    getStockBatches(activeStoreId)
-                }
-
-                postInAppNotification(response.message, NotificationType.Positive)
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
-            }
-        }
-    }
+    val owner = inventoryOwners.current
+    submitStockBatchMutation(owner, globalAppConfigurationState.payloadValue.decideStockBatchMovePath.first,
+        request, onCompleted)
 }
 
 fun updateGoodsBatches(

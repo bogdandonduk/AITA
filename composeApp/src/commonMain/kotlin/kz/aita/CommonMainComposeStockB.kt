@@ -1150,6 +1150,7 @@ internal fun AppConfiguration.StockBatchMoveDialog(
     onDismiss: () -> Unit,
     onMoved: () -> Unit
 ) {
+    var moving by remember(sourceBatch.id, stateValues.activeStoreId) { mutableStateOf(false) }
     val locations = availability?.locations.orEmpty()
     val sourceLocation = locations.find { it.storeId == sourceBatch.storeId }
     val destinationOptions = locations.filter { it.storeId != sourceBatch.storeId }
@@ -1181,7 +1182,7 @@ internal fun AppConfiguration.StockBatchMoveDialog(
     AitaBottomSheet(
         title = localizedStringResource(550, "Move batch"),
         iconPath = stockMoveIconPath,
-        onDismiss = onDismiss
+        onDismiss = { if (!moving) onDismiss() }
     ) {
         Column(
             modifier = Modifier
@@ -1332,19 +1333,22 @@ internal fun AppConfiguration.StockBatchMoveDialog(
                 text = stateValues.stringCancel,
                 iconPath = stateValues.drawablePathIconCancel,
                 iconRes = stateValues.drawableResIconCancel.value,
+                enabled = !moving,
                 enabledColor = stateValues.DisabledColor,
                 confirmationRequired = false,
-                onClick = onDismiss
+                onClick = { if (!moving) onDismiss() }
             )
 
             actionButton(
                 modifier = Modifier.weight(1f),
                 text = if (willRequireReceivingAcceptance) localizedStringResource(1210, "Send en route") else localizedStringResource(549, "Move"),
-                enabled = canMove,
+                enabled = canMove && !moving,
                 iconPath = stockMoveIconPath,
                 iconRes = stockBatchMovementIconFallback(),
                 confirmationRequired = false,
-                onClick = {
+                onClick = move@ {
+                    if (moving) return@move
+                    moving = true
                     moveStockBatchBetweenStores(
                         StockBatchMoveRequestDataModel(
                             sourceStoreId = sourceBatch.storeId,
@@ -1356,6 +1360,7 @@ internal fun AppConfiguration.StockBatchMoveDialog(
                             actorStoreId = stateValues.activeStoreId
                         )
                     ) { state ->
+                        moving = false
                         if (state is DataState.Success) {
                             onMoved()
                             onDismiss()

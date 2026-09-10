@@ -4929,6 +4929,22 @@ private fun rootStoreIdForAccessInsideTransaction(storeId: UUID): UUID {
     ?: storeId
 }
 
+private fun lockStockInventoryInsideTransaction(storeIds: Iterable<UUID>) {
+  lockStockInventoryRootsInsideTransaction(storeIds.map(::rootStoreIdForAccessInsideTransaction))
+}
+
+private fun stockItemHasPendingTransferInsideTransaction(goodsItemId: UUID): Boolean =
+  !StockBatchMovements.select(StockBatchMovements.id).where {
+    ((StockBatchMovements.sourceGoodsItemId eq goodsItemId) or (StockBatchMovements.destinationGoodsItemId eq goodsItemId)) and
+      (StockBatchMovements.status eq StockBatchMovementStatusDataModel.PendingAcceptance.name)
+  }.empty()
+
+private fun pendingStockTransferItemChangeMessage(): List<LocalizedStringDataModel> = simpleMessage(
+  main = "Finish pending batch transfers before changing this item's unit, making it inactive, or deleting it.",
+  ru = "Завершите ожидающие перемещения партий перед сменой единицы товара, его деактивацией или удалением.",
+  kk = "Тауар бірлігін өзгертпес, оны өшірмес не белсенділігін тоқтатпас бұрын күтілген партия ауыстыруларын аяқтаңыз."
+)
+
 private fun activeRootStoreIdForAccessInsideTransaction(storeId: UUID): UUID? {
   val storeRow = Stores
     .select(Stores.id, Stores.parentStoreId, Stores.isActive)
@@ -16346,7 +16362,7 @@ private fun buildStockBranchAvailabilityInsideTransaction(
     ?: return null
 
   val rootStoreId = rootStoreIdForAccessInsideTransaction(sourceItemRow[StockItems.storeId])
-  val storeIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: storeGroupIdsInsideTransaction(rootStoreId)
+  val storeIds = visibleStoreIdsOverride ?: storeGroupIdsInsideTransaction(rootStoreId)
   if (sourceItemRow[StockItems.storeId] !in storeIds) return null
   val storesById = Stores
     .selectAll()
@@ -16412,19 +16428,6 @@ private fun buildStockBranchAvailabilityInsideTransaction(
     locations = locations,
     movements = movements
   )
-}
-
-private fun findMatchingStockItemInStoreInsideTransaction(
-  destinationStoreId: UUID,
-  sourceItemRow: ResultRow
-): ResultRow? {
-  return StockItems
-    .selectAll()
-    .where {
-      (StockItems.storeId eq destinationStoreId) and
-         (StockItems.isActive eq true)
-    }
-    .firstOrNull { candidate -> stockItemsMatchByIdentity(sourceItemRow, candidate) }
 }
 
 private fun cloneStockItemToStoreInsideTransaction(
@@ -16584,9 +16587,18 @@ private fun findOrCloneDestinationStockItemInsideTransaction(
   destinationStoreId: UUID,
   userId: UUID,
   now: Long
-): ResultRow {
-  return findMatchingStockItemInStoreInsideTransaction(destinationStoreId, sourceItemRow)
-    ?: cloneStockItemToStoreInsideTransaction(sourceItemRow, destinationStoreId, userId, now)
+): ResultRow? {
+  val matches = StockItems.selectAll().where {
+    (StockItems.storeId eq destinationStoreId) and (StockItems.isActive eq true)
+  }.filter { stockItemsMatchByIdentity(sourceItemRow, it) }
+  // Duplicate identities or different measurement units require explicit catalogue repair.
+  // Never arbitrarily merge a moved batch into the first matching barcode/name.
+  if (matches.size > 1) return null
+  val existing = matches.singleOrNull()
+  if (existing != null) return existing.takeIf {
+    it[StockItems.measurementUnitId] == sourceItemRow[StockItems.measurementUnitId]
+  }
+  return cloneStockItemToStoreInsideTransaction(sourceItemRow, destinationStoreId, userId, now)
 }
 
 private fun ResultRow.toSupplierGoodsPriceDataModel(): SupplierGoodsPriceDataModel {
@@ -17165,6 +17177,7 @@ private fun normalizeTransactionGoodsInsideTransaction(
   lines: List<GoodsItemInTransactionDataModel>,
   visibleStoreIdsOverride: List<UUID>? = null
 ): NormalizedTransactionGoodsResult {
+  lockStockInventoryInsideTransaction(listOf(storeId))
   val transactionTypeIndex = when (transactionType) {
     "purchase" -> 0
     "return" -> 1
@@ -19840,6 +19853,8 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_ITEM_CREATE, requireWorkshift = true))
               return@newSuspendedTransaction null
 
+            lockStockInventoryInsideTransaction(listOf(storeId))
+
             val cleanBarcodeModels = body.cleanBarcodeModelsForStore(storeId)
             val cleanBarcodes = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { body.barcodes.cleanBarcodes() }
 
@@ -19963,6 +19978,7 @@ fun Application.module() {
         put("/update") {
           val userId = call.checkPrincipal() ?: return@put
           val body = call.receiveAita<GoodsItemDataModel>()
+          var stockItemChangeFailure: List<LocalizedStringDataModel>? = null
 
           val updated = newSuspendedTransaction(aitaServerIoContext) {
             val id = runCatching { UUID.fromString(body.id) }.getOrNull()
@@ -19973,6 +19989,11 @@ fun Application.module() {
 
             if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
               return@newSuspendedTransaction null
+
+            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_ITEM_EDIT, requireWorkshift = true) &&
+                !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE, requireWorkshift = true))
+              return@newSuspendedTransaction null
+            lockStockInventoryInsideTransaction(listOf(storeId))
 
             val cleanBarcodeModels = body.cleanBarcodeModelsForStore(storeId)
             val cleanBarcodes = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { body.barcodes.cleanBarcodes() }
@@ -19991,6 +20012,12 @@ fun Application.module() {
               }
               .firstOrNull()
               ?: return@newSuspendedTransaction null
+
+            if ((body.measurementUnitId != goodsItemRow[StockItems.measurementUnitId] || !body.isActive) &&
+                stockItemHasPendingTransferInsideTransaction(id)) {
+              stockItemChangeFailure = pendingStockTransferItemChangeMessage()
+              return@newSuspendedTransaction null
+            }
 
             val requestedActiveShelfBatchId = body.activeShelfBatchId
               ?.takeIf { value -> value.isNotBlank() }
@@ -20137,7 +20164,7 @@ fun Application.module() {
             )
           } ?: call.genericResponseNoPayload(
             status = HttpStatusCode.Conflict,
-            message = simpleMessage(
+            message = stockItemChangeFailure ?: simpleMessage(
               main = "Invalid stock item or duplicated barcode",
               ru = "Некорректный товар или повторяющийся штрихкод",
               kk = "Қате тауар немесе қайталанған штрихкод"
@@ -20151,6 +20178,7 @@ fun Application.module() {
           val storeId = call.headerUuid("store_id")
             ?: return@delete call.respondAitaUnauthorized()
 
+          var stockItemDeleteFailure: List<LocalizedStringDataModel>? = null
           val deletedId = newSuspendedTransaction(aitaServerIoContext) {
             if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
               return@newSuspendedTransaction null
@@ -20161,6 +20189,8 @@ fun Application.module() {
             val id = runCatching { UUID.fromString(rawId) }.getOrNull()
               ?: return@newSuspendedTransaction null
 
+            lockStockInventoryInsideTransaction(listOf(storeId))
+
             val goodsItemRow = StockItems
               .selectAll()
               .where {
@@ -20169,6 +20199,12 @@ fun Application.module() {
               }
               .firstOrNull()
               ?: return@newSuspendedTransaction null
+
+            // Stock-item deletion cascades to its batches/movements: do not strand or erase an in-flight transfer.
+            if (stockItemHasPendingTransferInsideTransaction(id)) {
+              stockItemDeleteFailure = pendingStockTransferItemChangeMessage()
+              return@newSuspendedTransaction null
+            }
 
             preserveGoodsItemNameInTransactionsInsideTransaction(storeId, goodsItemRow)
 
@@ -20217,7 +20253,9 @@ fun Application.module() {
               payload = it,
               message = getResponse("16").message
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: if (stockItemDeleteFailure != null) {
+            call.genericResponseNoPayload(HttpStatusCode.Conflict, stockItemDeleteFailure)
+          } else call.respondAitaUnauthorized()
         }
       }
     }
@@ -20296,10 +20334,13 @@ fun Application.module() {
               ?: return@newSuspendedTransaction null
             val sourceBatchId = runCatching { UUID.fromString(request.sourceBatchId) }.getOrNull()
               ?: return@newSuspendedTransaction null
-            val actorStoreId = request.actorStoreId
-              ?.let { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
-              ?: call.headerUuid("store_id")
-              ?: sourceStoreId
+            val actorStoreId = request.actorStoreId?.let { raw ->
+              runCatching { UUID.fromString(raw) }.getOrNull() ?: return@newSuspendedTransaction null
+            } ?: call.headerUuid("store_id") ?: sourceStoreId
+            val headerStoreId = call.headerUuid("store_id")
+            if (headerStoreId != null && headerStoreId != actorStoreId) return@newSuspendedTransaction null
+            if (!userCanUseStoreActionInsideTransaction(userId, actorStoreId, STORE_PERMISSION_STOCK_BATCH_MOVE))
+              return@newSuspendedTransaction null
 
             if (sourceStoreId == destinationStoreId)
               return@newSuspendedTransaction null
@@ -20328,6 +20369,8 @@ fun Application.module() {
             } else if (!userCanUseStoreActionInsideTransaction(userId, destinationStoreId, STORE_PERMISSION_STOCK_BATCH_MOVE)) {
               return@newSuspendedTransaction null
             }
+
+            lockStockInventoryRootsInsideTransaction(listOf(rootSourceStoreId))
 
             val sourceItemRow = StockItems
               .selectAll()
@@ -20362,12 +20405,9 @@ fun Application.module() {
             ) return@newSuspendedTransaction null
 
             val sourceQuantity = sourceBatchRow[StockBatchesV2.quantity]
-            val moveQuantity = sourceQuantity.copy(
-              total = sourceQuantity.withTotalValue(request.quantity.total).total
-            )
-
-            if (!moveQuantity.total.isFinite() || moveQuantity.total <= 0.0 || sourceQuantity.total + 0.000001 < moveQuantity.total)
-              return@newSuspendedTransaction null
+            val quantities = planStockBatchTransfer(sourceQuantity, request.quantity.total)
+              ?: return@newSuspendedTransaction null
+            val moveQuantity = quantities.moved
 
             val now = System.currentTimeMillis()
             val destinationItemRow = findOrCloneDestinationStockItemInsideTransaction(
@@ -20375,12 +20415,10 @@ fun Application.module() {
               destinationStoreId = destinationStoreId,
               userId = userId,
               now = now
-            )
+            ) ?: return@newSuspendedTransaction null
             val destinationGoodsItemId = destinationItemRow[StockItems.id]
 
-            val remainingQuantity = sourceQuantity.copy(
-              total = sourceQuantity.withTotalValue(sourceQuantity.total - moveQuantity.total).total
-            )
+            val remainingQuantity = quantities.remaining
             val sourceNextStatus = if (!remainingQuantity.total.isFinite() || remainingQuantity.total <= 0.0) {
               StockBatchStatusDataModel.SoldOut.name
             } else {
@@ -20526,7 +20564,8 @@ fun Application.module() {
             val sourceItem = StockItems.selectAll().where { StockItems.id eq sourceGoodsItemId }.single().toGoodsItemDataModel()
             val destinationItem = StockItems.selectAll().where { StockItems.id eq destinationGoodsItemId }.single().toGoodsItemDataModel()
             val movement = StockBatchMovements.selectAll().where { StockBatchMovements.id eq movementId }.single().toStockBatchMovementDataModel()
-            val availability = buildStockBranchAvailabilityInsideTransaction(sourceStoreId, sourceGoodsItemId)
+            val availability = buildStockBranchAvailabilityInsideTransaction(actorStoreId, sourceGoodsItemId,
+              visibleStoreIdsOverride = stockVisibleStoreIdsForUserInsideTransaction(userId, actorStoreId))
               ?: StockItemBranchAvailabilityDataModel()
 
             StockBatchMoveResultDataModel(
@@ -20567,6 +20606,20 @@ fun Application.module() {
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val movementId = runCatching { UUID.fromString(request.movementId) }.getOrNull()
               ?: return@newSuspendedTransaction null
+            val movementLocation = StockBatchMovements.select(StockBatchMovements.rootStoreId, StockBatchMovements.destinationStoreId)
+              .where { StockBatchMovements.id eq movementId }.singleOrNull()
+              ?: return@newSuspendedTransaction null
+            val movementRoot = movementLocation[StockBatchMovements.rootStoreId]
+            val movementDestination = movementLocation[StockBatchMovements.destinationStoreId]
+            val requestedActorStoreId = call.headerUuid("store_id") ?: movementDestination
+            // Reject unrelated callers before they can contend on this inventory family's lock.
+            if (!userHasStoreAccessInsideTransaction(userId, requestedActorStoreId) ||
+                !storesShareInventoryRootInsideTransaction(requestedActorStoreId, movementDestination) ||
+                (!userCanUseStoreActionInsideTransaction(userId, movementDestination, STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE) &&
+                 !(requestedActorStoreId == movementRoot && userCanUseStoreActionInsideTransaction(userId, movementRoot, STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE))))
+              return@newSuspendedTransaction null
+            // Every decision re-reads its status after taking the root's transaction lock.
+            lockStockInventoryRootsInsideTransaction(listOf(movementRoot))
             val movementRow = StockBatchMovements
               .selectAll()
               .where { StockBatchMovements.id eq movementId }
@@ -20585,6 +20638,9 @@ fun Application.module() {
             val destinationBatchId = movementRow[StockBatchMovements.destinationBatchId]
             val actorStoreId = call.headerUuid("store_id") ?: destinationStoreId
 
+            if (!userHasStoreAccessInsideTransaction(userId, actorStoreId) ||
+                !call.matchesAnyInventoryContextStoreIdInsideTransaction(userId, setOf(actorStoreId, destinationStoreId)))
+              return@newSuspendedTransaction null
             if (!storesShareInventoryRootInsideTransaction(actorStoreId, destinationStoreId))
               return@newSuspendedTransaction null
 
@@ -20607,6 +20663,23 @@ fun Application.module() {
             if (destinationBatchRow[StockBatchesV2.status] != StockBatchStatusDataModel.InTransit.name)
               return@newSuspendedTransaction null
 
+            val destinationItemRow = StockItems.selectAll()
+              .where { (StockItems.id eq destinationGoodsItemId) and (StockItems.storeId eq destinationStoreId) and (StockItems.isActive eq true) }
+              .singleOrNull() ?: return@newSuspendedTransaction null
+            val sourceBatchRow = StockBatchesV2.selectAll()
+              .where { (StockBatchesV2.id eq sourceBatchId) and (StockBatchesV2.goodsItemId eq sourceGoodsItemId) and (StockBatchesV2.storeId eq sourceStoreId) }
+              .singleOrNull() ?: return@newSuspendedTransaction null
+            val sourceItemRow = StockItems.selectAll()
+              .where { (StockItems.id eq sourceGoodsItemId) and (StockItems.storeId eq sourceStoreId) }
+              .singleOrNull() ?: return@newSuspendedTransaction null
+            val restoredQuantity = if (!request.accept) {
+              // Never erase the incoming batch when its source cannot safely receive the return.
+              if (!sourceItemRow[StockItems.isActive] || !sourceBatchRow[StockBatchesV2.isActive] || sourceBatchRow[StockBatchesV2.status] in setOf(
+                  StockBatchStatusDataModel.Deleted.name, StockBatchStatusDataModel.WrittenOff.name))
+                return@newSuspendedTransaction null
+              restoreDeclinedStockQuantity(sourceBatchRow[StockBatchesV2.quantity], movementRow[StockBatchMovements.quantity])
+                ?: return@newSuspendedTransaction null
+            } else null
             val now = System.currentTimeMillis()
             val decisionNote = request.note?.takeIf { it.isNotBlank() }
 
@@ -20616,12 +20689,6 @@ fun Application.module() {
                 it[StockBatchesV2.deliveredAtMillis] = destinationBatchRow[StockBatchesV2.deliveredAtMillis] ?: now
                 it[StockBatchesV2.updatedAtMillis] = now
               }
-
-              val destinationItemRow = StockItems
-                .selectAll()
-                .where { StockItems.id eq destinationGoodsItemId }
-                .singleOrNull()
-                ?: return@newSuspendedTransaction null
 
               if (destinationItemRow[StockItems.activeShelfBatchId] == null) {
                 StockItems.update({ StockItems.id eq destinationGoodsItemId }) {
@@ -20637,26 +20704,16 @@ fun Application.module() {
                 it[StockBatchMovements.decisionNote] = decisionNote
               }
             } else {
-              val movedQuantity = movementRow[StockBatchMovements.quantity]
-              val sourceBatchRow = StockBatchesV2
-                .selectAll()
-                .where { StockBatchesV2.id eq sourceBatchId }
-                .singleOrNull()
-
-              if (sourceBatchRow != null) {
-                val sourceQuantity = sourceBatchRow[StockBatchesV2.quantity]
-                val restoredQuantity = sourceQuantity.copy(
-                  total = sourceQuantity.withTotalValue(sourceQuantity.total + movedQuantity.total).total
-                )
-                val restoredStatus = movementRow[StockBatchMovements.sourceStatusBeforeMove]
-                  .takeIf { status -> status != StockBatchStatusDataModel.Deleted.name }
-                  ?: StockBatchStatusDataModel.Delivered.name
-                StockBatchesV2.update({ StockBatchesV2.id eq sourceBatchId }) {
-                  it[StockBatchesV2.quantity] = restoredQuantity
-                  it[StockBatchesV2.status] = restoredStatus
-                  it[StockBatchesV2.updatedAtMillis] = now
-                  it[StockBatchesV2.isActive] = true
-                }
+              val currentSourceStatus = sourceBatchRow[StockBatchesV2.status]
+              val restoredStatus = if (currentSourceStatus == StockBatchStatusDataModel.SoldOut.name) {
+                movementRow[StockBatchMovements.sourceStatusBeforeMove].takeIf { it in setOf(
+                  StockBatchStatusDataModel.Delivered.name, StockBatchStatusDataModel.OnShelf.name
+                ) } ?: StockBatchStatusDataModel.Delivered.name
+              } else currentSourceStatus
+              StockBatchesV2.update({ StockBatchesV2.id eq sourceBatchId }) {
+                it[StockBatchesV2.quantity] = requireNotNull(restoredQuantity)
+                it[StockBatchesV2.status] = restoredStatus
+                it[StockBatchesV2.updatedAtMillis] = now
               }
 
               StockBatchesV2.update({ StockBatchesV2.id eq destinationBatchId }) {
@@ -20759,7 +20816,8 @@ fun Application.module() {
             val sourceItem = StockItems.selectAll().where { StockItems.id eq sourceGoodsItemId }.single().toGoodsItemDataModel()
             val destinationItem = StockItems.selectAll().where { StockItems.id eq destinationGoodsItemId }.single().toGoodsItemDataModel()
             val movement = StockBatchMovements.selectAll().where { StockBatchMovements.id eq movementId }.single().toStockBatchMovementDataModel()
-            val availability = buildStockBranchAvailabilityInsideTransaction(destinationStoreId, destinationGoodsItemId)
+            val availability = buildStockBranchAvailabilityInsideTransaction(actorStoreId, destinationGoodsItemId,
+              visibleStoreIdsOverride = stockVisibleStoreIdsForUserInsideTransaction(userId, actorStoreId))
               ?: StockItemBranchAvailabilityDataModel()
 
             StockBatchMoveResultDataModel(
@@ -20805,21 +20863,29 @@ fun Application.module() {
           val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
 
           val inserted = newSuspendedTransaction(aitaServerIoContext) {
+            val requestedStoreIds = bodies.map { body ->
+              runCatching { UUID.fromString(body.storeId) }.getOrNull() ?: return@newSuspendedTransaction run { rollback(); null }
+            }
+            if (requestedStoreIds.any { storeId ->
+                !call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId) ||
+                !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_CREATE, requireWorkshift = true)
+              }) return@newSuspendedTransaction null
+            lockStockInventoryInsideTransaction(requestedStoreIds)
             val result = mutableListOf<GoodsBatchDataModel>()
             val now = System.currentTimeMillis()
 
             batchAddLoop@ for (body in bodies) {
               val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-                ?: return@newSuspendedTransaction null
+                ?: return@newSuspendedTransaction run { rollback(); null }
 
               val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
-                ?: return@newSuspendedTransaction null
+                ?: return@newSuspendedTransaction run { rollback(); null }
 
               if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
-                return@newSuspendedTransaction null
+                return@newSuspendedTransaction run { rollback(); null }
 
               if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_CREATE, requireWorkshift = true))
-                return@newSuspendedTransaction null
+                return@newSuspendedTransaction run { rollback(); null }
 
               val itemExists = StockItems
                 .selectAll()
@@ -20832,7 +20898,7 @@ fun Application.module() {
                 .not()
 
               if (!itemExists)
-                return@newSuspendedTransaction null
+                return@newSuspendedTransaction run { rollback(); null }
 
               val requestedBatchId = body.id
                 .trim()
@@ -20847,7 +20913,7 @@ fun Application.module() {
 
                 if (existingRow != null) {
                   if (existingRow[StockBatchesV2.storeId] != storeId || existingRow[StockBatchesV2.goodsItemId] != goodsItemId) {
-                    return@newSuspendedTransaction null
+                    return@newSuspendedTransaction run { rollback(); null }
                   }
 
                   result += existingRow.toGoodsBatchDataModel()
@@ -20861,7 +20927,7 @@ fun Application.module() {
                 storeId = storeId,
                 rawSupplierId = body.supplierId,
                 rawSupplierOrderId = body.supplierOrderId
-              ) ?: return@newSuspendedTransaction null
+              ) ?: return@newSuspendedTransaction run { rollback(); null }
               val nextSupplierId = supplierLink.supplierId
               val nextSupplierOrderId = supplierLink.supplierOrderId
               val sanitizedSupplyPrice = body.supplyPrice.copy(
@@ -20999,30 +21065,38 @@ fun Application.module() {
           val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
 
           val updated = newSuspendedTransaction(aitaServerIoContext) {
+            val requestedStoreIds = bodies.map { body ->
+              runCatching { UUID.fromString(body.storeId) }.getOrNull() ?: return@newSuspendedTransaction run { rollback(); null }
+            }
+            if (requestedStoreIds.any { storeId ->
+                !call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId) ||
+                !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_EDIT, requireWorkshift = true)
+              }) return@newSuspendedTransaction null
+            lockStockInventoryInsideTransaction(requestedStoreIds)
             val result = mutableListOf<GoodsBatchDataModel>()
             val now = System.currentTimeMillis()
 
             for (body in bodies) {
               val id = runCatching { UUID.fromString(body.id) }.getOrNull()
-                ?: return@newSuspendedTransaction null
+                ?: return@newSuspendedTransaction run { rollback(); null }
 
               val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-                ?: return@newSuspendedTransaction null
+                ?: return@newSuspendedTransaction run { rollback(); null }
 
               val goodsItemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
-                ?: return@newSuspendedTransaction null
+                ?: return@newSuspendedTransaction run { rollback(); null }
 
               if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
-                return@newSuspendedTransaction null
+                return@newSuspendedTransaction run { rollback(); null }
 
               if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_EDIT, requireWorkshift = true))
-                return@newSuspendedTransaction null
+                return@newSuspendedTransaction run { rollback(); null }
 
               val supplierLink = resolveStockBatchSupplierLinkInsideTransaction(
                 storeId = storeId,
                 rawSupplierId = body.supplierId,
                 rawSupplierOrderId = body.supplierOrderId
-              ) ?: return@newSuspendedTransaction null
+              ) ?: return@newSuspendedTransaction run { rollback(); null }
               val nextSupplierId = supplierLink.supplierId
               val nextSupplierOrderId = supplierLink.supplierOrderId
               val sanitizedSupplyPrice = body.supplyPrice.copy(
@@ -21046,7 +21120,7 @@ fun Application.module() {
                      (StockBatchesV2.storeId eq storeId)
                 }
                 .singleOrNull()
-                ?: return@newSuspendedTransaction null
+                ?: return@newSuspendedTransaction run { rollback(); null }
 
               val hasPendingMovement = StockBatchMovements
                 .select(StockBatchMovements.id)
@@ -21056,7 +21130,7 @@ fun Application.module() {
                 }
                 .empty()
                 .not()
-              if (hasPendingMovement) return@newSuspendedTransaction null
+              if (hasPendingMovement) return@newSuspendedTransaction run { rollback(); null }
 
               val changedBatchFields = batchChangedFieldsInsideTransaction(
                 previousRow = previousBatchRow,
@@ -21171,11 +21245,12 @@ fun Application.module() {
 
           val deletedIds = newSuspendedTransaction(aitaServerIoContext) {
             if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId))
-              return@newSuspendedTransaction null
+              return@newSuspendedTransaction run { rollback(); null }
 
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_DELETE, requireWorkshift = true))
-              return@newSuspendedTransaction null
+              return@newSuspendedTransaction run { rollback(); null }
 
+            lockStockInventoryInsideTransaction(listOf(storeId))
             val now = System.currentTimeMillis()
             val result = mutableListOf<String>()
 
@@ -21266,6 +21341,8 @@ fun Application.module() {
 
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF, requireWorkshift = true))
               return@newSuspendedTransaction null
+
+            lockStockInventoryInsideTransaction(listOf(storeId))
 
             val batchRow = StockBatchesV2
               .selectAll()
@@ -26398,6 +26475,7 @@ fun Application.module() {
               )
 
               if (!stockMutationOk) {
+                rollback()
                 transactionFailureMessage = simpleMessage(
                   main = "Not enough stock or item barcode was not found",
                   ru = "Недостаточно товара на складе или штрихкод не найден",

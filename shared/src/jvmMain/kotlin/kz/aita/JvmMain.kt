@@ -156,6 +156,20 @@ private object AitaIpv4PreferredDns : Dns {
         .sortedBy { address -> if (address is Inet4Address) 0 else 1 }
 }
 
+private object AitaHttpCacheOwner {
+    private var cache: Cache? = null
+
+    @Synchronized
+    fun get(): Cache? {
+        cache?.let { return it }
+        val basePath = cacheDirPath.trim().takeIf { it.isNotBlank() } ?: return null
+        val directory = File(basePath, "http").apply { mkdirs() }
+        // OkHttp forbids two Cache instances owning the same disk journal. The engine factory is
+        // also used by health, refresh and validation clients, not only the long-lived API client.
+        return Cache(directory, cacheSize).also { cache = it }
+    }
+}
+
 private fun buildAitaOkHttpClient(): OkHttpClient {
     val profile = configuredAitaDesktopNetworkProfile()
     val builder = OkHttpClient.Builder()
@@ -171,13 +185,7 @@ private fun buildAitaOkHttpClient(): OkHttpClient {
     }
 
     runCatching {
-        cacheDirPath
-            .trim()
-            .takeIf { it.isNotBlank() }
-            ?.let { basePath ->
-                val httpCacheDirectory = File(basePath, "http").apply { mkdirs() }
-                builder.cache(Cache(httpCacheDirectory, cacheSize))
-            }
+        AitaHttpCacheOwner.get()?.let { builder.cache(it) }
     }.onFailure { throwable ->
         System.err.println("AITA desktop HTTP cache initialization failed: ${throwable.message}")
     }

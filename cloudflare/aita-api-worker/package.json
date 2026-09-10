@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test test/*.test.mjs",
     "deploy": "wrangler deploy --config wrangler.jsonc",
     "deploy:dry": "wrangler deploy --dry-run --config wrangler.jsonc",
     "dev": "wrangler dev --config wrangler.jsonc",

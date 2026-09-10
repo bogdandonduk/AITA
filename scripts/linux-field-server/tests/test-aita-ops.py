@@ -1438,5 +1438,104 @@ class ManagedLaunchTests(TempCase):
         self.assertFalse(self.root.exists())
 
 
+
+class ConnectionDoctorTests(TempCase):
+    def test_health_url_does_not_get_path_appended_twice(self):
+        for path in ("", "/", "/readyz", "/healthz/", "/auth/capabilities"):
+            self.assertEqual(ops.public_origin_url("https://aita.example" + path), "https://aita.example")
+
+    def test_unsafe_public_addresses_are_rejected_without_echoing_secrets(self):
+        for url in ("http://aita.example", "https://secret:password@aita.example", "https://aita.example?token=secret",
+                    "https://aita.example/path", "https://aita.example\n", "https://aita.example/#secret"):
+            with self.assertRaises(ops.OpsError) as failure: ops.public_origin_url(url)
+            self.assertNotIn("secret", str(failure.exception)); self.assertNotIn("password@", str(failure.exception))
+
+    def test_origin_codes_and_cf_ray_are_retained_not_private_values(self):
+        summary = ops.connection_response_summary("503", 0,
+            "cf-ray: 12345678abcdef00-ALA\nx-aita-origin-error: dns_error\nset-cookie: secret\nAuthorization: Bearer secret",
+            '{"error":"origin_unavailable","code":"dns_error","private":"secret"}')
+        self.assertEqual(summary["origin_error"], "dns_error")
+        self.assertEqual(summary["cf_ray"], "12345678abcdef00-ALA")
+        self.assertNotIn("secret", str(summary))
+
+    def test_malformed_and_untrusted_json_is_not_printed(self):
+        for body in ('secret', '["secret"]', '{"code":{"secret":1}}', '{"code":"secret","version":"secret\\n"}'):
+            result = ops.connection_response_summary("503", 0, "x-aita-origin-error: secret\ncf-ray: secret", body)
+            self.assertNotIn("secret", str(result))
+
+    def test_edge_binding_state_is_not_origin_readiness(self):
+        result = ops.connection_response_summary("200", 0, "", '{"gateway":"aita-workers-vpc","originBindingConfigured":false,"version":"2026-v4"}')
+        self.assertFalse(result["binding_configured"])
+        diagnosis = ops.connection_diagnosis({"status":"200"}, result, {"status":"503"}, {"status":"503"})
+        self.assertIn("origin API check failed", diagnosis)
+
+    def test_curl_errors_remain_distinct_from_server_503(self):
+        for code, expected in ((6,"dns"),(7,"connection"),(28,"timeout"),(35,"tls"),(60,"certificate")):
+            result = ops.connection_response_summary("000", code, "", "")
+            self.assertEqual(result, {"status":"unreachable", "failure":expected})
+        self.assertNotIn("failure", ops.connection_response_summary("503", 0, "", ""))
+
+    def test_actual_probe_is_bounded_direct_read_only_and_ignores_curlrc(self):
+        def fake(cmd, **kwargs):
+            self.assertEqual(cmd[:2], ["curl", "--disable"])
+            self.assertIn("--noproxy", cmd); self.assertIn("--max-filesize", cmd)
+            self.assertNotIn("-k", cmd); self.assertNotIn("--insecure", cmd); self.assertNotIn("-L", cmd)
+            Path(cmd[cmd.index("--output")+1]).write_text('{"code":"connection_refused"}')
+            Path(cmd[cmd.index("--dump-header")+1]).write_text('x-aita-origin-error: connection_refused\nSet-Cookie: secret')
+            return subprocess.CompletedProcess(cmd, 0, "503", "secret transport stderr")
+        with mock.patch.object(ops, "capture", side_effect=fake):
+            result = ops.connection_http_probe("https://aita.example/readyz")
+        self.assertEqual(result["origin_error"], "connection_refused"); self.assertNotIn("secret", str(result))
+
+    def test_probe_timeout_is_reported_not_swallowed_as_http_success(self):
+        with mock.patch.object(ops, "capture", side_effect=subprocess.TimeoutExpired("curl",12)):
+            self.assertEqual(ops.connection_http_probe("https://aita.example/readyz")["failure"], "probe_timeout")
+
+    def test_journal_summary_never_contains_raw_tokens_or_hosts(self):
+        result = ops.tunnel_journal_summary('Registered tunnel connection ip=10.0.0.1 protocol=quic\nERR timeout token=secret\nRegistered tunnel connection protocol=http2')
+        self.assertEqual(result["last_observed_protocol"], "http2")
+        self.assertEqual(result["registered_connections"], 2)
+        self.assertNotIn("secret", str(result)); self.assertNotIn("10.0.0.1", str(result))
+
+    def test_no_protocol_is_invented_from_empty_journal(self):
+        self.assertEqual(ops.tunnel_journal_summary("")["last_observed_protocol"], "unknown")
+
+    def test_healthy_http_does_not_claim_websocket_is_healthy(self):
+        ok = {"status":"200"}
+        self.assertIn("does NOT prove", ops.connection_diagnosis(ok, ok, ok, ok))
+
+    def test_local_failure_is_not_blindly_blamed_on_tunnel(self):
+        self.assertIn("backend/readiness first", ops.connection_diagnosis({"status":"503"},{},{},{}))
+
+    def test_known_origin_failure_is_printed_as_specific_code(self):
+        text = ops.connection_diagnosis({"status":"200"},{},{"origin_error":"destination_unavailable"},{})
+        self.assertIn("destination_unavailable",text); self.assertIn("not the database",text)
+
+    def test_unavailable_journal_does_not_hide_finished_http_diagnosis(self):
+        out = io.StringIO()
+        with mock.patch.object(ops,"require_tools"), mock.patch.object(ops,"report_server_state"), \
+                mock.patch.object(ops,"properties",return_value={}), \
+                mock.patch.object(ops,"connection_http_probe",return_value={"status":"200"}), \
+                mock.patch.object(ops.shutil,"which",return_value="/usr/bin/journalctl"), \
+                mock.patch.object(ops,"capture",side_effect=subprocess.TimeoutExpired("journalctl",8)), redirect_stdout(out):
+            self.assertEqual(ops.main(["connection"]),0)
+        self.assertIn("Unavailable or empty",out.getvalue())
+        self.assertIn("[DIAGNOSIS]",out.getvalue())
+
+    def test_cli_reads_no_secrets_and_restarts_no_services(self):
+        def fake_props(unit, *fields):
+            self.assertNotIn("ExecStart",fields); self.assertNotIn("Environment",fields)
+            return {"ActiveState":"active", "SubState":"running"}
+        out = io.StringIO()
+        with mock.patch.object(ops,"require_tools"), mock.patch.object(ops,"report_server_state"), \
+                mock.patch.object(ops,"properties",side_effect=fake_props), \
+                mock.patch.object(ops,"connection_http_probe",return_value={"status":"200"}), \
+                mock.patch.object(ops.shutil,"which",return_value=None), \
+                mock.patch.object(ops,"read_env",side_effect=AssertionError("no secrets")), \
+                mock.patch.object(ops,"stream_command",side_effect=AssertionError("no service writes")), redirect_stdout(out):
+            self.assertEqual(ops.main(["connection"]),0)
+        self.assertIn("does NOT prove",out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2, buffer=True)
