@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kz.aita.auth.*
 
-private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, TOTP_POLICY, RECOVERY_CODES, PHONE, EMAIL }
+private enum class AccountAuthEditor { NONE, TOTP_ENABLE, TOTP_SETUP, TOTP_DISABLE, TOTP_POLICY, RECOVERY_CODES, PHONE, EMAIL, TOTP_RECOVERY }
 
 @Composable
 internal fun AppConfiguration.AccountAuthenticationSettingsCard(
@@ -204,6 +204,8 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                 }
 
                 settings?.let { current ->
+                    if (current.mainPhoneNumber.isNotBlank()) AuthSettingsInfoRow(
+                        authUiText("Main phone number", "Основной номер телефона", "Негізгі телефон нөмірі"), current.mainPhoneNumber)
                     AuthSettingsInfoRow(authUiText("Main email", "Основной email", "Негізгі email"), current.email)
                     AuthSettingsInfoRow(
                         authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
@@ -313,6 +315,11 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             enabled = !loading && settings != null && capabilities?.additionalEmailLoginEnabled == true,
                             onDisabledClick = { info = authUiText("Update the server and enable email confirmation", "Обновите сервер и включите подтверждение email", "Серверді жаңартып, email растауын қосыңыз") }
                         ) { clearSensitive(); editor = AccountAuthEditor.EMAIL }
+                        if (settings?.authenticatorEnabled == true) {
+                            AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?"), !loading) {
+                                clearSensitive(); editor = AccountAuthEditor.TOTP_RECOVERY
+                            }
+                        }
                         QuietAction(onClick = ::load, enabled = !loading) { Text(authUiText("Refresh", "Обновить", "Жаңарту")) }
                     }
 
@@ -321,6 +328,16 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                             onUpdated = { settings = it },
                             onClose = { editor = AccountAuthEditor.NONE; clearSensitive() })
                     }
+
+                    AccountAuthEditor.TOTP_RECOVERY -> AuthenticatorRecoveryEditor(
+                        initialIdentifier = settings?.email.orEmpty(), editableIdentifier = false,
+                        onRecovered = { recoveredUserId ->
+                            if (stateValues.userAccount?.id == recoveredUserId) settings = settings?.copy(authenticatorEnabled = false, authenticatorRequiredForLogin = false,
+                                recoveryCodesRemaining = 0, securityRevision = (settings?.securityRevision ?: 0L) + 1L)
+                            clearSensitive()
+                        },
+                        onClose = { clearSensitive(); editor = AccountAuthEditor.NONE }
+                    )
 
                     AccountAuthEditor.TOTP_ENABLE -> {
                         Text(
@@ -585,15 +602,18 @@ internal fun AppConfiguration.AccountAuthenticationSettingsCard(
                                 }
                             }
                         }
+                        AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?"), !loading) {
+                            clearSensitive(); editor = AccountAuthEditor.TOTP_RECOVERY
+                        }
                         QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
                     }
 
                     AccountAuthEditor.PHONE -> {
                         Text(
                             text = authUiText(
-                                "An extra number for sign-in; your main number stays unchanged. Confirmation goes to your main email, not SMS.",
-                                "Дополнительный номер для входа; основной номер не изменится. Подтверждение придёт на основной email, не в SMS.",
-                                "Кіруге арналған қосымша нөмір; негізгі нөмір өзгермейді. Растау SMS емес, негізгі email арқылы келеді."
+                                "An extra number for sign-in; your main number stays unchanged.",
+                                "Дополнительный номер для входа; основной номер не изменится.",
+                                "Кіруге арналған қосымша нөмір; негізгі нөмір өзгермейді."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize

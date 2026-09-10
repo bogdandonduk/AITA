@@ -2262,6 +2262,8 @@ object RefreshSessions: Table("refresh_sessions") {
   val expiresAt = timestamp("expires_at")
   val rotatedFrom = uuid("rotated_from").nullable()
   val revokedAt = timestamp("revoked_at").nullable()
+  // Recovery/explicit revocation is irreversible; refresh replay recovery cannot undo it.
+  val securityInvalidated = bool("security_invalidated").default(false)
 
   val meta = jsonb<Map<String, String>>(
     name = "meta",
@@ -3151,7 +3153,7 @@ fun Application.configureJwtAuth() {
             .singleOrNull() ?: return@newSuspendedTransaction false
 
           val sessionActive = row[RefreshSessions.userId] == subjectId &&
-            row[RefreshSessions.revokedAt] == null &&
+            row[RefreshSessions.revokedAt] == null && !row[RefreshSessions.securityInvalidated] &&
             row[RefreshSessions.expiresAt].isAfter(Instant.now())
           if (!sessionActive) return@newSuspendedTransaction false
 
@@ -3221,7 +3223,17 @@ class TokenService(private val cfg: JwtConfig) {
     return newPairOnce(userId, metaParam)
   }
 
-  private suspend fun newPairOnce(userId: UUID, metaParam: Map<String, String>?): TokenPair = coroutineScope {
+  private suspend fun newPairOnce(userId: UUID, metaParam: Map<String, String>?): TokenPair =
+    checkNotNull(newPairAfterVerification(userId, metaParam) { true })
+
+  /** Verification, one-time consumption and session issuance share ONE user-locked transaction.
+   * No retry around the caller's verifier: a failed transaction rolls back its factor changes.
+   */
+  internal suspend fun newPairAfterVerification(
+    userId: UUID,
+    metaParam: Map<String, String>?,
+    verifyInsideTransaction: () -> Boolean
+  ): TokenPair? = coroutineScope {
     val refreshPlain = Refresh.newPlainToken()
     val refreshHash = Refresh.hash(refreshPlain)
     val now = Instant.now()
@@ -3233,12 +3245,14 @@ class TokenService(private val cfg: JwtConfig) {
       signAccess(userId, sessionId, now)
     }
 
-    newSuspendedTransaction(aitaServerIoContext) {
+    val issued = newSuspendedTransaction(aitaServerIoContext) {
+      maxAttempts = 1 // The credential verifier must not be invoked again by an implicit SQL retry.
       Users
         .selectAll()
         .where { Users.id eq userId }
         .forUpdate()
-        .singleOrNull()
+        .singleOrNull() ?: return@newSuspendedTransaction false
+      if (!verifyInsideTransaction()) return@newSuspendedTransaction false
 
       val oldSameDeviceSessionIds = sameDeviceSessionIdsInsideTransaction(userId, metaParam)
 
@@ -3273,8 +3287,13 @@ class TokenService(private val cfg: JwtConfig) {
         metaParam = metaParam,
         now = nowMillis
       )
+      true
     }
 
+    if (!issued) {
+      signAccessAsync.cancel()
+      return@coroutineScope null
+    }
     TokenPair(
       signAccessAsync.await(),
       REFRESH_SESSION_NEVER_EXPIRES_AT_MILLIS,
@@ -3325,6 +3344,11 @@ class TokenService(private val cfg: JwtConfig) {
     val newSessionId = UUID.randomUUID()
 
     val userId = newSuspendedTransaction(aitaServerIoContext) {
+      val owner = RefreshSessions.select(RefreshSessions.userId).where { RefreshSessions.tokenHash eq hash }
+        .singleOrNull()?.get(RefreshSessions.userId) ?: return@newSuspendedTransaction null
+      val user = Users.selectAll().where { Users.id eq owner }.forUpdate().singleOrNull()
+        ?: return@newSuspendedTransaction null
+      if (!user[Users.isActive]) return@newSuspendedTransaction null
       val oldSession = RefreshSessions
         .selectAll()
         .where { RefreshSessions.tokenHash eq hash }
@@ -3332,6 +3356,7 @@ class TokenService(private val cfg: JwtConfig) {
         .singleOrNull() ?: return@newSuspendedTransaction null
 
       oldSession[RefreshSessions.revokedAt] ?: return@newSuspendedTransaction null
+      if (oldSession[RefreshSessions.securityInvalidated]) return@newSuspendedTransaction null
 
       val oldSessionId = oldSession[RefreshSessions.id]
       val sessionUserId = oldSession[RefreshSessions.userId]
@@ -3360,13 +3385,14 @@ class TokenService(private val cfg: JwtConfig) {
 
       val replacement = RefreshSessions
         .selectAll()
-        .where { (RefreshSessions.userId eq sessionUserId) and (RefreshSessions.rotatedFrom eq oldSessionId) }
+        .where { (RefreshSessions.userId eq sessionUserId) and (RefreshSessions.rotatedFrom eq oldSessionId) and
+          RefreshSessions.revokedAt.isNull() and (RefreshSessions.securityInvalidated eq false) }
         .orderBy(RefreshSessions.createdAt, SortOrder.DESC)
         .toList()
         .firstOrNull { row -> row.matchesRecoveryDevice() }
         ?: RefreshSessions
           .selectAll()
-          .where { (RefreshSessions.userId eq sessionUserId) and RefreshSessions.revokedAt.isNull() }
+          .where { (RefreshSessions.userId eq sessionUserId) and RefreshSessions.revokedAt.isNull() and (RefreshSessions.securityInvalidated eq false) }
           .orderBy(RefreshSessions.createdAt, SortOrder.DESC)
           .toList()
           .firstOrNull { row -> row.matchesRecoveryDevice() }
@@ -3374,12 +3400,6 @@ class TokenService(private val cfg: JwtConfig) {
 
       val replacementSessionId = replacement[RefreshSessions.id]
       val recoveredMeta = mergedRefreshSessionMeta(oldMeta, replacement[RefreshSessions.meta], metaParam)
-
-      Users
-        .selectAll()
-        .where { Users.id eq sessionUserId }
-        .forUpdate()
-        .singleOrNull()
 
       if (replacement[RefreshSessions.revokedAt] == null) {
         RefreshSessions.update({ RefreshSessions.id eq replacementSessionId }) {
@@ -3453,6 +3473,11 @@ class TokenService(private val cfg: JwtConfig) {
     val expires = REFRESH_SESSION_NEVER_EXPIRES_AT
 
     val (userId, sessionId) = newSuspendedTransaction(aitaServerIoContext) {
+      val owner = RefreshSessions.select(RefreshSessions.userId).where { RefreshSessions.tokenHash eq hash }
+        .singleOrNull()?.get(RefreshSessions.userId) ?: throw IllegalAccessException("No refresh token session")
+      val user = Users.selectAll().where { Users.id eq owner }.forUpdate().singleOrNull()
+        ?: throw IllegalAccessException("No refresh account")
+      if (!user[Users.isActive]) throw IllegalAccessException("Account is inactive")
       val session = RefreshSessions
         .selectAll()
         .where { RefreshSessions.tokenHash eq hash }
@@ -3462,13 +3487,7 @@ class TokenService(private val cfg: JwtConfig) {
       val sessionId = session[RefreshSessions.id]
       val sessionUserId = session[RefreshSessions.userId]
 
-      Users
-        .selectAll()
-        .where { Users.id eq sessionUserId }
-        .forUpdate()
-        .singleOrNull()
-
-      if (session[RefreshSessions.revokedAt] != null) {
+      if (session[RefreshSessions.securityInvalidated] || session[RefreshSessions.revokedAt] != null) {
         throw IllegalAccessException("Refresh token was already rotated or revoked")
       }
 
@@ -3525,6 +3544,9 @@ class TokenService(private val cfg: JwtConfig) {
     val hash = Refresh.hash(refreshPlain)
     val now = Instant.now()
     val nowMillis = now.toEpochMilli()
+    val owner = RefreshSessions.select(RefreshSessions.userId).where { RefreshSessions.tokenHash eq hash }
+      .singleOrNull()?.get(RefreshSessions.userId) ?: return@newSuspendedTransaction
+    Users.selectAll().where { Users.id eq owner }.forUpdate().singleOrNull() ?: return@newSuspendedTransaction
     val sessions = RefreshSessions
       .selectAll()
       .where { (RefreshSessions.tokenHash eq hash) and RefreshSessions.revokedAt.isNull() }
@@ -3534,6 +3556,7 @@ class TokenService(private val cfg: JwtConfig) {
     sessions.forEach { row ->
       RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) {
         it[RefreshSessions.revokedAt] = now
+        it[RefreshSessions.securityInvalidated] = true
       }
       insertSecuritySessionEventInsideTransaction(
         userId = row[RefreshSessions.userId],
@@ -4155,6 +4178,13 @@ private object RealtimeServerBus {
 
     if (!updates.tryEmit(update)) updates.emit(update)
   }
+}
+
+/** Published only AFTER the security reset transaction commits. Replayed events are harmless:
+ * each socket checks its own session row, so a later legitimate login is not disconnected.
+ */
+internal suspend fun publishAuthenticatorReset(userId: UUID) {
+  RealtimeServerBus.publish(entity = "auth/security", userId = userId.toString(), reason = "authenticator_recovered")
 }
 
 private suspend fun publishWorkerRealtimeBundle(storeId: String?, reason: String) {
@@ -18538,8 +18568,9 @@ fun Application.module() {
       webSocket("/rt/updates") {
         val principal = call.principal<JWTPrincipal>()
         val userId = runCatching { principal?.subject?.let { UUID.fromString(it) } }.getOrNull()
+        val sessionId = runCatching { principal?.payload?.getClaim("sessionId")?.asString()?.let(UUID::fromString) }.getOrNull()
 
-        if (userId == null) {
+        if (userId == null || sessionId == null) {
           close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
           return@webSocket
         }
@@ -18567,6 +18598,14 @@ fun Application.module() {
               try {
                 val targetUserId = update.userId?.trim()?.takeIf { it.isNotBlank() }
                 if (targetUserId == null || targetUserId.equals(userId.toString(), ignoreCase = true)) {
+                  if (update.entity == "auth/security" && update.reason == "authenticator_recovered") {
+                    val invalidated = newSuspendedTransaction(aitaServerIoContext) {
+                      RefreshSessions.select(RefreshSessions.securityInvalidated).where { RefreshSessions.id eq sessionId }
+                        .singleOrNull()?.get(RefreshSessions.securityInvalidated) != false
+                    }
+                    if (invalidated) close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Sign in again"))
+                    return@collect
+                  }
                   sendRealtimeUpdate(update)
                 }
               } catch (throwable: Throwable) {
@@ -19022,6 +19061,7 @@ fun Application.module() {
           }
 
           newSuspendedTransaction(aitaServerIoContext) {
+            Users.selectAll().where { Users.id eq userId }.forUpdate().singleOrNull() ?: return@newSuspendedTransaction
             val now = Instant.now()
             val nowMillis = now.toEpochMilli()
             val rows = RefreshSessions
@@ -19037,6 +19077,7 @@ fun Application.module() {
             rows.forEach { row ->
               RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) {
                 it[RefreshSessions.revokedAt] = now
+                it[RefreshSessions.securityInvalidated] = true
               }
               insertSecuritySessionEventInsideTransaction(
                 userId = userId,
@@ -19062,6 +19103,7 @@ fun Application.module() {
           val sessionToKeep = currentSessionId ?: UUID(0L, 0L)
 
           newSuspendedTransaction(aitaServerIoContext) {
+            Users.selectAll().where { Users.id eq userId }.forUpdate().singleOrNull() ?: return@newSuspendedTransaction
             val now = Instant.now()
             val nowMillis = now.toEpochMilli()
             val rows = RefreshSessions
@@ -19077,6 +19119,7 @@ fun Application.module() {
             rows.forEach { row ->
               RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) {
                 it[RefreshSessions.revokedAt] = now
+                it[RefreshSessions.securityInvalidated] = true
               }
               insertSecuritySessionEventInsideTransaction(
                 userId = userId,

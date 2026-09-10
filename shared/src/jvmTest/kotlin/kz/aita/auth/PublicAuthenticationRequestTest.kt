@@ -17,7 +17,9 @@ class PublicAuthenticationRequestTest {
     fun publicCredentialRejectionDoesNotSendStoredBearerRefreshOrReplay() = runBlocking {
         val endpoints = listOf(
             "auth/logIn", "auth/login/password", "auth/login/code/verify", "auth/login/totp",
-            "auth/password-recovery/verify", "auth/password-recovery/reset"
+            "auth/password-recovery/verify", "auth/password-recovery/reset",
+            "auth/login/authenticator", "auth/login/authenticator/password",
+            "auth/authenticator-recovery/request", "auth/authenticator-recovery/resend", "auth/authenticator-recovery/confirm"
         )
         var refreshCalls = 0
         var requests = 0

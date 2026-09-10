@@ -21,7 +21,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kz.aita.auth.*
 
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
-private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, NEW_PASSWORD, FINISHING, COMPLETE }
+private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, PASSWORD_CONFIRMATION, NEW_PASSWORD, FINISHING, COMPLETE, AUTHENTICATOR_RECOVERY }
+private enum class AitaCodeLoginMethod { EMAIL, AUTHENTICATOR }
 private enum class AitaLoginIdentifierType { PHONE, EMAIL }
 
 internal enum class AitaAuthFeatureAvailability { CHECKING, AVAILABLE, UNAVAILABLE, UNKNOWN }
@@ -69,6 +70,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var capabilitiesError by remember { mutableStateOf("") }
     var capabilitiesRefresh by remember { mutableIntStateOf(0) }
     var mode by remember { mutableStateOf(AitaLoginMode.PASSWORD) }
+    var codeMethod by remember { mutableStateOf(AitaCodeLoginMethod.EMAIL) }
     var step by remember { mutableStateOf(AitaLoginStep.PRIMARY) }
     var identifierType by remember { mutableStateOf(AitaLoginIdentifierType.PHONE) }
     // The parent owns the submitted identifier. A second StateHost could restore visible text
@@ -171,6 +173,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         val valid = when (result.nextStep) {
             AitaAuthNextStep.EMAIL_CODE -> result.flowId.isNotBlank() && (step == AitaLoginStep.PRIMARY || step == AitaLoginStep.EMAIL_CODE)
             AitaAuthNextStep.TOTP -> result.flowId.isNotBlank() && mode != AitaLoginMode.RECOVERY
+            AitaAuthNextStep.PASSWORD_CONFIRMATION -> result.flowId.isNotBlank() && mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR
             AitaAuthNextStep.PASSWORD_RESET -> result.flowId.isNotBlank() && result.resetTicket.isNotBlank() && mode == AitaLoginMode.RECOVERY
             AitaAuthNextStep.COMPLETE -> mode == AitaLoginMode.RECOVERY && step == AitaLoginStep.NEW_PASSWORD
             else -> false
@@ -181,6 +184,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         step = when (result.nextStep) {
             AitaAuthNextStep.EMAIL_CODE -> AitaLoginStep.EMAIL_CODE
             AitaAuthNextStep.TOTP -> AitaLoginStep.TOTP
+            AitaAuthNextStep.PASSWORD_CONFIRMATION -> AitaLoginStep.PASSWORD_CONFIRMATION
             AitaAuthNextStep.PASSWORD_RESET -> AitaLoginStep.NEW_PASSWORD
             else -> AitaLoginStep.COMPLETE
         }
@@ -212,6 +216,8 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         val who = identifier()
         val pass = password
         val selectedMode = mode
+        val selectedCodeMethod = codeMethod
+        val factor = code
         if (busy) return
         val kind = if (identifierType == AitaLoginIdentifierType.EMAIL) AitaAuthIdentifierKind.EMAIL else AitaAuthIdentifierKind.PHONE
         if (!aitaPrimarySignInIsWellFormed(who, kind, pass, selectedMode == AitaLoginMode.PASSWORD)) {
@@ -220,15 +226,26 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
             } else authUiText("Enter a valid email or phone number", "Введите корректный email или номер телефона", "Дұрыс email немесе телефон нөмірін енгізіңіз")
             return
         }
+        if (selectedMode == AitaLoginMode.EMAIL_CODE && selectedCodeMethod == AitaCodeLoginMethod.AUTHENTICATOR && !aitaSecondFactorIsWellFormed(factor)) {
+            error = authUiText("Enter a 6-digit authenticator code or a recovery code", "Введите 6 цифр аутентификатора или резервный код", "Аутентификатордың 6 санын немесе қалпына келтіру кодын енгізіңіз")
+            return
+        }
         // Capabilities are advisory, not a per-account authorization gate. A stale/failed
         // lookup must not disable a valid form; the actual endpoint enforces availability.
         runAction {
             accept(when (selectedMode) {
                 AitaLoginMode.PASSWORD -> AitaAdvancedAuthenticationClient.passwordLogin(AitaPasswordLoginRequestDataModel(who, pass, buildCurrentClientDeviceInfo()))
                 AitaLoginMode.RECOVERY -> AitaAdvancedAuthenticationClient.requestPasswordRecovery(AitaEmailCodeRequestDataModel(who, stateValues.appLanguage, buildCurrentClientDeviceInfo()))
-                AitaLoginMode.EMAIL_CODE -> AitaAdvancedAuthenticationClient.requestLoginCode(AitaEmailCodeRequestDataModel(who, stateValues.appLanguage, buildCurrentClientDeviceInfo()))
+                AitaLoginMode.EMAIL_CODE -> if (selectedCodeMethod == AitaCodeLoginMethod.AUTHENTICATOR) {
+                    AitaAdvancedAuthenticationClient.authenticatorLogin(AitaAuthenticatorLoginRequestDataModel(who, factor, buildCurrentClientDeviceInfo()))
+                } else AitaAdvancedAuthenticationClient.requestLoginCode(AitaEmailCodeRequestDataModel(who, stateValues.appLanguage, buildCurrentClientDeviceInfo()))
             })
         }
+    }
+
+    fun recoverAuthenticator() {
+        reset(AitaLoginMode.EMAIL_CODE)
+        step = AitaLoginStep.AUTHENTICATOR_RECOVERY
     }
 
     fun verifyCode() {
@@ -275,7 +292,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         when (currentStep) {
                             AitaLoginStep.PRIMARY -> {
-                                val ime = if (mode == AitaLoginMode.PASSWORD) ImeWithAction(ImeAction.Next) else ImeWithAction(ImeAction.Go, ::submitPrimary)
+                                val ime = if (mode == AitaLoginMode.PASSWORD || (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR)) ImeWithAction(ImeAction.Next) else ImeWithAction(ImeAction.Go, ::submitPrimary)
                                 when (identifierType) {
                                     AitaLoginIdentifierType.PHONE -> countrySelectionPhoneNumberTextField(
                                         modifier = Modifier.fillMaxWidth(), countries = countries, valueInitial = phone,
@@ -299,10 +316,21 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     imeAction = ImeAction.Go, onImeAction = ::submitPrimary, leadingIconPath = stateValues.drawablePathIconPassword,
                                     password = true, sensitive = true
                                 ) else {
-                                    if (identifierType == AitaLoginIdentifierType.PHONE) Text(
-                                        authUiText("Code goes to your main account email, not SMS", "Код придёт на основной email аккаунта, не в SMS", "Код SMS емес, аккаунттың негізгі email мекенжайына келеді"),
-                                        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                    if (!emailReady || capabilitiesError.isNotBlank()) {
+                                    if (mode == AitaLoginMode.EMAIL_CODE) tabRowWidget(
+                                        modifier = Modifier.fillMaxWidth(), enabled = !busy, persistSelection = false,
+                                        selectedIndexInitial = if (codeMethod == AitaCodeLoginMethod.EMAIL) "email-code" else "authenticator-code",
+                                        tabs = listOf(
+                                            TabContent("email-code", authUiText("Email code", "Email-код", "Email коды")) {
+                                                if (codeMethod != AitaCodeLoginMethod.EMAIL) { reset(AitaLoginMode.EMAIL_CODE); codeMethod = AitaCodeLoginMethod.EMAIL }
+                                            },
+                                            TabContent("authenticator-code", authUiText("Authenticator", "Аутентификатор", "Аутентификатор")) {
+                                                if (codeMethod != AitaCodeLoginMethod.AUTHENTICATOR) { reset(AitaLoginMode.EMAIL_CODE); codeMethod = AitaCodeLoginMethod.AUTHENTICATOR }
+                                            }
+                                        )
+                                    )
+                                    if (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR) {
+                                        AuthenticatorCodeEntryField(code, busy, { code = it; error = "" }, ::submitPrimary, "auth-direct-factor")
+                                    } else if (!emailReady || capabilitiesError.isNotBlank()) {
                                         Text(when {
                                             capabilities?.emailDeliveryUnavailable == true -> authUiText("Email delivery delayed", "Доставка писем задерживается", "Хат жеткізу кешігуде")
                                             emailAvailability == AitaAuthFeatureAvailability.CHECKING -> authUiText("Checking…", "Проверяем…", "Тексерілуде…")
@@ -312,9 +340,12 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                         if (!capabilitiesLoading) AuthQuietAction(authUiText("Refresh", "Обновить", "Жаңарту"), !busy) { capabilitiesRefresh++ }
                                     }
                                 }
-                                actionButton(modifier = Modifier.fillMaxWidth(), text = if (mode == AitaLoginMode.PASSWORD) stateValues.stringLogIn else authUiText("Get code", "Получить код", "Код алу"),
+                                actionButton(modifier = Modifier.fillMaxWidth(), text = if (mode == AitaLoginMode.PASSWORD || (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR)) stateValues.stringLogIn else authUiText("Get code", "Получить код", "Код алу"),
                                     enabled = !busy,
                                     loading = busy, autoLoading = false, onClick = ::submitPrimary)
+                                if (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR) {
+                                    AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?"), !busy, ::recoverAuthenticator)
+                                }
                             }
                             AitaLoginStep.EMAIL_CODE -> {
                                 Text(flow?.maskedDestination?.takeIf { it.isNotBlank() } ?: authUiText("Check your account email", "Проверьте почту аккаунта", "Аккаунт поштаңызды тексеріңіз"),
@@ -342,15 +373,33 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     val request = AitaTotpLoginRequestDataModel(flow?.flowId.orEmpty(), code, buildCurrentClientDeviceInfo())
                                     runAction { accept(AitaAdvancedAuthenticationClient.completeTotpLogin(request)) }
                                 }
-                                aitaFormTextField(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), value = code, onValueChange = { code = it; error = "" },
-                                    titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код"),
-                                    placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(!busy) },
-                                    identityKey = "auth_totp", enabled = !busy, sensitive = true,
-                                    keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go, onImeAction = ::submit,
-                                    leadingIconPath = stateValues.drawablePathIconSecurity, onTransformValue = { it.take(32) })
+                                AuthenticatorCodeEntryField(code, busy, { code = it; error = "" }, ::submit, "auth_totp")
                                 if (countdown.expired) Text(authUiText("Sign in again", "Войдите заново", "Қайта кіріңіз"), color = stateValues.ErrorColor)
                                 actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringLogIn, enabled = !busy, loading = busy, autoLoading = false, onClick = ::submit)
                             }
+                            AitaLoginStep.PASSWORD_CONFIRMATION -> {
+                                fun submit() {
+                                    if (busy) return
+                                    if (countdown.expired || password.isBlank()) {
+                                        error = if (countdown.expired) authUiText("Sign in again", "Войдите заново", "Қайта кіріңіз")
+                                            else authUiText("Enter your password", "Введите пароль", "Құпия сөзді енгізіңіз")
+                                        return
+                                    }
+                                    val request = AitaAuthenticatorPasswordRequestDataModel(flow?.flowId.orEmpty(), password, buildCurrentClientDeviceInfo())
+                                    runAction { accept(AitaAdvancedAuthenticationClient.completeAuthenticatorPassword(request)) }
+                                }
+                                Text(authUiText("Two-factor sign-in is on. Confirm your password.", "Двухфакторный вход включён. Подтвердите пароль.", "Екі факторлы кіру қосулы. Құпия сөзіңізді растаңыз."),
+                                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                aitaFormTextField(modifier = Modifier.fillMaxWidth(), value = password, onValueChange = { password = it; error = "" },
+                                    titleText = stateValues.stringPassword, placeholderText = stateValues.stringEnterPassword,
+                                    identityKey = "auth-factor-password", enabled = !busy, sensitive = true, password = true,
+                                    keyboardType = KeyboardType.Password, imeAction = ImeAction.Go, onImeAction = ::submit,
+                                    leadingIconPath = stateValues.drawablePathIconPassword)
+                                actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringLogIn, enabled = !busy,
+                                    loading = busy, autoLoading = false, onClick = ::submit)
+                            }
+                            AitaLoginStep.AUTHENTICATOR_RECOVERY -> AuthenticatorRecoveryEditor(
+                                initialIdentifier = identifier(), onClose = { reset(AitaLoginMode.PASSWORD) })
                             AitaLoginStep.NEW_PASSWORD -> PasswordRecoveryNewPasswordContent(newPassword, repeatPassword, busy,
                                 { newPassword = it; error = "" }, { repeatPassword = it; error = "" }, onSubmit = {
                                     when {
@@ -380,9 +429,12 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                     }
                 }
             }
+            if (step == AitaLoginStep.TOTP) {
+                AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?"), !busy, ::recoverAuthenticator)
+            }
             if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize, textAlign = TextAlign.Center)
             when {
-                step == AitaLoginStep.COMPLETE -> Unit
+                step == AitaLoginStep.COMPLETE || step == AitaLoginStep.AUTHENTICATOR_RECOVERY -> Unit
                 step == AitaLoginStep.FINISHING -> AuthQuietAction(authUiText("Back to sign in", "Назад ко входу", "Кіруге қайту"), !busy) {
                     runAction {
                         installedSessionGeneration?.let { discardAdvancedAuthenticationSignIn(it) }

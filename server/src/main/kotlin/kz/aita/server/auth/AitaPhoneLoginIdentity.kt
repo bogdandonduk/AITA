@@ -1,5 +1,7 @@
 package kz.aita.server.auth
 
+import kz.aita.auth.normalizeAitaStoredMainPhone
+import kz.aita.auth.aitaMainPhoneNationalCandidate
 import kz.aita.auth.aitaPhoneLoginStorageCandidates
 import kz.aita.auth.aitaMatchingPhoneLoginOwners
 import kz.aita.auth.normalizeAitaPhoneAlias
@@ -22,9 +24,14 @@ private fun phoneLoginOwnersInside(raw: String, verifiedAliasesOnly: Boolean): P
     if (digits.isEmpty()) return emptySet<UUID>() to emptySet()
     // No early exact-match return and no LIMIT before validation: either could hide a conflicting
     // formatted owner. Query only matching full numbers; do not copy the users table into memory.
-    val primaries = Users.select(Users.id, Users.phoneNumber).where {
-        storedPhoneLookup(Users.phoneNumber) inList digits
-    }.map { it[Users.phoneNumber] to it[Users.id] }
+    val national = aitaMainPhoneNationalCandidate(raw)
+    val primaries = Users.select(Users.id, Users.phoneNumber, Users.countryLocale).where {
+        (storedPhoneLookup(Users.phoneNumber) inList digits) or
+            (national?.let { (number, locales) ->
+                (storedPhoneLookup(Users.phoneNumber) eq number) and
+                    (CustomFunction<String>("lower", TextColumnType(), CustomFunction<String>("btrim", TextColumnType(), Users.countryLocale)) inList locales.toList())
+            } ?: Op.FALSE)
+    }.map { normalizeAitaStoredMainPhone(it[Users.phoneNumber], it[Users.countryLocale]) to it[Users.id] }
     val aliases = AuthSecurityProfiles.select(AuthSecurityProfiles.userId, AuthSecurityProfiles.phoneLoginAlias).where {
         (storedPhoneLookup(AuthSecurityProfiles.phoneLoginAlias) inList digits) and
             (if (verifiedAliasesOnly) AuthSecurityProfiles.phoneAliasVerifiedAtMillis.isNotNull() else Op.TRUE)

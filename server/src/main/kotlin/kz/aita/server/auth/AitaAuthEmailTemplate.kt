@@ -6,13 +6,27 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
     require(code.length == 6 && code.all { it in '0'..'9' })
     val ru = locale.startsWith("ru", ignoreCase = true)
     val kk = locale.startsWith("kk", ignoreCase = true) || locale.startsWith("kz", ignoreCase = true)
+    if (purpose == "TOTP_RESET_NOTICE") {
+        val title = when { ru -> "Аутентификатор удалён"; kk -> "Аутентификатор жойылды"; else -> "Authenticator removed" }
+        val detail = when {
+            ru -> "Аутентификатор AITA удалён после подтверждения пароля и кода из письма. Все сеансы входа и старые резервные коды отозваны. Войдите заново и подключите новый аутентификатор. Если это были не вы, немедленно смените пароль AITA и защитите почту."
+            kk -> "AITA аутентификаторы құпия сөз бен email коды расталғаннан кейін жойылды. Барлық кіру сеанстары мен ескі резервтік кодтар қайтарып алынды. Қайта кіріп, жаңа аутентификаторды қосыңыз. Мұны сіз жасамасаңыз, AITA құпия сөзін дереу өзгертіп, поштаңызды қорғаңыз."
+            else -> "Your AITA authenticator was removed after password and email-code confirmation. All sign-in sessions and old recovery codes were revoked. Sign in again and connect a new authenticator. If this was not you, change your AITA password immediately and secure your email account."
+        }
+        return AuthEmailCopy("AITA · $title", "<html><body><h2>AITA · $title</h2><p>$detail</p></body></html>", "AITA · $title\n\n$detail")
+    }
     val title = when (purpose) {
+        "TOTP_RECOVERY" -> when { ru -> "Сброс аутентификатора"; kk -> "Аутентификаторды қалпына келтіру"; else -> "Reset your authenticator" }
         "PASSWORD_RECOVERY" -> when { ru -> "Восстановление пароля"; kk -> "Құпия сөзді қалпына келтіру"; else -> "Reset your password" }
         "EMAIL_ALIAS" -> when { ru -> "Подтвердите email для входа"; kk -> "Кіру email мекенжайын растаңыз"; else -> "Confirm your sign-in email" }
         "PHONE_ALIAS" -> when { ru -> "Подтвердите номер для входа"; kk -> "Кіру нөмірін растаңыз"; else -> "Confirm your sign-in number" }
         else -> when { ru -> "Ваш код входа"; kk -> "Кіру кодыңыз"; else -> "Your sign-in code" }
     }
-    val instruction = when { ru -> "Введите код в AITA."; kk -> "Кодты AITA қолданбасына енгізіңіз."; else -> "Enter this code in AITA." }
+    val instruction = if (purpose == "TOTP_RECOVERY") when {
+        ru -> "Этот код удалит аутентификатор и резервные коды, а также завершит все сеансы входа. Введите его только если вы запросили сброс в AITA."
+        kk -> "Бұл код аутентификатор мен резервтік кодтарды жойып, барлық кіру сеанстарын аяқтайды. Оны AITA қолданбасында қалпына келтіруді өзіңіз сұратсаңыз ғана енгізіңіз."
+        else -> "This code removes your authenticator and recovery codes and ends all sign-in sessions. Enter it only if you requested this reset in AITA."
+    } else when { ru -> "Введите код в AITA."; kk -> "Кодты AITA қолданбасына енгізіңіз."; else -> "Enter this code in AITA." }
     val expiry = when {
         ru -> "Действует $ttlMinutes мин. Никому не сообщайте код."
         kk -> "$ttlMinutes минут жарамды. Кодты ешкімге бермеңіз."

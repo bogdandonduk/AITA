@@ -37,7 +37,7 @@ class AitaPhoneLoginIdentityDatabaseTest {
                     exec("SET LOCAL search_path TO $schema")
                     exec("SET LOCAL statement_timeout = '10s'")
                     exec("SET LOCAL lock_timeout = '2s'")
-                    exec("CREATE TABLE users (id uuid PRIMARY KEY, phone_number varchar(32) NOT NULL)")
+                    exec("CREATE TABLE users (id uuid PRIMARY KEY, phone_number varchar(32) NOT NULL, country_locale varchar(64) NOT NULL DEFAULT 'kz')")
                     exec("""CREATE TABLE auth_security_profiles (
                         user_id uuid PRIMARY KEY, phone_login_alias varchar(32), phone_alias_verified_at_millis bigint)""")
                     block()
@@ -62,6 +62,24 @@ class AitaPhoneLoginIdentityDatabaseTest {
         assertEquals(owner, resolvePhoneLoginUserInside("8 777 123 45 67"))
         assertFalse(phoneLoginIdentityHasOtherOwnerInside("+77771234567", owner))
         assertTrue(phoneLoginIdentityHasOtherOwnerInside("+77771234567", UUID.randomUUID()))
+    }
+
+    @Test fun mainPhoneWorksWithoutAnExtraPhoneOrSecurityProfile() = fixture {
+        val owner = primary("77771234567")
+        assertEquals(owner, resolvePhoneLoginUserInside("+77771234567"))
+    }
+
+    @Test fun legacyNationalMainPhoneUsesOnlyItsOwnCountry() = fixture {
+        val owner = primary("7771234567")
+        assertEquals(owner, resolvePhoneLoginUserInside("+77771234567"))
+        TransactionManager.current().exec("UPDATE users SET country_locale='tj' WHERE id='$owner'")
+        assertNull(resolvePhoneLoginUserInside("+77771234567"))
+    }
+
+    @Test fun nationalMainPhoneCannotHideInternationalCollision() = fixture {
+        primary("7771234567")
+        primary("77771234567")
+        assertNull(resolvePhoneLoginUserInside("+77771234567"))
     }
 
     @Test fun exactMatchCannotHideAnotherFormattedOwner() = fixture {

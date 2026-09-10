@@ -113,3 +113,23 @@ internal fun AppConfiguration.AuthenticatorCodePlaceholder(enabled: Boolean = tr
         )
     }
 }
+
+
+/** Shared editor for both factor-first login and the mandatory second-factor step. */
+@Composable
+internal fun AppConfiguration.AuthenticatorCodeEntryField(
+    value: String,
+    busy: Boolean,
+    onValueChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    identity: String,
+) {
+    aitaFormTextField(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp), value = value, onValueChange = onValueChange,
+        titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код"),
+        placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(!busy) },
+        identityKey = identity, enabled = !busy, sensitive = true,
+        keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go, onImeAction = onSubmit,
+        leadingIconPath = stateValues.drawablePathIconSecurity, onTransformValue = { it.take(32) }
+    )
+}

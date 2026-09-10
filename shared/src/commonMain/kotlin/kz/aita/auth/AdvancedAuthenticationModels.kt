@@ -13,6 +13,7 @@ enum class AitaAuthNextStep {
     EMAIL_CODE,
     TOTP,
     PASSWORD_RESET,
+    PASSWORD_CONFIRMATION,
     COMPLETE
 }
 
@@ -47,7 +48,9 @@ data class AitaAuthCapabilitiesDataModel(
     // Provider-wide state only: never expose delivery/account existence for an anonymous flow.
     val emailDeliveryUnavailable: Boolean = false,
     val additionalEmailLoginEnabled: Boolean = false,
-    val authenticatorLoginPolicyEnabled: Boolean = false
+    val authenticatorLoginPolicyEnabled: Boolean = false,
+    val authenticatorCodeLoginEnabled: Boolean = false,
+    val authenticatorEmailRecoveryEnabled: Boolean = false
 )
 
 @Serializable
@@ -60,7 +63,9 @@ data class AitaAuthFlowDataModel(
     val tokenPair: TokenPair? = null,
     val resetTicket: String = "",
     val recoveryCodes: List<String> = emptyList(),
-    val serverTimeMillis: Long = 0L
+    val serverTimeMillis: Long = 0L,
+    // Only disclosed after successful recovery proof; never sent in anonymous challenge responses.
+    val recoveredUserId: String = ""
 )
 
 @Serializable
@@ -97,6 +102,29 @@ data class AitaTotpLoginRequestDataModel(
     val deviceInfo: ClientDeviceInfoDataModel? = null
 )
 
+/** An enrolled authenticator is a sign-in factor, never proof of a remembered password. */
+@Serializable
+data class AitaAuthenticatorLoginRequestDataModel(
+    val identifier: String,
+    val code: String,
+    val deviceInfo: ClientDeviceInfoDataModel? = null
+)
+
+@Serializable
+data class AitaAuthenticatorPasswordRequestDataModel(
+    val flowId: String,
+    val password: String,
+    val deviceInfo: ClientDeviceInfoDataModel? = null
+)
+
+/** Recovery sends only to the account's existing main email. No client-supplied destination. */
+@Serializable
+data class AitaAuthenticatorRecoveryRequestDataModel(
+    val identifier: String,
+    val currentPassword: String,
+    val locale: String = "en"
+)
+
 @Serializable
 data class AitaPasswordRecoveryResetRequestDataModel(
     val flowId: String,
@@ -115,7 +143,8 @@ data class AitaAuthenticationSettingsDataModel(
     val securityRevision: Long = 0L,
     val additionalLoginEmails: List<String> = emptyList(),
     // Old servers only sent authenticatorEnabled: preserve their mandatory-login behavior.
-    val authenticatorRequiredForLogin: Boolean = authenticatorEnabled
+    val authenticatorRequiredForLogin: Boolean = authenticatorEnabled,
+    val mainPhoneNumber: String = ""
 )
 
 @Serializable

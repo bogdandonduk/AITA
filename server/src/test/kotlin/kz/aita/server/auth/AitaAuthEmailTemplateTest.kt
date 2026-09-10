@@ -3,7 +3,7 @@ import kotlin.test.*
 class AitaAuthEmailTemplateTest {
     @Test fun everyPurposeHasPlainAndHtmlCode() {
         for (locale in listOf("en","ru","kk","kz","ru-RU","unknown"))
-            for (purpose in listOf("PASSWORDLESS_LOGIN","PASSWORD_RECOVERY","PHONE_ALIAS","EMAIL_ALIAS")) {
+            for (purpose in listOf("PASSWORDLESS_LOGIN","PASSWORD_RECOVERY","PHONE_ALIAS","EMAIL_ALIAS","TOTP_RECOVERY")) {
                 val copy=aitaAuthEmailCopy(purpose,locale,"001234",10)
                 assertTrue(copy.subject.startsWith("AITA"))
                 assertTrue(copy.text.contains("001234"));assertTrue(copy.html.contains("001234"))
@@ -18,5 +18,19 @@ class AitaAuthEmailTemplateTest {
         for (v in listOf("<b>123", "123", "1234567", "abcdef")) {
             assertFailsWith<IllegalArgumentException> { aitaAuthEmailCopy("PASSWORDLESS_LOGIN","en",v,10) }
         }
+    }
+
+    @Test fun removalNoticeContainsNoReusableCodeOrResetLink() {
+        for (locale in listOf("en", "ru", "kk", "kz")) {
+            val copy = aitaAuthEmailCopy("TOTP_RESET_NOTICE", locale, "001234", 10)
+            assertFalse(copy.text.contains("001234")); assertFalse(copy.html.contains("001234"))
+            assertFalse(copy.html.contains("href=")); assertTrue(copy.subject.startsWith("AITA"))
+        }
+    }
+    @Test fun recoveryWarningNamesTheDestructiveSecurityAction() {
+        val copy = aitaAuthEmailCopy("TOTP_RECOVERY", "en", "001234", 10)
+        assertTrue(copy.text.contains("removes your authenticator"))
+        assertTrue(copy.text.contains("ends all sign-in sessions"))
+        assertTrue(copy.text.contains("only if you requested"))
     }
 }

@@ -39319,19 +39319,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Choose Phone or Email, then Password or Sign-in code. Use your main contact or a verified extra contact. A connected authenticator is requested at login only when “Require 2FA at sign-in” is enabled."
+          "value": "Choose Phone or Email, then Password or Sign-in code. Code sign-in offers Email code and Authenticator. An enrolled authenticator or unused recovery code can sign you in directly when login 2FA is off; when it is on, confirm your password too."
         },
         {
           "language": "en",
-          "value": "Choose Phone or Email, then Password or Sign-in code. Use your main contact or a verified extra contact. A connected authenticator is requested at login only when “Require 2FA at sign-in” is enabled."
+          "value": "Choose Phone or Email, then Password or Sign-in code. Code sign-in offers Email code and Authenticator. An enrolled authenticator or unused recovery code can sign you in directly when login 2FA is off; when it is on, confirm your password too."
         },
         {
           "language": "ru",
-          "value": "Выберите телефон или email, затем пароль или код входа. Подойдёт основной либо подтверждённый дополнительный контакт. Подключённый аутентификатор нужен при входе, если включено «Требовать 2FA при входе»."
+          "value": "Выберите телефон или email, затем пароль или вход по коду. Для кода доступны email и аутентификатор. Подключённый аутентификатор или неиспользованный резервный код позволяет войти без пароля, если 2FA при входе отключена. При включённой 2FA подтвердите также пароль."
         },
         {
           "language": "kk",
-          "value": "Телефон не email, одан кейін құпия сөз не кіру кодын таңдаңыз. Негізгі немесе расталған қосымша контактіні қолданыңыз. Қосылған аутентификатор кіру кезінде тек «Кіруде 2FA талап ету» қосулы болса сұралады."
+          "value": "Телефон не email, содан кейін құпия сөз не кодпен кіруді таңдаңыз. Кодпен кіруде email және аутентификатор бар. Кіруде 2FA өшірулі болса, қосылған аутентификатор не қолданылмаған резервтік код жеткілікті. 2FA қосулы болса, құпия сөзді де растаңыз."
         }
       ]
     },
@@ -39445,19 +39445,19 @@
       "values": [
         {
           "language": "main",
-          "value": "A phone identifier sends the sign-in code to the account’s main email, not by SMS. A verified extra email used as the identifier receives its own code. Check the main email in account security before relying on phone-based code login."
+          "value": "Both the main phone and a confirmed extra phone send an email code to the account’s main email. Adding an extra phone is not required. A verified extra email used as the login receives its own code. Check your main contacts in Sign in and security."
         },
         {
           "language": "en",
-          "value": "A phone identifier sends the sign-in code to the account’s main email, not by SMS. A verified extra email used as the identifier receives its own code. Check the main email in account security before relying on phone-based code login."
+          "value": "Both the main phone and a confirmed extra phone send an email code to the account’s main email. Adding an extra phone is not required. A verified extra email used as the login receives its own code. Check your main contacts in Sign in and security."
         },
         {
           "language": "ru",
-          "value": "При указании телефона код приходит на основной email аккаунта, не по SMS. Если для входа указан подтверждённый дополнительный email, код приходит на него. Проверьте основной email в настройках безопасности."
+          "value": "При входе по основному или подтверждённому дополнительному телефону email-код приходит на основной email аккаунта. Добавлять дополнительный телефон не нужно. При входе по подтверждённому дополнительному email код приходит на него. Основные контакты указаны в разделе «Вход и безопасность»."
         },
         {
           "language": "kk",
-          "value": "Телефон көрсетілсе, кіру коды SMS-пен емес, аккаунттың негізгі email мекенжайына келеді. Расталған қосымша email көрсетілсе, код соған жіберіледі. Негізгі email-ді қауіпсіздік баптауларынан тексеріңіз."
+          "value": "Негізгі не расталған қосымша телефонмен кіргенде email коды аккаунттың негізгі email мекенжайына жіберіледі. Қосымша телефон қосу міндетті емес. Расталған қосымша email арқылы кірсеңіз, код соған келеді. Негізгі контактілер «Кіру және қауіпсіздік» бөлімінде көрсетілген."
         }
       ]
     },
@@ -39550,19 +39550,19 @@
       "values": [
         {
           "language": "main",
-          "value": "How do recovery codes work?"
+          "value": "What if I lose my authenticator or recovery codes?"
         },
         {
           "language": "en",
-          "value": "How do recovery codes work?"
+          "value": "What if I lose my authenticator or recovery codes?"
         },
         {
           "language": "ru",
-          "value": "Как пользоваться резервными кодами?"
+          "value": "Что делать, если потерян аутентификатор или резервные коды?"
         },
         {
           "language": "kk",
-          "value": "Резервтік кодтарды қалай қолданамын?"
+          "value": "Аутентификатор не резервтік кодтар жоғалса не істеймін?"
         }
       ]
     },
@@ -39571,19 +39571,19 @@
       "values": [
         {
           "language": "main",
-          "value": "A recovery code can replace an authenticator code in the same field. Enter the full xxxxxx-xxxxxx code. Each recovery code is single-use. Keep the list privately outside this device; never send it to support or include it in screenshots."
+          "value": "An unused xxxxxx-xxxxxx recovery code replaces an authenticator code in the same field. If both are lost, choose “Lost authenticator?” at sign-in or in security settings. Confirm your current password and a fresh main-email code. This removes the authenticator, revokes all sessions and old recovery codes, and lets you sign in and enroll again. Protect your main mailbox."
         },
         {
           "language": "en",
-          "value": "A recovery code can replace an authenticator code in the same field. Enter the full xxxxxx-xxxxxx code. Each recovery code is single-use. Keep the list privately outside this device; never send it to support or include it in screenshots."
+          "value": "An unused xxxxxx-xxxxxx recovery code replaces an authenticator code in the same field. If both are lost, choose “Lost authenticator?” at sign-in or in security settings. Confirm your current password and a fresh main-email code. This removes the authenticator, revokes all sessions and old recovery codes, and lets you sign in and enroll again. Protect your main mailbox."
         },
         {
           "language": "ru",
-          "value": "Резервный код вводится в то же поле вместо кода аутентификатора. Укажите полный код xxxxxx-xxxxxx. Каждый код одноразовый. Храните список отдельно от устройства; не отправляйте его поддержке и не показывайте на скриншотах."
+          "value": "Неиспользованный резервный код xxxxxx-xxxxxx заменяет код аутентификатора в том же поле. Если потеряны оба, нажмите «Нет доступа к аутентификатору?» при входе или в настройках безопасности. Подтвердите текущий пароль и новый код с основного email. Аутентификатор удалится, все сеансы и старые резервные коды будут отозваны. Войдите и подключите его заново. Защитите основной почтовый ящик."
         },
         {
           "language": "kk",
-          "value": "Резервтік кодты аутентификатор кодының орнына сол өріске енгізіңіз. Толық xxxxxx-xxxxxx кодын қолданыңыз. Әр код бір рет жарамды. Тізімді құрылғыдан бөлек, құпия сақтаңыз; қолдауға жібермеңіз және скриншотта көрсетпеңіз."
+          "value": "Қолданылмаған xxxxxx-xxxxxx резервтік коды сол өрісте аутентификатор кодын алмастырады. Екеуі де жоғалса, кіруде не қауіпсіздік баптауларында «Аутентификаторға қолжетімділік жоқ па?» тармағын таңдаңыз. Қазіргі құпия сөзді және негізгі email-ден жаңа кодты растаңыз. Аутентификатор жойылып, барлық сеанстар мен ескі резервтік кодтар қайтарып алынады. Қайта кіріп, жаңадан қосыңыз. Негізгі поштаңызды қорғаңыз."
         }
       ]
     },
@@ -39613,19 +39613,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Use the AITA entry for this account and enable automatic date/time on the authenticator device. Try a fresh code after the current one changes. An already-used code may be rejected. Use an unused recovery code when necessary; do not disconnect the authenticator blindly."
+          "value": "Use this account’s AITA entry and automatic date/time on the authenticator device. Wait for a fresh code: an accepted code cannot be reused. An unused recovery code works in the same field. If the entry and recovery codes are gone, use “Lost authenticator?” rather than creating another account."
         },
         {
           "language": "en",
-          "value": "Use the AITA entry for this account and enable automatic date/time on the authenticator device. Try a fresh code after the current one changes. An already-used code may be rejected. Use an unused recovery code when necessary; do not disconnect the authenticator blindly."
+          "value": "Use this account’s AITA entry and automatic date/time on the authenticator device. Wait for a fresh code: an accepted code cannot be reused. An unused recovery code works in the same field. If the entry and recovery codes are gone, use “Lost authenticator?” rather than creating another account."
         },
         {
           "language": "ru",
-          "value": "Выберите запись AITA для нужного аккаунта и включите автоматические дату и время на устройстве с аутентификатором. Дождитесь нового кода. Уже использованный код может не приниматься. При необходимости используйте неиспользованный резервный код; не отключайте защиту наугад."
+          "value": "Выберите запись AITA нужного аккаунта и автоматические дату и время на устройстве с аутентификатором. Дождитесь нового кода: принятый код повторно не используется. Резервный код вводится в то же поле. Если запись и резервные коды потеряны, воспользуйтесь восстановлением аутентификатора, а не создавайте новый аккаунт."
         },
         {
           "language": "kk",
-          "value": "Осы аккаунттың AITA жазбасын таңдап, аутентификатор құрылғысында автоматты күн мен уақытты қосыңыз. Жаңа код шыққанша күтіңіз. Қолданылған код қайта қабылданбауы мүмкін. Қажет болса, қолданылмаған резервтік кодты енгізіңіз; қорғанысты себепсіз өшірмеңіз."
+          "value": "Осы аккаунттың AITA жазбасын таңдап, аутентификатор құрылғысында автоматты күн мен уақытты қосыңыз. Жаңа кодты күтіңіз: қабылданған код қайталап қолданылмайды. Қолданылмаған резервтік код сол өріске енгізіледі. Жазба мен резервтік кодтар жоғалса, жаңа аккаунт жасамай, аутентификаторды қалпына келтіруді таңдаңыз."
         }
       ]
     },

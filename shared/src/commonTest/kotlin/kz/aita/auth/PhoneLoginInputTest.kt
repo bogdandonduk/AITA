@@ -88,4 +88,27 @@ class PhoneLoginInputTest {
         assertTrue(aitaMatchingPhoneLoginOwners("+77771234567", records).isEmpty())
         assertTrue(aitaMatchingPhoneLoginOwners("invalid", records).isEmpty())
     }
+
+    @Test fun historicalNationalMainPhoneUsesStoredCountryNotCallerCountry() {
+        for (country in listOf("kz", "ru", " KZ ")) assertEquals("+77771234567", normalizeAitaStoredMainPhone("777 123-45-67", country))
+        assertEquals("+992900123456", normalizeAitaStoredMainPhone("900123456", "tj"))
+        assertNotEquals("+77771234567", normalizeAitaStoredMainPhone("7771234567", "us"))
+        assertNotEquals("+77771234567", normalizeAitaStoredMainPhone("7771234567", ""))
+    }
+    @Test fun fullMainPhonesNeverReceiveADoubledCallingCode() {
+        for (value in listOf("+77771234567", "77771234567", "8 (777) 123-45-67")) {
+            assertEquals("+77771234567", normalizeAitaStoredMainPhone(value, "kz"))
+        }
+        assertEquals("+992900123456", normalizeAitaStoredMainPhone("+992900123456", "kz"))
+    }
+    @Test fun nationalCompatibilityDoesNotBlessMalformedMainPhones() {
+        for (value in listOf("777abc1234567", "77+71234567", "++7771234567", "not a phone")) assertNull(normalizeAitaStoredMainPhone(value, "kz"))
+        assertNotEquals("+77771234567", normalizeAitaStoredMainPhone("+7771234567", "kz"))
+    }
+    @Test fun candidateCountryAndCompleteLengthAreExplicit() {
+        assertEquals("7771234567" to setOf("kz", "ru"), aitaMainPhoneNationalCandidate("+77771234567"))
+        assertEquals("900123456" to setOf("tj"), aitaMainPhoneNationalCandidate("+992900123456"))
+        assertNull(aitaMainPhoneNationalCandidate("+12025550123"))
+        assertNull(aitaMainPhoneNationalCandidate("+777123"))
+    }
 }

@@ -56,3 +56,31 @@ fun <T> aitaMatchingPhoneLoginOwners(raw: String, candidates: Iterable<Pair<Stri
         owner.takeIf { stored != null && normalizeAitaPhoneAlias(stored) == canonical }
     }.toSet()
 }
+
+/** Older profiles can contain a NATIONAL main number next to an explicit country locale.
+ * Use only that profile's stored country, never suffix-search another country's accounts.
+ * Extra phones remain complete international identities and do not use this compatibility rule.
+ */
+fun normalizeAitaStoredMainPhone(raw: String, countryLocale: String): String? {
+    val plan = when (countryLocale.trim().lowercase()) {
+        "kz", "ru" -> "7" to 10
+        "tj" -> "992" to 9
+        else -> null
+    }
+    val digits = aitaAuthCodeDigits(raw)
+    if (plan != null && !raw.trim().startsWith('+') && digits.length == plan.second) {
+        val national = normalizeAitaPhoneFieldInput(raw, plan.first, plan.second) ?: return null
+        return normalizeAitaPhoneAlias("+" + plan.first + national)
+    }
+    return normalizeAitaPhoneAlias(raw)
+}
+
+/** SQL may include a national candidate only for accounts explicitly registered in its country. */
+fun aitaMainPhoneNationalCandidate(raw: String): Pair<String, Set<String>>? {
+    val digits = normalizeAitaPhoneAlias(raw)?.removePrefix("+") ?: return null
+    return when {
+        digits.length == 11 && digits.startsWith('7') -> digits.drop(1) to setOf("kz", "ru")
+        digits.length == 12 && digits.startsWith("992") -> digits.drop(3) to setOf("tj")
+        else -> null
+    }
+}

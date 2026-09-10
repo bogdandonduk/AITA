@@ -37,6 +37,21 @@ object AitaAdvancedAuthenticationClient {
     suspend fun completeTotpLogin(request: AitaTotpLoginRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaTotpLoginRequestDataModel>(HttpMethod.Post, "auth/login/totp", request)
 
+    suspend fun authenticatorLogin(request: AitaAuthenticatorLoginRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaAuthenticatorLoginRequestDataModel>(HttpMethod.Post, "auth/login/authenticator", request)
+
+    suspend fun completeAuthenticatorPassword(request: AitaAuthenticatorPasswordRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaAuthenticatorPasswordRequestDataModel>(HttpMethod.Post, "auth/login/authenticator/password", request)
+
+    suspend fun requestAuthenticatorRecovery(request: AitaAuthenticatorRecoveryRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaAuthenticatorRecoveryRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/request", request)
+
+    suspend fun resendAuthenticatorRecovery(request: AitaEmailCodeResendRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/resend", request)
+
+    suspend fun confirmAuthenticatorRecovery(request: AitaEmailCodeVerifyRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeVerifyRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/confirm", request)
+
     suspend fun requestPasswordRecovery(request: AitaEmailCodeRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaEmailCodeRequestDataModel>(HttpMethod.Post, "auth/password-recovery/request", request)
 
