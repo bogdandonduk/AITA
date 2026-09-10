@@ -2565,7 +2565,7 @@ internal fun AppConfiguration.ReceiptPreviewHeader(
 
     store?.location?.name?.takeIf { it.isNotBlank() }?.let {
         Spacer(modifier = Modifier.height(3.dp))
-        ReceiptPreviewText(text = it, center = true)
+        ReceiptPreviewText(text = it, center = true, bold = true, large = true)
     }
 
     store?.phoneNumbers?.asDisplayPhoneNumbers()?.takeIf { it.isNotEmpty() }?.let {
@@ -2585,6 +2585,7 @@ internal fun AppConfiguration.ReceiptPreviewHeader(
     ReceiptPreviewText(
         text = labels.goodsReceiptTitle,
         bold = true,
+        large = true,
         center = true
     )
 
@@ -2752,11 +2753,21 @@ internal fun AppConfiguration.ReceiptPreviewTotals(
     )
 }
 
-internal fun AppConfiguration.receiptActionNotification(result: ReceiptPlatformActionResult, positiveMessage: String) {
-    postInAppNotification(
-        if (result.success) positiveMessage else result.message.ifBlank { stateValues.stringReceiptActionFailed },
-        if (result.success) NotificationType.Positive else NotificationType.Negative
-    )
+internal fun AppConfiguration.receiptActionNotification(
+    result: ReceiptPlatformActionResult,
+    positiveMessage: String,
+    owner: ReceiptActionOwner = captureReceiptActionOwner()
+) {
+    if (!owner.isCurrent()) return
+    val file = result.savedFile?.takeIf { result.success }
+    val message = when {
+        file != null -> "$positiveMessage\n${localizedStringResource(2601, "Folder")}: ${file.folder}\n${localizedStringResource(2602, "File")}: ${file.fileName}"
+        result.success -> positiveMessage
+        else -> result.message.ifBlank { stateValues.stringReceiptActionFailed }
+    }
+    val type = if (result.success) NotificationType.Positive else NotificationType.Negative
+    // Native error strings can contain device paths too; keep the whole result local.
+    coroutineScope.launch { postDeviceFileNotification(message, file, owner, type) }
 }
 
 internal fun AppConfiguration.buildTransactionReceiptLines(
@@ -3023,16 +3034,6 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         val darkActionIcons = stateValues.appThemeId == 1L
         val completeReceiptIconPath = if (darkActionIcons) "svg/125_1.svg" else "svg/125_0.svg"
         val completeReceiptIconRes = if (darkActionIcons) Res.drawable._125_1 else Res.drawable._125_0
-        val savePdfIconPath = if (darkActionIcons) "svg/126_1.svg" else "svg/126_0.svg"
-        val savePdfIconRes = if (darkActionIcons) Res.drawable._126_1 else Res.drawable._126_0
-        val shareReceiptIconPath = if (darkActionIcons) "svg/127_1.svg" else "svg/127_0.svg"
-        val shareReceiptIconRes = if (darkActionIcons) Res.drawable._127_1 else Res.drawable._127_0
-        val whatsappReceiptIconPath = if (darkActionIcons) "svg/128_1.svg" else "svg/128_0.svg"
-        val whatsappReceiptIconRes = if (darkActionIcons) Res.drawable._128_1 else Res.drawable._128_0
-        val printReceiptIconPath = if (darkActionIcons) "svg/129_1.svg" else "svg/129_0.svg"
-        val printReceiptIconRes = if (darkActionIcons) Res.drawable._129_1 else Res.drawable._129_0
-        val finishReceiptIconPath = if (darkActionIcons) "svg/130_1.svg" else "svg/130_0.svg"
-        val finishReceiptIconRes = if (darkActionIcons) Res.drawable._130_1 else Res.drawable._130_0
 
         ScreenAppBarWidget(
             title = stateValues.stringReceipt,
@@ -3219,12 +3220,14 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
         fun runReceiptAction(action: String, successMessage: String) {
             if (activeReceiptAction != null) return
+            val actionOwner = captureReceiptActionOwner()
             activeReceiptAction = action // reserve synchronously, before launching
             receiptScope.launch {
                 try {
-                    val pdf = pdfCache.value ?: withContext(Dispatchers.Default) {
+                    val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {
                         snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
                     }.also { pdfCache.value = it }
+                    if (!actionOwner.isCurrent()) return@launch
                     val result = when (action) {
                         "pdf" -> saveReceiptPdf(fileName, pdf, labels)
                         "share" -> shareReceiptPdf(fileName, pdf, whatsappOnly = false, labels = labels)
@@ -3233,14 +3236,15 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                             val escPos = withContext(Dispatchers.Default) {
                                 snapshotForScreen.buildReceiptEscPosBytes(receiptLanguage, labels)
                             }
+                            if (!actionOwner.isCurrent()) return@launch
                             printReceipt(fileName, pdf, escPos, labels)
                         }
                     }
-                    receiptActionNotification(result, successMessage)
+                    receiptActionNotification(result, successMessage, actionOwner)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
-                    postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative)
+                    if (actionOwner.isCurrent()) postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative)
                 } finally {
                     activeReceiptAction = null
                 }
@@ -3302,92 +3306,20 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     }
                 )
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stateValues.stringPdf,
-                        iconPath = savePdfIconPath,
-                        iconRes = savePdfIconRes,
-                        iconTintColor = Color.White,
-                        iconSizeOverride = 22.dp,
-                        enabled = activeReceiptAction == null,
-                        loading = activeReceiptAction == "pdf",
-                        autoLoading = false,
-                        onClick = { runReceiptAction("pdf", stateValues.stringReceiptPdfSaved) }
-                    )
-
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stateValues.stringShare,
-                        iconPath = shareReceiptIconPath,
-                        iconRes = shareReceiptIconRes,
-                        iconTintColor = Color.White,
-                        iconSizeOverride = 22.dp,
-                        enabled = activeReceiptAction == null,
-                        loading = activeReceiptAction == "share",
-                        autoLoading = false,
-                        onClick = { runReceiptAction("share", stateValues.stringReceiptShared) }
-                    )
-
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stateValues.stringWhatsApp,
-                        iconPath = whatsappReceiptIconPath,
-                        iconRes = whatsappReceiptIconRes,
-                        iconTintColor = Color.White,
-                        iconSizeOverride = 22.dp,
-                        enabled = activeReceiptAction == null,
-                        loading = activeReceiptAction == "whatsapp",
-                        autoLoading = false,
-                        onClick = { runReceiptAction("whatsapp", stateValues.stringReceiptSentToWhatsApp) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stateValues.stringPrint,
-                        loading = activeReceiptAction == "print",
-                        loadingText = localizedStringResource(2298, "Printing receipt…"),
-                        enabled = activeReceiptAction == null,
-                        autoLoading = false,
-                        iconPath = printReceiptIconPath,
-                        iconRes = printReceiptIconRes,
-                        iconTintColor = Color.White,
-                        iconSizeOverride = 22.dp,
-                        onClick = { runReceiptAction("print", stateValues.stringReceiptSentToPrinter) }
-                    )
-
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        text = stateValues.stringQuit,
-                        enabled = activeReceiptAction == null,
-                        autoLoading = false,
-                        enabledColor = stateValues.DisabledColor,
-                        iconPath = finishReceiptIconPath,
-                        iconRes = finishReceiptIconRes,
-                        iconTintColor = Color.White,
-                        iconSizeOverride = 22.dp,
-                        onClick = {
-                            coroutineScope.launch {
-                                latestTransactionReceiptSnapshotState.emit(null)
-                                when (context.transactionTypeIndex) {
-                                    0 -> Navigation.TransactionSale.clear()
-                                    1 -> Navigation.TransactionReturn.clear()
-                                    else -> Navigation.TransactionSupply.clear()
-                                }
+                ReceiptActionToolbar(
+                    activeAction = activeReceiptAction,
+                    onAction = ::runReceiptAction,
+                    onFinish = {
+                        coroutineScope.launch {
+                            latestTransactionReceiptSnapshotState.emit(null)
+                            when (context.transactionTypeIndex) {
+                                0 -> Navigation.TransactionSale.clear()
+                                1 -> Navigation.TransactionReturn.clear()
+                                else -> Navigation.TransactionSupply.clear()
                             }
                         }
-                    )
-                }
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(4.dp))

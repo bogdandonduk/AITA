@@ -539,5 +539,6 @@ internal fun buildBundledLocalizedStringFallbacks(): Map<Long, Map<String, Strin
         putBundledLocalizedStringFallbacksPart47()
         putBundledLocalizedStringFallbacksPart48()
         putBundledLocalizedStringFallbacksPart49()
+        putReceiptSupportStringFallbacks()
     }
 

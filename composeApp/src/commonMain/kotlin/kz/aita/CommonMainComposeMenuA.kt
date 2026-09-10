@@ -3830,12 +3830,14 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
         val fileName = remember(snapshotForScreen, labels) { snapshotForScreen.receiptPdfFileName(labels) }
         fun runReceiptAction(action: String, successMessage: String) {
             if (activeReceiptAction != null) return
+            val actionOwner = captureReceiptActionOwner()
             activeReceiptAction = action
             receiptScope.launch {
                 try {
-                    val pdf = pdfCache.value ?: withContext(Dispatchers.Default) {
+                    val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {
                         snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
                     }.also { pdfCache.value = it }
+                    if (!actionOwner.isCurrent()) return@launch
                     val result = when (action) {
                         "pdf" -> saveReceiptPdf(fileName, pdf, labels)
                         "share" -> shareReceiptPdf(fileName, pdf, whatsappOnly = false, labels = labels)
@@ -3844,12 +3846,13 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
                             val escPos = withContext(Dispatchers.Default) {
                                 snapshotForScreen.buildReceiptEscPosBytes(receiptLanguage, labels)
                             }
+                            if (!actionOwner.isCurrent()) return@launch
                             printReceipt(fileName, pdf, escPos, labels)
                         }
                     }
-                    receiptActionNotification(result, successMessage)
+                    receiptActionNotification(result, successMessage, actionOwner)
                 } catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative) }
+                catch (_: Exception) { if (actionOwner.isCurrent()) postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative) }
                 finally { activeReceiptAction = null }
             }
         }
@@ -3861,67 +3864,7 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(408, "Receipt operations"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.smallTextSize,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = stateValues.stringPdf,
-                    iconPath = stateValues.drawablePathIconReceipt,
-                    confirmationRequired = false,
-                    enabled = activeReceiptAction == null,
-                    loading = activeReceiptAction == "pdf",
-                    autoLoading = false,
-                    onClick = { runReceiptAction("pdf", stateValues.stringReceiptPdfSaved) }
-                )
-
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = stateValues.stringShare,
-                    iconPath = stateValues.drawablePathIconSwitch,
-                    confirmationRequired = false,
-                    enabled = activeReceiptAction == null,
-                    loading = activeReceiptAction == "share",
-                    autoLoading = false,
-                    onClick = { runReceiptAction("share", stateValues.stringReceiptShared) }
-                )
-
-                actionButton(
-                    modifier = Modifier.weight(1f),
-                    text = stateValues.stringWhatsApp,
-                    iconPath = stateValues.drawablePathIconSwitch,
-                    confirmationRequired = false,
-                    enabled = activeReceiptAction == null,
-                    loading = activeReceiptAction == "whatsapp",
-                    autoLoading = false,
-                    onClick = { runReceiptAction("whatsapp", stateValues.stringReceiptSentToWhatsApp) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = stateValues.stringPrint,
-                iconPath = stateValues.drawablePathIconDevices,
-                confirmationRequired = false,
-                enabled = activeReceiptAction == null,
-                loading = activeReceiptAction == "print",
-                autoLoading = false,
-                onClick = { runReceiptAction("print", stateValues.stringReceiptSentToPrinter) }
-            )
+            ReceiptActionToolbar(activeAction = activeReceiptAction, onAction = ::runReceiptAction)
 
             Spacer(modifier = Modifier.height(4.dp))
         }

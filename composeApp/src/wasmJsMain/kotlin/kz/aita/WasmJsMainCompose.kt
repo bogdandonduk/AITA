@@ -54,6 +54,7 @@ private fun installWasmComposePlatformBridges() {
         }
     }
 
+    receiptPrintUsesCurrentPage = true
     printReceiptPlatformAction = { _, _, _ ->
         runCatching { window.print() }
         ReceiptPlatformActionResult(true, "Browser print dialog opened")

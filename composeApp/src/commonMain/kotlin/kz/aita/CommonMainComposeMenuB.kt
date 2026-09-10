@@ -1104,23 +1104,24 @@ internal fun supportFaqEntries(): List<SupportFaqEntry> = listOf(
     SupportFaqEntry(822, 868, "What is a shelf batch?", 869, "A shelf batch is the batch currently used for sales. It lets you sell from the right delivery first, especially when expiration dates and supplier prices matter."),
     SupportFaqEntry(822, 870, "How do suppliers and supplier prices work?", 871, "Suppliers can be attached to goods. Remembered supplier prices help prefill future batches, so repeated deliveries become faster and less error-prone."),
     SupportFaqEntry(822, 872, "How do supplier orders work?", 873, "Supplier orders are used to plan what you expect to receive from a supplier. When received, they can become stock batches and update warehouse quantities."),
-    SupportFaqEntry(822, 874, "How do receipts, PDF, sharing, WhatsApp and printing work?", 875, "After a transaction, receipt actions can save PDF, open the platform share sheet, send through WhatsApp when available, or send the receipt to a printer/device bridge."),
+    SupportFaqEntry(822, 874, "How do receipts, PDF, sharing, WhatsApp and printing work?", 875, "After completion, the centered receipt toolbar can save PDF, share, open WhatsApp where supported, or print. Save notifications show the actual folder and an Open action. Platform capabilities vary; check the result before sending or printing again."),
     SupportFaqEntry(822, 876, "How does the cash register work?", 877, "The cash register tracks expected cash in the drawer. Cash sales increase it, cash returns decrease it, and authorized users can register cash extractions."),
     SupportFaqEntry(822, 878, "How do debtors and partial payments work?", 879, "Debtors store customers or companies that owe money. You can track debt amount, due date, interest, payment history and partial repayments."),
     SupportFaqEntry(822, 880, "What does Analytics show?", 881, "Analytics summarizes revenue, returns, supply cost, estimated profit, payment mix, debt, top items, sales by time, stock risk, expiring batches, supplier activity and worker performance."),
     SupportFaqEntry(820, 882, "How do finances and subscriptions work?", 883, "Finances show wallet balance, top-ups, ledger entries and subscription charges. Store subscriptions unlock plan-based functionality and renewal state."),
-    SupportFaqEntry(821, 884, "What happens if the server or internet is unavailable?", 885, "The app keeps cached data where possible and shows connection notifications. When the server returns, realtime sync refreshes stores, stock, transactions, workers, finance and messages."),
+    SupportFaqEntry(821, 884, "What happens if the server or internet is unavailable?", 885, "The top status bar shows server reachability, and AITA attempts recovery automatically. Cached data and supported queued operations may remain available; not every action works offline. Do not repeat an uncertain sale or delete local data before reconciliation."),
     SupportFaqEntry(821, 886, "How does realtime sync work?", 887, "The app keeps a WebSocket connection to the server. After changes, connected clients refresh affected data, so cashier, owner and branch devices stay closer to the same state."),
     SupportFaqEntry(821, 888, "How do scanners, printers and devices work?", 889, "Device screens and platform bridges handle barcode scanners, receipt printers, Bluetooth/system settings and platform-specific saving, sharing and printing."),
     SupportFaqEntry(821, 890, "What is local branch network?", 891, "Local branch network is meant for branch devices that can exchange queued local operations and snapshots when direct server availability is limited. It should still reconcile with the server as authority."),
-    SupportFaqEntry(819, 892, "How do language and theme preferences work?", 893, "Language and theme are saved locally and can also be synced with the user account. Login-screen choices can intentionally override saved account preferences."),
+    SupportFaqEntry(819, 892, "How do language and theme preferences work?", 893, "Language, theme and scale are applied together and saved locally, with account synchronization when available. A new selection takes precedence over older delayed responses. Changing appearance should not replace your screen or clear carts and drafts."),
     SupportFaqEntry(823, 894, "How is account security handled?", 895, "Security sessions show devices signed into the account. You can revoke unfamiliar sessions, and tokens are refreshed securely by platform storage."),
     SupportFaqEntry(821, 896, "What should I do if stock or transaction data looks wrong?", 897, "Refresh data, check active store/branch, check operation logs, review batches and transaction history, then contact support with store, time, item barcode and screenshots if needed."),
     SupportFaqEntry(822, 898, "How are goods categories and global goods used?", 899, "Generic categories and goods templates help start faster. Store-specific goods can still have their own names, barcodes, prices, units, conditions and supplier data."),
     SupportFaqEntry(822, 900, "How will manufacturers, suppliers, stores and buyers connect?", 901, "The project is being built as a chain: manufacturer/supplier data can feed stores, stores manage branches and stock, and future buyer flows can show goods and orders outside the current account."),
     SupportFaqEntry(819, 902, "How should I prepare before using AITA in a real store day?", 903, "Create the store and branches, add workers and permissions, add goods and batches, test scanner/printer, make a few test transactions, check receipts and confirm analytics/cash register behavior."),
-    SupportFaqEntry(819, 904, "What should I include when contacting support?", 905, "Send what you were doing, store/branch, approximate time, device/platform, barcode or transaction id, screenshots, and whether the issue repeats after refresh or reconnect."),
-)
+    SupportFaqEntry(819, 904, "What should I include when contacting support?", 905, "Describe the action, store or branch, approximate time, client build, platform, barcode or transaction ID, and whether it repeats. Attach only relevant screenshots with private details hidden. Never include passwords, codes, tokens or authentication QR images."),
+) + additionalSupportFaqEntries()
+
 
 @Composable
 internal fun AppConfiguration.SupportFaqCard(entry: SupportFaqEntry) {
@@ -2828,13 +2829,35 @@ internal fun AppConfiguration.AnalyticsReportPreview(snapshot: AnalyticsReportSn
 @Composable
 internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsReportSnapshotDataModel, onDismiss: () -> Unit) {
     val fileName = remember(snapshot) { snapshot.analyticsReportPdfFileName() }
-    val pdfBytes = remember(snapshot) { snapshot.buildAnalyticsReportPdfBytes() }
+    var pdfCache by remember(snapshot) { mutableStateOf<ByteArray?>(null) }
+    var activeExport by remember(snapshot) { mutableStateOf<String?>(null) }
+    val exportScope = rememberCoroutineScope()
     val saveNotConfiguredText = localizedStringResource(1267, "PDF export is not configured for this platform")
     val shareNotConfiguredText = localizedStringResource(1268, "PDF sharing is not configured for this platform")
     val printNotConfiguredText = localizedStringResource(1269, "Paper document printing is not configured for this platform")
     val saveSuccessText = localizedStringResource(1246, "Report PDF saved")
     val shareSuccessText = localizedStringResource(1247, "Report PDF shared")
     val printSuccessText = localizedStringResource(1248, "Report opened for printing")
+
+    fun export(action: String) {
+        if (activeExport != null) return
+        val owner = captureReceiptActionOwner()
+        activeExport = action
+        exportScope.launch {
+            try {
+                val bytes = pdfCache ?: withContext(Dispatchers.Default) { snapshot.buildAnalyticsReportPdfBytes() }.also { pdfCache = it }
+                if (!owner.isCurrent()) return@launch
+                val result = when (action) {
+                    "pdf" -> savePdfDocument(fileName, bytes, saveNotConfiguredText)
+                    "share" -> sharePdfDocument(fileName, bytes, shareNotConfiguredText)
+                    else -> printPdfDocument(fileName, bytes, printNotConfiguredText)
+                }
+                receiptActionNotification(result, when (action) { "pdf" -> saveSuccessText; "share" -> shareSuccessText; else -> printSuccessText }, owner)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { if (owner.isCurrent()) postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative, transient = true) }
+            finally { activeExport = null }
+        }
+    }
 
     AitaBottomSheet(
         title = localizedStringResource(1239, "Analytics report"),
@@ -2864,11 +2887,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     iconPath = stateValues.drawablePathIconReceipt,
                     iconRes = stateValues.drawableResIconReceipt.value,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(savePdfDocument(fileName, pdfBytes, saveNotConfiguredText), saveSuccessText)
-                        }
-                    }
+                    enabled = activeExport == null,
+                    loading = activeExport == "pdf",
+                    autoLoading = false,
+                    onClick = { export("pdf") }
                 )
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -2876,11 +2898,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     iconPath = stateValues.drawablePathIconShare,
                     iconRes = stateValues.drawableResIconShare.value,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(sharePdfDocument(fileName, pdfBytes, shareNotConfiguredText), shareSuccessText)
-                        }
-                    }
+                    enabled = activeExport == null,
+                    loading = activeExport == "share",
+                    autoLoading = false,
+                    onClick = { export("share") }
                 )
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -2888,11 +2909,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     iconPath = stateValues.drawablePathIconDevices,
                     iconRes = stateValues.drawableResIconDevices.value,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(printPdfDocument(fileName, pdfBytes, printNotConfiguredText), printSuccessText)
-                        }
-                    }
+                    enabled = activeExport == null,
+                    loading = activeExport == "print",
+                    autoLoading = false,
+                    onClick = { export("print") }
                 )
             }
         } else {
@@ -2907,11 +2927,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     iconPath = stateValues.drawablePathIconReceipt,
                     iconRes = stateValues.drawableResIconReceipt.value,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(savePdfDocument(fileName, pdfBytes, saveNotConfiguredText), saveSuccessText)
-                        }
-                    }
+                    enabled = activeExport == null,
+                    loading = activeExport == "pdf",
+                    autoLoading = false,
+                    onClick = { export("pdf") }
                 )
                 actionButton(
                     modifier = Modifier.weight(1f),
@@ -2919,11 +2938,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     iconPath = stateValues.drawablePathIconShare,
                     iconRes = stateValues.drawableResIconShare.value,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(sharePdfDocument(fileName, pdfBytes, shareNotConfiguredText), shareSuccessText)
-                        }
-                    }
+                    enabled = activeExport == null,
+                    loading = activeExport == "share",
+                    autoLoading = false,
+                    onClick = { export("share") }
                 )
                 actionButton(
                     modifier = Modifier.weight(1f),
@@ -2931,11 +2949,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     iconPath = stateValues.drawablePathIconDevices,
                     iconRes = stateValues.drawableResIconDevices.value,
                     confirmationRequired = false,
-                    onClick = {
-                        coroutineScope.launch {
-                            receiptActionNotification(printPdfDocument(fileName, pdfBytes, printNotConfiguredText), printSuccessText)
-                        }
-                    }
+                    enabled = activeExport == null,
+                    loading = activeExport == "print",
+                    autoLoading = false,
+                    onClick = { export("print") }
                 )
             }
         }
@@ -5931,6 +5948,8 @@ internal fun AppConfiguration.NotificationPopupCard(
     onDismiss: () -> Unit,
     onOpenHistory: () -> Unit
 ) {
+    val deviceState by deviceFileNotifications.collectAsState()
+    if (isDeviceFileNotification(notification) && deviceState.entries.none { it.notification.id == notification.id && it.owner.isCurrent() }) return
     val color = when (notification.type) {
         NotificationType.Positive -> stateValues.OkayColor
         NotificationType.Negative -> stateValues.ErrorColor
@@ -5981,9 +6000,10 @@ internal fun AppConfiguration.NotificationPopupCard(
                 color = stateValues.TextColor,
                 fontSize = stateValues.textSize,
                 fontWeight = FontWeight.Bold,
-                maxLines = if (compact) 3 else 5,
+                maxLines = if (isDeviceFileNotification(notification)) Int.MAX_VALUE else if (compact) 3 else 5,
                 overflow = TextOverflow.Ellipsis
             )
+            DeviceNotificationLink(notification)
             Text(
                 text = receiptUiDateTime(notification.createdAtMillis.takeIf { it > 0L } ?: getCurrentTimeMillis()),
                 color = stateValues.TextColor,
@@ -6021,7 +6041,9 @@ internal fun AppConfiguration.NotificationPopupCard(
 fun AppConfiguration.NotificationsScreen(
     onBack: (() -> Unit)? = null
 ) {
-    val notifications = stateValues.notifications.orEmpty()
+    val deviceState by deviceFileNotifications.collectAsState()
+    val deviceHistory = deviceState.entries.filter { it.owner.isCurrent() }.map { it.notification }
+    val notifications = (deviceHistory + stateValues.notifications.orEmpty()).distinctBy { it.id }
     var search by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf("all") }
 
@@ -6060,6 +6082,7 @@ fun AppConfiguration.NotificationsScreen(
         if (filtered.any { it.readAtMillis == null }) {
             delay(700)
             markAllNotificationsRead()
+            markDeviceFileNotificationsRead()
         }
     }
 
@@ -6227,7 +6250,7 @@ internal fun AppConfiguration.localizedNotificationMessage(message: String): Str
 
 internal fun AppConfiguration.localizedNotificationSource(source: String): String {
     return when (source.lowercase()) {
-        "app" -> stateValues.stringAppName
+        "app", "device" -> stateValues.stringAppName
         "server" -> localizedStringResource(242, "Server")
         else -> source
     }
@@ -6239,6 +6262,7 @@ internal fun AppConfiguration.localizedNotificationCategory(category: String, ty
 
     val lower = clean.lowercase()
     return when (lower) {
+        "device_file" -> null
         "positive", "положительные", "положительное", "жағымды" -> notificationTypeLabel(NotificationType.Positive)
         "negative", "отрицательные", "отрицательное", "жағымсыз" -> notificationTypeLabel(NotificationType.Negative)
         "neutral", "нейтральные", "нейтральное", "бейтарап" -> notificationTypeLabel(NotificationType.Neutral)
@@ -6269,7 +6293,8 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = color)
             ) {
-                if (notification.readAtMillis == null) markNotificationRead(notification.id)
+                if (isDeviceFileNotification(notification)) markDeviceFileNotificationsRead(notification.id)
+                else if (notification.readAtMillis == null) markNotificationRead(notification.id)
             }
             .padding(stateValues.marginTextFieldGroup)
     ) {
@@ -6319,6 +6344,8 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
             fontSize = stateValues.textSize,
             fontWeight = FontWeight.Bold
         )
+
+        DeviceNotificationLink(notification)
 
         Spacer(modifier = Modifier.height(6.dp))
 

@@ -777,50 +777,8 @@ fun installReceiptPlatformAndroid(context: Context) {
         }
     }
 
-    fun savePdfToDownloadsOrPrivateDocuments(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult {
-        return runCatching {
-            val safeFileName = fileName.ifBlank { "receipt.pdf" }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, safeFileName)
-                    put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                    put(MediaStore.Downloads.IS_PENDING, 1)
-                }
-
-                val uri = appContext.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?: error("Could not create PDF file")
-
-                appContext.contentResolver.openOutputStream(uri)?.use { it.write(pdfBytes) }
-                    ?: error("Could not open PDF output stream")
-
-                val doneValues = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
-                appContext.contentResolver.update(uri, doneValues, null, null)
-
-                ReceiptPlatformActionResult(true, "Saved to Downloads")
-            } else {
-                val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val targetDir = if (publicDir.exists() || publicDir.mkdirs()) {
-                    publicDir
-                } else {
-                    appContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: appContext.filesDir
-                }
-                val file = File(targetDir, safeFileName)
-                file.writeBytes(pdfBytes)
-                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
-            }
-        }.getOrElse { throwable ->
-            val fallbackDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: appContext.filesDir
-            runCatching {
-                val file = File(fallbackDir, fileName.ifBlank { "receipt.pdf" })
-                file.writeBytes(pdfBytes)
-                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
-            }.getOrElse {
-                ReceiptPlatformActionResult(false, throwable.message ?: it.message ?: "Could not save PDF")
-            }
-        }
-    }
-
+    fun savePdfToDownloadsOrPrivateDocuments(fileName: String, pdfBytes: ByteArray): ReceiptPlatformActionResult =
+        saveAitaPdfOnAndroid(appContext, fileName, pdfBytes)
 
 
     fun printAttributesForDocument(fileName: String): PrintAttributes {

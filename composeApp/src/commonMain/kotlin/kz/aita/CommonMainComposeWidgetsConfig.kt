@@ -4327,7 +4327,11 @@ object AppConfiguration {
             private val appearance by appAppearancePreferencesState.collectAsState()
             private val appearanceResources by uiAppearanceResourcesState.collectAsState()
             override fun localizedString(id: Long, language: String): String? = appearanceResources.catalog.string(id, language)
-            override val latestNotification: NotificationDataModel? by latestInAppNotificationState.collectAsState()
+            private val latestPopup by latestInAppNotificationState.collectAsState()
+            // File-saving toasts keep an Open link visible without disabling the next sale.
+            // The popup host still renders every active notification independently below.
+            override val latestNotification: NotificationDataModel?
+                get() = notificationForBusinessActionGuard(latestPopup, activeNotifications)
             override val activeNotifications: List<NotificationDataModel> by activeInAppNotificationsState.collectAsState()
             override val notificationsState: DataState<List<NotificationDataModel>> by kz.aita.notificationsState.value.collectAsState()
             override val notifications: List<NotificationDataModel>? by kz.aita.notificationsState.payload.collectAsState()

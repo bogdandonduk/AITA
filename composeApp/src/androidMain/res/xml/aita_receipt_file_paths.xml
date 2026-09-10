@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="shared_receipts" path="receipts/" />
+    <files-path name="saved_receipts" path="receipts/" />
+    <external-files-path name="saved_documents" path="Documents/receipts/" />
+</paths>

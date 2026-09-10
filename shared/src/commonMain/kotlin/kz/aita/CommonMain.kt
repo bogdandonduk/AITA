@@ -721,7 +721,8 @@ data class TransactionReceiptLineDataModel(
 
 data class ReceiptPlatformActionResult(
     val success: Boolean,
-    val message: String = ""
+    val message: String = "",
+    val savedFile: SavedPdfFile? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -830,6 +831,8 @@ data class ReceiptTextLabelsDataModel(
 var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean) -> ReceiptPlatformActionResult)? = null
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
+// A browser prints the current page; it does not consume a native PDF or ESC/POS document.
+var receiptPrintUsesCurrentPage: Boolean = false
 var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray, printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printPdfDocumentPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printHtmlDocumentPlatformAction: (suspend (fileName: String, html: String) -> ReceiptPlatformActionResult)? = null
@@ -1830,79 +1833,84 @@ fun TransactionReceiptSnapshotDataModel.changeAmount(): Double {
     return change.coerceAtLeast(0.0).roundMoney()
 }
 
-fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, labels: ReceiptTextLabelsDataModel): String {
-    val builder = StringBuilder()
+fun TransactionReceiptSnapshotDataModel.buildReceiptPdfDocument(language: String, labels: ReceiptTextLabelsDataModel): AitaPdfDocument {
+    val blocks = mutableListOf<AitaPdfBlock>()
+    fun appendLine(text: String, role: AitaPdfRole = AitaPdfRole.Body) { blocks += AitaPdfBlock(text, role) }
     val storeName = store?.let {
         val form = it.companyForms.firstOrNull()?.name?.let { name -> receiptVisibleString(name, language, "") }.orEmpty()
         val name = receiptVisibleString(it.name, language, labels.store)
         "$form $name".trim()
     } ?: labels.store
 
-    builder.appendLine(storeName)
-    store?.location?.name?.takeIf { it.isNotBlank() }?.let { builder.appendLine(it) }
-    store?.phoneNumbers?.asDisplayPhoneNumbers()?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.phone}: ${it.joinToString()}") }
-    store?.emails?.takeIf { it.isNotEmpty() }?.let { builder.appendLine("${labels.email}: ${it.joinToString()}") }
-    builder.appendLine("--------------------------------")
-    builder.appendLine(labels.goodsReceiptTitle)
-    builder.appendLine(receiptTitle(labels))
+    appendLine(storeName, AitaPdfRole.Store)
+    store?.location?.name?.takeIf { it.isNotBlank() }?.let { appendLine(it, AitaPdfRole.Address) }
+    store?.phoneNumbers?.asDisplayPhoneNumbers()?.takeIf { it.isNotEmpty() }?.let { appendLine("${labels.phone}: ${it.joinToString()}") }
+    store?.emails?.takeIf { it.isNotEmpty() }?.let { appendLine("${labels.email}: ${it.joinToString()}") }
+    appendLine("--------------------------------", AitaPdfRole.Divider)
+    appendLine(labels.goodsReceiptTitle, AitaPdfRole.Title)
+    appendLine(receiptTitle(labels), AitaPdfRole.Heading)
     transaction.serverReceiptIdOrNull()?.let { serverId ->
-        builder.appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
-        builder.appendLine("${labels.transactionId}: $serverId")
+        appendLine("${labels.receipt}: ${receiptNumberText(labels)}")
+        appendLine("${labels.transactionId}: $serverId")
     }
-    builder.appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
-    cashierName.takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.cashier}: $it") }
-    builder.appendLine("--------------------------------")
+    appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
+    cashierName.takeIf { it.isNotBlank() }?.let { appendLine("${labels.cashier}: $it") }
+    appendLine("--------------------------------", AitaPdfRole.Divider)
 
     if (lines.isEmpty()) {
-        builder.appendLine(labels.noItems)
+        appendLine(labels.noItems)
     } else {
         lines.forEach { line ->
             val name = receiptVisibleString(line.name, language, labels.noName)
-            builder.appendLine("${line.index + 1}. $name")
-            if (line.barcode.isNotBlank()) builder.appendLine("   ${labels.barcode}: ${line.barcode}")
+            appendLine("${line.index + 1}. $name")
+            if (line.barcode.isNotBlank()) appendLine("   ${labels.barcode}: ${line.barcode}")
             if (line.saleMethodId == SALE_METHOD_WHOLESALE) {
                 val saleMethodText = receiptVisibleString(line.saleMethodName, language, "")
-                if (saleMethodText.isNotBlank()) builder.appendLine("   $saleMethodText")
+                if (saleMethodText.isNotBlank()) appendLine("   $saleMethodText")
             }
             line.returnReason.takeIf { it.isNotBlank() }?.let { reason ->
-                builder.appendLine("   ${labels.returnReason}: $reason")
+                appendLine("   ${labels.returnReason}: $reason")
             }
-            builder.appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
+            appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
         }
     }
 
-    builder.appendLine("--------------------------------")
-    builder.appendLine("${labels.total}: ${receiptMoney(totalAmount())} $currencySymbol")
-    if (paymentDraft.paidCash > 0.0) builder.appendLine("${labels.cash}: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
-    if (paymentDraft.paidCard > 0.0) builder.appendLine("${labels.cashless}: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
+    appendLine("--------------------------------", AitaPdfRole.Divider)
+    appendLine("${labels.total}: ${receiptMoney(totalAmount())} $currencySymbol", AitaPdfRole.Total)
+    if (paymentDraft.paidCash > 0.0) appendLine("${labels.cash}: ${receiptMoney(paymentDraft.paidCash)} $currencySymbol")
+    if (paymentDraft.paidCard > 0.0) appendLine("${labels.cashless}: ${receiptMoney(paymentDraft.paidCard)} $currencySymbol")
     if (debtAmount() > 0.0) {
-        builder.appendLine("${labels.debt}: ${receiptMoney(debtAmount())} $currencySymbol")
+        appendLine("${labels.debt}: ${receiptMoney(debtAmount())} $currencySymbol")
         paymentDraft.debtor?.let { debtor ->
-            builder.appendLine("${labels.debtor}: ${debtor.displayName}")
-            builder.appendLine("Type: ${debtor.debtorType}")
-            debtor.idNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("ID number: $it") }
-            debtor.companyIdNumber.takeIf { it.isNotBlank() }?.let { builder.appendLine("Company ID: $it") }
-            debtor.phoneNumber.asDisplayPhoneNumber().takeIf { it.isNotBlank() }?.let { builder.appendLine("${labels.debtorPhone}: $it") }
-            debtor.debtDueAtMillis?.let { builder.appendLine("Debt due at: ${receiptDateTimeText(it)}") }
+            appendLine("${labels.debtor}: ${debtor.displayName}")
+            appendLine("Type: ${debtor.debtorType}")
+            debtor.idNumber.takeIf { it.isNotBlank() }?.let { appendLine("ID number: $it") }
+            debtor.companyIdNumber.takeIf { it.isNotBlank() }?.let { appendLine("Company ID: $it") }
+            debtor.phoneNumber.asDisplayPhoneNumber().takeIf { it.isNotBlank() }?.let { appendLine("${labels.debtorPhone}: $it") }
+            debtor.debtDueAtMillis?.let { appendLine("Debt due at: ${receiptDateTimeText(it)}") }
             debtor.interest?.takeIf { it.enabled && it.ratePercent > 0.0 }?.let {
-                builder.appendLine("Interest: ${it.ratePercent}% per ${it.periodUnit}")
+                appendLine("Interest: ${it.ratePercent}% per ${it.periodUnit}")
             }
             debtor.plannedPayments.takeIf { it.isNotEmpty() }?.let { plans ->
-                builder.appendLine("Payment plan:")
+                appendLine("Payment plan:")
                 plans.forEach { plan ->
-                    builder.appendLine("- ${receiptMoney(plan.amount)} ${debtor.currency} by ${plan.dueAtMillis?.let { due -> receiptDateTimeText(due) } ?: "no date"}${plan.percent?.let { pct -> " ($pct%)" } ?: ""}")
+                    appendLine("- ${receiptMoney(plan.amount)} ${debtor.currency} by ${plan.dueAtMillis?.let { due -> receiptDateTimeText(due) } ?: "no date"}${plan.percent?.let { pct -> " ($pct%)" } ?: ""}")
                 }
             }
         }
     }
-    if (changeAmount() > 0.0) builder.appendLine("${labels.change}: ${receiptMoney(changeAmount())} $currencySymbol")
-    builder.appendLine("--------------------------------")
-    builder.appendLine("${labels.vat}: ${labels.vatNotSpecified}")
-    builder.appendLine("${labels.fiscalStatus}: ${labels.nonFiscalSoftwareReceipt}")
-    builder.appendLine(labels.thankYou)
+    if (changeAmount() > 0.0) appendLine("${labels.change}: ${receiptMoney(changeAmount())} $currencySymbol")
+    appendLine("--------------------------------", AitaPdfRole.Divider)
+    appendLine("${labels.vat}: ${labels.vatNotSpecified}")
+    appendLine("${labels.fiscalStatus}: ${labels.nonFiscalSoftwareReceipt}")
+    appendLine(labels.thankYou)
 
-    return builder.toString()
+    return AitaPdfDocument(blocks)
 }
+
+
+fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, labels: ReceiptTextLabelsDataModel): String =
+    buildReceiptPdfDocument(language, labels).blocks.joinToString(separator = "\n", postfix = "\n") { it.text }
 
 
 private fun pdfEscape(value: String): String {
@@ -1914,50 +1922,8 @@ private fun pdfEscape(value: String): String {
         .joinToString("")
 }
 
-fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray {
-    val lines = buildReceiptPlainText(language, labels)
-        .lines()
-        .flatMap { line ->
-            if (line.length <= 58) listOf(line) else line.chunked(58)
-        }
-
-    val pageWidth = 226.0
-    val pageHeight = kotlin.math.max(420.0, 84.0 + lines.size * 12.0)
-    val content = buildString {
-        append("BT\n")
-        append("/F1 9 Tf\n")
-        append("12 ${pageHeight - 24} Td\n")
-        lines.forEachIndexed { index, line ->
-            if (index > 0) append("0 -12 Td\n")
-            append("(${pdfEscape(line)}) Tj\n")
-        }
-        append("ET\n")
-    }
-
-    val objects = mutableListOf<String>()
-    objects += "<< /Type /Catalog /Pages 2 0 R >>"
-    objects += "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"
-    objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toInt()} ${pageHeight.toInt()}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
-    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
-    objects += "<< /Length ${content.toByteArray().size} >>\nstream\n$content\nendstream"
-
-    val out = StringBuilder()
-    val offsets = mutableListOf<Int>()
-    out.append("%PDF-1.4\n")
-    objects.forEachIndexed { index, obj ->
-        offsets += out.toString().toByteArray().size
-        out.append("${index + 1} 0 obj\n$obj\nendobj\n")
-    }
-    val xrefOffset = out.toString().toByteArray().size
-    out.append("xref\n0 ${objects.size + 1}\n")
-    out.append("0000000000 65535 f \n")
-    offsets.forEach { offset ->
-        out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n")
-    }
-    out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
-    out.append("startxref\n$xrefOffset\n%%EOF")
-    return out.toString().toByteArray()
-}
+fun TransactionReceiptSnapshotDataModel.buildReceiptPdfBytes(language: String, labels: ReceiptTextLabelsDataModel): ByteArray =
+    renderAitaPdfDocument(buildReceiptPdfDocument(language, labels))
 
 fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPlainText(): String {
     val builder = StringBuilder()
@@ -1987,104 +1953,19 @@ fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPlainText(): String {
     return builder.toString()
 }
 
-private fun wrapPdfPlainTextLine(line: String, maxChars: Int): List<String> {
-    if (line.isBlank()) return listOf("")
-
-    val result = mutableListOf<String>()
-    var current = StringBuilder()
-
-    fun flush() {
-        if (current.isNotEmpty()) {
-            result += current.toString()
-            current = StringBuilder()
-        }
-    }
-
-    line.split(Regex("\\s+")).forEach { word ->
-        if (word.length > maxChars) {
-            flush()
-            result += word.chunked(maxChars)
-        } else if (current.isEmpty()) {
-            current.append(word)
-        } else if (current.length + 1 + word.length <= maxChars) {
-            current.append(' ').append(word)
-        } else {
-            flush()
-            current.append(word)
-        }
-    }
-
-    flush()
-    return result.ifEmpty { listOf("") }
-}
-
-private fun buildPlainTextPdfBytes(
-    rawLines: List<String>,
-    pageWidth: Double,
-    pageHeight: Double,
-    margin: Double,
-    fontSize: Double,
-    lineHeight: Double,
-    maxCharsPerLine: Int
-): ByteArray {
-    val lines = rawLines.flatMap { wrapPdfPlainTextLine(it, maxCharsPerLine) }
-    val maxLinesPerPage = kotlin.math.floor((pageHeight - margin * 2.0) / lineHeight).toInt().coerceAtLeast(1)
-    val pages = lines.chunked(maxLinesPerPage).ifEmpty { listOf(listOf("")) }
-
-    val objects = mutableListOf<String>()
-    val pageObjectIds = pages.indices.map { 4 + it * 2 }
-    val fontObjectId = 3
-
-    objects += "<< /Type /Catalog /Pages 2 0 R >>"
-    objects += "<< /Type /Pages /Kids [${pageObjectIds.joinToString(" ") { "$it 0 R" }}] /Count ${pages.size} >>"
-    objects += "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
-
-    pages.forEachIndexed { index, pageLines ->
-        val pageObjectId = 4 + index * 2
-        val contentObjectId = pageObjectId + 1
-        val content = buildString {
-            append("BT\n")
-            append("/F1 $fontSize Tf\n")
-            append("$margin ${pageHeight - margin} Td\n")
-            pageLines.forEachIndexed { lineIndex, line ->
-                if (lineIndex > 0) append("0 -$lineHeight Td\n")
-                append("(${pdfEscape(line)}) Tj\n")
-            }
-            append("ET\n")
-        }
-        objects += "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toInt()} ${pageHeight.toInt()}] /Resources << /Font << /F1 $fontObjectId 0 R >> >> /Contents $contentObjectId 0 R >>"
-        objects += "<< /Length ${content.toByteArray().size} >>\nstream\n$content\nendstream"
-    }
-
-    val out = StringBuilder()
-    val offsets = mutableListOf<Int>()
-    out.append("%PDF-1.4\n")
-    objects.forEachIndexed { index, obj ->
-        offsets += out.toString().toByteArray().size
-        out.append("${index + 1} 0 obj\n$obj\nendobj\n")
-    }
-    val xrefOffset = out.toString().toByteArray().size
-    out.append("xref\n0 ${objects.size + 1}\n")
-    out.append("0000000000 65535 f \n")
-    offsets.forEach { offset ->
-        out.append(offset.toString().padStart(10, '0')).append(" 00000 n \n")
-    }
-    out.append("trailer\n<< /Size ${objects.size + 1} /Root 1 0 R >>\n")
-    out.append("startxref\n$xrefOffset\n%%EOF")
-    return out.toString().toByteArray()
-}
-
-fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray {
-    return buildPlainTextPdfBytes(
-        rawLines = buildAnalyticsReportPlainText().lines(),
-        pageWidth = 595.0,
-        pageHeight = 842.0,
-        margin = 42.0,
-        fontSize = 10.0,
-        lineHeight = 14.0,
-        maxCharsPerLine = 86
+fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray = renderAitaPdfDocument(
+    AitaPdfDocument(
+        blocks = buildAnalyticsReportPlainText().lines().mapIndexed { index, text ->
+            AitaPdfBlock(text, when {
+                index == 0 -> AitaPdfRole.Store
+                index == 1 -> AitaPdfRole.Title
+                text == "--------------------------------" -> AitaPdfRole.Divider
+                else -> AitaPdfRole.Body
+            })
+        },
+        width = 595f, maxHeight = 842f, minHeight = 842f, margin = 42f, bodySize = 10f
     )
-}
+)
 
 fun AnalyticsReportSnapshotDataModel.analyticsReportPdfFileName(): String {
     val safeStore = storeName
@@ -11249,6 +11130,7 @@ internal fun clearCloudAuthRequestMemory(tokens: TokenPair? = null) {
 
 private fun advanceAuthenticatedSessionGenerationLocked(): Long {
     authenticatedSessionGeneration = if (authenticatedSessionGeneration == Long.MAX_VALUE) 1L else authenticatedSessionGeneration + 1L
+    resetDeviceFileNotifications(authenticatedSessionGeneration)
     return authenticatedSessionGeneration
 }
 
@@ -15527,7 +15409,8 @@ private fun NotificationDataModel.isSessionStatusNotification(): Boolean {
     return normalizedCategory == NOTIFICATION_SESSION_CATEGORY || combined.isCloudSessionRefreshNotificationText()
 }
 
-private fun NotificationDataModel.isLocalOnlyNotification(): Boolean = isConnectionStatusNotification() || isSessionStatusNotification()
+private fun NotificationDataModel.isLocalOnlyNotification(): Boolean =
+    isDeviceFileNotification(this) || isConnectionStatusNotification() || isSessionStatusNotification()
 
 private fun NotificationDataModel.withHumanFriendlyNotificationText(): NotificationDataModel {
     val combined = notificationStatusCombinedText()
@@ -16078,6 +15961,7 @@ private suspend fun removeActiveInAppNotification(notificationId: String) {
 }
 
 private fun notificationPopupDelayMillis(notification: NotificationDataModel, transient: Boolean): Long = when {
+    isDeviceFileNotification(notification) && hasDeviceNotificationFile(notification.id) -> 12_000L
     transient && notification.type == NotificationType.Negative -> 9_000L
     transient && notification.type == NotificationType.Neutral -> 4_500L
     transient -> 4_000L
@@ -16126,6 +16010,7 @@ private suspend fun pushInAppNotificationNow(notification: NotificationDataModel
     var shouldPersist = false
 
     notificationPopupMutex.withLock {
+        if (isDeviceFileNotification(preparedNotification) && deviceFileNotification(preparedNotification.id) == null) return@withLock
         pruneDismissedNotificationPopupKeys(now)
         if (!shouldPostNotificationConsideringCloudTransport(preparedNotification)) return@withLock
 
@@ -16230,6 +16115,16 @@ fun postInAppNotification(
 fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = false) {
     if (message.trim().isBlank()) return
     pushInAppNotification(createNotificationDataModel(message, type), transient)
+}
+
+/** Saved-file messages and capabilities live on this device for this login only. */
+suspend fun postDeviceFileNotification(message: String, savedFile: SavedPdfFile?, owner: ReceiptActionOwner, type: NotificationType = NotificationType.Positive) {
+    if (!owner.isCurrent()) return
+    val notification = createNotificationDataModel(message, type).copy(
+        category = DEVICE_FILE_NOTIFICATION_CATEGORY, source = "device"
+    )
+    rememberDeviceFileNotification(notification, savedFile, owner)
+    if (owner.isCurrent()) pushInAppNotificationNow(notification, transient = true)
 }
 
 private suspend fun clearTransientOrNeutralInAppNotifications() {

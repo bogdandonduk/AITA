@@ -179,14 +179,20 @@ private fun installIosComposePlatformBridges() {
     saveReceiptPdfFile = { fileName, pdfBytes ->
         withContext(Dispatchers.ourIo) {
             runCatching {
-                val path = documentsPath(fileName)
+                val safeName = safeReceiptPdfFileName(fileName).removeSuffix(".pdf")
+                val path = documentsPath("${safeName}_${NSUUID().UUIDString}.pdf")
                 val saved = NSFileManager.defaultManager.createFileAtPath(
                     path = path,
                     contents = pdfBytes.toNSData(),
                     attributes = null
                 )
                 if (saved) {
-                    ReceiptPlatformActionResult(true, "Saved to $path")
+                    ReceiptPlatformActionResult(true, "Saved to $path", SavedPdfFile(path.substringAfterLast('/'), path.substringBeforeLast('/')) { isCurrent ->
+                        withContext(Dispatchers.Main) {
+                            if (isCurrent()) openSavedPdfPreviewIos(path)
+                            else ReceiptPlatformActionResult(false, "This file action belongs to an earlier sign-in")
+                        }
+                    })
                 } else {
                     ReceiptPlatformActionResult(false, "Could not save PDF")
                 }

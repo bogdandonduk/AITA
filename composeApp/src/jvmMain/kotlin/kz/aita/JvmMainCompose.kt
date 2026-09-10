@@ -1238,8 +1238,16 @@ private fun installDesktopPlatformActionsJvm() {
 
     fun writePdfToDownloads(fileName: String, pdfBytes: ByteArray): File {
         val safeName = safeDesktopFileName(fileName, "receipt.pdf", ".pdf")
-        return uniqueDesktopFile(desktopDownloadsDirectory(), safeName).also { file ->
+        // Reserve a distinct path atomically: two simultaneous exports cannot replace each other
+        // or redirect an earlier notification's Open action to a newer receipt.
+        val directory = ensureDesktopDirectory(desktopDownloadsDirectory())
+        val file = File.createTempFile((safeName.removeSuffix(".pdf") + "_").padEnd(3, '_'), ".pdf", directory)
+        try {
             writeDesktopBytesAtomically(file, pdfBytes, ownerOnly = true)
+            return file
+        } catch (failure: Exception) {
+            file.delete()
+            throw failure
         }
     }
 
@@ -1334,7 +1342,25 @@ private fun installDesktopPlatformActionsJvm() {
         withContext(Dispatchers.IO) {
             runCatching {
                 val file = writePdfToDownloads(fileName, pdfBytes)
-                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}")
+                ReceiptPlatformActionResult(true, "Saved to ${file.absolutePath}", SavedPdfFile(file.name, file.parentFile.absolutePath) { isCurrent ->
+                    withContext(Dispatchers.IO) {
+                        if (!file.isFile || !file.canRead()) ReceiptPlatformActionResult(false, "The saved PDF was moved, deleted, or is no longer accessible")
+                        else if (!isCurrent()) ReceiptPlatformActionResult(false, "This file action belongs to an earlier sign-in")
+                        else {
+                            val opened = runCatching {
+                                val viewer = desktop()
+                                if (viewer != null && viewer.isSupported(Desktop.Action.OPEN)) { viewer.open(file); true }
+                                else when (desktopOsFamily) {
+                                    DesktopOsFamily.Windows -> launchDesktopCommand("rundll32.exe", "url.dll,FileProtocolHandler", file.toURI().toASCIIString())
+                                    DesktopOsFamily.MacOS -> launchDesktopCommand("open", file.absolutePath)
+                                    DesktopOsFamily.Linux -> launchDesktopCommand("xdg-open", file.absolutePath)
+                                    else -> false
+                                }
+                            }.getOrDefault(false)
+                            ReceiptPlatformActionResult(opened, if (opened) "Opening saved PDF" else "No available PDF viewer could open this file")
+                        }
+                    }
+                })
             }.getOrElse { throwable ->
                 ReceiptPlatformActionResult(false, throwable.message ?: "Could not save PDF")
             }
