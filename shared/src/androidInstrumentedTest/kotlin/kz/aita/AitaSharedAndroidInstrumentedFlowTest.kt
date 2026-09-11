@@ -140,6 +140,7 @@ class AitaSharedAndroidInstrumentedFlowTest {
 
     @After
     fun tearDown() {
+        runBlocking { publishActiveInventoryStoreId(null) }
         stopRealtimeUpdates()
         runCatching { httpClient.close() }
         httpClient = originalHttpClient
@@ -1095,6 +1096,8 @@ class AitaSharedAndroidInstrumentedFlowTest {
             title = "Sale completed",
             createdAtMillis = 1_710_000_020_000L
         )
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
         environment.stores = listOf(root)
         environment.operationLogs = listOf(rootLog, branchLog)
         storesState.emit(DataState.Success(listOf(root)))
@@ -1114,6 +1117,14 @@ class AitaSharedAndroidInstrumentedFlowTest {
                     it.queryParameters["scope"] == listOf(OPERATION_LOG_SCOPE_CURRENT)
         })
 
+        val samePlaceFamily = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
+        getOperationLogs(AITA_FLOW_SOURCE_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { samePlaceFamily.complete(it) }
+        assertEquals(2, requireAitaFlowSuccess(samePlaceFamily).payload.size)
+        assertEquals(listOf(rootLog.id), operationLogViewsState.value.current.records?.map { it.id })
+        assertEquals(listOf(branchLog.id, rootLog.id), operationLogViewsState.value.family.records?.map { it.id })
+        assertEquals(listOf(rootLog.id), operationLogsState.payloadValue?.map { it.id })
+
+        publishActiveInventoryStoreId(AITA_FLOW_DESTINATION_STORE_ID)
         val rootScopeCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
         getOperationLogs(AITA_FLOW_DESTINATION_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { rootScopeCallback.complete(it) }
 
@@ -1134,6 +1145,7 @@ class AitaSharedAndroidInstrumentedFlowTest {
         assertEquals(supplier.id, requireAitaFlowSuccess(addSupplierCallback).payload.id)
         waitUntilAitaFlowCondition { environment.operationLogs.any { it.action == "supplier_add" && it.entityId == supplier.id } }
 
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
         val afterActionCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
         getOperationLogs(AITA_FLOW_SOURCE_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { afterActionCallback.complete(it) }
         val afterActionLogs = requireAitaFlowSuccess(afterActionCallback).payload
@@ -1427,8 +1439,8 @@ class AitaSharedAndroidInstrumentedFlowTest {
 
 private suspend fun resetAitaFlowSharedState() {
     stopRealtimeUpdates()
-    activeStoreIdState.emit(null)
     userAccountState.emit(DataState.Empty())
+    publishActiveInventoryStoreId(null)
     storesState.emit(DataState.Empty())
     storeWorkerMembershipsState.emit(DataState.Empty())
     myWorkerMembershipsState.emit(DataState.Empty())

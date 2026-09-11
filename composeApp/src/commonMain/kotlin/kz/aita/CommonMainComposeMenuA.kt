@@ -4204,19 +4204,27 @@ internal fun AppConfiguration.OperationLogCard(log: OperationLogDataModel) {
 
 @Composable
 fun AppConfiguration.MenuOperationLogsScreen() {
-    val logsState by operationLogsState.value.collectAsState()
-    val logs = operationLogsState.payload.collectAsState().value.orEmpty()
+    val publishedViews by operationLogViewsState.collectAsState()
+    val activeStoreId = stateValues.activeStoreId
+    val accountId = stateValues.userAccount?.id
+    val views = publishedViews.takeIf { it.storeId == activeStoreId && it.accountId == accountId }
+        ?: OperationLogViews()
     var query by rememberSaveable { mutableStateOf("") }
     var showRootScope by rememberSaveable { mutableStateOf(false) }
-    val activeStoreId = stateValues.activeStoreId
+    val refreshIcon by stateValues.drawableResIconRefresh.collectAsState()
 
-    LaunchedEffect(activeStoreId, showRootScope) {
-        activeStoreId?.let { getOperationLogs(it, if (showRootScope) OPERATION_LOG_SCOPE_ROOT else OPERATION_LOG_SCOPE_CURRENT) }
+    fun refreshBothScopes() {
+        activeStoreId?.let { storeId ->
+            getOperationLogs(storeId, OPERATION_LOG_SCOPE_CURRENT)
+            getOperationLogs(storeId, OPERATION_LOG_SCOPE_ROOT)
+        }
     }
 
-    val filtered = remember(logs, query) {
+    LaunchedEffect(activeStoreId, accountId, views.ownerEpoch) { refreshBothScopes() }
+
+    fun filterLogs(logs: List<OperationLogDataModel>?): List<OperationLogDataModel>? {
         val q = query.trim().lowercase()
-        if (q.isBlank()) logs else logs.filter { log ->
+        return logs?.let { source -> if (q.isBlank()) source else source.filter { log ->
             listOf(
                 log.action, log.entityType, log.entityId.orEmpty(), log.actorDisplayName, log.actorPublicId, log.storePublicId,
                 log.title.visibleLocalizedString(stateValues.appLanguage, ""),
@@ -4224,19 +4232,20 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                 localizedOperationLogReadableText(log.title.visibleLocalizedString(stateValues.appLanguage, ""), operationLogFallbackText(log)),
                 localizedOperationLogReadableText(log.details.visibleLocalizedString(stateValues.appLanguage, ""), operationLogFallbackText(log))
             ).any { it.lowercase().contains(q) }
-        }
+        } }
     }
-
-    var currentPlaceVisibleCount by rememberSaveable { mutableStateOf(0) }
-    var parentAndBranchesVisibleCount by rememberSaveable { mutableStateOf(0) }
-    LaunchedEffect(showRootScope, filtered.size) {
-        if (showRootScope) parentAndBranchesVisibleCount = filtered.size else currentPlaceVisibleCount = filtered.size
-    }
+    val currentRecords = remember(views.current.records, query, stateValues.appLanguage) { filterLogs(views.current.records) }
+    val familyRecords = remember(views.family.records, query, stateValues.appLanguage) { filterLogs(views.family.records) }
+    val selected = if (showRootScope) views.family else views.current
+    val filtered = if (showRootScope) familyRecords else currentRecords
+    fun scopeLabel(label: String, records: List<OperationLogDataModel>?) =
+        records?.let { tabLabelWithCount(label, it.size) } ?: "$label (…)"
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenAppBarWidget(
             title = localizedStringResource(662, "Operation logs"),
             iconPath = stateValues.drawablePathIconLog,
+            trailingIcons = listOf(Triple(stateValues.drawablePathIconRefresh, refreshIcon, ::refreshBothScopes)),
             onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
         )
 
@@ -4267,11 +4276,11 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                         tabs = listOf(
                             TabContent(
                                 "current",
-                                tabLabelWithCount(localizedStringResource(664, "Current place"), currentPlaceVisibleCount)
+                                scopeLabel(localizedStringResource(664, "Current place"), currentRecords)
                             ) { showRootScope = false },
                             TabContent(
                                 "parent",
-                                tabLabelWithCount(localizedStringResource(666, "Parent and branches"), parentAndBranchesVisibleCount)
+                                scopeLabel(localizedStringResource(666, "Parent and branches"), familyRecords)
                             ) { showRootScope = true }
                         ),
                         selectedIndexInitial = if (showRootScope) "parent" else "current",
@@ -4296,6 +4305,32 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                         modifier = Modifier.padding(stateValues.marginTextField)
                     )
                 }
+            } else if (selected.accessDenied) {
+                item {
+                    Text(
+                        text = localizedStringResource(665, "You do not have permission for this action"),
+                        color = stateValues.ErrorColor,
+                        modifier = Modifier.padding(stateValues.marginTextField)
+                    )
+                }
+            } else if (filtered == null) {
+                item {
+                    Column(
+                        modifier = Modifier.fillParentMaxSize().padding(stateValues.marginTextField),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        if (selected.loading) androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp), color = stateValues.AccentColor, strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = selected.failure?.extractLocalizedString(stateValues.appLanguage)
+                                ?: localizedStringResource(1141, "Please wait…"),
+                            color = if (selected.failure != null) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize, textAlign = TextAlign.Center
+                        )
+                    }
+                }
             } else if (filtered.isEmpty()) {
                 item {
                     Box(
@@ -4313,6 +4348,12 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                     }
                 }
             } else {
+                selected.failure?.extractLocalizedString(stateValues.appLanguage)?.let { message ->
+                    item {
+                        Text(message, color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize, modifier = Modifier.padding(stateValues.marginTextField))
+                    }
+                }
                 items(filtered, key = { it.id }) { log ->
                     Box(modifier = Modifier.padding(horizontal = stateValues.marginTextField)) { OperationLogCard(log) }
                 }

@@ -46,6 +46,7 @@ private class AitaFlowTestEnvironment {
     var myWorkerRequests: List<StoreWorkerRequestDataModel> = emptyList()
     var activeWorkshift: WorkshiftDataModel? = null
     var stock: List<GoodsItemDataModel> = emptyList()
+    var stockReadFailureStatus: HttpStatusCode? = null
     var batches: List<GoodsBatchDataModel> = emptyList()
     var availability: StockItemBranchAvailabilityDataModel = aitaTestAvailability()
     var transactions: List<TransactionDataModel> = emptyList()
@@ -121,6 +122,7 @@ class AitaSharedJvmFlowTest {
 
     @AfterTest
     fun tearDown() {
+        runBlocking { publishActiveInventoryStoreId(null) }
         stopRealtimeUpdates()
         runCatching { httpClient.close() }
         httpClient = originalHttpClient
@@ -134,6 +136,92 @@ class AitaSharedJvmFlowTest {
         runCatching { testSqlDriver?.close() }
         testSqlDriver = null
         
+    }
+
+    @Test
+    fun expiredSessionKeepsSameAccountStockAndBatches() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        val item = aitaTestGoodsItem(id = "offline-item")
+        val batch = aitaTestBatch(id = "offline-batch", goodsItemId = item.id)
+        stockState.emit(DataState.Success(listOf(item)))
+        stockBatchesState.emit(DataState.Success(listOf(batch)))
+        environment.stockReadFailureStatus = HttpStatusCode.Unauthorized
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        getStockBatches(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null && stockBatchesLoadStatusState.value.failure != null }
+        assertEquals(listOf(item), stockState.payloadValue)
+        assertEquals(listOf(batch), stockBatchesState.payloadValue)
+        assertFalse(stockLoadStatusState.value.accessDenied)
+        assertFalse(stockBatchesLoadStatusState.value.accessDenied)
+    }
+
+    @Test
+    fun successfulStockReadSavesTheWholeListBeforePublishingIt() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        val owner = inventoryOwners.current
+        environment.stock = (1..150).map { aitaTestGoodsItem(id = "cached-$it") }
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.source == InventoryLoadSource.Cloud }
+        val raw = getLocalKv("cache_json:" + inventoryCacheKey("stock", owner))
+        assertNotNull(raw)
+        assertEquals(environment.stock, jsonBase.decodeFromString<List<GoodsItemDataModel>>(raw))
+        assertEquals(environment.stock, stockState.payloadValue)
+    }
+
+    @Test
+    fun cachedStockHydratesWhenTheCloudIsUnavailable() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        val item = aitaTestGoodsItem(id = "disk-only-item")
+        putLocalKv("cache_json:" + inventoryCacheKey("stock", inventoryOwners.current), jsonBase.encodeToString(listOf(item)))
+        environment.stockReadFailureStatus = HttpStatusCode.ServiceUnavailable
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null }
+        assertEquals(listOf(item), stockState.payloadValue)
+        assertEquals(InventoryLoadSource.Cache, stockLoadStatusState.value.source)
+        assertFalse(stockLoadStatusState.value.accessDenied)
+    }
+
+    @Test
+    fun forbiddenReadPersistsADenialAndPreventsOldCacheHydration() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        val item = aitaTestGoodsItem(id = "revoked-item")
+        val key = "cache_json:" + inventoryCacheKey("stock", inventoryOwners.current)
+        putLocalKv(key, jsonBase.encodeToString(listOf(item)))
+        stockState.emit(DataState.Success(listOf(item)))
+        environment.stockReadFailureStatus = HttpStatusCode.Forbidden
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.accessDenied && getLocalKv(key + ":access-denied") == "1" }
+        assertNull(stockState.payloadValue)
+        assertNull(stockBatchesState.payloadValue)
+        // Simulate a partial cache deletion and a cold re-entry. The denial marker must win.
+        publishActiveInventoryStoreId(null)
+        putLocalKv(key, jsonBase.encodeToString(listOf(item)))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        environment.stockReadFailureStatus = HttpStatusCode.ServiceUnavailable
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null }
+        assertNull(stockState.payloadValue)
+        assertTrue(stockLoadStatusState.value.accessDenied)
+    }
+
+    @Test
+    fun sameAccountFreshSignInRetainsStockButChangesRequestOwnership() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        val item = aitaTestGoodsItem(id = "same-account-item")
+        stockState.emit(DataState.Success(listOf(item)))
+        stockLoadStatusState.value = InventoryLoadStatus(AITA_FLOW_SOURCE_STORE_ID, loading = true, source = InventoryLoadSource.Cache)
+        val previous = inventoryOwners.current
+        installAuthenticatedSession(aitaTestTokenPair("new-sign-in"))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        assertEquals(listOf(item), stockState.payloadValue)
+        assertFalse(stockLoadStatusState.value.loading)
+        assertFalse(inventoryOwnerIsCurrent(previous))
+        assertNotEquals(previous, inventoryOwners.current)
     }
 
     @Test
@@ -1158,6 +1246,8 @@ class AitaSharedJvmFlowTest {
             title = "Sale completed",
             createdAtMillis = 1_710_000_020_000L
         )
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
         environment.stores = listOf(root)
         environment.operationLogs = listOf(rootLog, branchLog)
         storesState.emit(DataState.Success(listOf(root)))
@@ -1177,6 +1267,14 @@ class AitaSharedJvmFlowTest {
                     it.queryParameters["scope"] == listOf(OPERATION_LOG_SCOPE_CURRENT)
         })
 
+        val samePlaceFamily = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
+        getOperationLogs(AITA_FLOW_SOURCE_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { samePlaceFamily.complete(it) }
+        assertEquals(2, requireAitaFlowSuccess(samePlaceFamily).payload.size)
+        assertEquals(listOf(rootLog.id), operationLogViewsState.value.current.records?.map { it.id })
+        assertEquals(listOf(branchLog.id, rootLog.id), operationLogViewsState.value.family.records?.map { it.id })
+        assertEquals(listOf(rootLog.id), operationLogsState.payloadValue?.map { it.id })
+
+        publishActiveInventoryStoreId(AITA_FLOW_DESTINATION_STORE_ID)
         val rootScopeCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
         getOperationLogs(AITA_FLOW_DESTINATION_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { rootScopeCallback.complete(it) }
 
@@ -1197,6 +1295,7 @@ class AitaSharedJvmFlowTest {
         assertEquals(supplier.id, requireAitaFlowSuccess(addSupplierCallback).payload.id)
         waitUntilAitaFlowCondition { environment.operationLogs.any { it.action == "supplier_add" && it.entityId == supplier.id } }
 
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
         val afterActionCallback = CompletableDeferred<DataState<List<OperationLogDataModel>>>()
         getOperationLogs(AITA_FLOW_SOURCE_STORE_ID, OPERATION_LOG_SCOPE_ROOT) { afterActionCallback.complete(it) }
         val afterActionLogs = requireAitaFlowSuccess(afterActionCallback).payload
@@ -1490,8 +1589,8 @@ class AitaSharedJvmFlowTest {
 
 private suspend fun resetAitaFlowSharedState() {
     stopRealtimeUpdates()
-    activeStoreIdState.emit(null)
     userAccountState.emit(DataState.Empty())
+    publishActiveInventoryStoreId(null)
     storesState.emit(DataState.Empty())
     storeWorkerMembershipsState.emit(DataState.Empty())
     myWorkerMembershipsState.emit(DataState.Empty())
@@ -1569,6 +1668,14 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
             return@MockEngine respond(
                 content = aitaTestNegativeEnvelope("Temporary server failure"),
                 status = HttpStatusCode.ServiceUnavailable,
+                headers = aitaFlowResponseHeaders()
+            )
+        }
+
+        environment.stockReadFailureStatus?.let { status ->
+            if (path == "stock/get" || path == "stockBatches/get") return@MockEngine respond(
+                content = aitaTestNegativeEnvelope("Inventory request rejected"),
+                status = status,
                 headers = aitaFlowResponseHeaders()
             )
         }

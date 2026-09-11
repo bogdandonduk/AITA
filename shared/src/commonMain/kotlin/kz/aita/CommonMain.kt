@@ -4168,23 +4168,10 @@ fun getOperationLogs(
     scope: String = OPERATION_LOG_SCOPE_CURRENT,
     onCompleted: ((DataState<List<OperationLogDataModel>>) -> Unit)? = null
 ) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        getOperationLogsMutex.withLock {
-            val response = networkRequest<List<OperationLogDataModel>, Unit>(
-                method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getOperationLogsPath.first,
-                headers = mapOf("store_id" to storeId),
-                query = mapOf("scope" to scope)
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                operationLogsState.emit(DataState.Success(response.payload, response.message))
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
-            }
-        }
+    loadOperationLogScope(storeId, scope, onCompleted)
+    // Keep an already-visited family view fresh without fetching it for users who never open logs.
+    if (!operationLogScopeIsFamily(scope) && operationLogViewsState.value.family.records != null) {
+        loadOperationLogScope(storeId, OPERATION_LOG_SCOPE_ROOT)
     }
 }
 
@@ -8073,9 +8060,7 @@ val stockBatchesState = MutableDataStateFlow<List<GoodsBatchDataModel>>(GlobalSc
 val stockItemBranchAvailabilityState = MutableDataStateFlow<StockItemBranchAvailabilityDataModel>(GlobalScope)
 val stockBatchMoveResultState = MutableDataStateFlow<StockBatchMoveResultDataModel>(GlobalScope)
 
-val getStockMutex = Mutex()
 val getParentStoreStockMutex = Mutex()
-val getStockBatchesMutex = Mutex()
 val addGoodsItemMutex = Mutex()
 val updateGoodsItemMutex = Mutex()
 val deleteGoodsItemMutex = Mutex()
@@ -8207,7 +8192,6 @@ private val updateMyWorkerPasswordMutex = Mutex()
 private val getCurrentWorkshiftMutex = Mutex()
 private val startWorkshiftMutex = Mutex()
 private val endWorkshiftMutex = Mutex()
-private val getOperationLogsMutex = Mutex()
 private val getStockItemHistoryMutex = Mutex()
 private val getStoreAnalyticsMutex = Mutex()
 
@@ -8524,24 +8508,7 @@ fun init() {
             }
     }
 
-    GlobalScope.launch(Dispatchers.ourIo) {
-        activeStoreIdState
-            .collectLatest { storedActiveStoreId ->
-                val normalizedStoreId = storedActiveStoreId?.takeIf { it.isNotBlank() }
-                normalizedStoreId?.let { storeId ->
-                    loadCachedStoreScopedData(storeId)
-                    getStock(storeId)
-                    getStockBatches(storeId)
-                    getTransactions(storeId)
-                    getCashRegister(storeId)
-                    getStoreWorkers(storeId)
-                    getIncomingWorkerRequests(storeId)
-                    getMyWorkerMemberships()
-                    getMyWorkerRequests()
-                    getStoreSubscription(storeId)
-                }
-            }
-    }
+    GlobalScope.launch(Dispatchers.ourIo) { observeActiveInventoryData() }
 
     GlobalScope.launch(Dispatchers.ourIo) {
         observeCart(0, 0)
@@ -13610,33 +13577,120 @@ val realtimeUpdatesConnectedState: StateFlow<Boolean> = realtimeUpdatesJob.state
     .map { it.connected }
     .stateIn(GlobalScope, SharingStarted.Eagerly, false)
 
-private suspend fun loadCachedInventory(storeId: String) {
-    val owner = inventoryOwners.current
-    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
-    getJsonCache<List<GoodsItemDataModel>>(inventoryCacheKey("stock", owner))?.let {
-        val cached = filterRecentlyDeletedStockItems(it)
-        inventoryStateMutex.withLock {
-            if (canHydrateInventory(stockState.payloadValue != null || stockLoadStatusState.value.accessDenied, inventoryOwnerIsCurrent(owner))) {
-                stockState.emit(DataState.Success(cached, cacheMessage()))
-                stockLoadStatusState.value = stockLoadStatusState.value.copy(source = InventoryLoadSource.Cache)
-            }
-        }
-    }
-    getJsonCache<List<GoodsBatchDataModel>>(inventoryCacheKey("stock_batches", owner))?.let {
-        val cached = filterRecentlyDeletedStockBatches(it)
-        inventoryStateMutex.withLock {
-            if (canHydrateInventory(stockBatchesState.payloadValue != null || stockBatchesLoadStatusState.value.accessDenied, inventoryOwnerIsCurrent(owner))) {
-                stockBatchesState.emit(DataState.Success(cached, cacheMessage()))
-                stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(source = InventoryLoadSource.Cache)
-            }
+/** Must be called with inventoryStateMutex held, so a late cache writer cannot undo revocation. */
+private suspend inline fun <reified T> persistInventoryCacheLocked(
+    name: String,
+    owner: InventoryOwner,
+    payload: List<T>,
+    cloudVerified: Boolean = false
+): Boolean = try {
+    withTimeoutOrNull(5_000L) {
+        val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
+        putLocalKv(key, jsonBase.encodeToString(payload))
+        // Cache/local writes must never grant permission. Only an accepted cloud read clears this marker.
+        if (cloudVerified) deleteLocalKv(key + ":access-denied")
+        getLocalKv(key + ":access-denied") != "1"
+    } ?: false
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    logCloudConnectionDiagnostic("Inventory cache write failed; in-memory data retained")
+    false
+}
+
+private suspend fun denyCachedInventoryLocked(owner: InventoryOwner, failure: List<LocalizedStringDataModel>) {
+    inventoryAccessRevision++
+    // STOCK_READ protects both endpoints. Do not leave sellable cached batches beside a denied list.
+    stockState.emit(DataState.Empty(failure))
+    stockBatchesState.emit(DataState.Empty(failure))
+    parentStoreStockState.emit(DataState.Empty(failure))
+    stockItemBranchAvailabilityState.emit(DataState.Empty(failure))
+    stockLoadStatusState.value = InventoryLoadStatus(owner.storeId, failure = failure, accessDenied = true)
+    stockBatchesLoadStatusState.value = InventoryLoadStatus(owner.storeId, failure = failure, accessDenied = true)
+    for (name in listOf("stock", "stock_batches")) {
+        try {
+            val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
+            // Marker first: even an interrupted deletion must not make the old cache eligible again.
+            val saved = withTimeoutOrNull(5_000L) {
+                putLocalKv(key + ":access-denied", "1")
+                deleteLocalKv(key)
+                true
+            } ?: false
+            if (!saved) logCloudConnectionDiagnostic("Inventory revocation cache write timed out; memory remains denied")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            logCloudConnectionDiagnostic("Inventory revocation could not be persisted; memory access remains denied")
         }
     }
 }
 
-private suspend fun loadCachedStoreScopedData(storeId: String) {
-    val owner = inventoryOwners.current
+private suspend inline fun <reified T> hydrateInventoryResource(
+    name: String,
+    owner: InventoryOwner,
+    state: MutableDataStateFlow<List<T>>,
+    status: MutableStateFlow<InventoryLoadStatus>,
+    filter: (List<T>) -> List<T>
+) {
+    val accessAtStart = inventoryStateMutex.withLock {
+        if (!inventoryOwnerIsCurrent(owner) || state.payloadValue != null || status.value.accessDenied) return
+        inventoryAccessRevision
+    }
+    // Disk I/O must not hold the ownership lock: logout/store switching can cancel this hydration.
+    val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
+    val cached = try {
+        withTimeoutOrNull(5_000L) {
+            val denied = getLocalKv(key + ":access-denied") == "1"
+            denied to if (denied) null else getJsonCache<List<T>>(inventoryCacheKey(name, owner))
+        }
+    } catch (failure: Exception) {
+        ensureConnectionOwnerActive(failure)
+        logCloudConnectionDiagnostic("Inventory cache read failed; cloud loading remains available")
+        null
+    } ?: return
+    val payload = cached.second?.let(filter)
+    inventoryStateMutex.withLock {
+        if (inventoryAccessRevision != accessAtStart ||
+            !canHydrateInventory(state.payloadValue != null || status.value.accessDenied, inventoryOwnerIsCurrent(owner))) return
+        if (cached.first) {
+            status.value = status.value.copy(accessDenied = true, failure = inventoryLoadFailureMessage())
+        } else if (payload != null) {
+            state.emit(DataState.Success(payload, cacheMessage()))
+            status.value = status.value.copy(source = InventoryLoadSource.Cache)
+        }
+    }
+}
+
+private suspend fun loadCachedInventory(storeId: String, owner: InventoryOwner = inventoryOwners.current) {
     if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
-    loadCachedInventory(storeId)
+    hydrateInventoryResource("stock", owner, stockState, stockLoadStatusState, ::filterRecentlyDeletedStockItems)
+    hydrateInventoryResource("stock_batches", owner, stockBatchesState, stockBatchesLoadStatusState, ::filterRecentlyDeletedStockBatches)
+}
+
+/** Includes null owners so logout also cancels an in-progress cache hydration. */
+internal suspend fun observeActiveInventoryData() {
+    combine(inventoryOwners.state, activeStoreIdState) { owner, storeId ->
+        owner.takeIf { it.storeId == storeId && !storeId.isNullOrBlank() }
+    }.distinctUntilChanged().collectLatest { owner ->
+        if (owner == null || !inventoryOwnerIsCurrent(owner)) return@collectLatest
+        val storeId = owner.storeId ?: return@collectLatest
+        loadCachedStoreScopedData(storeId, owner)
+        if (!inventoryOwnerIsCurrent(owner)) return@collectLatest
+        getStock(storeId)
+        getStockBatches(storeId)
+        getTransactions(storeId)
+        getCashRegister(storeId)
+        getStoreWorkers(storeId)
+        getIncomingWorkerRequests(storeId)
+        getMyWorkerMemberships()
+        getMyWorkerRequests()
+        getStoreSubscription(storeId)
+    }
+}
+
+private suspend fun loadCachedStoreScopedData(storeId: String, owner: InventoryOwner = inventoryOwners.current) {
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
+    loadCachedInventory(storeId, owner)
     if (!inventoryOwnerIsCurrent(owner)) return
     // Capture store-scoped keys before I/O; late disk reads cannot replace a fresh cloud/local ledger.
     val transactionKey = storeScopedCacheKey("transactions", storeId)
@@ -13670,13 +13724,14 @@ private suspend fun loadCachedStoreScopedData(storeId: String) {
     }
     if (!inventoryOwnerIsCurrent(owner)) return
     getJsonCache<List<StoreWorkerDataModel>>(storeScopedCacheKey("store_workers", storeId))?.let {
-        storeWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+        inventoryStateMutex.withLock {
+            if (inventoryOwnerIsCurrent(owner)) storeWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+        }
     }
     getJsonCache<List<StoreWorkerRequestDataModel>>(storeScopedCacheKey("incoming_worker_requests", storeId))?.let {
-        incomingWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<OperationLogDataModel>>(storeScopedCacheKey("operation_logs", storeId))?.let {
-        operationLogsState.emit(DataState.Success(it, cacheMessage()))
+        inventoryStateMutex.withLock {
+            if (inventoryOwnerIsCurrent(owner)) incomingWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
+        }
     }
 }
 
@@ -13808,33 +13863,28 @@ private fun startAppCacheCollectors() {
     GlobalScope.launch(Dispatchers.ourIo) { subscriptionPlansState.payload.collect { it?.let { putJsonCache(CACHE_SUBSCRIPTION_PLANS, it) } } }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-        operationLogsState.payload.collect { payload ->
-            val storeId = activeStoreIdState.value
-            if (hasStoredAuthenticatedSession() && !storeId.isNullOrBlank() && payload != null) putJsonCache(storeScopedCacheKey("operation_logs", storeId), payload)
-        }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
         stockState.payload.collect { payload ->
-            if (payload != null) {
-                val cacheKey = inventoryStateMutex.withLock {
-                    val owner = inventoryOwners.current
-                    if (inventoryOwnerIsCurrent(owner) && stockState.payloadValue === payload)
-                        inventoryCacheKey("stock", owner) else null
+            if (payload != null) inventoryStateMutex.withLock {
+                val owner = inventoryOwners.current
+                if (inventoryOwnerIsCurrent(owner) && stockState.payloadValue === payload && !stockLoadStatusState.value.accessDenied) {
+                    val saved = persistInventoryCacheLocked("stock", owner, payload)
+                    if (inventoryOwnerIsCurrent(owner) && stockState.payloadValue === payload) {
+                        stockLoadStatusState.value = stockLoadStatusState.value.copy(cacheWriteFailed = !saved)
+                    }
                 }
-                if (cacheKey != null) putJsonCache(cacheKey, payload)
             }
         }
     }
     GlobalScope.launch(Dispatchers.ourIo) {
         stockBatchesState.payload.collect { payload ->
-            if (payload != null) {
-                val cacheKey = inventoryStateMutex.withLock {
-                    val owner = inventoryOwners.current
-                    if (inventoryOwnerIsCurrent(owner) && stockBatchesState.payloadValue === payload)
-                        inventoryCacheKey("stock_batches", owner) else null
+            if (payload != null) inventoryStateMutex.withLock {
+                val owner = inventoryOwners.current
+                if (inventoryOwnerIsCurrent(owner) && stockBatchesState.payloadValue === payload && !stockBatchesLoadStatusState.value.accessDenied) {
+                    val saved = persistInventoryCacheLocked("stock_batches", owner, payload)
+                    if (inventoryOwnerIsCurrent(owner) && stockBatchesState.payloadValue === payload) {
+                        stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(cacheWriteFailed = !saved)
+                    }
                 }
-                if (cacheKey != null) putJsonCache(cacheKey, payload)
             }
         }
     }
@@ -18256,64 +18306,79 @@ fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<Goods
     }
 }
 
-fun getStock(storeId: String) {
+/** A read has one account/store owner and a bounded lifetime; repeat taps do not queue more reads. */
+private inline fun <reified T> readInventoryResource(
+    storeId: String,
+    name: String,
+    endpoint: String,
+    state: MutableDataStateFlow<List<T>>,
+    status: MutableStateFlow<InventoryLoadStatus>,
+    read: OwnedScopedRead<InventoryOwner>,
+    crossinline filter: (List<T>) -> List<T>
+) {
     val owner = inventoryOwners.current
-    val cleanStoreId = storeId.trim()
-    if (owner.storeId != cleanStoreId) return
-    GlobalScope.launch(Dispatchers.ourIo) {
-        getStockMutex.withLock {
-            val started = inventoryStateMutex.withLock startRead@{
-                if (!inventoryOwnerIsCurrent(owner)) return@startRead false
-                stockLoadStatusState.value = stockLoadStatusState.value.copy(loading = true, failure = null)
-                true
+    if (owner.storeId != storeId.trim() || !inventoryOwnerIsCurrent(owner)) return
+    read.start(owner, GlobalScope, Dispatchers.ourIo) {
+        val requestJob = currentCoroutineContext()[Job]
+        try {
+            hydrateInventoryResource(name, owner, state, status) { filter(it) }
+            val atStart = inventoryStateMutex.withLock {
+                if (!inventoryOwnerIsCurrent(owner) || !read.owns(owner, requestJob)) return@start
+                status.value = status.value.copy(loading = true, failure = null)
+                inventoryAccessRevision to state.payloadValue
             }
-            if (!started) return@withLock
-            try {
-                val response = networkRequest<List<GoodsItemDataModel>, Unit>(
+            val response = withTimeoutOrNull(45_000L) {
+                networkRequest<List<T>, Unit>(
                     HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStockPath.first,
-                    headers = mapOf("store_id" to cleanStoreId)
+                    endpointUrl = endpoint,
+                    headers = mapOf("store_id" to requireNotNull(owner.storeId)),
+                    expectedSessionGeneration = owner.sessionGeneration
                 )
-                val cleanPayload = response.payload?.let { filterRecentlyDeletedStockItems(it) }
-                inventoryStateMutex.withLock publish@{
-                    if (!inventoryOwnerIsCurrent(owner)) return@publish
-                    if (!response.negative && cleanPayload != null) {
-                        stockState.emit(DataState.Success(cleanPayload, response.message))
-                        stockLoadStatusState.value = InventoryLoadStatus(cleanStoreId, source = InventoryLoadSource.Cloud)
-                    } else {
-                        val failure = response.message?.takeIf { it.isNotEmpty() } ?: inventoryLoadFailureMessage()
-                        // A transport failure retains same-account cached stock. Revoked access does not.
-                        if (response.httpStatusCode == 401 || response.httpStatusCode == 403) {
-                            stockState.emit(DataState.Empty(failure))
-                        }
-                        stockLoadStatusState.value = stockLoadStatusState.value.copy(
-                            loading = false, failure = failure,
-                            accessDenied = stockLoadStatusState.value.accessDenied || response.httpStatusCode == 401 || response.httpStatusCode == 403
+            }
+            val cleanPayload = response?.payload?.let { filter(it) }
+            inventoryStateMutex.withLock {
+                if (!inventoryOwnerIsCurrent(owner) || !read.owns(owner, requestJob) || inventoryAccessRevision != atStart.first) return@withLock
+                when {
+                    response != null && inventoryReadRevokesAccess(response.httpStatusCode, response.transportFailure) -> {
+                        denyCachedInventoryLocked(owner, response.message?.takeIf { it.isNotEmpty() } ?: inventoryLoadFailureMessage())
+                    }
+                    response != null && !response.negative && cleanPayload != null -> {
+                        // An intervening local mutation wins over the snapshot requested BEFORE it.
+                        if (state.payloadValue !== atStart.second) return@withLock
+                        val saved = persistInventoryCacheLocked(name, owner, cleanPayload, cloudVerified = true)
+                        if (!inventoryOwnerIsCurrent(owner) || state.payloadValue !== atStart.second) return@withLock
+                        state.emit(DataState.Success(cleanPayload, response.message))
+                        status.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Cloud, cacheWriteFailed = !saved)
+                    }
+                    else -> {
+                        // 401, timeout and transport failures never erase same-owner data or become a false empty success.
+                        status.value = status.value.copy(
+                            loading = false,
+                            failure = response?.message?.takeIf { it.isNotEmpty() } ?: inventoryLoadFailureMessage()
                         )
                     }
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
+            }
+        } catch (failure: Exception) {
+            ensureConnectionOwnerActive(failure)
+            inventoryStateMutex.withLock {
+                if (inventoryOwnerIsCurrent(owner) && read.owns(owner, requestJob)) status.value = status.value.copy(loading = false, failure = inventoryLoadFailureMessage())
+            }
+        } finally {
+            withContext(NonCancellable) {
                 inventoryStateMutex.withLock {
-                    if (inventoryOwnerIsCurrent(owner)) {
-                        stockLoadStatusState.value = stockLoadStatusState.value.copy(
-                            loading = false, failure = inventoryLoadFailureMessage()
-                        )
-                    }
-                }
-            } finally {
-                withContext(NonCancellable) {
-                    inventoryStateMutex.withLock {
-                        if (inventoryOwnerIsCurrent(owner)) {
-                            stockLoadStatusState.value = stockLoadStatusState.value.copy(loading = false)
-                        }
-                    }
+                    // Tokens can disappear before the next owner is published. Never strand this read's spinner.
+                    if (inventoryOwners.owns(owner) && read.owns(owner, requestJob)) status.value = status.value.copy(loading = false)
                 }
             }
         }
     }
 }
+
+fun getStock(storeId: String) = readInventoryResource(
+    storeId, "stock", globalAppConfigurationState.payloadValue.getStockPath.first,
+    stockState, stockLoadStatusState, stockRead, ::filterRecentlyDeletedStockItems
+)
 
 fun getParentStoreStock(
     storeId: String,
@@ -18533,63 +18598,10 @@ fun deleteGoodsItem(id: String, storeId: String, onCompleted: (() -> Unit)?) {
     }
 }
 
-fun getStockBatches(storeId: String) {
-    val owner = inventoryOwners.current
-    val cleanStoreId = storeId.trim()
-    if (owner.storeId != cleanStoreId) return
-    GlobalScope.launch(Dispatchers.ourIo) {
-        getStockBatchesMutex.withLock {
-            val started = inventoryStateMutex.withLock startRead@{
-                if (!inventoryOwnerIsCurrent(owner)) return@startRead false
-                stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(loading = true, failure = null)
-                true
-            }
-            if (!started) return@withLock
-            try {
-                val response = networkRequest<List<GoodsBatchDataModel>, Unit>(
-                    HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
-                    headers = mapOf("store_id" to cleanStoreId)
-                )
-                val cleanPayload = response.payload?.let { filterRecentlyDeletedStockBatches(it) }
-                inventoryStateMutex.withLock publish@{
-                    if (!inventoryOwnerIsCurrent(owner)) return@publish
-                    if (!response.negative && cleanPayload != null) {
-                        stockBatchesState.emit(DataState.Success(cleanPayload, response.message))
-                        stockBatchesLoadStatusState.value = InventoryLoadStatus(cleanStoreId, source = InventoryLoadSource.Cloud)
-                    } else {
-                        val failure = response.message?.takeIf { it.isNotEmpty() } ?: inventoryLoadFailureMessage()
-                        if (response.httpStatusCode == 401 || response.httpStatusCode == 403) {
-                            stockBatchesState.emit(DataState.Empty(failure))
-                        }
-                        stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(
-                            loading = false, failure = failure,
-                            accessDenied = stockBatchesLoadStatusState.value.accessDenied || response.httpStatusCode == 401 || response.httpStatusCode == 403
-                        )
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                inventoryStateMutex.withLock {
-                    if (inventoryOwnerIsCurrent(owner)) {
-                        stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(
-                            loading = false, failure = inventoryLoadFailureMessage()
-                        )
-                    }
-                }
-            } finally {
-                withContext(NonCancellable) {
-                    inventoryStateMutex.withLock {
-                        if (inventoryOwnerIsCurrent(owner)) {
-                            stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(loading = false)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+fun getStockBatches(storeId: String) = readInventoryResource(
+    storeId, "stock_batches", globalAppConfigurationState.payloadValue.getStockBatchesPath.first,
+    stockBatchesState, stockBatchesLoadStatusState, stockBatchesRead, ::filterRecentlyDeletedStockBatches
+)
 
 private val branchAvailabilityReadRevision = MutableStateFlow(0L)
 

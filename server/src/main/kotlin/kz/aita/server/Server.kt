@@ -5341,16 +5341,12 @@ private fun operationLogStoreIdsForScopeInsideTransaction(userId: UUID, storeId:
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
   val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
     .distinct()
-  if (visibleStoreIds.isEmpty()) return emptyList()
-
-  val parentScope = scope.equals(OPERATION_LOG_SCOPE_ROOT, ignoreCase = true) || storeId == rootStoreId
-  if (!parentScope) return listOf(storeId).filter { it in visibleStoreIds }
-
-  return if (userHasRootInventoryScopeInsideTransaction(userId, rootStoreId)) {
-    visibleStoreIds
-  } else {
-    listOf(storeId).filter { it in visibleStoreIds }
-  }
+    .filter { userCanUseStoreActionInsideTransaction(userId, it, STORE_PERMISSION_LOGS_VIEW, requireWorkshift = false) }
+  return operationLogScopeStoreIds(
+    storeId, visibleStoreIds,
+    familyRequested = scope.equals(OPERATION_LOG_SCOPE_ROOT, ignoreCase = true),
+    familyAllowed = userHasRootInventoryScopeInsideTransaction(userId, rootStoreId)
+  )
 }
 
 
@@ -19782,7 +19778,7 @@ fun Application.module() {
               status = HttpStatusCode.OK,
               payload = it
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(HttpStatusCode.Forbidden, getResponse("665").message)
         }
 
         get("/parent/get") {
@@ -26313,7 +26309,7 @@ fun Application.module() {
               payload = it,
               message = getResponse("92").message
             )
-          } ?: call.respondAitaUnauthorized()
+          } ?: call.genericResponseNoPayload(HttpStatusCode.Forbidden, getResponse("665").message)
         }
       }
     }

@@ -2925,8 +2925,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     modifier = modifier
                         .fillMaxWidth()
                 ) {
-                    val failedLoad = stockLoadStatus.takeIf { it.failure != null }
-                        ?: batchesLoadStatus.takeIf { it.failure != null }
+                    val failedLoad = stockLoadStatus.takeIf { it.failure != null || it.cacheWriteFailed }
+                        ?: batchesLoadStatus.takeIf { it.failure != null || it.cacheWriteFailed }
                     if (failedLoad != null) {
                         InventoryLoadFeedback(
                             modifier = Modifier.fillMaxWidth(),

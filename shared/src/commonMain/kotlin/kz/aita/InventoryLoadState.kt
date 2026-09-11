@@ -12,7 +12,8 @@ data class InventoryLoadStatus(
     val loading: Boolean = false,
     val source: InventoryLoadSource = InventoryLoadSource.None,
     val failure: List<LocalizedStringDataModel>? = null,
-    val accessDenied: Boolean = false
+    val accessDenied: Boolean = false,
+    val cacheWriteFailed: Boolean = false
 )
 
 enum class InventoryLoadSource { None, Cache, Cloud, Local }
@@ -48,6 +49,21 @@ internal class InventoryOwnerTracker {
 
 internal val inventoryStateMutex = Mutex()
 internal val inventoryOwners = InventoryOwnerTracker()
+internal val stockRead = OwnedScopedRead<InventoryOwner>()
+internal val stockBatchesRead = OwnedScopedRead<InventoryOwner>()
+// Held under inventoryStateMutex. A denial rejects already-running companion reads as well.
+internal var inventoryAccessRevision: Long = 0L
+
+internal fun sameInventoryAccountAndStore(first: InventoryOwner, second: InventoryOwner): Boolean =
+    !first.accountId.isNullOrBlank() && !first.storeId.isNullOrBlank() &&
+        first.accountId == second.accountId && first.storeId == second.storeId
+
+/** 401 is an expired cloud credential, not a decision revoking the cached store's permission. */
+internal fun inventoryReadRevokesAccess(httpStatus: Int?, transportFailure: Boolean): Boolean =
+    httpStatus == 403 && !transportFailure
+
+internal fun InventoryLoadStatus.afterSessionChange(storeId: String?): InventoryLoadStatus =
+    copy(storeId = storeId, loading = false, failure = if (accessDenied) failure else null)
 
 /** All active-store publishers must go through this before exposing a new inventory scope. */
 internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIsCurrent: () -> Boolean = { true }) {
@@ -61,20 +77,31 @@ internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIs
             currentAuthenticatedSessionGeneration()
         )
         if (owner != previous) {
-            AnalyticsWorkspace.invalidate()
-            storeAnalyticsDashboardState.emit(DataState.Empty())
-            transactionsState.emit(DataState.Empty())
-            cashRegisterState.emit(DataState.Empty())
-            cashRegisterEventsState.emit(DataState.Empty())
-            cashRegisterExtractionsState.emit(DataState.Empty())
-            cashRegisterAmountState.emit(0.0)
-            stockState.emit(DataState.Empty())
-            stockBatchesState.emit(DataState.Empty())
-            parentStoreStockState.emit(DataState.Empty())
-            stockItemBranchAvailabilityState.emit(DataState.Empty())
+            stockRead.cancel()
+            stockBatchesRead.cancel()
+            inventoryAccessRevision++
+            val retain = sameInventoryAccountAndStore(previous, owner)
+            if (!retain) {
+                AnalyticsWorkspace.invalidate()
+                storeAnalyticsDashboardState.emit(DataState.Empty())
+                transactionsState.emit(DataState.Empty())
+                cashRegisterState.emit(DataState.Empty())
+                cashRegisterEventsState.emit(DataState.Empty())
+                cashRegisterExtractionsState.emit(DataState.Empty())
+                cashRegisterAmountState.emit(0.0)
+                stockState.emit(DataState.Empty())
+                stockBatchesState.emit(DataState.Empty())
+                parentStoreStockState.emit(DataState.Empty())
+                stockItemBranchAvailabilityState.emit(DataState.Empty())
+                stockLoadStatusState.value = InventoryLoadStatus(storeId = cleanId)
+                stockBatchesLoadStatusState.value = InventoryLoadStatus(storeId = cleanId)
+            } else {
+                // Fresh sign-in invalidates requests, not this same account/store's offline data.
+                stockLoadStatusState.value = stockLoadStatusState.value.afterSessionChange(cleanId)
+                stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.afterSessionChange(cleanId)
+            }
             stockBatchMoveResultState.emit(DataState.Empty())
-            stockLoadStatusState.value = InventoryLoadStatus(storeId = cleanId)
-            stockBatchesLoadStatusState.value = InventoryLoadStatus(storeId = cleanId)
+            resetOperationLogViews(owner, retain)
         }
         activeStoreIdState.value = cleanId
     }
@@ -100,3 +127,17 @@ internal fun inventoryLoadFailureMessage(): List<LocalizedStringDataModel> = lis
 /** Cache hydration must never overwrite a cloud/local result (even an authoritative empty list). */
 internal fun canHydrateInventory(hasPayload: Boolean, ownerIsCurrent: Boolean): Boolean =
     ownerIsCurrent && !hasPayload
+
+fun inventoryCachedWhileOfflineMessage(): List<LocalizedStringDataModel> = listOf(
+    LocalizedStringDataModel("main", "Offline · showing saved stock"),
+    LocalizedStringDataModel("en", "Offline · showing saved stock"),
+    LocalizedStringDataModel("ru", "Офлайн · показаны сохранённые остатки"),
+    LocalizedStringDataModel("kk", "Офлайн · сақталған қор көрсетілген")
+)
+
+fun inventoryCacheWriteFailureMessage(): List<LocalizedStringDataModel> = listOf(
+    LocalizedStringDataModel("main", "Stock is visible, but could not be saved on this device. Check free storage before working offline."),
+    LocalizedStringDataModel("en", "Stock is visible, but could not be saved on this device. Check free storage before working offline."),
+    LocalizedStringDataModel("ru", "Остатки показаны, но не сохранены на устройстве. Проверьте свободное место перед работой офлайн."),
+    LocalizedStringDataModel("kk", "Қор көрсетілген, бірақ құрылғыға сақталмады. Офлайн жұмысқа дейін бос орынды тексеріңіз.")
+)
