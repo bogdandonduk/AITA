@@ -21,7 +21,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kz.aita.auth.*
 
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
-private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, TOTP, PASSWORD_CONFIRMATION, NEW_PASSWORD, FINISHING, COMPLETE, AUTHENTICATOR_RECOVERY }
+private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, EMAIL_DESTINATION, EMAIL_SECOND_FACTOR, TOTP, PASSWORD_CONFIRMATION, NEW_PASSWORD, FINISHING, COMPLETE, AUTHENTICATOR_RECOVERY }
 private enum class AitaCodeLoginMethod { EMAIL, AUTHENTICATOR }
 private enum class AitaLoginIdentifierType { PHONE, EMAIL }
 
@@ -82,6 +82,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var emailDestination by remember { mutableStateOf(AitaEmailDestination.MAIN) }
     var flow by remember { mutableStateOf<AitaAuthFlowDataModel?>(null) }
     var newPassword by remember { mutableStateOf("") }
     var repeatPassword by remember { mutableStateOf("") }
@@ -173,7 +174,9 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         val valid = when (result.nextStep) {
             AitaAuthNextStep.EMAIL_CODE -> result.flowId.isNotBlank() && (step == AitaLoginStep.PRIMARY || step == AitaLoginStep.EMAIL_CODE)
             AitaAuthNextStep.TOTP -> result.flowId.isNotBlank() && mode != AitaLoginMode.RECOVERY
-            AitaAuthNextStep.PASSWORD_CONFIRMATION -> result.flowId.isNotBlank() && mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR
+            AitaAuthNextStep.PASSWORD_CONFIRMATION -> result.flowId.isNotBlank() && mode != AitaLoginMode.RECOVERY
+            AitaAuthNextStep.EMAIL_DESTINATION -> result.flowId.isNotBlank() && result.emailDestinations.isNotEmpty() && mode != AitaLoginMode.RECOVERY
+            AitaAuthNextStep.EMAIL_SECOND_FACTOR -> result.flowId.isNotBlank() && result.parentFlowId.isNotBlank() && mode != AitaLoginMode.RECOVERY
             AitaAuthNextStep.PASSWORD_RESET -> result.flowId.isNotBlank() && result.resetTicket.isNotBlank() && mode == AitaLoginMode.RECOVERY
             AitaAuthNextStep.COMPLETE -> mode == AitaLoginMode.RECOVERY && step == AitaLoginStep.NEW_PASSWORD
             else -> false
@@ -181,9 +184,12 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         if (!valid) { error = authUiText("Unexpected server response", "Некорректный ответ сервера", "Сервер жауабы дұрыс емес"); return }
         flow = result.copy(maskedDestination = result.maskedDestination.ifBlank { flow?.maskedDestination.orEmpty() })
         code = ""; password = ""
+        if (result.nextStep == AitaAuthNextStep.EMAIL_DESTINATION) emailDestination = result.emailDestinations.first().destination
         step = when (result.nextStep) {
             AitaAuthNextStep.EMAIL_CODE -> AitaLoginStep.EMAIL_CODE
             AitaAuthNextStep.TOTP -> AitaLoginStep.TOTP
+            AitaAuthNextStep.EMAIL_DESTINATION -> AitaLoginStep.EMAIL_DESTINATION
+            AitaAuthNextStep.EMAIL_SECOND_FACTOR -> AitaLoginStep.EMAIL_SECOND_FACTOR
             AitaAuthNextStep.PASSWORD_CONFIRMATION -> AitaLoginStep.PASSWORD_CONFIRMATION
             AitaAuthNextStep.PASSWORD_RESET -> AitaLoginStep.NEW_PASSWORD
             else -> AitaLoginStep.COMPLETE
@@ -238,7 +244,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                 AitaLoginMode.RECOVERY -> AitaAdvancedAuthenticationClient.requestPasswordRecovery(AitaEmailCodeRequestDataModel(who, stateValues.appLanguage, buildCurrentClientDeviceInfo()))
                 AitaLoginMode.EMAIL_CODE -> if (selectedCodeMethod == AitaCodeLoginMethod.AUTHENTICATOR) {
                     AitaAdvancedAuthenticationClient.authenticatorLogin(AitaAuthenticatorLoginRequestDataModel(who, factor, buildCurrentClientDeviceInfo()))
-                } else AitaAdvancedAuthenticationClient.requestLoginCode(AitaEmailCodeRequestDataModel(who, stateValues.appLanguage, buildCurrentClientDeviceInfo()))
+                } else AitaAdvancedAuthenticationClient.requestLoginCode(AitaEmailCodeRequestDataModel(who, stateValues.appLanguage, buildCurrentClientDeviceInfo(), emailDestination))
             })
         }
     }
@@ -340,6 +346,10 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                         if (!capabilitiesLoading) AuthQuietAction(authUiText("Refresh", "Обновить", "Жаңарту"), !busy) { capabilitiesRefresh++ }
                                     }
                                 }
+                                if (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.EMAIL &&
+                                    identifierType == AitaLoginIdentifierType.PHONE && capabilities?.emailSecondFactorEnabled == true) {
+                                    AuthEmailDestinationPicker(emailDestination, !busy, onSelected = { emailDestination = it })
+                                }
                                 actionButton(modifier = Modifier.fillMaxWidth(), text = if (mode == AitaLoginMode.PASSWORD || (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR)) stateValues.stringLogIn else authUiText("Get code", "Получить код", "Код алу"),
                                     enabled = !busy,
                                     loading = busy, autoLoading = false, onClick = ::submitPrimary)
@@ -358,6 +368,32 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                         val request = AitaEmailCodeResendRequestDataModel(flow?.flowId.orEmpty(), stateValues.appLanguage)
                                         runAction { accept(if (mode == AitaLoginMode.RECOVERY) AitaAdvancedAuthenticationClient.resendPasswordRecovery(request) else AitaAdvancedAuthenticationClient.resendLoginCode(request)) }
                                     }, resendEnabled = true)
+                            }
+                            AitaLoginStep.EMAIL_DESTINATION -> {
+                                Text(authUiText("Send your code to", "Куда отправить код", "Кодты жіберу мекенжайы"),
+                                    color = stateValues.TextColor, fontSize = stateValues.accentTextSize)
+                                AuthEmailDestinationPicker(emailDestination, !busy, flow?.emailDestinations.orEmpty()) { emailDestination = it }
+                                actionButton(modifier = Modifier.fillMaxWidth(), text = authUiText("Get code", "Получить код", "Код алу"), enabled = !busy && !countdown.expired,
+                                    loading = busy, autoLoading = false) {
+                                    val request = AitaLoginEmailFactorRequest(flow?.flowId.orEmpty(), emailDestination, stateValues.appLanguage)
+                                    runAction { accept(AitaAdvancedAuthenticationClient.requestLoginEmailFactor(request)) }
+                                }
+                            }
+                            AitaLoginStep.EMAIL_SECOND_FACTOR -> {
+                                Text(flow?.maskedDestination.orEmpty(), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                AuthEmailCodeEntry(code, flow, busy, { code = it; error = "" },
+                                    onSubmit = {
+                                        val request = AitaEmailCodeVerifyRequestDataModel(flow?.flowId.orEmpty(), code, buildCurrentClientDeviceInfo())
+                                        runAction { accept(AitaAdvancedAuthenticationClient.verifyLoginEmailFactor(request)) }
+                                    }, onResend = {
+                                        val current = flow
+                                        val request = AitaLoginEmailFactorRequest(current?.parentFlowId.orEmpty(), current?.selectedEmailDestination ?: emailDestination, stateValues.appLanguage)
+                                        runAction { accept(AitaAdvancedAuthenticationClient.requestLoginEmailFactor(request)) }
+                                    }, identity = "auth-email-second-factor")
+                                AuthQuietAction(authUiText("Choose another email", "Выбрать другой email", "Басқа email таңдау"), !busy) {
+                                    flow = flow?.copy(flowId = flow?.parentFlowId.orEmpty(), parentFlowId = "", nextStep = AitaAuthNextStep.EMAIL_DESTINATION)
+                                    code = ""; step = AitaLoginStep.EMAIL_DESTINATION
+                                }
                             }
                             AitaLoginStep.TOTP -> {
                                 fun submit() {

@@ -1,6 +1,6 @@
 package kz.aita.server.auth
 
-internal data class AuthEmailCopy(val subject: String, val html: String, val text: String)
+internal data class AuthEmailCopy(val subject: String, val html: String, val text: String, val inlineImages: List<AitaInlineEmailImage> = AitaAuthEmailBranding.images)
 
 internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, ttlMinutes: Long): AuthEmailCopy {
     require(code.length == 6 && code.all { it in '0'..'9' })
@@ -13,9 +13,11 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
             kk -> "AITA аутентификаторы құпия сөз бен email коды расталғаннан кейін жойылды. Барлық кіру сеанстары мен ескі резервтік кодтар қайтарып алынды. Қайта кіріп, жаңа аутентификаторды қосыңыз. Мұны сіз жасамасаңыз, AITA құпия сөзін дереу өзгертіп, поштаңызды қорғаңыз."
             else -> "Your AITA authenticator was removed after password and email-code confirmation. All sign-in sessions and old recovery codes were revoked. Sign in again and connect a new authenticator. If this was not you, change your AITA password immediately and secure your email account."
         }
-        return AuthEmailCopy("AITA · $title", "<html><body><h2>AITA · $title</h2><p>$detail</p></body></html>", "AITA · $title\n\n$detail")
+        return AuthEmailCopy("AITA · $title", aitaAuthEmailLayout(title, detail, null, "", "AITA", if (ru) "ru" else if (kk) "kk" else "en"), "AITA · $title\n\n$detail")
     }
     val title = when (purpose) {
+        "LOGIN_EMAIL_FACTOR" -> when { ru -> "Подтвердите вход"; kk -> "Кіруді растаңыз"; else -> "Confirm your sign-in" }
+        "SECURITY_EMAIL_PROOF" -> when { ru -> "Подтвердите изменение"; kk -> "Өзгерісті растаңыз"; else -> "Confirm a security change" }
         "TOTP_RECOVERY" -> when { ru -> "Сброс аутентификатора"; kk -> "Аутентификаторды қалпына келтіру"; else -> "Reset your authenticator" }
         "PASSWORD_RECOVERY" -> when { ru -> "Восстановление пароля"; kk -> "Құпия сөзді қалпына келтіру"; else -> "Reset your password" }
         "EMAIL_ALIAS" -> when { ru -> "Подтвердите email для входа"; kk -> "Кіру email мекенжайын растаңыз"; else -> "Confirm your sign-in email" }
@@ -26,6 +28,10 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
         ru -> "Этот код удалит аутентификатор и резервные коды, а также завершит все сеансы входа. Введите его только если вы запросили сброс в AITA."
         kk -> "Бұл код аутентификатор мен резервтік кодтарды жойып, барлық кіру сеанстарын аяқтайды. Оны AITA қолданбасында қалпына келтіруді өзіңіз сұратсаңыз ғана енгізіңіз."
         else -> "This code removes your authenticator and recovery codes and ends all sign-in sessions. Enter it only if you requested this reset in AITA."
+    } else if (purpose == "SECURITY_EMAIL_PROOF") when {
+        ru -> "Введите код в настройках AITA, чтобы подтвердить запрошенное изменение."
+        kk -> "Сұратылған өзгерісті растау үшін кодты AITA баптауларына енгізіңіз."
+        else -> "Enter this code in AITA settings to confirm the change you requested."
     } else when { ru -> "Введите код в AITA."; kk -> "Кодты AITA қолданбасына енгізіңіз."; else -> "Enter this code in AITA." }
     val expiry = when {
         ru -> "Действует $ttlMinutes мин. Никому не сообщайте код."
@@ -38,6 +44,6 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
         else -> "Did not request this? You can ignore this email."
     }
     val text = "AITA\n$title\n\n$instruction\n\n$code\n\n$expiry\n$unsolicited"
-    val html = """<!doctype html><html><body style="margin:0;background:#f5f5f2;color:#252830;font-family:Arial,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="440" style="width:100%;max-width:440px;background:#fff;border-radius:20px" cellpadding="0" cellspacing="0"><tr><td style="padding:28px"><div style="font-weight:800;font-size:28px;letter-spacing:-1px">aita<span style="color:#ffba24">.</span></div><h2 style="margin:24px 0 12px;font-size:20px">$title</h2><p style="margin:0;color:#555">$instruction</p><div style="margin:20px 0;padding:18px;background:#fff7e3;border-radius:12px;font-size:34px;font-weight:700;letter-spacing:7px;text-align:center">$code</div><p style="font-size:13px;color:#666">$expiry</p><p style="font-size:12px;color:#888">$unsolicited</p></td></tr></table></td></tr></table></body></html>"""
+    val html = aitaAuthEmailLayout(title, instruction, code, expiry, unsolicited, if (ru) "ru" else if (kk) "kk" else "en")
     return AuthEmailCopy("AITA · $title", html, text)
 }

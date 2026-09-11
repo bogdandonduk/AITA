@@ -651,6 +651,7 @@ internal var userAuthScreenScrollFirstVisibleItemScrollOffset: Int = 0
 @Composable
 fun AppConfiguration.UserAuthScreen() {
     Column(
+        modifier = Modifier.fillMaxSize().imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val authListState = rememberLazyListState(
@@ -672,7 +673,7 @@ fun AppConfiguration.UserAuthScreen() {
             state = authListState,
             contentPadding = PaddingValues(
                 top = if (stateValues.isNarrowScreen) 0.dp else stateValues.screenHeight / 18,
-                bottom = stateValues.screenHeight / 12
+                bottom = 112.dp
             ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

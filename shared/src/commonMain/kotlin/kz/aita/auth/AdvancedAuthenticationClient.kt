@@ -64,6 +64,18 @@ object AitaAdvancedAuthenticationClient {
     suspend fun resetPassword(request: AitaPasswordRecoveryResetRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaPasswordRecoveryResetRequestDataModel>(HttpMethod.Post, "auth/password-recovery/reset", request)
 
+    suspend fun requestLoginEmailFactor(request: AitaLoginEmailFactorRequest) =
+        authRequest<AitaAuthFlowDataModel, AitaLoginEmailFactorRequest>(HttpMethod.Post, "auth/login/email-factor/request", request)
+
+    suspend fun verifyLoginEmailFactor(request: AitaEmailCodeVerifyRequestDataModel) =
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeVerifyRequestDataModel>(HttpMethod.Post, "auth/login/email-factor/verify", request)
+
+    suspend fun requestSecurityEmail(request: AitaSecurityEmailRequest) =
+        authRequest<AitaAuthFlowDataModel, AitaSecurityEmailRequest>(HttpMethod.Post, "auth/security/email-proof/request", request)
+
+    suspend fun updateLoginPolicy(request: AitaLoginPolicyRequest) =
+        authRequest<AitaAuthenticationSettingsDataModel, AitaLoginPolicyRequest>(HttpMethod.Post, "auth/security/login-policy", request)
+
     suspend fun settings() = authRequest<AitaAuthenticationSettingsDataModel, Unit>(HttpMethod.Get, "auth/security/settings")
 
     suspend fun startTotpSetup(request: AitaSensitiveSecurityActionRequestDataModel) =

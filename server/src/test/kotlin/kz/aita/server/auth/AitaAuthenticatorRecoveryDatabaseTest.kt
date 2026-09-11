@@ -6,6 +6,7 @@ import kotlinx.serialization.json.*
 import kz.aita.auth.*
 import kz.aita.server.*
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.Assume.assumeTrue
@@ -38,11 +39,11 @@ class AitaAuthenticatorRecoveryDatabaseTest {
 
     private inner class Fixture(val db: Database, val service: AitaAdvancedAuthService) {
         fun <T> sql(block: Transaction.() -> T): T = transaction(db = db) { maxAttempts = 1; block() }
-        fun user(phone: String = mainPhone, alias: Boolean = false, enrolled: Boolean = false, required: Boolean = true): UUID = sql {
+        fun user(phone: String = mainPhone, alias: Boolean = false, enrolled: Boolean = false, required: Boolean = true, mail: String = mainEmail): UUID = sql {
             val userId = UUID.randomUUID()
             Users.insert {
                 it[id] = userId; it[publicId] = UUID.randomUUID().toString().take(12)
-                it[phoneNumber] = phone; it[email] = mainEmail; it[firstName] = "Test"; it[lastName] = "Account"
+                it[phoneNumber] = phone; it[email] = mail; it[firstName] = "Test"; it[lastName] = "Account"
                 it[countryLocale] = "kz"; it[passwordHash] = Pw.hash(password.toCharArray())
             }
             if (alias || enrolled) {
@@ -64,6 +65,27 @@ class AitaAuthenticatorRecoveryDatabaseTest {
         }
         fun code(flowId: String): String = Regex("(?<![0-9])[0-9]{6}(?![0-9])")
             .find(requireNotNull(email(flowId)["text"]).jsonPrimitive.content)?.value ?: error("No OTP in email fixture")
+        suspend fun emailPolicy(id: UUID) {
+            service.settings(id) // Materialize a missing security profile.
+            sql { AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq id }) { it[emailRequiredForLogin] = true; it[totpRequiredForLogin] = false } }
+        }
+        fun addExtra(id: UUID, address: String = extraEmail) = sql {
+            AuthLoginEmails.insert {
+                it[emailNormalized] = address; it[userId] = id; it[isPrimary] = false
+                it[verifiedAtMillis] = System.currentTimeMillis(); it[createdAtMillis] = System.currentTimeMillis()
+            }
+        }
+        suspend fun proof(id: UUID, action: AitaSecurityEmailAction, target: String): AitaSecurityEmailProof {
+            val flow = assertNotNull(service.requestSecurityEmail(id, AitaSecurityEmailRequest(action, target, password,
+                service.settings(id).securityRevision), device.getValue("ip")))
+            return AitaSecurityEmailProof(flow.flowId, code(flow.flowId))
+        }
+        suspend fun emailLogin(destination: AitaEmailDestination = AitaEmailDestination.MAIN): AitaAuthFlowDataModel {
+            val parent = assertNotNull(service.passwordLogin(AitaPasswordLoginRequestDataModel(mainPhone, password), device))
+            assertEquals(AitaAuthNextStep.EMAIL_DESTINATION, parent.nextStep)
+            assertNull(parent.tokenPair)
+            return assertNotNull(service.requestLoginEmailFactor(AitaLoginEmailFactorRequest(parent.flowId, destination), device.getValue("ip")))
+        }
         suspend fun recovery(): AitaAuthFlowDataModel = service.requestAuthenticatorRecovery(
             AitaAuthenticatorRecoveryRequestDataModel(mainPhone, password), device.getValue("ip"))
     }
@@ -97,7 +119,8 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                     listOf("V93__email_password_recovery_and_authenticator_security.sql",
                         "V94__authenticated_phone_login_alias_challenges.sql", "V95__authentication_email_delivery_snapshots.sql",
                         "V96__verified_additional_login_emails.sql", "V97__authenticator_login_requirement.sql",
-                        "V98__authenticator_sign_in_and_email_recovery.sql").forEach { name ->
+                        "V98__authenticator_sign_in_and_email_recovery.sql",
+                        "V99__email_second_factor_and_single_extra_email.sql").forEach { name ->
                         val sql = requireNotNull(javaClass.getResourceAsStream("/db/migration/$name")).bufferedReader().use { it.readText() }
                         exec(sql)
                     }
@@ -251,6 +274,189 @@ class AitaAuthenticatorRecoveryDatabaseTest {
     private fun hmac(context: String, text: String): String = Mac.getInstance("HmacSHA256").run {
         init(SecretKeySpec(config.codePepper, "HmacSHA256")); doFinal("$context\u0000$text".toByteArray()).joinToString("") { "%02x".format(it) }
     }
+    @Test fun passwordAndMainEmailCompleteOnce() = fixture {
+        val id = user(); emailPolicy(id)
+        val flow = emailLogin()
+        val request = AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId))
+        assertNotNull(service.verifyLoginEmailFactor(request, device)?.tokenPair)
+        assertNull(service.verifyLoginEmailFactor(request, device))
+    }
+
+    @Test fun passwordAndExtraEmailUseThatVerifiedDestination() = fixture {
+        val id = user(); emailPolicy(id); addExtra(id)
+        val flow = emailLogin(AitaEmailDestination.EXTRA)
+        assertEquals(extraEmail, email(flow.flowId)["to"]!!.jsonArray.single().jsonPrimitive.content)
+        assertNotNull(service.verifyLoginEmailFactor(AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), device)?.tokenPair)
+    }
+
+    @Test fun anonymousPhoneChoiceHasNoAccountSpecificDisclosure() = fixture {
+        val id = user(); addExtra(id)
+        val flow = service.requestEmailCode(mainPhone, "PASSWORDLESS_LOGIN", "en", "192.0.2.7", AitaEmailDestination.EXTRA)
+        assertTrue(flow.maskedDestination.isBlank()); assertTrue(flow.emailDestinations.isEmpty())
+        assertEquals(extraEmail, email(flow.flowId)["to"]!!.jsonArray.single().jsonPrimitive.content)
+    }
+
+    @Test fun missingExtraDoesNotSendToMainOrRevealItsAbsence() = fixture {
+        user()
+        val flow = service.requestEmailCode(mainPhone, "PASSWORDLESS_LOGIN", "en", "192.0.2.7", AitaEmailDestination.EXTRA)
+        assertEquals(AitaAuthNextStep.EMAIL_CODE, flow.nextStep)
+        assertTrue(flow.maskedDestination.isBlank()); assertTrue(flow.emailDestinations.isEmpty())
+        assertEquals(0L, sql { AuthEmailOutbox.selectAll().count() })
+    }
+
+    @Test fun emailFirstStillRequiresPasswordWhenEmailPolicyIsOn() = fixture {
+        val id = user(); emailPolicy(id)
+        val first = service.requestEmailCode(mainPhone, "PASSWORDLESS_LOGIN", "en", "192.0.2.7")
+        val next = assertNotNull(service.verifyEmailCode(AitaEmailCodeVerifyRequestDataModel(first.flowId, code(first.flowId)), "PASSWORDLESS_LOGIN", device))
+        assertEquals(AitaAuthNextStep.PASSWORD_CONFIRMATION, next.nextStep); assertNull(next.tokenPair)
+        assertNull(service.completeAuthenticatorPassword(AitaAuthenticatorPasswordRequestDataModel(next.flowId, "wrong"), device))
+        assertNotNull(service.completeAuthenticatorPassword(AitaAuthenticatorPasswordRequestDataModel(next.flowId, password), device)?.tokenPair)
+    }
+
+    @Test fun emailChallengeCannotSkipMandatoryAuthenticatorOrBeConsumedByWrongEndpoint() = fixture {
+        user(enrolled = true)
+        val first = service.requestEmailCode(mainPhone, "PASSWORDLESS_LOGIN", "en", "192.0.2.7")
+        val next = assertNotNull(service.verifyEmailCode(AitaEmailCodeVerifyRequestDataModel(first.flowId, code(first.flowId)), "PASSWORDLESS_LOGIN", device))
+        assertEquals(AitaAuthNextStep.TOTP, next.nextStep)
+        assertNull(service.completeAuthenticatorPassword(AitaAuthenticatorPasswordRequestDataModel(next.flowId, password), device))
+        assertNotNull(service.completeTotpLogin(AitaTotpLoginRequestDataModel(next.flowId, totp()), device)?.tokenPair)
+    }
+
+    @Test fun changingPolicyRequiresBoundMainEmailProof() = fixture {
+        val id = user(); emailPolicy(id)
+        assertNull(service.updateLoginPolicy(id, AitaLoginPolicyRequest(AitaLoginSecondFactor.NONE, password, expectedSecurityRevision = 1)))
+        val confirmed = proof(id, AitaSecurityEmailAction.LOGIN_POLICY, "NONE")
+        assertFalse(assertNotNull(service.updateLoginPolicy(id, AitaLoginPolicyRequest(AitaLoginSecondFactor.NONE, password,
+            expectedSecurityRevision = 1, emailProof = confirmed))).emailRequiredForLogin)
+        assertNull(service.updateLoginPolicy(id, AitaLoginPolicyRequest(AitaLoginSecondFactor.EMAIL, password,
+            expectedSecurityRevision = 2, emailProof = confirmed)))
+    }
+
+    @Test fun securityProofCannotAuthorizeAnotherActionOrTarget() = fixture {
+        val id = user(); emailPolicy(id)
+        val confirmed = proof(id, AitaSecurityEmailAction.LOGIN_POLICY, "EMAIL")
+        assertNull(service.updateLoginPolicy(id, AitaLoginPolicyRequest(AitaLoginSecondFactor.NONE, password,
+            expectedSecurityRevision = 1, emailProof = confirmed)))
+        assertNull(service.requestEmailAlias(id, AitaEmailAliasRequestDataModel(extraEmail, password, emailProof = confirmed), "192.0.2.8"))
+    }
+
+    @Test fun addingExtraEmailChecksMainAndExtraNamespaces() = fixture {
+        val first = user(); addExtra(first)
+        val other = user(phone = "+77771234568", mail = "other@example.test")
+        for (address in listOf(mainEmail, extraEmail)) {
+            val failure = assertFailsWith<AitaAuthContactConflictException> {
+                service.requestEmailAlias(other, AitaEmailAliasRequestDataModel(address, password), "192.0.2.8")
+            }
+            assertEquals(AuthContactConflict.EMAIL, failure.conflict)
+        }
+    }
+
+    @Test fun addingExtraPhoneChecksMainAndExtraNamespaces() = fixture {
+        user(alias = true)
+        val other = user(phone = "+77771234568", mail = "other@example.test")
+        for (phone in listOf(mainPhone, extraPhone)) {
+            val failure = assertFailsWith<AitaAuthContactConflictException> {
+                service.requestPhoneAlias(other, AitaPhoneAliasRequestDataModel(AitaPhoneAliasAction.ADD_OR_REPLACE, phone, password), "192.0.2.8")
+            }
+            assertEquals(AuthContactConflict.PHONE, failure.conflict)
+        }
+    }
+
+    @Test fun claimedEmailInTransitReportsConflictWithoutChangingOwner() = fixture {
+        val first = user()
+        val flow = assertNotNull(service.requestEmailAlias(first, AitaEmailAliasRequestDataModel(extraEmail, password), "192.0.2.8"))
+        val other = user(phone = "+77771234568", mail = extraEmail)
+        assertEquals(AuthContactConflict.EMAIL, assertFailsWith<AitaAuthContactConflictException> {
+            service.confirmEmailAlias(first, AitaEmailAliasConfirmRequestDataModel(flow.flowId, code(flow.flowId)))
+        }.conflict)
+        assertEquals(other, sql { AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq extraEmail }.single()[AuthLoginEmails.userId] })
+    }
+
+    @Test fun claimedPhoneInTransitReportsConflictWithoutChangingAlias() = fixture {
+        val first = user()
+        val flow = assertNotNull(service.requestPhoneAlias(first, AitaPhoneAliasRequestDataModel(AitaPhoneAliasAction.ADD_OR_REPLACE, extraPhone, password), "192.0.2.8"))
+        user(phone = extraPhone, mail = "other@example.test")
+        assertEquals(AuthContactConflict.PHONE, assertFailsWith<AitaAuthContactConflictException> {
+            service.confirmPhoneAlias(first, AitaPhoneAliasConfirmRequestDataModel(flow.flowId, code(flow.flowId)))
+        }.conflict)
+        assertNull(service.settings(first).phoneLoginAlias)
+    }
+
+    @Test fun databaseRejectsSecondExtraEvenWithoutServiceCode() = fixture {
+        val first = user(); addExtra(first)
+        assertEquals("23505", assertFailsWith<ExposedSQLException> { addExtra(first, "second@example.test") }.sqlState)
+        assertEquals(listOf(extraEmail), service.settings(first).additionalLoginEmails)
+    }
+
+    @Test fun databasePrimaryRegistrationCannotStealAnExtraEmail() = fixture {
+        val first = user(); addExtra(first)
+        assertEquals("23505", assertFailsWith<ExposedSQLException> { user(phone = "+77771234568", mail = extraEmail) }.sqlState)
+        assertEquals(first, sql { AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq extraEmail }.single()[AuthLoginEmails.userId] })
+    }
+
+    @Test fun securityProofCannotBeUsedByAnotherAccount() = fixture {
+        val first = user(); emailPolicy(first)
+        val other = user(phone = "+77771234568", mail = "other@example.test"); emailPolicy(other)
+        val confirmed = proof(first, AitaSecurityEmailAction.LOGIN_POLICY, "NONE")
+        assertNull(service.updateLoginPolicy(other, AitaLoginPolicyRequest(AitaLoginSecondFactor.NONE, password,
+            expectedSecurityRevision = 1, emailProof = confirmed)))
+    }
+
+    @Test fun securityRevisionChangeInvalidatesEmailLogin() = fixture {
+        val first = user(); emailPolicy(first)
+        val flow = emailLogin()
+        sql { AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq first }) { it[securityRevision] = 2L } }
+        assertNull(service.verifyLoginEmailFactor(AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), device))
+    }
+
+    @Test fun twoAccountsCannotConcurrentlyConfirmTheSameExtraEmail() = fixture {
+        val first = user()
+        val other = user(phone = "+77771234568", mail = "other@example.test")
+        val a = assertNotNull(service.requestEmailAlias(first, AitaEmailAliasRequestDataModel(extraEmail, password), "192.0.2.8"))
+        val b = assertNotNull(service.requestEmailAlias(other, AitaEmailAliasRequestDataModel(extraEmail, password), "192.0.2.9"))
+        val requests = listOf(first to AitaEmailAliasConfirmRequestDataModel(a.flowId, code(a.flowId)),
+            other to AitaEmailAliasConfirmRequestDataModel(b.flowId, code(b.flowId)))
+        val start = CompletableDeferred<Unit>()
+        val results = coroutineScope {
+            val jobs = requests.map { (id, request) -> async(Dispatchers.IO) {
+                start.await()
+                try { service.confirmEmailAlias(id, request) != null }
+                catch (conflict: AitaAuthContactConflictException) { assertEquals(AuthContactConflict.EMAIL, conflict.conflict); false }
+            } }
+            start.complete(Unit)
+            withTimeout(15_000L) { jobs.awaitAll() }
+        }
+        assertEquals(1, results.count { it })
+        assertEquals(1L, sql { AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq extraEmail }.count() })
+    }
+
+    @Test fun emailFactorDoesNotAllowAnUnverifiedMainEmailReplacement() = fixture {
+        val id = user(); emailPolicy(id)
+        val request = profileRequest(id, "typo@example.test")
+        assertEquals(AuthContactConflict.MAIN_EMAIL_VERIFICATION, assertFailsWith<AitaAuthContactConflictException> {
+            sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), request) }
+        }.conflict)
+        assertEquals(mainEmail, service.settings(id).email)
+    }
+
+    @Test fun verifiedExtraCanBecomeMainAfterCurrentMainEmailConfirmation() = fixture {
+        val id = user(); emailPolicy(id); addExtra(id)
+        val confirmed = proof(id, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(mainPhone, extraEmail, true))
+        sql {
+            assertTrue(service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), profileRequest(id, extraEmail, confirmed)))
+            Users.update({ Users.id eq id }) { it[email] = extraEmail }
+        }
+        val settings = service.settings(id)
+        assertEquals(extraEmail, settings.email)
+        assertTrue(settings.emailRequiredForLogin)
+        assertTrue(settings.additionalLoginEmails.isEmpty())
+    }
+
+    private fun profileRequest(id: UUID, email: String, proof: AitaSecurityEmailProof? = null) = kz.aita.UserAccountUpdateDataModel(
+        account = kz.aita.UserAccountDataModel(id = id.toString(), phoneNumber = mainPhone, email = email,
+            firstName = "Test", lastName = "Account", countryLocale = "kz", workerAccountIds = null, supplierAccountIds = null,
+            createdAt = 0L, isActive = true), password = password, newPassword = null, emailProof = proof)
+
     private fun encrypt(context: String, text: String): String {
         val iv = ByteArray(12).also(java.security.SecureRandom()::nextBytes)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

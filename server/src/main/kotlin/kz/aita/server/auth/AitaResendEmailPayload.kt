@@ -16,12 +16,19 @@ internal fun aitaResendEmailRequestJson(
     subject: String,
     html: String,
     replyTo: String? = null,
-    text: String? = null
+    text: String? = null,
+    inlineImages: List<AitaInlineEmailImage> = emptyList()
 ): String = buildJsonObject {
     put("from", from)
     put("to", JsonArray(listOf(JsonPrimitive(to))))
     put("subject", subject)
     put("html", html)
+    if (inlineImages.isNotEmpty()) put("attachments", JsonArray(inlineImages.map { image -> buildJsonObject {
+        put("filename", image.filename)
+        put("content_type", "image/png")
+        put("content_id", image.contentId)
+        put("content", image.base64)
+    } }))
     text?.takeIf { it.isNotBlank() }?.let { put("text", it) }
     replyTo?.trim()?.takeIf { it.isNotEmpty() }?.let { put("reply_to", it) }
 }.toString()

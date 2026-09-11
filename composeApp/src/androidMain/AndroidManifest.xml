@@ -41,7 +41,7 @@
                 android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/aita_receipt_file_paths" />
         </provider>
-        <activity
+        <activity android:windowSoftInputMode="adjustResize"
                 android:exported="true"
                 android:name=".android.MainActivity"
                 android:launchMode="singleTop"

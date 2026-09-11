@@ -39319,19 +39319,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Choose Phone or Email, then Password or Sign-in code. Code sign-in offers Email code and Authenticator. An enrolled authenticator or unused recovery code can sign you in directly when login 2FA is off; when it is on, confirm your password too."
+          "value": "Choose Phone or Email, then Password or Sign-in code. Code sign-in offers Email code and Authenticator. When two-factor sign-in is required, complete the configured checks; an email code alone cannot replace a password plus a second factor."
         },
         {
           "language": "en",
-          "value": "Choose Phone or Email, then Password or Sign-in code. Code sign-in offers Email code and Authenticator. An enrolled authenticator or unused recovery code can sign you in directly when login 2FA is off; when it is on, confirm your password too."
+          "value": "Choose Phone or Email, then Password or Sign-in code. Code sign-in offers Email code and Authenticator. When two-factor sign-in is required, complete the configured checks; an email code alone cannot replace a password plus a second factor."
         },
         {
           "language": "ru",
-          "value": "Выберите телефон или email, затем пароль или вход по коду. Для кода доступны email и аутентификатор. Подключённый аутентификатор или неиспользованный резервный код позволяет войти без пароля, если 2FA при входе отключена. При включённой 2FA подтвердите также пароль."
+          "value": "Выберите телефон или email, затем пароль или вход по коду. Доступны код из письма и аутентификатор. При включённом двухфакторном входе пройдите выбранные проверки: один email-код не заменяет пароль и второй фактор."
         },
         {
           "language": "kk",
-          "value": "Телефон не email, содан кейін құпия сөз не кодпен кіруді таңдаңыз. Кодпен кіруде email және аутентификатор бар. Кіруде 2FA өшірулі болса, қосылған аутентификатор не қолданылмаған резервтік код жеткілікті. 2FA қосулы болса, құпия сөзді де растаңыз."
+          "value": "Телефон не email, содан кейін құпия сөз не кодпен кіруді таңдаңыз. Email коды және аутентификатор қолжетімді. Екі факторлы кіру қосылса, таңдалған тексерулерден өтіңіз: бір email коды құпия сөз бен екінші факторды алмастырмайды."
         }
       ]
     },
@@ -39382,11 +39382,11 @@
       "values": [
         {
           "language": "main",
-          "value": "What are extra phone numbers and emails?"
+          "value": "What are the extra phone number and email?"
         },
         {
           "language": "en",
-          "value": "What are extra phone numbers and emails?"
+          "value": "What are the extra phone number and email?"
         },
         {
           "language": "ru",
@@ -39403,19 +39403,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Extra contacts are additional sign-in identifiers, not replacements for your main contacts. They work only after confirmation. Adding an extra phone uses email confirmation; it does not verify ownership of a SIM or enable SMS delivery."
+          "value": "You can add one extra phone number and one verified extra email for sign-in without replacing your main contacts. A contact used by another account cannot be added. Phone changes are confirmed through your main email; this does not verify a SIM or enable SMS."
         },
         {
           "language": "en",
-          "value": "Extra contacts are additional sign-in identifiers, not replacements for your main contacts. They work only after confirmation. Adding an extra phone uses email confirmation; it does not verify ownership of a SIM or enable SMS delivery."
+          "value": "You can add one extra phone number and one verified extra email for sign-in without replacing your main contacts. A contact used by another account cannot be added. Phone changes are confirmed through your main email; this does not verify a SIM or enable SMS."
         },
         {
           "language": "ru",
-          "value": "Это дополнительные способы указать аккаунт при входе, а не замена основных контактов. Они работают после подтверждения. Дополнительный телефон подтверждается через email: это не проверка SIM-карты и не подключение SMS."
+          "value": "Можно добавить один дополнительный телефон и один подтверждённый email для входа, не заменяя основные контакты. Контакт другого аккаунта добавить нельзя. Изменение телефона подтверждается через основной email: это не проверка SIM-карты и не подключение SMS."
         },
         {
           "language": "kk",
-          "value": "Бұлар негізгі контактілерді ауыстырмайтын қосымша кіру идентификаторлары. Олар расталғаннан кейін жұмыс істейді. Қосымша телефон email арқылы расталады: бұл SIM-карта иесін тексеру немесе SMS қосуды білдірмейді."
+          "value": "Негізгі контактілерді ауыстырмай, кіру үшін бір қосымша телефон мен бір расталған email қосуға болады. Басқа аккаунт қолданатын контакт қосылмайды. Телефон өзгерісі негізгі email арқылы расталады; бұл SIM тексеруі немесе SMS қосу емес."
         }
       ]
     },
@@ -39445,19 +39445,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Both the main phone and a confirmed extra phone send an email code to the account’s main email. Adding an extra phone is not required. A verified extra email used as the login receives its own code. Check your main contacts in Sign in and security."
+          "value": "Enter your main or confirmed extra phone, then choose Main email or Extra email for that sign-in. Before password verification, AITA does not reveal stored addresses or whether an extra exists. After a correct password, available addresses are masked. Entering an email directly sends the code there. Recovery and security changes still use the main email."
         },
         {
           "language": "en",
-          "value": "Both the main phone and a confirmed extra phone send an email code to the account’s main email. Adding an extra phone is not required. A verified extra email used as the login receives its own code. Check your main contacts in Sign in and security."
+          "value": "Enter your main or confirmed extra phone, then choose Main email or Extra email for that sign-in. Before password verification, AITA does not reveal stored addresses or whether an extra exists. After a correct password, available addresses are masked. Entering an email directly sends the code there. Recovery and security changes still use the main email."
         },
         {
           "language": "ru",
-          "value": "При входе по основному или подтверждённому дополнительному телефону email-код приходит на основной email аккаунта. Добавлять дополнительный телефон не нужно. При входе по подтверждённому дополнительному email код приходит на него. Основные контакты указаны в разделе «Вход и безопасность»."
+          "value": "Введите основной или подтверждённый дополнительный телефон и выберите основной либо дополнительный email для этого входа. До проверки пароля AITA не раскрывает адреса и наличие дополнительного email. После верного пароля доступные адреса показаны с маской. При вводе email напрямую код приходит на него. Восстановление и изменения безопасности используют основной email."
         },
         {
           "language": "kk",
-          "value": "Негізгі не расталған қосымша телефонмен кіргенде email коды аккаунттың негізгі email мекенжайына жіберіледі. Қосымша телефон қосу міндетті емес. Расталған қосымша email арқылы кірсеңіз, код соған келеді. Негізгі контактілер «Кіру және қауіпсіздік» бөлімінде көрсетілген."
+          "value": "Негізгі не расталған қосымша телефонды енгізіп, осы кіру үшін негізгі немесе қосымша email таңдаңыз. Құпия сөз тексерілгенше AITA мекенжайларды және қосымша email бар-жоғын ашпайды. Дұрыс құпия сөзден кейін қолжетімді мекенжайлар бүркемеленеді. Email тікелей енгізілсе, код соған келеді. Қалпына келтіру мен қауіпсіздік өзгерістері негізгі email-ді қолданады."
         }
       ]
     },
@@ -39529,19 +39529,19 @@
       "values": [
         {
           "language": "main",
-          "value": "Yes. In Sign in and security, keep the authenticator connected and turn off “Require 2FA at sign-in”. Changing this setting requires your password and an authenticator or recovery code. Sensitive security changes can still require the second factor."
+          "value": "Yes. Keep the authenticator connected and turn off Require 2FA at sign-in, or select Email code as the required method. Protecting security changes still requires your password and current protection. Enabling email verification also confirms the main mailbox. Email is less independent than an authenticator, especially when it is also used to reset your password."
         },
         {
           "language": "en",
-          "value": "Yes. In Sign in and security, keep the authenticator connected and turn off “Require 2FA at sign-in”. Changing this setting requires your password and an authenticator or recovery code. Sensitive security changes can still require the second factor."
+          "value": "Yes. Keep the authenticator connected and turn off Require 2FA at sign-in, or select Email code as the required method. Protecting security changes still requires your password and current protection. Enabling email verification also confirms the main mailbox. Email is less independent than an authenticator, especially when it is also used to reset your password."
         },
         {
           "language": "ru",
-          "value": "Да. В разделе «Вход и безопасность» оставьте аутентификатор подключённым и отключите требование 2FA при входе. Для изменения нужны пароль и код аутентификатора либо резервный код. Важные изменения безопасности по-прежнему могут требовать второй фактор."
+          "value": "Да. Оставьте аутентификатор подключённым и выключите «Требовать 2FA при входе» либо выберите код из письма. Для изменений безопасности нужны пароль и текущая защита. Включение email-проверки также подтверждает основной почтовый ящик. Email менее независим, чем аутентификатор, особенно если используется для восстановления пароля."
         },
         {
           "language": "kk",
-          "value": "Иә. «Кіру және қауіпсіздік» бөлімінде аутентификаторды қосулы қалдырып, кіруде 2FA талабын өшіріңіз. Өзгерту үшін құпия сөз және аутентификатор не резервтік код керек. Маңызды қауіпсіздік өзгерістері екінші факторды әлі де талап етуі мүмкін."
+          "value": "Иә. Аутентификаторды қосулы қалдырып, «Кіру кезінде 2FA талап ету» параметрін өшіріңіз немесе email кодын таңдаңыз. Қауіпсіздік өзгерістері құпия сөз бен ағымдағы қорғанысты талап етеді. Email тексеруін қосқанда негізгі пошта да расталады. Email, әсіресе құпия сөзді қалпына келтіруге қолданылса, аутентификаторға қарағанда тәуелсіздігі төмен."
         }
       ]
     },

@@ -298,8 +298,8 @@ fun AppConfiguration.MenuSecurityScreen() {
             ),
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .weight(1f),
-            contentPadding = PaddingValues(stateValues.marginTextFieldGroup),
+                .weight(1f).imePadding(),
+            contentPadding = PaddingValues(start = stateValues.marginTextFieldGroup, end = stateValues.marginTextFieldGroup, top = stateValues.marginTextFieldGroup, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup)
         ) {
             if (selectedSecurityTab == "signin") {

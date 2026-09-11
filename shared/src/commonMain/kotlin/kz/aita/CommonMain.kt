@@ -21962,7 +21962,9 @@ data class UserAccountDataModel(
 class UserAccountUpdateDataModel(
     val account: UserAccountDataModel,
     val password: String,
-    val newPassword: String?
+    val newPassword: String?,
+    val secondFactorCode: String = "",
+    val emailProof: kz.aita.auth.AitaSecurityEmailProof? = null
 )
 
 @kotlinx.serialization.Serializable

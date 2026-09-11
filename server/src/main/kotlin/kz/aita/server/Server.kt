@@ -18113,6 +18113,16 @@ fun Application.module() {
   }
 
   install(StatusPages) {
+    exception<AitaAuthContactConflictException> { call, cause ->
+      val message = when (cause.conflict) {
+        AuthContactConflict.PHONE -> simpleMessage(main = "This phone number is already in use", en = "This phone number is already in use", ru = "Этот номер телефона уже используется", kk = "Бұл телефон нөмірі қолданылып жатыр")
+        AuthContactConflict.EMAIL -> simpleMessage(main = "This email is already in use", en = "This email is already in use", ru = "Этот email уже используется", kk = "Бұл email қолданылып жатыр")
+        AuthContactConflict.EXTRA_LIMIT -> simpleMessage(main = "Only one extra email is allowed. Remove the existing one first.", en = "Only one extra email is allowed. Remove the existing one first.", ru = "Можно добавить один дополнительный email. Сначала удалите прежний.", kk = "Бір қосымша email қосуға болады. Алдымен бұрынғысын жойыңыз.")
+        AuthContactConflict.MAIN_EMAIL_VERIFICATION -> simpleMessage(main = "Verify the new address as your extra email before making it the main email.", en = "Verify the new address as your extra email before making it the main email.", ru = "Сначала подтвердите новый адрес как дополнительный email, затем сделайте его основным.", kk = "Жаңа мекенжайды негізгі email етпес бұрын қосымша email ретінде растаңыз.")
+      }
+      call.safeGenericResponseNoPayload(status = HttpStatusCode.Conflict, message = message)
+    }
+
     exception<AitaAuthRateLimitedException> { call, cause ->
       call.response.headers.append(HttpHeaders.RetryAfter, cause.retryAfterSeconds.coerceIn(1L, 3600L).toString())
       call.safeGenericResponseNoPayload(
@@ -18860,7 +18870,16 @@ fun Application.module() {
             )
           }
 
-          val tokenPair: TokenPair = tokenService.newPair(user[Users.id], metaFrom(call, body.deviceInfo))
+          // Recheck credentials AND policy while the session issuer holds the account lock.
+          // A simultaneous policy change must not let the legacy endpoint bypass the new factor.
+          val tokenPair = tokenService.newPairAfterVerification(user[Users.id], metaFrom(call, body.deviceInfo)) {
+            val current = Users.selectAll().where { Users.id eq user[Users.id] }.singleOrNull()
+            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq user[Users.id] }.singleOrNull()
+            current != null && current[Users.isActive] && Pw.verify(body.password.toCharArray(), current[Users.passwordHash]) &&
+              (profile == null || kz.aita.auth.aitaLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
+                profile[AuthSecurityProfiles.totpRequiredForLogin], profile[AuthSecurityProfiles.emailRequiredForLogin]) == kz.aita.auth.AitaLoginSecondFactor.NONE)
+          } ?: return@post call.genericResponseNoPayload(HttpStatusCode(428, "Precondition Required"),
+            message = simpleMessage(main = "Sign in again using the updated AITA login screen.", ru = "Войдите заново через обновлённый экран входа AITA.", kk = "Жаңартылған AITA кіру экраны арқылы қайта кіріңіз."))
 
           call.genericTokenPairResponse(HttpStatusCode.OK, tokenPair)
         } catch (throwable: Throwable) {
@@ -24387,7 +24406,6 @@ fun Application.module() {
           val isActive = newAccount.isActive
 
           val updated = newSuspendedTransaction(aitaServerIoContext) {
-            lockPhoneLoginIdentityInside(phoneNumber)
             val existingUser =
               Users
                 .selectAll()
@@ -24401,16 +24419,13 @@ fun Application.module() {
             if (!Pw.verify(body.password.toCharArray(), existingUser[Users.passwordHash]))
               return@newSuspendedTransaction "password_mismatch"
 
+            lockPhoneLoginIdentityInside(phoneNumber)
             val phoneNumberClash = phoneLoginIdentityHasOtherOwnerInside(phoneNumber, uuid)
 
 
-            val emailClash = Users
-              .select(Users.id, Users.email)
-              .where {
-                (Users.email eq email) and (Users.id neq uuid)
-              }
-              .empty()
-              .not()
+            val emailClash = AuthLoginEmails.selectAll().where {
+              (AuthLoginEmails.emailNormalized eq email) and (AuthLoginEmails.userId neq uuid)
+            }.limit(1).singleOrNull() != null
 
             if (phoneNumberClash && emailClash)
               return@newSuspendedTransaction "phone_number_and_email_clash"
@@ -24418,6 +24433,9 @@ fun Application.module() {
               return@newSuspendedTransaction "phone_number_clash"
             else if (emailClash)
               return@newSuspendedTransaction "email_clash"
+
+            if (!verifyAdvancedAuthProfileChangeInside(existingUser, body, tokenService, call.application))
+              return@newSuspendedTransaction "security_confirmation"
 
             val newHash = cleanNewPassword
               ?.takeIf { !Pw.verify(it.toCharArray(), existingUser[Users.passwordHash]) }
@@ -24427,6 +24445,12 @@ fun Application.module() {
             val appThemeId = normalizeAppThemePreference(newAccount.appThemeId)
             val appSizeModeId = normalizeAppSizeModePreference(newAccount.appSizeModeId)
 
+            if (newHash != null || email != existingUser[Users.email].trim().lowercase() ||
+                phoneNumber != existingUser[Users.phoneNumber] || isActive != existingUser[Users.isActive]) {
+              AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq uuid }) {
+                it[totpPendingSecretCiphertext] = null; it[totpPendingSetupId] = null; it[totpPendingExpiresAtMillis] = null
+              }
+            }
             Users.update({ Users.id eq uuid }) {
               // Keep account update no-op safe too: unchanged profile saves should still
               // return the current account instead of creating an empty SQL UPDATE.
@@ -24466,6 +24490,9 @@ fun Application.module() {
               )
             }
 
+            "security_confirmation" -> call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+              message = simpleMessage(main = "Confirm this change with your current security method.",
+                ru = "Подтвердите изменение текущим способом защиты.", kk = "Өзгерісті ағымдағы қауіпсіздік тәсілімен растаңыз."))
             "unauthorized", "password_mismatch" -> call.respondAitaUnauthorized()
 
             "phone_number_and_email_clash" -> call.genericResponseNoPayload(

@@ -74,4 +74,18 @@ class AitaResendEmailPayloadTest {
         assertEquals(text, request.getValue("text").jsonPrimitive.content)
         assertFalse("text" in Json.parseToJsonElement(body()).jsonObject)
     }
+    @Test
+    fun inlineLogoHasMatchingCidAndImmutableContent() {
+        val copy = aitaAuthEmailCopy("PASSWORDLESS_LOGIN", "ru", "001234", 10)
+        val request = Json.parseToJsonElement(aitaResendEmailRequestJson(
+            "AITA <security@example.com>", "recipient@example.com", copy.subject, copy.html,
+            text = copy.text, inlineImages = copy.inlineImages)).jsonObject
+        val logo = request.getValue("attachments").jsonArray.single().jsonObject
+        assertEquals("aita-logo", logo.getValue("content_id").jsonPrimitive.content)
+        assertEquals("aita-logo.png", logo.getValue("filename").jsonPrimitive.content)
+        assertEquals("image/png", logo.getValue("content_type").jsonPrimitive.content)
+        assertEquals(copy.inlineImages.single().base64, logo.getValue("content").jsonPrimitive.content)
+        assertFalse("attachments" in Json.parseToJsonElement(body()).jsonObject)
+    }
+
 }

@@ -56,7 +56,8 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
     onResend: () -> Unit,
     resendEnabled: Boolean = true,
     confirmText: String = authUiText("Continue", "Продолжить", "Жалғастыру"),
-    identity: String = "auth-email-code"
+    identity: String = "auth-email-code",
+    trailingAction: (@Composable () -> Unit)? = null
 ) {
     val countdown = rememberAuthFlowCountdown(flow)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -69,9 +70,12 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
             leadingIconPath = stateValues.drawablePathIconEmail,
             onTransformValue = { aitaAuthCodeDigits(it).take(6) }
         )
-        actionButton(modifier = Modifier.fillMaxWidth(), text = confirmText,
-            enabled = !busy && !countdown.expired && value.length == 6 && !flow?.flowId.isNullOrBlank(),
-            loading = busy, autoLoading = false, onClick = onSubmit)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            actionButton(modifier = Modifier.weight(1f), text = confirmText,
+                enabled = !busy && !countdown.expired && value.length == 6 && !flow?.flowId.isNullOrBlank(),
+                loading = busy, autoLoading = false, onClick = onSubmit)
+            trailingAction?.invoke()
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
             Text(

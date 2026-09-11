@@ -11,6 +11,8 @@ enum class AitaAuthIdentifierKind { EMAIL, PHONE }
 enum class AitaAuthNextStep {
     AUTHENTICATED,
     EMAIL_CODE,
+    EMAIL_DESTINATION,
+    EMAIL_SECOND_FACTOR,
     TOTP,
     PASSWORD_RESET,
     PASSWORD_CONFIRMATION,
@@ -50,7 +52,8 @@ data class AitaAuthCapabilitiesDataModel(
     val additionalEmailLoginEnabled: Boolean = false,
     val authenticatorLoginPolicyEnabled: Boolean = false,
     val authenticatorCodeLoginEnabled: Boolean = false,
-    val authenticatorEmailRecoveryEnabled: Boolean = false
+    val authenticatorEmailRecoveryEnabled: Boolean = false,
+    val emailSecondFactorEnabled: Boolean = false
 )
 
 @Serializable
@@ -65,7 +68,10 @@ data class AitaAuthFlowDataModel(
     val recoveryCodes: List<String> = emptyList(),
     val serverTimeMillis: Long = 0L,
     // Only disclosed after successful recovery proof; never sent in anonymous challenge responses.
-    val recoveredUserId: String = ""
+    val recoveredUserId: String = "",
+    val emailDestinations: List<AitaEmailDestinationOption> = emptyList(),
+    val parentFlowId: String = "",
+    val selectedEmailDestination: AitaEmailDestination = AitaEmailDestination.MAIN
 )
 
 @Serializable
@@ -79,7 +85,8 @@ data class AitaPasswordLoginRequestDataModel(
 data class AitaEmailCodeRequestDataModel(
     val identifier: String,
     val locale: String = "en",
-    val deviceInfo: ClientDeviceInfoDataModel? = null
+    val deviceInfo: ClientDeviceInfoDataModel? = null,
+    val destination: AitaEmailDestination = AitaEmailDestination.MAIN
 )
 
 @Serializable
@@ -144,7 +151,8 @@ data class AitaAuthenticationSettingsDataModel(
     val additionalLoginEmails: List<String> = emptyList(),
     // Old servers only sent authenticatorEnabled: preserve their mandatory-login behavior.
     val authenticatorRequiredForLogin: Boolean = authenticatorEnabled,
-    val mainPhoneNumber: String = ""
+    val mainPhoneNumber: String = "",
+    val emailRequiredForLogin: Boolean = false
 )
 
 @Serializable
@@ -178,7 +186,8 @@ fun aitaRequiresLoginSecondFactor(authenticatorEnabled: Boolean, requiredForLogi
 @Serializable
 data class AitaSensitiveSecurityActionRequestDataModel(
     val currentPassword: String,
-    val secondFactorCode: String = ""
+    val secondFactorCode: String = "",
+    val emailProof: AitaSecurityEmailProof? = null
 )
 
 @Serializable
@@ -187,7 +196,8 @@ data class AitaPhoneAliasRequestDataModel(
     val phoneNumber: String = "",
     val currentPassword: String,
     val secondFactorCode: String = "",
-    val locale: String = "en"
+    val locale: String = "en",
+    val emailProof: AitaSecurityEmailProof? = null
 )
 
 @Serializable
@@ -202,7 +212,8 @@ data class AitaEmailAliasRequestDataModel(
     val email: String,
     val currentPassword: String,
     val secondFactorCode: String = "",
-    val locale: String = "en"
+    val locale: String = "en",
+    val emailProof: AitaSecurityEmailProof? = null
 )
 
 @Serializable
@@ -212,10 +223,11 @@ data class AitaEmailAliasConfirmRequestDataModel(val flowId: String, val code: S
 data class AitaEmailAliasRemoveRequestDataModel(
     val email: String,
     val currentPassword: String,
-    val secondFactorCode: String = ""
+    val secondFactorCode: String = "",
+    val emailProof: AitaSecurityEmailProof? = null
 )
 
-const val AITA_MAX_ADDITIONAL_LOGIN_EMAILS = 5
+const val AITA_MAX_ADDITIONAL_LOGIN_EMAILS = 1
 
 fun normalizeAitaLoginIdentifier(raw: String): AitaNormalizedLoginIdentifier? {
     val clean = raw.trim()

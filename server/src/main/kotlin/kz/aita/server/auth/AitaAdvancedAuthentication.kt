@@ -52,6 +52,8 @@ import kotlin.collections.singleOrNull
 import kotlin.collections.toByteArray
 import kotlin.math.pow
 
+private const val AUTH_PURPOSE_EMAIL_FACTOR = "LOGIN_EMAIL_FACTOR"
+private const val AUTH_PURPOSE_SECURITY_EMAIL = "SECURITY_EMAIL_PROOF"
 private const val AUTH_PURPOSE_LOGIN = "PASSWORDLESS_LOGIN"
 private const val AUTH_PURPOSE_RECOVERY = "PASSWORD_RECOVERY"
 private const val AUTH_PURPOSE_PHONE = "PHONE_ALIAS"
@@ -79,6 +81,7 @@ object AuthSecurityProfiles : Table("auth_security_profiles") {
     val totpPendingExpiresAtMillis = long("totp_pending_expires_at_millis").nullable()
     val totpEnabledAtMillis = long("totp_enabled_at_millis").nullable()
     val totpRequiredForLogin = bool("totp_required_for_login").default(true)
+    val emailRequiredForLogin = bool("email_required_for_login").default(false)
     val totpLastUsedStep = long("totp_last_used_step").nullable()
     val securityRevision = long("security_revision").default(1L)
     val createdAtMillis = long("created_at_millis")
@@ -152,6 +155,7 @@ object AuthRecoveryCodes : Table("auth_recovery_codes") {
 }
 
 object AuthPhoneAliasChallenges : Table("auth_phone_alias_challenges") {
+    val authorizationHash = char("authorization_hash", 64).nullable()
     val id = uuid("id")
     val challengePublicId = uuid("challenge_public_id").uniqueIndex()
     val userId = uuid("user_id").index()
@@ -199,6 +203,23 @@ object AuthSecurityAuditEvents : Table("auth_security_audit_events") {
     val createdAtMillis = long("created_at_millis").index()
     override val primaryKey = PrimaryKey(id)
 }
+
+object AuthLoginEmailChallenges : Table("auth_login_email_challenges") {
+    val challengePublicId = uuid("challenge_public_id")
+    val loginPublicId = uuid("login_public_id")
+    override val primaryKey = PrimaryKey(challengePublicId)
+}
+object AuthSecurityEmailChallenges : Table("auth_security_email_challenges") {
+    val challengePublicId = uuid("challenge_public_id")
+    val userId = uuid("user_id")
+    val action = varchar("action", 40)
+    val targetHash = char("target_hash", 64)
+    val authorizationHash = char("authorization_hash", 64)
+    override val primaryKey = PrimaryKey(challengePublicId)
+}
+
+internal enum class AuthContactConflict { PHONE, EMAIL, EXTRA_LIMIT, MAIN_EMAIL_VERIFICATION }
+internal class AitaAuthContactConflictException(val conflict: AuthContactConflict) : IllegalStateException(conflict.name)
 
 private fun authMessage(main: String, ru: String, kk: String): List<LocalizedStringDataModel> = listOf(
     LocalizedStringDataModel("main", main),
@@ -304,7 +325,8 @@ internal class AitaAdvancedAuthService(
         emailDeliveryUnavailable = emailUnavailableUntil.get() > System.currentTimeMillis(),
         authenticatorLoginPolicyEnabled = config.securityConfigured,
         authenticatorCodeLoginEnabled = config.advancedReady,
-        authenticatorEmailRecoveryEnabled = config.emailReady
+        authenticatorEmailRecoveryEnabled = config.emailReady,
+        emailSecondFactorEnabled = config.emailReady
     )
 
     suspend fun passwordLogin(request: AitaPasswordLoginRequestDataModel, meta: Map<String, String>): AitaAuthFlowDataModel? {
@@ -328,7 +350,7 @@ internal class AitaAdvancedAuthService(
             val authorization = loginAuthorizationInside(user)
             val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq resolved.id }.singleOrNull()
             auditInside(resolved.id, "PASSWORD_PRIMARY_VERIFIED", null, ipHash, now)
-            if (profile != null && aitaRequiresLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null, profile[AuthSecurityProfiles.totpRequiredForLogin])) {
+            if (loginFactorInside(profile) != AitaLoginSecondFactor.NONE) {
                 createLoginChallengeInside(resolved.id, AUTH_LOGIN_CHALLENGE_PASSWORD, authorization, now) to authorization
             } else null to authorization
         } ?: return null
@@ -406,7 +428,7 @@ internal class AitaAdvancedAuthService(
         if (userId != null && destination != null) {
             val workId = UUID.randomUUID()
             val copy = aitaAuthEmailCopy(purpose, locale, code, ((deadlineMillis - now + 59_999L) / 60_000L).coerceAtLeast(1L))
-            val json = aitaResendEmailRequestJson(config.fromEmail, destination, copy.subject, copy.html, config.replyTo, copy.text)
+            val json = aitaResendEmailRequestJson(config.fromEmail, destination, copy.subject, copy.html, config.replyTo, copy.text, copy.inlineImages)
             AuthEmailOutbox.insert {
                 it[AuthEmailOutbox.id] = workId
                 it[AuthEmailOutbox.challengeId] = id
@@ -428,7 +450,7 @@ internal class AitaAdvancedAuthService(
         )
     }
 
-    suspend fun requestEmailCode(identifier: String, purpose: String, locale: String, ip: String): AitaAuthFlowDataModel {
+    suspend fun requestEmailCode(identifier: String, purpose: String, locale: String, ip: String, destinationChoice: AitaEmailDestination = AitaEmailDestination.MAIN): AitaAuthFlowDataModel {
         require(purpose == AUTH_PURPOSE_LOGIN || purpose == AUTH_PURPOSE_RECOVERY)
         requireEmailDelivery(recovery = purpose == AUTH_PURPOSE_RECOVERY)
         val now = System.currentTimeMillis()
@@ -450,7 +472,11 @@ internal class AitaAdvancedAuthService(
                 }.singleOrNull()?.get(AuthLoginEmails.userId) == currentUser[Users.id]
             }
             val destination = currentUser?.takeIf { stillOwned && it[Users.isActive] }
-                ?.let { aitaEmailCodeDestination(normalized, it[Users.email]) }
+                ?.let {
+                    if (purpose == AUTH_PURPOSE_LOGIN && normalized.kind == AitaAuthIdentifierKind.PHONE)
+                        emailDestinationInside(it, destinationChoice)
+                    else aitaEmailCodeDestination(normalized, it[Users.email])
+                }
             val owner = currentUser?.get(Users.id)?.takeIf { destination != null }
             requestDisposition = when {
                 currentUser == null || !stillOwned -> "NO_UNIQUE_ACCOUNT"
@@ -531,6 +557,8 @@ internal class AitaAdvancedAuthService(
                 user?.get(Users.id), destination, expectedPurpose, locale,
                 old[AuthOneTimeChallenges.identifierHash], ipHash, now,
                 deadlineMillis = authenticatorRecovery?.get(AuthTotpRecoveryChallenges.createdAtMillis)?.plus(config.codeTtlMillis)
+                    ?: phoneChange?.get(AuthPhoneAliasChallenges.createdAtMillis)?.plus(config.codeTtlMillis)
+                    ?: emailChange?.get(AuthEmailAliasChallenges.createdAtMillis)?.plus(config.codeTtlMillis)
                     ?: (now + config.codeTtlMillis)
             )
             if (authenticatorRecovery != null) AuthTotpRecoveryChallenges.insert {
@@ -545,7 +573,7 @@ internal class AitaAdvancedAuthService(
                 AuthEmailAliasChallenges.insert {
                     it[AuthEmailAliasChallenges.challengePublicId] = UUID.fromString(flow.flowId); it[AuthEmailAliasChallenges.userId] = requireNotNull(ownerUserId)
                     it[AuthEmailAliasChallenges.requestedEmail] = emailChange[AuthEmailAliasChallenges.requestedEmail]
-                    it[AuthEmailAliasChallenges.authorizationHash] = emailChange[AuthEmailAliasChallenges.authorizationHash]; it[AuthEmailAliasChallenges.createdAtMillis] = now
+                    it[AuthEmailAliasChallenges.authorizationHash] = emailChange[AuthEmailAliasChallenges.authorizationHash]; it[AuthEmailAliasChallenges.createdAtMillis] = emailChange[AuthEmailAliasChallenges.createdAtMillis]
                 }
             }
             if (phoneChange != null) {
@@ -553,7 +581,9 @@ internal class AitaAdvancedAuthService(
                 AuthPhoneAliasChallenges.insert {
                     it[AuthPhoneAliasChallenges.id] = UUID.randomUUID(); it[AuthPhoneAliasChallenges.challengePublicId] = UUID.fromString(flow.flowId)
                     it[AuthPhoneAliasChallenges.userId] = requireNotNull(ownerUserId); it[AuthPhoneAliasChallenges.action] = phoneChange[AuthPhoneAliasChallenges.action]
-                    it[AuthPhoneAliasChallenges.requestedPhoneAlias] = phoneChange[AuthPhoneAliasChallenges.requestedPhoneAlias]; it[AuthPhoneAliasChallenges.createdAtMillis] = now
+                    it[AuthPhoneAliasChallenges.requestedPhoneAlias] = phoneChange[AuthPhoneAliasChallenges.requestedPhoneAlias]
+                    it[AuthPhoneAliasChallenges.authorizationHash] = phoneChange[AuthPhoneAliasChallenges.authorizationHash]
+                    it[AuthPhoneAliasChallenges.createdAtMillis] = phoneChange[AuthPhoneAliasChallenges.createdAtMillis]
                 }
             }
             flow
@@ -641,6 +671,9 @@ internal class AitaAdvancedAuthService(
                 return@newSuspendedTransaction false
             }
             Users.update({ Users.id eq userId }) { it[Users.passwordHash] = Pw.hash(request.newPassword.toCharArray()) }
+            AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
+                it[totpPendingSecretCiphertext] = null; it[totpPendingSetupId] = null; it[totpPendingExpiresAtMillis] = null
+            }
             RefreshSessions.update({ RefreshSessions.userId eq userId }) {
                 it[RefreshSessions.revokedAt] = java.time.Instant.now()
                 it[RefreshSessions.securityInvalidated] = true
@@ -669,8 +702,7 @@ internal class AitaAdvancedAuthService(
         if (!user[Users.isActive] || !crypto.constantTimeEquals(expected, loginAuthorizationInside(user))) return false
         if (requireOptionalTotp) {
             val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull()
-            if (profile != null && aitaRequiresLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
-                    profile[AuthSecurityProfiles.totpRequiredForLogin])) return false
+            if (loginFactorInside(profile) != AitaLoginSecondFactor.NONE) return false
         }
         return true
     }
@@ -683,8 +715,17 @@ internal class AitaAdvancedAuthService(
             it[authorizationHash] = authorization; it[attempts] = 0; it[maxAttempts] = 8
             it[expiresAtMillis] = now + 5 * 60_000L; it[createdAtMillis] = now
         }
-        return AitaAuthFlowDataModel(flowId = publicId.toString(),
-            nextStep = if (method == AUTH_LOGIN_CHALLENGE_AUTHENTICATOR) AitaAuthNextStep.PASSWORD_CONFIRMATION else AitaAuthNextStep.TOTP,
+        val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull()
+        val factor = loginFactorInside(profile)
+        val next = when {
+            method == AUTH_LOGIN_CHALLENGE_AUTHENTICATOR -> AitaAuthNextStep.PASSWORD_CONFIRMATION
+            method == AUTH_LOGIN_CHALLENGE_EMAIL && factor == AitaLoginSecondFactor.EMAIL -> AitaAuthNextStep.PASSWORD_CONFIRMATION
+            method == AUTH_LOGIN_CHALLENGE_PASSWORD && factor == AitaLoginSecondFactor.EMAIL -> AitaAuthNextStep.EMAIL_DESTINATION
+            else -> AitaAuthNextStep.TOTP
+        }
+        val user = Users.selectAll().where { Users.id eq userId }.single()
+        return AitaAuthFlowDataModel(flowId = publicId.toString(), nextStep = next,
+            emailDestinations = if (next == AitaAuthNextStep.EMAIL_DESTINATION) emailOptionsInside(user) else emptyList(),
             expiresAtMillis = now + 5 * 60_000L, serverTimeMillis = now)
     }
 
@@ -718,6 +759,8 @@ internal class AitaAdvancedAuthService(
             val now = System.currentTimeMillis()
             val row = usableLoginChallengeInside(publicId, userId, setOf(AUTH_LOGIN_CHALLENGE_PASSWORD, AUTH_LOGIN_CHALLENGE_EMAIL), now)
                 ?: return@newPairAfterVerification false
+            if (loginFactorInside(AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull()) != AitaLoginSecondFactor.AUTHENTICATOR)
+                return@newPairAfterVerification false
             val valid = verifySecondFactorInside(userId, request.code, now)
             AuthLoginChallenges.update({ AuthLoginChallenges.id eq row[AuthLoginChallenges.id] }) {
                 it[attempts] = row[AuthLoginChallenges.attempts] + 1
@@ -767,7 +810,7 @@ internal class AitaAdvancedAuthService(
                 ?: return@newSuspendedTransaction null
             if (profile[AuthSecurityProfiles.totpEnabledAtMillis] == null || !verifySecondFactorInside(userId, request.code, System.currentTimeMillis())) return@newSuspendedTransaction null
             val authorization = loginAuthorizationInside(user)
-            if (profile[AuthSecurityProfiles.totpRequiredForLogin]) {
+            if (loginFactorInside(profile) != AitaLoginSecondFactor.NONE) {
                 createLoginChallengeInside(userId, AUTH_LOGIN_CHALLENGE_AUTHENTICATOR, authorization, now) to authorization
             } else null to authorization
         } ?: return null
@@ -786,20 +829,32 @@ internal class AitaAdvancedAuthService(
         val userId = newSuspendedTransaction(Dispatchers.IO) {
             AuthLoginChallenges.selectAll().where { AuthLoginChallenges.publicId eq publicId }.singleOrNull()?.get(AuthLoginChallenges.userId)
         } ?: return null
+        var nextEmailFlow: AitaAuthFlowDataModel? = null
         val tokens = tokenService.newPairAfterVerification(userId, meta) {
             val now = System.currentTimeMillis()
-            val row = usableLoginChallengeInside(publicId, userId, setOf(AUTH_LOGIN_CHALLENGE_AUTHENTICATOR), now)
+            val row = usableLoginChallengeInside(publicId, userId, setOf(AUTH_LOGIN_CHALLENGE_AUTHENTICATOR, AUTH_LOGIN_CHALLENGE_EMAIL), now)
                 ?: return@newPairAfterVerification false
             val user = Users.selectAll().where { Users.id eq userId }.single()
+            val policy = loginFactorInside(AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull())
+            // A wrong endpoint must not consume a valid challenge for a different second factor.
+            if (row[AuthLoginChallenges.primaryMethod] == AUTH_LOGIN_CHALLENGE_EMAIL && policy != AitaLoginSecondFactor.EMAIL)
+                return@newPairAfterVerification false
             val valid = Pw.verify(request.password.toCharArray(), user[Users.passwordHash])
             AuthLoginChallenges.update({ AuthLoginChallenges.id eq row[AuthLoginChallenges.id] }) {
                 it[attempts] = row[AuthLoginChallenges.attempts] + 1
                 if (valid) it[consumedAtMillis] = now
             }
-            if (valid) auditInside(userId, "AUTHENTICATOR_PASSWORD_COMPLETED", null, meta["ip"]?.let { crypto.hmac("ip", it) }, now)
-            valid
-        } ?: return null
-        return AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.AUTHENTICATED, tokenPair = tokens)
+            if (!valid) return@newPairAfterVerification false
+            if (row[AuthLoginChallenges.primaryMethod] == AUTH_LOGIN_CHALLENGE_AUTHENTICATOR &&
+                loginFactorInside(AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull()) == AitaLoginSecondFactor.EMAIL) {
+                nextEmailFlow = createLoginChallengeInside(userId, AUTH_LOGIN_CHALLENGE_PASSWORD, loginAuthorizationInside(user), now)
+                return@newPairAfterVerification false
+            }
+            auditInside(userId, "FACTOR_PASSWORD_COMPLETED", null, meta["ip"]?.let { crypto.hmac("ip", it) }, now)
+            true
+        }
+        nextEmailFlow?.let { return it }
+        return tokens?.let { AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.AUTHENTICATED, tokenPair = it) }
     }
 
     /** Password proof is bound to this account's current credentials/revision/main email.
@@ -925,6 +980,7 @@ internal class AitaAdvancedAuthService(
             email = user[Users.email],
             mainPhoneNumber = normalizeAitaStoredMainPhone(user[Users.phoneNumber], user[Users.countryLocale]) ?: user[Users.phoneNumber],
             emailVerified = profile[AuthSecurityProfiles.emailVerifiedAtMillis] != null,
+            emailRequiredForLogin = profile[AuthSecurityProfiles.emailRequiredForLogin],
             phoneLoginAlias = profile[AuthSecurityProfiles.phoneLoginAlias],
             phoneLoginAliasVerified = profile[AuthSecurityProfiles.phoneAliasVerifiedAtMillis] != null,
             authenticatorEnabled = profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
@@ -955,7 +1011,7 @@ internal class AitaAdvancedAuthService(
             val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction null
             ensureProfileInside(userId, now)
             AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
-            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, System.currentTimeMillis())) return@newSuspendedTransaction null
+            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, System.currentTimeMillis(), request.emailProof, AitaSecurityEmailAction.TOTP_SETUP)) return@newSuspendedTransaction null
             AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
                 it[AuthSecurityProfiles.totpPendingSecretCiphertext] = crypto.encrypt("totp-pending:$userId:$setupId", secret)
                 it[AuthSecurityProfiles.totpPendingSetupId] = setupId
@@ -994,6 +1050,7 @@ internal class AitaAdvancedAuthService(
                 it[AuthSecurityProfiles.totpPendingExpiresAtMillis] = null
                 it[AuthSecurityProfiles.totpEnabledAtMillis] = now
                 it[AuthSecurityProfiles.totpRequiredForLogin] = request.requireForLogin
+                if (request.requireForLogin) it[AuthSecurityProfiles.emailRequiredForLogin] = false
                 it[AuthSecurityProfiles.totpLastUsedStep] = acceptedStep
                 it[AuthSecurityProfiles.securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L
                 it[AuthSecurityProfiles.updatedAtMillis] = now
@@ -1019,6 +1076,7 @@ internal class AitaAdvancedAuthService(
             if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, now)) return@newSuspendedTransaction false
             AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
                 it[totpRequiredForLogin] = request.requiredForLogin
+                if (request.requiredForLogin) it[emailRequiredForLogin] = false
                 it[securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L
                 it[updatedAtMillis] = now
             }
@@ -1082,18 +1140,15 @@ internal class AitaAdvancedAuthService(
             AitaPhoneAliasAction.ADD_OR_REPLACE -> normalizeAitaPhoneAlias(request.phoneNumber) ?: return null
             AitaPhoneAliasAction.REMOVE -> null
         }
-        if (phone != null) {
-            val conflict = newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
-                phoneLoginIdentityHasOtherOwnerInside(phone, userId)
-            }
-            if (conflict) return null
-        }
         val now = System.currentTimeMillis()
         val ipHash = crypto.hmac("ip", ip)
         requireEmailDelivery()
         return newSuspendedTransaction(Dispatchers.IO) {
             val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction null
-            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, System.currentTimeMillis())) return@newSuspendedTransaction null
+            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, System.currentTimeMillis(), defersMainEmailProof = true)) return@newSuspendedTransaction null
+            if (phone != null && (phoneLoginIdentityHasOtherOwnerInside(phone, userId) ||
+                phone == normalizeAitaStoredMainPhone(user[Users.phoneNumber], user[Users.countryLocale])))
+                throw AitaAuthContactConflictException(AuthContactConflict.PHONE)
             val email = normalizeAitaEmail(user[Users.email]) ?: return@newSuspendedTransaction null
             val identifierHash = crypto.hmac("identifier", email)
             lockEmailBucketsInside(identifierHash, ipHash, userId)
@@ -1110,7 +1165,9 @@ internal class AitaAdvancedAuthService(
             AuthPhoneAliasChallenges.insert {
                 it[AuthPhoneAliasChallenges.id] = UUID.randomUUID(); it[AuthPhoneAliasChallenges.challengePublicId] = UUID.fromString(flow.flowId)
                 it[AuthPhoneAliasChallenges.userId] = userId; it[AuthPhoneAliasChallenges.action] = request.action.name
-                it[AuthPhoneAliasChallenges.requestedPhoneAlias] = phone; it[AuthPhoneAliasChallenges.createdAtMillis] = now
+                it[AuthPhoneAliasChallenges.requestedPhoneAlias] = phone
+                it[AuthPhoneAliasChallenges.authorizationHash] = aliasAuthorizationInside(user)
+                it[AuthPhoneAliasChallenges.createdAtMillis] = now
             }
             flow.copy(maskedDestination = maskEmail(email))
         }
@@ -1134,6 +1191,8 @@ internal class AitaAdvancedAuthService(
                 challenge[AuthOneTimeChallenges.attempts] >= challenge[AuthOneTimeChallenges.maxAttempts]
             ) return@newSuspendedTransaction false
             if (challenge[AuthOneTimeChallenges.userId] != userId) return@newSuspendedTransaction false
+            val authorization = phone[AuthPhoneAliasChallenges.authorizationHash] ?: return@newSuspendedTransaction false
+            if (!crypto.constantTimeEquals(authorization, aliasAuthorizationInside(user))) return@newSuspendedTransaction false
             val binding = challenge[AuthOneTimeChallenges.deliveryEmailHash]
             if (binding != null && !crypto.constantTimeEquals(binding, crypto.hmac("delivery-email", normalizeAitaEmail(user[Users.email]).orEmpty()))) return@newSuspendedTransaction false
             val valid = crypto.constantTimeEquals(challenge[AuthOneTimeChallenges.codeHash], crypto.hmac("code:$publicId", code))
@@ -1146,20 +1205,18 @@ internal class AitaAdvancedAuthService(
             val alias = if (action == AitaPhoneAliasAction.REMOVE) null else phone[AuthPhoneAliasChallenges.requestedPhoneAlias]
             if (alias != null) {
                 lockPhoneLoginIdentityInside(alias)
-                if (phoneLoginIdentityHasOtherOwnerInside(alias, userId)) return@newSuspendedTransaction false
+                if (phoneLoginIdentityHasOtherOwnerInside(alias, userId) ||
+                    alias == normalizeAitaStoredMainPhone(user[Users.phoneNumber], user[Users.countryLocale]))
+                    throw AitaAuthContactConflictException(AuthContactConflict.PHONE)
             }
             ensureProfileInside(userId, now)
             val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
-            try {
-                AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
+            AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
                     it[AuthSecurityProfiles.phoneLoginAlias] = alias
                     it[AuthSecurityProfiles.phoneAliasVerifiedAtMillis] = if (alias == null) null else now
                     it[AuthSecurityProfiles.emailVerifiedAtMillis] = now
                     it[AuthSecurityProfiles.securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L
                     it[AuthSecurityProfiles.updatedAtMillis] = now
-                }
-            } catch (_: ExposedSQLException) {
-                return@newSuspendedTransaction false
             }
             AuthOneTimeChallenges.update({ AuthOneTimeChallenges.id eq challenge[AuthOneTimeChallenges.id] }) {
                 it[AuthOneTimeChallenges.consumedAtMillis] = now
@@ -1200,13 +1257,31 @@ internal class AitaAdvancedAuthService(
                 AuthEmailAliasChallenges.challengePublicId eq challenge[AuthOneTimeChallenges.publicId]
             }.singleOrNull() ?: return null
             if (pending[AuthEmailAliasChallenges.userId] != id || pending[AuthEmailAliasChallenges.consumedAtMillis] != null ||
+                pending[AuthEmailAliasChallenges.createdAtMillis] + config.codeTtlMillis <= System.currentTimeMillis() ||
                 !crypto.constantTimeEquals(pending[AuthEmailAliasChallenges.authorizationHash], aliasAuthorizationInside(user))) return null
             val email = pending[AuthEmailAliasChallenges.requestedEmail]
             val binding = challenge[AuthOneTimeChallenges.deliveryEmailHash] ?: return null
             if (!crypto.constantTimeEquals(binding, crypto.hmac("delivery-email", email))) return null
-            return email.takeIf {
-                AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq email }.limit(1).singleOrNull() == null
-            }
+            return email // Claim conflicts are reported after the correct code is verified, not as a bad code.
+        }
+        if (challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_PHONE) {
+            val change = AuthPhoneAliasChallenges.selectAll().where { AuthPhoneAliasChallenges.challengePublicId eq challenge[AuthOneTimeChallenges.publicId] }.singleOrNull() ?: return null
+            val hash = change[AuthPhoneAliasChallenges.authorizationHash] ?: return null
+            if (change[AuthPhoneAliasChallenges.userId] != id || change[AuthPhoneAliasChallenges.consumedAtMillis] != null ||
+                change[AuthPhoneAliasChallenges.createdAtMillis] + config.codeTtlMillis <= System.currentTimeMillis() ||
+                !crypto.constantTimeEquals(hash, aliasAuthorizationInside(user))) return null
+        }
+        if (challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_SECURITY_EMAIL) {
+            val proof = AuthSecurityEmailChallenges.selectAll().where { AuthSecurityEmailChallenges.challengePublicId eq challenge[AuthOneTimeChallenges.publicId] }.singleOrNull() ?: return null
+            if (proof[AuthSecurityEmailChallenges.userId] != id || !crypto.constantTimeEquals(proof[AuthSecurityEmailChallenges.authorizationHash], loginAuthorizationInside(user))) return null
+        }
+        if (challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_EMAIL_FACTOR) {
+            val link = AuthLoginEmailChallenges.selectAll().where { AuthLoginEmailChallenges.challengePublicId eq challenge[AuthOneTimeChallenges.publicId] }.singleOrNull() ?: return null
+            val login = AuthLoginChallenges.selectAll().where { AuthLoginChallenges.publicId eq link[AuthLoginEmailChallenges.loginPublicId] }.singleOrNull() ?: return null
+            if (login[AuthLoginChallenges.userId] != id || login[AuthLoginChallenges.primaryMethod] != AUTH_LOGIN_CHALLENGE_PASSWORD ||
+                login[AuthLoginChallenges.consumedAtMillis] != null || login[AuthLoginChallenges.expiresAtMillis] <= System.currentTimeMillis() ||
+                login[AuthLoginChallenges.attempts] >= login[AuthLoginChallenges.maxAttempts] ||
+                !crypto.constantTimeEquals(login[AuthLoginChallenges.authorizationHash].orEmpty(), loginAuthorizationInside(user))) return null
         }
         if (challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_TOTP_RECOVERY) {
             val recovery = AuthTotpRecoveryChallenges.selectAll().where {
@@ -1218,17 +1293,22 @@ internal class AitaAdvancedAuthService(
         }
         val primary = normalizeAitaEmail(user[Users.email])
         val binding = challenge[AuthOneTimeChallenges.deliveryEmailHash] ?: return primary
-        val candidates = listOfNotNull(primary) + if (challenge[AuthOneTimeChallenges.purpose] in setOf(AUTH_PURPOSE_PHONE, AUTH_PURPOSE_TOTP_RECOVERY, AUTH_PURPOSE_TOTP_NOTICE)) emptyList() else
+        val candidates = listOfNotNull(primary) + if (challenge[AuthOneTimeChallenges.purpose] in setOf(AUTH_PURPOSE_PHONE, AUTH_PURPOSE_TOTP_RECOVERY, AUTH_PURPOSE_TOTP_NOTICE, AUTH_PURPOSE_SECURITY_EMAIL)) emptyList() else
             AuthLoginEmails.selectAll().where {
                 (AuthLoginEmails.userId eq id) and (AuthLoginEmails.isPrimary eq false) and AuthLoginEmails.verifiedAtMillis.isNotNull()
             }.map { it[AuthLoginEmails.emailNormalized] }
         return candidates.firstOrNull { crypto.constantTimeEquals(binding, crypto.hmac("delivery-email", it)) }
     }
 
-    private fun verifyEmailAliasCredentialsInside(user: ResultRow, password: String, secondFactor: String, now: Long): Boolean {
+    private fun verifyEmailAliasCredentialsInside(user: ResultRow, password: String, secondFactor: String, now: Long,
+        proof: AitaSecurityEmailProof? = null, action: AitaSecurityEmailAction? = null, target: String = "",
+        defersMainEmailProof: Boolean = false): Boolean {
         if (password.length !in 1..1024 || !user[Users.isActive] || !Pw.verify(password.toCharArray(), user[Users.passwordHash])) return false
         val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq user[Users.id] }.singleOrNull()
-        return profile?.get(AuthSecurityProfiles.totpEnabledAtMillis) == null || verifySecondFactorInside(user[Users.id], secondFactor, now)
+        if (profile?.get(AuthSecurityProfiles.totpEnabledAtMillis) != null) return verifySecondFactorInside(user[Users.id], secondFactor, now)
+        if (profile?.get(AuthSecurityProfiles.emailRequiredForLogin) == true && !defersMainEmailProof)
+            return action != null && verifySecurityEmailInside(user, proof, action, target, now)
+        return true
     }
 
     suspend fun requestEmailAlias(userId: UUID, request: AitaEmailAliasRequestDataModel, ip: String): AitaAuthFlowDataModel? {
@@ -1244,9 +1324,9 @@ internal class AitaAdvancedAuthService(
             lockEmailBucketsInside(idHash, ipHash, userId)
             ensureProfileInside(userId, now)
             AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
-            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, now)) return@newSuspendedTransaction null
-            if (AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq email }.limit(1).singleOrNull() != null) return@newSuspendedTransaction null
-            if (AuthLoginEmails.selectAll().where { (AuthLoginEmails.userId eq userId) and (AuthLoginEmails.isPrimary eq false) }.count() >= AITA_MAX_ADDITIONAL_LOGIN_EMAILS) return@newSuspendedTransaction null
+            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, now, request.emailProof, AitaSecurityEmailAction.ADD_EMAIL, email)) return@newSuspendedTransaction null
+            if (AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq email }.limit(1).singleOrNull() != null) throw AitaAuthContactConflictException(AuthContactConflict.EMAIL)
+            if (AuthLoginEmails.selectAll().where { (AuthLoginEmails.userId eq userId) and (AuthLoginEmails.isPrimary eq false) }.count() >= AITA_MAX_ADDITIONAL_LOGIN_EMAILS) throw AitaAuthContactConflictException(AuthContactConflict.EXTRA_LIMIT)
             checkEmailQuotaInside(idHash, ipHash, now)
             val flow = createEmailChallengeInside(userId, email, AUTH_PURPOSE_EMAIL_ALIAS, request.locale, idHash, ipHash, now)
             AuthEmailAliasChallenges.insert {
@@ -1277,7 +1357,9 @@ internal class AitaAdvancedAuthService(
                     it[attempts] = row[AuthOneTimeChallenges.attempts] + 1; it[updatedAtMillis] = now
                 }
                 if (!valid) return@newSuspendedTransaction false
-                if (AuthLoginEmails.selectAll().where { (AuthLoginEmails.userId eq userId) and (AuthLoginEmails.isPrimary eq false) }.count() >= AITA_MAX_ADDITIONAL_LOGIN_EMAILS) return@newSuspendedTransaction false
+                if (AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq destination }.singleOrNull() != null)
+                    throw AitaAuthContactConflictException(AuthContactConflict.EMAIL)
+                if (AuthLoginEmails.selectAll().where { (AuthLoginEmails.userId eq userId) and (AuthLoginEmails.isPrimary eq false) }.count() >= AITA_MAX_ADDITIONAL_LOGIN_EMAILS) throw AitaAuthContactConflictException(AuthContactConflict.EXTRA_LIMIT)
                 AuthLoginEmails.insert {
                     it[AuthLoginEmails.emailNormalized] = destination; it[AuthLoginEmails.userId] = userId; it[AuthLoginEmails.isPrimary] = false
                     it[AuthLoginEmails.verifiedAtMillis] = now; it[AuthLoginEmails.createdAtMillis] = now
@@ -1295,7 +1377,7 @@ internal class AitaAdvancedAuthService(
         } catch (error: ExposedSQLException) {
             // A competing account registration/confirmation won the registry's unique key.
             // Catch OUTSIDE the transaction: do not commit an aborted SQL transaction.
-            if (error.sqlState == "23505") false else throw error
+            if (error.sqlState == "23505") throw AitaAuthContactConflictException(AuthContactConflict.EMAIL) else throw error
         }
         return if (applied) settings(userId) else null
     }
@@ -1319,7 +1401,7 @@ internal class AitaAdvancedAuthService(
             }.orderBy(AuthOneTimeChallenges.id to SortOrder.ASC).forUpdate().toList()
             ensureProfileInside(userId, now)
             val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
-            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, now)) return@newSuspendedTransaction false
+            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode, now, request.emailProof, AitaSecurityEmailAction.REMOVE_EMAIL, email)) return@newSuspendedTransaction false
             val removedCount = AuthLoginEmails.deleteWhere {
                 (AuthLoginEmails.userId eq userId) and (AuthLoginEmails.emailNormalized eq email) and (AuthLoginEmails.isPrimary eq false)
             }
@@ -1336,6 +1418,227 @@ internal class AitaAdvancedAuthService(
             true
         }
         return if (removed) settings(userId) else null
+    }
+
+    private fun loginFactorInside(profile: ResultRow?): AitaLoginSecondFactor = if (profile == null) AitaLoginSecondFactor.NONE else
+        aitaLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
+            profile[AuthSecurityProfiles.totpRequiredForLogin], profile[AuthSecurityProfiles.emailRequiredForLogin])
+
+    private fun emailDestinationInside(user: ResultRow, choice: AitaEmailDestination): String? = when (choice) {
+        AitaEmailDestination.MAIN -> normalizeAitaEmail(user[Users.email])
+        AitaEmailDestination.EXTRA -> AuthLoginEmails.selectAll().where {
+            (AuthLoginEmails.userId eq user[Users.id]) and (AuthLoginEmails.isPrimary eq false) and AuthLoginEmails.verifiedAtMillis.isNotNull()
+        }.orderBy(AuthLoginEmails.createdAtMillis to SortOrder.ASC, AuthLoginEmails.emailNormalized to SortOrder.ASC)
+            .firstOrNull()?.get(AuthLoginEmails.emailNormalized)?.let(::normalizeAitaEmail)
+    }
+
+    private fun emailOptionsInside(user: ResultRow): List<AitaEmailDestinationOption> = AitaEmailDestination.entries.mapNotNull { choice ->
+        emailDestinationInside(user, choice)?.let { AitaEmailDestinationOption(choice, maskAitaEmailDestination(it)) }
+    }
+
+    /** Password-bound challenge only. Anonymous phone requests never get these masked addresses. */
+    suspend fun requestLoginEmailFactor(request: AitaLoginEmailFactorRequest, ip: String): AitaAuthFlowDataModel? {
+        requireEmailDelivery()
+        val loginId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
+        val now = System.currentTimeMillis()
+        val ipHash = crypto.hmac("ip", ip)
+        requireActionBudget("email-factor:$ipHash", 60, now)
+        return newSuspendedTransaction(Dispatchers.IO) {
+            val peek = AuthLoginChallenges.selectAll().where { AuthLoginChallenges.publicId eq loginId }.singleOrNull() ?: return@newSuspendedTransaction null
+            val userId = peek[AuthLoginChallenges.userId]
+            val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction null
+            val login = usableLoginChallengeInside(loginId, userId, setOf(AUTH_LOGIN_CHALLENGE_PASSWORD), now) ?: return@newSuspendedTransaction null
+            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull()
+            if (loginFactorInside(profile) != AitaLoginSecondFactor.EMAIL) return@newSuspendedTransaction null
+            val destination = emailDestinationInside(user, request.destination) ?: return@newSuspendedTransaction null
+            val idHash = crypto.hmac("login-email-factor", userId.toString())
+            lockEmailBucketsInside(idHash, ipHash, userId)
+            val previous = AuthLoginEmailChallenges.selectAll().where { AuthLoginEmailChallenges.loginPublicId eq loginId }
+                .map { it[AuthLoginEmailChallenges.challengePublicId] }
+            val latest = if (previous.isEmpty()) null else AuthOneTimeChallenges.selectAll().where {
+                (AuthOneTimeChallenges.publicId inList previous) and AuthOneTimeChallenges.consumedAtMillis.isNull()
+            }.orderBy(AuthOneTimeChallenges.createdAtMillis to SortOrder.DESC).limit(1).forUpdate().singleOrNull()
+            fun flow(value: AitaAuthFlowDataModel) = value.copy(nextStep = AitaAuthNextStep.EMAIL_SECOND_FACTOR,
+                parentFlowId = loginId.toString(), selectedEmailDestination = request.destination,
+                maskedDestination = maskAitaEmailDestination(destination), emailDestinations = emailOptionsInside(user))
+            if (latest != null && latest[AuthOneTimeChallenges.resendAfterMillis] > now) {
+                if (latest[AuthOneTimeChallenges.deliveryEmailHash] != crypto.hmac("delivery-email", destination) ||
+                    latest[AuthOneTimeChallenges.attempts] >= latest[AuthOneTimeChallenges.maxAttempts])
+                    throw AitaAuthRateLimitedException((latest[AuthOneTimeChallenges.resendAfterMillis] - now) / 1000L + 1L)
+                return@newSuspendedTransaction flow(emailFlow(latest, now))
+            }
+            checkEmailQuotaInside(idHash, ipHash, now)
+            if (previous.isNotEmpty()) AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId inList previous }) {
+                it[consumedAtMillis] = now; it[updatedAtMillis] = now
+            }
+            val result = createEmailChallengeInside(userId, destination, AUTH_PURPOSE_EMAIL_FACTOR, request.locale, idHash, ipHash, now,
+                deadlineMillis = login[AuthLoginChallenges.expiresAtMillis])
+            AuthLoginEmailChallenges.insert {
+                it[challengePublicId] = UUID.fromString(result.flowId); it[loginPublicId] = loginId
+            }
+            flow(result)
+        }
+    }
+
+    suspend fun verifyLoginEmailFactor(request: AitaEmailCodeVerifyRequestDataModel, meta: Map<String, String>): AitaAuthFlowDataModel? {
+        config.requireAdvancedAuthentication()
+        val id = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
+        val code = normalizeAitaOneTimeCode(request.code) ?: return null
+        val userId = newSuspendedTransaction(Dispatchers.IO) {
+            AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq id }.singleOrNull()?.get(AuthOneTimeChallenges.userId)
+        } ?: return null
+        val tokens = tokenService.newPairAfterVerification(userId, meta) {
+            val now = System.currentTimeMillis()
+            val link = AuthLoginEmailChallenges.selectAll().where { AuthLoginEmailChallenges.challengePublicId eq id }.singleOrNull()
+                ?: return@newPairAfterVerification false
+            val login = usableLoginChallengeInside(link[AuthLoginEmailChallenges.loginPublicId], userId, setOf(AUTH_LOGIN_CHALLENGE_PASSWORD), now)
+                ?: return@newPairAfterVerification false
+            val user = Users.selectAll().where { Users.id eq userId }.single()
+            val row = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq id }.forUpdate().singleOrNull()
+                ?: return@newPairAfterVerification false
+            if (row[AuthOneTimeChallenges.userId] != userId || row[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_EMAIL_FACTOR ||
+                !authCodeCanBeVerified(now, row[AuthOneTimeChallenges.expiresAtMillis], row[AuthOneTimeChallenges.consumedAtMillis],
+                    row[AuthOneTimeChallenges.verifiedAtMillis], row[AuthOneTimeChallenges.attempts], row[AuthOneTimeChallenges.maxAttempts])) return@newPairAfterVerification false
+            if (loginFactorInside(AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.singleOrNull()) != AitaLoginSecondFactor.EMAIL) return@newPairAfterVerification false
+            val destination = challengeDestinationInside(row, user) ?: return@newPairAfterVerification false
+            val valid = crypto.constantTimeEquals(row[AuthOneTimeChallenges.codeHash], crypto.hmac("code:$id", code))
+            AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId eq id }) {
+                it[attempts] = row[AuthOneTimeChallenges.attempts] + 1; it[updatedAtMillis] = now
+                if (valid) { it[verifiedAtMillis] = now; it[consumedAtMillis] = now }
+            }
+            AuthLoginChallenges.update({ AuthLoginChallenges.id eq login[AuthLoginChallenges.id] }) {
+                it[attempts] = login[AuthLoginChallenges.attempts] + 1
+                if (valid) it[consumedAtMillis] = now
+            }
+            if (valid && destination == normalizeAitaEmail(user[Users.email])) AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
+                it[emailVerifiedAtMillis] = now; it[updatedAtMillis] = now
+            }
+            if (valid) auditInside(userId, "EMAIL_SECOND_FACTOR_COMPLETED", null, meta["ip"]?.let { crypto.hmac("ip", it) }, now)
+            valid
+        } ?: return null
+        return AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.AUTHENTICATED, tokenPair = tokens)
+    }
+
+    /** A signed-in bearer is NOT enough: check the password and bind the exact operation/revision.
+     * Only the existing main email receives these proofs; client cannot supply another recipient.
+     */
+    suspend fun requestSecurityEmail(userId: UUID, request: AitaSecurityEmailRequest, ip: String): AitaAuthFlowDataModel? {
+        requireEmailDelivery()
+        val target = canonicalAitaSecurityTarget(request.action, request.target) ?: return null
+        val now = System.currentTimeMillis()
+        requireActionBudget("security-email:$userId", 12, now)
+        val ipHash = crypto.hmac("ip", ip)
+        return newSuspendedTransaction(Dispatchers.IO) {
+            val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction null
+            ensureProfileInside(userId, now)
+            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
+            if (!user[Users.isActive] || request.currentPassword.length !in 1..1024 ||
+                profile[AuthSecurityProfiles.securityRevision] != request.expectedSecurityRevision ||
+                !Pw.verify(request.currentPassword.toCharArray(), user[Users.passwordHash])) return@newSuspendedTransaction null
+            val email = normalizeAitaEmail(user[Users.email]) ?: return@newSuspendedTransaction null
+            val idHash = crypto.hmac("security-email-user", userId.toString())
+            lockEmailBucketsInside(idHash, ipHash, userId)
+            val targetHash = crypto.hmac("security-target:${request.action.name}", target)
+            val authorization = loginAuthorizationInside(user)
+            val latest = AuthOneTimeChallenges.selectAll().where {
+                (AuthOneTimeChallenges.userId eq userId) and (AuthOneTimeChallenges.purpose eq AUTH_PURPOSE_SECURITY_EMAIL) and
+                    AuthOneTimeChallenges.consumedAtMillis.isNull() and (AuthOneTimeChallenges.expiresAtMillis greater now)
+            }.orderBy(AuthOneTimeChallenges.createdAtMillis to SortOrder.DESC).limit(1).forUpdate().singleOrNull()
+            if (latest != null && latest[AuthOneTimeChallenges.resendAfterMillis] > now) {
+                val old = AuthSecurityEmailChallenges.selectAll().where { AuthSecurityEmailChallenges.challengePublicId eq latest[AuthOneTimeChallenges.publicId] }.singleOrNull()
+                if (old != null && latest[AuthOneTimeChallenges.attempts] < latest[AuthOneTimeChallenges.maxAttempts] &&
+                    old[AuthSecurityEmailChallenges.action] == request.action.name &&
+                    old[AuthSecurityEmailChallenges.targetHash] == targetHash && old[AuthSecurityEmailChallenges.authorizationHash] == authorization)
+                    return@newSuspendedTransaction emailFlow(latest, now).copy(maskedDestination = maskAitaEmailDestination(email))
+                throw AitaAuthRateLimitedException((latest[AuthOneTimeChallenges.resendAfterMillis] - now) / 1000L + 1L)
+            }
+            checkEmailQuotaInside(idHash, ipHash, now)
+            AuthOneTimeChallenges.update({ (AuthOneTimeChallenges.userId eq userId) and (AuthOneTimeChallenges.purpose eq AUTH_PURPOSE_SECURITY_EMAIL) and AuthOneTimeChallenges.consumedAtMillis.isNull() }) {
+                it[consumedAtMillis] = now; it[updatedAtMillis] = now
+            }
+            val flow = createEmailChallengeInside(userId, email, AUTH_PURPOSE_SECURITY_EMAIL, request.locale, idHash, ipHash, now)
+            AuthSecurityEmailChallenges.insert {
+                it[challengePublicId] = UUID.fromString(flow.flowId); it[AuthSecurityEmailChallenges.userId] = userId
+                it[action] = request.action.name; it[AuthSecurityEmailChallenges.targetHash] = targetHash; it[authorizationHash] = authorization
+            }
+            flow.copy(maskedDestination = maskAitaEmailDestination(email))
+        }
+    }
+
+    private fun verifySecurityEmailInside(user: ResultRow, proof: AitaSecurityEmailProof?, action: AitaSecurityEmailAction, target: String, now: Long): Boolean {
+        val id = proof?.flowId?.let { runCatching { UUID.fromString(it) }.getOrNull() } ?: return false
+        val code = normalizeAitaOneTimeCode(proof.code) ?: return false
+        val canonical = canonicalAitaSecurityTarget(action, target) ?: return false
+        val binding = AuthSecurityEmailChallenges.selectAll().where { AuthSecurityEmailChallenges.challengePublicId eq id }.singleOrNull() ?: return false
+        if (binding[AuthSecurityEmailChallenges.userId] != user[Users.id] || binding[AuthSecurityEmailChallenges.action] != action.name ||
+            !crypto.constantTimeEquals(binding[AuthSecurityEmailChallenges.targetHash], crypto.hmac("security-target:${action.name}", canonical)) ||
+            !crypto.constantTimeEquals(binding[AuthSecurityEmailChallenges.authorizationHash], loginAuthorizationInside(user))) return false
+        val row = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq id }.forUpdate().singleOrNull() ?: return false
+        if (row[AuthOneTimeChallenges.userId] != user[Users.id] || row[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_SECURITY_EMAIL ||
+            !authCodeCanBeVerified(now, row[AuthOneTimeChallenges.expiresAtMillis], row[AuthOneTimeChallenges.consumedAtMillis],
+                row[AuthOneTimeChallenges.verifiedAtMillis], row[AuthOneTimeChallenges.attempts], row[AuthOneTimeChallenges.maxAttempts]) ||
+            challengeDestinationInside(row, user) == null) return false
+        val valid = crypto.constantTimeEquals(row[AuthOneTimeChallenges.codeHash], crypto.hmac("code:$id", code))
+        AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId eq id }) {
+            it[attempts] = row[AuthOneTimeChallenges.attempts] + 1; it[updatedAtMillis] = now
+            if (valid) { it[consumedAtMillis] = now; it[verifiedAtMillis] = now }
+        }
+        if (valid) AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq user[Users.id] }) { it[emailVerifiedAtMillis] = now }
+        return valid
+    }
+
+    suspend fun updateLoginPolicy(userId: UUID, request: AitaLoginPolicyRequest): AitaAuthenticationSettingsDataModel? {
+        config.requireAdvancedAuthentication()
+        requireActionBudget("login-policy:$userId", 12, System.currentTimeMillis())
+        val changed = newSuspendedTransaction(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction false
+            ensureProfileInside(userId, now)
+            val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }.forUpdate().single()
+            if (profile[AuthSecurityProfiles.securityRevision] != request.expectedSecurityRevision || !user[Users.isActive] ||
+                request.currentPassword.length !in 1..1024 || !Pw.verify(request.currentPassword.toCharArray(), user[Users.passwordHash])) return@newSuspendedTransaction false
+            if (request.method == AitaLoginSecondFactor.AUTHENTICATOR && profile[AuthSecurityProfiles.totpEnabledAtMillis] == null) return@newSuspendedTransaction false
+            if (request.method == AitaLoginSecondFactor.EMAIL && (!config.emailReady || normalizeAitaEmail(user[Users.email]) == null)) return@newSuspendedTransaction false
+            // Never require the same TOTP twice. Current enrollment protects factor changes;
+            // main-email proof additionally verifies the destination before enabling email 2FA.
+            if (profile[AuthSecurityProfiles.totpEnabledAtMillis] != null && !verifySecondFactorInside(userId, request.secondFactorCode, now)) return@newSuspendedTransaction false
+            val needsEmail = request.method == AitaLoginSecondFactor.EMAIL ||
+                (profile[AuthSecurityProfiles.totpEnabledAtMillis] == null && profile[AuthSecurityProfiles.emailRequiredForLogin])
+            if (needsEmail && !verifySecurityEmailInside(user, request.emailProof, AitaSecurityEmailAction.LOGIN_POLICY, request.method.name, now)) return@newSuspendedTransaction false
+            AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
+                it[totpRequiredForLogin] = request.method == AitaLoginSecondFactor.AUTHENTICATOR
+                it[emailRequiredForLogin] = request.method == AitaLoginSecondFactor.EMAIL
+                it[securityRevision] = profile[AuthSecurityProfiles.securityRevision] + 1L; it[updatedAtMillis] = now
+                // A pending setup made before this policy must not later undo it.
+                it[totpPendingSecretCiphertext] = null; it[totpPendingSetupId] = null; it[totpPendingExpiresAtMillis] = null
+            }
+            AuthLoginChallenges.update({ (AuthLoginChallenges.userId eq userId) and AuthLoginChallenges.consumedAtMillis.isNull() }) { it[consumedAtMillis] = now }
+            auditInside(userId, "LOGIN_POLICY_${request.method.name}", null, null, now)
+            true
+        }
+        return if (changed) settings(userId) else null
+    }
+
+    /** Called under the account row lock by the existing profile route. */
+    internal fun verifyProfileSecurityInside(user: ResultRow, request: kz.aita.UserAccountUpdateDataModel): Boolean {
+        val account = request.account
+        val changesProtectedValues = normalizeAitaEmail(account.email) != normalizeAitaEmail(user[Users.email]) ||
+            normalizeAitaPhoneAlias(account.phoneNumber) != normalizeAitaStoredMainPhone(user[Users.phoneNumber], user[Users.countryLocale]) ||
+            account.isActive != user[Users.isActive] || !request.newPassword.isNullOrBlank()
+        if (!changesProtectedValues) return true
+        val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq user[Users.id] }.singleOrNull()
+        val requestedEmail = normalizeAitaEmail(account.email)
+        if (profile?.get(AuthSecurityProfiles.emailRequiredForLogin) == true && requestedEmail != normalizeAitaEmail(user[Users.email])) {
+            // Email is now a required factor. Do not replace its destination with an unverified
+            // typo and strand the owner. Verify the new address as the extra email first.
+            val verified = requestedEmail?.let { address -> AuthLoginEmails.selectAll().where {
+                (AuthLoginEmails.userId eq user[Users.id]) and (AuthLoginEmails.emailNormalized eq address) and
+                    (AuthLoginEmails.isPrimary eq false) and AuthLoginEmails.verifiedAtMillis.isNotNull()
+            }.singleOrNull() } != null
+            if (!verified) throw AitaAuthContactConflictException(AuthContactConflict.MAIN_EMAIL_VERIFICATION)
+        }
+        return verifyEmailAliasCredentialsInside(user, request.password, request.secondFactorCode, System.currentTimeMillis(),
+            request.emailProof, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(account.phoneNumber, account.email, account.isActive))
     }
 
     private fun verifySecondFactorInside(userId: UUID, rawCode: String, now: Long): Boolean {
@@ -1692,8 +1995,8 @@ suspend fun advancedAuthSecondFactorEnabled(userId: UUID): Boolean =
     newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) {
         val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }
             .limit(1).singleOrNull() ?: return@newSuspendedTransaction false
-        aitaRequiresLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
-            profile[AuthSecurityProfiles.totpRequiredForLogin])
+        aitaLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
+            profile[AuthSecurityProfiles.totpRequiredForLogin], profile[AuthSecurityProfiles.emailRequiredForLogin]) != AitaLoginSecondFactor.NONE
     }
 
 suspend fun resolveAdvancedAuthUser(identifier: String): UUID? {
@@ -1708,6 +2011,10 @@ suspend fun resolveAdvancedAuthUser(identifier: String): UUID? {
         }
     }
 }
+
+internal fun verifyAdvancedAuthProfileChangeInside(user: ResultRow, request: kz.aita.UserAccountUpdateDataModel,
+    tokenService: TokenService, application: Application): Boolean =
+    advancedAuthService(tokenService, application).verifyProfileSecurityInside(user, request)
 
 fun Route.installAitaAdvancedAuthenticationRoutes(
     tokenService: TokenService,
@@ -1725,6 +2032,20 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             call.genericResponse(HttpStatusCode.OK, service.capabilities())
         }
 
+        post("/login/email-factor/request") {
+            val result = service.requestLoginEmailFactor(call.receiveAita<AitaLoginEmailFactorRequest>(), call.authClientIp())
+            if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+                authMessage("Sign in again or choose an available email", "Войдите заново или выберите доступный email", "Қайта кіріңіз немесе қолжетімді email таңдаңыз"))
+            else call.genericResponse(HttpStatusCode.Accepted, result)
+        }
+        post("/login/email-factor/verify") {
+            val request = call.receiveAita<AitaEmailCodeVerifyRequestDataModel>()
+            val result = service.verifyLoginEmailFactor(request, authMeta(call, request.deviceInfo))
+            if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+                authMessage("Code invalid or expired", "Код неверен или истёк", "Код қате немесе мерзімі аяқталған"))
+            else call.genericResponse(HttpStatusCode.OK, result)
+        }
+
         post("/login/password") {
             val request = call.receiveAita<AitaPasswordLoginRequestDataModel>()
             val result = service.passwordLogin(request.copy(deviceInfo = request.deviceInfo), authMeta(call, request.deviceInfo))
@@ -1736,7 +2057,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
 
         post("/login/code/request") {
             val request = call.receiveAita<AitaEmailCodeRequestDataModel>()
-            val result = service.requestEmailCode(request.identifier, AUTH_PURPOSE_LOGIN, request.locale, call.authClientIp())
+            val result = service.requestEmailCode(request.identifier, AUTH_PURPOSE_LOGIN, request.locale, call.authClientIp(), request.destination)
             call.genericResponse(HttpStatusCode.Accepted, result)
         }
 
@@ -1848,6 +2169,22 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
 
         authenticate("auth-jwt") {
             route("/security") {
+                post("/email-proof/request") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val result = service.requestSecurityEmail(userId, call.receiveAita<AitaSecurityEmailRequest>(), call.authClientIp())
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+                        authMessage("Check your password and refresh settings", "Проверьте пароль и обновите настройки", "Құпия сөзді тексеріп, баптауларды жаңартыңыз"))
+                    else call.genericResponse(HttpStatusCode.Accepted, result)
+                }
+                post("/login-policy") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val result = service.updateLoginPolicy(userId, call.receiveAita<AitaLoginPolicyRequest>())
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+                        authMessage("Security confirmation failed or settings changed. Refresh and try again.",
+                            "Подтверждение не выполнено или настройки изменились. Обновите их и повторите.",
+                            "Растау сәтсіз немесе баптаулар өзгерді. Жаңартып, қайталаңыз."))
+                    else call.genericResponse(HttpStatusCode.OK, result)
+                }
                 get("/settings") {
                     val userId = call.checkPrincipal() ?: return@get
                     call.genericResponse(HttpStatusCode.OK, service.settings(userId))

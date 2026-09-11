@@ -19,6 +19,7 @@ class PublicAuthenticationRequestTest {
             "auth/logIn", "auth/login/password", "auth/login/code/verify", "auth/login/totp",
             "auth/password-recovery/verify", "auth/password-recovery/reset",
             "auth/login/authenticator", "auth/login/authenticator/password",
+            "auth/login/email-factor/request", "auth/login/email-factor/verify",
             "auth/authenticator-recovery/request", "auth/authenticator-recovery/resend", "auth/authenticator-recovery/confirm"
         )
         var refreshCalls = 0
@@ -56,7 +57,8 @@ class PublicAuthenticationRequestTest {
 
     @Test
     fun protectedSecurityAndSessionRoutesRetainBearerAuthentication() = runBlocking {
-        val endpoints = listOf("auth/session", "auth/security/settings", "auth/security/totp/setup/start")
+        val endpoints = listOf("auth/session", "auth/security/settings", "auth/security/totp/setup/start",
+            "auth/security/email-proof/request", "auth/security/login-policy")
         var requests = 0
         val engine = MockEngine { request ->
             requests++

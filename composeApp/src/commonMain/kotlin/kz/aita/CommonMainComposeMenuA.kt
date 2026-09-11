@@ -2575,6 +2575,18 @@ fun AppConfiguration.MenuUserAccountScreen() {
                     stateKey = NavigationScreenModel.Menu.UserAccount.KEY_STATE_CONFIRMATION_PASSWORD
                 )
 
+                val profilePhone = stateValues.globalAppConfiguration.countries.run {
+                    find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
+                }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim()
+                val profileEmail = emailTextFieldContent.value.text.trim()
+                val protectedProfileChange = kz.aita.auth.normalizeAitaPhoneAlias(profilePhone) !=
+                    stateValues.userAccount?.let { kz.aita.auth.normalizeAitaStoredMainPhone(it.phoneNumber, it.countryLocale) } ||
+                    kz.aita.auth.normalizeAitaEmail(profileEmail) != kz.aita.auth.normalizeAitaEmail(stateValues.userAccount?.email.orEmpty()) ||
+                    passwordTextFieldContent?.value?.text?.isNotEmpty() == true
+                val profileConfirmation = if (protectedProfileChange) ProfileSecurityConfirmationInput(
+                    kz.aita.auth.aitaProfileSecurityTarget(profilePhone, profileEmail, true),
+                    confirmationPasswordTextFieldContent?.value?.text.orEmpty()) else ProfileSecurityConfirmation(true)
+
 //        responseText(
 //          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
 //          showIf = {
@@ -2632,6 +2644,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
                         && (passwordTextFieldContent.value.text.isEmpty() || passwordTextFieldContent.isContentValid)
                         && (passwordTextFieldContent.value.text.isEmpty() || repeatedPasswordTextFieldContent!!.isContentValid)
                         && confirmationPasswordTextFieldContent.isContentValid
+                        && profileConfirmation.ready
                     ) {
                         updateUser(
                             userAccountUpdate = UserAccountUpdateDataModel(
@@ -2655,7 +2668,9 @@ fun AppConfiguration.MenuUserAccountScreen() {
                                     isActive = true
                                 ),
                                 password = confirmationPasswordTextFieldContent!!.value.text,
-                                newPassword = passwordTextFieldContent!!.takeIf { it.value.text.isNotEmpty() }?.value?.text
+                                newPassword = passwordTextFieldContent!!.takeIf { it.value.text.isNotEmpty() }?.value?.text,
+                                secondFactorCode = profileConfirmation.factor,
+                                emailProof = profileConfirmation.emailProof
                             )
                         )
 
