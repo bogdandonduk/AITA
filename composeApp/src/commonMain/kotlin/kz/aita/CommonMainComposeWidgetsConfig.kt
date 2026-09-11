@@ -1570,15 +1570,21 @@ fun AppConfiguration.genericTextField(
     onFilterValue: ((String) -> Boolean)? = null,
     onTransformValue: ((String) -> String)? = null,
     successHighlightPulseKey: Int = 0,
+    // For synchronous parent-owned inputs, e.g. payment amounts edited by AITA's keypad.
+    // The parent owns persistence too; no second field draft may restore over its value.
+    parentOwnsValue: Boolean = false,
     onValueChange: ((String, () -> Unit) -> Unit)? = null
 ): GenericTextFieldContent {
+    require(!parentOwnsValue || (valueInitial != null && stateHost == null && stateKey == null)) {
+        "A parent-controlled field needs valueInitial and cannot also have a StateHost value"
+    }
 
     val state: Map<String, String>? by stateHost?.state?.collectAsState() ?: remember {
         mutableStateOf(emptyMap())
     }
 
     val stateValue = state?.get(stateKey)
-    val persistentTextDraftKey = if (persistTextDraft && shouldPersistUiTextDraft(keyboardType, stateKey)) {
+    val persistentTextDraftKey = if (!parentOwnsValue && persistTextDraft && shouldPersistUiTextDraft(keyboardType, stateKey)) {
         persistentUiDraftKey(stateHost, stateKey)
     } else {
         null
@@ -1598,7 +1604,7 @@ fun AppConfiguration.genericTextField(
         ?: stateKey
         ?: listOf(titleText, placeholderText, leadingIconPath.orEmpty()).joinToString("|")
 
-    val textFieldValueState: MutableState<TextFieldValue> = if (retainTextAcrossRecreation) {
+    val textFieldValueState: MutableState<TextFieldValue> = if (retainTextAcrossRecreation && !parentOwnsValue) {
         rememberSaveable(textFieldIdentityKey, stateSaver = TextFieldValue.Saver) {
             mutableStateOf(TextFieldValue(initialTextFieldText, selection = initialTextFieldMeta.selection))
         }
@@ -1608,6 +1614,19 @@ fun AppConfiguration.genericTextField(
         }
     }
     var textFieldValue by textFieldValueState
+    // Render the accepted parent value in this composition, including when an over-limit
+    // typed edit is rejected/clamped to the same value as before. An effect keyed only
+    // by valueInitial misses that case and leaves the rejected text on screen.
+    val displayedTextFieldValue = if (parentOwnsValue) {
+        reconcileControlledTextFieldValue(textFieldValue, valueInitial.orEmpty())
+    } else {
+        textFieldValue
+    }
+    SideEffect {
+        if (parentOwnsValue && textFieldValue != displayedTextFieldValue) {
+            textFieldValue = displayedTextFieldValue
+        }
+    }
 
     val persistentTextDraftLoadedState = if (retainTextAcrossRecreation && persistTextDraft) {
         rememberSaveable(textFieldIdentityKey, persistentTextDraftKey ?: "no_persistent_text_draft") {
@@ -1897,7 +1916,8 @@ fun AppConfiguration.genericTextField(
         )
     }
 
-    LaunchedEffect(valueInitial) {
+    LaunchedEffect(valueInitial, parentOwnsValue) {
+        if (parentOwnsValue) return@LaunchedEffect
         if (valueInitial != null && valueInitial != textFieldValue.text) {
             val cameRightAfterLocalEdit = getCurrentTimeMillis() - lastLocalTextEditMillis < 450L
             val externalClearAfterSuccessfulAction = valueInitial.isEmpty()
@@ -1910,7 +1930,8 @@ fun AppConfiguration.genericTextField(
         }
     }
 
-    LaunchedEffect(stateValue) {
+    LaunchedEffect(stateValue, parentOwnsValue) {
+        if (parentOwnsValue) return@LaunchedEffect
         if (stateKey != null && stateValue != null && stateValue != textFieldValue.text) {
             val cameRightAfterLocalEdit = getCurrentTimeMillis() - lastLocalTextEditMillis < 450L
             val externalClearAfterSuccessfulAction = stateValue.isEmpty()
@@ -2006,7 +2027,7 @@ fun AppConfiguration.genericTextField(
 
         CompositionLocalProvider(LocalTextSelectionColors provides textSelectionColors) {
             BasicTextField(
-                value = textFieldValue,
+                value = displayedTextFieldValue,
                 onValueChange = onValueChange@ { rawValue ->
                     lastLocalTextEditMillis = getCurrentTimeMillis()
                     val nextText = onTransformValue?.invoke(rawValue.text) ?: rawValue.text
@@ -2082,7 +2103,7 @@ fun AppConfiguration.genericTextField(
                     color = textColor
                 ),
                 visualTransformation = {
-                    visualTransformation(textFieldValue)
+                    visualTransformation(displayedTextFieldValue)
                 },
                 singleLine = singleLine,
                 cursorBrush = SolidColor(selectionBackgroundColor),
@@ -2133,11 +2154,11 @@ fun AppConfiguration.genericTextField(
                                     .background(animatedTextInputHighlightColor),
                                 contentAlignment = if (!adaptiveMultiline || adaptiveVisualLineCount <= 1) Alignment.CenterStart else Alignment.TopStart
                             ) {
-                                if (placeholderContent != null && textFieldValue.text.isEmpty()) {
+                                if (placeholderContent != null && displayedTextFieldValue.text.isEmpty()) {
                                     placeholderContent()
                                 } else {
                                     Text(
-                                        text = if (textFieldValue.text.isEmpty()) placeholderText else "",
+                                        text = if (displayedTextFieldValue.text.isEmpty()) placeholderText else "",
                                         fontSize = placeholderTextSize,
                                         color = placeholderTextColor,
                                         textAlign = TextAlign.Start,
@@ -2262,7 +2283,7 @@ fun AppConfiguration.genericTextField(
                                         }
                                     }
 
-                                    if (showClearButton && textFieldValue.text.isNotEmpty()) {
+                                    if (showClearButton && displayedTextFieldValue.text.isNotEmpty()) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxHeight()
@@ -2415,7 +2436,7 @@ fun AppConfiguration.genericTextField(
     }
 
     val content = GenericTextFieldContent(
-        value = textFieldValue,
+        value = displayedTextFieldValue,
         isFocused = isFocused,
         focusRequester = focusRequester,
         isContentValid = isContentValid,

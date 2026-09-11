@@ -4132,6 +4132,7 @@ internal fun AppConfiguration.TransactionPaymentAmountField(
     modifier: Modifier = Modifier,
     title: String,
     value: String,
+    identityKey: String,
     placeholder: String = "0.00",
     selected: Boolean,
     leadingIconPath: String,
@@ -4145,6 +4146,12 @@ internal fun AppConfiguration.TransactionPaymentAmountField(
         modifier = modifier,
         titleText = title,
         valueInitial = value,
+        identityKey = identityKey,
+        parentOwnsValue = true,
+        autoFocus = false,
+        retainTextAcrossRecreation = false,
+        persistTextDraft = false,
+        enableVoiceInput = false,
         placeholderText = placeholder,
         leadingIconPath = leadingIconPath,
         keyboardType = KeyboardType.Decimal,
@@ -5472,15 +5479,40 @@ fun AppConfiguration.TransactionPaymentScreen() {
             )
         }
 
-        val paymentScreenState by context.stateHost.state.collectAsState()
         val paymentModeStateKey = "payment_mode_${context.transactionTypeIndex}_${context.clientId}"
 
         var persistedPaymentDraftApplied by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(false) }
+        var paymentDraftEdited by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf(false) }
+        var selectedPaymentModeId by rememberSaveable(context.transactionTypeIndex, context.clientId) {
+            mutableStateOf(
+                context.stateHost.state.value[paymentModeStateKey]?.takeIf { it in listOf("0", "1", "2") }
+                    ?: persistedPaymentDraft?.paymentModeId?.takeIf { it in listOf("0", "1", "2") }
+                    ?: "1"
+            )
+        }
+        var amountFieldScrollRequest by remember(context.transactionTypeIndex, context.clientId) {
+            mutableStateOf<String?>(null)
+        }
+
+        fun selectAmountField(field: String) {
+            paymentDraftEdited = true
+            if (activeAmountField != field) {
+                activeAmountField = field
+                amountFieldScrollRequest = field
+            }
+        }
+
+        fun selectPaymentMode(modeId: String) {
+            paymentDraftEdited = true
+            selectedPaymentModeId = modeId
+            amountFieldScrollRequest = null
+            coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to modeId) }
+        }
         var paymentModeDefaultsInitializedFor by rememberSaveable(context.transactionTypeIndex, context.clientId) { mutableStateOf<String?>(null) }
 
         LaunchedEffect(context.transactionTypeIndex, context.clientId, persistedPaymentDraft?.updatedAtMillis) {
             val draft = persistedPaymentDraft ?: return@LaunchedEffect
-            if (persistedPaymentDraftApplied) return@LaunchedEffect
+            if (persistedPaymentDraftApplied || paymentDraftEdited) return@LaunchedEffect
 
             selectedCashlessPaymentMethodId = draft.cardPaymentOptionId
                 .takeIf { it > 0 }
@@ -5515,12 +5547,11 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
             draft.paymentModeId.takeIf { it in listOf("0", "1", "2") }?.let { restoredModeId ->
                 paymentModeDefaultsInitializedFor = restoredModeId
+                selectedPaymentModeId = restoredModeId
                 context.stateHost.setState(paymentModeStateKey to restoredModeId)
             }
             persistedPaymentDraftApplied = true
         }
-
-        val restoredPaymentModeId = persistedPaymentDraft?.paymentModeId?.takeIf { it in listOf("0", "1", "2") }
 
         val paymentMode = tabRowWidget(
             modifier = Modifier.padding(
@@ -5528,21 +5559,23 @@ fun AppConfiguration.TransactionPaymentScreen() {
                 top = stateValues.marginTextField,
                 end = stateValues.marginTextField
             ),
-            selectedIndexInitial = paymentScreenState[paymentModeStateKey] ?: restoredPaymentModeId ?: "1",
+            selectedIndexInitial = selectedPaymentModeId,
             tabs = listOf(
                 TabContent("0", stateValues.stringCash) {
-                    coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
+                    selectPaymentMode(it)
                 },
                 TabContent("1", stateValues.stringCashless) {
-                    coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
+                    selectPaymentMode(it)
                 },
                 TabContent("2", stateValues.stringMixed) {
-                    coroutineScope.launch { context.stateHost.setState(paymentModeStateKey to it) }
+                    selectPaymentMode(it)
                 }
             )
         )
 
         LaunchedEffect(paymentMode.id, total) {
+            // A disk hydration or click can supersede the mode this effect was composed for.
+            if (paymentMode.id != selectedPaymentModeId) return@LaunchedEffect
             if (persistedPaymentDraft != null && paymentModeDefaultsInitializedFor == null && paymentMode.id == persistedPaymentDraft.paymentModeId) {
                 paymentModeDefaultsInitializedFor = paymentMode.id
                 return@LaunchedEffect
@@ -5595,6 +5628,8 @@ fun AppConfiguration.TransactionPaymentScreen() {
         }
 
         fun setPaymentField(field: String, rawValue: String) {
+            paymentDraftEdited = true
+            paymentModeDefaultsInitializedFor = paymentMode.id
             val normalized = paymentInputNormalize(rawValue)
             val numericValue = normalized.toMoneyDouble()
             val maxValue = fieldMax(field)
@@ -5610,15 +5645,6 @@ fun AppConfiguration.TransactionPaymentScreen() {
                 "debt" -> debtText = finalText
                 else -> cashText = finalText
             }
-        }
-
-        fun setActiveAmount(value: Double) {
-            setPaymentField(activeAmountField, moneyInputFromDouble(value))
-        }
-
-        fun applyNumpadToken(token: String) {
-            val current = rawPaymentValue(activeAmountField)
-            setPaymentField(activeAmountField, paymentInputAppend(current, token))
         }
 
         val paidCash = when (paymentMode.id) {
@@ -5759,49 +5785,56 @@ fun AppConfiguration.TransactionPaymentScreen() {
             stateKey = "transaction_payment_scroll_${context.transactionTypeIndex}_${context.clientId}"
         )
 
+        val amountSlots = remember(paymentMode.id, activeAmountField) {
+            paymentAmountSlots(paymentMode.id, activeAmountField)
+        }
+        LaunchedEffect(amountFieldScrollRequest, paymentMode.id, activeAmountField) {
+            val field = amountFieldScrollRequest ?: return@LaunchedEffect
+            val index = amountSlots.indexOfFirst { !it.keypad && it.field == field }
+            if (index >= 0) paymentListState.animateScrollToItem(index)
+            if (amountFieldScrollRequest == field) amountFieldScrollRequest = null
+        }
+
         LazyColumn(
             state = paymentListState,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = stateValues.marginTextField)
         ) {
-            when (paymentMode.id) {
-                "0" -> {
-                    item {
-                        TransactionPaymentAmountField(
-                            title = stateValues.stringCash,
-                            value = cashText,
-                            selected = activeAmountField == "cash",
-                            leadingIconPath = stateValues.drawablePathIconFinances,
-                            onSelected = { activeAmountField = "cash" },
-                            onValueChange = { setPaymentField("cash", it) }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                        TransactionQuickAmountButtons(
-                            targetAmount = total,
-                            currencyCode = currencyCode,
-                            currencySymbol = currencySymbol,
-                            includeExactRemaining = true,
-                            currentAmount = cashText.toMoneyDouble(),
-                            onAmountSelected = {
-                                activeAmountField = "cash"
-                                setPaymentField("cash", moneyInputFromDouble(it))
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                        TransactionNumpad(
-                            onInput = {
-                                activeAmountField = "cash"
-                                applyNumpadToken(it)
-                            }
-                        )
-                    }
+            items(amountSlots, key = { it.key }, contentType = { if (it.keypad) "payment-keypad" else "payment-field" }) { slot ->
+                val field = slot.field
+                if (slot.keypad) {
+                    TransactionNumpad(onInput = { token ->
+                        setPaymentField(field, paymentInputAppend(rawPaymentValue(field), token))
+                    })
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                    TransactionQuickAmountButtons(
+                        targetAmount = if (paymentMode.id == "0") total else targetForField(field),
+                        currencyCode = currencyCode,
+                        currencySymbol = currencySymbol,
+                        includeExactRemaining = true,
+                        currentAmount = rawPaymentValue(field).toMoneyDouble(),
+                        onAmountSelected = { setPaymentField(field, moneyInputFromDouble(it)) }
+                    )
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                } else {
+                    TransactionPaymentAmountField(
+                        title = when (field) {
+                            "card" -> stateValues.stringCashless
+                            "debt" -> stateValues.stringDebtors
+                            else -> stateValues.stringCash
+                        },
+                        value = rawPaymentValue(field),
+                        identityKey = "payment:${context.transactionTypeIndex}:${context.clientId}:$field",
+                        selected = activeAmountField == field,
+                        leadingIconPath = if (field == "debt") stateValues.drawablePathIconDebtors else stateValues.drawablePathIconFinances,
+                        onSelected = { selectAmountField(field) },
+                        onValueChange = { setPaymentField(field, it) }
+                    )
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
                 }
-
+            }
+            when (paymentMode.id) {
                 "1" -> {
                     item {
                         Text(
@@ -5825,6 +5858,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                     text = option.name.extractLocalizedString(stateValues.appLanguage) ?: option.id,
                                     selected = selectedCashlessPaymentMethodId == option.id
                                 ) {
+                                    paymentDraftEdited = true
                                     selectedCashlessPaymentMethodId = option.id
                                 }
                             }
@@ -5838,92 +5872,11 @@ fun AppConfiguration.TransactionPaymentScreen() {
                     }
                 }
 
-                else -> {
-                    item {
-                        TransactionPaymentAmountField(
-                            title = stateValues.stringCash,
-                            value = cashText,
-                            selected = activeAmountField == "cash",
-                            leadingIconPath = stateValues.drawablePathIconFinances,
-                            onSelected = { activeAmountField = "cash" },
-                            onValueChange = { setPaymentField("cash", it) }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                        TransactionQuickAmountButtons(
-                            targetAmount = targetForField("cash"),
-                            currencyCode = currencyCode,
-                            currencySymbol = currencySymbol,
-                            includeExactRemaining = true,
-                            currentAmount = cashText.toMoneyDouble(),
-                            onAmountSelected = {
-                                activeAmountField = "cash"
-                                setPaymentField("cash", moneyInputFromDouble(it))
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                        TransactionPaymentAmountField(
-                            title = stateValues.stringCashless,
-                            value = cardText,
-                            selected = activeAmountField == "card",
-                            leadingIconPath = stateValues.drawablePathIconFinances,
-                            onSelected = { activeAmountField = "card" },
-                            onValueChange = { setPaymentField("card", it) }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                        TransactionQuickAmountButtons(
-                            targetAmount = targetForField("card"),
-                            currencyCode = currencyCode,
-                            currencySymbol = currencySymbol,
-                            includeExactRemaining = true,
-                            currentAmount = cardText.toMoneyDouble(),
-                            onAmountSelected = {
-                                activeAmountField = "card"
-                                setPaymentField("card", moneyInputFromDouble(it))
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                        TransactionPaymentAmountField(
-                            title = stateValues.stringDebtors,
-                            value = debtText,
-                            selected = activeAmountField == "debt",
-                            leadingIconPath = stateValues.drawablePathIconDebtors,
-                            onSelected = { activeAmountField = "debt" },
-                            onValueChange = { setPaymentField("debt", it) }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                        TransactionQuickAmountButtons(
-                            targetAmount = targetForField("debt"),
-                            currencyCode = currencyCode,
-                            currencySymbol = currencySymbol,
-                            includeExactRemaining = true,
-                            currentAmount = debtText.toMoneyDouble(),
-                            onAmountSelected = {
-                                activeAmountField = "debt"
-                                setPaymentField("debt", moneyInputFromDouble(it))
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
+                "2" -> {
+                    item(key = "payment-debt-summary") {
                         TransactionDebtText(
                             debtAmount = debtAmount,
                             currencySymbol = currencySymbol
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                        TransactionNumpad(
-                            onInput = ::applyNumpadToken
                         )
 
                         if (debtAmount > 0.0) {
@@ -5946,6 +5899,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                 debtor = debtor,
                                 selected = debtor.id == selectedDebtorId,
                                 onClick = {
+                                    paymentDraftEdited = true
                                     selectedDebtorId = if (selectedDebtorId == debtor.id) null else debtor.id
                                 }
                             )
@@ -5971,7 +5925,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                     selectedId = newDebtorType,
                                     options = listOf(DropdownOption("individual", localizedStringResource(289, "Individual")), DropdownOption("company", localizedStringResource(290, "Company"))),
                                     placeholder = localizedStringResource(288, "Debtor form"),
-                                    onSelected = { newDebtorType = it }
+                                    onSelected = { paymentDraftEdited = true; newDebtorType = it }
                                 )
 
                                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -5982,7 +5936,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                         value = newDebtorCompanyName,
                                         placeholder = localizedStringResource(291, "Company name"),
                                         leadingIconPath = stateValues.drawablePathIconStores,
-                                        onValueChange = { newDebtorCompanyName = it }
+                                        onValueChange = { paymentDraftEdited = true; newDebtorCompanyName = it }
                                     )
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -5993,7 +5947,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                         placeholder = localizedStringResource(292, "Company ID / BIN"),
                                         leadingIconPath = stateValues.drawablePathIconStores,
                                         keyboardType = KeyboardType.Number,
-                                        onValueChange = { newDebtorCompanyIdNumber = it.filter { ch -> ch.isDigit() }.take(32) }
+                                        onValueChange = { paymentDraftEdited = true; newDebtorCompanyIdNumber = it.filter { ch -> ch.isDigit() }.take(32) }
                                     )
                                 } else {
                                     TransactionPlainTextField(
@@ -6001,7 +5955,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                         value = newDebtorFirstName,
                                         placeholder = stateValues.stringFirstName,
                                         leadingIconPath = stateValues.drawablePathIconPerson,
-                                        onValueChange = { newDebtorFirstName = it }
+                                        onValueChange = { paymentDraftEdited = true; newDebtorFirstName = it }
                                     )
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -6011,7 +5965,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                         value = newDebtorLastName,
                                         placeholder = stateValues.stringLastName,
                                         leadingIconPath = stateValues.drawablePathIconPerson,
-                                        onValueChange = { newDebtorLastName = it }
+                                        onValueChange = { paymentDraftEdited = true; newDebtorLastName = it }
                                     )
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -6022,7 +5976,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                         placeholder = localizedStringResource(294, "ID number optional"),
                                         leadingIconPath = stateValues.drawablePathIconPerson,
                                         keyboardType = KeyboardType.Number,
-                                        onValueChange = { newDebtorIdNumber = it.filter { ch -> ch.isDigit() }.take(32) }
+                                        onValueChange = { paymentDraftEdited = true; newDebtorIdNumber = it.filter { ch -> ch.isDigit() }.take(32) }
                                     )
                                 }
 
@@ -6034,7 +5988,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                     placeholder = stateValues.stringPhoneNumber,
                                     leadingIconPath = stateValues.drawablePathIconPerson,
                                     keyboardType = KeyboardType.Phone,
-                                    onValueChange = { newDebtorPhone = it.filter { ch -> ch.isDigit() || ch == '+' } }
+                                    onValueChange = { paymentDraftEdited = true; newDebtorPhone = it.filter { ch -> ch.isDigit() || ch == '+' } }
                                 )
 
                                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -6045,12 +5999,12 @@ fun AppConfiguration.TransactionPaymentScreen() {
                                     placeholder = stateValues.stringEmail,
                                     leadingIconPath = stateValues.drawablePathIconEmail,
                                     keyboardType = KeyboardType.Email,
-                                    onValueChange = { newDebtorEmail = it }
+                                    onValueChange = { paymentDraftEdited = true; newDebtorEmail = it }
                                 )
 
                                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                                StockDatePartsEditor(localizedStringResource(314, "Final due date"), newDebtDueDateText) { newDebtDueDateText = it }
+                                StockDatePartsEditor(localizedStringResource(314, "Final due date"), newDebtDueDateText) { paymentDraftEdited = true; newDebtDueDateText = it }
                             }
                         }
                     }

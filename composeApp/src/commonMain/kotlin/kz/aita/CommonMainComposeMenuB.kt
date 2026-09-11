@@ -1871,6 +1871,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     TransactionPaymentAmountField(
                         title = localizedStringResource(362, "Debt amount"),
                         value = debtAmountText,
+                        identityKey = "debtor:${debtor.id}:edit",
                         selected = true,
                         onSelected = {},
                         onValueChange = { debtAmountText = it },
@@ -1920,6 +1921,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     TransactionPaymentAmountField(
                         title = localizedStringResource(364, "Planned amount"),
                         value = planAmountText,
+                        identityKey = "debtor:${debtor.id}:plan",
                         selected = true,
                         onSelected = {},
                         onValueChange = { planAmountText = it },
@@ -2012,6 +2014,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     TransactionPaymentAmountField(
                         title = stateValues.stringCloseDebt,
                         value = paymentAmountText,
+                        identityKey = "debtor:${debtor.id}:payment",
                         selected = true,
                         onSelected = {},
                         onValueChange = { paymentAmountText = it },

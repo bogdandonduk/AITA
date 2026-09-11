@@ -11136,11 +11136,9 @@ private fun advanceAuthenticatedSessionGenerationLocked(): Long {
     return authenticatedSessionGeneration
 }
 
-@PublishedApi
-internal fun currentAuthenticatedSessionGeneration(): Long = authenticatedSessionGeneration
+fun currentAuthenticatedSessionGeneration(): Long = authenticatedSessionGeneration
 
-@PublishedApi
-internal fun authenticatedSessionGenerationIsCurrent(expectedGeneration: Long): Boolean =
+fun authenticatedSessionGenerationIsCurrent(expectedGeneration: Long): Boolean =
     authenticatedSessionGeneration == expectedGeneration && getStoredUserAuthTokens?.invoke() != null
 
 private fun authenticatedSessionRefreshIsCurrent(

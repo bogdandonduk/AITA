@@ -161,7 +161,7 @@ class PublicAuthenticationRequestTest {
         }
         try {
             assertEquals(HttpStatusCode.OK, client.get("https://aita.test/stock/get").status)
-            assertEquals(listOf("Bearer expired", "Bearer renewed"), sent)
+            assertEquals<List<String?>>(listOf("Bearer expired", "Bearer renewed"), sent.toList())
             assertEquals(1, refreshes)
         } finally { client.close() }
     }
