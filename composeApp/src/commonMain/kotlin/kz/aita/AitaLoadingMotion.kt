@@ -164,7 +164,8 @@ internal fun AitaLiveMenuPane(
 ) {
     val destination = navigationStack.lastOrNull() ?: return
     val target = AitaSceneMotionTarget(label, destination.route, navigationStack.map { it.route })
-    Box(modifier.aitaSceneMotion(target)) {
+    val paneWidth = (destination as? NavigationScreenModel.Menu)?.let(::menuPaneMaximumWidth) ?: 1200.dp
+    Box(modifier.aitaWidthCap(paneWidth).aitaSceneMotion(target)) {
         key(destination.route) { content(navigationStack) }
     }
 }

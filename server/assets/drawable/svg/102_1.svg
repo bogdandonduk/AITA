@@ -1,17 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-  <defs>
-    <linearGradient id="g" x1="14" y1="12" x2="82" y2="84" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#B8F3FF"/>
-      <stop offset="1" stop-color="#B6A8FF"/>
-    </linearGradient>
-  </defs>
-  <rect x="12" y="12" width="72" height="72" rx="22" fill="url(#g)" opacity="0.28"/>
-  <path d="M30 22h30c5 0 9 4 9 9v42c0 5-4 9-9 9H30c-5 0-9-4-9-9V31c0-5 4-9 9-9z" fill="#152033" opacity="0.96"/>
-  <path d="M30 22h30c5 0 9 4 9 9v42c0 5-4 9-9 9H30c-5 0-9-4-9-9V31c0-5 4-9 9-9z" fill="none" stroke="#F5F8FF" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M36 18h18c3 0 5 2 5 5v6H31v-6c0-3 2-5 5-5z" fill="#FFD56A" stroke="#F5F8FF" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M35 45h22M35 58h16M35 70h24" stroke="#F5F8FF" stroke-width="4" stroke-linecap="round" opacity="0.60"/>
-  <path d="M26 45l4 4 8-10" fill="none" stroke="#70F0B5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="66" cy="44" r="8" fill="#FF8FA4" opacity="0.98"/>
-  <path d="M61 44h10M66 39v10" stroke="#152033" stroke-width="4" stroke-linecap="round"/>
-  <path d="M60 64c4-3 9-3 13 0M60 72c4 3 9 3 13 0" fill="none" stroke="#8EE6FF" stroke-width="4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M4 2h16v20H4z M8 6h8 M8 10h3 M14 10h2 M8 14h3 M14 14h2 M8 18h3 M14 18h2" stroke="#F5F7FA" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

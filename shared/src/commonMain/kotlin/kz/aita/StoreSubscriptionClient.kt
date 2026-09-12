@@ -31,12 +31,14 @@ private fun subscriptionCacheKey(account: String, store: String) = "subscription
 private fun currentSubscriptionAccountId(): String? = userAccountState.payloadValue?.id
     ?.takeIf { it.isNotBlank() && getStoredUserAuthTokens?.invoke() != null }
 
-fun currentStoreHasSubscriptionAccess(storeId: String?, now: Long = getCurrentTimeMillis()): Boolean {
-    val account = currentSubscriptionAccountId() ?: return false
-    val store = storeId?.takeIf { it.isNotBlank() } ?: return false
-    val key = subscriptionCacheKey(account, store)
-    return key !in deniedSubscriptionKeys.value && verifiedSubscriptions.value[key]?.allows(store, now) == true
+fun currentStoreSubscriptionGate(storeId: String?, now: Long = getCurrentTimeMillis()): StoreSubscriptionGate {
+    val account = currentSubscriptionAccountId()
+    val key = if (account != null && !storeId.isNullOrBlank()) subscriptionCacheKey(account, storeId) else null
+    return resolveStoreSubscriptionGate(account, storeId, key?.let { verifiedSubscriptions.value[it] },
+        key != null && key in deniedSubscriptionKeys.value, now)
 }
+fun currentStoreHasSubscriptionAccess(storeId: String?, now: Long = getCurrentTimeMillis()): Boolean =
+    currentStoreSubscriptionGate(storeId, now) == StoreSubscriptionGate.Active
 
 internal fun clearStoreSubscriptionRuntime() {
     verifiedSubscriptions.value = emptyMap()
@@ -107,9 +109,11 @@ private suspend fun acceptSubscriptionDashboard(account: String, generation: Lon
 }
 
 /** Used after an authoritative 402/403. Does not erase inventory, drafts, or queued operations. */
-suspend fun invalidateStoreSubscriptionAccess(storeId: String, observedBeforeMillis: Long = Long.MAX_VALUE) {
-    val account = currentSubscriptionAccountId() ?: return
-    val generation = currentAuthenticatedSessionGeneration()
+suspend fun invalidateStoreSubscriptionAccess(storeId: String, observedBeforeMillis: Long = Long.MAX_VALUE,
+    expectedAccountId: String? = userAccountState.payloadValue?.id,
+    expectedGeneration: Long = currentAuthenticatedSessionGeneration()) {
+    val account = expectedAccountId ?: return
+    val generation = expectedGeneration
     val key = subscriptionCacheKey(account, storeId)
     subscriptionPublicationMutex.withLock {
         if (currentSubscriptionAccountId() != account || !authenticatedSessionGenerationIsCurrent(generation)) return@withLock
@@ -231,9 +235,11 @@ suspend fun checkStoreSubscriptionForNetwork(endpoint: String, storeId: String?)
     val known = verifiedSubscriptions.value[subscriptionCacheKey(account, store)]
     if (known == null && subscriptionCacheKey(account, store) !in deniedSubscriptionKeys.value)
         refreshStoreSubscriptionNow(store, onlyIfUnknown = true)
-    return if (currentStoreHasSubscriptionAccess(store)) null else eventMessage(
-        if (subscriptionCacheKey(account, store) in verifiedSubscriptions.value ||
-            subscriptionCacheKey(account, store) in deniedSubscriptionKeys.value) "subscription.required" else "subscription.verify")
+    return when (currentStoreSubscriptionGate(store)) {
+        StoreSubscriptionGate.Active -> null
+        StoreSubscriptionGate.Required -> eventMessage("subscription.required")
+        StoreSubscriptionGate.Checking -> eventMessage("subscription.verify")
+    }
 }
 
 /** Recovers a lost success response without persisting/replaying a secret promo code. */

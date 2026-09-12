@@ -63,9 +63,9 @@ class SubscriptionAdminTest(unittest.TestCase):
 
     def test_explicit_bindings_and_limits(self):
         sql = admin.promo_sql(self.args("promo", "--type", "lifetime", "--region", "kz", "--store-id",
-            "a4dd4118-f19b-49a8-a560-4b29315aa246", "--max-redemptions", "2"), "AITA-BOUND")
+            "a4dd4118-f19b-49a8-a560-4b29315aa246", "--max-redemptions", "1"), "AITA-BOUND")
         self.assertIn("'KZ'", sql); self.assertIn("'a4dd4118-f19b-49a8-a560-4b29315aa246'", sql)
-        for bad in ("0", "-1", "9223372036854775808"):
+        for bad in ("0", "-1", "2", "9223372036854775808"):
             with self.assertRaises(ValueError):
                 admin.promo_sql(self.args("promo", "--type", "lifetime", "--max-redemptions", bad), "AITA-BOUND")
 
@@ -99,7 +99,7 @@ class SubscriptionAdminTest(unittest.TestCase):
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 self.assertEqual(0, admin.main(["promo", "--type", "lifetime", "--sql", str(path)]))
             code = stderr.getvalue().strip().splitlines()[-1]
-            self.assertRegex(code, r"^AITA-[A-F0-9]{40}$")
+            self.assertRegex(code, r"^[0-9A-HJKMNP-TV-Z]{5}(?:-[0-9A-HJKMNP-TV-Z]{5}){3}$")
             self.assertNotIn(code, path.read_text()); self.assertNotIn(code, stdout.getvalue())
             self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
             original = path.read_bytes()
@@ -107,13 +107,27 @@ class SubscriptionAdminTest(unittest.TestCase):
                 admin.main(["promo", "--type", "lifetime", "--sql", str(path)])
             self.assertEqual(original, path.read_bytes())
 
-    def test_environment_secret_is_not_in_the_sql(self):
-        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"AITA_TEST_PROMO_CODE": "aita-private-code"}):
+    def test_weak_custom_code_entry_point_is_removed(self):
+        with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "code.sql"
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 admin.main(["promo", "--type", "lifetime", "--code-env", "AITA_TEST_PROMO_CODE", "--sql", str(path)])
-            self.assertIn(hashlib.sha256(b"AITA-PRIVATE-CODE").hexdigest(), path.read_text())
-            self.assertNotIn("PRIVATE-CODE", path.read_text())
+            self.assertFalse(path.exists())
+
+    def test_generator_uses_twenty_independent_secure_choices(self):
+        self.assertEqual(32, len(set(admin.PROMO_ALPHABET)))
+        with patch.object(admin.secrets, "choice", return_value="Z") as choice:
+            self.assertEqual("ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ", admin.generate_code())
+        self.assertEqual(20, choice.call_count)
+        self.assertTrue(all(call.args == (admin.PROMO_ALPHABET,) for call in choice.call_args_list))
+
+    def test_code_grouping_round_trips_without_changing_legacy_code_identity(self):
+        for _ in range(100):
+            code = admin.generate_code()
+            self.assertEqual(23, len(code))
+            self.assertEqual(20, len(code.replace("-", "")))
+            self.assertEqual(code, admin.normalize_code("  " + code.lower() + "  "))
+        self.assertEqual("AITA-OLDER-CODE", admin.normalize_code("aita-older-code"))
 
     def test_invalid_input_creates_no_file(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -19,7 +19,13 @@ internal data class VerifiedStoreSubscription(
         val elapsed = (localNow - verifiedAtLocalMillis).coerceAtLeast(0L)
         return verifiedAtServerMillis.takeIf { it <= Long.MAX_VALUE - elapsed }?.plus(elapsed)
     }
-    fun allows(storeId: String, localNow: Long): Boolean = effectiveNow(localNow)?.let {
-        subscription.grantsStoreAccess(storeId, it)
-    } == true
+    fun allows(storeId: String, localNow: Long): Boolean {
+        if (subscription.accessKind == SUBSCRIPTION_ACCESS_LIFETIME) {
+            // No invented far-future date, elapsed-clock lease or periodic renewal. The grant's
+            // shape was verified at server time; a device clock adjustment cannot expire it.
+            return verifiedAtServerMillis > 0L && verifiedAtLocalMillis > 0L &&
+                subscription.grantsStoreAccess(storeId, verifiedAtServerMillis)
+        }
+        return effectiveNow(localNow)?.let { subscription.grantsStoreAccess(storeId, it) } == true
+    }
 }

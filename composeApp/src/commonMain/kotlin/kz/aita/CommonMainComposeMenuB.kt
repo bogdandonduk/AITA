@@ -1212,366 +1212,6 @@ internal fun AppConfiguration.SupportFaqCard(entry: SupportFaqEntry) {
 }
 
 @Composable
-internal fun AppConfiguration.SupportMessageBubble(message: SupportMessageDataModel) {
-    val mine = message.senderRole == "customer"
-    val alignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart
-    val bubbleColor = if (mine) Color.Transparent else stateValues.AccentColor
-    val bodyColor = if (mine) stateValues.TextColor else stateValues.AccentTextColor
-    val metadataColor = if (mine) stateValues.PlaceholderTextColor else stateValues.AccentTextColor
-
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = alignment) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 0.86f else 0.68f)
-                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                .background(bubbleColor)
-                .padding(stateValues.marginTextField)
-        ) {
-            Text(
-                text = if (mine) localizedStringResource(834, "You") else message.senderDisplayName.ifBlank { localizedStringResource(835, "Support team") },
-                color = if (mine) stateValues.AccentColor else stateValues.AccentTextColor,
-                fontSize = stateValues.smallTextSize,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = message.body,
-                color = bodyColor,
-                fontSize = stateValues.textSize
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = receiptUiDateTime(message.createdAtMillis),
-                color = metadataColor,
-                fontSize = stateValues.smallTextSize,
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-@Composable
-fun AppConfiguration.MenuSupportScreen() {
-    val ticketsState by supportTicketsState.value.collectAsState()
-    val tickets = (ticketsState as? DataState.Success<List<SupportTicketDataModel>>)?.payload.orEmpty()
-    val messagesState by supportMessagesState.value.collectAsState()
-    val messages = (messagesState as? DataState.Success<List<SupportMessageDataModel>>)?.payload.orEmpty()
-    val sending by supportMessageSendingState.collectAsState()
-    val activeTicketId by activeSupportTicketIdState.collectAsState()
-
-    var selectedTab by rememberSaveable { mutableStateOf("faq") }
-    var faqSearch by rememberSaveable { mutableStateOf("") }
-    var draftMessage by rememberSaveable { mutableStateOf("") }
-    var selectedCategory by rememberSaveable { mutableStateOf("general") }
-    var composingNewTicket by rememberSaveable { mutableStateOf(false) }
-    val faqEntries = supportFaqEntries()
-
-    val selectedTicket = if (composingNewTicket) null else (
-        tickets.firstOrNull { it.id == activeTicketId }
-            ?: tickets.firstOrNull { it.status != "closed" }
-            ?: tickets.firstOrNull()
-        )
-
-    LaunchedEffect(Unit) { getSupportTickets() }
-    LaunchedEffect(tickets.joinToString("|") { it.id }, composingNewTicket) {
-        if (!composingNewTicket && activeTicketId == null) {
-            val firstTicketId = tickets.firstOrNull { it.status != "closed" }?.id ?: tickets.firstOrNull()?.id
-            firstTicketId?.let { activeSupportTicketIdState.emit(it) }
-        }
-    }
-    LaunchedEffect(selectedTicket?.id, composingNewTicket) {
-        if (!composingNewTicket) {
-            selectedTicket?.let {
-                activeSupportTicketIdState.emit(it.id)
-                getSupportMessages(it.id, markRead = true)
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(813, "Support"),
-            iconPath = stateValues.drawablePathIconSupport,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
-        )
-
-        tabRowWidget(
-            modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
-            tabs = listOf(
-                TabContent("faq", tabLabelWithCount(localizedStringResource(814, "FAQ"), faqEntries.size)) { selectedTab = it },
-                TabContent("chat", tabLabelWithCount(localizedStringResource(815, "Support chat"), tickets.size)) { selectedTab = it }
-            ),
-            selectedIndexInitial = selectedTab
-        )
-
-        if (selectedTab == "faq") {
-            val allEntries = faqEntries
-            val query = faqSearch.trim()
-            val filtered = allEntries.filter { entry ->
-                val question = localizedStringResource(entry.questionId, entry.questionFallback)
-                val answer = localizedStringResource(entry.answerId, entry.answerFallback)
-                val category = localizedStringResource(entry.categoryId, "General")
-                query.isBlank() || listOf(question, answer, category).any { it.contains(query, ignoreCase = true) }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                    .padding(horizontal = stateValues.marginTextField)
-            ) {
-                TransactionPlainTextField(
-                    title = "",
-                    value = faqSearch,
-                    placeholder = localizedStringResource(816, "Search FAQ"),
-                    leadingIconPath = stateValues.drawablePathIconSearch,
-                    stateHost = NavigationScreenModel.Menu.Support,
-                    stateKey = "menu_support_faq_search",
-                    onValueChange = { faqSearch = it }
-                )
-            }
-
-            LazyColumn(
-                state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Support, "faq"),
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                    .padding(stateValues.marginTextField),
-                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-            ) {
-                if (filtered.isEmpty()) {
-                    item { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(841, "Nothing found in FAQ")) }
-                } else {
-                    items(filtered, key = { it.questionId }) { entry -> SupportFaqCard(entry) }
-                }
-                item { Spacer(modifier = Modifier.height(stateValues.screenHeight / 5)) }
-            }
-        } else {
-            val categories = listOf(
-                "general" to localizedStringResource(819, "General"),
-                "billing" to localizedStringResource(820, "Billing"),
-                "technical" to localizedStringResource(821, "Technical"),
-                "operations" to localizedStringResource(822, "Store operations"),
-                "account" to localizedStringResource(823, "Account and security")
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                    .weight(1f)
-            ) {
-                if (tickets.isNotEmpty()) {
-                    LazyRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                    ) {
-                        items(tickets, key = { it.id }) { ticket ->
-                            actionButton(
-                                text = ticket.subject,
-                                subText = "${ticket.publicId} • ${if (ticket.status == "closed") localizedStringResource(832, "Closed") else localizedStringResource(831, "Open")}",
-                                iconPath = stateValues.drawablePathIconSupport,
-                                iconRes = stateValues.drawableResIconSupport.value,
-                                enabledColor = if (!composingNewTicket && ticket.id == selectedTicket?.id) stateValues.AccentColor else stateValues.DisabledColor,
-                                fillMaxWidthIfTextPresent = false,
-                                onClick = {
-                                    composingNewTicket = false
-                                    coroutineScope.launch {
-                                        activeSupportTicketIdState.emit(ticket.id)
-                                        getSupportMessages(ticket.id, markRead = true)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-
-                selectedTicket?.let { ticket ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = stateValues.marginTextField)
-                            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                            .clip(RoundedCornerShape(stateValues.cornerRadius))
-                            .background(stateValues.BackgroundColor)
-                            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                            .padding(stateValues.marginTextField)
-                    ) {
-                        Text(
-                            text = ticket.subject,
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.accentTextSize,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "${ticket.publicId} • ${localizedStringResource(842, "Last update")}: ${receiptUiDateTime(ticket.updatedAtMillis)}",
-                            color = stateValues.PlaceholderTextColor,
-                            fontSize = stateValues.smallTextSize
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-                            actionButton(
-                                text = localizedStringResource(826, "New question"),
-                                iconPath = stateValues.drawablePathIconAdd,
-                                fillMaxWidthIfTextPresent = false,
-                                onClick = {
-                                    composingNewTicket = true
-                                    coroutineScope.launch {
-                                        activeSupportTicketIdState.emit(null)
-                                        supportMessagesState.emit(DataState.Success(emptyList()))
-                                    }
-                                }
-                            )
-                            if (ticket.status == "closed") {
-                                actionButton(
-                                    text = localizedStringResource(828, "Reopen request"),
-                                    iconPath = stateValues.drawablePathIconSwitch,
-                                    fillMaxWidthIfTextPresent = false,
-                                    onClick = { reopenSupportTicket(ticket.id) }
-                                )
-                            } else {
-                                actionButton(
-                                    text = localizedStringResource(827, "Close request"),
-                                    iconPath = stateValues.drawablePathIconCancel,
-                                    fillMaxWidthIfTextPresent = false,
-                                    enabledColor = stateValues.ErrorColor,
-                                    confirmationRequired = true,
-                                    onClick = { closeSupportTicket(ticket.id) }
-                                )
-                            }
-                        }
-                    }
-                } ?: Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
-                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                        .clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                        .padding(stateValues.marginTextFieldGroup)
-                ) {
-                    Text(localizedStringResource(817, "Ask support"), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(localizedStringResource(830, "We usually answer inside this chat. Describe what happened and add IDs, barcode, store or screenshots if useful."), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                    Text(localizedStringResource(818, "Choose topic"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    tabRowWidget(
-                        modifier = Modifier.fillMaxWidth(),
-                        tabs = categories.map { (id, title) ->
-                            TabContent(id, title) { selectedCategory = it }
-                        },
-                        selectedIndexInitial = selectedCategory,
-                        textSize = stateValues.smallTextSize
-                    )
-                }
-
-                LazyColumn(
-                    state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Support, selectedTicket?.id ?: "new_ticket"),
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(stateValues.marginTextField),
-                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                ) {
-                    if (selectedTicket == null) {
-                        item { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(817, "Ask support"), subText = localizedStringResource(824, "Type your message")) }
-                    } else if (messages.isEmpty()) {
-                        item { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(829, "No support messages yet")) }
-                    } else {
-                        items(messages, key = { it.id }) { message -> SupportMessageBubble(message) }
-                    }
-                    item { Spacer(modifier = Modifier.height(24.dp)) }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2)
-                ) {
-                    if (selectedTicket?.status == "closed") {
-                        Text(
-                            text = localizedStringResource(837, "This request is closed. Reopen it to send a new message."),
-                            color = stateValues.PlaceholderTextColor,
-                            fontSize = stateValues.smallTextSize,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                    ) {
-                        SimpleTextInput(
-                            modifier = Modifier.weight(1f),
-                            value = draftMessage,
-                            placeholder = localizedStringResource(824, "Type your message"),
-                            singleLine = false,
-                            leadingIconPath = stateValues.drawablePathIconSupport,
-                            stateHost = NavigationScreenModel.Menu.Support,
-                            stateKey = "menu_support_draft_message",
-                            onValueChange = { draftMessage = it.take(4000) }
-                        )
-                        actionButton(
-                            text = "",
-                            iconPath = supportSendIconPath(),
-                            iconRes = supportSendIconFallback(),
-                            iconContentDescription = localizedStringResource(825, "Send"),
-                            enabled = draftMessage.isNotBlank() && !sending && selectedTicket?.status != "closed",
-                            loading = sending,
-                            loadingText = localizedStringResource(907, "Sending…"),
-                            onDisabledClick = {
-                                if (draftMessage.isBlank()) postInAppNotification(localizedStringResource(824, "Type your message"), NotificationType.Neutral)
-                            },
-                            onClick = {
-                                val textToSend = draftMessage.trim()
-                                if (textToSend.isNotBlank()) {
-                                    val currentTicket = selectedTicket
-                                    draftMessage = ""
-                                    if (currentTicket == null) {
-                                        createSupportTicket(
-                                            SupportTicketCreateRequestDataModel(
-                                                subject = textToSend.take(80),
-                                                initialMessage = textToSend,
-                                                category = selectedCategory,
-                                                storeId = stateValues.activeStoreId,
-                                                metadata = mapOf("clientLanguage" to stateValues.appLanguage),
-                                                clientMessageId = "support_${getCurrentTimeMillis()}_${textToSend.hashCode()}"
-                                            )
-                                        ) { state ->
-                                            if (state is DataState.Success) coroutineScope.launch { composingNewTicket = false }
-                                        }
-                                    } else {
-                                        sendSupportMessage(
-                                            SupportMessageSendRequestDataModel(
-                                                ticketId = currentTicket.id,
-                                                body = textToSend,
-                                                metadata = mapOf("clientLanguage" to stateValues.appLanguage),
-                                                clientMessageId = "support_${getCurrentTimeMillis()}_${textToSend.hashCode()}"
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun AppConfiguration.MenuDebtorsScreen() {
     var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -2217,17 +1857,15 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
     ),
     AppModeOptionUiModel(
         modeId = APP_MODE_BUYER,
-        title = localizedStringResource(725, "Buyer mode"),
-        subtitle = localizedStringResource(1387, "Personal buying, carts, order history and marketplace discovery."),
-        promise = localizedStringResource(1388, "Best for the end user choosing and tracking goods."),
-        iconPath = stateValues.drawablePathIconAppModeBuyer,
-        iconRes = stateValues.drawableResIconAppModeBuyer.value,
-        features = listOf(
-            stateValues.stringSearchByAnyData,
-            stateValues.stringCart,
-            localizedStringResource(254, "Orders"),
-            localizedStringResource(177, "Notifications")
-        )
+        title = authUiText("Buyer · preview", "Покупатель · предварительная версия", "Сатып алушы · алдын ала нұсқа"),
+        subtitle = authUiText("Browse published shop windows, save products and compare matching offers.",
+            "Смотрите витрины, сохраняйте товары и сравнивайте предложения.", "Витриналарды қарап, тауарларды сақтаңыз және ұсыныстарды салыстырыңыз."),
+        promise = authUiText("Discovery first. Ordering and online payment are not enabled yet.",
+            "Сначала — выбор товаров. Заказ и онлайн-оплата пока не подключены.", "Әзірге — тауар таңдау. Тапсырыс пен онлайн төлем әлі қосылмаған."),
+        iconPath = marketIconPath(139),
+        iconRes = marketIconFallback(139),
+        features = listOf(authUiText("Shop windows", "Витрины", "Витриналар"),
+            authUiText("Saved offers", "Сохранённое", "Сақталғандар"), authUiText("Comparison", "Сравнение", "Салыстыру"))
     ),
     AppModeOptionUiModel(
         modeId = APP_MODE_SUPPLIER,
@@ -2260,7 +1898,7 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
 )
 
 internal fun appModeIsAvailableInCurrentRelease(optionModeId: Int, currentModeId: Int): Boolean =
-    optionModeId in setOf(APP_MODE_STORE, APP_MODE_SUPPLIER)
+    optionModeId in setOf(APP_MODE_STORE, APP_MODE_SUPPLIER, APP_MODE_BUYER)
 
 internal fun AppConfiguration.availableAppModeOptions(currentModeId: Int): List<AppModeOptionUiModel> =
     appModeOptions().filter { option -> appModeIsAvailableInCurrentRelease(option.modeId, currentModeId) }
@@ -5665,7 +5303,34 @@ internal fun List<NotificationDataModel>.compactForPopupDisplay(): List<Notifica
 
 @Composable
 fun AppConfiguration.MainScreen() {
-    val subscriptionAccess = rememberStoreSubscriptionAccess()
+    val subscriptionGate = rememberStoreSubscriptionGate()
+    val subscriptionAccess = subscriptionGate == StoreSubscriptionGate.Active
+    val accountForSubscription = stateValues.userAccount?.id
+    val storeForSubscription = stateValues.activeStoreId
+    val sessionForSubscription = currentAuthenticatedSessionGeneration()
+    var denialOpened by remember(accountForSubscription, storeForSubscription, sessionForSubscription) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(accountForSubscription, storeForSubscription, sessionForSubscription,
+        stateValues.appModeId, subscriptionGate, stateValues.navigationScreensMain.last().route) {
+        Navigation.awaitAppNavigationRestore()
+        if (stateValues.appModeId != APP_MODE_STORE || accountForSubscription.isNullOrBlank() ||
+            storeForSubscription.isNullOrBlank() ||
+            !authenticatedSessionGenerationIsCurrent(sessionForSubscription) ||
+            stateValues.userAccount?.id != accountForSubscription || stateValues.activeStoreId != storeForSubscription) return@LaunchedEffect
+        if (subscriptionAccess) {
+            denialOpened = false
+        } else if (subscriptionGate == StoreSubscriptionGate.Required) {
+            val route = Navigation.Main.value.last()
+            if (route is NavigationScreenModel.UserAuth || route is NavigationScreenModel.Splash) return@LaunchedEffect
+            // Do not steal focus back from Support, Account or renewal after the initial redirect.
+            // A stale deep-link to business data is still redirected on every attempt.
+            if (!denialOpened || route is NavigationScreenModel.Stock || route is NavigationScreenModel.Transaction) {
+                denialOpened = true
+                Navigation.showSubscriptionRecovery()
+            }
+        }
+    }
     val showNavigationBar = stateValues.navigationScreensMain.last().run {
         this !is NavigationScreenModel.Splash && this !is NavigationScreenModel.UserAuth
     }
@@ -5674,7 +5339,7 @@ fun AppConfiguration.MainScreen() {
     // disconnect/recovery state. Keeping those transient status events out of popup cards avoids
     // duplicate flashes and notification fatigue while preserving actionable notifications.
     val activeNotifications = stateValues.activeNotifications
-        .filterNot { it.isConnectionStatusPopupNoise() }
+        .filterNot { it.isConnectionStatusPopupNoise() || it.isSubscriptionAccessNotice() }
         .compactForPopupDisplay()
     val visibleNotifications = activeNotifications.take(if (stateValues.isNarrowScreen) 1 else 5)
     val workshiftStartDialogVisible by workshiftStartDialogVisibleState.collectAsState()
@@ -5758,7 +5423,7 @@ fun AppConfiguration.MainScreen() {
         }
 
         val bottomNavigationItems = when (stateValues.appModeId) {
-            APP_MODE_STORE -> filteredMainBottomDestinations()
+            APP_MODE_STORE -> filteredMainBottomDestinations(subscriptionAccess)
             APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> Navigation.bottomNavBarScreensSupplier
             else -> Navigation.bottomNavBarScreensBuyer
         }
@@ -5772,7 +5437,7 @@ fun AppConfiguration.MainScreen() {
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds()
         ) {
-            Box(Modifier.fillMaxSize().aitaSceneMotion(mainMotionTarget)) {
+            Box(Modifier.fillMaxSize().aitaWidthCap(1600.dp).aitaSceneMotion(mainMotionTarget)) {
                 // Route-only identity: preferences and refreshed data never recreate this tree.
                 // Do not keep an outgoing live transaction/auth/supplier owner for animation.
                 key(mainDestination.route) {
@@ -5786,6 +5451,7 @@ fun AppConfiguration.MainScreen() {
                         is NavigationScreenModel.Transaction.MainSale, NavigationScreenModel.Transaction.MainReturn, NavigationScreenModel.Transaction.MainSupply -> TransactionScreen()
                         is NavigationScreenModel.Stock -> StockScreen()
                         is NavigationScreenModel.Supplier -> SupplierScreen()
+                        is NavigationScreenModel.Buyer -> BuyerMarketplaceScreen()
                         is NavigationScreenModel.Menu -> MenuScreen()
                         else -> {}
                     }
@@ -5850,9 +5516,14 @@ fun AppConfiguration.MainScreen() {
             }
         }
 
-        val bottomNavigationCompact = stateValues.screenWidth < 390.dp || bottomNavigationItems.size >= 6
+        val normalSlotCount = when (stateValues.appModeId) {
+            APP_MODE_STORE -> Navigation.bottomNavBarScreensStore.size
+            APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> Navigation.bottomNavBarScreensSupplier.size
+            else -> Navigation.bottomNavBarScreensBuyer.size
+        }.coerceAtLeast(1)
+        val bottomNavigationCompact = stateValues.screenWidth < 390.dp || normalSlotCount >= 6
         val bottomNavigationIconSize = when {
-            stateValues.screenWidth < 340.dp && bottomNavigationItems.size > 5 -> 20.dp
+            stateValues.screenWidth < 340.dp && normalSlotCount > 5 -> 20.dp
             bottomNavigationCompact -> 22.dp
             else -> 24.dp
         }
@@ -5887,9 +5558,12 @@ fun AppConfiguration.MainScreen() {
             Row(
                 modifier = Modifier.weight(1f).run {
                     if (stateValues.isNarrowScreen) fillMaxWidth()
-                    else width((stateValues.boundWidgetWidth * 2.2f))
-                }) {
+                    else aitaWidthCap(720.dp).fillMaxWidth()
+                }, horizontalArrangement = Arrangement.Center) {
                 val items = bottomNavigationItems
+                // Preserve a destination's normal share even when permissions leave only Menu.
+                val missingSlots = (normalSlotCount - items.size).coerceAtLeast(0)
+                if (missingSlots > 0) Spacer(Modifier.weight(missingSlots / 2f).fillMaxHeight())
 
                 items.forEach { model ->
                     val isSelected = model.route == stateValues.navigationScreensMain.last().route
@@ -5949,6 +5623,7 @@ fun AppConfiguration.MainScreen() {
                         )
                     }
                 }
+                if (missingSlots > 0) Spacer(Modifier.weight(missingSlots / 2f).fillMaxHeight())
             }
         }
 

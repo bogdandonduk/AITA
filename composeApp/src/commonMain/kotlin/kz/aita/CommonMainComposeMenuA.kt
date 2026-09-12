@@ -4846,6 +4846,7 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.List -> {
                         MenuListScreen()
                     }
+                    is NavigationScreenModel.Menu.ShopWindow -> { MarketPublicationScreen() }
                     is NavigationScreenModel.Menu.AppMode -> {
                         MenuAppModeScreen()
                     }
@@ -4937,7 +4938,8 @@ fun AppConfiguration.MenuScreen() {
             ) {
                 AitaLiveMenuPane(
                     modifier = Modifier
-                        .weight(0.2f),
+                        .widthIn(min = 220.dp, max = 280.dp)
+                        .fillMaxWidth(0.26f),
                     navigationStack = stateValues.navigationScreensMenuLeft,
                     label = "menuNavigationLeft"
                 ) { navigationStack ->
@@ -4947,6 +4949,7 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.List -> {
                             MenuListScreen()
                         }
+                        is NavigationScreenModel.Menu.ShopWindow -> { MarketPublicationScreen() }
                         is NavigationScreenModel.Menu.AppMode -> {
                             MenuAppModeScreen()
                         }
@@ -5044,6 +5047,7 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.List -> {
                             MenuListScreen()
                         }
+                        is NavigationScreenModel.Menu.ShopWindow -> { MarketPublicationScreen() }
                         is NavigationScreenModel.Menu.AppMode -> {
                             MenuAppModeScreen()
                         }
@@ -5167,7 +5171,7 @@ internal fun menuDestinationRequiresStoreSubscription(model: NavigationScreenMod
     NavigationScreenModel.Menu.Suppliers, NavigationScreenModel.Menu.AddEditSupplier,
     NavigationScreenModel.Menu.Debtors, NavigationScreenModel.Menu.CloseDebt,
     NavigationScreenModel.Menu.GoodsCategories, NavigationScreenModel.Menu.AddEditGoodsCategory,
-    NavigationScreenModel.Menu.Devices -> true
+    NavigationScreenModel.Menu.Devices, NavigationScreenModel.Menu.ShopWindow -> true
     else -> false // Account, store selection/creation, recovery and billing remain reachable.
 }
 
@@ -5181,6 +5185,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
         NavigationScreenModel.Menu.Workers -> activeOwnerFallback || currentUserCanViewWorkers(activeStoreId)
+        NavigationScreenModel.Menu.ShopWindow -> currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.Stores -> true
         NavigationScreenModel.Menu.Suppliers -> activeOwnerFallback || currentUserCanViewSuppliers(activeStoreId) || currentUserCanViewSupplierOrders(activeStoreId) || currentUserCanManageSupplierOrders(activeStoreId) || currentUserCanReceiveSupplierOrders(activeStoreId)
         NavigationScreenModel.Menu.Debtors -> activeOwnerFallback || currentUserCanViewDebtors(activeStoreId) || currentUserCanManageDebtorPayments(activeStoreId)
@@ -5223,8 +5228,10 @@ internal fun AppConfiguration.filteredMenuDestinations(): List<NavigationScreenM
         .filter { canOpenMenuDestination(it) }
 }
 
-internal fun AppConfiguration.filteredMainBottomDestinations(): List<NavigationScreenModel> {
-    if (!currentStoreHasSubscriptionAccess(stateValues.activeStoreId)) return listOf(NavigationScreenModel.Menu.Main)
+internal fun AppConfiguration.filteredMainBottomDestinations(
+    hasSubscriptionAccess: Boolean = currentStoreHasSubscriptionAccess(stateValues.activeStoreId)
+): List<NavigationScreenModel> {
+    if (!hasSubscriptionAccess) return listOf(NavigationScreenModel.Menu.Main)
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return Navigation.bottomNavBarScreensStore.filter { model ->
@@ -5851,7 +5858,7 @@ fun AppConfiguration.MenuListScreen() {
             iconPath = stateValues.drawablePathIconMenu
         )
 
-        if (stateValues.appModeId == APP_MODE_STORE) {
+        if (subscriptionAccess && stateValues.appModeId == APP_MODE_STORE) {
             stateValues.activeWorkshift?.takeIf { it.isActive && it.endedAtMillis == null && it.storeId == stateValues.activeStoreId }?.let { workshift ->
                 ActiveWorkshiftMenuTile(workshift = workshift)
             }

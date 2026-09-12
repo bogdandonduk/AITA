@@ -1597,7 +1597,7 @@ fun AppConfiguration.tabRowWidget(
     }
 
     if (tabs.isNotEmpty()) {
-        Column(modifier = modifier) {
+        Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
             titleText.takeIf { it.isNotEmpty() && it.isNotBlank() }?.apply {
                 Text(
                     text = this,
@@ -1610,56 +1610,44 @@ fun AppConfiguration.tabRowWidget(
                 )
             }
 
-            val scrollableTabs = scrollable
             val tabScrollState = rememberScrollState()
-
-            Row(
-                modifier = Modifier
-                    .padding(2.dp)
-                    .foregroundTactileShadow(cornerRadius, elevated = false)
-                    .clip(RoundedCornerShape(cornerRadius))
-                    .background(stateValues.BackgroundColor)
-                    .run { if (scrollableTabs) horizontalScroll(tabScrollState) else fillMaxWidth() }
-            ) {
-                tabs.forEachIndexed { _, tab ->
-                    val isSelected = tab.id == selectedId
-                    val tabItemModifier = if (scrollableTabs) Modifier.widthIn(min = 106.dp) else Modifier.weight(1f)
-
-                    val containerColor by animateColorAsState(
-                        targetValue = if (isSelected) selectedContainerColor else unselectedContainerColor
-                    )
-                    val textColor by animateColorAsState(
-                        targetValue = if (isSelected) selectedTextColor else unselectedTextColor
-                    )
-
-                    Box(
-                        modifier = tabItemModifier
-                            .background(containerColor)
-                            .aitaClickable(
+            BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                val scrollableTabs = scrollable || maxWidth > 600.dp
+                Row(
+                    modifier = Modifier.padding(2.dp)
+                        .foregroundTactileShadow(cornerRadius, elevated = false)
+                        .clip(RoundedCornerShape(cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .run { if (scrollableTabs) horizontalScroll(tabScrollState) else fillMaxWidth() }
+                ) {
+                    tabs.forEach { tab ->
+                        val isSelected = tab.id == selectedId
+                        val tabItemModifier = if (scrollableTabs) Modifier.widthIn(min = 96.dp, max = 240.dp)
+                            else Modifier.weight(1f)
+                        val containerColor by animateColorAsState(
+                            targetValue = if (isSelected) selectedContainerColor else unselectedContainerColor)
+                        val textColor by animateColorAsState(
+                            targetValue = if (isSelected) selectedTextColor else unselectedTextColor)
+                        Box(
+                            modifier = tabItemModifier.background(containerColor).aitaClickable(
                                 enabled = enabled,
-                                interactionSource = remember {
-                                    MutableInteractionSource()
-                                },
+                                interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(color = textColor)
                             ) {
                                 selectedId = tab.id
-
                                 tab.onClick?.invoke(tab.id)
                             },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = tab.text,
-                            modifier = Modifier
-                                .padding(6.dp),
-                            fontSize = textSize,
-                            color = textColor,
-                            fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
-                            style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = tab.text,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                fontSize = textSize, color = textColor,
+                                fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
+                                style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
+                                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }

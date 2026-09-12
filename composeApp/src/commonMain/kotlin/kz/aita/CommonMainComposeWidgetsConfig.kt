@@ -376,6 +376,14 @@ internal fun localDrawableResourceForPath(
         "137_1" -> Res.drawable._137_1
         "138_0" -> Res.drawable._138_0
         "138_1" -> Res.drawable._138_1
+        "139_0" -> Res.drawable._139_0
+        "139_1" -> Res.drawable._139_1
+        "140_0" -> Res.drawable._140_0
+        "140_1" -> Res.drawable._140_1
+        "141_0" -> Res.drawable._141_0
+        "141_1" -> Res.drawable._141_1
+        "142_0" -> Res.drawable._142_0
+        "142_1" -> Res.drawable._142_1
         else -> fallbackRes
     }
 }
@@ -1964,7 +1972,7 @@ fun AppConfiguration.genericTextField(
     }
 
     Column(
-        modifier = modifier
+        modifier = modifier.aitaWidthCap(720.dp)
     ) {
         val titleTextPresent = titleText.isNotEmpty() && titleText.isNotBlank()
 
@@ -5948,6 +5956,7 @@ fun AppConfiguration.actionButton(
 
     Row(
         modifier = modifier
+            .aitaWidthCap()
             .run {
                 if (!textPresent || !fillMaxWidthIfTextPresent)
                     wrapContentWidth()

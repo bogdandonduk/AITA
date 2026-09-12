@@ -2,6 +2,11 @@
 
 package kz.aita.server
 
+import kz.aita.server.marketplace.marketplaceRoutes
+import kz.aita.server.marketplace.publishMarketplaceStockChange
+import kz.aita.server.support.companySupportRoutes
+import kz.aita.server.support.companySupportRepositoryInsideTransaction
+
 import kz.aita.server.subscriptions.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 
@@ -3508,7 +3513,7 @@ private class AitaServerClassLoaderContextElement(
 }
 
 private fun aitaServerClassLoaderContextElement(): CoroutineContext = AitaServerClassLoaderContextElement()
-private val aitaServerIoContext: CoroutineContext = Dispatchers.IO + AitaServerClassLoaderContextElement()
+internal val aitaServerIoContext: CoroutineContext = Dispatchers.IO + AitaServerClassLoaderContextElement()
 
 @PublishedApi
 internal suspend fun <T> withAitaServerRuntimeClassLoader(
@@ -3611,6 +3616,13 @@ private fun prewarmSharedRuntimeSerializers() {
   touch("SupplierModeDashboardDataModel") { SupplierModeDashboardDataModel.serializer() }
   touch("SupplierOrderWithLinesDataModel") { SupplierOrderWithLinesDataModel.serializer() }
   touch("SupplierOrderStatusUpdateRequestDataModel") { SupplierOrderStatusUpdateRequestDataModel.serializer() }
+  touch("CompanyJobDataModel") { CompanyJobDataModel.serializer() }
+  touch("CompanyAccessDataModel") { CompanyAccessDataModel.serializer() }
+  touch("SupportTicketPage") { SupportTicketPage.serializer() }
+  touch("SupportMessagePage") { SupportMessagePage.serializer() }
+  touch("SupportAgentActionRequest") { SupportAgentActionRequest.serializer() }
+  touch("SupportReadCursorRequest") { SupportReadCursorRequest.serializer() }
+  touch("SupportTeamMetrics") { SupportTeamMetrics.serializer() }
   touch("SupportMessageSendRequestDataModel") { SupportMessageSendRequestDataModel.serializer() }
   touch("SupportMessagesReadRequestDataModel") { SupportMessagesReadRequestDataModel.serializer() }
   touch("SupportTicketActionRequestDataModel") { SupportTicketActionRequestDataModel.serializer() }
@@ -4008,7 +4020,7 @@ fun main(args: Array<String>) {
   }
 }
 
-private object RealtimeServerBus {
+internal object RealtimeServerBus {
   private val updates = MutableSharedFlow<RealtimeUpdateDataModel>(
     replay = 128, extraBufferCapacity = 192, onBufferOverflow = BufferOverflow.DROP_OLDEST)
   private val publication = Mutex()
@@ -4042,6 +4054,7 @@ private fun realtimeSessionStillValidInsideTransaction(userId: UUID, sessionId: 
 
 private fun realtimeAudienceAllowsInsideTransaction(userId: UUID, update: RealtimeUpdateDataModel): Boolean {
   update.userId?.takeIf(String::isNotBlank)?.let { return it.equals(userId.toString(), ignoreCase = true) }
+  if (update.entity == "support/agent") return companySupportRepositoryInsideTransaction().canAgent(userId)
   val storeText = update.storeId?.takeIf(String::isNotBlank) ?: return true // Sanitized invalidation only.
   val storeId = runCatching { UUID.fromString(storeText) }.getOrNull() ?: return false
   if (userHasStoreAccessInsideTransaction(userId, storeId)) return true
@@ -4091,6 +4104,7 @@ private suspend fun publishStockRealtimeBundle(storeId: String?, reason: String)
   RealtimeServerBus.publish(entity = "stock/availability", storeId = cleanStoreId, reason = reason)
   RealtimeServerBus.publish(entity = "transactions/cart", storeId = cleanStoreId, reason = reason)
   RealtimeServerBus.publish(entity = "notifications", storeId = cleanStoreId, reason = reason)
+  publishMarketplaceStockChange(cleanStoreId)
 }
 
 private suspend fun publishStockRealtimeBundle(storeIds: Iterable<String?>, reason: String) {
@@ -4413,6 +4427,7 @@ private suspend fun runDueSubscriptionRenewalsOnce(onFailure: (UUID, Throwable) 
       }
       if (owner != null) {
         RealtimeServerBus.publish(entity = "subscriptions", storeId = id.toString(), reason = "subscription_period_changed")
+        publishMarketplaceStockChange(id.toString())
         RealtimeServerBus.publish(entity = "finance", userId = owner.toString(), reason = "subscription_period_changed")
       }
     } catch (cancelled: CancellationException) { throw cancelled }
@@ -4895,7 +4910,7 @@ private fun stockVisibleStoreIdsForUserInsideTransaction(userId: UUID, storeId: 
   return paid(listOf(storeId))
 }
 
-private fun userHasStoreAccessInsideTransaction(
+internal fun userHasStoreAccessInsideTransaction(
   userId: UUID,
   storeId: UUID
 ): Boolean {
@@ -4938,6 +4953,10 @@ private fun userHasSupplierAccessInsideTransaction(
   return decodeSupplierStringList(supplier[Suppliers.userIds]).contains(userId.toString())
 }
 
+
+/** Publishing is a customer-store owner permission, never a company-employee capability. */
+internal fun marketplaceStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean =
+  isStoreOwnerInsideTransaction(userId, storeId)
 
 private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return false
@@ -17866,6 +17885,8 @@ fun Application.module() {
       // relationship/recipient identity lives in the body/database rather than necessarily in request
       // headers, so a generic event here would duplicate refreshes and wake unrelated clients.
       if (
+        !path.startsWith("/support/", ignoreCase = true) &&
+        !path.startsWith("/company/", ignoreCase = true) &&
         !path.startsWith("/supplierContracts/", ignoreCase = true) &&
         !path.startsWith("/supplierOrders/", ignoreCase = true) &&
         !path.startsWith("/suppliers/", ignoreCase = true)
@@ -17884,7 +17905,9 @@ fun Application.module() {
       val logAction = operationLogActionForHttpMutation(methodText, entityPath)
       val logEntityType = operationLogEntityForPath(entityPath)
       val normalizedEntityPath = entityPath.lowercase()
-      val routeWritesSpecificOperationLog = normalizedEntityPath.startsWith("notifications") ||
+      val routeWritesSpecificOperationLog = normalizedEntityPath.startsWith("support/") ||
+         normalizedEntityPath.startsWith("company/") ||
+         normalizedEntityPath.startsWith("notifications") ||
          normalizedEntityPath.startsWith("operationlogs") ||
          normalizedEntityPath.startsWith("logs/") ||
          normalizedEntityPath.startsWith("stock/history") ||
@@ -18652,267 +18675,8 @@ fun Application.module() {
     }
 
 
-    route("/support") {
-      authenticate("auth-jwt") {
-        route("/tickets") {
-          get("/get") {
-            val userId = call.checkPrincipal() ?: return@get
-
-            val tickets = newSuspendedTransaction(aitaServerIoContext) {
-              SupportTickets
-                .selectAll()
-                .where { (SupportTickets.userId eq userId) and (SupportTickets.isActive eq true) }
-                .orderBy(SupportTickets.updatedAtMillis to SortOrder.DESC)
-                .limit(100)
-                .map { it.toSupportTicketDataModel() }
-            }
-
-            call.genericResponse(HttpStatusCode.OK, tickets, getResponse("96").message)
-          }
-
-          post("/create") {
-            val userId = call.checkPrincipal() ?: return@post
-            val body = call.receiveAita<SupportTicketCreateRequestDataModel>()
-            val messageText = body.initialMessage.trim()
-
-            if (messageText.isBlank()) {
-              return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-            }
-
-            val ticket = newSuspendedTransaction(aitaServerIoContext) {
-              val now = System.currentTimeMillis()
-              val ticketId = UUID.randomUUID()
-              val ticketPublicId = generateUniqueSupportTicketPublicIdInsideTransaction()
-              val storeId = body.storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-              val subject = sanitizeSupportSubject(body.subject, messageText)
-              val category = sanitizeSupportCategory(body.category)
-              val priority = sanitizeSupportPriority(body.priority)
-              val displayName = userDisplayNameInsideTransaction(userId)
-              val clientMessageId = body.clientMessageId?.takeIf { it.isNotBlank() }
-
-              SupportTickets.insert {
-                it[SupportTickets.id] = ticketId
-                it[SupportTickets.publicId] = ticketPublicId
-                it[SupportTickets.userId] = userId
-                it[SupportTickets.storeId] = storeId
-                it[SupportTickets.subject] = subject
-                it[SupportTickets.category] = category
-                it[SupportTickets.priority] = priority
-                it[SupportTickets.status] = "open"
-                it[SupportTickets.assignedAgentUserId] = null
-                it[SupportTickets.lastMessage] = messageText.take(500)
-                it[SupportTickets.lastMessageAtMillis] = now
-                it[SupportTickets.lastCustomerMessageAtMillis] = now
-                it[SupportTickets.lastAgentMessageAtMillis] = null
-                it[SupportTickets.unreadForUserCount] = 0
-                it[SupportTickets.unreadForAgentCount] = 1
-                it[SupportTickets.metadata] = body.metadata
-                it[SupportTickets.createdAtMillis] = now
-                it[SupportTickets.updatedAtMillis] = now
-                it[SupportTickets.closedAtMillis] = null
-                it[SupportTickets.isActive] = true
-              }
-
-              SupportMessages.insert {
-                it[SupportMessages.id] = UUID.randomUUID()
-                it[SupportMessages.ticketId] = ticketId
-                it[SupportMessages.userId] = userId
-                it[SupportMessages.senderUserId] = userId
-                it[SupportMessages.senderRole] = "customer"
-                it[SupportMessages.senderDisplayName] = displayName
-                it[SupportMessages.body] = messageText
-                it[SupportMessages.attachments] = emptyList()
-                it[SupportMessages.metadata] = body.metadata
-                it[SupportMessages.clientMessageId] = clientMessageId
-                it[SupportMessages.createdAtMillis] = now
-                it[SupportMessages.editedAtMillis] = null
-                it[SupportMessages.readByCustomerAtMillis] = now
-                it[SupportMessages.readByAgentAtMillis] = null
-                it[SupportMessages.isActive] = true
-              }
-
-              SupportTickets.selectAll().where { SupportTickets.id eq ticketId }.single().toSupportTicketDataModel()
-            }
-
-            call.genericResponse(HttpStatusCode.Created, ticket, getResponse("97").message)
-          }
-
-          post("/close") {
-            val userId = call.checkPrincipal() ?: return@post
-            val body = call.receiveAita<SupportTicketActionRequestDataModel>()
-            val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
-              ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-
-            val ticket = newSuspendedTransaction(aitaServerIoContext) {
-              val existing = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
-              val now = System.currentTimeMillis()
-              SupportTickets.update({ SupportTickets.id eq ticketId }) {
-                it[SupportTickets.status] = "closed"
-                it[SupportTickets.closedAtMillis] = now
-                it[SupportTickets.updatedAtMillis] = now
-                it[SupportTickets.unreadForUserCount] = 0
-              }
-              SupportTickets.selectAll().where { SupportTickets.id eq existing[SupportTickets.id] }.single().toSupportTicketDataModel()
-            }
-
-            ticket?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("98").message) }
-              ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
-          }
-
-          post("/reopen") {
-            val userId = call.checkPrincipal() ?: return@post
-            val body = call.receiveAita<SupportTicketActionRequestDataModel>()
-            val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
-              ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-
-            val ticket = newSuspendedTransaction(aitaServerIoContext) {
-              val existing = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
-              val now = System.currentTimeMillis()
-              SupportTickets.update({ SupportTickets.id eq ticketId }) {
-                it[SupportTickets.status] = "open"
-                it[SupportTickets.closedAtMillis] = null
-                it[SupportTickets.updatedAtMillis] = now
-              }
-              SupportTickets.selectAll().where { SupportTickets.id eq existing[SupportTickets.id] }.single().toSupportTicketDataModel()
-            }
-
-            ticket?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("99").message) }
-              ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
-          }
-        }
-
-        route("/messages") {
-          get("/get") {
-            val userId = call.checkPrincipal() ?: return@get
-            val ticketId = (call.request.header("ticket_id") ?: call.request.queryParameters["ticket_id"])
-              ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-              ?: return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-            val markRead = (call.request.header("mark_read") ?: call.request.queryParameters["mark_read"])
-              ?.equals("true", ignoreCase = true) != false
-
-            val messages = newSuspendedTransaction(aitaServerIoContext) {
-              supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
-              val now = System.currentTimeMillis()
-
-              if (markRead) {
-                SupportMessages.update({
-                  (SupportMessages.ticketId eq ticketId) and
-                     (SupportMessages.userId eq userId) and
-                     (SupportMessages.senderRole neq "customer") and
-                     SupportMessages.readByCustomerAtMillis.isNull()
-                }) {
-                  it[SupportMessages.readByCustomerAtMillis] = now
-                }
-                SupportTickets.update({ SupportTickets.id eq ticketId }) {
-                  it[SupportTickets.unreadForUserCount] = 0
-                }
-              }
-
-              SupportMessages
-                .selectAll()
-                .where { (SupportMessages.ticketId eq ticketId) and (SupportMessages.userId eq userId) and (SupportMessages.isActive eq true) }
-                .orderBy(SupportMessages.createdAtMillis to SortOrder.ASC)
-                .map { it.toSupportMessageDataModel() }
-            }
-
-            messages?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("100").message) }
-              ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
-          }
-
-          post("/send") {
-            val userId = call.checkPrincipal() ?: return@post
-            val body = call.receiveAita<SupportMessageSendRequestDataModel>()
-            val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
-              ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-            val messageText = body.body.trim()
-
-            if (messageText.isBlank()) {
-              return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-            }
-
-            val message = newSuspendedTransaction(aitaServerIoContext) {
-              val existingTicket = supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
-              val clientMessageId = body.clientMessageId?.takeIf { it.isNotBlank() }
-              clientMessageId?.let { id ->
-                SupportMessages.selectAll()
-                  .where { (SupportMessages.clientMessageId eq id) and (SupportMessages.userId eq userId) }
-                  .singleOrNull()
-                  ?.let { return@newSuspendedTransaction it.toSupportMessageDataModel() }
-              }
-
-              val now = System.currentTimeMillis()
-              val messageId = UUID.randomUUID()
-              val displayName = userDisplayNameInsideTransaction(userId)
-
-              SupportMessages.insert {
-                it[SupportMessages.id] = messageId
-                it[SupportMessages.ticketId] = ticketId
-                it[SupportMessages.userId] = userId
-                it[SupportMessages.senderUserId] = userId
-                it[SupportMessages.senderRole] = "customer"
-                it[SupportMessages.senderDisplayName] = displayName
-                it[SupportMessages.body] = messageText
-                it[SupportMessages.attachments] = body.attachments
-                it[SupportMessages.metadata] = body.metadata
-                it[SupportMessages.clientMessageId] = clientMessageId
-                it[SupportMessages.createdAtMillis] = now
-                it[SupportMessages.editedAtMillis] = null
-                it[SupportMessages.readByCustomerAtMillis] = now
-                it[SupportMessages.readByAgentAtMillis] = null
-                it[SupportMessages.isActive] = true
-              }
-
-              SupportTickets.update({ SupportTickets.id eq ticketId }) {
-                it[SupportTickets.status] = "open"
-                it[SupportTickets.lastMessage] = messageText.take(500)
-                it[SupportTickets.lastMessageAtMillis] = now
-                it[SupportTickets.lastCustomerMessageAtMillis] = now
-                it[SupportTickets.updatedAtMillis] = now
-                it[SupportTickets.closedAtMillis] = null
-                it[SupportTickets.unreadForAgentCount] = existingTicket[SupportTickets.unreadForAgentCount] + 1
-              }
-
-              SupportMessages.selectAll().where { SupportMessages.id eq messageId }.single().toSupportMessageDataModel()
-            }
-
-            message?.let { call.genericResponse(HttpStatusCode.Created, it, getResponse("101").message) }
-              ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
-          }
-
-          post("/read") {
-            val userId = call.checkPrincipal() ?: return@post
-            val body = call.receiveAita<SupportMessagesReadRequestDataModel>()
-            val ticketId = runCatching { UUID.fromString(body.ticketId) }.getOrNull()
-              ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("13").message)
-
-            val messages = newSuspendedTransaction(aitaServerIoContext) {
-              supportTicketForUserInsideTransaction(userId, ticketId) ?: return@newSuspendedTransaction null
-              val now = System.currentTimeMillis()
-              SupportMessages.update({
-                (SupportMessages.ticketId eq ticketId) and
-                   (SupportMessages.userId eq userId) and
-                   (SupportMessages.senderRole neq "customer") and
-                   SupportMessages.readByCustomerAtMillis.isNull()
-              }) {
-                it[SupportMessages.readByCustomerAtMillis] = now
-              }
-              SupportTickets.update({ SupportTickets.id eq ticketId }) {
-                it[SupportTickets.unreadForUserCount] = 0
-                it[SupportTickets.updatedAtMillis] = now
-              }
-              SupportMessages
-                .selectAll()
-                .where { (SupportMessages.ticketId eq ticketId) and (SupportMessages.userId eq userId) and (SupportMessages.isActive eq true) }
-                .orderBy(SupportMessages.createdAtMillis to SortOrder.ASC)
-                .map { it.toSupportMessageDataModel() }
-            }
-
-            messages?.let { call.genericResponse(HttpStatusCode.OK, it, getResponse("102").message) }
-              ?: call.genericResponseNoPayload(HttpStatusCode.NotFound, getResponse("13").message)
-          }
-        }
-      }
-    }
+    companySupportRoutes()
+    marketplaceRoutes()
 
     route("/notifications") {
       authenticate("auth-jwt") {
@@ -23253,11 +23017,12 @@ fun Application.module() {
             val location = repository.lockLocation(storeId) ?: return@newSuspendedTransaction null
             if (!subscriptionCanManageInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
             val now = System.currentTimeMillis()
-            repository.update(location, userId, body, now)
+            repository.update(location, userId, body, now, call.currentJwtSessionId())
             repository.dashboard(location, canManage = true, now = now) to location.ownerId
           } ?: return@post call.genericResponseNoPayload(HttpStatusCode.Forbidden, eventMessage("subscription.required"))
           // Publish only after transaction commit; the subscriber may fetch immediately.
           RealtimeServerBus.publish(entity = "subscriptions", storeId = storeId.toString(), reason = "subscription_updated")
+          publishMarketplaceStockChange(storeId.toString())
           RealtimeServerBus.publish(entity = "finance", userId = result.second.toString(), reason = "subscription_updated")
           call.genericResponse(HttpStatusCode.OK, result.first, eventMessage("subscription.updated"))
         }

@@ -22,32 +22,38 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun AppConfiguration.rememberStoreSubscriptionAccess(storeId: String? = stateValues.activeStoreId): Boolean {
-    val revision by subscriptionAccessRevisionState.collectAsState()
+internal fun AppConfiguration.rememberStoreSubscriptionGate(storeId: String? = stateValues.activeStoreId): StoreSubscriptionGate {
+    val revision = subscriptionAccessRevisionState.collectAsState()
     val account = stateValues.userAccount?.id
-    var access by remember(storeId, account) { mutableStateOf(currentStoreHasSubscriptionAccess(storeId)) }
-    LaunchedEffect(storeId, account, revision) {
+    val clock = remember(storeId, account) { mutableStateOf(getCurrentTimeMillis()) }
+    LaunchedEffect(storeId, account) {
         while (isActive) {
-            val next = currentStoreHasSubscriptionAccess(storeId)
-            if (access && !next && storeId != null) getStoreSubscription(storeId)
-            access = next
-            // Only a Boolean transition recomposes the screen; not every ticking second.
             delay(1_000L)
+            clock.value = getCurrentTimeMillis()
         }
     }
-    return access
+    // Re-evaluate the real registry; derivedStateOf prevents a full main-tree recompose on every tick.
+    return remember(storeId, account) {
+        derivedStateOf { revision.value; currentStoreSubscriptionGate(storeId, clock.value) }
+    }.value
 }
+
+@Composable
+internal fun AppConfiguration.rememberStoreSubscriptionAccess(storeId: String? = stateValues.activeStoreId): Boolean =
+    rememberStoreSubscriptionGate(storeId) == StoreSubscriptionGate.Active
 
 @Composable
 internal fun AppConfiguration.SubscriptionRequiredPane(modifier: Modifier = Modifier) {
     val store = stateValues.activeStoreId
     val loading by subscriptionLoadingStoreIdState.collectAsState()
+    val gate = rememberStoreSubscriptionGate(store)
     Column(modifier.fillMaxSize().padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         if (store != null && loading == store) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 3)
         else MessageText(Modifier.fillMaxWidth(), if (store == null)
             authUiText("Choose a location", "Выберите торговую точку", "Сауда нүктесін таңдаңыз")
-            else eventMessage("subscription.required").visibleLocalizedString(stateValues.appLanguage, ""))
+            else eventMessage(if (gate == StoreSubscriptionGate.Checking) "subscription.verify" else "subscription.required")
+                .visibleLocalizedString(stateValues.appLanguage, ""))
         Spacer(Modifier.height(16.dp))
         actionButton(text = if (store == null) stateValues.stringStores else stateValues.stringSubscription,
             iconPath = if (store == null) stateValues.drawablePathIconStores else stateValues.drawablePathIconSubscription,
@@ -130,12 +136,12 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
             Modifier.align(Alignment.CenterHorizontally).padding(stateValues.marginTextField),
             color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
         val tabs = listOf(TabContent("current", localizedStringResource(587, "Current subscription")),
-            TabContent("plans", authUiText("Plans & promo code", "Тарифы и промокод", "Тарифтер мен промокод"))) +
+            TabContent("plans", authUiText("Plans", "Тарифы", "Тарифтер"))) +
             if (dashboard?.canManage == true) listOf(TabContent("charges", localizedStringResource(589, "Subscription charges"))) else emptyList()
         val section = sectionTabsWidget(stateKey = "location-subscription:$accountId:$storeId", tabs = tabs,
             modifier = Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField))
         LazyColumn(state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.StoreSubscriptionPlans, "$storeId:$section"),
-            modifier = Modifier.weight(1f).fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
+            modifier = Modifier.weight(1f).fillMaxWidth().aitaWidthCap(760.dp)
                 .align(Alignment.CenterHorizontally).aitaPaneEntrance(section).padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {

@@ -2678,16 +2678,14 @@ sealed class NavigationScreenModel(
 
         sealed class Main(route: String): Buyer(route) {
             data object Home: Main("BuyerMainHomeNavigationScreenModelRoute") {
-                override val name: String
-                    get() = AppConfiguration.stateValues.stringMain // TODO
-                override val iconPath: String
-                    get() {
-                        return AppConfiguration.stateValues.drawablePathIconMenu // TODO
-                    }
-                override val iconRes: DrawableResource
-                    get() {
-                        return AppConfiguration.stateValues.drawableResIconMenu.value
-                    }
+                override val name get() = with(AppConfiguration) { authUiText("Market", "Маркет", "Маркет") }
+                override val iconPath get() = AppConfiguration.marketIconPath(139)
+                override val iconRes get() = AppConfiguration.marketIconFallback(139)
+            }
+            data object Saved: Main("BuyerMainSavedNavigationScreenModelRoute") {
+                override val name get() = with(AppConfiguration) { authUiText("Saved", "Сохранённое", "Сақталғандар") }
+                override val iconPath get() = AppConfiguration.marketIconPath(140)
+                override val iconRes get() = AppConfiguration.marketIconFallback(140)
             }
             data object Search: Main("BuyerMainSearchNavigationScreenModelRoute")
         }
@@ -2732,9 +2730,9 @@ sealed class NavigationScreenModel(
                 override val name: String
                     get() = with(AppConfiguration) { localizedStringResource(1337, "Orders") }
                 override val iconPath: String
-                    get() = AppConfiguration.stateValues.drawablePathIconAppModeSupplier
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierRecoveryLedger
                 override val iconRes: DrawableResource
-                    get() = AppConfiguration.stateValues.drawableResIconAppModeSupplier.value
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierRecoveryLedger.value
             }
         }
 
@@ -2798,9 +2796,9 @@ sealed class NavigationScreenModel(
                 override val name: String
                     get() = with(AppConfiguration) { localizedStringResource(2490, "Supplier profiles") }
                 override val iconPath: String
-                    get() = AppConfiguration.stateValues.drawablePathIconSuppliers
+                    get() = AppConfiguration.stateValues.drawablePathIconSupplierRecoveryOwner
                 override val iconRes: DrawableResource
-                    get() = AppConfiguration.stateValues.drawableResIconSuppliers.value
+                    get() = AppConfiguration.stateValues.drawableResIconSupplierRecoveryOwner.value
             }
         }
     }
@@ -2995,6 +2993,12 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.stringAppMode
             override val iconRes: DrawableResource
                 get() = AppConfiguration.stateValues.drawableResIconSwitch.value
+        }
+
+        data object ShopWindow: Menu("MenuShopWindowNavigationScreenModelRoute") {
+            override val name get() = with(AppConfiguration) { authUiText("Shop window", "Витрина", "Витрина") }
+            override val iconPath get() = AppConfiguration.marketIconPath(142)
+            override val iconRes get() = AppConfiguration.marketIconFallback(142)
         }
 
         data object StoreSubscription: Menu("MenuStoreSubscriptionNavigationScreenModelRoute") {
@@ -3269,6 +3273,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.AppMode,
     NavigationScreenModel.Menu.StoreSubscription,
     NavigationScreenModel.Menu.StoreSubscriptionPlans,
+    NavigationScreenModel.Menu.ShopWindow,
     NavigationScreenModel.Menu.Workers,
     NavigationScreenModel.Menu.AddEditWorker,
     NavigationScreenModel.Menu.Stores,
@@ -3294,6 +3299,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.UserAuth.SignUp,
     NavigationScreenModel.Buyer.Main.Home,
     NavigationScreenModel.Buyer.Main.Search,
+    NavigationScreenModel.Buyer.Main.Saved,
     NavigationScreenModel.Buyer.Cart.Main,
     NavigationScreenModel.Buyer.Orders.Main,
     NavigationScreenModel.Supplier.Orders.Main,
@@ -3468,8 +3474,7 @@ object Navigation {
 
     val bottomNavBarScreensBuyer = listOf(
         NavigationScreenModel.Buyer.Main.Home,
-        NavigationScreenModel.Buyer.Cart.Main,
-        NavigationScreenModel.Buyer.Orders.Main,
+        NavigationScreenModel.Buyer.Main.Saved,
         NavigationScreenModel.Menu.Main
     )
 
@@ -3542,7 +3547,25 @@ object Navigation {
         }
     }
 
+    suspend fun showSubscriptionRecovery() {
+        // Replace both saved menu panes, not the customer's carts/editor state hosts.
+        Menu.clearLeft()
+        val recovery = if (activeStoreIdState.value.isNullOrBlank()) NavigationScreenModel.Menu.Stores
+            else NavigationScreenModel.Menu.StoreSubscriptionPlans
+        if (AppConfiguration.stateValues.isNarrowScreen) {
+            Menu.clearRight()
+            Menu.goLeft(recovery)
+        } else Menu.clearRight(recovery)
+        _Main.emit(listOf(NavigationScreenModel.Menu.Main))
+    }
+
     suspend fun goMain(model: NavigationScreenModel) {
+        if (appModeState.value == APP_MODE_STORE &&
+            (model is NavigationScreenModel.Stock || model is NavigationScreenModel.Transaction) &&
+            currentStoreSubscriptionGate(activeStoreIdState.value) == StoreSubscriptionGate.Required) {
+            showSubscriptionRecovery()
+            return
+        }
         if (model.route != _Main.value.last().route)
             _Main.emit(listOf(model))
     }
@@ -6201,6 +6224,7 @@ object Navigation {
             NavigationScreenModel.Menu.AppMode,
             NavigationScreenModel.Menu.Finances,
             NavigationScreenModel.Menu.StoreSubscription,
+            NavigationScreenModel.Menu.ShopWindow,
             NavigationScreenModel.Menu.Stores,
             NavigationScreenModel.Menu.TransactionHistory,
             NavigationScreenModel.Menu.OperationLogs,

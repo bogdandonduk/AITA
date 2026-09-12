@@ -7,7 +7,7 @@ Examples:
   python3 scripts/subscriptions/subscription-admin.py promo --type discount --discount-percent 25 --region KZ --sql /tmp/discount.sql
   python3 scripts/subscriptions/subscription-admin.py price --region KZ --currency KZT --price-minor 799000 --sql /tmp/kz-price.sql
 
-Review the SQL, then run it explicitly with psql against the intended database after V101.
+Review the SQL, then run it explicitly with psql against the intended database after V102.
 No database credentials, plaintext code, or SQL execution are built into this program.
 A generated high-entropy code is printed once; SQL stores only its normalized SHA-256 hash.
 """
@@ -24,6 +24,15 @@ import secrets
 import sys
 import uuid
 from typing import Sequence
+
+PROMO_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+PROMO_SYMBOLS = 20
+
+def generate_code() -> str:
+    # 32 equally likely symbols × 20 draws = 100 bits. Hyphens group the code; enter or paste the printed grouping.
+    raw = "".join(secrets.choice(PROMO_ALPHABET) for _ in range(PROMO_SYMBOLS))
+    return "-".join(raw[i:i + 5] for i in range(0, PROMO_SYMBOLS, 5))
+
 
 MAX_MINOR = 1_000_000_000_000
 MAX_DURATION_MS = 3_153_600_000_000
@@ -95,8 +104,8 @@ def promo_sql(args: argparse.Namespace, raw_code: str) -> str:
         raise ValueError("Discount codes need exactly one discount type and no duration")
     if fixed is not None and currency is None:
         raise ValueError("A fixed discount requires an explicit --currency")
-    if not 1 <= args.max_redemptions <= 9_223_372_036_854_775_807:
-        raise ValueError("Maximum redemptions must fit a positive database BIGINT")
+    if args.max_redemptions != 1:
+        raise ValueError("Every promo code can be redeemed exactly once; issue separate codes for multiple locations")
     valid_from = timestamp(args.valid_from) or 0
     valid_until = timestamp(args.valid_until)
     if valid_until is not None and valid_until <= valid_from:
@@ -141,7 +150,7 @@ def parser() -> argparse.ArgumentParser:
     promo.add_argument("--max-redemptions", type=int, default=1)
     promo.add_argument("--valid-from", help="Inclusive ISO-8601 timestamp with timezone")
     promo.add_argument("--valid-until", help="Exclusive ISO-8601 timestamp with timezone")
-    promo.add_argument("--code-env", help="Optional environment variable containing a custom code; not a command-line secret")
+
     promo.add_argument("--sql", type=Path, required=True, help="New SQL file; existing files are never overwritten")
     price = commands.add_parser("price", help="Configure an explicit regional Basic price")
     price.add_argument("--region", required=True)
@@ -159,12 +168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         code = None
         if args.command == "promo":
-            if args.code_env:
-                if args.code_env not in os.environ:
-                    raise ValueError("The requested code environment variable is absent")
-                code = normalize_code(os.environ[args.code_env])
-            else:
-                code = "AITA-" + secrets.token_hex(20).upper()  # 160 bits of secret entropy
+            code = generate_code()
             sql = promo_sql(args, code)
         else:
             sql = price_sql(args)

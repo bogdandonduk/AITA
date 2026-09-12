@@ -7020,8 +7020,8 @@ const val APP_MODE_SUPPLIER = 2
 const val APP_MODE_MANUFACTURER = 3
 
 /**
- * Public workspaces: Store and Supplier. Buyer/Manufacturer foundations remain in source,
- * but persisted unsupported modes fall back to Store rather than trapping a user in a hidden mode.
+ * Buyer is a read-only shop-window preview; Store and Supplier remain the business workspaces.
+ * Manufacturer remains hidden until its own end-to-end workflow is implemented.
  */
 const val APP_MODE_SELECTION_PUBLICLY_ENABLED = true
 
@@ -7029,6 +7029,7 @@ private fun normalizeAppModePreference(modeId: Int?): Int {
     if (!APP_MODE_SELECTION_PUBLICLY_ENABLED) return APP_MODE_STORE
     return when (modeId) {
         APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
+        APP_MODE_BUYER -> APP_MODE_BUYER
         else -> APP_MODE_STORE
     }
 }
@@ -14044,14 +14045,16 @@ private suspend fun refreshEverythingFromServerAfterRealtimeUpdate() {
     lastRealtimeBroadRefreshAtMillis = getCurrentTimeMillis()
 
     getGlobalAppConfiguration(loadAll = false)
-    getUser(forceLogOut = false, applyServerActiveStore = false)
+    getUser(forceLogOut = false, applyServerActiveStore = false, refreshRelatedData = false)
     getStores()
     getSuppliers()
     getGenericGoodsCategories()
     refreshGenericGoodsItems(limit = 200)
     getNotifications()
     getSupportTickets()
-    activeSupportTicketIdState.value?.let { getSupportMessages(it, markRead = true) }
+    CompanyEmployment.refreshSoon()
+    SupportWorkspaceSignals.changed()
+    MarketplaceSignals.changed()
     getSecuritySessions()
     getSecuritySessionHistory()
     getMyWorkerMemberships()
@@ -14095,7 +14098,7 @@ private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     }
 
     if (anyEntityMatches("config")) getGlobalAppConfiguration(loadAll = false)
-    if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false, applyServerActiveStore = false)
+    if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false, applyServerActiveStore = false, refreshRelatedData = false)
     if (anyEntityMatches("stores")) getStores()
 
     // Profile mutations and dashboard invalidations share the `suppliers/...` namespace, but they
@@ -14140,10 +14143,12 @@ private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
         refreshGenericGoodsItems(limit = 200)
     }
     if (anyEntityMatches("notifications")) getNotifications()
+    if (anyEntityMatches("company")) CompanyEmployment.refresh()
     if (anyEntityMatches("support")) {
         getSupportTickets()
-        activeSupportTicketIdState.value?.let { getSupportMessages(it, markRead = true) }
+        SupportWorkspaceSignals.changed()
     }
+    if (anyEntityMatches("market")) MarketplaceSignals.changed()
     if (anyEntityMatches("security")) {
         getSecuritySessions()
         getSecuritySessionHistory()
@@ -14181,7 +14186,7 @@ private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
         if (anyEntityMatches("cashregister")) getCashRegister(storeId)
         if (anyEntityMatches("workshifts")) getCurrentWorkshift(storeId)
 
-        if (cleanEntities.any { it !in setOf("notifications", "security", "support") }) {
+        if (cleanEntities.any { it.substringBefore('/') !in setOf("notifications", "security", "support", "company") }) {
             getOperationLogs(storeId, OPERATION_LOG_SCOPE_CURRENT)
             getOperationLogs(storeId, OPERATION_LOG_SCOPE_ROOT)
         }
@@ -16170,11 +16175,13 @@ private suspend fun postInAppNotificationNow(
     type: NotificationType,
     transient: Boolean = false
 ) {
+    if (isSubscriptionAccessNotice(message)) return
     val text = message?.extractLocalizedString(appLanguageState.value)?.takeIf { it.isNotBlank() } ?: return
     pushInAppNotificationNow(createNotificationDataModel(text, type, translations = message), transient)
 }
 
 private suspend fun postInAppNotificationNow(message: String, type: NotificationType, transient: Boolean = false) {
+    if (isSubscriptionAccessNotice(message)) return
     if (message.trim().isBlank()) return
     pushInAppNotificationNow(createNotificationDataModel(message, type), transient)
 }
@@ -16184,11 +16191,13 @@ fun postInAppNotification(
     type: NotificationType,
     transient: Boolean = false
 ) {
+    if (isSubscriptionAccessNotice(message)) return
     val text = message?.extractLocalizedString(appLanguageState.value)?.takeIf { it.isNotBlank() } ?: return
     pushInAppNotification(createNotificationDataModel(text, type, translations = message), transient)
 }
 
 fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = false) {
+    if (isSubscriptionAccessNotice(message)) return
     if (message.trim().isBlank()) return
     pushInAppNotification(createNotificationDataModel(message, type), transient)
 }
@@ -16506,15 +16515,19 @@ private fun List<SupportMessageDataModel>.upsertSupportMessage(message: SupportM
 }
 
 fun getSupportTickets(onCompleted: ((DataState<List<SupportTicketDataModel>>) -> Unit)? = null) {
+    val generation = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
         getSupportTicketsMutex.withLock {
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             if (getStoredUserAuthTokens?.invoke() == null) return@withLock
 
             val response = networkRequest<List<SupportTicketDataModel>, Unit>(
                 method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getSupportTicketsPath.first
+                endpointUrl = globalAppConfigurationState.payloadValue.getSupportTicketsPath.first,
+                expectedSessionGeneration = generation
             )
 
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             if (response.negative || response.payload == null) {
                 if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
@@ -17039,6 +17052,9 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
     userWalletLedgerState.emit(DataState.Empty())
     paymentIntentsState.emit(DataState.Empty())
     clearStoreSubscriptionRuntime()
+    CompanyEmployment.clear()
+    SupportWorkspaceSignals.changed()
+    MarketplaceSignals.changed()
     activeStoreSubscriptionState.emit(DataState.Empty())
     activeStoreSubscriptionChargesState.emit(DataState.Empty())
 
@@ -17192,10 +17208,10 @@ fun logOutUser() {
     }
 }
 
-fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true) {
+fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true, refreshRelatedData: Boolean = true) {
     val sessionGeneration = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
-        refreshUserAccountNow(sessionGeneration, forceLogOut, applyServerActiveStore)
+        refreshUserAccountNow(sessionGeneration, forceLogOut, applyServerActiveStore, refreshRelatedData = refreshRelatedData)
     }
 }
 
@@ -17205,7 +17221,8 @@ internal suspend fun refreshUserAccountNow(
     forceLogOut: Boolean = false,
     applyServerActiveStore: Boolean = true,
     restoreCachedAccount: Boolean = true,
-    postFailure: Boolean = true
+    postFailure: Boolean = true,
+    refreshRelatedData: Boolean = true
 ): ResponseDataModel<UserAccountDataModel> = getUserAccountMutex.withLock {
     if (getStoredUserAuthTokens?.invoke() == null) return@withLock cloudSessionExpiredResponse()
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
@@ -17249,13 +17266,19 @@ internal suspend fun refreshUserAccountNow(
         if (stockState.payloadValue == null || stockLoadStatusState.value.failure != null) getStock(storeId)
         if (stockBatchesState.payloadValue == null || stockBatchesLoadStatusState.value.failure != null) getStockBatches(storeId)
     }
-    getGlobalAppConfiguration()
-    getNotifications()
+    // Recovery of locally queued notifications is not an optional UI list refresh.
     syncPendingNotificationsToServer()
-    getSupportTickets()
-    getStores()
-    getSuppliers()
-    getGenericGoodsCategories()
+    // Realtime callers already select the exact resources to refresh. Avoid fetching the
+    // same lists a second time, and avoid making a preference edit reload the whole app.
+    if (refreshRelatedData) {
+        CompanyEmployment.refreshSoon()
+        getGlobalAppConfiguration()
+        getNotifications()
+        getSupportTickets()
+        getStores()
+        getSuppliers()
+        getGenericGoodsCategories()
+    }
     startRealtimeUpdates()
     response.copy(payload = currentAccount)
 }
@@ -17337,6 +17360,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 ): ResponseDataModel<Response> {
     activeNetworkOperationsState.update { it + 1 }
     val requestStartedAtMillis = getCurrentTimeMillis()
+    val requestAccountId = userAccountState.payloadValue?.id
+    val requestSessionGeneration = currentAuthenticatedSessionGeneration()
 
     return try {
         if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
@@ -17470,7 +17495,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     val decodedResponse = decodeNetworkResponseDataModel<Response>(rawBody, response.status)
                         .withAitaTransportFailureFromStatus(response.status)
                     if (response.status.value == 402 && subscriptionStoreId != null)
-                        invalidateStoreSubscriptionAccess(subscriptionStoreId, requestStartedAtMillis)
+                        invalidateStoreSubscriptionAccess(subscriptionStoreId, requestStartedAtMillis, requestAccountId, requestSessionGeneration)
 
                     if (response.status.isAitaServerUnhealthyForClientBanner() || decodedResponse.transportFailure) {
                         val failureResponse = decodedResponse.copy(transportFailure = true)
@@ -20486,7 +20511,8 @@ data class SupportTicketDataModel(
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L,
     val closedAtMillis: Long? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val revision: Long = 0L
 ): Searchable {
     override val exactSearchOperands: List<String>
         get() = listOf(id, publicId, subject, category, priority, status, lastMessage) + metadata.values
@@ -20514,7 +20540,8 @@ data class SupportMessageDataModel(
     val editedAtMillis: Long? = null,
     val readByCustomerAtMillis: Long? = null,
     val readByAgentAtMillis: Long? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val sequence: Long = 0L
 ): Searchable {
     override val exactSearchOperands: List<String>
         get() = listOf(id, ticketId, senderRole, senderDisplayName, body) + metadata.values + attachments

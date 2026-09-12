@@ -115,7 +115,7 @@ internal class SubscriptionRepository(private val db: Connection) {
     }
 
     /** Successful replay returns the current dashboard, not an old entitlement snapshot. */
-    fun update(location: SubscriptionLocation, actorId: UUID, request: StoreSubscriptionUpdateRequestDataModel, now: Long) {
+    fun update(location: SubscriptionLocation, actorId: UUID, request: StoreSubscriptionUpdateRequestDataModel, now: Long, sessionId: UUID? = null) {
         val command = subscriptionCommandUuid(request.commandId)
         val hash = subscriptionCommandHash(request)
         val current = ensureState(location, now)
@@ -172,11 +172,14 @@ internal class SubscriptionRepository(private val db: Connection) {
         if (promo != null) {
             execute("""
                 INSERT INTO subscription_promo_redemptions
-                    (promo_id, store_id, actor_user_id, command_id, kind, granted_until_millis, discount_applied_minor, redeemed_at_millis)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (promo_id, store_id, actor_user_id, command_id, kind, granted_until_millis, discount_applied_minor, redeemed_at_millis,
+                     billing_owner_user_id, session_id, charge_minor, regular_price_minor, currency_code, granted_from_millis, request_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(), promo.id, location.storeId, actorId, command, promo.kind, end,
-                if (promo.kind == SUBSCRIPTION_PROMO_DISCOUNT) plan.priceMinor - quote.chargeMinor else 0L, now)
-            check(execute("UPDATE subscription_promocodes SET redemption_count = redemption_count + 1 WHERE id = ? AND redemption_count < max_redemptions", promo.id) == 1)
+                if (promo.kind == SUBSCRIPTION_PROMO_DISCOUNT) plan.priceMinor - quote.chargeMinor else 0L, now,
+                location.ownerId, sessionId, quote.chargeMinor, plan.priceMinor, plan.currencyCode, now, hash)
+            // V102 atomically consumes and archives the code with this redemption. Never delete
+            // its hash tombstone: re-issuing a used secret must fail even after a store is deleted.
         }
         recordCommand(location.storeId, command, actorId, hash, current.revision + 1, now)
     }
@@ -251,14 +254,14 @@ internal class SubscriptionRepository(private val db: Connection) {
             val region = row.getString("region_code")
             if (!row.getBoolean("is_active") || row.getString("plan_id") != plan.id ||
                 row.getLong("valid_from_millis") > now || (row.longOrNull("valid_until_millis")?.let { it <= now } == true) ||
-                row.getLong("redemption_count") >= row.getLong("max_redemptions") ||
+                row.getLong("redemption_count") != 0L ||
                 (store != null && store != location.storeId.toString()) || (owner != null && owner != location.ownerId.toString()) ||
                 (currency != null && currency != plan.currencyCode) || (region != null && region != location.region))
                 subscriptionFailure("subscription.promo_invalid", 400)
             Promo(UUID.fromString(row.getString("id")), row.getString("kind"), row.longOrNull("duration_millis"),
                 row.longOrNull("discount_basis_points")?.toInt(), row.longOrNull("discount_minor"))
         }.singleOrNull() ?: subscriptionFailure("subscription.promo_invalid", 400)
-        if (query("SELECT id FROM subscription_promo_redemptions WHERE promo_id = ? AND store_id = ?", row.id, location.storeId) { it.getString(1) }.isNotEmpty())
+        if (query("SELECT promo_id FROM used_subscription_promocodes WHERE promo_id = ?", row.id) { it.getString(1) }.isNotEmpty())
             subscriptionFailure("subscription.promo_invalid", 400)
         return row
     }

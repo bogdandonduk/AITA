@@ -15,7 +15,7 @@ import kotlin.test.*
 
 /** Opt-in real PostgreSQL tests, not an in-memory billing substitute.
  * AITA_BILLING_TEST_DB_URL must name a separately provisioned aita_test_* database.
- * Each test creates/drops only its own random schema and runs the actual V46 + V101 SQL.
+ * Each test creates/drops only its own random schema and runs the actual V46 + V101 + V102 SQL.
  * This fixture tests the repository/transaction protocol, not Ktor authentication or all prior migrations.
  */
 class SubscriptionRepositoryDatabaseTest {
@@ -59,6 +59,7 @@ class SubscriptionRepositoryDatabaseTest {
                 exec(c, "UPDATE user_wallets SET balance_minor=3000000")
                 if (legacyRoot) exec(c, "INSERT INTO store_subscription_states(store_id,owner_user_id,plan_id,status,current_period_start_millis,current_period_end_millis,auto_renew,next_charge_at_millis) VALUES ('${f.root}','${f.owner}','standard_monthly_kzt','active',$now,${now + 99_000},TRUE,${now + 99_000})")
                 exec(c, resource("V101__per_location_subscriptions_and_promocodes.sql"))
+                exec(c, resource("V102__single_use_promo_archive.sql"))
                 block(f, c)
             } finally {
                 exec(c, "SET search_path TO public")
@@ -186,6 +187,8 @@ class SubscriptionRepositoryDatabaseTest {
         val b = command(quote(f, f.anotherOwnersRoot, "AITA-ONE-ONLY"), "AITA-ONE-ONLY")
         val results = parallel({ runCatching { purchase(f, a) } }, { runCatching { purchase(f, b, f.anotherOwner) } })
         assertEquals(1, results.count { it.isSuccess }); assertEquals(1L, number(c, "SELECT redemption_count FROM subscription_promocodes"))
+        assertEquals(1L, number(c, "SELECT count(*) FROM used_subscription_promocodes"))
+        assertEquals("false", scalar(c, "SELECT is_active::text FROM subscription_promocodes"))
     }
     @Test fun differentRootsSharingAWalletCannotBothSpendAnInsufficientBalance() = fixture { f, c ->
         exec(c, "UPDATE user_wallets SET balance_minor=1000000 WHERE user_id='${f.owner}'")
@@ -201,6 +204,7 @@ class SubscriptionRepositoryDatabaseTest {
         assertFailsWith<SQLException> { purchase(f, request) }
         assertEquals(3_000_000L, balance(c, f.owner)); assertEquals(0L, number(c, "SELECT COUNT(*) FROM store_subscription_charge_events"))
         assertEquals(0L, number(c, "SELECT redemption_count FROM subscription_promocodes"))
+        assertEquals(0L, number(c, "SELECT count(*) FROM used_subscription_promocodes"))
         tx(f) { assertFalse(it.hasAccess(f.branch, now)) }
     }
     @Test fun activateNowFalseDoesNotCreateAFreePeriod() = fixture { f, c ->
@@ -263,4 +267,42 @@ class SubscriptionRepositoryDatabaseTest {
         assertEquals(state.currentPeriodEndMillis, next.currentPeriodEndMillis)
         assertEquals(3_000_000L, balance(c, f.anotherOwner))
     }
+    @Test fun usedArchiveRetainsActorLocationCommandAndFinancialFacts() = fixture { f, c ->
+        promo(c, "ARCHIVE-ONE-USE", "discount", percent = 2500, store = f.branch, owner = f.owner)
+        val request=command(quote(f,f.branch,"ARCHIVE-ONE-USE"),"ARCHIVE-ONE-USE")
+        purchase(f,request)
+        assertEquals(f.owner.toString(),scalar(c,"SELECT actor_user_id::text FROM used_subscription_promocodes"))
+        assertEquals(f.owner.toString(),scalar(c,"SELECT billing_owner_user_id::text FROM used_subscription_promocodes"))
+        assertEquals(f.branch.toString(),scalar(c,"SELECT store_id::text FROM used_subscription_promocodes"))
+        assertEquals(request.commandId,scalar(c,"SELECT command_id::text FROM used_subscription_promocodes"))
+        assertEquals(now,number(c,"SELECT first_used_at_millis FROM used_subscription_promocodes"))
+        assertEquals(599250L,number(c,"SELECT charge_minor FROM used_subscription_promocodes"))
+        assertEquals(199750L,number(c,"SELECT discount_applied_minor FROM used_subscription_promocodes"))
+        assertEquals("KZT",scalar(c,"SELECT currency_code FROM used_subscription_promocodes"))
+        assertEquals(64,requireNotNull(scalar(c,"SELECT request_hash FROM used_subscription_promocodes")).length)
+    }
+    @Test fun archiveAndUsedIdentityCannotBeRewrittenOrReactivated() = fixture { f,c ->
+        promo(c,"IMMUTABLE-USE","lifetime")
+        purchase(f,command(quote(f,f.branch,"IMMUTABLE-USE"),"IMMUTABLE-USE"))
+        assertFailsWith<SQLException> { exec(c,"DELETE FROM used_subscription_promocodes") }
+        assertFailsWith<SQLException> { exec(c,"UPDATE used_subscription_promocodes SET actor_user_id=NULL") }
+        assertFailsWith<SQLException> { exec(c,"UPDATE subscription_promocodes SET redemption_count=0,is_active=TRUE") }
+        assertFailsWith<SQLException> { exec(c,"DELETE FROM subscription_promocodes") }
+        assertEquals(1L,number(c,"SELECT count(*) FROM used_subscription_promocodes"))
+    }
+    @Test fun maximumRedemptionCountCannotBeExpandedForNewCodes() = fixture { _,c ->
+        assertFailsWith<SQLException> { promo(c,"ILLEGAL-MULTI","lifetime",max=2) }
+        promo(c,"SINGLE-ONLY","lifetime")
+        assertFailsWith<SQLException> { exec(c,"UPDATE subscription_promocodes SET max_redemptions=10") }
+        assertFailsWith<SQLException> { exec(c,"UPDATE subscription_promocodes SET redemption_count=1,is_active=FALSE") }
+    }
+    @Test fun deletingABoundBranchDoesNotEraseTheUsedPromoArchive() = fixture { f,c ->
+        promo(c,"BOUND-ARCHIVE","lifetime",store=f.branch)
+        purchase(f,command(quote(f,f.branch,"BOUND-ARCHIVE"),"BOUND-ARCHIVE"))
+        exec(c,"DELETE FROM stores WHERE id='${f.branch}'")
+        assertEquals(1L,number(c,"SELECT count(*) FROM used_subscription_promocodes"))
+        assertEquals(f.branch.toString(),scalar(c,"SELECT store_id::text FROM used_subscription_promocodes"))
+        assertEquals(1L,number(c,"SELECT count(*) FROM subscription_promocodes WHERE NOT is_active"))
+    }
+
 }

@@ -1,4 +1,5 @@
-<configuration scan="true" scanPeriod="30 seconds">
+<!-- Packaged in the application JAR: live file watching is not available. -->
+<configuration>
     <property name="AITA_LOG_DIR" value="${AITA_LOG_DIR:-${user.home}/.aita/logs/server}" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">

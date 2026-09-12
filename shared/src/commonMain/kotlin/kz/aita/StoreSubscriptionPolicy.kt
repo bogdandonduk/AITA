@@ -74,6 +74,7 @@ fun storeSubscriptionRequiredForEndpoint(endpoint: String): Boolean {
     val path = endpoint.substringBefore('?').substringBefore('#').trim('/').lowercase()
     val root = path.substringBefore('/')
     if (root in setOf("stock", "stockbatches", "transactions", "cashregister", "debtors", "analytics", "logs", "operationlogs")) return true
+    if (root == "market") return path == "market/seller" || path.startsWith("market/seller/")
     if (root == "workshifts") return path != "workshifts/end"
     if (root == "workers") return path !in setOf("workers/my/get", "workers/requests/my", "workers/my/password", "workers/removal/confirm", "workers/removal/decline", "workers/invitations/decline")
     if (root == "stores") return path in setOf("stores/update", "stores/delete")
