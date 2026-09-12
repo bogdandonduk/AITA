@@ -13,6 +13,7 @@ internal fun AppConfiguration.marketIconFallback(id: Int): DrawableResource {
         140 -> if(dark) Res.drawable._140_1 else Res.drawable._140_0
         141 -> if(dark) Res.drawable._141_1 else Res.drawable._141_0
         142 -> if(dark) Res.drawable._142_1 else Res.drawable._142_0
+        143 -> if(dark) Res.drawable._143_1 else Res.drawable._143_0
         else -> if(dark) Res.drawable._139_1 else Res.drawable._139_0
     }
 }

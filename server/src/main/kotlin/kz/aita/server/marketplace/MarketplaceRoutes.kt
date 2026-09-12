@@ -3,6 +3,7 @@ package kz.aita.server.marketplace
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.*
+import io.ktor.server.response.header
 import kz.aita.*
 import kz.aita.server.*
 import kotlinx.coroutines.CancellationException
@@ -15,9 +16,11 @@ private suspend inline fun <reified T> RoutingCall.marketResult(
     crossinline after: suspend (T) -> Unit = {},
     crossinline work: MarketplaceRepository.() -> T
 ) {
+    response.header("Cache-Control", "private, no-store, max-age=0")
     try {
         val result = newSuspendedTransaction(aitaServerIoContext,
             transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ, readOnly = readOnly) {
+            maxAttempts = 3
             // Public visibility, stock projection and saved markers share one snapshot. A second
             // query must not accidentally mix a published row with a just-created private draft.
             MarketplaceRepository(TransactionManager.current().connection.connection as Connection,
@@ -36,7 +39,31 @@ internal fun Route.marketplaceRoutes() {
             get("/offers") {
                 val user = call.checkPrincipal() ?: return@get
                 call.marketResult(readOnly = true) { browse(user, call.request.queryParameters["q"].orEmpty(), call.request.queryParameters["city"].orEmpty(),
-                    call.request.queryParameters["after"], call.request.queryParameters["gtin"]) }
+                    call.request.queryParameters["after"], call.request.queryParameters["gtin"], call.request.queryParameters["store"]) }
+            }
+            get("/offers/{offerId}") {
+                val user = call.checkPrincipal() ?: return@get
+                call.marketResult(readOnly = true) { offer(user, call.parameters["offerId"].orEmpty()) }
+            }
+            get("/shops/{storeId}") {
+                call.checkPrincipal() ?: return@get
+                call.marketResult(readOnly = true) { publicShop(call.parameters["storeId"].orEmpty()) }
+            }
+            get("/shopping-list") {
+                val user = call.checkPrincipal() ?: return@get
+                call.marketResult(readOnly = true) {
+                    MarketShoppingRepository(TransactionManager.current().connection.connection as Connection, this).snapshot(user)
+                }
+            }
+            put("/shopping-list") {
+                val user = call.checkPrincipal() ?: return@put
+                val body = call.receiveAita<MarketShoppingCommand>()
+                call.marketResult(after = { result: MarketShoppingOutcome ->
+                    if (result.accepted) RealtimeServerBus.publish(entity = "market/shopping-list", userId = user.toString(), reason = "shopping_list_changed")
+                }) {
+                    MarketShoppingRepository(TransactionManager.current().connection.connection as Connection, this)
+                        .apply(user, call.currentJwtSessionId(), body)
+                }
             }
             get("/saved") {
                 val user = call.checkPrincipal() ?: return@get

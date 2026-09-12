@@ -1860,6 +1860,19 @@
           "path": "svg/142_1.svg"
         }
       ]
+    },
+    {
+      "id": 143,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/143_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/143_1.svg"
+        }
+      ]
     }
   ]
 }

@@ -59,7 +59,7 @@ class MarketplacePolicyTest {
         }
     }
     @Test fun buyerRecoveryNeverDependsOnSelectedStoreSubscription() {
-        listOf("market/offers","market/saved","market/saved/clear-unavailable").forEach{assertFalse(storeSubscriptionRequiredForEndpoint(it))}
+        listOf("market/offers","market/saved","market/saved/clear-unavailable","market/shopping-list","market/shops/example","market/offers/example").forEach{assertFalse(storeSubscriptionRequiredForEndpoint(it))}
         listOf("market/seller","market/seller/listing","/MARKET/seller/storefront?test=1").forEach{assertTrue(storeSubscriptionRequiredForEndpoint(it))}
     }
 }

@@ -5451,6 +5451,7 @@ fun AppConfiguration.MainScreen() {
                         is NavigationScreenModel.Transaction.MainSale, NavigationScreenModel.Transaction.MainReturn, NavigationScreenModel.Transaction.MainSupply -> TransactionScreen()
                         is NavigationScreenModel.Stock -> StockScreen()
                         is NavigationScreenModel.Supplier -> SupplierScreen()
+                        NavigationScreenModel.Buyer.Main.Shopping -> BuyerShoppingListScreen()
                         is NavigationScreenModel.Buyer -> BuyerMarketplaceScreen()
                         is NavigationScreenModel.Menu -> MenuScreen()
                         else -> {}

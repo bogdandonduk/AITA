@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -50,6 +51,8 @@ internal fun AppConfiguration.MarketPublicationScreen() {
     var dashboard by remember(account,store,generation) { mutableStateOf<MarketPublicationDashboard?>(null) }
     var loading by remember(account,store,generation) { mutableStateOf(false) }
     var saving by remember(account,store,generation) { mutableStateOf(false) }
+    // A reload that started before a successful write must not restore that older revision.
+    var publicationAckRevision by remember(account,store,generation) { mutableStateOf(0L) }
     var refresh by remember(account,store) { mutableStateOf(0) }
     var feedback by remember(account,store,generation) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     var feedbackNegative by remember(account,store,generation) { mutableStateOf(false) }
@@ -74,14 +77,20 @@ internal fun AppConfiguration.MarketPublicationScreen() {
         if(store==null) return@LaunchedEffect
         val owner=captureMarketRequestScope(store) ?: return@LaunchedEffect
         loading=true
+        val readRevision=publicationAckRevision
         try {
             val result=loadMarketPublication(owner)
-            if(owner.isCurrent()) {
+            if(owner.isCurrent() && readRevision==publicationAckRevision) {
                 val data=result.payload
                 if(!result.negative && data!=null) { accept(data); feedback=null }
                 else { feedback=result.message ?: eventMessage("market.unavailable"); feedbackNegative=true }
             }
             if(owner.isCurrent()) getStock(store)
+        } catch(cancelled:CancellationException) { throw cancelled }
+        catch(_:Exception) {
+            if(owner.isCurrent() && readRevision==publicationAckRevision) {
+                feedback=eventMessage("market.refresh_failed"); feedbackNegative=true
+            }
         } finally { loading=false }
     }
     val subscriptionAccess=rememberStoreSubscriptionAccess(store)
@@ -123,17 +132,19 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                 item("published") { MarketPublishToggle(authUiText("Visible in Buyer mode","Видно в режиме покупателя","Сатып алушы режимінде көрінеді"),value.published,!saving) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(published=it),storefrontDirty=true)) } }
                 item("save") { actionButton(text=authUiText("Save storefront","Сохранить витрину","Витринаны сақтау"),iconPath=marketIconPath(142),iconRes=marketIconFallback(142),
-                    enabled=!saving,loading=saving,autoLoading=false,confirmationRequired=value.published && dashboard?.storefront?.published!=true,onClick={
+                    enabled=!saving && !loading,loading=saving,autoLoading=false,confirmationRequired=value.published && dashboard?.storefront?.published!=true,onClick={
                         val owner=captureMarketRequestScope(store)
-                        if(owner!=null && !saving) { val snapshot=value; saving=true; uiScope.launch {
+                        if(owner!=null && !saving && !loading) { val snapshot=value; saving=true; uiScope.launch {
                             try {
                                 val result=saveMarketStorefront(owner,snapshot)
                                 if(owner.isCurrent()) {
                                     val data=result.payload
                                     feedbackNegative=result.negative; feedback=result.message ?: if(result.negative) eventMessage("market.changed") else eventMessage("market.saved")
-                                    if(!result.negative && data!=null) { accept(data,clearStore=true); MarketplaceSignals.changed() }
+                                    if(!result.negative && data!=null) { publicationAckRevision++; accept(data,clearStore=true); MarketplaceSignals.changed() }
                                 }
-                            } finally { saving=false }
+                            } catch(cancelled:CancellationException) { throw cancelled }
+                            catch(_:Exception) { if(owner.isCurrent()) { feedback=eventMessage("market.refresh_failed"); feedbackNegative=true } }
+                            finally { saving=false }
                         } }
                     }) }
             } else {
@@ -161,18 +172,20 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                     }
                     item("listingVisible") { MarketPublishToggle(authUiText("Publish this product","Опубликовать этот товар","Осы тауарды жариялау"),listing.published,!saving) {
                         edit(draft.copy(listing=(draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing).copy(published=it),listingDirty=true)) } }
-                    item("listingSave") { actionButton(text=authUiText("Save listing","Сохранить товар","Тауарды сақтау"),enabled=!saving,loading=saving,autoLoading=false,
+                    item("listingSave") { actionButton(text=authUiText("Save listing","Сохранить товар","Тауарды сақтау"),enabled=!saving && !loading,loading=saving,autoLoading=false,
                         confirmationRequired=listing.published && dashboard!!.listings.none { it.id==listing.id && it.published },onClick={
                             val owner=captureMarketRequestScope(store)
-                            if(owner!=null && !saving) { val snapshot=listing; saving=true; uiScope.launch {
+                            if(owner!=null && !saving && !loading) { val snapshot=listing; saving=true; uiScope.launch {
                                 try {
                                     val result=saveMarketListing(owner,snapshot)
                                     if(owner.isCurrent()) {
                                         val data=result.payload
                                         feedbackNegative=result.negative; feedback=result.message ?: if(result.negative) eventMessage("market.changed") else eventMessage("market.saved")
-                                        if(!result.negative && data!=null) { accept(data,clearListing=true); MarketplaceSignals.changed() }
+                                        if(!result.negative && data!=null) { publicationAckRevision++; accept(data,clearListing=true); MarketplaceSignals.changed() }
                                     }
-                                } finally { saving=false }
+                                } catch(cancelled:CancellationException) { throw cancelled }
+                                catch(_:Exception) { if(owner.isCurrent()) { feedback=eventMessage("market.refresh_failed"); feedbackNegative=true } }
+                                finally { saving=false }
                             } }
                         }) }
                 }

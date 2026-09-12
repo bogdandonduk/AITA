@@ -384,6 +384,8 @@ internal fun localDrawableResourceForPath(
         "141_1" -> Res.drawable._141_1
         "142_0" -> Res.drawable._142_0
         "142_1" -> Res.drawable._142_1
+        "143_0" -> Res.drawable._143_0
+        "143_1" -> Res.drawable._143_1
         else -> fallbackRes
     }
 }

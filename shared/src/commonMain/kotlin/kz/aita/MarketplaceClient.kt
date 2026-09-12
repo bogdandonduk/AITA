@@ -12,9 +12,15 @@ object MarketplaceSignals {
     fun changed() { counter.update { it + 1L } }
 }
 
-class MarketRequestScope internal constructor(val accountId: String, val generation: Long,
-    val storeId: String?, private val inventoryEpoch: Long?) {
-    fun isCurrent(): Boolean = userAccountState.payloadValue?.id == accountId &&
+interface MarketAccountScope {
+    val accountId: String
+    val generation: Long
+    fun isCurrent(): Boolean
+}
+
+class MarketRequestScope internal constructor(override val accountId: String, override val generation: Long,
+    val storeId: String?, private val inventoryEpoch: Long?) : MarketAccountScope {
+    override fun isCurrent(): Boolean = userAccountState.payloadValue?.id == accountId &&
         authenticatedSessionGenerationIsCurrent(generation) && (storeId == null ||
         (activeStoreIdState.value == storeId && inventoryOwners.current.epoch == inventoryEpoch))
 }
@@ -26,10 +32,10 @@ fun captureMarketRequestScope(storeId: String? = null): MarketRequestScope? {
 }
 
 suspend fun loadMarketOffers(scope: MarketRequestScope, search: String = "", city: String = "",
-    after: String? = null, gtin: String? = null): ResponseDataModel<MarketPage> {
+    after: String? = null, gtin: String? = null, storefrontId: String? = null): ResponseDataModel<MarketPage> {
     if(!scope.isCurrent()) return cloudSessionExpiredResponse()
     return networkRequest<MarketPage,Unit>(HttpMethod.Get,endpointUrl="market/offers",
-        query=buildMap { put("q",search); put("city",city); after?.let { put("after",it) }; gtin?.let { put("gtin",it) } },
+        query=buildMap { put("q",search); put("city",city); after?.let { put("after",it) }; gtin?.let { put("gtin",it) }; storefrontId?.let { put("store",it) } },
         expectedSessionGeneration=scope.generation)
 }
 suspend fun loadMarketSaved(scope: MarketRequestScope): ResponseDataModel<MarketPage> {
@@ -58,4 +64,17 @@ suspend fun saveMarketListing(scope: MarketRequestScope, value: MarketListing): 
     if(!scope.isCurrent() || scope.storeId!=value.storeId) return cloudSessionExpiredResponse()
     return networkRequest(HttpMethod.Put,endpointUrl="market/seller/listing",headers=mapOf("store_id" to value.storeId),
         body=MarketListingUpdate(value),expectedSessionGeneration=scope.generation)
+}
+
+suspend fun loadMarketOffer(scope: MarketRequestScope, id: String): ResponseDataModel<MarketOffer> {
+    if (!scope.isCurrent()) return cloudSessionExpiredResponse()
+    if (!id.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")))
+        return ResponseDataModel(eventMessage("market.unavailable"), null, true, 404)
+    return networkRequest<MarketOffer, Unit>(HttpMethod.Get, endpointUrl = "market/offers/$id", expectedSessionGeneration = scope.generation)
+}
+suspend fun loadMarketShop(scope: MarketRequestScope, id: String): ResponseDataModel<MarketStorefront> {
+    if (!scope.isCurrent()) return cloudSessionExpiredResponse()
+    if (!id.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")))
+        return ResponseDataModel(eventMessage("market.shop_unavailable"), null, true, 404)
+    return networkRequest<MarketStorefront, Unit>(HttpMethod.Get, endpointUrl = "market/shops/$id", expectedSessionGeneration = scope.generation)
 }

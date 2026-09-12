@@ -136,7 +136,7 @@ internal class MarketplaceRepository(private val db: Connection,
     private fun candidates(sql: String, args: List<Any?>): List<Candidate> = query(sql, *args.toTypedArray()) {
         Candidate(listingRow(it), it.getLong("updated_at_millis"))
     }
-    fun browse(user: UUID, text: String, city: String, after: String?, gtin: String?): MarketPage {
+    fun browse(user: UUID, text: String, city: String, after: String?, gtin: String?, storeId: String? = null): MarketPage {
         val search = clean(text, 120); val place = clean(city, 100); val now = System.currentTimeMillis()
         val conditions = mutableListOf(publicPredicate); val args = mutableListOf<Any?>(now, now)
         if (search.isNotEmpty()) {
@@ -145,11 +145,79 @@ internal class MarketplaceRepository(private val db: Connection,
             args.add(search); args.add(search); args.add(marketCanonicalGtin(search) ?: "")
         }
         if (place.isNotEmpty()) { conditions += "lower(f.city)=lower(?)"; args.add(place) }
+        if (storeId != null) { conditions += "l.store_id=?"; args.add(marketUuid(storeId)) }
         if (after != null) { conditions += "l.id>?"; args.add(marketUuid(after)) }
         if (gtin != null) { conditions += "l.gtin=?"; args.add(marketCanonicalGtin(gtin) ?: marketFail()) }
         val rows = candidates("SELECT l.* $publicJoins WHERE ${conditions.joinToString(" AND ")} ORDER BY l.id LIMIT 41", args)
         val page = rows.take(40)
         return MarketPage(project(user, page, now), if (rows.size > 40) page.last().listing.id else null, now)
+    }
+    /** Same public visibility predicate for details, list estimates and the browse page. */
+    fun offersByIds(user: UUID, ids: List<UUID>, now: Long = System.currentTimeMillis()): List<MarketOffer> {
+        if (ids.isEmpty()) return emptyList()
+        require(ids.size <= 100)
+        val rows = candidates("SELECT l.* $publicJoins WHERE $publicPredicate AND l.id IN (${ids.joinToString(",") { "?" }}) ORDER BY l.id",
+            listOf(now, now) + ids)
+        return project(user, rows, now)
+    }
+    fun offer(user: UUID, id: String): MarketOffer = offersByIds(user, listOf(marketUuid(id))).singleOrNull()
+        ?: marketFail("market.unavailable", 404)
+
+    /** A public shop page can remain empty. It never falls back to the private Stores model. */
+    fun publicShop(storeId: String): MarketStorefront {
+        val store = marketUuid(storeId)
+        val now = System.currentTimeMillis()
+        return query("""SELECT f.* FROM marketplace_storefronts f JOIN stores s ON s.id=f.store_id
+            LEFT JOIN stores p ON p.id=s.parent_store_id JOIN store_subscription_states e ON e.store_id=f.store_id
+            WHERE f.store_id=? AND f.is_published AND s.is_active AND (s.parent_store_id IS NULL OR p.is_active)
+            AND e.status='active' AND coalesce(e.current_period_start_millis,e.started_at_millis)<=?
+            AND ((e.access_kind='lifetime' AND e.plan_id='internal_lifetime' AND e.current_period_end_millis IS NULL AND NOT e.auto_renew)
+                OR (e.access_kind IN ('paid','timed') AND e.current_period_end_millis>?))""", store, now, now,
+            map = ::storefrontRow).singleOrNull() ?: marketFail("market.shop_unavailable", 404)
+    }
+
+    /** Estimates use the requested selling-unit multiples and the real retail promotion rules.
+     * Do not extrapolate a selected batch's price across other batches with different prices/units.
+     * Neither the selected batch id nor its stock count leaves this repository.
+     */
+    fun quoteShopping(user: UUID, lines: List<MarketShoppingLine>, now: Long): List<MarketShoppingQuotedLine> {
+        if (lines.isEmpty()) return emptyList()
+        require(lines.size <= MARKET_SHOPPING_MAX_LINES)
+        val ids = lines.map { marketUuid(it.offerId) }
+        val rows = candidates("SELECT l.* $publicJoins WHERE $publicPredicate AND l.id IN (${ids.joinToString(",") { "?" }})",
+            listOf(now, now) + ids)
+        val offers = project(user, rows, now).associateBy { it.id }
+        val itemIds = rows.map { marketUuid(it.listing.goodsItemId) }.distinct()
+        val storeIds = rows.map { marketUuid(it.listing.storeId) }.distinct()
+        val itemById = items(itemIds).associateBy { it.id }
+        val batchByItem = batches(itemIds, storeIds, now).associateBy { it.storeId to it.goodsItemId }
+        val listingById = rows.associateBy { it.listing.id }
+        return lines.map { line ->
+            val offer = offers[line.offerId]
+                ?: return@map MarketShoppingQuotedLine(line, status = MARKET_QUOTE_UNAVAILABLE)
+            val currentBasis = offer.shoppingBasis()
+            if (currentBasis == null) return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_PRICE)
+            if (line.basis != currentBasis) return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_CHANGED)
+            val listing = listingById.getValue(line.offerId).listing
+            val item = itemById[listing.goodsItemId]
+                ?: return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_UNAVAILABLE)
+            val batch = batchByItem[listing.storeId to listing.goodsItemId]
+                ?: return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_QUANTITY)
+            // Decimal selling units such as 3 x 0.1 kg must not become 0.30000000000000004
+            // and incorrectly fail against a recorded 0.3 kg batch.
+            val total = marketRequestedQuantity(line.basis.pricedAmount, line.units)
+            if (!total.isFinite() || !batch.isMarketSellableAt(line.storeId, now) || batch.quantity.total < total)
+                return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_QUANTITY)
+            if (item.firstViolatedPromotionRestriction(0, total, batch, now) != null)
+                return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_PRICE)
+            val price = item.promotedPriceForTransaction(0, quantityTotal = total, batch = batch, nowMillis = now).finalPrice
+            if (price.currency.trim().uppercase() != line.basis.currencyCode)
+                return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_CHANGED)
+            val minor = marketPriceMinor(price.price)
+            val subtotal = marketShoppingSubtotal(minor, line.units)
+            MarketShoppingQuotedLine(line, offer, minor, subtotal,
+                if (subtotal == null) MARKET_QUOTE_PRICE else MARKET_QUOTE_ESTIMATED)
+        }
     }
     fun saved(user: UUID): MarketPage {
         val now = System.currentTimeMillis()
@@ -249,7 +317,7 @@ internal class MarketplaceRepository(private val db: Connection,
                 pricedAmount=priced.takeIf { minor!=null },unitId=batch?.quantity?.id?.takeIf { minor!=null },
                 unitName=if(minor==null) emptyList() else batch?.quantity?.immutableUnitName.orEmpty().take(12)
                     .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) },
-                availability=if(batch!=null && minor!=null) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
+                availability=if(batch!=null && minor!=null && batch.quantity.total >= batch.quantity.pricedAmount) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
                 checkedAtMillis=now,sourceUpdatedAtMillis=maxOf(candidate.sourceUpdated,item.updatedAtMillis,batch?.updatedAtMillis ?: 0L),
                 saved=listing.id in saved)
         }
@@ -262,3 +330,9 @@ internal fun marketPriceMinor(raw: String): Long? = runCatching {
     if(value < BigDecimal.ZERO || value > BigDecimal("10000000000")) null
     else value.movePointRight(2).setScale(0,RoundingMode.HALF_UP).longValueExact()
 }.getOrNull()
+
+/** Exact decimal multiplication before adapting to the existing POS Double quantity API. */
+internal fun marketRequestedQuantity(pricedAmount: Double, units: Int): Double {
+    require(pricedAmount.isFinite() && pricedAmount > 0.0 && units in 1..MARKET_SHOPPING_MAX_UNITS)
+    return BigDecimal.valueOf(pricedAmount).multiply(BigDecimal.valueOf(units.toLong())).toDouble()
+}

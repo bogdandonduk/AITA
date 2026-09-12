@@ -2687,6 +2687,11 @@ sealed class NavigationScreenModel(
                 override val iconPath get() = AppConfiguration.marketIconPath(140)
                 override val iconRes get() = AppConfiguration.marketIconFallback(140)
             }
+            data object Shopping: Main("BuyerMainShoppingNavigationScreenModelRoute") {
+                override val name get() = with(AppConfiguration) { authUiText("List", "Покупки", "Тізім") }
+                override val iconPath get() = AppConfiguration.marketIconPath(143)
+                override val iconRes get() = AppConfiguration.marketIconFallback(143)
+            }
             data object Search: Main("BuyerMainSearchNavigationScreenModelRoute")
         }
 
@@ -3300,6 +3305,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Buyer.Main.Home,
     NavigationScreenModel.Buyer.Main.Search,
     NavigationScreenModel.Buyer.Main.Saved,
+    NavigationScreenModel.Buyer.Main.Shopping,
     NavigationScreenModel.Buyer.Cart.Main,
     NavigationScreenModel.Buyer.Orders.Main,
     NavigationScreenModel.Supplier.Orders.Main,
@@ -3475,6 +3481,7 @@ object Navigation {
     val bottomNavBarScreensBuyer = listOf(
         NavigationScreenModel.Buyer.Main.Home,
         NavigationScreenModel.Buyer.Main.Saved,
+        NavigationScreenModel.Buyer.Main.Shopping,
         NavigationScreenModel.Menu.Main
     )
 

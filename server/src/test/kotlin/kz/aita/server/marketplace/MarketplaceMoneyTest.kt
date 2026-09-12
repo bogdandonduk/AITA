@@ -18,4 +18,11 @@ class MarketplaceMoneyTest {
         listOf("", "1-1-1-1-1", "not-uuid", "x' OR true--").forEach{assertFailsWith<MarketFailure>{marketUuid(it)}}
         assertEquals("c534bab2-3f6a-4c0d-ae55-40faa6f2790f",marketUuid("C534BAB2-3F6A-4C0D-AE55-40FAA6F2790F").toString())
     }
+    @Test fun decimalSellingMultiplesDoNotInventExcessQuantity() {
+        assertEquals(0.3, marketRequestedQuantity(0.1, 3))
+        assertEquals(1.5, marketRequestedQuantity(0.5, 3))
+        assertEquals(999_000_000.0, marketRequestedQuantity(1_000_000.0, 999))
+        assertFailsWith<IllegalArgumentException> { marketRequestedQuantity(Double.NaN, 1) }
+        assertFailsWith<IllegalArgumentException> { marketRequestedQuantity(1.0, 0) }
+    }
 }
