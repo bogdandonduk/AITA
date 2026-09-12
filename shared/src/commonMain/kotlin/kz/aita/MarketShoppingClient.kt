@@ -17,7 +17,8 @@ data class MarketShoppingClientResult(
     val acknowledged: Boolean = false,
     val accepted: Boolean = false,
     val fresh: Boolean = false,
-    val journalRevision: Long = -1L
+    val journalRevision: Long = -1L,
+    val acknowledgedCommandId: String? = null
 )
 
 /** Injectable journal/transport boundary: the production instance below owns the one writer.
@@ -40,16 +41,8 @@ class MarketShoppingDeliveryStore(
         check(journal.accountId == account && journal.snapshot?.userId?.let { it == account } != false &&
             journal.pending?.accountId?.let { it == account } != false)
         check(journal.localRevision >= 0L)
-        journal.snapshot?.let { data ->
-            check(data.revision >= 0L && data.lines.size <= MARKET_SHOPPING_MAX_LINES)
-            check(data.lines.map { it.line.offerId }.distinct().size == data.lines.size)
-            check(data.lines.all { it.line.units in 1..MARKET_SHOPPING_MAX_UNITS && it.line.basis.isValidMarketBasis() &&
-                (it.subtotalMinor == null || it.subtotalMinor >= 0L) })
-        }
-        journal.pending?.command?.let { command ->
-            check(command.expectedRevision >= 0L && command.units in 0..MARKET_SHOPPING_MAX_UNITS &&
-                (if (command.units == 0) command.basis == null else command.basis?.isValidMarketBasis() == true))
-        }
+        journal.snapshot?.let { check(it.isValidMarketShoppingSnapshot(account)) }
+        journal.pending?.command?.let { check(it.isValidMarketShoppingCommand()) }
         return journal
     }
     private suspend fun write(journal: MarketShoppingJournal) {
@@ -75,8 +68,9 @@ class MarketShoppingDeliveryStore(
             val journal = try { read(scope.accountId) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_storage")) }
+            if (!scope.isCurrent()) return@withLock MarketShoppingClientResult()
             val data = response.payload
-            if (response.negative || data?.userId != scope.accountId) return@withLock result(journal).copy(
+            if (response.negative || data?.isValidMarketShoppingSnapshot(scope.accountId) != true) return@withLock result(journal).copy(
                 error = response.message ?: eventMessage("market.shopping_refresh"))
             val next = journal.withSnapshot(data)
             try { if (scope.isCurrent()) write(next) }
@@ -89,12 +83,15 @@ class MarketShoppingDeliveryStore(
     /** Prepare durably before any network write. All screens share these two writers. */
     suspend fun change(scope: MarketAccountScope, command: MarketShoppingCommand): MarketShoppingClientResult = sender.withLock {
         if (!scope.isCurrent()) return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_denied"))
+        if (!command.isValidMarketShoppingCommand()) return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_invalid"))
         val pending = PendingMarketShoppingCommand(scope.accountId, command)
         val prepared = writer.withLock prepare@{
             val current = try { read(scope.accountId) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { return@prepare null }
-            if (current.pending != null && current.pending != pending) return@prepare current
+            // A storage read or another writer may have suspended while the account/session
+            // changed. Never prepare new work for an owner that is no longer current.
+            if (!scope.isCurrent() || (current.pending != null && current.pending != pending)) return@prepare current
             try { current.prepare(pending).also { write(it) } }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
@@ -126,7 +123,7 @@ class MarketShoppingDeliveryStore(
         if (!scope.isCurrent()) return unresolved(null)
         val outcome = response.payload
         val valid = !response.negative && outcome != null && outcome.commandId == pending.command.commandId &&
-            outcome.snapshot.userId == scope.accountId && outcome.snapshot.revision >= 0 &&
+            outcome.snapshot.isValidMarketShoppingSnapshot(scope.accountId) &&
             (if (outcome.accepted) outcome.appliedRevision?.let { it in 0..outcome.snapshot.revision } == true && outcome.errorKey == null
                 else outcome.appliedRevision == null && !outcome.errorKey.isNullOrBlank())
         if (!valid || outcome == null) {
@@ -138,6 +135,7 @@ class MarketShoppingDeliveryStore(
             val journal = try { read(scope.accountId) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { return@withLock unresolved(eventMessage("market.shopping_storage")) }
+            if (!scope.isCurrent()) return@withLock unresolved(null)
             val next = journal.acknowledge(pending, outcome)
             try { write(next) }
             catch (cancelled: CancellationException) { throw cancelled }
@@ -145,7 +143,7 @@ class MarketShoppingDeliveryStore(
                 return@withLock MarketShoppingClientResult(outcome.snapshot, pending, eventMessage("market.shopping_storage"), fresh = true, journalRevision = journal.localRevision)
             }
             onChanged()
-            result(next, outcome.errorKey).copy(acknowledged = true, accepted = outcome.accepted, fresh = true)
+            result(next, outcome.errorKey).copy(acknowledged = true, accepted = outcome.accepted, fresh = true, acknowledgedCommandId = pending.command.commandId)
         }
     }
 }
@@ -155,7 +153,8 @@ object MarketShoppingDelivery {
         loadRemote = { scope -> networkRequest<MarketShoppingSnapshot, Unit>(HttpMethod.Get,
             endpointUrl = "market/shopping-list", expectedSessionGeneration = scope.generation) },
         sendRemote = { scope, command -> networkRequest<MarketShoppingOutcome, MarketShoppingCommand>(HttpMethod.Put,
-            endpointUrl = "market/shopping-list", body = command, expectedSessionGeneration = scope.generation) },
+            endpointUrl = if (command.replaceOfferId == null) "market/shopping-list" else "market/shopping-list/replace",
+            body = command, expectedSessionGeneration = scope.generation) },
         onChanged = MarketplaceSignals::changed)
     suspend fun cached(scope: MarketAccountScope) = withContext(Dispatchers.ourIo) { store.cached(scope) }
     suspend fun refresh(scope: MarketAccountScope) = withContext(Dispatchers.ourIo) { store.refresh(scope) }

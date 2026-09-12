@@ -23,6 +23,11 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         private set
     var error by mutableStateOf<List<LocalizedStringDataModel>?>(null)
         private set
+    var acknowledgedCommandId by mutableStateOf<String?>(null)
+        private set
+    var lastChangeAccepted by mutableStateOf(false)
+        private set
+    private var acknowledgedJournalRevision = -1L
     private var observedJournalRevision = -1L
     private var reviewNotice = false
     var active = true
@@ -31,13 +36,21 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
 
     private fun accept(result: MarketShoppingClientResult) {
         if (!active || owner?.isCurrent() != true) return
+        // Completion is an event, not a list snapshot. A newer GET may arrive before this
+        // callback; it must not swallow a valid acknowledgement or leave review stuck open.
+        if (result.acknowledged && result.journalRevision >= acknowledgedJournalRevision) {
+            acknowledgedJournalRevision = result.journalRevision
+            reviewNotice = !result.accepted
+            acknowledgedCommandId = result.acknowledgedCommandId
+            lastChangeAccepted = result.accepted
+            if (result.error != null) error = result.error
+        }
         if (result.journalRevision >= 0L && result.journalRevision < observedJournalRevision) return
         result.snapshot?.let { snapshot = snapshot.acceptShoppingSnapshot(it) }
         if (result.journalRevision >= 0L) {
             observedJournalRevision = result.journalRevision
             pending = result.pending
         } else if (result.pending != null) pending = result.pending
-        if (result.acknowledged) reviewNotice = !result.accepted
         if (result.error != null || !reviewNotice) error = result.error
         fresh = result.fresh
     }
@@ -57,11 +70,18 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         }
     }
     fun change(offerId: String, units: Int, basis: MarketShoppingBasis?) {
-        val owned = owner ?: return
         val current = snapshot ?: return
-        if (!canChange) return
+        send(MarketShoppingCommand(newClientSideUuidString(), current.revision, offerId, units, if (units == 0) null else basis))
+    }
+    fun replace(selection: MarketComparisonSelection, candidate: MarketShoppingQuotedLine): String? {
+        val current = snapshot ?: return null
+        val command = selection.reviewedReplacement(current, candidate, newClientSideUuidString()) ?: return null
+        return if (send(command)) command.commandId else null
+    }
+    private fun send(command: MarketShoppingCommand): Boolean {
+        val owned = owner ?: return false
+        if (!canChange || !command.isValidMarketShoppingCommand()) return false
         changing = true
-        val command = MarketShoppingCommand(newClientSideUuidString(), current.revision, offerId, units, if (units == 0) null else basis)
         scope.launch {
             try { accept(MarketShoppingDelivery.change(owned, command)) }
             catch (cancelled: CancellationException) { throw cancelled }
@@ -69,6 +89,7 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
                 if (active && owned.isCurrent()) accept(MarketShoppingDelivery.cached(owned).copy(error = eventMessage("market.shopping_pending")))
             } finally { changing = false; if (active) refresh() }
         }
+        return true
     }
     fun retry() {
         val owned = owner ?: return

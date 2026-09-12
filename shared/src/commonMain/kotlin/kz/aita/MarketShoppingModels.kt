@@ -1,6 +1,8 @@
 package kz.aita
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 const val MARKET_SHOPPING_MAX_LINES = 50
 const val MARKET_SHOPPING_MAX_UNITS = 999
@@ -62,14 +64,20 @@ data class MarketShoppingSnapshot(
     val checkedAtMillis: Long = 0L
 )
 
-/** An absolute desired quantity, not a replayable increment. 0 removes the specific line. */
+/** An absolute desired quantity, not a replayable increment. 0 removes the specific line.
+ * Replacement fields are absent from legacy JSON even with encodeDefaults=true: existing command
+ * hashes and persisted retry identities must not change after an application update.
+ */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class MarketShoppingCommand(
     val commandId: String,
     val expectedRevision: Long,
     val offerId: String,
     val units: Int,
-    val basis: MarketShoppingBasis? = null
+    val basis: MarketShoppingBasis? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val replaceOfferId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val reviewedSubtotalMinor: Long? = null
 )
 
 @Serializable
@@ -146,3 +154,26 @@ fun MarketShoppingSnapshot.shoppingGroups(): List<MarketShoppingGroup> = lines
             key.second, values, if (overflow || values.all { it.subtotalMinor == null }) null else sum,
             values.count { it.subtotalMinor == null }, values.count { it.status != MARKET_QUOTE_ESTIMATED })
     }.sortedWith(compareBy<MarketShoppingGroup> { it.shopName.lowercase() }.thenBy { it.storeId }.thenBy { it.currencyCode })
+
+/** One shape check shared by the journal, UI and server. UUID parsing stays at the server boundary. */
+fun MarketShoppingCommand.isValidMarketShoppingCommand(): Boolean {
+    if (commandId.isBlank() || offerId.isBlank() || expectedRevision < 0L || units !in 0..MARKET_SHOPPING_MAX_UNITS) return false
+    if (units == 0) return basis == null && replaceOfferId == null && reviewedSubtotalMinor == null
+    if (basis?.isValidMarketBasis() != true) return false
+    return if (replaceOfferId == null) reviewedSubtotalMinor == null
+        else replaceOfferId.isNotBlank() && !replaceOfferId.equals(offerId, ignoreCase = true) &&
+            basis.gtin != null && reviewedSubtotalMinor?.let { it >= 0L } == true
+}
+
+/** Reject malformed remote snapshots before they poison the durable local journal. */
+fun MarketShoppingSnapshot.isValidMarketShoppingSnapshot(account: String): Boolean =
+    userId == account && revision >= 0L && checkedAtMillis >= 0L && lines.size <= MARKET_SHOPPING_MAX_LINES &&
+        lines.map { it.line.offerId }.distinct().size == lines.size && lines.all { row ->
+            row.line.offerId.isNotBlank() && row.line.storeId.isNotBlank() &&
+                row.line.units in 1..MARKET_SHOPPING_MAX_UNITS && row.line.basis.isValidMarketBasis() &&
+                (row.unitPriceMinor == null || row.unitPriceMinor >= 0L) &&
+                (row.subtotalMinor == null || row.subtotalMinor >= 0L) &&
+                (row.offer == null || (row.offer.id == row.line.offerId && row.offer.storefront.storeId == row.line.storeId)) &&
+                (row.status != MARKET_QUOTE_ESTIMATED || (row.offer != null && row.offer.shoppingBasis() == row.line.basis &&
+                    row.subtotalMinor != null && row.subtotalMinor == marketShoppingSubtotal(row.unitPriceMinor, row.line.units)))
+        }

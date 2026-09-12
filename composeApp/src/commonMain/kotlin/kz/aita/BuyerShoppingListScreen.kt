@@ -40,6 +40,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
     val generation = currentAuthenticatedSessionGeneration()
     val scope = rememberCoroutineScope()
     var openedId by remember(account, generation) { mutableStateOf<String?>(null) }
+    var comparison by remember(account, generation) { mutableStateOf<MarketComparisonSelection?>(null) }
     val groups = state.snapshot?.shoppingGroups().orEmpty()
     Column(Modifier.fillMaxSize().aitaWidthCap(1120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ScreenAppBarWidget(title = authUiText("Shopping list", "Список покупок", "Сатып алу тізімі"), iconPath = marketIconPath(143))
@@ -68,7 +69,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                 }
             }
             if (section == "list") items(state.snapshot?.lines.orEmpty(), key = { it.line.offerId }) { row ->
-                ShoppingLineCard(row, state, onOpen = { openedId = row.line.offerId })
+                ShoppingLineCard(row, state, onOpen = { openedId = row.line.offerId }, onCompare = {
+                    state.snapshot?.revision?.let { comparison = row.line.comparisonSelection(it) }
+                })
             } else {
                 items(groups, key = { "${it.storeId}:${it.currencyCode}" }) { group ->
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
@@ -120,12 +123,22 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
         NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
         openedId = null
         scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+    }, onCompare = { offer ->
+        openedId = null
+        val current = state.snapshot
+        comparison = current?.let { snapshot -> snapshot.lines.firstOrNull { it.line.offerId == offer.id }?.line?.comparisonSelection(snapshot.revision) }
+            ?: offer.comparisonSelection()
+    }) }
+    comparison?.let { selection -> MarketComparisonDialog(selection, state, onDismiss = { comparison = null }, onVisitShop = { shop ->
+        comparison = null
+        NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
+        scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
     }) }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, state: MarketShoppingUiState, onOpen: () -> Unit) {
+private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, state: MarketShoppingUiState, onOpen: () -> Unit, onCompare: () -> Unit) {
     val line = row.line
     val unit = line.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл."))
     val amount = line.basis.pricedAmount.toString().removeSuffix(".0")
@@ -160,6 +173,10 @@ private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, sta
                 enabled = state.canChange, autoLoading = false, confirmationRequired = true,
                 onClick = { state.change(line.offerId, 0, null) })
         }
+        if (line.comparisonSelection(state.snapshot?.revision ?: 0L) != null) actionButton(
+            text = authUiText("Compare other shops", "Сравнить другие магазины", "Басқа дүкендерді салыстыру"),
+            iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = !state.changing && state.pending == null,
+            autoLoading = false, confirmationRequired = false, onClick = onCompare)
         if (row.offer != null) actionButton(text = authUiText("View current offer", "Посмотреть предложение", "Ағымдағы ұсынысты көру"),
             autoLoading = false, confirmationRequired = false, onClick = onOpen)
     }

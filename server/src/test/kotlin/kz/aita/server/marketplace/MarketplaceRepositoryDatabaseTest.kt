@@ -11,7 +11,7 @@ import java.util.UUID
 import kotlin.test.*
 
 /** Opt-in PostgreSQL repository tests. Never point at production.
- * Uses actual V46/V101/V102/V104/V105 SQL with minimal prerequisite inventory tables, not the entire
+ * Uses actual V46/V101/V102/V104/V105/V106 SQL with minimal prerequisite inventory tables, not the entire
  * migration history or the Ktor authentication pipeline. Every test gets its own random schema.
  */
 class MarketplaceRepositoryDatabaseTest {
@@ -56,7 +56,7 @@ class MarketplaceRepositoryDatabaseTest {
                             'NEVER-PUBLIC-NOTE','[{"price":"77.77","currency":"KZT","supplierId":"NEVER-PUBLIC-SUPPLIER"}]');
                 """)
                 listOf("V46__paging_user_finances_and_store_subscriptions.sql","V101__per_location_subscriptions_and_promocodes.sql",
-                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql").forEach{exec(c,resource(it))}
+                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql").forEach{exec(c,resource(it))}
                 listOf(f.root,f.branch,f.sibling).forEach{store->exec(c,"""INSERT INTO store_subscription_states
                     (store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
                     VALUES ('$store','${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0)""")}
@@ -318,5 +318,179 @@ class MarketplaceRepositoryDatabaseTest {
             assertEquals(2L,shoppingTx(f){it.snapshot(f.buyer)}.revision)
             assertEquals("3",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"))
         } finally { executor.shutdownNow();executor.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS) }
+    }
+
+    private fun alternative(f:Fixture,c:Connection,price:String="150.00",total:Double=10.0):MarketListing {
+        val offer=published(f.copy(branch=f.sibling));batch(f,c,store=f.sibling,total=total)
+        exec(c,"""UPDATE stock_batches SET sale_price_override='{"price":"$price","currency":"KZT","supplierId":""}' WHERE store_id='${f.sibling}'""")
+        return offer
+    }
+    private fun comparison(f:Fixture,source:MarketListing,revision:Long?=null,units:Int=2,city:String=""):MarketComparisonPage {
+        val basis=if(revision==null) tx(f){it.offer(f.buyer,source.id)}.shoppingBasis()!!
+            else shoppingTx(f){it.snapshot(f.buyer)}.lines.first{it.line.offerId==source.id}.line.basis
+        return shoppingTx(f){it.comparison(f.buyer,MarketComparisonRequest(MarketComparisonSelection(source.id,basis,units,revision),city))}
+    }
+    private fun replacement(f:Fixture,source:MarketListing):MarketShoppingCommand {
+        val snapshot=shoppingTx(f){it.snapshot(f.buyer)}
+        val page=comparison(f,source,snapshot.revision,snapshot.lines.first{it.line.offerId==source.id}.line.units)
+        return page.selection.reviewedReplacement(snapshot,page.matches.single(),UUID.randomUUID().toString())!!
+    }
+    @Test fun comparisonFindsOtherShopsAndQuotesRequestedQuantity()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);val target=alternative(f,c)
+        val page=comparison(f,source)
+        assertEquals(39998L,page.reference.subtotalMinor);assertEquals(30000L,page.matches.single().subtotalMinor)
+        assertEquals(target.id,page.matches.single().line.offerId);assertNull(page.nextId)
+        assertEquals("0",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"))
+        assertEquals("0",scalar(c,"SELECT count(*) FROM transactions"))
+    }
+    @Test fun comparisonDoesNotMixCurrenciesSellingUnitsOrChangedBarcodes()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        exec(c,"""UPDATE stock_batches SET sale_price_override='{"price":"150","currency":"USD","supplierId":""}' WHERE store_id='${f.sibling}'""")
+        assertTrue(comparison(f,source).matches.isEmpty())
+        exec(c,"""UPDATE stock_batches SET sale_price_override=NULL,quantity=jsonb_set(quantity,'{pricedAmount}','2') WHERE store_id='${f.sibling}'""")
+        assertTrue(comparison(f,source).matches.isEmpty())
+        exec(c,"UPDATE stock_batches SET quantity=jsonb_set(quantity,'{pricedAmount}','1') WHERE store_id='${f.sibling}'")
+        exec(c,"UPDATE marketplace_listings SET gtin='00036000291452' WHERE store_id='${f.sibling}'")
+        assertTrue(comparison(f,source).matches.isEmpty())
+    }
+    @Test fun comparisonRespectsCityAndPhysicalLocationEntitlement()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        exec(c,"UPDATE marketplace_storefronts SET city='Almaty' WHERE store_id='${f.sibling}'")
+        assertTrue(comparison(f,source,city="Astana").matches.isEmpty())
+        assertEquals(1,comparison(f,source,city="almaty").matches.size)
+        exec(c,"UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.sibling}'")
+        assertTrue(comparison(f,source).matches.isEmpty())
+    }
+    @Test fun withdrawnOriginalCanFindAlternativesOnlyThroughItsOwnersList()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))}
+        exec(c,"DELETE FROM marketplace_listings WHERE id='${source.id}'")
+        val page=comparison(f,source,revision=1)
+        assertNull(page.reference.offer);assertEquals(1,page.matches.size)
+        assertEquals(409,assertFailsWith<MarketFailure>{shoppingTx(f){it.comparison(f.owner,MarketComparisonRequest(page.selection))}}.status)
+        assertEquals(404,assertFailsWith<MarketFailure>{shoppingTx(f){it.comparison(f.buyer,MarketComparisonRequest(page.selection.copy(shoppingRevision=null)))}}.status)
+    }
+    @Test fun replacementChangesOneLineOnceWithTheSameQuantityAndNoStockWrites()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);val target=alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))}
+        val before=scalar(c,"SELECT created_at_millis FROM buyer_shopping_lines")
+        val command=replacement(f,source)
+        val first=shoppingTx(f){it.replace(f.buyer,null,command)}
+        assertTrue(first.accepted);assertEquals(2L,first.snapshot.revision)
+        assertEquals(target.id,first.snapshot.lines.single().line.offerId);assertEquals(2,first.snapshot.lines.single().line.units)
+        assertEquals(before,scalar(c,"SELECT created_at_millis FROM buyer_shopping_lines"))
+        assertEquals(source.id,scalar(c,"SELECT replaced_offer_id FROM buyer_shopping_commands WHERE command_id='${command.commandId}'"))
+        assertEquals("30000",scalar(c,"SELECT reviewed_subtotal_minor FROM buyer_shopping_commands WHERE command_id='${command.commandId}'"))
+        val retry=shoppingTx(f){it.replace(f.buyer,null,command)}
+        assertTrue(retry.replayed && retry.accepted);assertEquals(2L,retry.snapshot.revision)
+        assertEquals("2",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"));assertEquals("0",scalar(c,"SELECT count(*) FROM transactions"))
+        assertEquals(20.0,scalar(c,"SELECT sum((quantity->>'total')::numeric) FROM stock_batches").toDouble())
+    }
+    @Test fun changedEstimateKeepsOriginalAndRecordsItsRejection()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))};val command=replacement(f,source)
+        exec(c,"""UPDATE stock_batches SET sale_price_override='{"price":"151","currency":"KZT","supplierId":""}' WHERE store_id='${f.sibling}'""")
+        val rejected=shoppingTx(f){it.replace(f.buyer,null,command)}
+        assertFalse(rejected.accepted);assertEquals("market.comparison_price_changed",rejected.errorKey)
+        assertEquals(source.id,rejected.snapshot.lines.single().line.offerId)
+        exec(c,"""UPDATE stock_batches SET sale_price_override='{"price":"150","currency":"KZT","supplierId":""}' WHERE store_id='${f.sibling}'""")
+        val retry=shoppingTx(f){it.replace(f.buyer,null,command)};assertTrue(retry.replayed);assertFalse(retry.accepted)
+    }
+    @Test fun unavailableTargetCannotDeleteTheOriginalLine()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))};val command=replacement(f,source)
+        exec(c,"UPDATE stock_batches SET quantity=jsonb_set(quantity,'{total}','1') WHERE store_id='${f.sibling}'")
+        val rejected=shoppingTx(f){it.replace(f.buyer,null,command)}
+        assertFalse(rejected.accepted);assertEquals("market.comparison_unavailable",rejected.errorKey)
+        assertEquals(source.id,rejected.snapshot.lines.single().line.offerId)
+    }
+    @Test fun existingTargetLineIsNotMergedOrOverwrittenByReplacement()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);val target=alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))};val command=replacement(f,source)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,target,revision=1,units=3))}
+        val result=shoppingTx(f){it.replace(f.buyer,null,command.copy(expectedRevision=2))}
+        assertFalse(result.accepted);assertEquals("market.comparison_already_listed",result.errorKey)
+        assertEquals(setOf(2,3),result.snapshot.lines.map{it.line.units}.toSet());assertEquals(2,result.snapshot.lines.size)
+    }
+    @Test fun replacementOnLegacyMutationEndpointIsRejectedNotInterpretedAsAdd()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))};val command=replacement(f,source)
+        assertEquals(400,assertFailsWith<MarketFailure>{shoppingTx(f){it.apply(f.buyer,null,command)}}.status)
+        assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_lines"));assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"))
+    }
+    @Test fun failedReplacementReceiptRollsBackDeletionAndInsertion()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))};val command=replacement(f,source)
+        exec(c,"""CREATE FUNCTION fail_replace_receipt() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$;
+            CREATE TRIGGER fail_replace_receipt BEFORE INSERT ON buyer_shopping_commands FOR EACH ROW EXECUTE FUNCTION fail_replace_receipt();""")
+        assertFailsWith<SQLException>{shoppingTx(f){it.replace(f.buyer,null,command)}}
+        assertEquals(source.id,scalar(c,"SELECT offer_id FROM buyer_shopping_lines"));assertEquals("1",scalar(c,"SELECT revision FROM buyer_shopping_lists"))
+    }
+    @Test fun simultaneousReplacementRetriesDoNotAddTwoEffects()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))};val command=replacement(f,source)
+        val pool=java.util.concurrent.Executors.newFixedThreadPool(2);val start=java.util.concurrent.CountDownLatch(1)
+        try {
+            val jobs=(1..2).map{pool.submit<MarketShoppingOutcome>{start.await();shoppingTx(f){it.replace(f.buyer,null,command)}}}
+            start.countDown();val replies=jobs.map{it.get(20,java.util.concurrent.TimeUnit.SECONDS)}
+            assertTrue(replies.all{it.accepted});assertEquals(1,replies.count{it.replayed})
+            assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_lines"));assertEquals("2",scalar(c,"SELECT revision FROM buyer_shopping_lists"))
+        } finally {start.countDown();pool.shutdownNow()}
+    }
+    @Test fun simultaneousQuantityEditAndReplacementHaveOnlyOneRevisionWinner()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source,units=2))}
+        val replace=replacement(f,source);val edit=listCommand(f,source,revision=1,units=3)
+        val pool=java.util.concurrent.Executors.newFixedThreadPool(2);val start=java.util.concurrent.CountDownLatch(1)
+        try {
+            val jobs=listOf(pool.submit<MarketShoppingOutcome>{start.await();shoppingTx(f){it.replace(f.buyer,null,replace)}},
+                pool.submit<MarketShoppingOutcome>{start.await();shoppingTx(f){it.apply(f.buyer,null,edit)}})
+            start.countDown();val replies=jobs.map{it.get(20,java.util.concurrent.TimeUnit.SECONDS)}
+            assertEquals(1,replies.count{it.accepted});assertEquals(1,replies.count{it.errorKey=="market.shopping_changed"})
+            assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_lines"));assertEquals("2",scalar(c,"SELECT revision FROM buyer_shopping_lists"))
+        } finally {start.countDown();pool.shutdownNow()}
+    }
+
+    @Test fun comparisonHonoursTheRequestedCountForMinimumQuantityOffers()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);alternative(f,c)
+        exec(c,"""UPDATE stock_batches SET promotions='[{"id":"minimum","type":"restriction","minQuantity":3}]' WHERE store_id='${f.sibling}'""")
+        assertTrue(comparison(f,source,units=2).matches.isEmpty())
+        val page=comparison(f,source,units=3)
+        assertEquals(45000L,page.matches.single().subtotalMinor)
+        val target=page.matches.single()
+        val added=shoppingTx(f){it.apply(f.buyer,null,MarketShoppingCommand(UUID.randomUUID().toString(),0,target.line.offerId,3,target.line.basis))}
+        assertTrue(added.accepted);assertEquals(45000L,added.snapshot.lines.single().subtotalMinor)
+    }
+    @Test fun comparisonCanContinueBeyondAPageOfIncompatibleCandidates()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);val target=alternative(f,c)
+        // 41 additional published same-GTIN records with no eligible batch. They are scanned,
+        // never fabricated as priced offers, and must not hide the later compatible target.
+        repeat(41){ n ->
+            val item=UUID.randomUUID();val id=UUID.fromString("00000000-0000-0000-0000-"+(n+1).toString().padStart(12,'0'))
+            exec(c,"""INSERT INTO stock_items(id,store_id,barcodes,sale_prices) VALUES ('$item','${f.root}','["4006381333931"]','[{"price":"100","currency":"KZT","supplierId":""}]');
+                INSERT INTO marketplace_listings(id,store_id,goods_item_id,title,description,gtin,is_published,revision,created_at_millis,updated_at_millis,updated_by)
+                VALUES ('$id','${f.sibling}','$item','Unpriced candidate','','04006381333931',TRUE,1,1,1,'${f.owner}');""")
+        }
+        val first=comparison(f,source);assertTrue(first.matches.isEmpty());assertNotNull(first.nextId)
+        val next=shoppingTx(f){it.comparison(f.buyer,MarketComparisonRequest(first.selection,after=first.nextId))}
+        assertEquals(target.id,next.matches.single().line.offerId);assertNull(next.nextId)
+    }
+
+    @Test fun oldRepeatableReadSnapshotCannotAcceptAStaleNoOpRemoval()=fixture{f,c->
+        val source=published(f);batch(f,c,total=10.0);val target=alternative(f,c)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,source))}
+        DriverManager.getConnection(f.url,f.props).use{old->
+            old.autoCommit=false;old.transactionIsolation=Connection.TRANSACTION_REPEATABLE_READ
+            exec(old,"SET LOCAL search_path TO ${f.schema},public")
+            assertEquals("1",scalar(old,"SELECT revision FROM buyer_shopping_lists WHERE user_id='${f.buyer}'"))
+            shoppingTx(f){it.apply(f.buyer,null,listCommand(f,target,revision=1))}
+            val removal=MarketShoppingCommand(UUID.randomUUID().toString(),1,target.id,0)
+            val market=MarketplaceRepository(old){user,_->user==f.owner}
+            val failure=assertFailsWith<SQLException>{MarketShoppingRepository(old,market).apply(f.buyer,null,removal)}
+            assertEquals("40001",failure.sqlState);old.rollback()
+            val retry=shoppingTx(f){it.apply(f.buyer,null,removal)}
+            assertFalse(retry.accepted);assertEquals("market.shopping_changed",retry.errorKey)
+            assertEquals(2,retry.snapshot.lines.size)
+        }
     }
 }

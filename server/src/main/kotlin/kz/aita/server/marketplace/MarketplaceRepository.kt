@@ -152,13 +152,36 @@ internal class MarketplaceRepository(private val db: Connection,
         val page = rows.take(40)
         return MarketPage(project(user, page, now), if (rows.size > 40) page.last().listing.id else null, now)
     }
+    /** Dedicated same-product search, independent of the discovery grid's loaded window.
+     * Candidate keyset is bounded before price projection; empty compatible pages can still continue.
+     * Real stock/price changes are checked under this route's repeatable-read snapshot.
+     */
+    fun compare(user: UUID, request: MarketComparisonRequest, reference: MarketShoppingLine, now: Long): MarketComparisonPage {
+        val selection = request.selection
+        if (!selection.isValidMarketComparison()) marketFail("market.comparison_invalid")
+        val place = clean(request.city, 100)
+        val conditions = mutableListOf(publicPredicate, "l.gtin=?", "l.id<>?", "l.store_id<>?")
+        val args = mutableListOf<Any?>(now, now, selection.basis.gtin, marketUuid(selection.offerId), marketUuid(reference.storeId))
+        if (place.isNotEmpty()) { conditions += "lower(f.city)=lower(?)"; args.add(place) }
+        request.after?.let { conditions += "l.id>?"; args.add(marketUuid(it)) }
+        val candidates = candidates("SELECT l.* $publicJoins WHERE ${conditions.joinToString(" AND ")} ORDER BY l.id LIMIT ${MARKET_COMPARISON_PAGE_CANDIDATES + 1}", args)
+        val scanned = candidates.take(MARKET_COMPARISON_PAGE_CANDIDATES)
+        val compatible = project(user, scanned, now, scanned.associate { it.listing.id to selection.units }).filter { it.matchesComparison(selection) }.map { offer ->
+            MarketShoppingLine(offer.id, offer.storefront.storeId, offer.title, offer.storefront.displayName,
+                selection.units, selection.basis, offer.unitName, offer.sourceUpdatedAtMillis)
+        }
+        val quotes = quoteShopping(user, listOf(reference) + compatible, now)
+        return MarketComparisonPage(selection, quotes.first(), quotes.drop(1),
+            if (candidates.size > MARKET_COMPARISON_PAGE_CANDIDATES) scanned.last().listing.id else null, now, place)
+    }
+
     /** Same public visibility predicate for details, list estimates and the browse page. */
-    fun offersByIds(user: UUID, ids: List<UUID>, now: Long = System.currentTimeMillis()): List<MarketOffer> {
+    fun offersByIds(user: UUID, ids: List<UUID>, now: Long = System.currentTimeMillis(), units: Int = 1): List<MarketOffer> {
         if (ids.isEmpty()) return emptyList()
-        require(ids.size <= 100)
+        require(ids.size <= 100 && units in 1..MARKET_SHOPPING_MAX_UNITS)
         val rows = candidates("SELECT l.* $publicJoins WHERE $publicPredicate AND l.id IN (${ids.joinToString(",") { "?" }}) ORDER BY l.id",
             listOf(now, now) + ids)
-        return project(user, rows, now)
+        return project(user, rows, now, ids.associate { it.toString() to units })
     }
     fun offer(user: UUID, id: String): MarketOffer = offersByIds(user, listOf(marketUuid(id))).singleOrNull()
         ?: marketFail("market.unavailable", 404)
@@ -186,7 +209,7 @@ internal class MarketplaceRepository(private val db: Connection,
         val ids = lines.map { marketUuid(it.offerId) }
         val rows = candidates("SELECT l.* $publicJoins WHERE $publicPredicate AND l.id IN (${ids.joinToString(",") { "?" }})",
             listOf(now, now) + ids)
-        val offers = project(user, rows, now).associateBy { it.id }
+        val offers = project(user, rows, now, lines.associate { it.offerId to it.units }).associateBy { it.id }
         val itemIds = rows.map { marketUuid(it.listing.goodsItemId) }.distinct()
         val storeIds = rows.map { marketUuid(it.listing.storeId) }.distinct()
         val itemById = items(itemIds).associateBy { it.id }
@@ -287,7 +310,7 @@ internal class MarketplaceRepository(private val db: Connection,
                 updatedAtMillis=row.getLong("updated_at_millis"))
         }
     }
-    private fun project(user: UUID, candidates: List<Candidate>, now: Long): List<MarketOffer> {
+    private fun project(user: UUID, candidates: List<Candidate>, now: Long, requestedUnits: Map<String, Int> = emptyMap()): List<MarketOffer> {
         if(candidates.isEmpty()) return emptyList()
         val itemIds=candidates.map { marketUuid(it.listing.goodsItemId) }.distinct()
         val storeIds=candidates.map { marketUuid(it.listing.storeId) }.distinct()
@@ -304,10 +327,14 @@ internal class MarketplaceRepository(private val db: Connection,
                     .thenBy { it.expirationDateMillis ?: Long.MAX_VALUE }.thenByDescending { it.shelfPriority }.thenBy { it.id })
             val batch=eligible.firstOrNull()
             val priced=batch?.quantity?.pricedAmount
-            val base=if(batch==null) null else item.basePriceForTransaction(0,batch=batch,quantityTotal=priced ?: 1.0)
+            // In a list/comparison, priceMinor is the selling-unit price at that requested count.
+            // Evaluate restrictions at the same count; a valid minimum-quantity offer must not be
+            // excluded merely because one unit on a discovery card would violate its minimum.
+            val total = priced?.let { marketRequestedQuantity(it, requestedUnits[listing.id] ?: 1) } ?: 1.0
+            val base=if(batch==null) null else item.basePriceForTransaction(0,batch=batch,quantityTotal=total)
             val price=if(batch==null || base==null || base.price.toMoneyDouble()<=0.0 ||
-                item.firstViolatedPromotionRestriction(0,priced ?: 1.0,batch,now)!=null) null
-                else item.promotedPriceForTransaction(0,quantityTotal=priced ?: 1.0,batch=batch,nowMillis=now).finalPrice
+                item.firstViolatedPromotionRestriction(0,total,batch,now)!=null) null
+                else item.promotedPriceForTransaction(0,quantityTotal=total,batch=batch,nowMillis=now).finalPrice
             val currency=price?.currency?.trim()?.uppercase()?.takeIf { it.matches(Regex("[A-Z]{3}")) }
             val minor=if(currency==null) null else price?.price?.let(::marketPriceMinor)
             // A later stock barcode change must not silently keep a stale comparison identity alive.
@@ -317,7 +344,7 @@ internal class MarketplaceRepository(private val db: Connection,
                 pricedAmount=priced.takeIf { minor!=null },unitId=batch?.quantity?.id?.takeIf { minor!=null },
                 unitName=if(minor==null) emptyList() else batch?.quantity?.immutableUnitName.orEmpty().take(12)
                     .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) },
-                availability=if(batch!=null && minor!=null && batch.quantity.total >= batch.quantity.pricedAmount) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
+                availability=if(batch!=null && minor!=null && batch.quantity.total >= total) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
                 checkedAtMillis=now,sourceUpdatedAtMillis=maxOf(candidate.sourceUpdated,item.updatedAtMillis,batch?.updatedAtMillis ?: 0L),
                 saved=listing.id in saved)
         }

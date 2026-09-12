@@ -29,7 +29,7 @@ internal fun AppConfiguration.marketPriceLabel(offer: MarketOffer): String {
 }
 
 private data class BuyerBrowseQuery(val search: String, val city: String, val shopId: String?,
-    val savedOnly: Boolean, val gtin: String?, val comparisonKey: String?)
+    val savedOnly: Boolean)
 
 @Stable
 private class BuyerBrowseData {
@@ -53,13 +53,14 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     var search by rememberSaveable(account) { mutableStateOf("") }
     var city by rememberSaveable(account) { mutableStateOf("") }
     var shopId by remember(account, savedOnly) { mutableStateOf(if (savedOnly) null else home.state.value["market-shop:$account"]?.takeIf { it.isNotBlank() }) }
-    var compareTo by remember(account, generation, savedOnly) { mutableStateOf<MarketOffer?>(null) }
+    var compareTo by remember(account, generation, savedOnly) { mutableStateOf<MarketComparisonSelection?>(null) }
     var openedId by remember(account, generation, savedOnly) { mutableStateOf<String?>(null) }
     var savingId by remember(account, generation) { mutableStateOf<String?>(null) }
     var saveFailure by remember(account, generation) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     val fence = remember(account, generation) { MarketSavedReadFence() }
-    val query = BuyerBrowseQuery(if (compareTo == null) search.trim() else "", if (shopId == null) city.trim() else "",
-        if (compareTo == null) shopId else null, savedOnly && compareTo == null && shopId == null, compareTo?.gtin, compareTo?.comparisonKey())
+    val dialogOpen = openedId != null || compareTo != null
+    val latestDialogOpen by rememberUpdatedState(dialogOpen)
+    val query = BuyerBrowseQuery(search.trim(), if (shopId == null) city.trim() else "", shopId, savedOnly && shopId == null)
     val data = remember(account, generation, query) { BuyerBrowseData() }
     var wantedPages by remember(account, generation, query) { mutableStateOf(1) }
     val latestWantedPages by rememberUpdatedState(wantedPages)
@@ -70,12 +71,13 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         if (!savedOnly) home.setStateNow("market-shop:$account" to shop.storeId)
     }
     DisposableEffect(requests) { onDispose { requests.close() } }
-    LaunchedEffect(requests, revision, wantedPages) { requests.trySend(Unit) }
+    LaunchedEffect(requests, revision, wantedPages, dialogOpen) { if (!dialogOpen) requests.trySend(Unit) }
     LaunchedEffect(requests) {
         val owned = owner ?: run { data.loading = false; return@LaunchedEffect }
         for (ignored in requests) {
             delay(220)
             while (requests.tryReceive().isSuccess) { /* coalesce before starting this read */ }
+            if (latestDialogOpen) continue // The dialogue owns its own fresh read; reload this window when it closes.
             data.loading = true
             val readRevision = fence.capture()
             try {
@@ -92,7 +94,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                     if (owned.isCurrent()) { data.shop = shop; data.gone = false }
                 }
                 val result = if (query.savedOnly) loadMarketSaved(owned) else readMarketPageWindow(latestWantedPages) { after ->
-                    loadMarketOffers(owned, query.search, query.city, after, query.gtin, query.shopId)
+                    loadMarketOffers(owned, query.search, query.city, after, storefrontId = query.shopId)
                 }
                 if (owned.isCurrent()) {
                     val value = result.payload
@@ -118,7 +120,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 if (owned.isCurrent()) {
                     val value = result.payload
                     if (!result.negative && value != null) {
-                        fence.acknowledge(offer.id, desired)
+                        fence.acknowledgeSnapshot(value.offers.map { it.id }.toSet(), value.unavailableSavedCount)
                         data.page = if (query.savedOnly) value else data.page?.let { current ->
                             current.copy(offers = current.offers.map { if (it.id == offer.id) it.copy(saved = desired) else it })
                         }
@@ -131,16 +133,13 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         }
     }
 
-    val rows = data.page?.offers.orEmpty().let { offers ->
-        if (query.comparisonKey == null) offers else offers.filter { it.comparisonKey() == query.comparisonKey }.sortedBy { it.priceMinor }
-    }
+    val rows = data.page?.offers.orEmpty()
     Column(Modifier.fillMaxSize().aitaWidthCap(1440.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ScreenAppBarWidget(title = when {
-            compareTo != null -> authUiText("Compare offers", "Сравнение предложений", "Ұсыныстарды салыстыру")
             shopId != null -> data.shop?.displayName ?: authUiText("Shop window", "Витрина", "Витрина")
             savedOnly -> authUiText("Saved offers", "Сохранённое", "Сақталғандар")
             else -> "AITA Market"
-        }, iconPath = marketIconPath(when { compareTo != null -> 141; shopId != null -> 139; savedOnly -> 140; else -> 139 }))
+        }, iconPath = marketIconPath(when { savedOnly && shopId == null -> 140; else -> 139 }))
         LazyVerticalGrid(columns = GridCells.Adaptive(250.dp), state = gridState, modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item(key = "browse-header", span = { GridItemSpan(maxLineSpan) }) {
@@ -149,37 +148,28 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                         "Находите магазины · планируйте список · уточняйте в магазине",
                         "Дүкендерді табыңыз · тізімді жоспарлаңыз · дүкеннен нақтылаңыз"),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                    if (compareTo != null) {
-                        Text(compareTo?.title.orEmpty(), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
-                        Text(authUiText("Same barcode and selling unit, ordered by price among loaded offers. Check model and packaging; barcode agreement is not manufacturer verification.",
-                            "Один штрихкод и единица продажи; загруженные предложения упорядочены по цене. Сверьте модель и упаковку: штрихкод не является проверкой производителя.",
-                            "Бір штрихкод пен сату бірлігі; жүктелген ұсыныстар баға бойынша реттелген. Модель мен қаптаманы тексеріңіз: штрихкод өндірушінің растауы емес."),
-                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        actionButton(text = stateValues.stringBack, autoLoading = false, confirmationRequired = false,
-                            fillMaxWidthIfTextPresent = false, onClick = { compareTo = null })
-                    } else {
-                        if (shopId != null) {
-                            data.shop?.let { shop ->
-                                Text("${shop.city} · ${shop.publicAddress}", color = stateValues.TextColor, fontSize = stateValues.textSize)
-                                if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                            }
-                            actionButton(text = authUiText("All shops", "Все магазины", "Барлық дүкендер"), fillMaxWidthIfTextPresent = false,
-                                autoLoading = false, confirmationRequired = false, onClick = {
-                                    shopId = null; search = ""; home.setStateNow("market-shop:$account" to "")
-                                })
+                    if (shopId != null) {
+                        data.shop?.let { shop ->
+                            Text("${shop.city} · ${shop.publicAddress}", color = stateValues.TextColor, fontSize = stateValues.textSize)
+                            if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
-                        if (!query.savedOnly) BoxWithConstraints(Modifier.fillMaxWidth()) {
-                            if (maxWidth > 720.dp && shopId == null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                aitaFormTextField(Modifier.weight(2f), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод"),
-                                    identityKey = "market-search:$account", autoFocus = false)
-                                aitaFormTextField(Modifier.weight(1f), city, { city = it.take(100) }, authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"),
-                                    identityKey = "market-city:$account", autoFocus = false)
-                            } else Column {
-                                aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод"),
-                                    identityKey = "market-search:$account", autoFocus = false)
-                                if (shopId == null) aitaFormTextField(Modifier.fillMaxWidth(), city, { city = it.take(100) },
-                                    authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"), identityKey = "market-city:$account", autoFocus = false)
-                            }
+                        actionButton(text = if (savedOnly) authUiText("Back to saved", "К сохранённому", "Сақталғандарға оралу")
+                            else authUiText("All shops", "Все магазины", "Барлық дүкендер"), fillMaxWidthIfTextPresent = false,
+                            autoLoading = false, confirmationRequired = false, onClick = {
+                                shopId = null; search = ""; if (!savedOnly) home.setStateNow("market-shop:$account" to "")
+                            })
+                    }
+                    if (!query.savedOnly) BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        if (maxWidth > 720.dp && shopId == null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            aitaFormTextField(Modifier.weight(2f), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод"),
+                                identityKey = "market-search:$account", autoFocus = false)
+                            aitaFormTextField(Modifier.weight(1f), city, { city = it.take(100) }, authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"),
+                                identityKey = "market-city:$account", autoFocus = false)
+                        } else Column {
+                            aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод"),
+                                identityKey = "market-search:$account", autoFocus = false)
+                            if (shopId == null) aitaFormTextField(Modifier.fillMaxWidth(), city, { city = it.take(100) },
+                                authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"), identityKey = "market-city:$account", autoFocus = false)
                         }
                     }
                     if (data.failure != null || saveFailure != null) Text((saveFailure ?: data.failure).orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
@@ -191,7 +181,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 240.dp), rows = 4)
             } else if (rows.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    CpImage(Modifier.size(64.dp), url = marketIconPath(if (savedOnly) 140 else 139), fallbackRes = marketIconFallback(if (savedOnly) 140 else 139), contentDescription = null, tintColor = stateValues.AccentColor)
+                    CpImage(Modifier.size(64.dp), url = marketIconPath(if (query.savedOnly) 140 else 139), fallbackRes = marketIconFallback(if (query.savedOnly) 140 else 139), contentDescription = null, tintColor = stateValues.AccentColor)
                     Text(when {
                         data.gone -> authUiText("This shop is no longer available", "Этот магазин больше недоступен", "Бұл дүкен енді қолжетімсіз")
                         data.page == null -> authUiText("Connect to load shop windows", "Подключитесь, чтобы загрузить витрины", "Витриналарды жүктеу үшін қосылыңыз")
@@ -202,7 +192,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 }
             } else items(rows, key = { it.id }) { offer ->
                 MarketOfferCard(offer, savingId != null, shopping, onOpen = { openedId = offer.id }, onSaved = { setSaved(offer) },
-                    onCompare = { compareTo = offer }, onShop = { visitShop(offer.storefront) })
+                    onCompare = { compareTo = offer.comparisonSelection() }, onShop = { visitShop(offer.storefront) })
             }
             if (data.page?.nextId != null) item(key = "more", span = { GridItemSpan(maxLineSpan) }) {
                 if (wantedPages < 10) actionButton(text = authUiText("More offers", "Ещё предложения", "Тағы ұсыныстар"), enabled = !data.loading,
@@ -221,7 +211,11 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                                 try {
                                     val result = clearUnavailableMarketSaved(owned)
                                     if (owned.isCurrent()) {
-                                        if (!result.negative) { data.page = result.payload; MarketplaceSignals.changed() }
+                                        val value = result.payload
+                                        if (!result.negative && value != null) {
+                                            fence.acknowledgeSnapshot(value.offers.map { it.id }.toSet(), value.unavailableSavedCount)
+                                            data.page = value; MarketplaceSignals.changed()
+                                        }
                                         else saveFailure = result.message
                                     }
                                 } catch (cancelled: CancellationException) { throw cancelled }
@@ -234,7 +228,6 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         }
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(if (data.page == null) authUiText("Waiting for offers", "Ожидаем предложения", "Ұсыныстар күтілуде")
-                else if (query.comparisonKey != null) authUiText("${rows.size} loaded matches", "Совпадений загружено: ${rows.size}", "${rows.size} сәйкестік жүктелді")
                 else authUiText("${rows.size} loaded offers", "Предложений загружено: ${rows.size}", "${rows.size} ұсыныс жүктелді"),
                 Modifier.weight(1f), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false,
@@ -242,7 +235,8 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         }
     }
     openedId?.let { id -> MarketOfferDetailDialog(id, shopping, onDismiss = { openedId = null }, onVisitShop = ::visitShop,
-        onCompare = { offer -> openedId = null; compareTo = offer }) }
+        onCompare = { offer -> openedId = null; compareTo = offer.comparisonSelection() }) }
+    compareTo?.let { target -> MarketComparisonDialog(target, shopping, onDismiss = { compareTo = null }, onVisitShop = ::visitShop, initialCity = city) }
 }
 
 @Composable
@@ -276,7 +270,7 @@ private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean
                 if (inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
                 else shopping.change(offer.id, 1, offer.shoppingBasis())
             })
-        if (offer.comparisonKey() != null) actionButton(text = authUiText("Compare", "Сравнить", "Салыстыру"),
+        if (offer.comparisonSelection() != null) actionButton(text = authUiText("Compare", "Сравнить", "Салыстыру"),
             iconPath = marketIconPath(141), iconRes = marketIconFallback(141), autoLoading = false, confirmationRequired = false,
             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = onCompare)
     }

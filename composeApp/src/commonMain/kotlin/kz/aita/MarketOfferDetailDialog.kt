@@ -100,7 +100,7 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                     })
                 actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту"), iconPath = marketIconPath(139), iconRes = marketIconFallback(139),
                     enabled = fresh, autoLoading = false, confirmationRequired = false, onClick = { onVisitShop(current.storefront) })
-                if (onCompare != null && current.comparisonKey() != null) actionButton(text = authUiText("Compare offers", "Сравнить предложения", "Ұсыныстарды салыстыру"),
+                if (onCompare != null && current.comparisonSelection() != null) actionButton(text = authUiText("Compare offers", "Сравнить предложения", "Ұсыныстарды салыстыру"),
                     iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = fresh, autoLoading = false, confirmationRequired = false,
                     onClick = { onCompare(current) })
             }

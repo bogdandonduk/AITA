@@ -135,4 +135,53 @@ class MarketShoppingDeliveryTest {
         assertFalse(store.change(Owner(), command).acknowledged)
         assertEquals(0, sends); assertEquals(original, memory.data.values.single())
     }
+
+    @Test fun replacementResponseLossRetriesTheWholeReviewedCommand() = runTest {
+        val memory = Memory(); val owner = Owner(); val sent = mutableListOf<MarketShoppingCommand>()
+        val replacement = command.copy(basis = MarketShoppingBasis("04006381333931", "KZT", "piece", 1.0),
+            replaceOfferId = "original", reviewedSubtotalMinor = 19999)
+        val first = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot()) }, { _, value ->
+            sent += value; ResponseDataModel(null, null, true, 503)
+        })
+        assertNotNull(first.change(owner, replacement).pending)
+        val restarted = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot()) }, { _, value ->
+            sent += value; ok(outcome(value).copy(replayed = true))
+        })
+        val result = restarted.retry(owner)
+        assertTrue(result.acknowledged); assertEquals(replacement.commandId, result.acknowledgedCommandId)
+        assertEquals(listOf(replacement, replacement), sent)
+    }
+    @Test fun malformedRemoteSnapshotDoesNotOverwriteGoodLocalData() = runTest {
+        val memory = Memory(); val owner = Owner()
+        val good = MarketShoppingJournal("buyer", snapshot(3))
+        val original = jsonBase.encodeToString(good); memory.data["buyer-shopping-journal-v1:buyer"] = original
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(-1)) }, { _, value -> ok(outcome(value)) })
+        val result = store.refresh(owner)
+        assertNotNull(result.error); assertFalse(result.fresh); assertEquals(3L, result.snapshot?.revision)
+        assertEquals(original, memory.data.values.single())
+    }
+    @Test fun malformedAcknowledgementDoesNotRetireTheStoredCommand() = runTest {
+        val memory = Memory()
+        val duplicate = MarketShoppingLine("x", "shop", "Product", "Shop", 1, MarketShoppingBasis(null, "KZT", "piece", 1.0))
+        val malformed = snapshot().copy(lines = listOf(MarketShoppingQuotedLine(duplicate), MarketShoppingQuotedLine(duplicate)))
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot()) }, { _, value -> ok(outcome(value).copy(snapshot = malformed)) })
+        assertFalse(store.change(Owner(), command).acknowledged); assertNotNull(memory.journal()?.pending)
+    }
+    @Test fun invalidReplacementCannotBecomeAPendingPoisonedJournal() = runTest {
+        val memory = Memory(); var sends = 0
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot()) }, { _, value -> sends++; ok(outcome(value)) })
+        assertFalse(store.change(Owner(), command.copy(replaceOfferId = "original")).acknowledged)
+        assertEquals(0, sends); assertNull(memory.journal())
+    }
+
+    @Test fun ownerChangeDuringStorageReadNeverPreparesOrSendsNewWork() = runTest {
+        val memory = Memory(); val owner = Owner(); var sends = 0
+        val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val store = MarketShoppingDeliveryStore({ key -> entered.complete(Unit); release.await(); memory.get(key) },
+            memory::put, { ok(snapshot()) }, { _, value -> sends++; ok(outcome(value)) })
+        val changing = async { store.change(owner, command) }
+        entered.await(); owner.current = false; release.complete(Unit)
+        assertFalse(changing.await().acknowledged)
+        assertEquals(0, sends); assertNull(memory.journal())
+    }
 }

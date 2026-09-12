@@ -49,6 +49,23 @@ internal fun Route.marketplaceRoutes() {
                 call.checkPrincipal() ?: return@get
                 call.marketResult(readOnly = true) { publicShop(call.parameters["storeId"].orEmpty()) }
             }
+            post("/compare") {
+                val user = call.checkPrincipal() ?: return@post
+                val body = call.receiveAita<MarketComparisonRequest>()
+                call.marketResult(readOnly = true) {
+                    MarketShoppingRepository(TransactionManager.current().connection.connection as Connection, this).comparison(user, body)
+                }
+            }
+            put("/shopping-list/replace") {
+                val user = call.checkPrincipal() ?: return@put
+                val body = call.receiveAita<MarketShoppingCommand>()
+                call.marketResult(after = { result: MarketShoppingOutcome ->
+                    if (result.accepted) RealtimeServerBus.publish(entity = "market/shopping-list", userId = user.toString(), reason = "shopping_list_changed")
+                }) {
+                    MarketShoppingRepository(TransactionManager.current().connection.connection as Connection, this)
+                        .replace(user, call.currentJwtSessionId(), body)
+                }
+            }
             get("/shopping-list") {
                 val user = call.checkPrincipal() ?: return@get
                 call.marketResult(readOnly = true) {

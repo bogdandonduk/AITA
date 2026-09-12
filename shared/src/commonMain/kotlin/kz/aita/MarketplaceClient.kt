@@ -78,3 +78,11 @@ suspend fun loadMarketShop(scope: MarketRequestScope, id: String): ResponseDataM
         return ResponseDataModel(eventMessage("market.shop_unavailable"), null, true, 404)
     return networkRequest<MarketStorefront, Unit>(HttpMethod.Get, endpointUrl = "market/shops/$id", expectedSessionGeneration = scope.generation)
 }
+
+/** Read-only POST: structured comparison identity is kept out of the URL and not cached. */
+suspend fun loadMarketComparison(scope: MarketRequestScope, request: MarketComparisonRequest): ResponseDataModel<MarketComparisonPage> {
+    if (!scope.isCurrent()) return cloudSessionExpiredResponse()
+    if (!request.selection.isValidMarketComparison()) return ResponseDataModel(eventMessage("market.comparison_invalid"), null, true, 400)
+    return networkRequest(HttpMethod.Post, endpointUrl = "market/compare", body = request,
+        expectedSessionGeneration = scope.generation)
+}
