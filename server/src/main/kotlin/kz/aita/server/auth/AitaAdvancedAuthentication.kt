@@ -1,5 +1,6 @@
 package kz.aita.server.auth
 
+import kz.aita.eventMessage
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -220,13 +221,6 @@ object AuthSecurityEmailChallenges : Table("auth_security_email_challenges") {
 
 internal enum class AuthContactConflict { PHONE, EMAIL, EXTRA_LIMIT, MAIN_EMAIL_VERIFICATION }
 internal class AitaAuthContactConflictException(val conflict: AuthContactConflict) : IllegalStateException(conflict.name)
-
-private fun authMessage(main: String, ru: String, kk: String): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel("main", main),
-    LocalizedStringDataModel("en", main),
-    LocalizedStringDataModel("ru", ru),
-    LocalizedStringDataModel("kk", kk)
-)
 
 // AdvancedAuthConfig is shared with the error handler and tests; its only declaration
 // and environment parser live in AitaAuthConfiguration.kt in this package.
@@ -2035,14 +2029,14 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
         post("/login/email-factor/request") {
             val result = service.requestLoginEmailFactor(call.receiveAita<AitaLoginEmailFactorRequest>(), call.authClientIp())
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-                authMessage("Sign in again or choose an available email", "Войдите заново или выберите доступный email", "Қайта кіріңіз немесе қолжетімді email таңдаңыз"))
+                eventMessage("auth.message.sign_in_again_or_choose_an_available_email"))
             else call.genericResponse(HttpStatusCode.Accepted, result)
         }
         post("/login/email-factor/verify") {
             val request = call.receiveAita<AitaEmailCodeVerifyRequestDataModel>()
             val result = service.verifyLoginEmailFactor(request, authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-                authMessage("Code invalid or expired", "Код неверен или истёк", "Код қате немесе мерзімі аяқталған"))
+                eventMessage("auth.message.code_invalid_or_expired"))
             else call.genericResponse(HttpStatusCode.OK, result)
         }
 
@@ -2051,7 +2045,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val result = service.passwordLogin(request.copy(deviceInfo = request.deviceInfo), authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(
                 HttpStatusCode.Unauthorized,
-                authMessage("Invalid login or password", "Неверный логин или пароль", "Логин немесе құпиясөз қате")
+                eventMessage("message.invalid_login_or_password")
             ) else call.genericResponse(HttpStatusCode.OK, result)
         }
 
@@ -2065,7 +2059,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
             val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_LOGIN)
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                authMessage("Request a new code", "Запросите новый код", "Жаңа код сұраңыз"))
+                eventMessage("auth.message.request_a_new_code"))
             else call.genericResponse(HttpStatusCode.Accepted, result)
         }
 
@@ -2074,7 +2068,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val result = service.verifyEmailCode(request, AUTH_PURPOSE_LOGIN, authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(
                 HttpStatusCode.Unauthorized,
-                authMessage("The code is invalid or expired", "Код неверен или истёк", "Код қате немесе мерзімі аяқталған")
+                eventMessage("auth.message.the_code_is_invalid_or_expired")
             ) else call.genericResponse(HttpStatusCode.OK, result)
         }
 
@@ -2083,7 +2077,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val result = service.completeTotpLogin(request, authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(
                 HttpStatusCode.Unauthorized,
-                authMessage("The authenticator or recovery code is invalid", "Код аутентификатора или резервный код неверен", "Аутентификатор немесе қалпына келтіру коды қате")
+                eventMessage("auth.message.the_authenticator_or_recovery_code_is_invalid")
             ) else call.genericResponse(HttpStatusCode.OK, result)
         }
 
@@ -2091,14 +2085,14 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val request = call.receiveAita<AitaAuthenticatorLoginRequestDataModel>()
             val result = service.authenticatorLogin(request, authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                authMessage("Check the login and use a fresh authenticator or recovery code", "Проверьте логин и введите новый код аутентификатора или резервный код", "Логинді тексеріп, аутентификатордың жаңа кодын немесе резервтік кодты енгізіңіз"))
+                eventMessage("auth.message.check_the_login_and_use_a_fresh_authenticator_or_recovery_code"))
             else call.genericResponse(HttpStatusCode.OK, result)
         }
         post("/login/authenticator/password") {
             val request = call.receiveAita<AitaAuthenticatorPasswordRequestDataModel>()
             val result = service.completeAuthenticatorPassword(request, authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                authMessage("Password is incorrect or this sign-in has expired", "Пароль неверен или сеанс входа истёк", "Құпия сөз қате немесе кіру сеансының мерзімі аяқталған"))
+                eventMessage("auth.message.password_is_incorrect_or_this_sign_in_has_expired"))
             else call.genericResponse(HttpStatusCode.OK, result)
         }
         post("/authenticator-recovery/request") {
@@ -2109,7 +2103,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
             val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_TOTP_RECOVERY)
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                authMessage("Start authenticator recovery again", "Начните восстановление аутентификатора заново", "Аутентификаторды қалпына келтіруді қайта бастаңыз"))
+                eventMessage("auth.message.start_authenticator_recovery_again"))
             else call.genericResponse(HttpStatusCode.Accepted, result)
         }
         post("/authenticator-recovery/confirm") {
@@ -2117,9 +2111,9 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val recoveredUserId = service.confirmAuthenticatorRecovery(request)
             if (recoveredUserId != null) call.genericResponse(HttpStatusCode.OK,
                 AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.COMPLETE, recoveredUserId = recoveredUserId.toString()),
-                authMessage("Authenticator removed. Sign in again and connect a new authenticator.", "Аутентификатор удалён. Войдите заново и подключите новый.", "Аутентификатор жойылды. Қайта кіріп, жаңасын қосыңыз."))
+                eventMessage("auth.message.authenticator_removed_sign_in_again_and_connect_a_new_authenticator"))
             else call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                authMessage("The code is invalid, expired or the security settings changed", "Код неверен, истёк или настройки безопасности изменились", "Код қате, мерзімі аяқталған немесе қауіпсіздік баптаулары өзгерген"))
+                eventMessage("auth.message.the_code_is_invalid_expired_or_the_security_settings_changed"))
         }
 
         post("/password-recovery/request") {
@@ -2132,7 +2126,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
             val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_RECOVERY)
             if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                authMessage("Request a new code", "Запросите новый код", "Жаңа код сұраңыз"))
+                eventMessage("auth.message.request_a_new_code"))
             else call.genericResponse(HttpStatusCode.Accepted, result)
         }
 
@@ -2141,7 +2135,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             val result = service.verifyEmailCode(request, AUTH_PURPOSE_RECOVERY, authMeta(call, request.deviceInfo))
             if (result == null) call.genericResponseNoPayload(
                 HttpStatusCode.Unauthorized,
-                authMessage("The code is invalid or expired", "Код неверен или истёк", "Код қате немесе мерзімі аяқталған")
+                eventMessage("auth.message.the_code_is_invalid_or_expired")
             ) else call.genericResponse(HttpStatusCode.OK, result)
         }
 
@@ -2150,20 +2144,16 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
             if (!request.newPassword.checkAsPassword()) {
                 return@post call.genericResponseNoPayload(
                     HttpStatusCode.BadRequest,
-                    authMessage(
-                        "Password must contain at least 8 characters, a digit and a special character",
-                        "Пароль должен содержать не менее 8 символов, цифру и специальный символ",
-                        "Құпия сөз кемінде 8 таңба, сан және арнайы таңба қамтуы керек"
-                    )
+                    eventMessage("auth.message.password_must_contain_at_least_8_characters_a_digit_and_a_special")
                 )
             }
             if (service.resetPassword(request)) call.genericResponse(
                 HttpStatusCode.OK,
                 AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.COMPLETE),
-                authMessage("Password restored. Sign in with the new password.", "Пароль восстановлен. Войдите с новым паролем.", "Құпия сөз қалпына келтірілді. Жаңа құпия сөзбен кіріңіз.")
+                eventMessage("auth.message.password_restored_sign_in_with_the_new_password")
             ) else call.genericResponseNoPayload(
                 HttpStatusCode.Unauthorized,
-                authMessage("The recovery session is invalid or expired", "Сеанс восстановления недействителен или истёк", "Қалпына келтіру сеансы жарамсыз немесе мерзімі аяқталған")
+                eventMessage("auth.message.the_recovery_session_is_invalid_or_expired")
             )
         }
 
@@ -2173,16 +2163,14 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.requestSecurityEmail(userId, call.receiveAita<AitaSecurityEmailRequest>(), call.authClientIp())
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-                        authMessage("Check your password and refresh settings", "Проверьте пароль и обновите настройки", "Құпия сөзді тексеріп, баптауларды жаңартыңыз"))
+                        eventMessage("auth.message.check_your_password_and_refresh_settings"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
                 post("/login-policy") {
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.updateLoginPolicy(userId, call.receiveAita<AitaLoginPolicyRequest>())
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-                        authMessage("Security confirmation failed or settings changed. Refresh and try again.",
-                            "Подтверждение не выполнено или настройки изменились. Обновите их и повторите.",
-                            "Растау сәтсіз немесе баптаулар өзгерді. Жаңартып, қайталаңыз."))
+                        eventMessage("auth.message.security_confirmation_failed_or_settings_changed_refresh_and_try_again"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
                 get("/settings") {
@@ -2197,11 +2185,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     if (result == null) {
                         call.genericResponseNoPayload(
                             HttpStatusCode.Unauthorized,
-                            authMessage(
-                                "Security confirmation failed",
-                                "Не удалось подтвердить действие",
-                                "Қауіпсіздік растауы сәтсіз"
-                            )
+                            eventMessage("auth.message.security_confirmation_failed")
                         )
                     } else {
                         call.genericResponse(HttpStatusCode.OK, result)
@@ -2212,7 +2196,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaTotpSetupConfirmRequestDataModel>()
                     val result = service.confirmTotpSetup(userId, request)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, authMessage("Authenticator code is invalid", "Код аутентификатора неверен", "Аутентификатор коды қате"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.authenticator_code_is_invalid"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 
@@ -2221,9 +2205,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val request = call.receiveAita<AitaTotpLoginPolicyRequestDataModel>()
                     val result = service.updateTotpLoginPolicy(userId, request)
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-                        authMessage("Security confirmation failed or settings changed. Refresh and try again.",
-                            "Подтверждение не выполнено или настройки изменились. Обновите их и повторите.",
-                            "Растау сәтсіз немесе баптаулар өзгерді. Жаңартып, қайталаңыз."))
+                        eventMessage("auth.message.security_confirmation_failed_or_settings_changed_refresh_and_try_again"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 
@@ -2231,7 +2213,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaSensitiveSecurityActionRequestDataModel>()
                     val result = service.disableTotp(userId, request)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, authMessage("Security confirmation failed", "Не удалось подтвердить действие", "Қауіпсіздік растауы сәтсіз"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.security_confirmation_failed"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 
@@ -2239,37 +2221,33 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaSensitiveSecurityActionRequestDataModel>()
                     val codes = service.regenerateRecoveryCodes(userId, request)
-                    if (codes == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, authMessage("Security confirmation failed", "Не удалось подтвердить действие", "Қауіпсіздік растауы сәтсіз"))
+                    if (codes == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.security_confirmation_failed"))
                     else call.genericResponse(HttpStatusCode.OK, AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.COMPLETE, recoveryCodes = codes))
                 }
 
                 post("/email/request") {
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.requestEmailAlias(userId, call.receiveAita<AitaEmailAliasRequestDataModel>(), call.authClientIp())
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage(
-                        "Could not add this extra email. Check your password, security code and address.",
-                        "Не удалось добавить дополнительный email. Проверьте пароль, код безопасности и адрес.",
-                        "Қосымша email қосылмады. Құпия сөзді, қауіпсіздік кодын және мекенжайды тексеріңіз."))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.could_not_add_this_extra_email_check_your_password_security_code_and"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
                 post("/email/resend") {
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
                     val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_EMAIL_ALIAS, userId)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Start extra email setup again", "Начните добавление дополнительного email заново", "Қосымша email қосуды қайта бастаңыз"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.start_extra_email_setup_again"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
                 post("/email/confirm") {
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.confirmEmailAlias(userId, call.receiveAita<AitaEmailAliasConfirmRequestDataModel>())
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage(
-                        "Code invalid, expired, or extra email unavailable", "Код неверен, истёк или дополнительный email недоступен", "Код қате, мерзімі аяқталған немесе қосымша email қолжетімсіз"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.code_invalid_expired_or_extra_email_unavailable"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
                 post("/email/remove") {
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.removeEmailAlias(userId, call.receiveAita<AitaEmailAliasRemoveRequestDataModel>(), call.authClientIp())
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Security confirmation failed", "Не удалось подтвердить действие", "Қауіпсіздік растауы сәтсіз"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.security_confirmation_failed"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 
@@ -2277,7 +2255,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaPhoneAliasRequestDataModel>()
                     val result = service.requestPhoneAlias(userId, request, call.authClientIp())
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, authMessage("Extra phone number change could not be requested", "Не удалось запросить изменение дополнительного номера", "Қосымша телефон нөмірінің өзгерісін сұрау мүмкін болмады"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.extra_phone_number_change_could_not_be_requested"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
 
@@ -2286,7 +2264,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
                     val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_PHONE, userId)
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
-                        authMessage("Request a new code", "Запросите новый код", "Жаңа код сұраңыз"))
+                        eventMessage("auth.message.request_a_new_code"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
 
@@ -2294,7 +2272,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaPhoneAliasConfirmRequestDataModel>()
                     val result = service.confirmPhoneAlias(userId, request)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, authMessage("The confirmation code is invalid or expired", "Код подтверждения неверен или истёк", "Растау коды қате немесе мерзімі аяқталған"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.the_confirmation_code_is_invalid_or_expired"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
             }

@@ -537,8 +537,21 @@ fun AppConfiguration.MenuDevicesScreen() {
             }
         )
 
+        val section = sectionTabsWidget(
+            stateKey = "devices",
+            tabs = listOf(
+                TabContent("receipt", localizedStringResource(1254, "Thermal receipt printer")),
+                TabContent("label", localizedStringResource(1276, "Sticky label printer")),
+                TabContent("system", localizedStringResource(616, "Open system devices"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
+
         LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Devices),
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Devices, section),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -546,358 +559,364 @@ fun AppConfiguration.MenuDevicesScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextFieldGroup),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
-            item {
-                MessageText(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(617, "Open Bluetooth/devices settings"),
-                    subText = stateValues.stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters,
-                    textSize = stateValues.titleTextSize,
-                    subTextSize = stateValues.textSize
-                )
-            }
-
-            item {
-                DeviceSettingsCard(
-                    title = localizedStringResource(1252, "A4 paper printer"),
-                    subtitle = localizedStringResource(1253, "Analytics reports use the regular system print dialog for A4 paper printers."),
-                    iconPath = stateValues.drawablePathIconAnalyticsReport,
-                    iconRes = stateValues.drawableResIconAnalyticsReport.value
-                ) {
-                    actionButton(
+            if (section == "system") {
+                item(key = "MenuDevicesScreen:$section:0") {
+                    MessageText(
                         modifier = Modifier.fillMaxWidth(),
-                        text = localizedStringResource(616, "Open system devices"),
-                        iconPath = stateValues.drawablePathIconDevices,
-                        iconRes = stateValues.drawableResIconDevices.value,
-                        confirmationRequired = false,
-                        onClick = { openPlatformDevicesSettings() }
+                        text = localizedStringResource(617, "Open Bluetooth/devices settings"),
+                        subText = stateValues.stringForSearchAndConnectionToBluetoothBarcodeScannersAndReceiptPrinters,
+                        textSize = stateValues.titleTextSize,
+                        subTextSize = stateValues.textSize
                     )
+                }
+
+                item(key = "MenuDevicesScreen:$section:1") {
+                    DeviceSettingsCard(
+                        title = localizedStringResource(1252, "A4 paper printer"),
+                        subtitle = localizedStringResource(1253, "Analytics reports use the regular system print dialog for A4 paper printers."),
+                        iconPath = stateValues.drawablePathIconAnalyticsReport,
+                        iconRes = stateValues.drawableResIconAnalyticsReport.value
+                    ) {
+                        actionButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = localizedStringResource(616, "Open system devices"),
+                            iconPath = stateValues.drawablePathIconDevices,
+                            iconRes = stateValues.drawableResIconDevices.value,
+                            confirmationRequired = false,
+                            onClick = { openPlatformDevicesSettings() }
+                        )
+                    }
                 }
             }
 
-            item {
-                DeviceSettingsCard(
-                    title = localizedStringResource(1254, "Thermal receipt printer"),
-                    subtitle = localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
-                    iconPath = stateValues.drawablePathIconReceipt,
-                    iconRes = stateValues.drawableResIconReceipt.value
-                ) {
-                    if (stateValues.isNarrowScreen) {
-                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-                            actionButton(
+            if (section == "receipt") {
+                item(key = "MenuDevicesScreen:$section:2") {
+                    DeviceSettingsCard(
+                        title = localizedStringResource(1254, "Thermal receipt printer"),
+                        subtitle = localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+                        iconPath = stateValues.drawablePathIconReceipt,
+                        iconRes = stateValues.drawableResIconReceipt.value
+                    ) {
+                        if (stateValues.isNarrowScreen) {
+                            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                                actionButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = refreshButtonText,
+                                    iconPath = stateValues.drawablePathIconRefresh,
+                                    iconRes = stateValues.drawableResIconRefresh.value,
+                                    loading = refreshingReceiptPrinters,
+                                    enabled = !refreshingReceiptPrinters && !printingReceipt && !savingReceiptPrinter,
+                                    autoLoading = false,
+                                    confirmationRequired = false,
+                                    onClick = { refreshReceiptPrinters(showNotification = true) }
+                                )
+                                actionButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = testReceiptButtonText,
+                                    loading = printingReceipt,
+                                    iconPath = stateValues.drawablePathIconReceipt,
+                                    iconRes = stateValues.drawableResIconReceipt.value,
+                                    enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                    autoLoading = false,
+                                    onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                    confirmationRequired = false,
+                                    onClick = ::sendTestReceipt
+                                )
+                                actionButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = localizedStringResource(1265, "Clear receipt printer"),
+                                    iconPath = stateValues.drawablePathIconCancel,
+                                    iconRes = stateValues.drawableResIconCancel.value,
+                                    enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                    autoLoading = false,
+                                    confirmationRequired = false,
+                                    onClick = { selectReceiptPrinter(null) }
+                                )
+                            }
+                        } else {
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                text = refreshButtonText,
-                                iconPath = stateValues.drawablePathIconRefresh,
-                                iconRes = stateValues.drawableResIconRefresh.value,
-                                loading = refreshingReceiptPrinters,
-                                enabled = !refreshingReceiptPrinters && !printingReceipt && !savingReceiptPrinter,
-                                autoLoading = false,
-                                confirmationRequired = false,
-                                onClick = { refreshReceiptPrinters(showNotification = true) }
-                            )
-                            actionButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = testReceiptButtonText,
-                                loading = printingReceipt,
-                                iconPath = stateValues.drawablePathIconReceipt,
-                                iconRes = stateValues.drawableResIconReceipt.value,
-                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
-                                autoLoading = false,
-                                onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
-                                confirmationRequired = false,
-                                onClick = ::sendTestReceipt
-                            )
-                            actionButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = localizedStringResource(1265, "Clear receipt printer"),
-                                iconPath = stateValues.drawablePathIconCancel,
-                                iconRes = stateValues.drawableResIconCancel.value,
-                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
-                                autoLoading = false,
-                                confirmationRequired = false,
-                                onClick = { selectReceiptPrinter(null) }
-                            )
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = refreshButtonText,
-                                iconPath = stateValues.drawablePathIconRefresh,
-                                iconRes = stateValues.drawableResIconRefresh.value,
-                                loading = refreshingReceiptPrinters,
-                                enabled = !refreshingReceiptPrinters && !printingReceipt && !savingReceiptPrinter,
-                                autoLoading = false,
-                                confirmationRequired = false,
-                                onClick = { refreshReceiptPrinters(showNotification = true) }
-                            )
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = testReceiptButtonText,
-                                loading = printingReceipt,
-                                iconPath = stateValues.drawablePathIconReceipt,
-                                iconRes = stateValues.drawableResIconReceipt.value,
-                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
-                                autoLoading = false,
-                                onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
-                                confirmationRequired = false,
-                                onClick = ::sendTestReceipt
-                            )
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = localizedStringResource(1265, "Clear receipt printer"),
-                                iconPath = stateValues.drawablePathIconCancel,
-                                iconRes = stateValues.drawableResIconCancel.value,
-                                enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
-                                autoLoading = false,
-                                confirmationRequired = false,
-                                onClick = { selectReceiptPrinter(null) }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                    Text(
-                        text = localizedStringResource(1255, "Detected receipt printers"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.accentTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                    if (receiptPrinterError.isNotBlank()) Text(receiptPrinterError,
-                        color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-                    if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…"),
-                        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                    if (getPlatformName().startsWith("jvm", ignoreCase = true)) {
-                        AuthQuietAction(authUiText("Enter printer address", "Ввести адрес принтера", "Принтер мекенжайын енгізу"),
-                            !printingReceipt && !savingReceiptPrinter) { showManualReceiptTarget = !showManualReceiptTarget }
-                        if (showManualReceiptTarget) {
-                            aitaFormTextField(value = manualReceiptTarget, onValueChange = { manualReceiptTarget = it },
-                                titleText = authUiText("Queue or address", "Очередь или адрес", "Кезек немесе мекенжай"),
-                                placeholderText = "print-service:XP-58 (copy 1)", identityKey = "receipt-manual-target",
-                                enabled = !savingReceiptPrinter && !printingReceipt, keyboardType = KeyboardType.Ascii)
-                            Text("print-service:XP-58 (copy 1) · tcp://192.168.1.50:9100 · serial:COM3",
-                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                            actionButton(text = authUiText("Use this printer", "Выбрать принтер", "Осы принтерді таңдау"),
-                                enabled = !savingReceiptPrinter && !printingReceipt && manualReceiptTarget.isNotBlank(),
-                                loading = savingReceiptPrinter, autoLoading = false) { selectReceiptPrinter(manualReceiptTarget) }
-                        }
-                    }
-
-                    if (receiptPrinters.isEmpty() && !refreshingReceiptPrinters && receiptPrinterError.isBlank()) {
-                        MessageText(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = stateValues.marginTextFieldGroup),
-                            text = localizedStringResource(1256, "No paired thermal receipt printers found"),
-                            subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
-                            textSize = stateValues.textSize,
-                            subTextSize = stateValues.smallTextSize
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-                            receiptPrinters.forEach { printer ->
-                                ThermalReceiptPrinterCard(
-                                    printer = printer,
-                                    selected = printer.id == configuredReceiptPrinterId || printer.configured,
-                                    enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters,
-                                    onSelect = { selectReceiptPrinter(printer.id) }
+                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = refreshButtonText,
+                                    iconPath = stateValues.drawablePathIconRefresh,
+                                    iconRes = stateValues.drawableResIconRefresh.value,
+                                    loading = refreshingReceiptPrinters,
+                                    enabled = !refreshingReceiptPrinters && !printingReceipt && !savingReceiptPrinter,
+                                    autoLoading = false,
+                                    confirmationRequired = false,
+                                    onClick = { refreshReceiptPrinters(showNotification = true) }
+                                )
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = testReceiptButtonText,
+                                    loading = printingReceipt,
+                                    iconPath = stateValues.drawablePathIconReceipt,
+                                    iconRes = stateValues.drawableResIconReceipt.value,
+                                    enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                    autoLoading = false,
+                                    onDisabledClick = { postInAppNotification(receiptPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                    confirmationRequired = false,
+                                    onClick = ::sendTestReceipt
+                                )
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = localizedStringResource(1265, "Clear receipt printer"),
+                                    iconPath = stateValues.drawablePathIconCancel,
+                                    iconRes = stateValues.drawableResIconCancel.value,
+                                    enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
+                                    autoLoading = false,
+                                    confirmationRequired = false,
+                                    onClick = { selectReceiptPrinter(null) }
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                        Text(
+                            text = localizedStringResource(1255, "Detected receipt printers"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                        if (receiptPrinterError.isNotBlank()) Text(receiptPrinterError,
+                            color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                        if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…"),
+                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        if (getPlatformName().startsWith("jvm", ignoreCase = true)) {
+                            AuthQuietAction(authUiText("Enter printer address", "Ввести адрес принтера", "Принтер мекенжайын енгізу"),
+                                !printingReceipt && !savingReceiptPrinter) { showManualReceiptTarget = !showManualReceiptTarget }
+                            if (showManualReceiptTarget) {
+                                aitaFormTextField(value = manualReceiptTarget, onValueChange = { manualReceiptTarget = it },
+                                    titleText = authUiText("Queue or address", "Очередь или адрес", "Кезек немесе мекенжай"),
+                                    placeholderText = "print-service:XP-58 (copy 1)", identityKey = "receipt-manual-target",
+                                    enabled = !savingReceiptPrinter && !printingReceipt, keyboardType = KeyboardType.Ascii)
+                                Text("print-service:XP-58 (copy 1) · tcp://192.168.1.50:9100 · serial:COM3",
+                                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                actionButton(text = authUiText("Use this printer", "Выбрать принтер", "Осы принтерді таңдау"),
+                                    enabled = !savingReceiptPrinter && !printingReceipt && manualReceiptTarget.isNotBlank(),
+                                    loading = savingReceiptPrinter, autoLoading = false) { selectReceiptPrinter(manualReceiptTarget) }
+                            }
+                        }
+
+                        if (receiptPrinters.isEmpty() && !refreshingReceiptPrinters && receiptPrinterError.isBlank()) {
+                            MessageText(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = stateValues.marginTextFieldGroup),
+                                text = localizedStringResource(1256, "No paired thermal receipt printers found"),
+                                subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
+                                textSize = stateValues.textSize,
+                                subTextSize = stateValues.smallTextSize
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                                receiptPrinters.forEach { printer ->
+                                    ThermalReceiptPrinterCard(
+                                        printer = printer,
+                                        selected = printer.id == configuredReceiptPrinterId || printer.configured,
+                                        enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters,
+                                        onSelect = { selectReceiptPrinter(printer.id) }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-            item {
-                DeviceSettingsCard(
-                    title = localizedStringResource(1276, "Sticky label printer"),
-                    subtitle = localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
-                    iconPath = stateValues.drawablePathIconLabelPrinter,
-                    iconRes = stateValues.drawableResIconLabelPrinter.value
-                ) {
-                    if (stateValues.isNarrowScreen) {
-                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-                            actionButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = refreshButtonText,
-                                iconPath = stateValues.drawablePathIconRefresh,
-                                iconRes = stateValues.drawableResIconRefresh.value,
-                                loading = refreshingLabelPrinters,
-                                confirmationRequired = false,
-                                onClick = { refreshLabelPrinters(showNotification = true) }
-                            )
-                            actionButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = localizedStringResource(1282, "Send test label"),
-                                iconPath = stateValues.drawablePathIconLabelPrinter,
-                                iconRes = stateValues.drawableResIconLabelPrinter.value,
-                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
-                                onDisabledClick = { postInAppNotification(labelPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
-                                confirmationRequired = false,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        receiptActionNotification(
-                                            printStockItemLabel(
-                                                StockItemLabelDataModel(
-                                                    itemName = localizedStringResource(1289, "Sticky shelf tag"),
-                                                    barcode = "123456789012",
-                                                    priceText = "100 KZT",
-                                                    storeName = "AITA",
-                                                    copies = 1,
-                                                    protocol = configuredLabelPrinterProtocol
+            if (section == "label") {
+                item(key = "MenuDevicesScreen:$section:3") {
+                    DeviceSettingsCard(
+                        title = localizedStringResource(1276, "Sticky label printer"),
+                        subtitle = localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
+                        iconPath = stateValues.drawablePathIconLabelPrinter,
+                        iconRes = stateValues.drawableResIconLabelPrinter.value
+                    ) {
+                        if (stateValues.isNarrowScreen) {
+                            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                                actionButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = refreshButtonText,
+                                    iconPath = stateValues.drawablePathIconRefresh,
+                                    iconRes = stateValues.drawableResIconRefresh.value,
+                                    loading = refreshingLabelPrinters,
+                                    confirmationRequired = false,
+                                    onClick = { refreshLabelPrinters(showNotification = true) }
+                                )
+                                actionButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = localizedStringResource(1282, "Send test label"),
+                                    iconPath = stateValues.drawablePathIconLabelPrinter,
+                                    iconRes = stateValues.drawableResIconLabelPrinter.value,
+                                    enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                    onDisabledClick = { postInAppNotification(labelPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                    confirmationRequired = false,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            receiptActionNotification(
+                                                printStockItemLabel(
+                                                    StockItemLabelDataModel(
+                                                        itemName = localizedStringResource(1289, "Sticky shelf tag"),
+                                                        barcode = "123456789012",
+                                                        priceText = "100 KZT",
+                                                        storeName = "AITA",
+                                                        copies = 1,
+                                                        protocol = configuredLabelPrinterProtocol
+                                                    ),
+                                                    protocol = configuredLabelPrinterProtocol,
+                                                    notConfiguredMessage = labelPrinterNotConfiguredText
                                                 ),
-                                                protocol = configuredLabelPrinterProtocol,
-                                                notConfiguredMessage = labelPrinterNotConfiguredText
-                                            ),
-                                            testLabelSentText
-                                        )
-                                    }
-                                }
-                            )
-                            actionButton(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = localizedStringResource(1286, "Clear label printer"),
-                                iconPath = stateValues.drawablePathIconCancel,
-                                iconRes = stateValues.drawableResIconCancel.value,
-                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
-                                confirmationRequired = false,
-                                onClick = {
-                                    configureLabelPrinterDevice(null) { result ->
-                                        coroutineScope.launch { receiptActionNotification(result, labelPrinterClearedText) }
-                                    }
-                                }
-                            )
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = refreshButtonText,
-                                iconPath = stateValues.drawablePathIconRefresh,
-                                iconRes = stateValues.drawableResIconRefresh.value,
-                                loading = refreshingLabelPrinters,
-                                confirmationRequired = false,
-                                onClick = { refreshLabelPrinters(showNotification = true) }
-                            )
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = localizedStringResource(1282, "Send test label"),
-                                iconPath = stateValues.drawablePathIconLabelPrinter,
-                                iconRes = stateValues.drawableResIconLabelPrinter.value,
-                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
-                                onDisabledClick = { postInAppNotification(labelPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
-                                confirmationRequired = false,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        receiptActionNotification(
-                                            printStockItemLabel(
-                                                StockItemLabelDataModel(
-                                                    itemName = localizedStringResource(1289, "Sticky shelf tag"),
-                                                    barcode = "123456789012",
-                                                    priceText = "100 KZT",
-                                                    storeName = "AITA",
-                                                    copies = 1,
-                                                    protocol = configuredLabelPrinterProtocol
-                                                ),
-                                                protocol = configuredLabelPrinterProtocol,
-                                                notConfiguredMessage = labelPrinterNotConfiguredText
-                                            ),
-                                            testLabelSentText
-                                        )
-                                    }
-                                }
-                            )
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = localizedStringResource(1286, "Clear label printer"),
-                                iconPath = stateValues.drawablePathIconCancel,
-                                iconRes = stateValues.drawableResIconCancel.value,
-                                enabled = !configuredLabelPrinterId.isNullOrBlank(),
-                                confirmationRequired = false,
-                                onClick = {
-                                    configureLabelPrinterDevice(null) { result ->
-                                        coroutineScope.launch { receiptActionNotification(result, labelPrinterClearedText) }
-                                    }
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                    Text(
-                        text = localizedStringResource(1287, "Label printer protocol"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.accentTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                    tabRowWidget(
-                        modifier = Modifier.fillMaxWidth(),
-                        tabs = listOf(
-                            TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                            },
-                            TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                            },
-                            TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                            },
-                            TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
-                                configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                            }
-                        ),
-                        selectedIndexInitial = normalizeLabelPrinterProtocol(configuredLabelPrinterProtocol),
-                        textSize = stateValues.smallTextSize
-                    )
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                    Text(
-                        text = localizedStringResource(1278, "Detected label printers"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.accentTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                    if (labelPrinters.isEmpty()) {
-                        MessageText(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = stateValues.marginTextFieldGroup),
-                            text = localizedStringResource(1279, "No paired sticky label printers found"),
-                            subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
-                            textSize = stateValues.textSize,
-                            subTextSize = stateValues.smallTextSize
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-                            labelPrinters.forEach { printer ->
-                                StickyLabelPrinterCard(
-                                    printer = printer,
-                                    selected = printer.id == configuredLabelPrinterId || printer.configured,
-                                    onSelect = {
-                                        configureLabelPrinterDevice(printer.id) { result ->
-                                            coroutineScope.launch { receiptActionNotification(result, labelPrinterSelectedText) }
+                                                testLabelSentText
+                                            )
                                         }
                                     }
                                 )
+                                actionButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    text = localizedStringResource(1286, "Clear label printer"),
+                                    iconPath = stateValues.drawablePathIconCancel,
+                                    iconRes = stateValues.drawableResIconCancel.value,
+                                    enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                    confirmationRequired = false,
+                                    onClick = {
+                                        configureLabelPrinterDevice(null) { result ->
+                                            coroutineScope.launch { receiptActionNotification(result, labelPrinterClearedText) }
+                                        }
+                                    }
+                                )
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = refreshButtonText,
+                                    iconPath = stateValues.drawablePathIconRefresh,
+                                    iconRes = stateValues.drawableResIconRefresh.value,
+                                    loading = refreshingLabelPrinters,
+                                    confirmationRequired = false,
+                                    onClick = { refreshLabelPrinters(showNotification = true) }
+                                )
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = localizedStringResource(1282, "Send test label"),
+                                    iconPath = stateValues.drawablePathIconLabelPrinter,
+                                    iconRes = stateValues.drawableResIconLabelPrinter.value,
+                                    enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                    onDisabledClick = { postInAppNotification(labelPrinterNotConfiguredText, NotificationType.Negative, transient = true) },
+                                    confirmationRequired = false,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            receiptActionNotification(
+                                                printStockItemLabel(
+                                                    StockItemLabelDataModel(
+                                                        itemName = localizedStringResource(1289, "Sticky shelf tag"),
+                                                        barcode = "123456789012",
+                                                        priceText = "100 KZT",
+                                                        storeName = "AITA",
+                                                        copies = 1,
+                                                        protocol = configuredLabelPrinterProtocol
+                                                    ),
+                                                    protocol = configuredLabelPrinterProtocol,
+                                                    notConfiguredMessage = labelPrinterNotConfiguredText
+                                                ),
+                                                testLabelSentText
+                                            )
+                                        }
+                                    }
+                                )
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = localizedStringResource(1286, "Clear label printer"),
+                                    iconPath = stateValues.drawablePathIconCancel,
+                                    iconRes = stateValues.drawableResIconCancel.value,
+                                    enabled = !configuredLabelPrinterId.isNullOrBlank(),
+                                    confirmationRequired = false,
+                                    onClick = {
+                                        configureLabelPrinterDevice(null) { result ->
+                                            coroutineScope.launch { receiptActionNotification(result, labelPrinterClearedText) }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                        Text(
+                            text = localizedStringResource(1287, "Label printer protocol"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                        tabRowWidget(
+                            modifier = Modifier.fillMaxWidth(),
+                            tabs = listOf(
+                                TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
+                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                },
+                                TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
+                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                },
+                                TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
+                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                },
+                                TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
+                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                }
+                            ),
+                            selectedIndexInitial = normalizeLabelPrinterProtocol(configuredLabelPrinterProtocol),
+                            textSize = stateValues.smallTextSize
+                        )
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                        Text(
+                            text = localizedStringResource(1278, "Detected label printers"),
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.accentTextSize,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                        if (labelPrinters.isEmpty()) {
+                            MessageText(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = stateValues.marginTextFieldGroup),
+                                text = localizedStringResource(1279, "No paired sticky label printers found"),
+                                subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
+                                textSize = stateValues.textSize,
+                                subTextSize = stateValues.smallTextSize
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                                labelPrinters.forEach { printer ->
+                                    StickyLabelPrinterCard(
+                                        printer = printer,
+                                        selected = printer.id == configuredLabelPrinterId || printer.configured,
+                                        onSelect = {
+                                            configureLabelPrinterDevice(printer.id) { result ->
+                                                coroutineScope.launch { receiptActionNotification(result, labelPrinterSelectedText) }
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -3474,146 +3493,188 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
         emptyList()
     }
 
-    LazyColumn(
-        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "transaction_$transactionType"),
-        modifier = Modifier
-            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-            .padding(stateValues.marginTextField),
-        contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-    ) {
-        item {
-            Text(
-                text = title,
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val section = sectionTabsWidget(
+            stateKey = "analytics:$transactionType:${stateValues.activeStoreId.orEmpty()}",
+            tabs = buildList {
+                add(TabContent("overview", authUiText("Overview", "Обзор", "Шолу")))
+                if (transactionType == "purchase" && dashboard != null) {
+                    add(TabContent("revenue", localizedStringResource(680, "Top items by revenue")))
+                    add(TabContent("quantity", localizedStringResource(681, "Top items by quantity")))
+                    add(TabContent("days", localizedStringResource(691, "Sales by day")))
+                    add(TabContent("hours", localizedStringResource(692, "Sales by hour")))
+                }
+                if (transactionType == "return" && dashboard != null) {
+                    add(TabContent("return_quantity", localizedStringResource(1311, "Returned items")))
+                    add(TabContent("return_amount", localizedStringResource(1315, "Returned amount")))
+                }
+                add(TabContent("history", localizedStringResource(257, "History")))
+            },
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
 
-        item {
-            AnalyticsCardsGrid(
-                cards = if (salesDashboardCards.isNotEmpty()) {
-                    salesDashboardCards
-                } else {
-                    listOf(
-                        AnalyticsSummaryCardData(
-                            title = stateValues.stringTotal,
-                            value = total.money(currencyCode),
-                            subtitle = localizedStringResource(357, "Cash + cashless")
-                        ),
-                        AnalyticsSummaryCardData(title = stateValues.stringCash, value = if (summary.paymentsKnown) totalCash.money(currencyCode) else "—"),
-                        AnalyticsSummaryCardData(title = stateValues.stringCashless, value = if (summary.paymentsKnown) totalCard.money(currencyCode) else "—"),
-                        AnalyticsSummaryCardData(title = localizedStringResource(676, "Debt amount"), value = if (summary.paymentsKnown) debtTotal.money(currencyCode) else "—"),
-                        AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = summary.count.toString()),
-                        AnalyticsSummaryCardData(title = localizedStringResource(359, "Average transaction"), value = average.money(currencyCode)),
-                        AnalyticsSummaryCardData(title = localizedStringResource(710, "Average items"), value = averageItems.cleanNumber()),
-                        AnalyticsSummaryCardData(title = stateValues.stringItems, value = totalGoodsQuantity.cleanNumber())
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "transaction_${transactionType}_$section"),
+            modifier = Modifier
+                .weight(1f)
+                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item(key = "MenuAnalyticsTransactionScreen:$section:0") {
+                Text(
+                    text = title,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = stateValues.marginTextField)
+                )
+            }
+
+            if (section == "overview") {
+                item(key = "MenuAnalyticsTransactionScreen:$section:1") {
+                    AnalyticsCardsGrid(
+                        cards = if (salesDashboardCards.isNotEmpty()) {
+                            salesDashboardCards
+                        } else {
+                            listOf(
+                                AnalyticsSummaryCardData(
+                                    title = stateValues.stringTotal,
+                                    value = total.money(currencyCode),
+                                    subtitle = localizedStringResource(357, "Cash + cashless")
+                                ),
+                                AnalyticsSummaryCardData(title = stateValues.stringCash, value = if (summary.paymentsKnown) totalCash.money(currencyCode) else "—"),
+                                AnalyticsSummaryCardData(title = stateValues.stringCashless, value = if (summary.paymentsKnown) totalCard.money(currencyCode) else "—"),
+                                AnalyticsSummaryCardData(title = localizedStringResource(676, "Debt amount"), value = if (summary.paymentsKnown) debtTotal.money(currencyCode) else "—"),
+                                AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = summary.count.toString()),
+                                AnalyticsSummaryCardData(title = localizedStringResource(359, "Average transaction"), value = average.money(currencyCode)),
+                                AnalyticsSummaryCardData(title = localizedStringResource(710, "Average items"), value = averageItems.cleanNumber()),
+                                AnalyticsSummaryCardData(title = stateValues.stringItems, value = totalGoodsQuantity.cleanNumber())
+                            )
+                        }
                     )
                 }
-            )
-        }
+            }
 
-        if (transactionType == "purchase" && dashboard != null) {
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsRankedItemsSection(
-                    title = localizedStringResource(680, "Top items by revenue"),
-                    items = dashboard.topItemsByRevenue,
-                    valueTitle = localizedStringResource(693, "Revenue"),
-                    currencyCode = dashboard.currencyCode.ifBlank { currencyCode },
-                    valueSelector = { it.amount },
-                    subtitleSelector = { item ->
-                        "${localizedStringResource(705, "Sold quantity")}: ${item.quantity.cleanNumber()} · ${localizedStringResource(706, "Transactions")}: ${item.transactionCount}"
+            if (transactionType == "purchase" && dashboard != null) {
+                if (section == "revenue") {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:2") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsRankedItemsSection(
+                            title = localizedStringResource(680, "Top items by revenue"),
+                            items = dashboard.topItemsByRevenue,
+                            valueTitle = localizedStringResource(693, "Revenue"),
+                            currencyCode = dashboard.currencyCode.ifBlank { currencyCode },
+                            valueSelector = { it.amount },
+                            subtitleSelector = { item ->
+                                "${localizedStringResource(705, "Sold quantity")}: ${item.quantity.cleanNumber()} · ${localizedStringResource(706, "Transactions")}: ${item.transactionCount}"
+                            }
+                        )
                     }
-                )
-            }
+                }
 
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsRankedItemsSection(
-                    title = localizedStringResource(681, "Top items by quantity"),
-                    items = dashboard.topItemsByQuantity,
-                    valueTitle = localizedStringResource(271, "Quantity"),
-                    currencyCode = "",
-                    valueSelector = { it.quantity },
-                    subtitleSelector = { item ->
-                        "${localizedStringResource(693, "Revenue")}: ${item.amount.money(item.currencyCode.ifBlank { currencyCode })}"
+                if (section == "quantity") {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:3") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsRankedItemsSection(
+                            title = localizedStringResource(681, "Top items by quantity"),
+                            items = dashboard.topItemsByQuantity,
+                            valueTitle = localizedStringResource(271, "Quantity"),
+                            currencyCode = "",
+                            valueSelector = { it.quantity },
+                            subtitleSelector = { item ->
+                                "${localizedStringResource(693, "Revenue")}: ${item.amount.money(item.currencyCode.ifBlank { currencyCode })}"
+                            }
+                        )
                     }
-                )
-            }
+                }
 
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsBucketSection(
-                    title = localizedStringResource(691, "Sales by day"),
-                    buckets = dashboard.salesByDay,
-                    currencyCode = dashboard.currencyCode.ifBlank { currencyCode }
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsBucketSection(
-                    title = localizedStringResource(692, "Sales by hour"),
-                    buckets = dashboard.salesByHour.sortedByDescending { it.amount }.take(8),
-                    currencyCode = dashboard.currencyCode.ifBlank { currencyCode }
-                )
-            }
-        }
-
-        if (transactionType == "return" && dashboard != null) {
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsRankedItemsSection(
-                    title = localizedStringResource(1311, "Returned items"),
-                    items = dashboard.topReturnedItemsByQuantity,
-                    valueTitle = localizedStringResource(1314, "Returned quantity"),
-                    currencyCode = "",
-                    valueSelector = { it.quantity },
-                    subtitleSelector = { item -> analyticsReturnReasonsSubtitle(item, dashboard.currencyCode.ifBlank { currencyCode }) }
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsRankedItemsSection(
-                    title = localizedStringResource(1315, "Returned amount"),
-                    items = dashboard.topReturnedItemsByAmount,
-                    valueTitle = localizedStringResource(1315, "Returned amount"),
-                    currencyCode = dashboard.currencyCode.ifBlank { currencyCode },
-                    valueSelector = { it.amount },
-                    subtitleSelector = { item ->
-                        "${localizedStringResource(1314, "Returned quantity")}: ${item.quantity.cleanNumber()}\n${analyticsReturnReasonsSubtitle(item, dashboard.currencyCode.ifBlank { currencyCode })}"
+                if (section == "days") {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:4") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsBucketSection(
+                            title = localizedStringResource(691, "Sales by day"),
+                            buckets = dashboard.salesByDay,
+                            currencyCode = dashboard.currencyCode.ifBlank { currencyCode }
+                        )
                     }
-                )
-            }
-        }
+                }
 
-        item {
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-            Text(
-                text = localizedStringResource(257, "History"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.accentTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
-
-        if (!summary.historyKnown || summary.count == 0) {
-            item {
-                MessageText(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = stateValues.marginTextFieldGroup),
-                    text = if (summary.historyKnown) emptyText else authUiText("Detailed history is not available", "Подробная история недоступна", "Толық тарих қолжетімсіз")
-                )
+                if (section == "hours") {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:5") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsBucketSection(
+                            title = localizedStringResource(692, "Sales by hour"),
+                            buckets = dashboard.salesByHour.sortedByDescending { it.amount }.take(8),
+                            currencyCode = dashboard.currencyCode.ifBlank { currencyCode }
+                        )
+                    }
+                }
             }
-        } else {
-            items(historyRows) { row ->
-                AnalyticsHistoryRowWidget(row = AnalyticsHistoryRow(row.title, row.count, row.total), currencyCode = currencyCode)
-                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+            if (transactionType == "return" && dashboard != null) {
+                if (section == "return_quantity") {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:6") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsRankedItemsSection(
+                            title = localizedStringResource(1311, "Returned items"),
+                            items = dashboard.topReturnedItemsByQuantity,
+                            valueTitle = localizedStringResource(1314, "Returned quantity"),
+                            currencyCode = "",
+                            valueSelector = { it.quantity },
+                            subtitleSelector = { item -> analyticsReturnReasonsSubtitle(item, dashboard.currencyCode.ifBlank { currencyCode }) }
+                        )
+                    }
+                }
+
+                if (section == "return_amount") {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:7") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsRankedItemsSection(
+                            title = localizedStringResource(1315, "Returned amount"),
+                            items = dashboard.topReturnedItemsByAmount,
+                            valueTitle = localizedStringResource(1315, "Returned amount"),
+                            currencyCode = dashboard.currencyCode.ifBlank { currencyCode },
+                            valueSelector = { it.amount },
+                            subtitleSelector = { item ->
+                                "${localizedStringResource(1314, "Returned quantity")}: ${item.quantity.cleanNumber()}\n${analyticsReturnReasonsSubtitle(item, dashboard.currencyCode.ifBlank { currencyCode })}"
+                            }
+                        )
+                    }
+                }
+            }
+
+            if (section == "history") {
+                item(key = "MenuAnalyticsTransactionScreen:$section:8") {
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                    Text(
+                        text = localizedStringResource(257, "History"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = stateValues.marginTextField)
+                    )
+                }
+
+                if (!summary.historyKnown || summary.count == 0) {
+                    item(key = "MenuAnalyticsTransactionScreen:$section:9") {
+                        MessageText(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = stateValues.marginTextFieldGroup),
+                            text = if (summary.historyKnown) emptyText else authUiText("Detailed history is not available", "Подробная история недоступна", "Толық тарих қолжетімсіз")
+                        )
+                    }
+                } else {
+                    items(historyRows) { row ->
+                        AnalyticsHistoryRowWidget(row = AnalyticsHistoryRow(row.title, row.count, row.total), currencyCode = currencyCode)
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                    }
+                }
             }
         }
     }
@@ -3631,57 +3692,80 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
     val inactiveBatches = summary.batches - activeBatches
     val currencyCode = dashboard?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
 
-    LazyColumn(
-        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "stock"),
-        modifier = Modifier
-            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-            .padding(stateValues.marginTextField),
-        contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-    ) {
-        item {
-            Text(
-                text = stateValues.stringStock,
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val section = sectionTabsWidget(
+            stateKey = "analytics:stock:${stateValues.activeStoreId.orEmpty()}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("slow_moving", localizedStringResource(682, "Slow-moving inventory"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
 
-        item {
-            AnalyticsCardsGrid(
-                cards = listOf(
-                    AnalyticsSummaryCardData(title = stateValues.stringItems, value = if (summary.available) summary.items.toString() else "—", subtitle = localizedStringResource(282, "All stock items")),
-                    AnalyticsSummaryCardData(title = localizedStringResource(280, "Active items"), value = if (summary.available) activeItems.toString() else "—"),
-                    AnalyticsSummaryCardData(title = localizedStringResource(281, "Inactive items"), value = if (summary.available) inactiveItems.toString() else "—"),
-                    AnalyticsSummaryCardData(title = stateValues.stringQuick, value = if (summary.available) quickItems.toString() else "—", subtitle = localizedStringResource(283, "Quick-sale items")),
-                    AnalyticsSummaryCardData(title = stateValues.stringBatches, value = if (summary.available) summary.batches.toString() else "—"),
-                    AnalyticsSummaryCardData(title = localizedStringResource(284, "Active batches"), value = if (summary.available) activeBatches.toString() else "—"),
-                    AnalyticsSummaryCardData(title = localizedStringResource(285, "Inactive batches"), value = if (summary.available) inactiveBatches.toString() else "—"),
-                    AnalyticsSummaryCardData(title = localizedStringResource(683, "Inventory value at sale price"), value = (dashboard?.stockValueAtSalePrice ?: 0.0).money(currencyCode)),
-                    AnalyticsSummaryCardData(title = localizedStringResource(684, "Inventory value at supply cost"), value = (dashboard?.stockValueAtSupplyPrice ?: 0.0).money(currencyCode)),
-                    AnalyticsSummaryCardData(title = localizedStringResource(685, "Low stock items"), value = (dashboard?.lowStockItemCount ?: 0).toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(686, "Out of stock items"), value = (dashboard?.outOfStockItemCount ?: 0).toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(687, "Expired batches"), value = (dashboard?.expiredBatchCount ?: 0).toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(688, "Expiring soon"), value = (dashboard?.expiringSoonBatchCount ?: 0).toString(), subtitle = localizedStringResource(699, "Inventory risk")),
-                    AnalyticsSummaryCardData(title = localizedStringResource(689, "Sell-through estimate"), value = (dashboard?.sellThroughPercentEstimate ?: 0.0).percentText())
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "stock_$section"),
+            modifier = Modifier
+                .weight(1f)
+                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item(key = "MenuAnalyticsStockScreen:$section:0") {
+                Text(
+                    text = stateValues.stringStock,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = stateValues.marginTextField)
                 )
-            )
-        }
+            }
 
-        dashboard?.slowMovingItems?.takeIf { it.isNotEmpty() }?.let { items ->
-            item {
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                AnalyticsRankedItemsSection(
-                    title = localizedStringResource(682, "Slow-moving inventory"),
-                    items = items,
-                    valueTitle = localizedStringResource(271, "Quantity"),
-                    currencyCode = "",
-                    valueSelector = { it.quantity },
-                    subtitleSelector = { item ->
-                        "${localizedStringResource(683, "Inventory value at sale price")}: ${item.amount.money(item.currencyCode.ifBlank { currencyCode })}"
+            if (section == "overview") {
+                item(key = "MenuAnalyticsStockScreen:$section:1") {
+                    AnalyticsCardsGrid(
+                        cards = listOf(
+                            AnalyticsSummaryCardData(title = stateValues.stringItems, value = if (summary.available) summary.items.toString() else "—", subtitle = localizedStringResource(282, "All stock items")),
+                            AnalyticsSummaryCardData(title = localizedStringResource(280, "Active items"), value = if (summary.available) activeItems.toString() else "—"),
+                            AnalyticsSummaryCardData(title = localizedStringResource(281, "Inactive items"), value = if (summary.available) inactiveItems.toString() else "—"),
+                            AnalyticsSummaryCardData(title = stateValues.stringQuick, value = if (summary.available) quickItems.toString() else "—", subtitle = localizedStringResource(283, "Quick-sale items")),
+                            AnalyticsSummaryCardData(title = stateValues.stringBatches, value = if (summary.available) summary.batches.toString() else "—"),
+                            AnalyticsSummaryCardData(title = localizedStringResource(284, "Active batches"), value = if (summary.available) activeBatches.toString() else "—"),
+                            AnalyticsSummaryCardData(title = localizedStringResource(285, "Inactive batches"), value = if (summary.available) inactiveBatches.toString() else "—"),
+                            AnalyticsSummaryCardData(title = localizedStringResource(683, "Inventory value at sale price"), value = (dashboard?.stockValueAtSalePrice ?: 0.0).money(currencyCode)),
+                            AnalyticsSummaryCardData(title = localizedStringResource(684, "Inventory value at supply cost"), value = (dashboard?.stockValueAtSupplyPrice ?: 0.0).money(currencyCode)),
+                            AnalyticsSummaryCardData(title = localizedStringResource(685, "Low stock items"), value = (dashboard?.lowStockItemCount ?: 0).toString()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(686, "Out of stock items"), value = (dashboard?.outOfStockItemCount ?: 0).toString()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(687, "Expired batches"), value = (dashboard?.expiredBatchCount ?: 0).toString()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(688, "Expiring soon"), value = (dashboard?.expiringSoonBatchCount ?: 0).toString(), subtitle = localizedStringResource(699, "Inventory risk")),
+                            AnalyticsSummaryCardData(title = localizedStringResource(689, "Sell-through estimate"), value = (dashboard?.sellThroughPercentEstimate ?: 0.0).percentText())
+                        )
+                    )
+                }
+            }
+
+            if (section == "slow_moving") {
+                if (dashboard?.slowMovingItems.isNullOrEmpty()) {
+                    item(key = "MenuAnalyticsStockScreen:$section:2") { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                }
+                dashboard?.slowMovingItems?.takeIf { it.isNotEmpty() }?.let { items ->
+                    item(key = "MenuAnalyticsStockScreen:$section:3") {
+                        Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                        AnalyticsRankedItemsSection(
+                            title = localizedStringResource(682, "Slow-moving inventory"),
+                            items = items,
+                            valueTitle = localizedStringResource(271, "Quantity"),
+                            currencyCode = "",
+                            valueSelector = { it.quantity },
+                            subtitleSelector = { item ->
+                                "${localizedStringResource(683, "Inventory value at sale price")}: ${item.amount.money(item.currencyCode.ifBlank { currencyCode })}"
+                            }
+                        )
                     }
-                )
+                }
             }
         }
     }
@@ -3697,44 +3781,64 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
         if (item.name.isNotEmpty()) item else item.copy(name = listOf(LocalizedStringDataModel("main",
             if (item.id == "unknown") localizedStringResource(156, "Not specified") else item.id)))
     }
-    LazyColumn(
-        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "suppliers"),
-        modifier = Modifier
-            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-            .padding(stateValues.marginTextField),
-        contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-    ) {
-        item {
-            Text(
-                text = stateValues.stringSuppliers,
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val section = sectionTabsWidget(
+            stateKey = "analytics:suppliers:${stateValues.activeStoreId.orEmpty()}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("rankings", localizedStringResource(703, "Top performers"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
 
-        item {
-            AnalyticsCardsGrid(
-                cards = listOf(
-                    AnalyticsSummaryCardData(title = localizedStringResource(300, "Acceptance total"), value = (dashboard?.supplyCost ?: prepared.type("accept").total).money(currencyCode)),
-                    AnalyticsSummaryCardData(title = stateValues.stringSuppliers, value = if (prepared.remoteOnly) "—" else supplierRows.size.toString()),
-                    AnalyticsSummaryCardData(title = stateValues.stringItems, value = prepared.supplierQuantity.cleanNumber()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = prepared.type("accept").count.toString())
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "suppliers_$section"),
+            modifier = Modifier
+                .weight(1f)
+                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item(key = "MenuAnalyticsSuppliersScreen:$section:0") {
+                Text(
+                    text = stateValues.stringSuppliers,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = stateValues.marginTextField)
                 )
-            )
-        }
+            }
 
-        item {
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-            AnalyticsRankedItemsSection(
-                title = localizedStringResource(703, "Top performers"),
-                items = supplierRows,
-                valueTitle = localizedStringResource(300, "Acceptance total"),
-                currencyCode = currencyCode,
-                valueSelector = { it.amount },
-                subtitleSelector = { item -> "${localizedStringResource(271, "Quantity")}: ${item.quantity.cleanNumber()} · ${localizedStringResource(706, "Transactions")}: ${item.transactionCount}" }
-            )
+            if (section == "overview") {
+                item(key = "MenuAnalyticsSuppliersScreen:$section:1") {
+                    AnalyticsCardsGrid(
+                        cards = listOf(
+                            AnalyticsSummaryCardData(title = localizedStringResource(300, "Acceptance total"), value = (dashboard?.supplyCost ?: prepared.type("accept").total).money(currencyCode)),
+                            AnalyticsSummaryCardData(title = stateValues.stringSuppliers, value = if (prepared.remoteOnly) "—" else supplierRows.size.toString()),
+                            AnalyticsSummaryCardData(title = stateValues.stringItems, value = prepared.supplierQuantity.cleanNumber()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = prepared.type("accept").count.toString())
+                        )
+                    )
+                }
+            }
+
+            if (section == "rankings") {
+                item(key = "MenuAnalyticsSuppliersScreen:$section:2") {
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                    AnalyticsRankedItemsSection(
+                        title = localizedStringResource(703, "Top performers"),
+                        items = supplierRows,
+                        valueTitle = localizedStringResource(300, "Acceptance total"),
+                        currencyCode = currencyCode,
+                        valueSelector = { it.amount },
+                        subtitleSelector = { item -> "${localizedStringResource(271, "Quantity")}: ${item.quantity.cleanNumber()} · ${localizedStringResource(706, "Transactions")}: ${item.transactionCount}" }
+                    )
+                }
+            }
         }
     }
 }
@@ -3750,45 +3854,65 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
         subtitle = "${localizedStringResource(706, "Transactions")}: ${item.transactionCount}"
     ) }
 
-    LazyColumn(
-        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "workers"),
-        modifier = Modifier
-            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-            .padding(stateValues.marginTextField),
-        contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-    ) {
-        item {
-            Text(
-                text = stateValues.stringWorkers,
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val section = sectionTabsWidget(
+            stateKey = "analytics:workers:${stateValues.activeStoreId.orEmpty()}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("performance", localizedStringResource(702, "Performance"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
 
-        item {
-            AnalyticsCardsGrid(
-                cards = listOf(
-                    AnalyticsSummaryCardData(title = localizedStringResource(429, "Active workers"), value = workers.count { it.isActive }.toString(), subtitle = localizedStringResource(430, "Employees connected to this store")),
-                    AnalyticsSummaryCardData(title = localizedStringResource(431, "Admins"), value = workers.count { it.roleId == WORKER_ROLE_ADMIN }.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(432, "Standard workers"), value = workers.count { it.roleId == WORKER_ROLE_STANDARD }.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = prepared.type("purchase").count.toString()),
-                    AnalyticsSummaryCardData(title = localizedStringResource(303, "Revenue / worker"), value = prepared.type("purchase").total.money(currencyCode), subtitle = localizedStringResource(302, "Use workshifts, sales per worker, and salary here"))
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "workers_$section"),
+            modifier = Modifier
+                .weight(1f)
+                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item(key = "MenuAnalyticsWorkersScreen:$section:0") {
+                Text(
+                    text = stateValues.stringWorkers,
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = stateValues.marginTextField)
                 )
-            )
-        }
+            }
 
-        item {
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-            AnalyticsRankedItemsSection(
-                title = localizedStringResource(702, "Performance"),
-                items = salesByWorkshift,
-                valueTitle = localizedStringResource(693, "Revenue"),
-                currencyCode = currencyCode,
-                valueSelector = { it.amount },
-                subtitleSelector = { it.subtitle }
-            )
+            if (section == "overview") {
+                item(key = "MenuAnalyticsWorkersScreen:$section:1") {
+                    AnalyticsCardsGrid(
+                        cards = listOf(
+                            AnalyticsSummaryCardData(title = localizedStringResource(429, "Active workers"), value = workers.count { it.isActive }.toString(), subtitle = localizedStringResource(430, "Employees connected to this store")),
+                            AnalyticsSummaryCardData(title = localizedStringResource(431, "Admins"), value = workers.count { it.roleId == WORKER_ROLE_ADMIN }.toString()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(432, "Standard workers"), value = workers.count { it.roleId == WORKER_ROLE_STANDARD }.toString()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(358, "Transactions"), value = prepared.type("purchase").count.toString()),
+                            AnalyticsSummaryCardData(title = localizedStringResource(303, "Revenue / worker"), value = prepared.type("purchase").total.money(currencyCode), subtitle = localizedStringResource(302, "Use workshifts, sales per worker, and salary here"))
+                        )
+                    )
+                }
+            }
+
+            if (section == "performance") {
+                item(key = "MenuAnalyticsWorkersScreen:$section:2") {
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                    AnalyticsRankedItemsSection(
+                        title = localizedStringResource(702, "Performance"),
+                        items = salesByWorkshift,
+                        valueTitle = localizedStringResource(693, "Revenue"),
+                        currencyCode = currencyCode,
+                        valueSelector = { it.amount },
+                        subtitleSelector = { it.subtitle }
+                    )
+                }
+            }
         }
     }
 }
@@ -3804,158 +3928,192 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
     val returnCashTotal = prepared.returnCash
     val extractedTotal = prepared.extractedCash
 
+    var extractingCash by remember(stateValues.activeStoreId, stateValues.userAccount?.id) { mutableStateOf(false) }
     var extractionAmountText by rememberSaveable { mutableStateOf("") }
     var extractionNoteLocalized by remember { mutableStateOf(emptyLocalizedItemForCurrentLanguage()) }
     val canExtract = currentUserCanExtractCashRegister(stateValues.activeStoreId)
     val extractionAmount = extractionAmountText.toMoneyDouble()
 
-    LazyColumn(
-        state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "cash_register"),
-        modifier = Modifier
-            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-            .padding(stateValues.marginTextField),
-        contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-    ) {
-        item {
-            Text(
-                text = localizedStringResource(256, "Cash registers"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val section = sectionTabsWidget(
+            stateKey = "analytics:cash:${stateValues.activeStoreId.orEmpty()}",
+            tabs = listOf(
+                TabContent("overview", localizedStringResource(443, "Balance")),
+                TabContent("extract", localizedStringResource(437, "Extract cash")),
+                TabContent("history", localizedStringResource(257, "History"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
 
-        item {
-            AnalyticsCardsGrid(
-                cards = listOf(
-                    AnalyticsSummaryCardData(
-                        title = localizedStringResource(277, "Current amount"),
-                        value = currentAmount.money(currencyCode),
-                        subtitle = localizedStringResource(433, "Cash physically expected in the drawer")
-                    ),
-                    AnalyticsSummaryCardData(
-                        title = localizedStringResource(434, "Cash from sales"),
-                        value = saleCashTotal.money(currencyCode)
-                    ),
-                    AnalyticsSummaryCardData(
-                        title = localizedStringResource(435, "Cash paid for returns"),
-                        value = returnCashTotal.money(currencyCode)
-                    ),
-                    AnalyticsSummaryCardData(
-                        title = localizedStringResource(278, "Extracted"),
-                        value = extractedTotal.money(currencyCode)
-                    ),
-                    AnalyticsSummaryCardData(
-                        title = localizedStringResource(436, "Cash events"),
-                        value = events.size.toString()
+        LazyColumn(
+            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "cash_register_$section"),
+            modifier = Modifier
+                .weight(1f)
+                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .padding(stateValues.marginTextField),
+            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+        ) {
+            item(key = "MenuAnalyticsCashRegisterScreen:$section:0") {
+                Text(
+                    text = localizedStringResource(256, "Cash registers"),
+                    color = stateValues.TextColor,
+                    fontSize = stateValues.titleTextSize,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = stateValues.marginTextField)
+                )
+            }
+
+            if (section == "overview") {
+                item(key = "MenuAnalyticsCashRegisterScreen:$section:1") {
+                    AnalyticsCardsGrid(
+                        cards = listOf(
+                            AnalyticsSummaryCardData(
+                                title = localizedStringResource(277, "Current amount"),
+                                value = currentAmount.money(currencyCode),
+                                subtitle = localizedStringResource(433, "Cash physically expected in the drawer")
+                            ),
+                            AnalyticsSummaryCardData(
+                                title = localizedStringResource(434, "Cash from sales"),
+                                value = saleCashTotal.money(currencyCode)
+                            ),
+                            AnalyticsSummaryCardData(
+                                title = localizedStringResource(435, "Cash paid for returns"),
+                                value = returnCashTotal.money(currencyCode)
+                            ),
+                            AnalyticsSummaryCardData(
+                                title = localizedStringResource(278, "Extracted"),
+                                value = extractedTotal.money(currencyCode)
+                            ),
+                            AnalyticsSummaryCardData(
+                                title = localizedStringResource(436, "Cash events"),
+                                value = events.size.toString()
+                            )
+                        )
                     )
-                )
-            )
-        }
+                }
+            }
 
-        item {
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+            if (section == "extract") {
+                item(key = "MenuAnalyticsCashRegisterScreen:$section:2") {
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-            Text(
-                text = localizedStringResource(437, "Extract cash"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.accentTextSize,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-            if (!canExtract) {
-                MessageText(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = stateValues.marginTextField),
-                    text = localizedStringResource(438, "You do not have permission to extract cash from this register")
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    SimpleTextInput(
-                        modifier = Modifier.weight(1f),
-                        value = extractionAmountText,
-                        placeholder = localizedStringResource(439, "Amount to extract"),
-                        keyboardType = KeyboardType.Decimal,
-                        leadingIconPath = stateValues.drawablePathIconFinances,
-                        stateHost = NavigationScreenModel.Menu.Analytics,
-                        stateKey = "menu_analytics_cash_register_extraction_amount",
-                        onTransformValue = { value -> paymentInputNormalize(value) },
-                        onValueChange = { extractionAmountText = paymentInputNormalize(it) }
+                    Text(
+                        text = localizedStringResource(437, "Extract cash"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    actionButton(
-                        modifier = Modifier.weight(1f),
-                        enabled = extractionAmount > 0.0 && extractionAmount <= currentAmount + 0.01,
-                        text = localizedStringResource(440, "Extract"),
-                        iconPath = stateValues.drawablePathIconCheck,
-                        confirmationRequired = true,
-                        onClick = {
-                            stateValues.activeStoreId?.let { storeId ->
-                                extractCashRegister(
-                                    CashRegisterExtractionRequestDataModel(
-                                        storeId = storeId,
-                                        amount = extractionAmount,
-                                        note = extractionNoteLocalized.toStoredLocalizedNoteOrNull(),
-                                        timeMillis = getCurrentTimeMillis()
-                                    )
-                                ) {
-                                    extractionAmountText = ""
-                                    extractionNoteLocalized = emptyLocalizedItemForCurrentLanguage()
+                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                    if (!canExtract) {
+                        MessageText(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = stateValues.marginTextField),
+                            text = localizedStringResource(438, "You do not have permission to extract cash from this register")
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            SimpleTextInput(
+                                modifier = Modifier.weight(1f),
+                                value = extractionAmountText,
+                                placeholder = localizedStringResource(439, "Amount to extract"),
+                                keyboardType = KeyboardType.Decimal,
+                                leadingIconPath = stateValues.drawablePathIconFinances,
+                                stateHost = NavigationScreenModel.Menu.Analytics,
+                                stateKey = "menu_analytics_cash_register_extraction_amount",
+                                onTransformValue = { value -> paymentInputNormalize(value) },
+                                onValueChange = { extractionAmountText = paymentInputNormalize(it) }
+                            )
+
+                            actionButton(
+                                modifier = Modifier.weight(1f),
+                                enabled = !extractingCash && extractionAmount > 0.0 && extractionAmount <= currentAmount + 0.01,
+                                loading = extractingCash,
+                                autoLoading = false,
+                                text = localizedStringResource(440, "Extract"),
+                                iconPath = stateValues.drawablePathIconCheck,
+                                confirmationRequired = true,
+                                onClick = {
+                                    if (extractingCash) return@actionButton
+                                    stateValues.activeStoreId?.let { storeId ->
+                                        val submittedAmountText = extractionAmountText
+                                        val submittedNote = extractionNoteLocalized
+                                        extractingCash = true
+                                        extractCashRegister(
+                                            CashRegisterExtractionRequestDataModel(
+                                                storeId = storeId,
+                                                amount = extractionAmount,
+                                                note = extractionNoteLocalized.toStoredLocalizedNoteOrNull(),
+                                                timeMillis = getCurrentTimeMillis()
+                                            )
+                                        ) { result ->
+                                            extractingCash = false
+                                            if (result is DataState.Success && stateValues.activeStoreId == storeId &&
+                                                extractionAmountText == submittedAmountText && extractionNoteLocalized == submittedNote) {
+                                                extractionAmountText = ""
+                                                extractionNoteLocalized = emptyLocalizedItemForCurrentLanguage()
+                                            }
+                                        }
+                                    }
                                 }
-                            }
+                            )
                         }
+
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+
+                        StockLocalizedStringGroupEditor(
+                            title = localizedStringResource(441, "Extraction note"),
+                            placeholder = stateValues.stringOptional,
+                            values = extractionNoteLocalized,
+                            addText = localizedStringResource(1073, "Add cash extraction note translation"),
+                            required = false,
+                            singleLine = false,
+                            adaptiveMultiline = true,
+                            persistentKey = "cash-extraction-note:${stateValues.activeStoreId.orEmpty()}",
+                            onChanged = { extractionNoteLocalized = it }
+                        )
+                    }
+                }
+            }
+
+            if (section == "history") {
+                item(key = "MenuAnalyticsCashRegisterScreen:$section:3") {
+                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+
+                    Text(
+                        text = localizedStringResource(257, "History"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = stateValues.marginTextField)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                StockLocalizedStringGroupEditor(
-                    title = localizedStringResource(441, "Extraction note"),
-                    placeholder = stateValues.stringOptional,
-                    values = extractionNoteLocalized,
-                    addText = localizedStringResource(1073, "Add cash extraction note translation"),
-                    required = false,
-                    singleLine = false,
-                    adaptiveMultiline = true,
-                    persistentKey = "cash-extraction-note:${stateValues.activeStoreId.orEmpty()}",
-                    onChanged = { extractionNoteLocalized = it }
-                )
-            }
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-            Text(
-                text = localizedStringResource(257, "History"),
-                color = stateValues.TextColor,
-                fontSize = stateValues.accentTextSize,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = stateValues.marginTextField)
-            )
-        }
-
-        if (events.isEmpty()) {
-            item {
-                MessageText(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = stateValues.marginTextFieldGroup),
-                    localizedStringResource(442, "No cash register events in this period")
-                )
-            }
-        } else {
-            items(events, key = { it.id }) { event ->
-                CashRegisterEventCard(event, currencyCode)
-                Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                if (events.isEmpty()) {
+                    item(key = "MenuAnalyticsCashRegisterScreen:$section:4") {
+                        MessageText(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = stateValues.marginTextFieldGroup),
+                            localizedStringResource(442, "No cash register events in this period")
+                        )
+                    }
+                } else {
+                    items(events, key = { it.id }) { event ->
+                        CashRegisterEventCard(event, currencyCode)
+                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                    }
+                }
             }
         }
     }
@@ -5986,7 +6144,7 @@ internal fun AppConfiguration.NotificationPopupCard(
         )
 
         Column(modifier = Modifier.weight(1f)) {
-            notification.title
+            localizedNotificationTitle(notification)
                 .takeIf { !isNotificationTypeOnlyTitle(it, notification.type) }
                 ?.let { popupTitle ->
                     Text(
@@ -5999,7 +6157,7 @@ internal fun AppConfiguration.NotificationPopupCard(
                     )
                 }
             Text(
-                text = localizedNotificationMessage(notification.message),
+                text = localizedNotificationMessage(notification),
                 color = stateValues.TextColor,
                 fontSize = stateValues.textSize,
                 fontWeight = FontWeight.Bold,
@@ -6059,8 +6217,8 @@ fun AppConfiguration.NotificationsScreen(
             val q = search.trim()
             q.isBlank() || listOf(
                 notification.message,
-                localizedNotificationMessage(notification.message),
-                notification.title,
+                localizedNotificationMessage(notification),
+                localizedNotificationTitle(notification),
                 notification.category,
                 notificationTypeLabel(notification.type),
                 localizedNotificationSource(notification.source),
@@ -6185,69 +6343,44 @@ internal fun AppConfiguration.isNotificationTypeOnlyTitle(title: String, type: N
     return normalized.equals(notificationTypeLabel(type), ignoreCase = true) || normalized.lowercase() in technicalTypeLabels
 }
 
+internal fun AppConfiguration.eventPresentationLanguage(): String =
+    stateValues.appLanguage.let { if (it == "system") getSystemLocaleLanguage() else it }
+
+internal fun AppConfiguration.eventPresentationResourceValues(id: Long): List<LocalizedStringDataModel>? =
+    currentEventResourceCatalogue().values(id)
+        ?: bundledLocalizedStringFallbacks[id]?.map { (language, value) -> LocalizedStringDataModel(language, value) }
+
+internal fun AppConfiguration.localizedNotificationTitle(notification: NotificationDataModel): String {
+    val reference = notification.titleTemplate ?: notification.titleTranslations.eventMessageReferenceOrNull()
+        ?: legacyEventMessageReference(notification.title) ?: currentEventResourceCatalogue().referenceFor(notification.title)
+    return EventMessages.render(reference, eventPresentationLanguage(), ::eventPresentationResourceValues)
+        ?: notification.localizedEventTitle(eventPresentationLanguage(), ::eventPresentationResourceValues)
+}
+
+internal fun AppConfiguration.localizedNotificationMessage(notification: NotificationDataModel): String {
+    val reference = notification.messageTemplate ?: notification.messageTranslations.eventMessageReferenceOrNull()
+        ?: legacyEventMessageReference(notification.message) ?: currentEventResourceCatalogue().referenceFor(notification.message)
+    EventMessages.render(reference, eventPresentationLanguage(), ::eventPresentationResourceValues)?.let { return it }
+    if (notification.messageTranslations.isNotEmpty()) {
+        return notification.localizedEventMessage(eventPresentationLanguage(), ::eventPresentationResourceValues)
+    }
+    return localizedNotificationMessage(notification.message)
+}
+
 internal fun AppConfiguration.localizedNotificationMessage(message: String): String {
     val normalized = message.trim()
     if (normalized.isBlank()) return message
-
-    // Old notifications are stored as plain text. If the text matches any loaded
-    // localized resource value, render it in the currently selected app language.
-    stateValues.strings.orEmpty().firstOrNull { group ->
-        group.values.any { it.value.trim() == normalized }
-    }?.let { matchedGroup ->
-        return localizedStringResource(matchedGroup.id, normalized)
-    }
-
+    val reference = legacyEventMessageReference(normalized) ?: currentEventResourceCatalogue().referenceFor(normalized)
+    EventMessages.render(reference, eventPresentationLanguage(), ::eventPresentationResourceValues)?.let { return it }
     val notificationKey = normalized.normalizedNotificationPopupKey()
     if (notificationKey.isServerUnavailablePopupText()) {
         return localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
     }
-    if (notificationKey.isServerRecoveryPopupText()) {
-        return localizedStringResource(1138, "Server connected.")
-    }
+    if (notificationKey.isServerRecoveryPopupText()) return localizedStringResource(1138, "Server connected.")
     if (notificationKey.isSessionRefreshPopupText()) {
         return localizedStringResource(91, "Cloud sign-in expired. Sign in again to sync. Your local data stays available.")
     }
-
-    return when (normalized) {
-        "Goods item added", "Товар добавлен", "Тауар қосылды" -> localizedStringResource(1032, normalized)
-        "Stock item added" -> localizedStringResource(1033, normalized)
-        "Batch added", "Batch Added", "Партия добавлена", "Партия қосылды" -> localizedStringResource(1034, normalized)
-        "Batch updated", "Batch Updated", "Партия обновлена", "Партия жаңартылды" -> localizedStringResource(1035, normalized)
-        "Shelf batch selected", "Партия на полке выбрана", "Сөредегі партия таңдалды" -> localizedStringResource(1036, normalized)
-        "Transaction completed", "Транзакция завершена", "Транзакция аяқталды" -> localizedStringResource(1037, normalized)
-        "Receipt printer is not configured", "Принтер чеков не настроен", "Түбіртек принтері бапталмаған" -> localizedStringResource(1038, normalized)
-        "Printer rejected the receipt", "Принтер отклонил чек", "Принтер түбіртекті қабылдамады" -> localizedStringResource(1039, normalized)
-        "Could not print receipt", "Не удалось напечатать чек", "Түбіртекті басып шығару мүмкін болмады" -> localizedStringResource(1040, normalized)
-        "Android Bluetooth ESC/POS receipt printer is not configured", "Bluetooth ESC/POS-принтер чеков на Android не настроен", "Android Bluetooth ESC/POS түбіртек принтері бапталмаған" -> localizedStringResource(1041, normalized)
-        "Desktop ESC/POS receipt printer is not configured", "Настольный ESC/POS-принтер чеков не настроен", "Desktop ESC/POS түбіртек принтері бапталмаған" -> localizedStringResource(1042, normalized)
-        "Receipt sent to printer", "Sent to printer", "Чек отправлен на принтер", "Түбіртек принтерге жіберілді" -> localizedStringResource(1043, normalized)
-
-        "Cannot reach server. Keeping you signed in offline." -> localizedStringResource(214, normalized)
-        "Сервер недоступен. Вы остаётесь в аккаунте офлайн." -> localizedStringResource(214, normalized)
-        "Сервер қолжетімсіз. Сіз офлайн режимде аккаунтта қаласыз." -> localizedStringResource(214, normalized)
-
-        "Cannot reach server. Security sessions will refresh when connection returns." -> localizedStringResource(215, normalized)
-        "Сервер недоступен. Сеансы безопасности обновятся после восстановления соединения." -> localizedStringResource(215, normalized)
-        "Сервер қолжетімсіз. Қауіпсіздік сеанстары байланыс қалпына келгенде жаңартылады." -> localizedStringResource(215, normalized)
-
-        "Session revoked", "Сеанс завершён", "Сеанс тоқтатылды" -> localizedStringResource(216, normalized)
-        "Other sessions revoked", "Другие сеансы завершены", "Басқа сеанстар тоқтатылды" -> localizedStringResource(217, normalized)
-        "Active sessions loaded", "Активные сеансы загружены", "Белсенді сеанстар жүктелді" -> localizedStringResource(218, normalized)
-        "Login is already in progress", "Вход уже выполняется", "Кіру қазірдің өзінде орындалып жатыр" -> localizedStringResource(219, normalized)
-        "Logged out locally", "Вы вышли локально", "Сіз жергілікті түрде шықтыңыз" -> localizedStringResource(220, normalized)
-        "Logged out locally; server session cleanup failed", "Вы вышли локально; не удалось завершить сеанс на сервере", "Сіз жергілікті түрде шықтыңыз; сервердегі сеансты аяқтау мүмкін болмады" -> localizedStringResource(221, normalized)
-        "Logged out locally; server session cleanup is queued", "Выход выполнен локально; завершение серверного сеанса поставлено в очередь", "Жергілікті түрде шығу орындалды; сервердегі сеансты аяқтау кезекке қойылды" -> localizedStringResource(1148, normalized)
-        "Server could not refresh session. Keeping local login active.", "Сервер не смог обновить сеанс. Локальный вход сохранён.", "Сервер сеансты жаңарта алмады. Жергілікті кіру сақталды." -> localizedStringResource(1149, normalized)
-        "Login failed: empty token response", "Не удалось войти: сервер не вернул токены", "Кіру орындалмады: сервер токендерді қайтармады" -> localizedStringResource(222, normalized)
-        "Cannot reach server", "Сервер недоступен", "Сервер қолжетімсіз" -> localizedStringResource(223, normalized)
-        "Completing transaction", "Завершение операции", "Операция аяқталуда" -> localizedStringResource(224, normalized)
-        "Server response could not be read", "Не удалось прочитать ответ сервера", "Сервер жауабын оқу мүмкін болмады" -> localizedStringResource(225, normalized)
-        "Session id is required", "Нужен id сеанса", "Сеанс id қажет" -> localizedStringResource(240, normalized)
-        "Use logout to revoke the current session", "Чтобы завершить текущий сеанс, выйдите из аккаунта", "Ағымдағы сеансты тоқтату үшін аккаунттан шығыңыз" -> localizedStringResource(241, normalized)
-
-        "Authentication failed", "Incorrect password", "Please log in first" -> stateValues.stringAuthenticationFailed
-        else -> normalized
-    }
+    return message
 }
 
 
@@ -6315,7 +6448,7 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
 
             Text(
                 modifier = Modifier.weight(1f),
-                text = notification.title
+                text = localizedNotificationTitle(notification)
                     .takeIf { !isNotificationTypeOnlyTitle(it, notification.type) }
                     ?: notificationTypeLabel(notification.type),
                 color = color,
@@ -6342,7 +6475,7 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = localizedNotificationMessage(notification.message),
+            text = localizedNotificationMessage(notification),
             color = stateValues.TextColor,
             fontSize = stateValues.textSize,
             fontWeight = FontWeight.Bold

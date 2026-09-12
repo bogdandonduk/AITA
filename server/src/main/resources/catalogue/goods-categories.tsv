@@ -1,0 +1,645 @@
+slug	parent_slug	en	ru	kk	quantity_unit_id
+appliances		Home appliances	Бытовая техника	Тұрмыстық техника	0
+furniture		Furniture and interiors	Мебель и интерьер	Жиһаз және интерьер	0
+footwear		Footwear	Обувь	Аяқ киім	0
+bags		Bags and luggage	Сумки и багаж	Сөмкелер және жүк сөмкелері	0
+sports		Sports and outdoor recreation	Спорт и активный отдых	Спорт және белсенді демалыс	0
+beauty		Cosmetics and beauty	Косметика и красота	Косметика және сұлулық	0
+jewelry		Jewelry and watches	Украшения и часы	Әшекейлер және сағаттар	0
+books		Books and printed media	Книги и печатные издания	Кітаптар және баспа өнімдері	0
+music		Musical instruments	Музыкальные инструменты	Музыкалық аспаптар	0
+craft		Arts and crafts	Творчество и рукоделие	Шығармашылық және қолөнер	0
+construction		Building materials	Строительные материалы	Құрылыс материалдары	0
+plumbing		Plumbing and water systems	Сантехника и водоснабжение	Сантехника және сумен жабдықтау	0
+electrical		Electrical installation supplies	Электромонтажные товары	Электр монтаждау тауарлары	0
+industry		Industrial and commercial supplies	Промышленные и торговые товары	Өнеркәсіптік және сауда тауарлары	0
+agriculture		Agricultural supplies	Сельскохозяйственные товары	Ауыл шаруашылығы тауарлары	0
+party		Celebrations and gifts	Праздники и подарки	Мерекелер және сыйлықтар	0
+optics		Eyewear and optical supplies	Очки и оптика	Көзілдірік және оптика	0
+food_fruits_stone	food_fruits	Stone fruit	Косточковые фрукты	Сүйекті жемістер	1
+food_fruits_tropical	food_fruits	Tropical fruit	Тропические фрукты	Тропикалық жемістер	1
+food_fruits_pomegranates	food_fruits	Pomegranates	Гранаты	Анар	1
+food_fruits_persimmons	food_fruits	Persimmons	Хурма	Құрма	1
+food_fruits_kiwi	food_fruits	Kiwi fruit	Киви	Киви	1
+food_fruits_pineapples	food_fruits	Pineapples	Ананасы	Ананас	1
+food_fruits_coconuts	food_fruits	Coconuts	Кокосы	Кокос	1
+food_fruits_fruit_boxes	food_fruits	Assorted fruit boxes	Фруктовые наборы	Жеміс жиынтықтары	1
+food_fruits_apples_pears_apples	food_fruits_apples_pears	Apples	Яблоки	Алма	1
+food_fruits_apples_pears_pears	food_fruits_apples_pears	Pears	Груши	Алмұрт	1
+food_fruits_apples_pears_quinces	food_fruits_apples_pears	Quinces	Айва	Беже	1
+food_fruits_citrus_oranges	food_fruits_citrus	Oranges	Апельсины	Апельсин	1
+food_fruits_citrus_mandarins	food_fruits_citrus	Mandarins	Мандарины	Мандарин	1
+food_fruits_citrus_lemons_limes	food_fruits_citrus	Lemons and limes	Лимоны и лаймы	Лимон және лайм	1
+food_fruits_citrus_grapefruits	food_fruits_citrus	Grapefruits and pomelos	Грейпфруты и помело	Грейпфрут және помело	1
+food_fruits_berries_strawberries	food_fruits_berries	Strawberries	Клубника	Құлпынай	1
+food_fruits_berries_raspberries	food_fruits_berries	Raspberries	Малина	Таңқурай	1
+food_fruits_berries_blueberries	food_fruits_berries	Blueberries	Голубика и черника	Көкжидек және қаражидек	1
+food_fruits_berries_currants	food_fruits_berries	Currants and gooseberries	Смородина и крыжовник	Қарақат және қарлыған	1
+food_fruits_berries_cranberries	food_fruits_berries	Cranberries and lingonberries	Клюква и брусника	Мүкжидек және итбүлдірген	1
+food_fruits_stone_peaches	food_fruits_stone	Peaches and nectarines	Персики и нектарины	Шабдалы және нектарин	1
+food_fruits_stone_apricots	food_fruits_stone	Apricots	Абрикосы	Өрік	1
+food_fruits_stone_plums	food_fruits_stone	Plums	Сливы	Алхоры	1
+food_fruits_stone_cherries	food_fruits_stone	Cherries and sour cherries	Черешня и вишня	Шие және тәтті шие	1
+food_vegetables_peppers	food_vegetables	Peppers	Перец	Бұрыш	1
+food_vegetables_squashes	food_vegetables	Squashes and pumpkins	Кабачки и тыквы	Кәді және асқабақ	1
+food_vegetables_legumes	food_vegetables	Fresh peas and beans	Свежий горох и фасоль	Жаңа бұршақ және үрме бұршақ	1
+food_vegetables_avocados	food_vegetables	Avocados	Авокадо	Авокадо	1
+food_vegetables_sprouts	food_vegetables	Sprouts and microgreens	Проростки и микрозелень	Өскіндер және микрожасылдар	1
+food_vegetables_prepared	food_vegetables	Peeled and cut vegetables	Очищенные и нарезанные овощи	Аршылған және туралған көкөністер	1
+food_vegetables_root_carrots	food_vegetables_root	Carrots	Морковь	Сәбіз	1
+food_vegetables_root_beetroot	food_vegetables_root	Beetroot	Свёкла	Қызылша	1
+food_vegetables_root_radishes	food_vegetables_root	Radishes and daikon	Редис, редька и дайкон	Шалғам және дайкон	1
+food_vegetables_root_sweet_potatoes	food_vegetables_root	Sweet potatoes	Батат	Батат	1
+food_vegetables_root_turnips	food_vegetables_root	Turnips and root celery	Репа и корневой сельдерей	Шалқан және тамыр балдыркөк	1
+food_vegetables_leafy_lettuce	food_vegetables_leafy	Lettuce and salad mixes	Салат и салатные смеси	Салат жапырағы және салат қоспалары	1
+food_vegetables_leafy_spinach	food_vegetables_leafy	Spinach and sorrel	Шпинат и щавель	Саумалдық және қымыздық	1
+food_vegetables_leafy_herbs	food_vegetables_leafy	Fresh culinary herbs	Свежая пряная зелень	Жаңа дәмдеуіш шөптер	1
+bakery_flatbreads	bakery	Flatbreads and tortillas	Лепёшки, лаваш и тортильи	Таба нан, лаваш және тортилья	0
+bakery_bagels	bakery	Bagels and bread rings	Бейглы, баранки и сушки	Бейгл және кептірілген сақина нан	0
+bakery_crumbs	bakery	Breadcrumbs and croutons	Панировочные сухари и гренки	Аунатуға арналған кепкен нан және гренки	0
+bakery_pies	bakery	Pies and filled pastries	Пироги и пирожки	Бәліштер және тоқаштар	0
+bakery_pastry_sheets	bakery	Pastry sheets and ready dough	Коржи и готовое тесто	Корж және дайын қамыр	0
+dairy_cream	dairy	Cream	Сливки	Кілегей	0
+dairy_sour_cream	dairy	Sour cream	Сметана	Қаймақ	0
+dairy_fermented_drinks	dairy	Kefir, ayran and fermented milk	Кефир, айран и кисломолочные напитки	Айран және ашытылған сүт сусындары	0
+dairy_condensed	dairy	Condensed and evaporated milk	Сгущённое и концентрированное молоко	Қоюлатылған сүт	0
+dairy_powdered	dairy	Milk and whey powders	Сухое молоко и сыворотка	Құрғақ сүт және сарысу	0
+dairy_traditional	dairy	Traditional dairy products	Традиционные молочные продукты	Дәстүрлі сүт өнімдері	0
+dairy_traditional_kurt	dairy_traditional	Kurt	Курт	Құрт	0
+dairy_traditional_kumys	dairy_traditional	Kumys	Кумыс	Қымыз	0
+dairy_traditional_shubat	dairy_traditional	Shubat	Шубат	Шұбат	0
+dairy_traditional_irimshik	dairy_traditional	Irimshik	Иримшик	Ірімшік	0
+plant_based_cream	plant_based	Plant-based creams	Растительные сливки	Өсімдік кілегейі	0
+plant_based_spreads	plant_based	Plant-based spreads and butter alternatives	Растительные спреды и аналоги масла	Өсімдік спредтері және май баламалары	0
+plant_based_seitan	plant_based	Seitan and wheat protein foods	Сейтан и продукты из пшеничного белка	Сейтан және бидай ақуызы өнімдері	0
+plant_based_tempeh	plant_based	Tempeh	Темпе	Темпе	0
+plant_based_seafood	plant_based	Plant-based seafood alternatives	Растительные аналоги рыбы и морепродуктов	Балық пен теңіз өнімдерінің өсімдік баламалары	0
+plant_based_eggs	plant_based	Plant-based egg alternatives	Растительные заменители яиц	Жұмыртқаның өсімдік баламалары	0
+plant_based_protein	plant_based	Textured plant protein	Текстурированный растительный белок	Текстураланған өсімдік ақуызы	0
+plant_based_desserts	plant_based	Plant-based desserts	Растительные десерты	Өсімдік десерттері	0
+meat_horse	meat	Horse meat	Конина	Жылқы еті	1
+meat_rabbit	meat	Rabbit meat	Крольчатина	Қоян еті	1
+meat_duck_goose	meat	Duck and goose	Утка и гусь	Үйрек және қаз еті	1
+meat_game	meat	Game meat	Мясо дичи	Жабайы аң еті	1
+meat_offal	meat	Offal	Субпродукты	Ішек-қарын және басқа қосалқы ет өнімдері	1
+meat_minced	meat	Minced meat	Фарш	Тартылған ет	1
+meat_marinated	meat	Marinated meat	Маринованное мясо	Тұздықталған ет	1
+meat_broth_bones	meat	Bones and soup cuts	Кости и суповые наборы	Сүйек және сорпаға арналған ет	1
+seafood_salmon	seafood	Salmon and trout	Лосось и форель	Албырт және бақтақ	1
+seafood_white_fish	seafood	White fish	Белая рыба	Ақ балық	1
+seafood_freshwater	seafood	Freshwater fish	Пресноводная рыба	Тұщы су балығы	1
+seafood_shrimp	seafood	Shrimp and prawns	Креветки	Асшаян	1
+seafood_shellfish	seafood	Mussels, oysters and clams	Мидии, устрицы и моллюски	Мидия, устрица және ұлулар	1
+seafood_squid_octopus	seafood	Squid and octopus	Кальмары и осьминоги	Кальмар және сегізаяқ	1
+seafood_crab	seafood	Crab and lobster	Крабы и лобстеры	Теңіз шаяны және омар	1
+seafood_roe	seafood	Roe and caviar	Икра	Уылдырық	1
+seafood_surimi	seafood	Surimi products	Крабовые палочки и сурими	Сурими өнімдері	1
+seafood_seaweed	seafood	Edible seaweed	Пищевые водоросли	Тағамдық балдырлар	1
+eggs_chicken	eggs	Chicken eggs	Куриные яйца	Тауық жұмыртқасы	0
+eggs_quail	eggs	Quail eggs	Перепелиные яйца	Бөдене жұмыртқасы	0
+eggs_other	eggs	Duck and other food eggs	Утиные и другие пищевые яйца	Үйрек және басқа тағамдық жұмыртқа	0
+eggs_liquid	eggs	Liquid and dried egg products	Жидкие и сухие яичные продукты	Сұйық және құрғақ жұмыртқа өнімдері	0
+grocery_staples_legumes	grocery_staples	Dried pulses	Сухие бобовые	Кептірілген бұршақ тұқымдастар	0
+grocery_staples_baking	grocery_staples	Baking ingredients	Ингредиенты для выпечки	Пісіруге арналған ингредиенттер	0
+grocery_staples_breakfast	grocery_staples	Breakfast cereals and granola	Сухие завтраки и гранола	Құрғақ таңғы ас және гранола	0
+grocery_staples_spreads	grocery_staples	Spreads and preserves	Пасты, джемы и варенье	Пасталар, джем және тосап	0
+grocery_staples_vinegar	grocery_staples	Vinegar and cooking wine	Уксус и кулинарное вино	Сірке суы және аспаздық шарап	0
+grocery_staples_instant	grocery_staples	Instant meals	Продукты быстрого приготовления	Тез дайындалатын тағамдар	0
+grocery_staples_broths	grocery_staples	Stock cubes and soup bases	Бульонные кубики и основы для супа	Сорпа текшелері және сорпа негіздері	0
+grocery_staples_legumes_lentils	grocery_staples_legumes	Lentils	Чечевица	Жасымық	0
+grocery_staples_legumes_chickpeas	grocery_staples_legumes	Chickpeas	Нут	Ноқат	0
+grocery_staples_legumes_beans	grocery_staples_legumes	Dried beans	Сухая фасоль	Кептірілген үрме бұршақ	0
+grocery_staples_legumes_peas	grocery_staples_legumes	Dried peas	Сухой горох	Кептірілген асбұршақ	0
+grocery_staples_legumes_soybeans	grocery_staples_legumes	Soybeans	Соевые бобы	Соя бұршағы	0
+grocery_staples_baking_yeast	grocery_staples_baking	Yeast	Дрожжи	Ашытқы	0
+grocery_staples_baking_baking_powder	grocery_staples_baking	Baking powder and baking soda	Разрыхлитель и пищевая сода	Қопсытқыш және ас содасы	0
+grocery_staples_baking_starch	grocery_staples_baking	Food starch	Пищевой крахмал	Тағамдық крахмал	0
+grocery_staples_baking_cocoa	grocery_staples_baking	Cocoa powder	Какао-порошок	Какао ұнтағы	0
+grocery_staples_baking_thickeners	grocery_staples_baking	Gelatin, agar and pectin	Желатин, агар и пектин	Желатин, агар және пектин	0
+grocery_staples_baking_flavourings	grocery_staples_baking	Baking flavours and decorations	Ароматизаторы и декор для выпечки	Пісірмеге арналған хош иістендіргіштер мен әшекейлер	0
+grocery_staples_baking_mixes	grocery_staples_baking	Baking mixes	Смеси для выпечки	Пісіру қоспалары	0
+beverages_mineral_water	beverages	Mineral water	Минеральная вода	Минералды су	0
+beverages_sparkling_water	beverages	Sparkling water	Газированная вода	Газдалған су	0
+beverages_cordials	beverages	Syrups and drink concentrates	Сиропы и концентраты напитков	Сироптар және сусын концентраттары	0
+beverages_kvass	beverages	Kvass	Квас	Квас	0
+beverages_kombucha	beverages	Kombucha	Комбуча	Комбуча	0
+beverages_iced_tea	beverages	Iced tea and coffee	Холодный чай и кофе	Салқын шай және кофе	0
+beverages_sports	beverages	Sports and electrolyte drinks	Спортивные и электролитные напитки	Спорттық және электролитті сусындар	0
+beverages_cocoa_drinks	beverages	Cocoa and chocolate drinks	Какао и шоколадные напитки	Какао және шоколадты сусындар	0
+beverages_nonalcoholic	beverages	Non-alcoholic beer and wine	Безалкогольные пиво и вино	Алкогольсіз сыра және шарап	0
+snacks_popcorn	snacks	Popcorn	Попкорн	Попкорн	0
+snacks_pretzels	snacks	Pretzels and bread snacks	Крендельки и хлебные снеки	Крендель және нан тіскебасарлары	0
+snacks_fruit	snacks	Fruit chips and fruit snacks	Фруктовые чипсы и снеки	Жеміс чипстері және тіскебасарлары	0
+snacks_seaweed	snacks	Seaweed snacks	Снеки из водорослей	Балдыр тіскебасарлары	0
+snacks_protein	snacks	Protein and energy bars	Протеиновые и энергетические батончики	Ақуызды және энергетикалық батончиктер	0
+snacks_corn_rice	snacks	Corn and rice cakes	Кукурузные и рисовые хлебцы	Жүгері және күріш қытырлақ нандары	0
+sweets_gummies	sweets	Gummies and jelly sweets	Мармелад и желейные конфеты	Мармелад және желе кәмпиттері	0
+sweets_marshmallows	sweets	Marshmallows and zephyr	Маршмеллоу и зефир	Маршмеллоу және зефир	0
+sweets_caramels	sweets	Caramels and toffees	Карамель и ирис	Карамель және ирис	0
+sweets_halva	sweets	Halva and nougat	Халва и нуга	Халуа және нуга	0
+sweets_waffles	sweets	Wafers and waffles	Вафли	Вафли	0
+sweets_gum	sweets	Chewing gum and mints	Жевательная резинка и мятные конфеты	Сағыз және жалбыз кәмпиттері	0
+sweets_gift_boxes	sweets	Confectionery gift boxes	Подарочные наборы сладостей	Тәтті сыйлық жиынтықтары	0
+frozen_fruit	frozen	Frozen fruit	Замороженные фрукты	Мұздатылған жемістер	0
+frozen_berries	frozen	Frozen berries	Замороженные ягоды	Мұздатылған жидектер	0
+frozen_mushrooms	frozen	Frozen mushrooms	Замороженные грибы	Мұздатылған саңырауқұлақтар	0
+frozen_potatoes	frozen	Frozen potatoes and fries	Замороженный картофель и фри	Мұздатылған картоп және фри	0
+frozen_pizza	frozen	Frozen pizza	Замороженная пицца	Мұздатылған пицца	0
+frozen_dumplings	frozen	Frozen dumplings and filled pasta	Замороженные пельмени, вареники и манты	Мұздатылған тұшпара, вареник және манты	0
+frozen_bakery	frozen	Frozen bakery products	Замороженная выпечка	Мұздатылған нан-тоқаш өнімдері	0
+frozen_desserts	frozen	Frozen desserts and sorbets	Замороженные десерты и сорбеты	Мұздатылған десерттер және сорбет	0
+frozen_ice	frozen	Food ice	Пищевой лёд	Тағамдық мұз	0
+ready_meals_sandwiches	ready_meals	Sandwiches and wraps	Сэндвичи и роллы	Сэндвичтер және орамалар	0
+ready_meals_main_courses	ready_meals	Main courses	Вторые блюда	Негізгі тағамдар	0
+ready_meals_side_dishes	ready_meals	Side dishes	Гарниры	Гарнирлер	0
+ready_meals_sushi	ready_meals	Sushi and rolls	Суши и роллы	Суши және роллдар	0
+ready_meals_appetizers	ready_meals	Dips and appetizers	Закуски и дипы	Тіскебасарлар және диптер	0
+ready_meals_meal_kits	ready_meals	Meal kits	Наборы для приготовления блюд	Тағам дайындау жиынтықтары	0
+baby_feeding	baby	Feeding accessories	Принадлежности для кормления	Тамақтандыру керек-жарақтары	0
+baby_nursery	baby	Nursery furniture and equipment	Мебель и оборудование для младенцев	Сәбиге арналған жиһаз және жабдық	0
+baby_transport	baby	Strollers and child carriers	Коляски и переноски	Балалар арбалары және тасымалдағыштар	0
+baby_safety	baby	Child safety	Детская безопасность	Бала қауіпсіздігі	0
+baby_potty	baby	Potties and toilet training	Горшки и приучение к туалету	Түбектер және дәретханаға үйрету	0
+baby_bath	baby	Baby bathing	Купание младенцев	Сәбиді шомылдыру	0
+baby_feeding_bottles	baby_feeding	Bottles and nipples	Бутылочки и соски	Бөтелкелер және емізіктер	0
+baby_feeding_pacifiers	baby_feeding	Pacifiers	Пустышки	Жұбатқыш емізіктер	0
+baby_feeding_utensils	baby_feeding	Baby tableware and bibs	Детская посуда и нагрудники	Балалар ыдысы және алжапқыштары	0
+baby_feeding_pumps	baby_feeding	Breast pumps and accessories	Молокоотсосы и аксессуары	Сүтсорғыштар және керек-жарақтар	0
+baby_feeding_sterilizers	baby_feeding	Bottle warmers and sterilizers	Подогреватели и стерилизаторы	Жылытқыштар және зарарсыздандырғыштар	0
+pet_birds	pet	Bird supplies	Товары для птиц	Құстарға арналған тауарлар	0
+pet_fish	pet	Aquarium supplies	Аквариумистика	Аквариум тауарлары	0
+pet_small_animals	pet	Small animal supplies	Товары для мелких животных	Ұсақ жануарларға арналған тауарлар	0
+pet_reptiles	pet	Reptile supplies	Товары для рептилий	Бауырымен жорғалаушыларға арналған тауарлар	0
+pet_accessories	pet	Pet accessories	Аксессуары для животных	Жануарларға арналған керек-жарақтар	0
+pet_grooming	pet	Pet grooming	Уход за шерстью и когтями	Жүн және тырнақ күтімі	0
+pet_beds	pet	Pet beds and houses	Лежанки и домики	Жануарларға арналған төсеніштер және үйлер	0
+pet_travel	pet	Pet carriers and travel	Переноски и перевозка животных	Жануар тасымалдағыштары және сапар керек-жарақтары	0
+pet_accessories_bowls	pet_accessories	Bowls and feeders	Миски и кормушки	Астаулар және жем салғыштар	0
+pet_accessories_leads	pet_accessories	Leads, collars and harnesses	Поводки, ошейники и шлейки	Жетектер, қарғыбаулар және кеудешелі баулар	0
+pet_accessories_toys	pet_accessories	Pet toys	Игрушки для животных	Жануарларға арналған ойыншықтар	0
+pet_accessories_scratching	pet_accessories	Scratching posts and climbing trees	Когтеточки и игровые комплексы	Тырнау бағандары және ойын кешендері	0
+household_cleaning_tools	household	Cleaning tools	Инвентарь для уборки	Тазалау құрал-саймандары	0
+household_storage	household	Home storage and organization	Хранение и организация дома	Үйдегі сақтау және реттеу	0
+household_kitchenware	household	Kitchenware	Кухонные принадлежности	Асүй керек-жарақтары	0
+household_tableware	household	Tableware	Столовая посуда	Асхана ыдыстары	0
+household_disposable	household	Disposable tableware	Одноразовая посуда	Бір рет қолданылатын ыдыс	0
+household_pest_control	household	Household pest control	Средства от бытовых вредителей	Тұрмыстық зиянкестерден қорғау құралдары	0
+household_air_care	household	Air fresheners and odour absorbers	Освежители и поглотители запаха	Ауа сергіткіштері және иіс сіңіргіштер	0
+household_shoe_care	household	Shoe and leather care	Уход за обувью и кожей	Аяқ киім және былғары күтімі	0
+household_cleaning_tools_mops	household_cleaning_tools	Mops and buckets	Швабры и вёдра	Еден жуғыштар және шелектер	0
+household_cleaning_tools_brushes	household_cleaning_tools	Brushes and brooms	Щётки и веники	Щеткалар және сыпырғыштар	0
+household_cleaning_tools_cloths	household_cleaning_tools	Cloths and sponges	Тряпки и губки	Шүберектер және ысқыштар	0
+household_cleaning_tools_gloves	household_cleaning_tools	Cleaning gloves	Перчатки для уборки	Тазалау қолғаптары	0
+household_cleaning_tools_bins	household_cleaning_tools	Waste bins	Мусорные вёдра	Қоқыс шелектері	0
+household_kitchenware_cookware	household_kitchenware	Pots and pans	Кастрюли и сковороды	Кәстрөлдер және табалар	0
+household_kitchenware_bakeware	household_kitchenware	Baking trays and moulds	Противни и формы для выпечки	Пісіру табалары және қалыптары	0
+household_kitchenware_cutlery	household_kitchenware	Cutlery	Столовые приборы	Асхана аспаптары	0
+household_kitchenware_utensils	household_kitchenware	Cooking utensils	Кухонные инструменты	Асүй аспаптары	0
+household_kitchenware_cutting_boards	household_kitchenware	Cutting boards	Разделочные доски	Турау тақталары	0
+household_kitchenware_food_storage	household_kitchenware	Food storage containers	Контейнеры для продуктов	Азық-түлік контейнерлері	0
+household_kitchenware_thermoses	household_kitchenware	Thermoses and reusable bottles	Термосы и многоразовые бутылки	Термостар және көп рет қолданылатын бөтелкелер	0
+personal_care_soap	personal_care	Hand soap and sanitizing gels	Мыло для рук и очищающие гели	Қол сабыны және тазартқыш гельдер	0
+personal_care_deodorants	personal_care	Deodorants and antiperspirants	Дезодоранты и антиперспиранты	Дезодоранттар және антиперспиранттар	0
+personal_care_menstrual	personal_care	Menstrual care	Менструальная гигиена	Етеккір гигиенасы	0
+personal_care_incontinence	personal_care	Incontinence care	Средства при недержании	Несеп ұстамауға арналған құралдар	0
+personal_care_cotton	personal_care	Cotton pads and swabs	Ватные диски и палочки	Мақта дискілері және таяқшалары	0
+personal_care_sun	personal_care	Sun protection and after-sun care	Защита от солнца и уход после загара	Күннен қорғау және күнге күйгеннен кейінгі күтім	0
+personal_care_travel	personal_care	Travel toiletries	Дорожные средства гигиены	Сапарға арналған гигиена құралдары	0
+personal_care_oral_toothpaste	personal_care_oral	Toothpaste	Зубная паста	Тіс пастасы	0
+personal_care_oral_brushes	personal_care_oral	Toothbrushes	Зубные щётки	Тіс щеткалары	0
+personal_care_oral_floss	personal_care_oral	Dental floss and interdental brushes	Зубная нить и межзубные ёршики	Тіс жібі және тісаралық щеткалар	0
+personal_care_oral_mouthwash	personal_care_oral	Mouthwash	Ополаскиватели для рта	Ауыз шайғыштар	0
+personal_care_oral_dentures	personal_care_oral	Denture care	Уход за зубными протезами	Тіс протездерінің күтімі	0
+health_medical_devices	health	Home medical devices	Домашние медицинские приборы	Үйге арналған медициналық аспаптар	0
+health_mobility	health	Mobility aids	Средства реабилитации и передвижения	Оңалту және қозғалу құралдары	0
+health_orthopedic	health	Orthopedic supports	Ортопедические изделия	Ортопедиялық бұйымдар	0
+health_medical_consumables	health	Medical consumables	Медицинские расходные материалы	Медициналық шығыс материалдары	0
+health_medicines	health	Medicines	Лекарственные средства	Дәрілік заттар	0
+health_nutrition	health	Specialized nutrition	Специализированное питание	Арнайы тағам	0
+health_medical_devices_thermometers	health_medical_devices	Thermometers	Термометры	Термометрлер	0
+health_medical_devices_blood_pressure	health_medical_devices	Blood pressure monitors	Тонометры	Қан қысымын өлшегіштер	0
+health_medical_devices_glucose	health_medical_devices	Glucose meters and test strips	Глюкометры и тест-полоски	Глюкометрлер және тест жолақтары	0
+health_medical_devices_nebulizers	health_medical_devices	Nebulizers	Небулайзеры	Небулайзерлер	0
+health_medical_devices_pulse_oximeters	health_medical_devices	Pulse oximeters	Пульсоксиметры	Пульсоксиметрлер	0
+beauty_face_care	beauty	Facial skin care	Уход за кожей лица	Бет терісінің күтімі	0
+beauty_makeup	beauty	Makeup	Декоративная косметика	Сәндік косметика	0
+beauty_fragrance	beauty	Fragrances	Парфюмерия	Парфюмерия	0
+beauty_nails	beauty	Nail care and colour	Маникюр и средства для ногтей	Маникюр және тырнақ құралдары	0
+beauty_hair_colour	beauty	Hair colour and styling	Окрашивание и укладка волос	Шаш бояу және сәндеу	0
+beauty_accessories	beauty	Beauty tools and accessories	Косметические инструменты и аксессуары	Косметикалық аспаптар және керек-жарақтар	0
+beauty_salon	beauty	Salon supplies	Товары для салонов красоты	Сұлулық салондарына арналған тауарлар	0
+beauty_face_care_cleansers	beauty_face_care	Face cleansers	Средства для умывания	Бет жуу құралдары	0
+beauty_face_care_moisturizers	beauty_face_care	Face moisturizers	Увлажняющие кремы для лица	Бетке арналған ылғалдандырғыш кремдер	0
+beauty_face_care_serums	beauty_face_care	Serums and treatments	Сыворотки и средства специального ухода	Сарысулар және арнайы күтім құралдары	0
+beauty_face_care_masks	beauty_face_care	Face masks	Маски для лица	Бет маскалары	0
+beauty_face_care_lip_care	beauty_face_care	Lip care	Уход за губами	Ерін күтімі	0
+beauty_makeup_face	beauty_makeup	Foundation, powder and concealer	Тональные средства, пудры и консилеры	Тоналды құралдар, опа және консилерлер	0
+beauty_makeup_eyes	beauty_makeup	Eye makeup	Косметика для глаз	Көз косметикасы	0
+beauty_makeup_lips	beauty_makeup	Lip makeup	Косметика для губ	Ерін косметикасы	0
+beauty_makeup_brows	beauty_makeup	Brow makeup	Косметика для бровей	Қас косметикасы	0
+beauty_makeup_sets	beauty_makeup	Makeup sets	Наборы декоративной косметики	Сәндік косметика жиынтықтары	0
+stationery_notebooks	stationery	Notebooks and diaries	Тетради и ежедневники	Дәптерлер және күнделіктер	0
+stationery_filing	stationery	Folders and document filing	Папки и хранение документов	Қалталар және құжаттарды сақтау	0
+stationery_adhesives	stationery	Office tapes and adhesives	Канцелярские ленты и клеи	Кеңсе таспалары және желімдер	0
+stationery_desk	stationery	Desk accessories	Настольные канцелярские принадлежности	Үстел үсті кеңсе керек-жарақтары	0
+stationery_school	stationery	School supplies	Школьные принадлежности	Мектеп керек-жарақтары	0
+stationery_mailing	stationery	Mailing supplies	Почтовые принадлежности	Пошта керек-жарақтары	0
+stationery_presentation	stationery	Whiteboards and presentation supplies	Доски и товары для презентаций	Тақталар және таныстырылым тауарлары	0
+stationery_labels	stationery	Labels and stickers	Этикетки и наклейки	Заттаңбалар және жапсырмалар	0
+electronics_computers	electronics	Computers	Компьютеры	Компьютерлер	0
+electronics_components	electronics	Computer components	Компьютерные комплектующие	Компьютер құрамдастары	0
+electronics_peripherals	electronics	Computer peripherals	Компьютерная периферия	Компьютердің сыртқы құрылғылары	0
+electronics_phones	electronics	Phones and tablets	Телефоны и планшеты	Телефондар және планшеттер	0
+electronics_network	electronics	Networking equipment	Сетевое оборудование	Желілік жабдық	0
+electronics_audio	electronics	Audio equipment	Аудиотехника	Аудиотехника	0
+electronics_tv	electronics	Televisions and video	Телевизоры и видеотехника	Теледидарлар және бейнетехника	0
+electronics_photo	electronics	Photo and video cameras	Фото- и видеокамеры	Фото және бейнекамералар	0
+electronics_gaming	electronics	Gaming equipment	Игровое оборудование	Ойын жабдықтары	0
+electronics_wearables	electronics	Wearable electronics	Носимая электроника	Тағылатын электроника	0
+electronics_smart_home	electronics	Smart home	Умный дом	Ақылды үй	0
+electronics_parts	electronics	Electronic components	Электронные компоненты	Электрондық құрамдастар	0
+electronics_computers_laptops	electronics_computers	Laptops	Ноутбуки	Ноутбуктер	0
+electronics_computers_desktops	electronics_computers	Desktop computers	Настольные компьютеры	Үстел компьютерлері	0
+electronics_computers_servers	electronics_computers	Servers and workstations	Серверы и рабочие станции	Серверлер және жұмыс станциялары	0
+electronics_computers_single_board	electronics_computers	Single-board computers	Одноплатные компьютеры	Бір тақталы компьютерлер	0
+electronics_components_processors	electronics_components	Processors	Процессоры	Процессорлар	0
+electronics_components_motherboards	electronics_components	Motherboards	Материнские платы	Аналық тақталар	0
+electronics_components_memory	electronics_components	Memory modules	Оперативная память	Жедел жад	0
+electronics_components_storage	electronics_components	Internal drives	Внутренние накопители	Ішкі жинақтауыштар	0
+electronics_components_graphics	electronics_components	Graphics cards	Видеокарты	Бейнекарталар	0
+electronics_components_power	electronics_components	Computer power supplies	Блоки питания для компьютеров	Компьютердің қуат көздері	0
+electronics_components_cooling	electronics_components	Cooling systems	Системы охлаждения	Салқындату жүйелері	0
+electronics_components_cases	electronics_components	Computer cases	Корпуса компьютеров	Компьютер корпустары	0
+electronics_peripherals_monitors	electronics_peripherals	Monitors	Мониторы	Мониторлар	0
+electronics_peripherals_keyboards	electronics_peripherals	Keyboards	Клавиатуры	Пернетақталар	0
+electronics_peripherals_mice	electronics_peripherals	Mice and pointing devices	Мыши и устройства ввода	Тінтуірлер және енгізу құрылғылары	0
+electronics_peripherals_printers	electronics_peripherals	Printers and scanners	Принтеры и сканеры	Принтерлер және сканерлер	0
+electronics_peripherals_ink	electronics_peripherals	Ink, toner and cartridges	Чернила, тонер и картриджи	Сия, тонер және картридждер	0
+electronics_peripherals_external_storage	electronics_peripherals	External drives and memory cards	Внешние накопители и карты памяти	Сыртқы жинақтауыштар және жад карталары	0
+electronics_peripherals_webcams	electronics_peripherals	Webcams	Веб-камеры	Веб-камералар	0
+electronics_phones_smartphones	electronics_phones	Smartphones	Смартфоны	Смартфондар	0
+electronics_phones_feature_phones	electronics_phones	Feature phones	Кнопочные телефоны	Батырмалы телефондар	0
+electronics_phones_tablets	electronics_phones	Tablets	Планшеты	Планшеттер	0
+electronics_phones_cases	electronics_phones	Phone and tablet cases	Чехлы для телефонов и планшетов	Телефон және планшет қаптары	0
+electronics_phones_screen_protection	electronics_phones	Screen protectors	Защита экранов	Экран қорғаныштары	0
+electronics_phones_chargers	electronics_phones	Chargers and power banks	Зарядные устройства и пауэрбанки	Зарядтағыштар және сыртқы аккумуляторлар	0
+electronics_network_routers	electronics_network	Routers and access points	Роутеры и точки доступа	Маршрутизаторлар және кіру нүктелері	0
+electronics_network_switches	electronics_network	Network switches	Сетевые коммутаторы	Желілік коммутаторлар	0
+electronics_network_modems	electronics_network	Modems	Модемы	Модемдер	0
+electronics_network_adapters	electronics_network	Network adapters	Сетевые адаптеры	Желілік адаптерлер	0
+electronics_network_cables	electronics_network	Network cables and connectors	Сетевые кабели и разъёмы	Желілік кабельдер және қосқыштар	0
+electronics_audio_headphones	electronics_audio	Headphones and headsets	Наушники и гарнитуры	Құлаққаптар және гарнитуралар	0
+electronics_audio_speakers	electronics_audio	Speakers	Колонки	Дыбыс зорайтқыштар	0
+electronics_audio_microphones	electronics_audio	Microphones	Микрофоны	Микрофондар	0
+electronics_audio_amplifiers	electronics_audio	Amplifiers and receivers	Усилители и ресиверы	Күшейткіштер және ресиверлер	0
+electronics_audio_players	electronics_audio	Audio players and turntables	Аудиоплееры и проигрыватели	Аудиоплеерлер және күйтабақ ойнатқыштар	0
+electronics_parts_passive	electronics_parts	Resistors, capacitors and inductors	Резисторы, конденсаторы и катушки	Резисторлар, конденсаторлар және катушкалар	0
+electronics_parts_semiconductors	electronics_parts	Semiconductors and integrated circuits	Полупроводники и микросхемы	Жартылай өткізгіштер және микросұлбалар	0
+electronics_parts_controllers	electronics_parts	Microcontrollers and development boards	Микроконтроллеры и отладочные платы	Микроконтроллерлер және әзірлеу тақталары	0
+electronics_parts_sensors	electronics_parts	Sensors and modules	Датчики и модули	Датчиктер және модульдер	0
+electronics_parts_connectors	electronics_parts	Electronic connectors	Электронные разъёмы	Электрондық қосқыштар	0
+electronics_parts_prototyping	electronics_parts	Prototyping supplies	Макетирование электроники	Электроника макеттеу құралдары	0
+appliances_refrigeration	appliances	Refrigerators and freezers	Холодильники и морозильники	Тоңазытқыштар және мұздатқыштар	0
+appliances_cooking	appliances	Cooking appliances	Техника для приготовления пищи	Тағам дайындау техникасы	0
+appliances_laundry	appliances	Laundry appliances	Техника для стирки и сушки	Кір жуу және кептіру техникасы	0
+appliances_cleaning	appliances	Cleaning appliances	Техника для уборки	Тазалау техникасы	0
+appliances_climate	appliances	Heating and climate control	Климатическая техника	Климаттық техника	0
+appliances_small_kitchen	appliances	Small kitchen appliances	Мелкая кухонная техника	Шағын асүй техникасы	0
+appliances_personal	appliances	Personal care appliances	Техника для личного ухода	Жеке күтім техникасы	0
+appliances_parts	appliances	Appliance spare parts	Запчасти для бытовой техники	Тұрмыстық техника бөлшектері	0
+appliances_small_kitchen_kettles	appliances_small_kitchen	Electric kettles	Электрочайники	Электр шәйнектер	0
+appliances_small_kitchen_coffee	appliances_small_kitchen	Coffee machines and grinders	Кофемашины и кофемолки	Кофемашиналар және кофе тартқыштар	0
+appliances_small_kitchen_blenders	appliances_small_kitchen	Blenders and mixers	Блендеры и миксеры	Блендерлер және миксерлер	0
+appliances_small_kitchen_multicookers	appliances_small_kitchen	Multicookers and rice cookers	Мультиварки и рисоварки	Мультипісіргіштер және күріш пісіргіштер	0
+appliances_small_kitchen_toasters	appliances_small_kitchen	Toasters and sandwich makers	Тостеры и сэндвичницы	Тостерлер және сэндвич пісіргіштер	0
+appliances_small_kitchen_air_fryers	appliances_small_kitchen	Air fryers and countertop ovens	Аэрогрили и мини-печи	Аэрогрильдер және шағын пештер	0
+appliances_small_kitchen_juicers	appliances_small_kitchen	Juicers	Соковыжималки	Шырынсыққыштар	0
+appliances_small_kitchen_scales	appliances_small_kitchen	Kitchen scales	Кухонные весы	Асүй таразылары	0
+appliances_climate_air_conditioners	appliances_climate	Air conditioners	Кондиционеры	Кондиционерлер	0
+appliances_climate_fans	appliances_climate	Fans	Вентиляторы	Желдеткіштер	0
+appliances_climate_heaters	appliances_climate	Heaters	Обогреватели	Жылытқыштар	0
+appliances_climate_humidifiers	appliances_climate	Humidifiers and dehumidifiers	Увлажнители и осушители	Ылғалдандырғыштар және құрғатқыштар	0
+appliances_climate_air_purifiers	appliances_climate	Air purifiers	Очистители воздуха	Ауа тазартқыштар	0
+clothing_women	clothing	Women's clothing	Женская одежда	Әйелдер киімі	0
+clothing_men	clothing	Men's clothing	Мужская одежда	Ерлер киімі	0
+clothing_children	clothing	Children's clothing	Детская одежда	Балалар киімі	0
+clothing_infant	clothing	Infant clothing	Одежда для младенцев	Сәбилер киімі	0
+clothing_sportswear	clothing	Sportswear	Спортивная одежда	Спорттық киім	0
+clothing_workwear	clothing	Workwear and uniforms	Спецодежда и униформа	Арнайы киім және нысанды киім	0
+clothing_accessories	clothing	Clothing accessories	Аксессуары к одежде	Киім керек-жарақтары	0
+clothing_fabric	clothing	Fabric and haberdashery	Ткани и галантерея	Мата және галантерея	0
+clothing_women_tops	clothing_women	T-shirts and tops	Футболки и топы	Футболкалар және топтар	0
+clothing_women_shirts	clothing_women	Shirts and blouses	Рубашки и блузки	Жейделер және блузкалар	0
+clothing_women_trousers	clothing_women	Trousers and jeans	Брюки и джинсы	Шалбарлар және джинсы	0
+clothing_women_knitwear	clothing_women	Sweaters and knitwear	Свитеры и трикотаж	Свитерлер және тоқыма киім	0
+clothing_women_outerwear	clothing_women	Coats and jackets	Пальто и куртки	Пальтолар және күртелер	0
+clothing_women_sleepwear	clothing_women	Sleepwear and loungewear	Одежда для сна и дома	Ұйқы және үй киімі	0
+clothing_women_swimwear	clothing_women	Swimwear	Купальная одежда	Суға түсу киімі	0
+clothing_men_tops	clothing_men	T-shirts and tops	Футболки и топы	Футболкалар және топтар	0
+clothing_men_shirts	clothing_men	Shirts and blouses	Рубашки и блузки	Жейделер және блузкалар	0
+clothing_men_trousers	clothing_men	Trousers and jeans	Брюки и джинсы	Шалбарлар және джинсы	0
+clothing_men_knitwear	clothing_men	Sweaters and knitwear	Свитеры и трикотаж	Свитерлер және тоқыма киім	0
+clothing_men_outerwear	clothing_men	Coats and jackets	Пальто и куртки	Пальтолар және күртелер	0
+clothing_men_sleepwear	clothing_men	Sleepwear and loungewear	Одежда для сна и дома	Ұйқы және үй киімі	0
+clothing_men_swimwear	clothing_men	Swimwear	Купальная одежда	Суға түсу киімі	0
+clothing_children_tops	clothing_children	T-shirts and tops	Футболки и топы	Футболкалар және топтар	0
+clothing_children_shirts	clothing_children	Shirts and blouses	Рубашки и блузки	Жейделер және блузкалар	0
+clothing_children_trousers	clothing_children	Trousers and jeans	Брюки и джинсы	Шалбарлар және джинсы	0
+clothing_children_knitwear	clothing_children	Sweaters and knitwear	Свитеры и трикотаж	Свитерлер және тоқыма киім	0
+clothing_children_outerwear	clothing_children	Coats and jackets	Пальто и куртки	Пальтолар және күртелер	0
+clothing_children_sleepwear	clothing_children	Sleepwear and loungewear	Одежда для сна и дома	Ұйқы және үй киімі	0
+clothing_children_swimwear	clothing_children	Swimwear	Купальная одежда	Суға түсу киімі	0
+clothing_women_dresses	clothing_women	Dresses and skirts	Платья и юбки	Көйлектер және белдемшелер	0
+clothing_women_maternity	clothing_women	Maternity clothing	Одежда для беременных	Жүкті әйелдер киімі	0
+clothing_accessories_hats	clothing_accessories	Hats and headwear	Шапки и головные уборы	Қалпақтар және бас киімдер	0
+clothing_accessories_scarves	clothing_accessories	Scarves and shawls	Шарфы и платки	Мойынорағыштар және орамалдар	0
+clothing_accessories_gloves	clothing_accessories	Gloves and mittens	Перчатки и варежки	Қолғаптар және биялайлар	0
+clothing_accessories_belts	clothing_accessories	Belts and suspenders	Ремни и подтяжки	Белдіктер және аспабау	0
+clothing_accessories_umbrellas	clothing_accessories	Umbrellas	Зонты	Қолшатырлар	0
+footwear_women	footwear	Women's footwear	Женская обувь	Әйелдер аяқ киімі	0
+footwear_men	footwear	Men's footwear	Мужская обувь	Ерлер аяқ киімі	0
+footwear_children	footwear	Children's footwear	Детская обувь	Балалар аяқ киімі	0
+footwear_sports	footwear	Sports footwear	Спортивная обувь	Спорттық аяқ киім	0
+footwear_work	footwear	Work and safety footwear	Рабочая и защитная обувь	Жұмыс және қорғаныш аяқ киімі	0
+footwear_accessories	footwear	Footwear accessories	Аксессуары для обуви	Аяқ киім керек-жарақтары	0
+footwear_women_trainers	footwear_women	Trainers	Кроссовки	Кроссовкалар	0
+footwear_women_boots	footwear_women	Boots	Ботинки и сапоги	Бәтеңкелер және етіктер	0
+footwear_women_sandals	footwear_women	Sandals	Сандалии	Сандалдар	0
+footwear_women_shoes	footwear_women	Shoes	Туфли	Туфли	0
+footwear_women_slippers	footwear_women	Slippers	Домашние тапочки	Үй тәпішкелері	0
+footwear_men_trainers	footwear_men	Trainers	Кроссовки	Кроссовкалар	0
+footwear_men_boots	footwear_men	Boots	Ботинки и сапоги	Бәтеңкелер және етіктер	0
+footwear_men_sandals	footwear_men	Sandals	Сандалии	Сандалдар	0
+footwear_men_shoes	footwear_men	Shoes	Туфли	Туфли	0
+footwear_men_slippers	footwear_men	Slippers	Домашние тапочки	Үй тәпішкелері	0
+footwear_children_trainers	footwear_children	Trainers	Кроссовки	Кроссовкалар	0
+footwear_children_boots	footwear_children	Boots	Ботинки и сапоги	Бәтеңкелер және етіктер	0
+footwear_children_sandals	footwear_children	Sandals	Сандалии	Сандалдар	0
+footwear_children_shoes	footwear_children	Shoes	Туфли	Туфли	0
+footwear_children_slippers	footwear_children	Slippers	Домашние тапочки	Үй тәпішкелері	0
+bags_handbags	bags	Handbags	Сумки	Сөмкелер	0
+bags_backpacks	bags	Backpacks	Рюкзаки	Арқасөмкелер	0
+bags_suitcases	bags	Suitcases	Чемоданы	Чемодандар	0
+bags_travel_bags	bags	Travel and sports bags	Дорожные и спортивные сумки	Жол және спорт сөмкелері	0
+bags_wallets	bags	Wallets and card holders	Кошельки и визитницы	Әмияндар және карта салғыштар	0
+bags_laptop	bags	Laptop bags and sleeves	Сумки и чехлы для ноутбуков	Ноутбук сөмкелері және қаптары	0
+bags_accessories	bags	Luggage accessories	Дорожные аксессуары	Жол керек-жарақтары	0
+furniture_living	furniture	Living room furniture	Мебель для гостиной	Қонақ бөлме жиһазы	0
+furniture_bedroom	furniture	Bedroom furniture	Мебель для спальни	Жатын бөлме жиһазы	0
+furniture_kitchen	furniture	Kitchen and dining furniture	Мебель для кухни и столовой	Асүй және асхана жиһазы	0
+furniture_office	furniture	Office furniture	Офисная мебель	Кеңсе жиһазы	0
+furniture_children	furniture	Children's furniture	Детская мебель	Балалар жиһазы	0
+furniture_bathroom	furniture	Bathroom furniture	Мебель для ванной	Жуынатын бөлме жиһазы	0
+furniture_outdoor	furniture	Outdoor furniture	Уличная и садовая мебель	Аула және бақша жиһазы	0
+furniture_decor	furniture	Home decor	Декор для дома	Үй декоры	0
+furniture_lighting	furniture	Decorative lighting	Декоративное освещение	Сәндік жарықтандыру	0
+furniture_hardware	furniture	Furniture fittings	Мебельная фурнитура	Жиһаз фурнитурасы	0
+furniture_living_sofas	furniture_living	Sofas and armchairs	Диваны и кресла	Дивандар және креслолар	0
+furniture_living_tables	furniture_living	Coffee and side tables	Журнальные и приставные столы	Журнал және қосалқы үстелдер	0
+furniture_living_shelving	furniture_living	Shelves and bookcases	Полки и стеллажи	Сөрелер және стеллаждар	0
+furniture_living_cabinets	furniture_living	Cabinets and TV stands	Шкафы и тумбы под телевизор	Шкафтар және теледидар тұғырлары	0
+furniture_bedroom_beds	furniture_bedroom	Beds	Кровати	Кереуеттер	0
+furniture_bedroom_mattresses	furniture_bedroom	Mattresses	Матрасы	Матрастар	0
+furniture_bedroom_wardrobes	furniture_bedroom	Wardrobes	Платяные шкафы	Киім шкафтары	0
+furniture_bedroom_dressers	furniture_bedroom	Dressers and bedside tables	Комоды и прикроватные тумбы	Комодтар және кереует жанындағы тумбалар	0
+furniture_decor_mirrors	furniture_decor	Mirrors	Зеркала	Айналар	0
+furniture_decor_rugs	furniture_decor	Rugs and mats	Ковры и коврики	Кілемдер және төсеніштер	0
+furniture_decor_curtains	furniture_decor	Curtains and blinds	Шторы и жалюзи	Перделер және жалюзи	0
+furniture_decor_frames	furniture_decor	Picture frames and wall art	Рамки и настенный декор	Жақтаулар және қабырға әшекейлері	0
+furniture_decor_vases	furniture_decor	Vases and decorative bowls	Вазы и декоративные чаши	Құмыралар және сәндік тостағандар	0
+furniture_decor_candles	furniture_decor	Candles and candle holders	Свечи и подсвечники	Шамдар және шам қойғыштар	0
+furniture_decor_clocks	furniture_decor	Wall and table clocks	Настенные и настольные часы	Қабырға және үстел сағаттары	0
+toys_building	toys	Building sets	Конструкторы	Құрастырғыштар	0
+toys_dolls	toys	Dolls and accessories	Куклы и аксессуары	Қуыршақтар және керек-жарақтар	0
+toys_plush	toys	Plush toys	Мягкие игрушки	Жұмсақ ойыншықтар	0
+toys_vehicles	toys	Toy vehicles	Игрушечный транспорт	Ойыншық көлік	0
+toys_figures	toys	Action figures and playsets	Фигурки и игровые наборы	Мүсіншелер және ойын жиынтықтары	0
+toys_puzzles	toys	Puzzles	Пазлы и головоломки	Пазлдар және басқатырғыштар	0
+toys_board_games	toys	Board games	Настольные игры	Үстел ойындары	0
+toys_educational	toys	Educational toys	Развивающие игрушки	Дамытушы ойыншықтар	0
+toys_outdoor	toys	Outdoor toys	Уличные игрушки	Дала ойыншықтары	0
+toys_ride_on	toys	Ride-on toys	Каталки и детский транспорт	Мінетін ойыншықтар және балалар көлігі	0
+toys_pretend	toys	Pretend play	Сюжетно-ролевые игры	Сюжеттік-рөлдік ойындар	0
+toys_infant	toys	Infant toys	Игрушки для младенцев	Сәбилер ойыншықтары	0
+sports_fitness	sports	Fitness and strength training	Фитнес и силовые тренировки	Фитнес және күш жаттығулары	0
+sports_running	sports	Running	Бег	Жүгіру	0
+sports_cycling	sports	Cycling	Велоспорт	Велоспорт	0
+sports_camping	sports	Camping and hiking	Туризм и походы	Туризм және жорықтар	0
+sports_swimming	sports	Swimming	Плавание	Жүзу	0
+sports_team	sports	Team sports	Командные виды спорта	Командалық спорт түрлері	0
+sports_racket	sports	Racket sports	Ракеточные виды спорта	Ракеткамен ойналатын спорт	0
+sports_winter	sports	Winter sports	Зимние виды спорта	Қысқы спорт түрлері	0
+sports_skating	sports	Skating and skateboarding	Ролики и скейтбординг	Ролик және скейтбординг	0
+sports_fishing	sports	Fishing	Рыбалка	Балық аулау	0
+sports_martial_arts	sports	Martial arts	Единоборства	Жекпе-жек өнері	0
+sports_water	sports	Water sports	Водные виды спорта	Су спорты	0
+sports_fitness_weights	sports_fitness	Weights and dumbbells	Гири и гантели	Гірлер және гантельдер	0
+sports_fitness_benches	sports_fitness	Benches and racks	Скамьи и стойки	Орындықтар және тіреулер	0
+sports_fitness_cardio	sports_fitness	Cardio machines	Кардиотренажёры	Кардиотренажерлер	0
+sports_fitness_bands	sports_fitness	Resistance bands	Фитнес-резинки и эспандеры	Фитнес таспалары және эспандерлер	0
+sports_fitness_yoga	sports_fitness	Yoga and pilates	Йога и пилатес	Йога және пилатес	0
+sports_fitness_recovery	sports_fitness	Exercise recovery accessories	Аксессуары для восстановления после тренировок	Жаттығудан кейінгі қалпына келу керек-жарақтары	0
+sports_cycling_bicycles	sports_cycling	Bicycles	Велосипеды	Велосипедтер	0
+sports_cycling_parts	sports_cycling	Bicycle parts	Велозапчасти	Велосипед бөлшектері	0
+sports_cycling_tyres	sports_cycling	Bicycle tyres and tubes	Велопокрышки и камеры	Велосипед шиналары және камералары	0
+sports_cycling_helmets	sports_cycling	Cycling helmets	Велошлемы	Велодулығалар	0
+sports_cycling_lights	sports_cycling	Bicycle lights	Велосипедные фонари	Велосипед шамдары	0
+sports_cycling_locks	sports_cycling	Bicycle locks	Велозамки	Велосипед құлыптары	0
+sports_cycling_pumps	sports_cycling	Bicycle pumps and tools	Велонасосы и инструменты	Велосипед сорғылары және құралдары	0
+sports_camping_tents	sports_camping	Tents	Палатки	Шатырлар	0
+sports_camping_sleeping	sports_camping	Sleeping bags and mats	Спальные мешки и коврики	Ұйықтайтын қаптар және төсеніштер	0
+sports_camping_backpacks	sports_camping	Hiking backpacks	Туристические рюкзаки	Туристік арқасөмкелер	0
+sports_camping_cooking	sports_camping	Camping cooking equipment	Походное кухонное оборудование	Жорық асүй жабдығы	0
+sports_camping_lamps	sports_camping	Camping lamps and headlamps	Походные и налобные фонари	Жорық және маңдай шамдары	0
+sports_camping_poles	sports_camping	Trekking poles	Трекинговые палки	Треккинг таяқтары	0
+sports_camping_hydration	sports_camping	Hydration and water filters	Походные ёмкости и фильтры для воды	Жорық су ыдыстары және сүзгілер	0
+sports_team_football	sports_team	Football	Футбол	Футбол	0
+sports_team_basketball	sports_team	Basketball	Баскетбол	Баскетбол	0
+sports_team_volleyball	sports_team	Volleyball	Волейбол	Волейбол	0
+sports_team_hockey	sports_team	Hockey	Хоккей	Хоккей	0
+sports_team_rugby	sports_team	Rugby	Регби	Регби	0
+sports_winter_skiing	sports_winter	Skiing	Лыжи	Шаңғы	0
+sports_winter_snowboarding	sports_winter	Snowboarding	Сноубординг	Сноуборд	0
+sports_winter_ice_skates	sports_winter	Ice skates	Коньки	Коньки	0
+sports_winter_sledges	sports_winter	Sledges and snow tubes	Санки и тюбинги	Шаналар және тюбингтер	0
+garden_plants	garden	Live plants	Живые растения	Тірі өсімдіктер	0
+garden_seeds	garden	Garden seeds	Семена для сада	Бақша тұқымдары	0
+garden_pots	garden	Pots and planters	Горшки и кашпо	Гүл құмыралары және кашпо	0
+garden_watering	garden	Watering supplies	Товары для полива	Суару тауарлары	0
+garden_hand_tools	garden	Garden hand tools	Ручные садовые инструменты	Қол бақша құралдары	0
+garden_power_tools	garden	Garden power equipment	Садовая техника	Бақша техникасы	0
+garden_greenhouses	garden	Greenhouses and crop covers	Теплицы и укрывные материалы	Жылыжайлар және жабын материалдары	0
+garden_compost	garden	Composting	Компостирование	Компосттау	0
+garden_pest_control	garden	Plant protection supplies	Средства защиты растений	Өсімдіктерді қорғау құралдары	0
+tools_hand	tools	Hand tools	Ручные инструменты	Қол құралдары	0
+tools_power	tools	Power tools	Электроинструменты	Электр құралдары	0
+tools_measuring	tools	Measuring and marking	Измерение и разметка	Өлшеу және белгілеу	0
+tools_consumables	tools	Tool consumables	Расходники для инструментов	Құралдардың шығыс материалдары	0
+tools_storage	tools	Tool storage	Хранение инструментов	Құралдарды сақтау	0
+tools_ladders	tools	Ladders and access equipment	Лестницы и стремянки	Баспалдақтар және саты-құралдар	0
+tools_workshop	tools	Workshop equipment	Оборудование мастерских	Шеберхана жабдығы	0
+tools_safety	tools	Personal protective equipment	Средства индивидуальной защиты	Жеке қорғаныш құралдары	0
+tools_hand_screwdrivers	tools_hand	Screwdrivers and bits	Отвёртки и биты	Бұрағыштар және биталар	0
+tools_hand_wrenches	tools_hand	Wrenches and sockets	Ключи и торцевые головки	Кілттер және бастиектер	0
+tools_hand_pliers	tools_hand	Pliers and cutters	Пассатижи и кусачки	Тістеуіктер және қысқыштар	0
+tools_hand_hammers	tools_hand	Hammers and mallets	Молотки и киянки	Балғалар және ағаш балғалар	0
+tools_hand_saws	tools_hand	Hand saws	Ручные пилы	Қол аралары	0
+tools_hand_clamps	tools_hand	Clamps and vices	Струбцины и тиски	Қысқыштар және іскенжелер	0
+tools_hand_sets	tools_hand	Hand tool sets	Наборы ручных инструментов	Қол құралдарының жиынтықтары	0
+tools_power_drills	tools_power	Drills and drivers	Дрели и шуруповёрты	Бұрғылар және бұрамабұрғыштар	0
+tools_power_rotary_hammers	tools_power	Rotary hammers	Перфораторы	Перфораторлар	0
+tools_power_grinders	tools_power	Grinders and sanders	Болгарки и шлифмашины	Ажарлағыштар және тегістегіштер	0
+tools_power_saws	tools_power	Powered saws	Электропилы	Электр аралары	0
+tools_power_routers	tools_power	Routers and planers	Фрезеры и рубанки	Фрезерлер және сүргілер	0
+tools_power_welding	tools_power	Welding equipment	Сварочное оборудование	Дәнекерлеу жабдығы	0
+tools_power_soldering	tools_power	Soldering tools	Паяльные инструменты	Дәнекерлеуіш құралдар	0
+tools_power_batteries	tools_power	Tool batteries and chargers	Аккумуляторы и зарядки для инструментов	Құрал аккумуляторлары және зарядтағыштары	0
+construction_cement	construction	Cement and dry building mixes	Цемент и сухие смеси	Цемент және құрғақ қоспалар	0
+construction_masonry	construction	Bricks and masonry blocks	Кирпич и строительные блоки	Кірпіш және құрылыс блоктары	0
+construction_lumber	construction	Lumber and wood panels	Пиломатериалы и древесные плиты	Ағаш материалдары және ағаш тақталар	0
+construction_metal	construction	Metal stock and profiles	Металлопрокат и профили	Металл прокаты және профильдер	0
+construction_insulation	construction	Insulation materials	Изоляционные материалы	Оқшаулағыш материалдар	0
+construction_roofing	construction	Roofing materials	Кровельные материалы	Шатыр материалдары	0
+construction_flooring	construction	Flooring	Напольные покрытия	Еден жабындары	0
+construction_tiles	construction	Tiles and tile supplies	Плитка и материалы для укладки	Тақтайшалар және төсеу материалдары	0
+construction_wall	construction	Wall coverings	Настенные покрытия	Қабырға жабындары	0
+construction_paint	construction	Paints and coatings	Краски и покрытия	Бояулар және жабындар	0
+construction_doors	construction	Doors and windows	Двери и окна	Есіктер және терезелер	0
+construction_fasteners	construction	Fasteners and hardware	Крепёж и метизы	Бекіткіштер және металл бұйымдар	0
+construction_sealants	construction	Sealants and construction adhesives	Герметики и строительные клеи	Герметиктер және құрылыс желімдері	0
+construction_flooring_laminate	construction_flooring	Laminate flooring	Ламинат	Ламинат	0
+construction_flooring_wood	construction_flooring	Wood flooring	Паркет и деревянный пол	Паркет және ағаш еден	0
+construction_flooring_vinyl	construction_flooring	Vinyl flooring and linoleum	Виниловые покрытия и линолеум	Винил жабындары және линолеум	0
+construction_flooring_carpet	construction_flooring	Carpet flooring	Ковролин	Ковролин	0
+construction_flooring_underlay	construction_flooring	Underlay and skirting	Подложка и плинтусы	Еден асты төсемі және плинтустар	0
+plumbing_pipes	plumbing	Pipes and fittings	Трубы и фитинги	Құбырлар және фитингтер	0
+plumbing_valves	plumbing	Valves and taps	Вентили и краны	Вентильдер және шүмектер	0
+plumbing_faucets	plumbing	Mixer taps	Смесители	Араластырғыштар	0
+plumbing_sinks	plumbing	Sinks and washbasins	Раковины и мойки	Қолжуғыштар және жуғыштар	0
+plumbing_toilets	plumbing	Toilets and cisterns	Унитазы и бачки	Унитаздар және су құятын бактар	0
+plumbing_baths	plumbing	Baths and showers	Ванны и душевые	Ванналар және душтар	0
+plumbing_heating	plumbing	Heating and radiators	Отопление и радиаторы	Жылыту және радиаторлар	0
+plumbing_water_heaters	plumbing	Water heaters	Водонагреватели	Су жылытқыштар	0
+plumbing_pumps	plumbing	Water pumps	Водяные насосы	Су сорғылары	0
+plumbing_filters	plumbing	Water filters	Фильтры для воды	Су сүзгілері	0
+plumbing_drainage	plumbing	Drainage and sewerage	Водоотведение и канализация	Су бұру және кәріз	0
+electrical_cables	electrical	Electrical wires and cables	Провода и кабели	Сымдар және кабельдер	0
+electrical_sockets	electrical	Sockets and switches	Розетки и выключатели	Розеткалар және ажыратқыштар	0
+electrical_protection	electrical	Circuit protection	Автоматы и устройства защиты	Автоматтар және қорғаныс құрылғылары	0
+electrical_panels	electrical	Electrical panels and enclosures	Электрощиты и корпуса	Электр қалқандары және корпустар	0
+electrical_conduit	electrical	Cable management and conduits	Кабель-каналы и гофры	Кабель арналары және гофралар	0
+electrical_connectors	electrical	Terminals and wiring connectors	Клеммы и соединители проводов	Клеммалар және сым қосқыштары	0
+electrical_extension	electrical	Extension leads and power strips	Удлинители и сетевые фильтры	Ұзартқыштар және желілік сүзгілер	0
+electrical_power	electrical	Power conversion and backup	Преобразование и резервирование питания	Қуатты түрлендіру және резервтеу	0
+electrical_solar	electrical	Solar power components	Компоненты солнечных электростанций	Күн электр станциясының құрамдастары	0
+auto_parts	auto	Vehicle parts	Автозапчасти	Автокөлік бөлшектері	0
+auto_tyres	auto	Tyres and wheels	Шины и диски	Шиналар және дискілер	0
+auto_fluids	auto	Vehicle fluids	Автомобильные жидкости	Автокөлік сұйықтықтары	0
+auto_care	auto	Vehicle cleaning and care	Уход за автомобилем	Автокөлік күтімі	0
+auto_accessories	auto	Vehicle accessories	Автоаксессуары	Автокөлік керек-жарақтары	0
+auto_electronics	auto	Vehicle electronics	Автоэлектроника	Автокөлік электроникасы	0
+auto_tools	auto	Vehicle tools and workshop supplies	Автоинструменты и сервисное оборудование	Автокөлік құралдары және сервис жабдығы	0
+auto_motorcycles	auto	Motorcycle parts and accessories	Мотозапчасти и аксессуары	Мотоцикл бөлшектері және керек-жарақтары	0
+auto_parts_filters	auto_parts	Vehicle filters	Автомобильные фильтры	Автокөлік сүзгілері	0
+auto_parts_brakes	auto_parts	Braking systems	Тормозная система	Тежегіш жүйесі	0
+auto_parts_suspension	auto_parts	Suspension and steering	Подвеска и рулевое управление	Аспа және рульдік басқару	0
+auto_parts_engine	auto_parts	Engine parts	Детали двигателя	Қозғалтқыш бөлшектері	0
+auto_parts_transmission	auto_parts	Transmission parts	Детали трансмиссии	Трансмиссия бөлшектері	0
+auto_parts_cooling	auto_parts	Cooling system parts	Система охлаждения	Салқындату жүйесі	0
+auto_parts_body	auto_parts	Body parts and mirrors	Кузовные детали и зеркала	Шанақ бөлшектері және айналар	0
+auto_parts_lighting	auto_parts	Vehicle lighting	Автомобильное освещение	Автокөлік жарықтандыруы	0
+auto_parts_batteries	auto_parts	Vehicle batteries	Автомобильные аккумуляторы	Автокөлік аккумуляторлары	0
+auto_parts_wipers	auto_parts	Wipers and washer systems	Дворники и стеклоомыватели	Әйнек тазалағыштар және жуғыштар	0
+auto_accessories_mats	auto_accessories	Vehicle mats	Автомобильные коврики	Автокөлік төсеніштері	0
+auto_accessories_covers	auto_accessories	Seat covers	Чехлы для сидений	Орындық қаптары	0
+auto_accessories_child_seats	auto_accessories	Child car seats	Детские автокресла	Балалар автокреслолары	0
+auto_accessories_roof_racks	auto_accessories	Roof racks and cargo boxes	Багажники и боксы	Жүксалғыштар және бокстар	0
+auto_accessories_emergency	auto_accessories	Roadside emergency supplies	Аварийные дорожные принадлежности	Жолдағы апаттық керек-жарақтар	0
+books_fiction	books	Fiction	Художественная литература	Көркем әдебиет	0
+books_nonfiction	books	Non-fiction	Нехудожественная литература	Танымдық әдебиет	0
+books_children	books	Children's books	Детские книги	Балалар кітаптары	0
+books_education	books	Textbooks and learning aids	Учебники и учебные пособия	Оқулықтар және оқу құралдары	0
+books_languages	books	Language learning and dictionaries	Изучение языков и словари	Тіл үйрену және сөздіктер	0
+books_professional	books	Professional and technical books	Профессиональная и техническая литература	Кәсіби және техникалық әдебиет	0
+books_magazines	books	Magazines and newspapers	Журналы и газеты	Журналдар және газеттер	0
+books_maps	books	Maps and atlases	Карты и атласы	Карталар және атластар	0
+music_strings	music	String instruments	Струнные инструменты	Ішекті аспаптар	0
+music_keyboards	music	Keyboard instruments	Клавишные инструменты	Пернелі аспаптар	0
+music_percussion	music	Percussion instruments	Ударные инструменты	Ұрмалы аспаптар	0
+music_wind	music	Wind instruments	Духовые инструменты	Үрмелі аспаптар	0
+music_traditional	music	Traditional instruments	Народные инструменты	Ұлттық аспаптар	0
+music_accessories	music	Instrument accessories	Аксессуары для инструментов	Аспап керек-жарақтары	0
+music_recording	music	Recording and live sound	Звукозапись и концертный звук	Дыбыс жазу және концерттік дыбыс	0
+music_traditional_dombra	music_traditional	Dombra	Домбра	Домбыра	0
+music_traditional_kobyz	music_traditional	Kobyz	Кобыз	Қобыз	0
+music_traditional_other	music_traditional	Other traditional instruments	Другие народные инструменты	Басқа ұлттық аспаптар	0
+craft_drawing	craft	Drawing and painting	Рисование и живопись	Сурет салу және кескіндеме	0
+craft_sewing	craft	Sewing supplies	Швейные принадлежности	Тігін керек-жарақтары	0
+craft_knitting	craft	Knitting and crochet	Вязание	Тоқу	0
+craft_beads	craft	Beads and jewelry making	Бисер и создание украшений	Моншақ және әшекей жасау	0
+craft_modelling	craft	Clay and modelling	Лепка и моделирование	Мүсіндеу және үлгілеу	0
+craft_paper	craft	Paper crafts	Творчество из бумаги	Қағаз шығармашылығы	0
+craft_embroidery	craft	Embroidery	Вышивка	Кестелеу	0
+craft_kits	craft	Craft kits	Наборы для творчества	Шығармашылық жиынтықтары	0
+jewelry_rings	jewelry	Rings	Кольца	Сақиналар	0
+jewelry_earrings	jewelry	Earrings	Серьги	Сырғалар	0
+jewelry_necklaces	jewelry	Necklaces and pendants	Колье и подвески	Алқалар және аспалар	0
+jewelry_bracelets	jewelry	Bracelets	Браслеты	Білезіктер	0
+jewelry_brooches	jewelry	Brooches	Броши	Брошьтар	0
+jewelry_watches	jewelry	Watches	Наручные часы	Қол сағаттары	0
+jewelry_accessories	jewelry	Jewelry boxes and watch accessories	Шкатулки и аксессуары для часов	Әшекей қобдишалары және сағат керек-жарақтары	0
+optics_frames	optics	Eyeglass frames	Оправы для очков	Көзілдірік жақтаулары	0
+optics_sunglasses	optics	Sunglasses	Солнцезащитные очки	Күннен қорғайтын көзілдіріктер	0
+optics_reading	optics	Reading glasses	Очки для чтения	Оқуға арналған көзілдіріктер	0
+optics_contacts	optics	Contact lenses	Контактные линзы	Контакт линзалар	0
+optics_care	optics	Lens care supplies	Уход за линзами	Линза күтімі құралдары	0
+optics_accessories	optics	Eyewear accessories	Аксессуары для очков	Көзілдірік керек-жарақтары	0
+industry_retail	industry	Retail equipment	Торговое оборудование	Сауда жабдығы	0
+industry_packaging	industry	Packaging materials	Упаковочные материалы	Қаптама материалдары	0
+industry_storage	industry	Warehouse equipment	Складское оборудование	Қойма жабдығы	0
+industry_catering	industry	Catering equipment	Оборудование для общепита	Қоғамдық тамақтану жабдығы	0
+industry_manufacturing	industry	Manufacturing supplies	Производственные материалы	Өндірістік материалдар	0
+industry_lab	industry	Laboratory supplies	Лабораторные принадлежности	Зертхана керек-жарақтары	0
+industry_safety	industry	Workplace safety supplies	Промышленная безопасность	Өндірістік қауіпсіздік	0
+industry_cleaning	industry	Commercial cleaning equipment	Профессиональное уборочное оборудование	Кәсіби тазалау жабдығы	0
+industry_retail_pos	industry_retail	POS terminals	POS-терминалы	POS-терминалдар	0
+industry_retail_scanners	industry_retail	Barcode scanners	Сканеры штрихкодов	Штрихкод сканерлері	0
+industry_retail_printers	industry_retail	Receipt and label printers	Принтеры чеков и этикеток	Чек және заттаңба принтерлері	0
+industry_retail_scales	industry_retail	Commercial scales	Торговые весы	Сауда таразылары	0
+industry_retail_cash_drawers	industry_retail	Cash drawers	Денежные ящики	Ақша жәшіктері	0
+industry_retail_displays	industry_retail	Retail displays and shelves	Витрины и торговые стеллажи	Витриналар және сауда сөрелері	0
+industry_retail_receipt_paper	industry_retail	Receipt rolls and label stock	Чековые ленты и этикет-ленты	Чек таспалары және заттаңба таспалары	0
+industry_packaging_boxes	industry_packaging	Boxes and cartons	Коробки и картонная тара	Қораптар және картон ыдыстар	0
+industry_packaging_bags	industry_packaging	Packaging bags	Упаковочные пакеты	Қаптама пакеттері	0
+industry_packaging_film	industry_packaging	Packaging films	Упаковочные плёнки	Қаптама үлдірлері	0
+industry_packaging_cushioning	industry_packaging	Protective packaging	Защитная упаковка	Қорғаныш қаптамасы	0
+industry_packaging_tapes	industry_packaging	Packaging tape	Упаковочные ленты	Қаптама таспалары	0
+industry_packaging_containers	industry_packaging	Bulk containers and drums	Промышленные ёмкости и бочки	Өнеркәсіптік ыдыстар және бөшкелер	0
+industry_manufacturing_bearings	industry_manufacturing	Bearings	Подшипники	Мойынтіректер	0
+industry_manufacturing_belts	industry_manufacturing	Drive belts and chains	Приводные ремни и цепи	Жетек белдіктері және тізбектері	0
+industry_manufacturing_motors	industry_manufacturing	Electric motors and drives	Электродвигатели и приводы	Электрқозғалтқыштар және жетектер	0
+industry_manufacturing_pneumatics	industry_manufacturing	Pneumatic components	Пневматические компоненты	Пневматикалық құрамдастар	0
+industry_manufacturing_hydraulics	industry_manufacturing	Hydraulic components	Гидравлические компоненты	Гидравликалық құрамдастар	0
+industry_manufacturing_seals	industry_manufacturing	Seals and gaskets	Уплотнения и прокладки	Тығыздағыштар және төсемдер	0
+industry_manufacturing_abrasives	industry_manufacturing	Industrial abrasives	Промышленные абразивы	Өнеркәсіптік абразивтер	0
+industry_manufacturing_raw_materials	industry_manufacturing	Production raw materials	Производственное сырьё	Өндірістік шикізат	0
+agriculture_seeds	agriculture	Field crop seeds	Семена полевых культур	Егістік дақылдарының тұқымдары	0
+agriculture_feed	agriculture	Animal feed	Корма для сельхозживотных	Ауыл шаруашылығы жануарларының азығы	0
+agriculture_livestock	agriculture	Livestock equipment	Оборудование для животноводства	Мал шаруашылығы жабдығы	0
+agriculture_poultry	agriculture	Poultry equipment	Оборудование для птицеводства	Құс шаруашылығы жабдығы	0
+agriculture_beekeeping	agriculture	Beekeeping supplies	Пчеловодство	Омарташылық	0
+agriculture_irrigation	agriculture	Agricultural irrigation	Сельскохозяйственное орошение	Ауыл шаруашылығын суару	0
+agriculture_machinery	agriculture	Agricultural machinery parts	Запчасти для сельхозтехники	Ауыл шаруашылығы техникасының бөлшектері	0
+agriculture_fertilizers	agriculture	Agricultural fertilizers	Сельскохозяйственные удобрения	Ауыл шаруашылығы тыңайтқыштары	0
+party_gift_wrap	party	Gift wrapping	Подарочная упаковка	Сыйлық қаптамасы	0
+party_greeting_cards	party	Greeting cards	Открытки	Құттықтау ашықхаттары	0
+party_balloons	party	Balloons	Воздушные шары	Әуе шарлары	0
+party_decorations	party	Party decorations	Праздничный декор	Мерекелік әшекейлер	0
+party_costumes	party	Costumes and accessories	Карнавальные костюмы и аксессуары	Карнавал киімдері және керек-жарақтар	0
+party_souvenirs	party	Souvenirs	Сувениры	Кәдесыйлар	0
+party_flowers	party	Cut flowers and bouquets	Срезанные цветы и букеты	Кесілген гүлдер және гүл шоқтары	0
+seasonal_new_year	seasonal	New Year decorations	Новогодние украшения	Жаңа жыл әшекейлері	0
+seasonal_nauryz	seasonal	Nauryz celebration goods	Товары к Наурызу	Наурызға арналған тауарлар	0
+seasonal_summer	seasonal	Summer seasonal goods	Летние сезонные товары	Жазғы маусымдық тауарлар	0
+seasonal_winter	seasonal	Winter seasonal goods	Зимние сезонные товары	Қысқы маусымдық тауарлар	0
+seasonal_school	seasonal	Back-to-school collections	Товары к началу учебного года	Оқу жылының басына арналған тауарлар	0

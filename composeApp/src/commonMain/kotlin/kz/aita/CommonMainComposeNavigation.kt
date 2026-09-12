@@ -2451,12 +2451,7 @@ fun AppConfiguration.searchTextField(
                         val handled = activeTransactionBarcodeHandler?.invoke(candidate) == true
                         if (!handled) {
                             postInAppNotification(
-                                listOf(
-                                    LocalizedStringDataModel("main", "Barcode: $candidate"),
-                                    LocalizedStringDataModel("en", "Barcode: $candidate"),
-                                    LocalizedStringDataModel("ru", "Штрих-код: $candidate"),
-                                    LocalizedStringDataModel("kk", "Штрих-код: $candidate")
-                                ),
+                                eventMessage("message.barcode", "candidate" to (candidate).toString()),
                                 NotificationType.Neutral,
                                 transient = true
                             )

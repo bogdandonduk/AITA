@@ -280,7 +280,20 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
             }
         )
 
+        val section = sectionTabsWidget(
+            stateKey = "supplier-profiles:${currentUserId.orEmpty()}",
+            tabs = listOf(
+                TabContent("profiles", authUiText("Profiles", "Профили", "Профильдер")),
+                TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+        )
+
         LazyColumn(
+            state = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Identity.Main, "sections:$section"),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
@@ -311,79 +324,85 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
                 }
             }
 
-            if (items.isNotEmpty()) {
-                item {
-                    SupplierWorkspaceReadinessCard(
-                        summary = workspaceReadiness,
-                        onNextStep = openReadinessNextStep
-                    )
-                }
-            }
-
-            if (items.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                    ) {
-                        MessageText(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = localizedStringResource(2514, "No supplier profiles yet. Create the identity stores will order from.")
-                        )
-                        actionButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = localizedStringResource(2492, "Add profile"),
-                            iconPath = stateValues.drawablePathIconAdd,
-                            iconRes = stateValues.drawableResIconAdd.value,
-                            confirmationRequired = false,
-                            onClick = {
-                                coroutineScope.launch {
-                                    NavigationScreenModel.Supplier.Identity.Main.setStates(
-                                        SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
-                                        SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
-                                        SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
-                                    )
-                                }
-                            }
+            if (section == "readiness") {
+                if (items.isEmpty()) {
+                    item { MessageText(Modifier.fillMaxWidth(), localizedStringResource(2514, "No supplier profiles yet. Create the identity stores will order from.")) }
+                } else {
+                    item {
+                        SupplierWorkspaceReadinessCard(
+                            summary = workspaceReadiness,
+                            onNextStep = openReadinessNextStep
                         )
                     }
                 }
-            } else {
-                items(items, key = { it.supplier.id }) { item ->
-                    SupplierProfileWorkspaceCard(
-                        item = item,
-                        showFocusAction = identityPresentation.profileCount > 1,
-                        isDeleting = normalizeSupplierProfileIdentityId(item.supplier.id) in deletingSupplierIds,
-                        onFocus = {
-                            coroutineScope.launch {
-                                setActiveSupplierProfileId(item.supplier.id)
-                            }
-                        },
-                        onEdit = {
-                            coroutineScope.launch {
-                                NavigationScreenModel.Supplier.Identity.Main.setStates(
-                                    SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
-                                    SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to item.supplier.id,
-                                    SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
-                                )
-                            }
-                        },
-                        onDelete = {
-                            val normalizedSupplierId = normalizeSupplierProfileIdentityId(item.supplier.id)
-                            if (normalizedSupplierId != null && normalizedSupplierId !in deletingSupplierIds) {
-                                deletingSupplierIds = deletingSupplierIds + normalizedSupplierId
-                                deleteSupplier(item.supplier.id) { result ->
+            }
+
+            if (section == "profiles") {
+                if (items.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        ) {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(2514, "No supplier profiles yet. Create the identity stores will order from.")
+                            )
+                            actionButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(2492, "Add profile"),
+                                iconPath = stateValues.drawablePathIconAdd,
+                                iconRes = stateValues.drawableResIconAdd.value,
+                                confirmationRequired = false,
+                                onClick = {
                                     coroutineScope.launch {
-                                        deletingSupplierIds = deletingSupplierIds - normalizedSupplierId
-                                        if (result is DataState.Success) {
-                                            profileDashboard = (profileDashboard ?: SupplierModeDashboardDataModel())
-                                                .withoutSupplierProfileSnapshot(item.supplier.id)
+                                        NavigationScreenModel.Supplier.Identity.Main.setStates(
+                                            SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
+                                            SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
+                                            SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    items(items, key = { it.supplier.id }) { item ->
+                        SupplierProfileWorkspaceCard(
+                            item = item,
+                            showFocusAction = identityPresentation.profileCount > 1,
+                            isDeleting = normalizeSupplierProfileIdentityId(item.supplier.id) in deletingSupplierIds,
+                            onFocus = {
+                                coroutineScope.launch {
+                                    setActiveSupplierProfileId(item.supplier.id)
+                                }
+                            },
+                            onEdit = {
+                                coroutineScope.launch {
+                                    NavigationScreenModel.Supplier.Identity.Main.setStates(
+                                        SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
+                                        SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to item.supplier.id,
+                                        SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
+                                    )
+                                }
+                            },
+                            onDelete = {
+                                val normalizedSupplierId = normalizeSupplierProfileIdentityId(item.supplier.id)
+                                if (normalizedSupplierId != null && normalizedSupplierId !in deletingSupplierIds) {
+                                    deletingSupplierIds = deletingSupplierIds + normalizedSupplierId
+                                    deleteSupplier(item.supplier.id) { result ->
+                                        coroutineScope.launch {
+                                            deletingSupplierIds = deletingSupplierIds - normalizedSupplierId
+                                            if (result is DataState.Success) {
+                                                profileDashboard = (profileDashboard ?: SupplierModeDashboardDataModel())
+                                                    .withoutSupplierProfileSnapshot(item.supplier.id)
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }

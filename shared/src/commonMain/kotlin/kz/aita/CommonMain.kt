@@ -4714,19 +4714,9 @@ fun openPlatformDevicesSettings() {
             ReceiptPlatformActionResult(false, it.message ?: "Could not open device settings")
         }
 
-        val successMessage = listOf(
-            LocalizedStringDataModel("main", "Device settings opened"),
-            LocalizedStringDataModel("en", "Device settings opened"),
-            LocalizedStringDataModel("ru", "Настройки устройств открыты"),
-            LocalizedStringDataModel("kk", "Құрылғы баптаулары ашылды")
-        ).extractLocalizedString(appLanguageState.value) ?: "Device settings opened"
+        val successMessage = eventMessage("message.device_settings_opened").extractLocalizedString(appLanguageState.value) ?: "Device settings opened"
 
-        val errorMessage = listOf(
-            LocalizedStringDataModel("main", "Could not open device settings"),
-            LocalizedStringDataModel("en", "Could not open device settings"),
-            LocalizedStringDataModel("ru", "Не удалось открыть настройки устройств"),
-            LocalizedStringDataModel("kk", "Құрылғы баптауларын ашу мүмкін болмады")
-        ).extractLocalizedString(appLanguageState.value) ?: "Could not open device settings"
+        val errorMessage = eventMessage("message.could_not_open_device_settings").extractLocalizedString(appLanguageState.value) ?: "Could not open device settings"
 
         postInAppNotification(
             message = if (result.success) successMessage else errorMessage,
@@ -7466,12 +7456,7 @@ data class AuthScreenPreferenceOverrideDataModel(
 
 val authScreenPreferenceOverrideState = MutableStateFlow(AuthScreenPreferenceOverrideDataModel())
 val stringRawAuthenticationFailedState = MutableStateFlow(
-    listOf(
-        LocalizedStringDataModel("main", "Authentication failed"),
-        LocalizedStringDataModel("en", "Authentication failed"),
-        LocalizedStringDataModel("ru", "Аутентификация не удалась"),
-        LocalizedStringDataModel("kk", "Аутентификация сәтсіз аяқталды"),
-    )
+    eventMessage("message.authentication_failed")
 )
 val stringAppNameState = MutableStateFlow("AITA")
 val stringLogInState = MutableStateFlow("Log In")
@@ -8361,7 +8346,13 @@ fun List<RemoteResponseDataModel>.extractExceptionMessage(id: String): List<Loca
 fun List<LocalizedStringDataModel>.extractLocalizedString(language: String): String? {
     val targetLanguage = if (language == "system") getSystemLocaleLanguage() else language
 
+    explicitEventMessageReference()?.let { reference ->
+        EventMessages.render(reference, targetLanguage) { id ->
+            stringsState.payloadValue?.find { it.id == id }?.values
+        }?.let { return it }
+    }
     return find { it.language.equals(targetLanguage, ignoreCase = true) }?.value
+        ?: find { it.language.equals(targetLanguage.substringBefore('-').substringBefore('_'), ignoreCase = true) }?.value
         ?: find { it.language.equals("main", ignoreCase = true) }?.value
         ?: find { it.language.equals("en", ignoreCase = true) }?.value
         ?: firstOrNull()?.value
@@ -8374,7 +8365,7 @@ fun localizedStringResourceMessage(
     ru: String = main,
     kk: String = main
 ): List<LocalizedStringDataModel> {
-    return stringsState.payloadValue
+    val values = stringsState.payloadValue
         ?.find { it.id == id }
         ?.values
         ?.takeIf { it.isNotEmpty() }
@@ -8384,6 +8375,11 @@ fun localizedStringResourceMessage(
             LocalizedStringDataModel("ru", ru),
             LocalizedStringDataModel("kk", kk)
         )
+    val reference = EventMessageReference("resource.$id")
+    return values.mapIndexed { index, value ->
+        value.copy(messageTemplate = reference.takeIf { index == 0 })
+    }
+
 }
 
 fun localizedStringResourceText(
@@ -10904,12 +10900,7 @@ internal fun nonAitaHttpResponseMessage(
 ): List<LocalizedStringDataModel> {
     val looksLikeAnotherPage = status.value in 300..399 || rawBody.trimStart().startsWith("<")
     return if (looksLikeAnotherPage) {
-        listOf(
-            LocalizedStringDataModel("main", "Can’t reach AITA server. Check Wi‑Fi or server address."),
-            LocalizedStringDataModel("en", "Can’t reach AITA server. Check Wi‑Fi or server address."),
-            LocalizedStringDataModel("ru", "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера."),
-            LocalizedStringDataModel("kk", "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз.")
-        )
+        eventMessage("message.can_t_reach_aita_server_check_wi_fi_or_server_address")
     } else {
         localizedStringResourceMessage(
             id = 1140,
@@ -11012,24 +11003,7 @@ internal fun cloudEndpointRequiresAuthentication(endpointUrl: String): Boolean {
 }
 
 @PublishedApi
-internal fun cloudSessionExpiredMessage(): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel(
-        language = "main",
-        value = "Cloud sign-in expired. Sign in again to sync. Your local data stays available."
-    ),
-    LocalizedStringDataModel(
-        language = "en",
-        value = "Cloud sign-in expired. Sign in again to sync. Your local data stays available."
-    ),
-    LocalizedStringDataModel(
-        language = "ru",
-        value = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны."
-    ),
-    LocalizedStringDataModel(
-        language = "kk",
-        value = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
-    )
-)
+internal fun cloudSessionExpiredMessage(): List<LocalizedStringDataModel> = eventMessage("message.cloud_sign_in_expired_sign_in_again_to_sync_your_local")
 
 @PublishedApi
 internal fun <Response> cloudSessionExpiredResponse(
@@ -13630,7 +13604,7 @@ private suspend inline fun <reified T> hydrateInventoryResource(
     owner: InventoryOwner,
     state: MutableDataStateFlow<List<T>>,
     status: MutableStateFlow<InventoryLoadStatus>,
-    filter: (List<T>) -> List<T>
+    filter: suspend (List<T>) -> List<T>
 ) {
     val accessAtStart = inventoryStateMutex.withLock {
         if (!inventoryOwnerIsCurrent(owner) || state.payloadValue != null || status.value.accessDenied) return
@@ -13648,7 +13622,7 @@ private suspend inline fun <reified T> hydrateInventoryResource(
         logCloudConnectionDiagnostic("Inventory cache read failed; cloud loading remains available")
         null
     } ?: return
-    val payload = cached.second?.let(filter)
+    val payload = cached.second?.let { filter(it) }
     inventoryStateMutex.withLock {
         if (inventoryAccessRevision != accessAtStart ||
             !canHydrateInventory(state.payloadValue != null || status.value.accessDenied, inventoryOwnerIsCurrent(owner))) return
@@ -15900,6 +15874,15 @@ private fun shouldPostNotificationConsideringCloudTransport(
     return false
 }
 
+// Rebuild only when the immutable resource payload changes, not for each row or keystroke.
+@Volatile private var notificationResourceIndex: Pair<List<LocalizedStringGroupDataModel>, EventResourceCatalogue>? = null
+
+fun currentEventResourceCatalogue(): EventResourceCatalogue {
+    val groups = stringsState.payloadValue.orEmpty()
+    notificationResourceIndex?.takeIf { it.first === groups }?.let { return it.second }
+    return EventResourceCatalogue(groups).also { notificationResourceIndex = groups to it }
+}
+
 private fun createNotificationDataModel(
     message: String,
     type: NotificationType,
@@ -15908,7 +15891,8 @@ private fun createNotificationDataModel(
         NotificationType.Positive -> "positive"
         NotificationType.Negative -> "negative"
         NotificationType.Neutral -> "neutral"
-    }
+    },
+    translations: List<LocalizedStringDataModel> = emptyList()
 ): NotificationDataModel {
     val combined = listOf(title, message, category).joinToString(" ")
     val cleanMessage = message.humanFriendlyNotificationMessage()
@@ -15923,6 +15907,14 @@ private fun createNotificationDataModel(
         combined.isCloudSessionRefreshNotificationText() -> NOTIFICATION_SESSION_CATEGORY
         else -> category
     }
+    val resources = currentEventResourceCatalogue()
+    val messageReference = when (cleanCategory) {
+        NOTIFICATION_CONNECTION_CATEGORY -> resources.referenceFor(cleanMessage) ?: legacyEventMessageReference(cleanMessage)
+        NOTIFICATION_SESSION_CATEGORY -> EventMessageReference("resource.91")
+        else -> translations.eventMessageReferenceOrNull() ?: resources.referenceFor(translations)
+            ?: legacyEventMessageReference(message) ?: resources.referenceFor(message)
+    }
+    val titleReference = legacyEventMessageReference(cleanTitle) ?: resources.referenceFor(cleanTitle)
     val now = getCurrentTimeMillis()
     val storeId = activeStoreIdState.value
     val bucket = now / IN_APP_NOTIFICATION_ID_BUCKET_MILLIS
@@ -15931,8 +15923,8 @@ private fun createNotificationDataModel(
         userAccountState.payloadValue?.id.orEmpty(),
         dedupeStoreId,
         cleanCategory,
-        cleanTitle.notificationCanonicalText(),
-        cleanMessage.notificationCanonicalText()
+        eventTextIdentity(eventTextForStorage(cleanTitle, reference = titleReference, resources = resources)),
+        eventTextIdentity(eventTextForStorage(cleanMessage, translations, messageReference, resources))
     ).joinToString("|")
 
     return NotificationDataModel(
@@ -15948,7 +15940,10 @@ private fun createNotificationDataModel(
         createdAtMillis = now,
         shownAtMillis = now,
         readAtMillis = null,
-        isSavedOnServer = false
+        isSavedOnServer = false,
+        messageTemplate = messageReference,
+        titleTemplate = titleReference,
+        messageTranslations = translations
     )
 }
 
@@ -15968,8 +15963,8 @@ private fun NotificationDataModel.dedupeKey(): String = when {
         type.name,
         category.notificationCanonicalText(),
         source.normalizedNotificationText(),
-        title.notificationCanonicalText(),
-        message.notificationCanonicalText()
+        eventTitleIdentity(currentEventResourceCatalogue()),
+        eventMessageIdentity(currentEventResourceCatalogue())
     ).joinToString("|")
 }
 
@@ -16145,9 +16140,8 @@ private suspend fun postInAppNotificationNow(
     type: NotificationType,
     transient: Boolean = false
 ) {
-    message?.extractLocalizedString(appLanguageState.value)?.run {
-        postInAppNotificationNow(this, type, transient)
-    }
+    val text = message?.extractLocalizedString(appLanguageState.value)?.takeIf { it.isNotBlank() } ?: return
+    pushInAppNotificationNow(createNotificationDataModel(text, type, translations = message), transient)
 }
 
 private suspend fun postInAppNotificationNow(message: String, type: NotificationType, transient: Boolean = false) {
@@ -16160,9 +16154,8 @@ fun postInAppNotification(
     type: NotificationType,
     transient: Boolean = false
 ) {
-    message?.extractLocalizedString(appLanguageState.value)?.run {
-        postInAppNotification(this, type, transient)
-    }
+    val text = message?.extractLocalizedString(appLanguageState.value)?.takeIf { it.isNotBlank() } ?: return
+    pushInAppNotification(createNotificationDataModel(text, type, translations = message), transient)
 }
 
 fun postInAppNotification(message: String, type: NotificationType, transient: Boolean = false) {
@@ -16171,11 +16164,18 @@ fun postInAppNotification(message: String, type: NotificationType, transient: Bo
 }
 
 /** Saved-file messages and capabilities live on this device for this login only. */
-suspend fun postDeviceFileNotification(message: String, savedFile: SavedPdfFile?, owner: ReceiptActionOwner, type: NotificationType = NotificationType.Positive) {
+suspend fun postDeviceFileNotification(
+    message: String,
+    savedFile: SavedPdfFile?,
+    owner: ReceiptActionOwner,
+    type: NotificationType = NotificationType.Positive,
+    messageTemplate: EventMessageReference? = null
+) {
     if (!owner.isCurrent()) return
-    val notification = createNotificationDataModel(message, type).copy(
-        category = DEVICE_FILE_NOTIFICATION_CATEGORY, source = "device"
-    )
+    val notification = createNotificationDataModel(message, type).let { created ->
+        created.copy(category = DEVICE_FILE_NOTIFICATION_CATEGORY, source = "device",
+            messageTemplate = messageTemplate ?: created.messageTemplate)
+    }
     rememberDeviceFileNotification(notification, savedFile, owner)
     if (owner.isCurrent()) pushInAppNotificationNow(notification, transient = true)
 }
@@ -18314,7 +18314,7 @@ private inline fun <reified T> readInventoryResource(
     state: MutableDataStateFlow<List<T>>,
     status: MutableStateFlow<InventoryLoadStatus>,
     read: OwnedScopedRead<InventoryOwner>,
-    crossinline filter: (List<T>) -> List<T>
+    crossinline filter: suspend (List<T>) -> List<T>
 ) {
     val owner = inventoryOwners.current
     if (owner.storeId != storeId.trim() || !inventoryOwnerIsCurrent(owner)) return
@@ -18453,12 +18453,7 @@ fun refreshParentStoreStock(
     }
 }
 
-private fun stockItemSaveFailureMessage(): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel("main", "Could not save stock item. Please try again."),
-    LocalizedStringDataModel("en", "Could not save stock item. Please try again."),
-    LocalizedStringDataModel("ru", "Не удалось сохранить товар. Попробуйте ещё раз."),
-    LocalizedStringDataModel("kk", "Тауарды сақтау мүмкін болмады. Қайталап көріңіз.")
-)
+private fun stockItemSaveFailureMessage(): List<LocalizedStringDataModel> = eventMessage("message.could_not_save_stock_item_please_try_again")
 
 private suspend fun applySavedGoodsItemToStockState(
     savedGoodsItem: GoodsItemDataModel,
@@ -18605,26 +18600,11 @@ fun getStockBatches(storeId: String) = readInventoryResource(
 
 private val branchAvailabilityReadRevision = MutableStateFlow(0L)
 
-private fun stockMovementContextChangedMessage() = listOf(
-    LocalizedStringDataModel("main", "Store or account changed. Open the batch again."),
-    LocalizedStringDataModel("en", "Store or account changed. Open the batch again."),
-    LocalizedStringDataModel("ru", "Магазин или аккаунт изменился. Откройте партию заново."),
-    LocalizedStringDataModel("kk", "Дүкен немесе аккаунт өзгерді. Партияны қайта ашыңыз.")
-)
+private fun stockMovementContextChangedMessage() = eventMessage("message.store_or_account_changed_open_the_batch_again")
 
-private fun stockMovementBusyMessage() = listOf(
-    LocalizedStringDataModel("main", "A batch operation is already in progress. Please wait."),
-    LocalizedStringDataModel("en", "A batch operation is already in progress. Please wait."),
-    LocalizedStringDataModel("ru", "Операция с партией уже выполняется. Подождите."),
-    LocalizedStringDataModel("kk", "Партиямен операция орындалуда. Күте тұрыңыз.")
-)
+private fun stockMovementBusyMessage() = eventMessage("message.a_batch_operation_is_already_in_progress_please_wait")
 
-private fun stockMovementUnconfirmedMessage() = listOf(
-    LocalizedStringDataModel("main", "The batch result is not confirmed. Refresh branch stock before trying again; the operation may already have completed."),
-    LocalizedStringDataModel("en", "The batch result is not confirmed. Refresh branch stock before trying again; the operation may already have completed."),
-    LocalizedStringDataModel("ru", "Результат операции не подтверждён. Обновите остатки филиалов перед повтором: операция уже могла завершиться."),
-    LocalizedStringDataModel("kk", "Операция нәтижесі расталмады. Қайталаудан бұрын филиал қорын жаңартыңыз: операция аяқталған болуы мүмкін.")
-)
+private fun stockMovementUnconfirmedMessage() = eventMessage("message.the_batch_result_is_not_confirmed_refresh_branch_stock_before_trying")
 
 fun getStockItemBranchAvailability(
     storeId: String,
@@ -20259,7 +20239,9 @@ data class GoodsItemInTransactionDataModel(
 @kotlinx.serialization.Serializable
 data class LocalizedStringDataModel(
     val language: String,
-    val value: String
+    val value: String,
+    // Present only for application event wording, never inferred from customer-entered names.
+    val messageTemplate: EventMessageReference? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -20417,7 +20399,11 @@ data class NotificationDataModel(
     val createdAtMillis: Long = 0L,
     val shownAtMillis: Long = 0L,
     val readAtMillis: Long? = null,
-    val isSavedOnServer: Boolean = false
+    val isSavedOnServer: Boolean = false,
+    val messageTemplate: EventMessageReference? = null,
+    val titleTemplate: EventMessageReference? = null,
+    val messageTranslations: List<LocalizedStringDataModel> = emptyList(),
+    val titleTranslations: List<LocalizedStringDataModel> = emptyList()
 ): Searchable {
     override val exactSearchOperands: List<String>
         get() = listOf(id, title, message, category, source, type.name) + metadata.values
@@ -22229,7 +22215,9 @@ data class OperationLogDataModel(
     val title: List<LocalizedStringDataModel> = emptyList(),
     val details: List<LocalizedStringDataModel> = emptyList(),
     val metadata: Map<String, String> = emptyMap(),
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    val titleTemplate: EventMessageReference? = null,
+    val detailsTemplate: EventMessageReference? = null
 )
 
 @kotlinx.serialization.Serializable

@@ -761,38 +761,68 @@ internal fun AppConfiguration.SupplierPartnerDetail(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
-        SupplierCustomerOverviewCard(partner)
-        SupplierPartnerNextActionCard(
-            nextAction = nextAction,
-            onClick = ::executeNextAction,
+        val section = sectionTabsWidget(
+            stateKey = "supplier-partner-detail:${partner.partnerKey}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("work", authUiText("Work", "Работа", "Жұмыс")),
+                TabContent("commercial", authUiText("Commercial", "Коммерция", "Коммерция")),
+                TabContent("orders", localizedStringResource(254, "Orders")),
+                TabContent("agreements", authUiText("Agreements", "Соглашения", "Келісімдер")),
+                TabContent("offers", authUiText("Offers", "Предложения", "Ұсыныстар"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(vertical = stateValues.marginTextField / 2),
         )
-        SupplierCustomerActionGrid(
-            onOrders = { openOrders() },
-            onCatalog = { openCatalog() },
-            onContracts = { openContracts() },
-            onDispatch = { openDispatch() }
-        )
-        SupplierCustomerWorkCard(partner)
-        SupplierCustomerCommercialCard(partner)
-        SupplierCustomerRecentOrdersCard(partner, linesByOrder)
-        SupplierCustomerContractsCard(partner)
-        SupplierCustomerOffersCard(partner)
-        actionButton(
-            modifier = Modifier.fillMaxWidth(),
-            text = localizedStringResource(1466, "Copy partner brief"),
-            iconPath = stateValues.drawablePathIconClipboard,
-            iconRes = stateValues.drawableResIconClipboard.value,
-            confirmationRequired = false,
-            autoLoading = false,
-            onClick = {
-                copyTextToClipboard(partner.brief)
-                postInAppNotification(
-                    localizedStringResource(2386, "Store relationship copied"),
-                    NotificationType.Positive,
-                    transient = true
-                )
-            }
-        )
+
+        if (section == "overview") {
+            SupplierCustomerOverviewCard(partner)
+        }
+        if (section == "work") {
+            SupplierPartnerNextActionCard(
+                nextAction = nextAction,
+                onClick = ::executeNextAction,
+            )
+            SupplierCustomerActionGrid(
+                onOrders = { openOrders() },
+                onCatalog = { openCatalog() },
+                onContracts = { openContracts() },
+                onDispatch = { openDispatch() }
+            )
+            SupplierCustomerWorkCard(partner)
+        }
+        if (section == "commercial") {
+            SupplierCustomerCommercialCard(partner)
+        }
+        if (section == "orders") {
+            SupplierCustomerRecentOrdersCard(partner, linesByOrder)
+        }
+        if (section == "agreements") {
+            SupplierCustomerContractsCard(partner)
+        }
+        if (section == "offers") {
+            SupplierCustomerOffersCard(partner)
+        }
+        if (section == "overview") {
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = localizedStringResource(1466, "Copy partner brief"),
+                iconPath = stateValues.drawablePathIconClipboard,
+                iconRes = stateValues.drawableResIconClipboard.value,
+                confirmationRequired = false,
+                autoLoading = false,
+                onClick = {
+                    copyTextToClipboard(partner.brief)
+                    postInAppNotification(
+                        localizedStringResource(2386, "Store relationship copied"),
+                        NotificationType.Positive,
+                        transient = true
+                    )
+                }
+            )
+        }
     }
 }
 

@@ -152,30 +152,15 @@ internal suspend fun passwordLoginWithCompatibility(
 /** Preserve provider/policy/credential errors; distinguish them from a genuine transport outage. */
 internal fun <T> ResponseDataModel<T>.withAuthFailureMessage(): ResponseDataModel<T> {
     if (!negative) return this
-    val text = when {
+    val key = when {
         transportFailure -> return this
-        httpStatusCode == 404 || httpStatusCode == 405 || httpStatusCode == 501 -> arrayOf(
-            "Update the AITA server to use this sign-in method.",
-            "Обновите сервер AITA для этого способа входа.",
-            "Бұл кіру тәсілі үшін AITA серверін жаңартыңыз."
-        )
+        httpStatusCode == 404 || httpStatusCode == 405 || httpStatusCode == 501 -> "auth.client.server_update_required"
         httpStatusCode == 429 && !message.isNullOrEmpty() -> return this
-        httpStatusCode == 429 -> arrayOf(
-            "Too many attempts. Try again later.",
-            "Слишком много попыток. Попробуйте позже.",
-            "Тым көп әрекет жасалды. Кейінірек қайталаңыз."
-        )
-        httpStatusCode == 500 -> arrayOf(
-            "The server could not complete sign-in. Try again or contact the administrator.",
-            "Сервер не смог выполнить вход. Повторите или обратитесь к администратору.",
-            "Сервер кіруді аяқтай алмады. Қайталаңыз немесе әкімшіге хабарласыңыз."
-        )
+        httpStatusCode == 429 -> "auth.client.too_many_attempts"
+        httpStatusCode == 500 -> "auth.client.server_sign_in_failed"
         else -> return this
     }
-    return copy(message = listOf(
-        LocalizedStringDataModel("main", text[0]), LocalizedStringDataModel("en", text[0]),
-        LocalizedStringDataModel("ru", text[1]), LocalizedStringDataModel("kk", text[2])
-    ))
+    return copy(message = eventMessage(key))
 }
 
 /** Persisting credentials and loading the account are separate, retryable stages. */
@@ -204,12 +189,7 @@ private val authenticationCompletion = AuthenticationCompletionCoordinator<Respo
     }
 )
 
-private fun authenticationCompletionFailureMessage() = listOf(
-    LocalizedStringDataModel("main", "Sign-in was accepted, but your account could not be loaded. Press Continue to retry."),
-    LocalizedStringDataModel("en", "Sign-in was accepted, but your account could not be loaded. Press Continue to retry."),
-    LocalizedStringDataModel("ru", "Вход подтверждён, но аккаунт не загрузился. Нажмите «Продолжить», чтобы повторить."),
-    LocalizedStringDataModel("kk", "Кіру расталды, бірақ аккаунт жүктелмеді. Қайталау үшін «Жалғастыру» түймесін басыңыз.")
-)
+private fun authenticationCompletionFailureMessage() = eventMessage("message.sign_in_was_accepted_but_your_account_could_not_be_loaded")
 
 suspend fun finishAdvancedAuthenticationSignIn(generation: Long): ResponseDataModel<UserAccountDataModel> {
     if (!authenticatedSessionGenerationIsCurrent(generation)) return cloudSessionExpiredResponse()

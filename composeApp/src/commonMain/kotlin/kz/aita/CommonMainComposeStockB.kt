@@ -5798,16 +5798,19 @@ internal fun SupplierOrderDataModel.matchesSupplierDueFilter(dueFilter: String, 
 internal suspend fun seedSupplierOrdersInboxNavigation(
     searchQuery: String = "",
     dueFilter: String = "all",
-    statusFilter: String = if (searchQuery.isBlank()) "open" else "all"
+    statusFilter: String = if (searchQuery.isBlank()) "open" else "all",
+    revealResults: Boolean = true
 ) {
     val safeSearchQuery = searchQuery.trim()
-    NavigationScreenModel.Supplier.Orders.Main.setStates(
+    NavigationScreenModel.Supplier.Orders.Main.setStates(*supplierWorkspaceNavigationSeed(
+        resultSectionId = "orders",
+        revealResults = revealResults,
         NavigationScreenModel.KEY_STATE_SEARCH_QUERY to safeSearchQuery,
         SUPPLIER_ORDER_DUE_FILTER_STATE_KEY to dueFilter.ifBlank { "all" },
         SUPPLIER_ORDER_STATUS_FILTER_STATE_KEY to statusFilter.ifBlank {
             if (safeSearchQuery.isBlank()) "open" else "all"
         }
-    )
+    ).toTypedArray())
 }
 
 internal fun AppConfiguration.supplierDeliveryBucketTitle(bucketId: String): String = when (bucketId) {

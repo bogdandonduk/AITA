@@ -117,27 +117,12 @@ internal fun inventoryOwnerIsCurrent(owner: InventoryOwner): Boolean =
 internal fun inventoryCacheKey(name: String, owner: InventoryOwner): String =
     "inventory-v2:$name:${owner.accountId}:${owner.storeId}"
 
-internal fun inventoryLoadFailureMessage(): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel("main", "Could not load stock. Try again."),
-    LocalizedStringDataModel("en", "Could not load stock. Try again."),
-    LocalizedStringDataModel("ru", "Не удалось загрузить склад. Повторите попытку."),
-    LocalizedStringDataModel("kk", "Қойманы жүктеу мүмкін болмады. Қайталап көріңіз.")
-)
+internal fun inventoryLoadFailureMessage(): List<LocalizedStringDataModel> = eventMessage("message.could_not_load_stock_try_again")
 
 /** Cache hydration must never overwrite a cloud/local result (even an authoritative empty list). */
 internal fun canHydrateInventory(hasPayload: Boolean, ownerIsCurrent: Boolean): Boolean =
     ownerIsCurrent && !hasPayload
 
-fun inventoryCachedWhileOfflineMessage(): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel("main", "Offline · showing saved stock"),
-    LocalizedStringDataModel("en", "Offline · showing saved stock"),
-    LocalizedStringDataModel("ru", "Офлайн · показаны сохранённые остатки"),
-    LocalizedStringDataModel("kk", "Офлайн · сақталған қор көрсетілген")
-)
+fun inventoryCachedWhileOfflineMessage(): List<LocalizedStringDataModel> = eventMessage("message.offline_showing_saved_stock")
 
-fun inventoryCacheWriteFailureMessage(): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel("main", "Stock is visible, but could not be saved on this device. Check free storage before working offline."),
-    LocalizedStringDataModel("en", "Stock is visible, but could not be saved on this device. Check free storage before working offline."),
-    LocalizedStringDataModel("ru", "Остатки показаны, но не сохранены на устройстве. Проверьте свободное место перед работой офлайн."),
-    LocalizedStringDataModel("kk", "Қор көрсетілген, бірақ құрылғыға сақталмады. Офлайн жұмысқа дейін бос орынды тексеріңіз.")
-)
+fun inventoryCacheWriteFailureMessage(): List<LocalizedStringDataModel> = eventMessage("message.stock_is_visible_but_could_not_be_saved_on_this_device")

@@ -1576,6 +1576,7 @@ fun AppConfiguration.tabRowWidget(
     titleTextSize: TextUnit = stateValues.accentTextSize,
     titleTextColor: Color = stateValues.TextColor,
     enabled: Boolean = true,
+    scrollable: Boolean = tabs.size > 4,
 ): TabRowContent {
     val tabsKey = remember(tabs) { tabs.joinToString(separator = "|") { it.id } }
     val savedSelectedIdState = rememberSaveable(tabsKey, selectedIndexInitial) { mutableStateOf(selectedIndexInitial) }
@@ -1609,7 +1610,7 @@ fun AppConfiguration.tabRowWidget(
                 )
             }
 
-            val scrollableTabs = tabs.size > 4
+            val scrollableTabs = scrollable
             val tabScrollState = rememberScrollState()
 
             Row(

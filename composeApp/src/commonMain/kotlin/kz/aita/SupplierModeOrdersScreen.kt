@@ -66,7 +66,8 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
         seedSupplierOrdersInboxNavigation(
             searchQuery = searchQuery,
             dueFilter = dueFilter,
-            statusFilter = statusFilter
+            statusFilter = statusFilter,
+            revealResults = false
         )
     }
 
@@ -250,7 +251,23 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
             iconRes = stateValues.drawableResIconAppModeSupplier.value
         )
 
+        val section = sectionTabsWidget(
+            stateKey = "supplier-orders:${focusedSupplierId.orEmpty()}",
+            tabs = listOf(
+                TabContent("orders", localizedStringResource(254, "Orders")),
+                TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық")),
+                TabContent("promises", authUiText("Delivery promises", "Сроки доставки", "Жеткізу мерзімдері"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+            selectedId = supplierOrderNavigationState[SUPPLIER_WORKSPACE_SECTION_STATE_KEY] ?: "orders",
+            onSelected = { NavigationScreenModel.Supplier.Orders.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to it) },
+        )
+
         LazyColumn(
+            state = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Orders.Main, "sections:${focusedSupplierId.orEmpty()}:$section"),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -298,166 +315,184 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                     )
                 }
 
-                item {
-                    SupplierOrdersMetrics(
-                        metrics = metrics,
-                        onSelected = { metric ->
-                            statusFilter = metric.filterId
-                            dueFilter = "all"
-                            searchQuery = ""
-                            expandedOrderId = null
-                        }
-                    )
-                }
-
-                supplierReadiness?.let { readiness ->
-                    item(key = "supplier-order-readiness-board") {
-                        SupplierReadinessBoardCard(
-                            readiness = readiness,
-                            onOpenAnswerGaps = {
-                                statusFilter = "answer_gaps"
-                                dueFilter = "all"
-                                searchQuery = ""
-                                expandedOrderId = null
-                            },
-                            onOpenPackQueue = {
-                                statusFilter = "ready_to_pack"
-                                dueFilter = "all"
-                                searchQuery = ""
-                                expandedOrderId = null
-                            }
-                        )
-                    }
-                }
-
-                item {
-                    SupplierOrdersWorkflowLinks()
-                }
-
-                if (deliveryPromiseBuckets.isNotEmpty()) {
-                    item(key = "supplier-order-promise-radar") {
-                        SupplierDeliveryPromiseRadarCard(
-                            buckets = deliveryPromiseBuckets,
-                            selectedBucketId = dueFilter,
-                            onBucketSelected = { bucketId ->
-                                dueFilter = bucketId.ifBlank { "all" }
-                                if (dueFilter != "all") statusFilter = "open"
-                                searchQuery = ""
-                                expandedOrderId = null
-                            }
-                        )
-                    }
-                }
-
-                item {
-                    SupplierOrdersFilterPanel(
-                        searchQuery = searchQuery,
-                        statusFilter = statusFilter,
-                        dueFilter = dueFilter,
-                        dueOptions = dueOptions,
-                        filteredCount = filteredOrders.size,
-                        totalCount = activeOrders.size,
-                        expanded = filtersExpanded,
-                        onSearchChanged = {
-                            searchQuery = it
-                            expandedOrderId = null
-                        },
-                        onStatusChanged = {
-                            statusFilter = it.ifBlank { "open" }
-                            expandedOrderId = null
-                        },
-                        onDueChanged = {
-                            dueFilter = it.ifBlank { "all" }
-                            expandedOrderId = null
-                        },
-                        onExpandedChanged = { filtersExpanded = it }
-                    )
-                }
-
-                if (orderDataPending) {
-                    item(key = "supplier-orders-loading") {
-                        MessageText(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = localizedStringResource(1141, "Please wait…")
-                        )
-                    }
-                } else if (activeOrders.isEmpty()) {
-                    item(key = "supplier-orders-empty") {
-                        MessageText(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = localizedStringResource(1379, "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.")
-                        )
-                    }
-                } else if (filteredOrders.isEmpty()) {
+                if (section == "orders") {
                     item {
-                        MessageText(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = localizedStringResource(1380, "No orders match this filter")
+                        SupplierOrdersMetrics(
+                            metrics = metrics,
+                            onSelected = { metric ->
+                                statusFilter = metric.filterId
+                                dueFilter = "all"
+                                searchQuery = ""
+                                expandedOrderId = null
+                            }
                         )
                     }
-                } else if (expandedOrder != null) {
-                    item(key = "supplier-order-back-${expandedOrder.id}") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                        ) {
-                            actionButton(
-                                modifier = Modifier.weight(1f),
-                                text = localizedStringResource(254, "Orders"),
-                                iconPath = stateValues.drawablePathIconBackArrow,
-                                iconRes = stateValues.drawableResIconBackArrow.value,
-                                confirmationRequired = false,
-                                autoLoading = false,
-                                onClick = { expandedOrderId = null }
-                            )
-                            actionButton(
-                                modifier = Modifier.size(48.dp),
-                                fillMaxWidthIfTextPresent = false,
-                                text = "",
-                                iconPath = stateValues.drawablePathIconSupplierPartners,
-                                iconRes = stateValues.drawableResIconSupplierPartners.value,
-                                iconContentDescription = localizedStringResource(2375, "Partner overview"),
-                                confirmationRequired = false,
-                                autoLoading = false,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        seedSupplierCustomersNavigation(
-                                            searchQuery = expandedOrder.storeId
-                                                .trim()
-                                                .ifBlank { expandedOrder.storePublicIdSnapshot.trim() }
-                                                .ifBlank { supplierDeskStoreTitle(expandedOrder) }
-                                        )
-                                        Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main)
-                                    }
+                }
+
+                if (section == "readiness") {
+                    if (supplierReadiness == null) {
+                        item { MessageText(Modifier.fillMaxWidth(), authUiText("No readiness data yet", "Данные о готовности пока не загружены", "Дайындық деректері әлі жүктелмеген")) }
+                    }
+                    supplierReadiness?.let { readiness ->
+                        item(key = "supplier-order-readiness-board") {
+                            SupplierReadinessBoardCard(
+                                readiness = readiness,
+                                onOpenAnswerGaps = {
+                                    NavigationScreenModel.Supplier.Orders.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to "orders")
+                                    statusFilter = "answer_gaps"
+                                    dueFilter = "all"
+                                    searchQuery = ""
+                                    expandedOrderId = null
+                                },
+                                onOpenPackQueue = {
+                                    NavigationScreenModel.Supplier.Orders.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to "orders")
+                                    statusFilter = "ready_to_pack"
+                                    dueFilter = "all"
+                                    searchQuery = ""
+                                    expandedOrderId = null
                                 }
                             )
                         }
                     }
-                    item(key = "supplier-order-detail-${expandedOrder.id}") {
-                        SupplierOrderDeskCard(
-                            order = expandedOrder,
-                            lines = linesByOrder[expandedOrder.id].orEmpty(),
-                            substituteOptions = substituteOptionsByStore[expandedOrder.storeId].orEmpty(),
-                            supplierPriceRows = focusedSupplierPrices,
-                            supplierIdentityTitle = if (identityPresentation.combined) {
-                                identityPresentation.titleForSupplierIdentity(expandedOrder.supplierId)
-                            } else {
-                                ""
-                            }
+                }
+
+                if (section == "readiness") {
+                    item {
+                        SupplierOrdersWorkflowLinks()
+                    }
+                }
+
+                if (section == "promises") {
+                    if (deliveryPromiseBuckets.isEmpty()) {
+                        item { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                    } else {
+                        item(key = "supplier-order-promise-radar") {
+                            SupplierDeliveryPromiseRadarCard(
+                                buckets = deliveryPromiseBuckets,
+                                selectedBucketId = dueFilter,
+                                onBucketSelected = { bucketId ->
+                                    NavigationScreenModel.Supplier.Orders.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to "orders")
+                                    dueFilter = bucketId.ifBlank { "all" }
+                                    if (dueFilter != "all") statusFilter = "open"
+                                    searchQuery = ""
+                                    expandedOrderId = null
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (section == "orders") {
+                    item {
+                        SupplierOrdersFilterPanel(
+                            searchQuery = searchQuery,
+                            statusFilter = statusFilter,
+                            dueFilter = dueFilter,
+                            dueOptions = dueOptions,
+                            filteredCount = filteredOrders.size,
+                            totalCount = activeOrders.size,
+                            expanded = filtersExpanded,
+                            onSearchChanged = {
+                                searchQuery = it
+                                expandedOrderId = null
+                            },
+                            onStatusChanged = {
+                                statusFilter = it.ifBlank { "open" }
+                                expandedOrderId = null
+                            },
+                            onDueChanged = {
+                                dueFilter = it.ifBlank { "all" }
+                                expandedOrderId = null
+                            },
+                            onExpandedChanged = { filtersExpanded = it }
                         )
                     }
-                } else {
-                    items(prioritizedFilteredOrders, key = { it.id }) { order ->
-                        SupplierOrdersCompactCard(
-                            order = order,
-                            lines = linesByOrder[order.id].orEmpty(),
-                            supplierIdentityTitle = if (identityPresentation.combined) {
-                                identityPresentation.titleForSupplierIdentity(order.supplierId)
-                            } else {
-                                ""
-                            },
-                            onOpen = { expandedOrderId = order.id }
-                        )
+
+                    if (orderDataPending) {
+                        item(key = "supplier-orders-loading") {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1141, "Please wait…")
+                            )
+                        }
+                    } else if (activeOrders.isEmpty()) {
+                        item(key = "supplier-orders-empty") {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1379, "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.")
+                            )
+                        }
+                    } else if (filteredOrders.isEmpty()) {
+                        item {
+                            MessageText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = localizedStringResource(1380, "No orders match this filter")
+                            )
+                        }
+                    } else if (expandedOrder != null) {
+                        item(key = "supplier-order-back-${expandedOrder.id}") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                            ) {
+                                actionButton(
+                                    modifier = Modifier.weight(1f),
+                                    text = localizedStringResource(254, "Orders"),
+                                    iconPath = stateValues.drawablePathIconBackArrow,
+                                    iconRes = stateValues.drawableResIconBackArrow.value,
+                                    confirmationRequired = false,
+                                    autoLoading = false,
+                                    onClick = { expandedOrderId = null }
+                                )
+                                actionButton(
+                                    modifier = Modifier.size(48.dp),
+                                    fillMaxWidthIfTextPresent = false,
+                                    text = "",
+                                    iconPath = stateValues.drawablePathIconSupplierPartners,
+                                    iconRes = stateValues.drawableResIconSupplierPartners.value,
+                                    iconContentDescription = localizedStringResource(2375, "Partner overview"),
+                                    confirmationRequired = false,
+                                    autoLoading = false,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            seedSupplierCustomersNavigation(
+                                                searchQuery = expandedOrder.storeId
+                                                    .trim()
+                                                    .ifBlank { expandedOrder.storePublicIdSnapshot.trim() }
+                                                    .ifBlank { supplierDeskStoreTitle(expandedOrder) }
+                                            )
+                                            Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        item(key = "supplier-order-detail-${expandedOrder.id}") {
+                            SupplierOrderDeskCard(
+                                order = expandedOrder,
+                                lines = linesByOrder[expandedOrder.id].orEmpty(),
+                                substituteOptions = substituteOptionsByStore[expandedOrder.storeId].orEmpty(),
+                                supplierPriceRows = focusedSupplierPrices,
+                                supplierIdentityTitle = if (identityPresentation.combined) {
+                                    identityPresentation.titleForSupplierIdentity(expandedOrder.supplierId)
+                                } else {
+                                    ""
+                                }
+                            )
+                        }
+                    } else {
+                        items(prioritizedFilteredOrders, key = { it.id }) { order ->
+                            SupplierOrdersCompactCard(
+                                order = order,
+                                lines = linesByOrder[order.id].orEmpty(),
+                                supplierIdentityTitle = if (identityPresentation.combined) {
+                                    identityPresentation.titleForSupplierIdentity(order.supplierId)
+                                } else {
+                                    ""
+                                },
+                                onOpen = { expandedOrderId = order.id }
+                            )
+                        }
                     }
                 }
             }

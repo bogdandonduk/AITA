@@ -2767,8 +2767,15 @@ internal fun AppConfiguration.receiptActionNotification(
         else -> result.message.ifBlank { stateValues.stringReceiptActionFailed }
     }
     val type = if (result.success) NotificationType.Positive else NotificationType.Negative
+    val messageReference = if (file != null) {
+        val resultReference = currentEventResourceCatalogue().referenceFor(positiveMessage)
+            ?: legacyEventMessageReference(positiveMessage) ?: eventFact(positiveMessage)
+        EventMessageReference("device.file.location",
+            arguments = mapOf("folder" to file.folder, "file" to file.fileName),
+            children = mapOf("result" to listOf(resultReference)))
+    } else null
     // Native error strings can contain device paths too; keep the whole result local.
-    coroutineScope.launch { postDeviceFileNotification(message, file, owner, type) }
+    coroutineScope.launch { postDeviceFileNotification(message, file, owner, type, messageReference) }
 }
 
 internal fun AppConfiguration.buildTransactionReceiptLines(

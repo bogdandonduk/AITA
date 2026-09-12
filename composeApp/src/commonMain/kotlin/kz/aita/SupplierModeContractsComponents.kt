@@ -1207,80 +1207,105 @@ internal fun AppConfiguration.SupplierContractDetail(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
-        SupplierContractOverviewCard(item, actorSide)
-        SupplierContractAcceptanceCard(contract)
+        val section = sectionTabsWidget(
+            stateKey = "supplier-contract-detail:${contract.id}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("acceptance", authUiText("Acceptance", "Согласование", "Келісу")),
+                TabContent("terms", authUiText("Terms", "Условия", "Шарттар")),
+                TabContent("products", authUiText("Products", "Товары", "Тауарлар")),
+                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(vertical = stateValues.marginTextField / 2),
+        )
 
-        val customTerms = contract.customTerms.visibleLocalizedString(stateValues.appLanguage, "")
-        val delivery = contract.deliverySchedule.visibleLocalizedString(stateValues.appLanguage, "")
-        val payment = contract.paymentSchedule.visibleLocalizedString(stateValues.appLanguage, "")
-        if (
-            contract.conditions.isNotEmpty() ||
-            customTerms.isNotBlank() ||
-            delivery.isNotBlank() ||
-            payment.isNotBlank()
-        ) {
-            SupplierContractSectionCard(
-                title = localizedStringResource(1503, "Contract terms"),
-                iconPath = stateValues.drawablePathIconEdit,
-                iconRes = stateValues.drawableResIconEdit.value
+        if (section == "overview") {
+            SupplierContractOverviewCard(item, actorSide)
+        }
+        if (section == "acceptance") {
+            SupplierContractAcceptanceCard(contract)
+        }
+
+        if (section == "terms") {
+            val customTerms = contract.customTerms.visibleLocalizedString(stateValues.appLanguage, "")
+            val delivery = contract.deliverySchedule.visibleLocalizedString(stateValues.appLanguage, "")
+            val payment = contract.paymentSchedule.visibleLocalizedString(stateValues.appLanguage, "")
+            if (
+                contract.conditions.isNotEmpty() ||
+                customTerms.isNotBlank() ||
+                delivery.isNotBlank() ||
+                payment.isNotBlank()
             ) {
-                contract.conditions.forEach { raw ->
-                    Text(
-                        text = "• ${visibleStockConditionText(raw.toStockConditionDataModel())}",
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.smallTextSize
-                    )
+                SupplierContractSectionCard(
+                    title = localizedStringResource(1503, "Contract terms"),
+                    iconPath = stateValues.drawablePathIconEdit,
+                    iconRes = stateValues.drawableResIconEdit.value
+                ) {
+                    contract.conditions.forEach { raw ->
+                        Text(
+                            text = "• ${visibleStockConditionText(raw.toStockConditionDataModel())}",
+                            color = stateValues.TextColor,
+                            fontSize = stateValues.smallTextSize
+                        )
+                    }
+                    customTerms.takeIf { it.isNotBlank() }?.let {
+                        SupplierContractLabeledText(
+                            label = localizedStringResource(1524, "Custom written terms"),
+                            value = it
+                        )
+                    }
+                    delivery.takeIf { it.isNotBlank() }?.let {
+                        SupplierContractLabeledText(
+                            label = localizedStringResource(1504, "Delivery schedule"),
+                            value = it
+                        )
+                    }
+                    payment.takeIf { it.isNotBlank() }?.let {
+                        SupplierContractLabeledText(
+                            label = localizedStringResource(1505, "Payment schedule"),
+                            value = it
+                        )
+                    }
                 }
-                customTerms.takeIf { it.isNotBlank() }?.let {
-                    SupplierContractLabeledText(
-                        label = localizedStringResource(1524, "Custom written terms"),
-                        value = it
-                    )
-                }
-                delivery.takeIf { it.isNotBlank() }?.let {
-                    SupplierContractLabeledText(
-                        label = localizedStringResource(1504, "Delivery schedule"),
-                        value = it
-                    )
-                }
-                payment.takeIf { it.isNotBlank() }?.let {
-                    SupplierContractLabeledText(
-                        label = localizedStringResource(1505, "Payment schedule"),
-                        value = it
-                    )
-                }
+            } else {
+                MessageText(text = stateValues.stringListEmpty)
             }
         }
 
-        SupplierContractSectionCard(
-            title = localizedStringResource(2418, "Products covered by this agreement"),
-            iconPath = stateValues.drawablePathIconSupplierCatalog,
-            iconRes = stateValues.drawableResIconSupplierCatalog.value
-        ) {
-            when {
-                contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP && contract.priceTerms.none { it.isActive } -> {
-                    Text(
-                        text = localizedStringResource(2415, "Applies to the whole Store–Supplier relationship"),
-                        color = stateValues.PlaceholderTextColor,
-                        fontSize = stateValues.smallTextSize
-                    )
-                }
-                contract.priceTerms.any { it.isActive } -> {
-                    contract.priceTerms.filter { it.isActive }.forEach { term ->
-                        SupplierContractPriceTermRow(term)
+        if (section == "products") {
+            SupplierContractSectionCard(
+                title = localizedStringResource(2418, "Products covered by this agreement"),
+                iconPath = stateValues.drawablePathIconSupplierCatalog,
+                iconRes = stateValues.drawableResIconSupplierCatalog.value
+            ) {
+                when {
+                    contract.scopeType == SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP && contract.priceTerms.none { it.isActive } -> {
+                        Text(
+                            text = localizedStringResource(2415, "Applies to the whole Store–Supplier relationship"),
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize
+                        )
                     }
-                }
-                contract.goodsItemIds.isNotEmpty() -> {
-                    contract.goodsItemIds.forEach { goodsItemId ->
-                        SupplierCatalogChip(text = goodsItemId.take(16))
+                    contract.priceTerms.any { it.isActive } -> {
+                        contract.priceTerms.filter { it.isActive }.forEach { term ->
+                            SupplierContractPriceTermRow(term)
+                        }
                     }
-                }
-                else -> {
-                    Text(
-                        text = localizedStringResource(2426, "No product-specific price lines"),
-                        color = stateValues.PlaceholderTextColor,
-                        fontSize = stateValues.smallTextSize
-                    )
+                    contract.goodsItemIds.isNotEmpty() -> {
+                        contract.goodsItemIds.forEach { goodsItemId ->
+                            SupplierCatalogChip(text = goodsItemId.take(16))
+                        }
+                    }
+                    else -> {
+                        Text(
+                            text = localizedStringResource(2426, "No product-specific price lines"),
+                            color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.smallTextSize
+                        )
+                    }
                 }
             }
         }
@@ -1294,108 +1319,110 @@ internal fun AppConfiguration.SupplierContractDetail(
             )
         }
 
-        actionButton(
-            modifier = Modifier.fillMaxWidth(),
-            text = localizedStringResource(1495, "Counter / edit proposal"),
-            subText = localizedStringResource(2414, "Editing creates a new revision and asks the other side to accept it."),
-            iconPath = stateValues.drawablePathIconEdit,
-            iconRes = stateValues.drawableResIconEdit.value,
-            enabledColor = stateValues.AccentColor,
-            enabled = operation == null,
-            confirmationRequired = false,
-            autoLoading = false,
-            onClick = onEdit
-        )
-
-        if (contract.requiresAcceptanceFrom(actorSide)) {
+        if (section == "actions") {
             actionButton(
                 modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1496, "Accept contract"),
-                loadingText = localizedStringResource(2427, "Accepting agreement…"),
-                iconPath = stateValues.drawablePathIconCheck,
-                iconRes = stateValues.drawableResIconCheck.value,
-                enabledColor = stateValues.OkayColor,
+                text = localizedStringResource(1495, "Counter / edit proposal"),
+                subText = localizedStringResource(2414, "Editing creates a new revision and asks the other side to accept it."),
+                iconPath = stateValues.drawablePathIconEdit,
+                iconRes = stateValues.drawableResIconEdit.value,
+                enabledColor = stateValues.AccentColor,
                 enabled = operation == null,
-                loading = operation == "accept",
+                confirmationRequired = false,
                 autoLoading = false,
-                confirmationRequired = true,
-                onClick = {
-                    operation = "accept"
-                    resultMessage = ""
-                    acceptSupplierContract(contract.id, contract.revision, ::completeMutation)
-                }
+                onClick = onEdit
             )
-        } else if (contract.waitsForOtherContractSide(actorSide)) {
-            MessageText(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1527, "Waiting for the other side"),
-                subText = localizedStringResource(
-                    2428,
-                    "The partner must accept this exact revision before it becomes active."
-                ),
-                subTextSize = stateValues.smallTextSize
-            )
-        }
 
-        if (contract.canBeDeclinedByContractParty()) {
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1497, "Decline contract"),
-                loadingText = localizedStringResource(2429, "Declining proposal…"),
-                iconPath = stateValues.drawablePathIconCancel,
-                iconRes = stateValues.drawableResIconCancel.value,
-                enabledColor = stateValues.ErrorColor,
-                enabled = operation == null,
-                loading = operation == "decline",
-                autoLoading = false,
-                confirmationRequired = true,
-                onClick = {
-                    operation = "decline"
-                    resultMessage = ""
-                    declineSupplierContract(contract.id, contract.revision, ::completeMutation)
-                }
-            )
-        }
+            if (contract.requiresAcceptanceFrom(actorSide)) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1496, "Accept contract"),
+                    loadingText = localizedStringResource(2427, "Accepting agreement…"),
+                    iconPath = stateValues.drawablePathIconCheck,
+                    iconRes = stateValues.drawableResIconCheck.value,
+                    enabledColor = stateValues.OkayColor,
+                    enabled = operation == null,
+                    loading = operation == "accept",
+                    autoLoading = false,
+                    confirmationRequired = true,
+                    onClick = {
+                        operation = "accept"
+                        resultMessage = ""
+                        acceptSupplierContract(contract.id, contract.revision, ::completeMutation)
+                    }
+                )
+            } else if (contract.waitsForOtherContractSide(actorSide)) {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1527, "Waiting for the other side"),
+                    subText = localizedStringResource(
+                        2428,
+                        "The partner must accept this exact revision before it becomes active."
+                    ),
+                    subTextSize = stateValues.smallTextSize
+                )
+            }
 
-        if (contract.canBeArchivedByContractParty()) {
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1498, "Archive contract"),
-                loadingText = localizedStringResource(2430, "Archiving agreement…"),
-                iconPath = stateValues.drawablePathIconDelete,
-                iconRes = stateValues.drawableResIconDelete.value,
-                enabledColor = stateValues.DisabledColor,
-                enabled = operation == null,
-                loading = operation == "archive",
-                autoLoading = false,
-                confirmationRequired = true,
-                onClick = {
-                    operation = "archive"
-                    resultMessage = ""
-                    archiveSupplierContract(contract.id, contract.revision) { result ->
-                        coroutineScope.launch {
-                            operation = null
-                            when (result) {
-                                is DataState.Success -> {
-                                    resultPositive = true
-                                    resultMessage = result.message.orEmpty().visibleLocalizedString(
-                                        stateValues.appLanguage,
-                                        localizedStringResource(2431, "Agreement archived")
-                                    )
-                                    onArchived()
-                                }
-                                is DataState.Empty -> {
-                                    resultPositive = false
-                                    resultMessage = result.message.orEmpty().visibleLocalizedString(
-                                        stateValues.appLanguage,
-                                        localizedStringResource(2411, "Could not update supplier contract")
-                                    )
+            if (contract.canBeDeclinedByContractParty()) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1497, "Decline contract"),
+                    loadingText = localizedStringResource(2429, "Declining proposal…"),
+                    iconPath = stateValues.drawablePathIconCancel,
+                    iconRes = stateValues.drawableResIconCancel.value,
+                    enabledColor = stateValues.ErrorColor,
+                    enabled = operation == null,
+                    loading = operation == "decline",
+                    autoLoading = false,
+                    confirmationRequired = true,
+                    onClick = {
+                        operation = "decline"
+                        resultMessage = ""
+                        declineSupplierContract(contract.id, contract.revision, ::completeMutation)
+                    }
+                )
+            }
+
+            if (contract.canBeArchivedByContractParty()) {
+                actionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(1498, "Archive contract"),
+                    loadingText = localizedStringResource(2430, "Archiving agreement…"),
+                    iconPath = stateValues.drawablePathIconDelete,
+                    iconRes = stateValues.drawableResIconDelete.value,
+                    enabledColor = stateValues.DisabledColor,
+                    enabled = operation == null,
+                    loading = operation == "archive",
+                    autoLoading = false,
+                    confirmationRequired = true,
+                    onClick = {
+                        operation = "archive"
+                        resultMessage = ""
+                        archiveSupplierContract(contract.id, contract.revision) { result ->
+                            coroutineScope.launch {
+                                operation = null
+                                when (result) {
+                                    is DataState.Success -> {
+                                        resultPositive = true
+                                        resultMessage = result.message.orEmpty().visibleLocalizedString(
+                                            stateValues.appLanguage,
+                                            localizedStringResource(2431, "Agreement archived")
+                                        )
+                                        onArchived()
+                                    }
+                                    is DataState.Empty -> {
+                                        resultPositive = false
+                                        resultMessage = result.message.orEmpty().visibleLocalizedString(
+                                            stateValues.appLanguage,
+                                            localizedStringResource(2411, "Could not update supplier contract")
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }

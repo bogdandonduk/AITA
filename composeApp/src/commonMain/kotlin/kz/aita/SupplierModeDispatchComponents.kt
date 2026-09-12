@@ -627,158 +627,181 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
             .padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(stateValues.cornerRadius))
-                    .background(supplierDispatchRunAccent(run).copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CpImage(
-                    modifier = Modifier.size(30.dp),
-                    url = stateValues.drawablePathIconSupplierDispatch,
-                    fallbackRes = stateValues.drawableResIconSupplierDispatch.value,
-                    contentDescription = localizedStringResource(1556, "Dispatch"),
-                    tintColor = supplierDispatchRunAccent(run)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = run.storeTitle,
-                    color = stateValues.TextColor,
-                    fontSize = stateValues.titleTextSize,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = listOfNotNull(
-                        run.storePublicId.takeIf { it.isNotBlank() },
-                        run.storeAddress.takeIf { it.isNotBlank() }
-                    ).joinToString(" • ").ifBlank { run.storeId.take(12) },
-                    color = stateValues.PlaceholderTextColor,
-                    fontSize = stateValues.smallTextSize,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            SupplierCatalogChip(
-                text = supplierDispatchSuggestedActionTitle(run.suggestedAction),
-                color = supplierDispatchRunAccent(run)
-            )
-        }
-
-        Text(
-            text = run.goodsPreview,
-            color = stateValues.TextColor,
-            fontSize = stateValues.textSize,
-            fontWeight = FontWeight.Bold
+        val section = sectionTabsWidget(
+            stateKey = "supplier-dispatch-detail:${run.key}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("checklist", authUiText("Checklist", "Чек-лист", "Тексеру тізімі")),
+                TabContent("attention", authUiText("Attention", "Внимание", "Назар аудару")),
+                TabContent("handoff", authUiText("Driver handoff", "Передача водителю", "Жүргізушіге тапсыру")),
+                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(vertical = stateValues.marginTextField / 2),
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            StockCardInfoLine(
-                localizedStringResource(2478, "Orders in this run"),
-                run.orderCount.toString(),
-                stateValues.TextColor
-            )
-            StockCardInfoLine(
-                localizedStringResource(1564, "Goods lines"),
-                run.lineCount.toString(),
-                stateValues.TextColor
-            )
-            amountText.takeIf { it.isNotBlank() }?.let {
-                StockCardInfoLine(localizedStringResource(581, "Amount"), it, stateValues.TextColor)
-            }
-            run.earliestDueAtMillis?.takeIf { it > 0L }?.let {
-                StockCardInfoLine(
-                    localizedStringResource(1723, "Earliest due"),
-                    receiptUiDateTime(it),
-                    stateValues.TextColor
-                )
-            }
-            run.latestDueAtMillis?.takeIf { it > 0L && it != run.earliestDueAtMillis }?.let {
-                StockCardInfoLine(
-                    localizedStringResource(1724, "Latest due"),
-                    receiptUiDateTime(it),
-                    stateValues.TextColor
-                )
-            }
-            run.latestActivityMillis.takeIf { it > 0L }?.let {
-                StockCardInfoLine(
-                    localizedStringResource(1463, "Last activity"),
-                    receiptUiDateTime(it),
-                    stateValues.PlaceholderTextColor
-                )
-            }
-            statusSummary.takeIf { it.isNotBlank() }?.let {
-                StockCardInfoLine(localizedStringResource(200, "Status"), it, stateValues.PlaceholderTextColor)
-            }
-            StockCardInfoLine(
-                localizedStringResource(1562, "Contract check"),
-                if (run.contractSafetyReady) {
-                    "${run.activeContractCount} / ${run.pendingContractCount}"
-                } else {
-                    localizedStringResource(1141, "Please wait…")
-                },
-                if (!run.contractSafetyReady || run.contractBlockedOrderIds.isNotEmpty()) {
-                    stateValues.BorderlineBadColor
-                } else {
-                    stateValues.TextColor
-                }
-            )
-        }
-
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(horizontal = 1.dp)
-        ) {
-            item {
-                SupplierCatalogChip(
-                    text = "${localizedStringResource(1689, "Ready to pack")}: ${run.readyToPackCount}",
-                    color = if (run.readyToPackCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor
-                )
-            }
-            item {
-                SupplierCatalogChip(
-                    text = "${localizedStringResource(2442, "Ready to dispatch")}: ${run.readyToDispatchCount}",
-                    color = if (run.readyToDispatchCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor
-                )
-            }
-            item {
-                SupplierCatalogChip(
-                    text = "${localizedStringResource(1560, "In delivery")}: ${run.inDeliveryCount}",
-                    color = if (run.inDeliveryCount > 0) stateValues.OkayColor else stateValues.PlaceholderTextColor
-                )
-            }
-            if (run.attentionCount > 0) {
-                item {
-                    SupplierCatalogChip(
-                        text = "${localizedStringResource(1371, "Needs attention")}: ${run.attentionCount}",
-                        color = stateValues.BorderlineBadColor
+        if (section == "overview") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(supplierDispatchRunAccent(run).copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CpImage(
+                        modifier = Modifier.size(30.dp),
+                        url = stateValues.drawablePathIconSupplierDispatch,
+                        fallbackRes = stateValues.drawableResIconSupplierDispatch.value,
+                        contentDescription = localizedStringResource(1556, "Dispatch"),
+                        tintColor = supplierDispatchRunAccent(run)
                     )
                 }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = run.storeTitle,
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            run.storePublicId.takeIf { it.isNotBlank() },
+                            run.storeAddress.takeIf { it.isNotBlank() }
+                        ).joinToString(" • ").ifBlank { run.storeId.take(12) },
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                SupplierCatalogChip(
+                    text = supplierDispatchSuggestedActionTitle(run.suggestedAction),
+                    color = supplierDispatchRunAccent(run)
+                )
+            }
+
+            Text(
+                text = run.goodsPreview,
+                color = stateValues.TextColor,
+                fontSize = stateValues.textSize,
+                fontWeight = FontWeight.Bold
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                StockCardInfoLine(
+                    localizedStringResource(2478, "Orders in this run"),
+                    run.orderCount.toString(),
+                    stateValues.TextColor
+                )
+                StockCardInfoLine(
+                    localizedStringResource(1564, "Goods lines"),
+                    run.lineCount.toString(),
+                    stateValues.TextColor
+                )
+                amountText.takeIf { it.isNotBlank() }?.let {
+                    StockCardInfoLine(localizedStringResource(581, "Amount"), it, stateValues.TextColor)
+                }
+                run.earliestDueAtMillis?.takeIf { it > 0L }?.let {
+                    StockCardInfoLine(
+                        localizedStringResource(1723, "Earliest due"),
+                        receiptUiDateTime(it),
+                        stateValues.TextColor
+                    )
+                }
+                run.latestDueAtMillis?.takeIf { it > 0L && it != run.earliestDueAtMillis }?.let {
+                    StockCardInfoLine(
+                        localizedStringResource(1724, "Latest due"),
+                        receiptUiDateTime(it),
+                        stateValues.TextColor
+                    )
+                }
+                run.latestActivityMillis.takeIf { it > 0L }?.let {
+                    StockCardInfoLine(
+                        localizedStringResource(1463, "Last activity"),
+                        receiptUiDateTime(it),
+                        stateValues.PlaceholderTextColor
+                    )
+                }
+                statusSummary.takeIf { it.isNotBlank() }?.let {
+                    StockCardInfoLine(localizedStringResource(200, "Status"), it, stateValues.PlaceholderTextColor)
+                }
+                StockCardInfoLine(
+                    localizedStringResource(1562, "Contract check"),
+                    if (run.contractSafetyReady) {
+                        "${run.activeContractCount} / ${run.pendingContractCount}"
+                    } else {
+                        localizedStringResource(1141, "Please wait…")
+                    },
+                    if (!run.contractSafetyReady || run.contractBlockedOrderIds.isNotEmpty()) {
+                        stateValues.BorderlineBadColor
+                    } else {
+                        stateValues.TextColor
+                    }
+                )
+            }
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(horizontal = 1.dp)
+            ) {
+                item {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(1689, "Ready to pack")}: ${run.readyToPackCount}",
+                        color = if (run.readyToPackCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor
+                    )
+                }
+                item {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(2442, "Ready to dispatch")}: ${run.readyToDispatchCount}",
+                        color = if (run.readyToDispatchCount > 0) stateValues.AccentColor else stateValues.PlaceholderTextColor
+                    )
+                }
+                item {
+                    SupplierCatalogChip(
+                        text = "${localizedStringResource(1560, "In delivery")}: ${run.inDeliveryCount}",
+                        color = if (run.inDeliveryCount > 0) stateValues.OkayColor else stateValues.PlaceholderTextColor
+                    )
+                }
+                if (run.attentionCount > 0) {
+                    item {
+                        SupplierCatalogChip(
+                            text = "${localizedStringResource(1371, "Needs attention")}: ${run.attentionCount}",
+                            color = stateValues.BorderlineBadColor
+                        )
+                    }
+                }
             }
         }
 
-        SupplierDispatchTextPanel(
-            title = localizedStringResource(1746, "Pack checklist"),
-            text = run.packChecklist
-        )
-        SupplierDispatchTextPanel(
-            title = localizedStringResource(1756, "Attention notes"),
-            text = run.attentionSummary,
-            attention = true
-        )
-        SupplierDispatchTextPanel(
-            title = localizedStringResource(1757, "Driver handoff"),
-            text = run.driverHandoff
-        )
+        if (section == "checklist") {
+            SupplierDispatchTextPanel(
+                title = localizedStringResource(1746, "Pack checklist"),
+                text = run.packChecklist
+            )
+        }
+        if (section == "attention") {
+            SupplierDispatchTextPanel(
+                title = localizedStringResource(1756, "Attention notes"),
+                text = run.attentionSummary,
+                attention = true
+            )
+        }
+        if (section == "handoff") {
+            SupplierDispatchTextPanel(
+                title = localizedStringResource(1757, "Driver handoff"),
+                text = run.driverHandoff
+            )
+        }
 
         if (!run.contractSafetyReady) {
             MessageText(
@@ -817,187 +840,73 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
             )
         }
 
-        Text(
-            text = localizedStringResource(2458, "Delivery work"),
-            color = stateValues.TextColor,
-            fontSize = stateValues.titleTextSize,
-            fontWeight = FontWeight.Bold
-        )
+        if (section == "actions") {
+            Text(
+                text = localizedStringResource(2458, "Delivery work"),
+                color = stateValues.TextColor,
+                fontSize = stateValues.titleTextSize,
+                fontWeight = FontWeight.Bold
+            )
 
-        if (stateValues.isNarrowScreen) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-            ) {
-                actionButton(
+            if (stateValues.isNarrowScreen) {
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1568, "Open run orders"),
-                    iconPath = stateValues.drawablePathIconAppModeSupplier,
-                    iconRes = stateValues.drawableResIconAppModeSupplier.value,
-                    confirmationRequired = false,
-                    autoLoading = false,
-                    onClick = ::openOrders
-                )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(2463, "Open partner store"),
-                    iconPath = stateValues.drawablePathIconSupplierPartners,
-                    iconRes = stateValues.drawableResIconSupplierPartners.value,
-                    confirmationRequired = false,
-                    autoLoading = false,
-                    onClick = ::openPartner
-                )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(2464, "Open agreements"),
-                    iconPath = stateValues.drawablePathIconSupplierContracts,
-                    iconRes = stateValues.drawableResIconSupplierContracts.value,
-                    confirmationRequired = false,
-                    autoLoading = false,
-                    onClick = ::openContracts
-                )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(2465, "Open catalogue"),
-                    iconPath = stateValues.drawablePathIconSupplierCatalog,
-                    iconRes = stateValues.drawableResIconSupplierCatalog.value,
-                    confirmationRequired = false,
-                    autoLoading = false,
-                    onClick = ::openCatalog
-                )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1569, "Copy driver manifest"),
-                    iconPath = stateValues.drawablePathIconClipboard,
-                    iconRes = stateValues.drawableResIconClipboard.value,
-                    confirmationRequired = false,
-                    autoLoading = false,
-                    onClick = {
-                        copyTextToClipboard(supplierDispatchRunManifest(run))
-                        postInAppNotification(
-                            localizedStringResource(1573, "Driver manifest copied"),
-                            NotificationType.Positive,
-                            transient = true
-                        )
-                    }
-                )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1570, "Mark packed"),
-                    enabled = run.contractSafetyReady && run.packableOrderIds.isNotEmpty() && !anyMutation,
-                    loading = mutatingPacked,
-                    loadingText = localizedStringResource(2460, "Updating orders…"),
-                    autoLoading = false,
-                    iconPath = stateValues.drawablePathIconStock,
-                    iconRes = stateValues.drawableResIconStock.value,
-                    confirmationRequired = true,
-                    onDisabledClick = {
-                        postInAppNotification(
-                            packDisabledMessage,
-                            NotificationType.Neutral,
-                            transient = true
-                        )
-                    },
-                    onClick = onMarkPacked
-                )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1571, "Start delivery"),
-                    enabled = run.contractSafetyReady && run.dispatchableOrderIds.isNotEmpty() && !anyMutation,
-                    loading = mutatingDelivery,
-                    loadingText = localizedStringResource(2460, "Updating orders…"),
-                    autoLoading = false,
-                    iconPath = stateValues.drawablePathIconSupplierDispatch,
-                    iconRes = stateValues.drawableResIconSupplierDispatch.value,
-                    confirmationRequired = true,
-                    onDisabledClick = {
-                        postInAppNotification(
-                            dispatchDisabledMessage,
-                            NotificationType.Neutral,
-                            transient = true
-                        )
-                    },
-                    onClick = onStartDelivery
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                 ) {
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(1568, "Open run orders"),
                         iconPath = stateValues.drawablePathIconAppModeSupplier,
                         iconRes = stateValues.drawableResIconAppModeSupplier.value,
-                        textSize = stateValues.smallTextSize,
                         confirmationRequired = false,
                         autoLoading = false,
                         onClick = ::openOrders
                     )
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(2463, "Open partner store"),
                         iconPath = stateValues.drawablePathIconSupplierPartners,
                         iconRes = stateValues.drawableResIconSupplierPartners.value,
-                        textSize = stateValues.smallTextSize,
                         confirmationRequired = false,
                         autoLoading = false,
                         onClick = ::openPartner
                     )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                ) {
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(2464, "Open agreements"),
                         iconPath = stateValues.drawablePathIconSupplierContracts,
                         iconRes = stateValues.drawableResIconSupplierContracts.value,
-                        textSize = stateValues.smallTextSize,
                         confirmationRequired = false,
                         autoLoading = false,
                         onClick = ::openContracts
                     )
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(2465, "Open catalogue"),
                         iconPath = stateValues.drawablePathIconSupplierCatalog,
                         iconRes = stateValues.drawableResIconSupplierCatalog.value,
-                        textSize = stateValues.smallTextSize,
                         confirmationRequired = false,
                         autoLoading = false,
                         onClick = ::openCatalog
                     )
-                }
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1569, "Copy driver manifest"),
-                    iconPath = stateValues.drawablePathIconClipboard,
-                    iconRes = stateValues.drawableResIconClipboard.value,
-                    textSize = stateValues.smallTextSize,
-                    confirmationRequired = false,
-                    autoLoading = false,
-                    onClick = {
-                        copyTextToClipboard(supplierDispatchRunManifest(run))
-                        postInAppNotification(
-                            localizedStringResource(1573, "Driver manifest copied"),
-                            NotificationType.Positive,
-                            transient = true
-                        )
-                    }
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                ) {
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1569, "Copy driver manifest"),
+                        iconPath = stateValues.drawablePathIconClipboard,
+                        iconRes = stateValues.drawableResIconClipboard.value,
+                        confirmationRequired = false,
+                        autoLoading = false,
+                        onClick = {
+                            copyTextToClipboard(supplierDispatchRunManifest(run))
+                            postInAppNotification(
+                                localizedStringResource(1573, "Driver manifest copied"),
+                                NotificationType.Positive,
+                                transient = true
+                            )
+                        }
+                    )
+                    actionButton(
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(1570, "Mark packed"),
                         enabled = run.contractSafetyReady && run.packableOrderIds.isNotEmpty() && !anyMutation,
                         loading = mutatingPacked,
@@ -1005,7 +914,6 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                         autoLoading = false,
                         iconPath = stateValues.drawablePathIconStock,
                         iconRes = stateValues.drawableResIconStock.value,
-                        textSize = stateValues.smallTextSize,
                         confirmationRequired = true,
                         onDisabledClick = {
                             postInAppNotification(
@@ -1017,7 +925,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                         onClick = onMarkPacked
                     )
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(1571, "Start delivery"),
                         enabled = run.contractSafetyReady && run.dispatchableOrderIds.isNotEmpty() && !anyMutation,
                         loading = mutatingDelivery,
@@ -1025,7 +933,6 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                         autoLoading = false,
                         iconPath = stateValues.drawablePathIconSupplierDispatch,
                         iconRes = stateValues.drawableResIconSupplierDispatch.value,
-                        textSize = stateValues.smallTextSize,
                         confirmationRequired = true,
                         onDisabledClick = {
                             postInAppNotification(
@@ -1037,23 +944,143 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                         onClick = onStartDelivery
                     )
                 }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(1568, "Open run orders"),
+                            iconPath = stateValues.drawablePathIconAppModeSupplier,
+                            iconRes = stateValues.drawableResIconAppModeSupplier.value,
+                            textSize = stateValues.smallTextSize,
+                            confirmationRequired = false,
+                            autoLoading = false,
+                            onClick = ::openOrders
+                        )
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(2463, "Open partner store"),
+                            iconPath = stateValues.drawablePathIconSupplierPartners,
+                            iconRes = stateValues.drawableResIconSupplierPartners.value,
+                            textSize = stateValues.smallTextSize,
+                            confirmationRequired = false,
+                            autoLoading = false,
+                            onClick = ::openPartner
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(2464, "Open agreements"),
+                            iconPath = stateValues.drawablePathIconSupplierContracts,
+                            iconRes = stateValues.drawableResIconSupplierContracts.value,
+                            textSize = stateValues.smallTextSize,
+                            confirmationRequired = false,
+                            autoLoading = false,
+                            onClick = ::openContracts
+                        )
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(2465, "Open catalogue"),
+                            iconPath = stateValues.drawablePathIconSupplierCatalog,
+                            iconRes = stateValues.drawableResIconSupplierCatalog.value,
+                            textSize = stateValues.smallTextSize,
+                            confirmationRequired = false,
+                            autoLoading = false,
+                            onClick = ::openCatalog
+                        )
+                    }
+                    actionButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = localizedStringResource(1569, "Copy driver manifest"),
+                        iconPath = stateValues.drawablePathIconClipboard,
+                        iconRes = stateValues.drawableResIconClipboard.value,
+                        textSize = stateValues.smallTextSize,
+                        confirmationRequired = false,
+                        autoLoading = false,
+                        onClick = {
+                            copyTextToClipboard(supplierDispatchRunManifest(run))
+                            postInAppNotification(
+                                localizedStringResource(1573, "Driver manifest copied"),
+                                NotificationType.Positive,
+                                transient = true
+                            )
+                        }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    ) {
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(1570, "Mark packed"),
+                            enabled = run.contractSafetyReady && run.packableOrderIds.isNotEmpty() && !anyMutation,
+                            loading = mutatingPacked,
+                            loadingText = localizedStringResource(2460, "Updating orders…"),
+                            autoLoading = false,
+                            iconPath = stateValues.drawablePathIconStock,
+                            iconRes = stateValues.drawableResIconStock.value,
+                            textSize = stateValues.smallTextSize,
+                            confirmationRequired = true,
+                            onDisabledClick = {
+                                postInAppNotification(
+                                    packDisabledMessage,
+                                    NotificationType.Neutral,
+                                    transient = true
+                                )
+                            },
+                            onClick = onMarkPacked
+                        )
+                        actionButton(
+                            modifier = Modifier.weight(1f),
+                            text = localizedStringResource(1571, "Start delivery"),
+                            enabled = run.contractSafetyReady && run.dispatchableOrderIds.isNotEmpty() && !anyMutation,
+                            loading = mutatingDelivery,
+                            loadingText = localizedStringResource(2460, "Updating orders…"),
+                            autoLoading = false,
+                            iconPath = stateValues.drawablePathIconSupplierDispatch,
+                            iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                            textSize = stateValues.smallTextSize,
+                            confirmationRequired = true,
+                            onDisabledClick = {
+                                postInAppNotification(
+                                    dispatchDisabledMessage,
+                                    NotificationType.Neutral,
+                                    transient = true
+                                )
+                            },
+                            onClick = onStartDelivery
+                        )
+                    }
+                }
             }
         }
 
-        Text(
-            text = if (run.serverPlanned) {
-                localizedStringResource(
-                    2475,
-                    "This run uses the current server plan and the latest locally loaded order state."
-                )
-            } else {
-                localizedStringResource(
-                    2476,
-                    "A locally reconstructed run is shown until the server dashboard includes it."
-                )
-            },
-            color = stateValues.PlaceholderTextColor,
-            fontSize = stateValues.smallTextSize
-        )
+        if (section == "overview") {
+            Text(
+                text = if (run.serverPlanned) {
+                    localizedStringResource(
+                        2475,
+                        "This run uses the current server plan and the latest locally loaded order state."
+                    )
+                } else {
+                    localizedStringResource(
+                        2476,
+                        "A locally reconstructed run is shown until the server dashboard includes it."
+                    )
+                },
+                color = stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize
+            )
+        }
     }
 }

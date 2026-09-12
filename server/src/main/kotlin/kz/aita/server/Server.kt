@@ -256,6 +256,35 @@ private val assetsRootPath: Path by lazy {
     ?: serverFilesRootPath.resolve("assets").normalizedAbsolute()
 }
 
+private data class ServerEventResourceSnapshot(
+  val checkedAtNanos: Long,
+  val modifiedAtMillis: Long?,
+  val catalogue: EventResourceCatalogue
+)
+@Volatile private var serverEventResourceSnapshot: ServerEventResourceSnapshot? = null
+private val serverEventResourceLock = Any()
+
+private fun serverEventResourceCatalogue(): EventResourceCatalogue {
+  val now = System.nanoTime()
+  serverEventResourceSnapshot?.takeIf { now - it.checkedAtNanos < 1_000_000_000L }?.let { return it.catalogue }
+  return synchronized(serverEventResourceLock) {
+    val previous = serverEventResourceSnapshot
+    if (previous != null && now - previous.checkedAtNanos < 1_000_000_000L) return@synchronized previous.catalogue
+    val path = assetsRootPath.resolve("values/strings.json")
+    val modified = runCatching { Files.getLastModifiedTime(path).toMillis() }.getOrNull()
+    val catalogue = if (previous != null && previous.modifiedAtMillis == modified) previous.catalogue else {
+      runCatching {
+        val data = jsonBase.decodeFromString<ResponseDataModel<List<LocalizedStringGroupDataModel>>>(
+          readServerTextFile(path, "assets/values/strings.json", "values/strings.json")
+        )
+        EventResourceCatalogue(data.payload.orEmpty())
+      }.getOrElse { previous?.catalogue ?: EventResourceCatalogue(emptyList()) }
+    }
+    serverEventResourceSnapshot = ServerEventResourceSnapshot(now, modified, catalogue)
+    catalogue
+  }
+}
+
 private fun ApplicationConfig.optionalString(path: String): String? =
   runCatching { propertyOrNull(path)?.getString()?.trim()?.takeIf { it.isNotEmpty() } }.getOrNull()
 
@@ -710,12 +739,15 @@ fun metaFrom(call: ApplicationCall, deviceInfo: ClientDeviceInfoDataModel? = nul
 }
 
 fun ResultRow.toNotificationDataModel(): NotificationDataModel {
+  val resources = serverEventResourceCatalogue()
+  val titleText = eventTextForStorage(this[Notifications.title], this[Notifications.titleTranslations], this[Notifications.titleTemplate], resources)
+  val messageText = eventTextForStorage(this[Notifications.message], this[Notifications.messageTranslations], this[Notifications.messageTemplate], resources)
   return NotificationDataModel(
     id = this[Notifications.id],
     userId = this[Notifications.userId].toString(),
     storeId = this[Notifications.storeId]?.toString(),
-    title = this[Notifications.title],
-    message = this[Notifications.message],
+    title = EventMessages.render(titleText.reference, "en", resources::values) ?: this[Notifications.title],
+    message = EventMessages.render(messageText.reference, "en", resources::values) ?: this[Notifications.message],
     type = runCatching { NotificationType.valueOf(this[Notifications.type]) }.getOrDefault(NotificationType.Neutral),
     category = this[Notifications.category],
     source = this[Notifications.notificationSource],
@@ -723,7 +755,11 @@ fun ResultRow.toNotificationDataModel(): NotificationDataModel {
     createdAtMillis = this[Notifications.createdAtMillis],
     shownAtMillis = this[Notifications.shownAtMillis],
     readAtMillis = this[Notifications.readAtMillis],
-    isSavedOnServer = true
+    isSavedOnServer = true,
+    titleTemplate = titleText.reference,
+    messageTemplate = messageText.reference,
+    titleTranslations = eventTextCompatibilityValues(titleText.reference, titleText.translations, resources),
+    messageTranslations = eventTextCompatibilityValues(messageText.reference, messageText.translations, resources)
   )
 }
 
@@ -847,11 +883,7 @@ suspend fun RoutingCall.safeGenericResponseNoPayload(
     genericResponseNoPayload(status = status, message = message)
   }.getOrElse { responseThrowable ->
     application.environment.log.error("Failed to send JSON error response", responseThrowable)
-    val safeMessage = message ?: simpleMessage(
-      main = "Internal server error",
-      ru = "Внутренняя ошибка сервера",
-      kk = "Сервердің ішкі қатесі"
-    )
+    val safeMessage = message ?: eventMessage("message.internal_server_error")
     runCatching {
       withAitaServerRuntimeClassLoader("safe-response-no-payload-fallback:${request.httpMethod.value}:${request.path()}") {
         respondText(
@@ -886,11 +918,7 @@ suspend fun ApplicationCall.safeGenericResponseNoPayload(
     }
   }.getOrElse { responseThrowable ->
     application.environment.log.error("Failed to send JSON error response", responseThrowable)
-    val safeMessage = message ?: simpleMessage(
-      main = "Internal server error",
-      ru = "Внутренняя ошибка сервера",
-      kk = "Сервердің ішкі қатесі"
-    )
+    val safeMessage = message ?: eventMessage("message.internal_server_error")
     runCatching {
       withAitaServerRuntimeClassLoader("safe-application-response-no-payload-fallback:${request.httpMethod.value}:${request.path()}") {
         respondText(
@@ -904,12 +932,7 @@ suspend fun ApplicationCall.safeGenericResponseNoPayload(
 }
 
 suspend fun ApplicationCall.respondAitaUnauthorized(
-  message: List<LocalizedStringDataModel> = simpleMessage(
-    main = "Authentication or permission is required",
-    en = "Authentication or permission is required",
-    ru = "Требуется вход или разрешение",
-    kk = "Кіру немесе рұқсат қажет"
-  )
+  message: List<LocalizedStringDataModel> = eventMessage("message.authentication_or_permission_is_required")
 ) {
   withAitaServerRuntimeClassLoader("unauthorized:${request.httpMethod.value}:${request.path()}") {
     respondText(
@@ -933,12 +956,7 @@ suspend inline fun <reified T> RoutingCall.genericResponse(
         refreshSharedRuntimeSerializersAfterClassLoadingFailure("response:${T::class.qualifiedName}", throwable)
       }
       application.environment.log.error("Failed to encode generic response payload", throwable)
-      val safeMessage = listOf(
-        LocalizedStringDataModel("main", "Internal server error"),
-        LocalizedStringDataModel("en", "Internal server error"),
-        LocalizedStringDataModel("ru", "Внутренняя ошибка сервера"),
-        LocalizedStringDataModel("kk", "Сервердің ішкі қатесі")
-      )
+      val safeMessage = eventMessage("message.internal_server_error")
       respondText(
         text = aitaGenericEnvelopeText(message = safeMessage, payloadText = null, negative = true),
         contentType = ContentType.Application.Json,
@@ -1136,46 +1154,14 @@ private const val SECURITY_EVENT_SESSION_LOGOUT = "session_logout"
 private const val SECURITY_EVENT_SESSION_EXPIRED = "session_expired"
 
 private fun securitySessionEventTitle(eventType: String): List<LocalizedStringDataModel> = when (eventType) {
-  SECURITY_EVENT_SESSION_CREATED -> simpleMessage(
-    main = "Session created",
-    ru = "Сеанс создан",
-    kk = "Сеанс жасалды"
-  )
-  SECURITY_EVENT_SESSION_REFRESHED -> simpleMessage(
-    main = "Session refreshed",
-    ru = "Сеанс обновлён",
-    kk = "Сеанс жаңартылды"
-  )
-  SECURITY_EVENT_SESSION_REPLACED -> simpleMessage(
-    main = "Older session replaced",
-    ru = "Старый сеанс заменён",
-    kk = "Ескі сеанс ауыстырылды"
-  )
-  SECURITY_EVENT_SESSION_REVOKED -> simpleMessage(
-    main = "Session revoked",
-    ru = "Сеанс завершён",
-    kk = "Сеанс тоқтатылды"
-  )
-  SECURITY_EVENT_SESSION_REVOKED_OTHERS -> simpleMessage(
-    main = "Other session revoked",
-    ru = "Другой сеанс завершён",
-    kk = "Басқа сеанс тоқтатылды"
-  )
-  SECURITY_EVENT_SESSION_LOGOUT -> simpleMessage(
-    main = "Logged out",
-    ru = "Выполнен выход",
-    kk = "Шығу орындалды"
-  )
-  SECURITY_EVENT_SESSION_EXPIRED -> simpleMessage(
-    main = "Session expired",
-    ru = "Сеанс истёк",
-    kk = "Сеанс мерзімі өтті"
-  )
-  else -> simpleMessage(
-    main = "Security event",
-    ru = "Событие безопасности",
-    kk = "Қауіпсіздік оқиғасы"
-  )
+  SECURITY_EVENT_SESSION_CREATED -> eventMessage("message.session_created")
+  SECURITY_EVENT_SESSION_REFRESHED -> eventMessage("message.session_refreshed")
+  SECURITY_EVENT_SESSION_REPLACED -> eventMessage("message.older_session_replaced")
+  SECURITY_EVENT_SESSION_REVOKED -> eventMessage("message.session_revoked")
+  SECURITY_EVENT_SESSION_REVOKED_OTHERS -> eventMessage("message.other_session_revoked")
+  SECURITY_EVENT_SESSION_LOGOUT -> eventMessage("message.logged_out")
+  SECURITY_EVENT_SESSION_EXPIRED -> eventMessage("message.session_expired")
+  else -> eventMessage("message.security_event")
 }
 
 private fun securitySessionEventDetails(
@@ -1482,171 +1468,67 @@ private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
 
 private fun fallbackResponseMessage(id: String): List<LocalizedStringDataModel> {
   return when (id) {
-    "0" -> simpleMessage(
-      main = "User with this phone number is already registered",
-      ru = "Пользователь с этим номером телефона уже зарегистрирован",
-      kk = "Бұл телефон нөмірі бар пайдаланушы әлдеқашан тіркелген"
-    )
-    "1" -> simpleMessage(
-      main = "User with this email address is already registered",
-      ru = "Пользователь с этим email уже зарегистрирован",
-      kk = "Бұл email мекенжайы бар пайдаланушы әлдеқашан тіркелген"
-    )
-    "2" -> simpleMessage(
-      main = "User with this phone number and email address is already registered",
-      ru = "Пользователь с этим номером телефона и email уже зарегистрирован",
-      kk = "Бұл телефон нөмірі мен email мекенжайы бар пайдаланушы әлдеқашан тіркелген"
-    )
-    "3" -> simpleMessage(
-      main = "Internal server error",
-      ru = "Внутренняя ошибка сервера",
-      kk = "Сервердің ішкі қатесі"
-    )
-    "4" -> simpleMessage(
-      main = "Authentication failed",
-      ru = "Аутентификация не удалась",
-      kk = "Аутентификация сәтсіз аяқталды"
-    )
-    "5" -> simpleMessage(
-      main = "Please log in first",
-      ru = "Пожалуйста, сначала войдите",
-      kk = "Алдымен жүйеге кіріңіз"
-    )
-    "6" -> simpleMessage(
-      main = "Incorrect password",
-      ru = "Неверный пароль",
-      kk = "Қате құпия сөз"
-    )
-    "7" -> simpleMessage(
-      main = "Store is not registered",
-      ru = "Магазин не зарегистрирован",
-      kk = "Дүкен тіркелмеген"
-    )
-    "8" -> simpleMessage(
-      main = "Successfully logged out",
-      ru = "Вы успешно вышли",
-      kk = "Жүйеден сәтті шықтыңыз"
-    )
-    "9" -> simpleMessage(
-      main = "User successfully updated",
-      ru = "Данные пользователя обновлены",
-      kk = "Пайдаланушы деректері жаңартылды"
-    )
-    "10" -> simpleMessage(
-      main = "Store successfully added",
-      ru = "Магазин добавлен",
-      kk = "Дүкен қосылды"
-    )
-    "11" -> simpleMessage(
-      main = "Store successfully updated",
-      ru = "Магазин обновлён",
-      kk = "Дүкен жаңартылды"
-    )
-    "12" -> simpleMessage(
-      main = "Store successfully deleted",
-      ru = "Магазин удалён",
-      kk = "Дүкен жойылды"
-    )
-    "13" -> simpleMessage(
-      main = "Not found",
-      ru = "Не найдено",
-      kk = "Табылмады"
-    )
-    "14" -> simpleMessage(
-      main = "Stock item added",
-      ru = "Товар добавлен",
-      kk = "Тауар қосылды"
-    )
-    "15" -> simpleMessage(
-      main = "Stock item updated",
-      ru = "Товар обновлён",
-      kk = "Тауар жаңартылды"
-    )
-    "16" -> simpleMessage(
-      main = "Stock item deleted",
-      ru = "Товар удалён",
-      kk = "Тауар жойылды"
-    )
-    "17" -> simpleMessage(
-      main = "Batch added",
-      ru = "Партия добавлена",
-      kk = "Партия қосылды"
-    )
-    "18" -> simpleMessage(
-      main = "Batch updated",
-      ru = "Партия обновлена",
-      kk = "Партия жаңартылды"
-    )
-    "19" -> simpleMessage(
-      main = "Batch deleted",
-      ru = "Партия удалена",
-      kk = "Партия жойылды"
-    )
-    "44" -> simpleMessage(
-      main = "Active sessions loaded",
-      ru = "Активные сеансы загружены",
-      kk = "Белсенді сеанстар жүктелді"
-    )
-    "45" -> simpleMessage(
-      main = "Session revoked",
-      ru = "Сеанс завершён",
-      kk = "Сеанс тоқтатылды"
-    )
-    "46" -> simpleMessage(
-      main = "Other sessions revoked",
-      ru = "Другие сеансы завершены",
-      kk = "Басқа сеанстар тоқтатылды"
-    )
-    "47" -> simpleMessage(
-      main = "Session id is required",
-      ru = "Нужен id сеанса",
-      kk = "Сеанс id қажет"
-    )
-    "48" -> simpleMessage(
-      main = "Use logout to revoke the current session",
-      ru = "Чтобы завершить текущий сеанс, выйдите из аккаунта",
-      kk = "Ағымдағы сеансты тоқтату үшін аккаунттан шығыңыз"
-    )
-    "49" -> simpleMessage("Cash register loaded", ru = "Касса загружена", kk = "Касса жүктелді")
-    "50" -> simpleMessage("Cash extracted", ru = "Наличные извлечены", kk = "Қолма-қол ақша алынды")
-    "51" -> simpleMessage("Workers loaded", ru = "Сотрудники загружены", kk = "Қызметкерлер жүктелді")
-    "52" -> simpleMessage("My work loaded", ru = "Мои места работы загружены", kk = "Менің жұмыс орындарым жүктелді")
-    "53" -> simpleMessage("Incoming requests loaded", ru = "Входящие заявки загружены", kk = "Кіріс өтінімдер жүктелді")
-    "54" -> simpleMessage("My requests loaded", ru = "Мои заявки загружены", kk = "Менің өтінімдерім жүктелді")
-    "55" -> simpleMessage("Employment request sent", ru = "Заявка на работу отправлена", kk = "Жұмысқа өтінім жіберілді")
-    "56" -> simpleMessage("Worker accepted", ru = "Сотрудник принят", kk = "Қызметкер қабылданды")
-    "57" -> simpleMessage("Request declined", ru = "Заявка отклонена", kk = "Өтінім қабылданбады")
-    "58" -> simpleMessage("Worker permissions updated", ru = "Права сотрудника обновлены", kk = "Қызметкер рұқсаттары жаңартылды")
-    "59" -> simpleMessage("Permission denied", ru = "Недостаточно прав", kk = "Рұқсат жеткіліксіз")
-    "60" -> simpleMessage("Cash register amount is not enough", ru = "В кассе недостаточно наличных", kk = "Кассада қолма-қол ақша жеткіліксіз")
-    "61" -> simpleMessage("Request is already pending", ru = "Заявка уже ожидает решения", kk = "Өтінім қазірдің өзінде күтуде")
-    "62" -> simpleMessage("User is already a worker in this store", ru = "Пользователь уже сотрудник этого магазина", kk = "Пайдаланушы бұл дүкеннің қызметкері")
-    "96" -> simpleMessage("Support tickets loaded", ru = "Обращения в поддержку загружены", kk = "Қолдау өтініштері жүктелді")
-    "97" -> simpleMessage("Support request created", ru = "Обращение в поддержку создано", kk = "Қолдау өтініші жасалды")
-    "98" -> simpleMessage("Support request closed", ru = "Обращение закрыто", kk = "Өтініш жабылды")
-    "99" -> simpleMessage("Support request reopened", ru = "Обращение снова открыто", kk = "Өтініш қайта ашылды")
-    "100" -> simpleMessage("Support messages loaded", ru = "Сообщения поддержки загружены", kk = "Қолдау хабарламалары жүктелді")
-    "101" -> simpleMessage("Support message sent", ru = "Сообщение в поддержку отправлено", kk = "Қолдау хабарламасы жіберілді")
-    "102" -> simpleMessage("Support messages marked as read", ru = "Сообщения поддержки отмечены прочитанными", kk = "Қолдау хабарламалары оқылған деп белгіленді")
-    "103" -> simpleMessage("Workshift password updated", ru = "Пароль смены обновлён", kk = "Ауысым құпия сөзі жаңартылды")
-    "104" -> simpleMessage("Security history loaded", ru = "История безопасности загружена", kk = "Қауіпсіздік тарихы жүктелді")
-    "92" -> simpleMessage("Operation logs loaded", ru = "Журнал операций загружен", kk = "Операциялар журналы жүктелді")
-    "93" -> simpleMessage("Operation logged", ru = "Операция записана в журнал", kk = "Операция журналға жазылды")
-    else -> simpleMessage(
-      main = "Done",
-      ru = "Готово",
-      kk = "Дайын"
-    )
+    "0" -> eventMessage("message.user_with_this_phone_number_is_already_registered")
+    "1" -> eventMessage("message.user_with_this_email_address_is_already_registered")
+    "2" -> eventMessage("message.user_with_this_phone_number_and_email_address_is_already_registered")
+    "3" -> eventMessage("message.internal_server_error")
+    "4" -> eventMessage("message.authentication_failed")
+    "5" -> eventMessage("message.please_log_in_first")
+    "6" -> eventMessage("message.incorrect_password")
+    "7" -> eventMessage("message.store_is_not_registered")
+    "8" -> eventMessage("message.successfully_logged_out")
+    "9" -> eventMessage("message.user_successfully_updated")
+    "10" -> eventMessage("message.store_successfully_added")
+    "11" -> eventMessage("message.store_successfully_updated")
+    "12" -> eventMessage("message.store_successfully_deleted")
+    "13" -> eventMessage("message.not_found")
+    "14" -> eventMessage("message.stock_item_added")
+    "15" -> eventMessage("message.stock_item_updated")
+    "16" -> eventMessage("message.stock_item_deleted")
+    "17" -> eventMessage("message.batch_added")
+    "18" -> eventMessage("message.batch_updated")
+    "19" -> eventMessage("message.batch_deleted")
+    "44" -> eventMessage("message.active_sessions_loaded")
+    "45" -> eventMessage("message.session_revoked")
+    "46" -> eventMessage("message.other_sessions_revoked")
+    "47" -> eventMessage("message.session_id_is_required")
+    "48" -> eventMessage("message.use_logout_to_revoke_the_current_session")
+    "49" -> eventMessage("message.cash_register_loaded")
+    "50" -> eventMessage("message.cash_extracted")
+    "51" -> eventMessage("message.workers_loaded")
+    "52" -> eventMessage("message.my_work_loaded")
+    "53" -> eventMessage("message.incoming_requests_loaded")
+    "54" -> eventMessage("message.my_requests_loaded")
+    "55" -> eventMessage("message.employment_request_sent")
+    "56" -> eventMessage("message.worker_accepted")
+    "57" -> eventMessage("message.request_declined")
+    "58" -> eventMessage("message.worker_permissions_updated")
+    "59" -> eventMessage("message.permission_denied")
+    "60" -> eventMessage("message.cash_register_amount_is_not_enough")
+    "61" -> eventMessage("message.request_is_already_pending")
+    "62" -> eventMessage("message.user_is_already_a_worker_in_this_store")
+    "96" -> eventMessage("message.support_tickets_loaded")
+    "97" -> eventMessage("message.support_request_created")
+    "98" -> eventMessage("message.support_request_closed")
+    "99" -> eventMessage("message.support_request_reopened")
+    "100" -> eventMessage("message.support_messages_loaded")
+    "101" -> eventMessage("message.support_message_sent")
+    "102" -> eventMessage("message.support_messages_marked_as_read")
+    "103" -> eventMessage("message.workshift_password_updated")
+    "104" -> eventMessage("message.security_history_loaded")
+    "92" -> eventMessage("message.operation_logs_loaded")
+    "93" -> eventMessage("message.operation_logged")
+    else -> eventMessage("message.done")
   }
 }
 
 fun getResponse(id: String): RemoteResponseDataModel {
-  return runCatching { getResponses().find { it.id == id } }
-    .getOrNull()
-    ?: RemoteResponseDataModel(
-      id = id,
-      message = fallbackResponseMessage(id)
-    )
+  val configured = runCatching { getResponses().find { it.id == id } }.getOrNull()
+  val message = configured?.message ?: fallbackResponseMessage(id)
+  val reference = message.eventMessageReferenceOrNull()
+  return (configured ?: RemoteResponseDataModel(id = id, message = message)).copy(
+    message = reference?.let { eventTextCompatibilityValues(it, message) } ?: message
+  )
 }
 
 
@@ -1914,6 +1796,8 @@ object OperationLogs: Table("operation_logs") {
   val entityId = text("entity_id").nullable()
   val title = jsonb("title", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
   val details = jsonb("details", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+  val titleTemplate = jsonb("title_template", Json, EventMessageReference.serializer()).nullable()
+  val detailsTemplate = jsonb("details_template", Json, EventMessageReference.serializer()).nullable()
   val metadata = jsonb("metadata", Json, MapSerializer(String.serializer(), String.serializer())).default(emptyMap())
   val createdAtMillis = long("created_at_millis")
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
@@ -2307,6 +2191,10 @@ object Notifications: Table("user_notifications") {
   val storeId = uuid("store_id").nullable().index()
   val title = text("title").default("")
   val message = text("message")
+  val messageTemplate = jsonb("message_template", Json, EventMessageReference.serializer()).nullable()
+  val titleTemplate = jsonb("title_template", Json, EventMessageReference.serializer()).nullable()
+  val messageTranslations = jsonb("message_translations", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
+  val titleTranslations = jsonb("title_translations", Json, ListSerializer(LocalizedStringDataModel.serializer())).default(emptyList())
   val type = text("type")
   val category = text("category").default("general")
   val notificationSource = text("source").default("app")
@@ -2688,7 +2576,7 @@ private fun defaultAgeRestrictedAlcoholCategoryConditions(): List<String> = list
   encodedSeedStockCondition(STOCK_CONDITION_KIND_TRANSACTION_TIME_WINDOW, startsAtMinutes = 6 * 60, endsAtMinutes = 22 * 60)
 )
 
-private data class GenericGoodsCategorySeed(
+internal data class GenericGoodsCategorySeed(
   val slug: String,
   val typeIds: List<String>,
   val name: List<LocalizedStringDataModel>,
@@ -2696,7 +2584,8 @@ private data class GenericGoodsCategorySeed(
   val alias: List<LocalizedStringDataModel>? = null,
   val description: List<LocalizedStringDataModel>? = null,
   val imagePaths: List<StylizedDrawablePathsGroupDataModel> = emptyList(),
-  val conditions: List<String> = emptyList()
+  val conditions: List<String> = emptyList(),
+  val parentSlug: String? = null
 )
 
 private fun categoryText(
@@ -2728,9 +2617,6 @@ private fun String.withoutSeededGoodsCategoryPrefix(): String {
 private fun List<LocalizedStringDataModel>.cleanSeededGoodsCategoryPrefixes(): List<LocalizedStringDataModel> =
   map { it.copy(value = it.value.withoutSeededGoodsCategoryPrefix()) }
 
-private fun genericGoodsCategorySeedId(slug: String): UUID =
-  UUID.nameUUIDFromBytes("aita:generic-goods-category:$slug".toByteArray(StandardCharsets.UTF_8))
-
 private fun genericGoodsCategoryNameKey(values: List<LocalizedStringDataModel>): String {
   return (
      values.firstOrNull { it.language.equals("en", true) }
@@ -2743,54 +2629,7 @@ private fun genericGoodsCategoryNameKey(values: List<LocalizedStringDataModel>):
     .orEmpty()
 }
 
-private val seededGenericGoodsCategoryRootSlugs = setOf(
-  "food",
-  "bakery",
-  "dairy",
-  "plant_based",
-  "meat",
-  "seafood",
-  "eggs",
-  "grocery_staples",
-  "beverages",
-  "snacks",
-  "sweets",
-  "frozen",
-  "ready_meals",
-  "baby",
-  "pet",
-  "household",
-  "personal_care",
-  "health",
-  "stationery",
-  "electronics",
-  "clothing",
-  "toys",
-  "garden",
-  "tools",
-  "auto",
-  "regulated",
-  "seasonal"
-)
-
-private fun seededGenericGoodsCategoryRootSlug(slug: String): String? {
-  if (slug == "grocery_staples" || slug.startsWith("grocery_")) return "grocery_staples"
-
-  return seededGenericGoodsCategoryRootSlugs
-    .filter { root -> slug == root || slug.startsWith("${root}_") }
-    .maxByOrNull { it.length }
-}
-
-private fun GenericGoodsCategorySeed.parentCategoryIds(): List<String> {
-  val rootSlug = seededGenericGoodsCategoryRootSlug(slug) ?: return emptyList()
-  return if (rootSlug == slug) {
-    emptyList()
-  } else {
-    listOf(genericGoodsCategorySeedId(rootSlug).toString())
-  }
-}
-
-private fun defaultGenericGoodsCategorySeeds(): List<GenericGoodsCategorySeed> = listOf(
+internal fun originalGenericGoodsCategorySeeds(): List<GenericGoodsCategorySeed> = listOf(
   GenericGoodsCategorySeed("food", listOf("food"), categoryText("Food", "Продукты питания", "Азық-түлік"), "1"),
   GenericGoodsCategorySeed("food_fresh_produce", listOf("food", "fresh"), categoryText("Food / Fresh produce", "Продукты / Свежие овощи и фрукты", "Азық-түлік / Жаңа көкөніс пен жеміс"), "1"),
   GenericGoodsCategorySeed("food_fruits", listOf("food", "fresh", "fruit"), categoryText("Food / Fruits", "Продукты / Фрукты", "Азық-түлік / Жемістер"), "1"),
@@ -2913,6 +2752,42 @@ private fun defaultGenericGoodsCategorySeeds(): List<GenericGoodsCategorySeed> =
   GenericGoodsCategorySeed("seasonal", listOf("seasonal"), categoryText("Seasonal goods", "Сезонные товары", "Маусымдық тауарлар"), "0"),
 )
 
+internal fun defaultGenericGoodsCategorySeeds(): List<GenericGoodsCategorySeed> {
+  val seeds = originalGenericGoodsCategorySeeds().associateByTo(linkedMapOf()) { it.slug }
+  val additions = GoodsCategoryCatalogue.load().associateByTo(linkedMapOf()) { it.slug }
+  require(additions.keys.none { it in seeds }) { "Category catalogue reuses an existing seed slug" }
+  // Resolve topologically rather than depending on the order of the editable data file.
+  while (additions.isNotEmpty()) {
+    val ready = additions.values.filter { it.parentSlug == null || it.parentSlug in seeds }
+    require(ready.isNotEmpty()) { "Category catalogue has a missing parent or a cycle" }
+    ready.forEach { definition ->
+      val parent = definition.parentSlug?.let(seeds::getValue)
+      fun path(language: String, leaf: String): String = parent?.name
+        ?.firstOrNull { it.language == language }?.value?.let { "$it / $leaf" } ?: leaf
+      seeds[definition.slug] = GenericGoodsCategorySeed(
+        slug = definition.slug,
+        typeIds = emptyList(),
+        name = categoryText(path("en", definition.en), path("ru", definition.ru), path("kk", definition.kk)),
+        quantityUnitId = definition.quantityUnitId,
+        parentSlug = definition.parentSlug
+      )
+      additions.remove(definition.slug)
+    }
+  }
+  val names = seeds.values.map { genericGoodsCategoryNameKey(it.name) }
+  require(names.toSet().size == names.size) { "Duplicate fully-qualified category name" }
+  return seeds.values.toList()
+}
+
+internal fun categorySeedParents(seeds: List<GenericGoodsCategorySeed>): Map<String, String?> {
+  val slugs = seeds.map { it.slug }.toSet()
+  return seeds.associate { seed ->
+    val inferred = slugs.filter { it != seed.slug && seed.slug.startsWith("${it}_") }.maxByOrNull { it.length }
+    seed.slug to (seed.parentSlug ?: inferred
+      ?: "grocery_staples".takeIf { seed.slug != it && seed.slug.startsWith("grocery_") })
+  }.also { parents -> parents.keys.forEach { goodsCategoryAncestors(it, parents) } }
+}
+
 private fun sanitizeGenericGoodsCategoryPrefixesInsideTransaction() {
   GenericGoodsCategories.selectAll().forEach { row ->
     val categoryId = row[GenericGoodsCategories.id]
@@ -2935,53 +2810,43 @@ private fun sanitizeGenericGoodsCategoryPrefixesInsideTransaction() {
 }
 
 private fun seedGenericGoodsCategoriesInsideTransaction() {
+  val seeds = defaultGenericGoodsCategorySeeds()
+  val parents = categorySeedParents(seeds)
   val existingRows = GenericGoodsCategories.selectAll().toList()
-  val existingIds = existingRows
-    .map { it[GenericGoodsCategories.id] }
-    .toMutableSet()
-
-  val existingByName = linkedMapOf<String, UUID>()
-  existingRows
-    .forEach { row ->
-      val key = genericGoodsCategoryNameKey(row[GenericGoodsCategories.name])
-      if (key.isNotBlank()) existingByName.putIfAbsent(key, row[GenericGoodsCategories.id])
-    }
-
-  defaultGenericGoodsCategorySeeds().forEach { seed ->
-    val cleanName = seed.name.cleanSeededGoodsCategoryPrefixes()
-    val cleanAlias = seed.alias?.cleanSeededGoodsCategoryPrefixes()
-    val cleanDescription = seed.description?.cleanSeededGoodsCategoryPrefixes()
-    val parentCategoryIds = seed.parentCategoryIds()
-    val existingId = existingByName[genericGoodsCategoryNameKey(cleanName)]
-    val categoryId = existingId ?: genericGoodsCategorySeedId(seed.slug)
-
-    if (categoryId in existingIds) {
+  val existingNames = existingRows.associate { row ->
+    row[GenericGoodsCategories.id] to genericGoodsCategoryNameKey(row[GenericGoodsCategories.name])
+  }
+  val categoryIds = resolveGoodsCategoryIds(
+    seeds.associate { it.slug to genericGoodsCategoryNameKey(it.name) }, existingNames
+  )
+  // Resolve every real ID before building ancestors. Older installations may already have a
+  // root with a non-seed UUID; predicting its UUID would leave its descendants orphaned.
+  seeds.forEach { seed ->
+    val categoryId = categoryIds.getValue(seed.slug)
+    val parentIds = goodsCategoryAncestors(seed.slug, parents).map { categoryIds.getValue(it).toString() }
+    if (categoryId in existingNames) {
       GenericGoodsCategories.update({ GenericGoodsCategories.id eq categoryId }) { row ->
-        row[GenericGoodsCategories.typeIds] = parentCategoryIds.distinct()
-        row[GenericGoodsCategories.name] = cleanName
-        row[GenericGoodsCategories.alias] = cleanAlias
-        row[GenericGoodsCategories.description] = cleanDescription
+        row[GenericGoodsCategories.typeIds] = parentIds
+        row[GenericGoodsCategories.name] = seed.name.cleanSeededGoodsCategoryPrefixes()
         row[GenericGoodsCategories.quantityUnitId] = seed.quantityUnitId
-        row[GenericGoodsCategories.imagePaths] = seed.imagePaths
-        if (seed.conditions.isNotEmpty()) {
-          row[GenericGoodsCategories.conditions] = seed.conditions
-        }
+        // No deletion/replacement of existing custom images, aliases or sale conditions.
+        seed.alias?.let { row[GenericGoodsCategories.alias] = it.cleanSeededGoodsCategoryPrefixes() }
+        seed.description?.let { row[GenericGoodsCategories.description] = it.cleanSeededGoodsCategoryPrefixes() }
+        if (seed.imagePaths.isNotEmpty()) row[GenericGoodsCategories.imagePaths] = seed.imagePaths
+        if (seed.conditions.isNotEmpty()) row[GenericGoodsCategories.conditions] = seed.conditions
       }
     } else {
       GenericGoodsCategories.insert { row ->
         row[GenericGoodsCategories.id] = categoryId
-        row[GenericGoodsCategories.typeIds] = parentCategoryIds.distinct()
-        row[GenericGoodsCategories.name] = cleanName
-        row[GenericGoodsCategories.alias] = cleanAlias
-        row[GenericGoodsCategories.description] = cleanDescription
+        row[GenericGoodsCategories.typeIds] = parentIds
+        row[GenericGoodsCategories.name] = seed.name.cleanSeededGoodsCategoryPrefixes()
+        row[GenericGoodsCategories.alias] = seed.alias?.cleanSeededGoodsCategoryPrefixes()
+        row[GenericGoodsCategories.description] = seed.description?.cleanSeededGoodsCategoryPrefixes()
         row[GenericGoodsCategories.quantityUnitId] = seed.quantityUnitId
         row[GenericGoodsCategories.imagePaths] = seed.imagePaths
         row[GenericGoodsCategories.conditions] = seed.conditions
       }
-      existingIds += categoryId
     }
-
-    existingByName[genericGoodsCategoryNameKey(cleanName)] = categoryId
   }
 }
 
@@ -3171,11 +3036,7 @@ fun Application.configureJwtAuth() {
       }
 
       challenge { _, _ ->
-        val message = simpleMessage(
-          main = "Unauthorized",
-          ru = "Требуется вход в аккаунт",
-          kk = "Аккаунтқа кіру қажет"
-        )
+        val message = eventMessage("message.unauthorized")
         val response = GenericResponseDataModel(
           message = jsonBase.encodeToString(message),
           payload = null,
@@ -4969,11 +4830,7 @@ private fun stockItemHasPendingTransferInsideTransaction(goodsItemId: UUID): Boo
       (StockBatchMovements.status eq StockBatchMovementStatusDataModel.PendingAcceptance.name)
   }.empty()
 
-private fun pendingStockTransferItemChangeMessage(): List<LocalizedStringDataModel> = simpleMessage(
-  main = "Finish pending batch transfers before changing this item's unit, making it inactive, or deleting it.",
-  ru = "Завершите ожидающие перемещения партий перед сменой единицы товара, его деактивацией или удалением.",
-  kk = "Тауар бірлігін өзгертпес, оны өшірмес не белсенділігін тоқтатпас бұрын күтілген партия ауыстыруларын аяқтаңыз."
-)
+private fun pendingStockTransferItemChangeMessage(): List<LocalizedStringDataModel> = eventMessage("message.finish_pending_batch_transfers_before_changing_this_item_s_unit_making")
 
 private fun activeRootStoreIdForAccessInsideTransaction(storeId: UUID): UUID? {
   val storeRow = Stores
@@ -5317,7 +5174,8 @@ private fun userCanUseStoreActionInsideTransaction(userId: UUID, storeId: UUID, 
 }
 
 private fun ResultRow.toOperationLogDataModel(): OperationLogDataModel {
-  return OperationLogDataModel(
+  val resources = serverEventResourceCatalogue()
+  val snapshot = OperationLogDataModel(
     id = this[OperationLogs.id].toString(),
     rootStoreId = this[OperationLogs.rootStoreId].toString(),
     storeId = this[OperationLogs.storeId].toString(),
@@ -5333,7 +5191,17 @@ private fun ResultRow.toOperationLogDataModel(): OperationLogDataModel {
     title = this[OperationLogs.title],
     details = this[OperationLogs.details],
     metadata = this[OperationLogs.metadata],
-    createdAtMillis = this[OperationLogs.createdAtMillis]
+    createdAtMillis = this[OperationLogs.createdAtMillis],
+    titleTemplate = this[OperationLogs.titleTemplate],
+    detailsTemplate = this[OperationLogs.detailsTemplate]
+  )
+  val titleReference = snapshot.resolvedTitleMessageReference()
+  val detailsReference = snapshot.resolvedDetailsMessageReference()
+  return snapshot.copy(
+    titleTemplate = titleReference,
+    detailsTemplate = detailsReference,
+    title = eventTextCompatibilityValues(titleReference, snapshot.title, resources),
+    details = eventTextCompatibilityValues(detailsReference, snapshot.details, resources)
   )
 }
 
@@ -5388,117 +5256,11 @@ private fun operationLogEntityForPath(path: String): String {
 }
 
 
-private data class OperationLogHumanText(
-  val main: String,
-  val en: String = main,
-  val ru: String = main,
-  val kk: String = main
-)
+private fun operationLogHumanTitleFor(action: String, entityType: String): List<LocalizedStringDataModel> =
+  eventMessage(operationTitleMessageReference(action, entityType))
 
-private fun operationLogEntityHumanText(entityType: String): OperationLogHumanText {
-  return when (entityType) {
-    OPERATION_LOG_ENTITY_STORE -> OperationLogHumanText("Store", ru = "Магазин", kk = "Дүкен")
-    OPERATION_LOG_ENTITY_WORKER -> OperationLogHumanText("Worker", ru = "Сотрудник", kk = "Қызметкер")
-    OPERATION_LOG_ENTITY_WORKSHIFT -> OperationLogHumanText("Workshift", ru = "Смена", kk = "Ауысым")
-    OPERATION_LOG_ENTITY_STOCK_ITEM -> OperationLogHumanText("Stock item", ru = "Товар", kk = "Тауар")
-    OPERATION_LOG_ENTITY_STOCK_BATCH -> OperationLogHumanText("Stock batch", ru = "Партия", kk = "Партия")
-    OPERATION_LOG_ENTITY_TRANSACTION -> OperationLogHumanText("Transaction", ru = "Транзакция", kk = "Транзакция")
-    OPERATION_LOG_ENTITY_CASH_REGISTER -> OperationLogHumanText("Cash register", ru = "Касса", kk = "Касса")
-    OPERATION_LOG_ENTITY_SUPPLIER -> OperationLogHumanText("Supplier", ru = "Поставщик", kk = "Жеткізуші")
-    OPERATION_LOG_ENTITY_SUBSCRIPTION -> OperationLogHumanText("Subscription", ru = "Подписка", kk = "Жазылым")
-    OPERATION_LOG_ENTITY_FINANCE -> OperationLogHumanText("Finance", ru = "Финансы", kk = "Қаржы")
-    else -> OperationLogHumanText("Operation", ru = "Операция", kk = "Операция")
-  }
-}
-
-private fun operationLogTransactionTypeHumanText(type: String): OperationLogHumanText {
-  return when (type.trim().lowercase(Locale.ROOT)) {
-    "purchase", "sale" -> OperationLogHumanText("Sale", ru = "Продажа", kk = "Сату")
-    "return" -> OperationLogHumanText("Return", ru = "Возврат", kk = "Қайтару")
-    "supply" -> OperationLogHumanText("Supply", ru = "Поставка", kk = "Жеткізу")
-    else -> OperationLogHumanText(type.ifBlank { "Transaction" }, ru = type.ifBlank { "Транзакция" }, kk = type.ifBlank { "Транзакция" })
-  }
-}
-
-private fun operationLogHumanTitleFor(action: String, entityType: String): List<LocalizedStringDataModel> {
-  val entity = operationLogEntityHumanText(entityType)
-  return when (action) {
-    OPERATION_LOG_ACTION_CREATED -> simpleMessage(
-      main = "${entity.main} saved",
-      en = "${entity.en} saved",
-      ru = "${entity.ru} сохранён",
-      kk = "${entity.kk} сақталды"
-    )
-    OPERATION_LOG_ACTION_UPDATED -> simpleMessage(
-      main = "${entity.main} updated",
-      en = "${entity.en} updated",
-      ru = "${entity.ru} обновлён",
-      kk = "${entity.kk} жаңартылды"
-    )
-    OPERATION_LOG_ACTION_DELETED -> simpleMessage(
-      main = "${entity.main} deleted",
-      en = "${entity.en} deleted",
-      ru = "${entity.ru} удалён",
-      kk = "${entity.kk} жойылды"
-    )
-    OPERATION_LOG_ACTION_COMPLETED -> simpleMessage(
-      main = "${entity.main} completed",
-      en = "${entity.en} completed",
-      ru = "${entity.ru} завершена",
-      kk = "${entity.kk} аяқталды"
-    )
-    OPERATION_LOG_ACTION_EXTRACTED -> simpleMessage(
-      main = "Cash extracted",
-      ru = "Наличные изъяты",
-      kk = "Қолма-қол ақша алынды"
-    )
-    OPERATION_LOG_ACTION_STARTED -> simpleMessage(
-      main = "Workshift started",
-      ru = "Смена начата",
-      kk = "Ауысым басталды"
-    )
-    OPERATION_LOG_ACTION_ENDED -> simpleMessage(
-      main = "Workshift ended",
-      ru = "Смена завершена",
-      kk = "Ауысым аяқталды"
-    )
-    OPERATION_LOG_ACTION_ACCEPTED -> simpleMessage(
-      main = "Request accepted",
-      ru = "Заявка принята",
-      kk = "Өтінім қабылданды"
-    )
-    OPERATION_LOG_ACTION_DECLINED -> simpleMessage(
-      main = "Request declined",
-      ru = "Заявка отклонена",
-      kk = "Өтінім қабылданбады"
-    )
-    OPERATION_LOG_ACTION_INVITED -> simpleMessage(
-      main = "Worker invited",
-      ru = "Сотрудник приглашён",
-      kk = "Қызметкер шақырылды"
-    )
-    OPERATION_LOG_ACTION_MOVED -> simpleMessage(
-      main = "Stock moved",
-      ru = "Склад перемещён",
-      kk = "Қор жылжытылды"
-    )
-    else -> simpleMessage(
-      main = "Operation completed",
-      ru = "Операция выполнена",
-      kk = "Операция орындалды"
-    )
-  }
-}
-
-private fun operationLogHumanDetailsFor(action: String, entityType: String): List<LocalizedStringDataModel> {
-  val entity = operationLogEntityHumanText(entityType)
-  return simpleMessage(
-    main = "${entity.main}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("main").orEmpty()}",
-    en = "${entity.en}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("en").orEmpty()}",
-    ru = "${entity.ru}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("ru").orEmpty()}",
-    kk = "${entity.kk}: ${operationLogHumanTitleFor(action, entityType).extractLocalizedString("kk").orEmpty()}"
-  )
-}
+private fun operationLogHumanDetailsFor(action: String, entityType: String): List<LocalizedStringDataModel> =
+  eventMessage(operationDetailsMessageReference(action, entityType))
 
 
 private fun Double.operationLogNumberText(): String {
@@ -5577,73 +5339,17 @@ private fun stockBatchOperationLogTextInsideTransaction(
   val statusText = batch.status.name
 
   val title = when (action) {
-    OPERATION_LOG_ACTION_UPDATED -> simpleMessage(
-      main = "Batch updated: $goodsName",
-      en = "Batch updated: $goodsName",
-      ru = "Партия обновлена: $goodsName",
-      kk = "Партия жаңартылды: $goodsName"
-    )
-    OPERATION_LOG_ACTION_DELETED -> simpleMessage(
-      main = "Batch removed: $goodsName",
-      en = "Batch removed: $goodsName",
-      ru = "Партия удалена: $goodsName",
-      kk = "Партия жойылды: $goodsName"
-    )
-    OPERATION_LOG_ACTION_MOVED -> simpleMessage(
-      main = "Batch moved: $goodsName",
-      en = "Batch moved: $goodsName",
-      ru = "Партия перемещена: $goodsName",
-      kk = "Партия жылжытылды: $goodsName"
-    )
-    OPERATION_LOG_ACTION_ACCEPTED -> simpleMessage(
-      main = "Batch move accepted: $goodsName",
-      en = "Batch move accepted: $goodsName",
-      ru = "Перемещение партии принято: $goodsName",
-      kk = "Партия ауыстыруы қабылданды: $goodsName"
-    )
-    OPERATION_LOG_ACTION_DECLINED -> simpleMessage(
-      main = "Batch move declined: $goodsName",
-      en = "Batch move declined: $goodsName",
-      ru = "Перемещение партии отклонено: $goodsName",
-      kk = "Партия ауыстыруы қабылданбады: $goodsName"
-    )
-    else -> simpleMessage(
-      main = "Batch added: $goodsName",
-      en = "Batch added: $goodsName",
-      ru = "Партия добавлена: $goodsName",
-      kk = "Партия қосылды: $goodsName"
-    )
+    OPERATION_LOG_ACTION_UPDATED -> eventMessage("message.batch_updated_2", "goodsName" to (goodsName).toString())
+    OPERATION_LOG_ACTION_DELETED -> eventMessage("message.batch_removed", "goodsName" to (goodsName).toString())
+    OPERATION_LOG_ACTION_MOVED -> eventMessage("message.batch_moved", "goodsName" to (goodsName).toString())
+    OPERATION_LOG_ACTION_ACCEPTED -> eventMessage("message.batch_move_accepted", "goodsName" to (goodsName).toString())
+    OPERATION_LOG_ACTION_DECLINED -> eventMessage("message.batch_move_declined", "goodsName" to (goodsName).toString())
+    else -> eventMessage("message.batch_added_2", "goodsName" to (goodsName).toString())
   }
 
-  fun detailLine(
-    quantityLabel: String,
-    supplierLabel: String,
-    barcodeLabel: String,
-    supplyLabel: String,
-    saleLabel: String,
-    returnLabel: String,
-    wholesaleLabel: String,
-    statusLabel: String
-  ): String {
-    return listOfNotNull(
-      goodsName,
-      barcode.takeIf { it.isNotBlank() }?.let { "$barcodeLabel: $it" },
-      "$quantityLabel: $quantityText",
-      supplierName?.let { "$supplierLabel: $it" },
-      supplyText?.let { "$supplyLabel: $it" },
-      saleText?.let { "$saleLabel: $it" },
-      returnText?.let { "$returnLabel: $it" },
-      wholesaleText?.let { "$wholesaleLabel: $it" },
-      "$statusLabel: $statusText"
-    ).joinToString(" • ")
-  }
-
-  val details = simpleMessage(
-    main = detailLine("Qty", "Supplier", "Barcode", "Supply", "Sale", "Return", "Wholesale", "Status"),
-    en = detailLine("Qty", "Supplier", "Barcode", "Supply", "Sale", "Return", "Wholesale", "Status"),
-    ru = detailLine("Кол-во", "Поставщик", "Штрихкод", "Закупка", "Продажа", "Возврат", "Опт", "Статус"),
-    kk = detailLine("Саны", "Жеткізуші", "Штрихкод", "Жеткізу", "Сату", "Қайтару", "Көтерме", "Күйі")
-  )
+  val details = eventMessage(batchDetailsMessageReference(
+    goodsName, barcode, quantityText, supplierName, supplyText, saleText, returnText, wholesaleText, statusText
+  ))
 
   val metadata = linkedMapOf(
     "batch_id" to batchId.toString(),
@@ -5677,15 +5383,8 @@ private fun ResultRow.stockItemOperationLogBarcodeText(): String {
   return stockBarcodeValues().joinToString(",")
 }
 
-private fun stockItemChangeDetails(changedFields: List<String>): List<LocalizedStringDataModel> {
-  val value = changedFields.joinToString(", ").ifBlank { "Stock item data" }
-  return simpleMessage(
-    main = "Changed: $value",
-    en = "Changed: $value",
-    ru = "Изменено: $value",
-    kk = "Өзгерді: $value"
-  )
-}
+private fun stockItemChangeDetails(changedFields: List<String>): List<LocalizedStringDataModel> =
+  eventMessage(operationChangedFieldsReference(changedFields))
 
 private fun stockItemChangedFieldsInsideTransaction(
   previousRow: ResultRow,
@@ -5811,6 +5510,9 @@ private fun insertOperationLogInsideTransaction(
     if (duplicateAlreadyExists)
       return@runCatching
 
+    val resources = serverEventResourceCatalogue()
+    val titleText = eventTextForStorage("", title, resources = resources)
+    val detailsText = eventTextForStorage("", details, resources = resources)
     OperationLogs.insert {
       it[OperationLogs.id] = UUID.randomUUID()
       it[OperationLogs.rootStoreId] = rootStoreId
@@ -5824,8 +5526,10 @@ private fun insertOperationLogInsideTransaction(
       it[OperationLogs.action] = action
       it[OperationLogs.entityType] = entityType
       it[OperationLogs.entityId] = entityId
-      it[OperationLogs.title] = title
-      it[OperationLogs.details] = details
+      it[OperationLogs.title] = titleText.translations
+      it[OperationLogs.titleTemplate] = titleText.reference
+      it[OperationLogs.details] = detailsText.translations
+      it[OperationLogs.detailsTemplate] = detailsText.reference
       it[OperationLogs.metadata] = metadata
       it[OperationLogs.createdAtMillis] = now
     }
@@ -5886,26 +5590,8 @@ private fun addressProviderStatus(throwable: Throwable): HttpStatusCode =
     HttpStatusCode.ServiceUnavailable
   }
 
-private fun addressProviderMessage(throwable: Throwable): List<LocalizedStringDataModel> {
-  val clientFault = (throwable as? AddressProviderException)?.clientFault == true
-  return simpleMessage(
-    main = if (clientFault) {
-      throwable.message.orEmpty().ifBlank { "The selected address is invalid" }
-    } else {
-      "Address provider is temporarily unavailable. Please try again."
-    },
-    ru = if (clientFault) {
-      "Выбранный адрес недействителен. Выберите адрес из подсказок ещё раз."
-    } else {
-      "Сервис адресов временно недоступен. Попробуйте ещё раз."
-    },
-    kk = if (clientFault) {
-      "Таңдалған мекенжай жарамсыз. Мекенжайды ұсыныстардан қайта таңдаңыз."
-    } else {
-      "Мекенжай қызметі уақытша қолжетімсіз. Қайталап көріңіз."
-    }
-  )
-}
+private fun addressProviderMessage(throwable: Throwable): List<LocalizedStringDataModel> =
+  eventMessage(if ((throwable as? AddressProviderException)?.clientFault == true) "address.invalid" else "address.unavailable")
 
 private fun nextPublicId(prefix: String): String {
   return prefix + UUID.randomUUID().toString().replace("-", "").take(8).uppercase()
@@ -6181,9 +5867,14 @@ private fun insertServerNotificationInsideTransaction(
   category: String = "general",
   source: String = "server",
   metadata: Map<String, String> = emptyMap(),
-  nowMillis: Long = System.currentTimeMillis()
+  nowMillis: Long = System.currentTimeMillis(),
+  titleReference: EventMessageReference? = null,
+  messageReference: EventMessageReference? = null
 ): NotificationDataModel {
   cleanupNotificationsInsideTransaction(nowMillis)
+  val resources = serverEventResourceCatalogue()
+  val titleText = eventTextForStorage(title, reference = titleReference, resources = resources)
+  val messageText = eventTextForStorage(message, reference = messageReference, resources = resources)
 
   val operationId = notificationOperationIdFromMetadata(metadata)
   val incomingIsLoading = isLoadingNotificationIntent(type, category, metadata, title, message)
@@ -6212,8 +5903,12 @@ private fun insertServerNotificationInsideTransaction(
 
   if (existing != null) {
     Notifications.update({ (Notifications.id eq finalNotificationId) and (Notifications.userId eq userId) }) {
-      it[Notifications.title] = title
-      it[Notifications.message] = message
+      it[Notifications.title] = titleText.fallback
+      it[Notifications.titleTemplate] = titleText.reference
+      it[Notifications.titleTranslations] = titleText.translations
+      it[Notifications.message] = messageText.fallback
+      it[Notifications.messageTemplate] = messageText.reference
+      it[Notifications.messageTranslations] = messageText.translations
       it[Notifications.type] = type.name
       it[Notifications.category] = category.ifBlank { type.name.lowercase() }
       it[Notifications.notificationSource] = source.ifBlank { "server" }
@@ -6229,8 +5924,12 @@ private fun insertServerNotificationInsideTransaction(
       it[Notifications.id] = finalNotificationId
       it[Notifications.userId] = userId
       it[Notifications.storeId] = storeId
-      it[Notifications.title] = title
-      it[Notifications.message] = message
+      it[Notifications.title] = titleText.fallback
+      it[Notifications.titleTemplate] = titleText.reference
+      it[Notifications.titleTranslations] = titleText.translations
+      it[Notifications.message] = messageText.fallback
+      it[Notifications.messageTemplate] = messageText.reference
+      it[Notifications.messageTranslations] = messageText.translations
       it[Notifications.type] = type.name
       it[Notifications.category] = category.ifBlank { type.name.lowercase() }
       it[Notifications.notificationSource] = source.ifBlank { "server" }
@@ -6249,14 +5948,42 @@ private fun insertServerNotificationInsideTransaction(
     .toNotificationDataModel()
 }
 
+private fun insertServerNotificationInsideTransaction(
+  userId: UUID,
+  storeId: UUID?,
+  title: EventMessageReference,
+  message: EventMessageReference,
+  type: NotificationType = NotificationType.Neutral,
+  category: String = "general",
+  source: String = "server",
+  metadata: Map<String, String> = emptyMap(),
+  nowMillis: Long = System.currentTimeMillis()
+): NotificationDataModel = insertServerNotificationInsideTransaction(
+  userId = userId, storeId = storeId,
+  title = checkNotNull(EventMessages.render(title, "en")),
+  message = checkNotNull(EventMessages.render(message, "en")),
+  type = type, category = category, source = source, metadata = metadata, nowMillis = nowMillis,
+  titleReference = title, messageReference = message
+)
+
+private fun workerEvent(
+  key: String,
+  store: String,
+  person: String? = null,
+  personFallback: String = "worker"
+): EventMessageReference = EventMessageReference(key, children = buildMap {
+  put("store", listOf(eventNamedFact(store, "event.fallback.store")))
+  if (person != null) put("person", listOf(eventNamedFact(person, "event.fallback.$personFallback")))
+})
+
 private fun notifyEmploymentRequestCreatedInsideTransaction(
   requesterUserId: UUID,
   storeId: UUID,
   requestId: UUID,
   nowMillis: Long
 ) {
-  val requesterName = userDisplayNameOrPublicIdInsideTransaction(requesterUserId).ifBlank { "A user" }
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val requesterName = userDisplayNameOrPublicIdInsideTransaction(requesterUserId)
+  val storeName = storeDisplayNameInsideTransaction(storeId)
   val operationId = "worker_request_$requestId"
 
   storeWorkerNotificationRecipientUserIdsInsideTransaction(storeId, managersOnly = true)
@@ -6265,8 +5992,8 @@ private fun notifyEmploymentRequestCreatedInsideTransaction(
       insertServerNotificationInsideTransaction(
         userId = recipientId,
         storeId = storeId,
-        title = "Employment request",
-        message = "$requesterName requested to work in $storeName.",
+        title = EventMessageReference("worker.request.title"),
+        message = workerEvent("worker.request.body", storeName, requesterName, "user"),
         type = NotificationType.Neutral,
         category = "workers",
         metadata = mapOf("operationId" to operationId, "requestId" to requestId.toString(), "direction" to WORKER_REQUEST_DIRECTION_USER_TO_STORE),
@@ -6277,8 +6004,8 @@ private fun notifyEmploymentRequestCreatedInsideTransaction(
   insertServerNotificationInsideTransaction(
     userId = requesterUserId,
     storeId = storeId,
-    title = "Employment request sent",
-    message = "Your request to work in $storeName is waiting for review.",
+    title = EventMessageReference("worker.request_sent.title"),
+    message = workerEvent("worker.request_sent.body", storeName),
     type = NotificationType.Positive,
     category = "workers",
     metadata = mapOf("operationId" to "worker_request_sent_$requestId", "requestId" to requestId.toString(), "direction" to WORKER_REQUEST_DIRECTION_USER_TO_STORE),
@@ -6293,14 +6020,14 @@ private fun notifyEmploymentInviteCreatedInsideTransaction(
   requestId: UUID,
   nowMillis: Long
 ) {
-  val inviterName = userDisplayNameOrPublicIdInsideTransaction(inviterUserId).ifBlank { "A store manager" }
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val inviterName = userDisplayNameOrPublicIdInsideTransaction(inviterUserId)
+  val storeName = storeDisplayNameInsideTransaction(storeId)
 
   insertServerNotificationInsideTransaction(
     userId = invitedUserId,
     storeId = storeId,
-    title = "Store invitation",
-    message = "$inviterName invited you to work in $storeName.",
+    title = EventMessageReference("worker.invite.title"),
+    message = workerEvent("worker.invite.body", storeName, inviterName, "manager"),
     type = NotificationType.Neutral,
     category = "workers",
     metadata = mapOf("operationId" to "worker_invite_$requestId", "requestId" to requestId.toString(), "direction" to WORKER_REQUEST_DIRECTION_STORE_TO_USER),
@@ -6317,20 +6044,19 @@ private fun notifyEmploymentDecisionInsideTransaction(
   direction: String,
   nowMillis: Long
 ) {
-  val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId).ifBlank { "The worker" }
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId)
+  val storeName = storeDisplayNameInsideTransaction(storeId)
   val actionText = if (accepted) "accepted" else "declined"
   val notificationType = if (accepted) NotificationType.Positive else NotificationType.Negative
 
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
-    title = if (accepted) "Employment accepted" else "Employment declined",
-    message = if (direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) {
-      "Your invitation for $storeName was $actionText."
-    } else {
-      "Your request to work in $storeName was $actionText."
-    },
+    title = EventMessageReference("worker.decision.$actionText.title"),
+    message = workerEvent(
+      if (direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) "worker.invitation.$actionText" else "worker.application.$actionText",
+      storeName
+    ),
     type = notificationType,
     category = "workers",
     metadata = mapOf("operationId" to "worker_decision_${requestId}_$workerUserId", "requestId" to requestId.toString(), "status" to actionText, "direction" to direction),
@@ -6343,8 +6069,8 @@ private fun notifyEmploymentDecisionInsideTransaction(
       insertServerNotificationInsideTransaction(
         userId = recipientId,
         storeId = storeId,
-        title = if (accepted) "Worker accepted" else "Worker declined",
-        message = "$workerName $actionText employment in $storeName.",
+        title = EventMessageReference("worker.manager_decision.$actionText.title"),
+        message = workerEvent("worker.manager_decision.$actionText.body", storeName, workerName),
         type = notificationType,
         category = "workers",
         metadata = mapOf("operationId" to "worker_manager_decision_${requestId}_$recipientId", "requestId" to requestId.toString(), "status" to actionText, "direction" to direction),
@@ -6359,12 +6085,12 @@ private fun notifyWorkerPermissionsUpdatedInsideTransaction(
   workerId: UUID,
   nowMillis: Long
 ) {
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val storeName = storeDisplayNameInsideTransaction(storeId)
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
-    title = "Worker permissions updated",
-    message = "Your permissions in $storeName were updated.",
+    title = EventMessageReference("worker.permissions.title"),
+    message = workerEvent("worker.permissions.body", storeName),
     type = NotificationType.Neutral,
     category = "workers",
     metadata = mapOf("operationId" to "worker_permissions_$workerId", "workerId" to workerId.toString()),
@@ -6378,12 +6104,12 @@ private fun notifyWorkerRemovedInsideTransaction(
   workerId: UUID,
   nowMillis: Long
 ) {
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val storeName = storeDisplayNameInsideTransaction(storeId)
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
-    title = "Worker removed",
-    message = "Your worker access to $storeName was removed.",
+    title = EventMessageReference("worker.removed.title"),
+    message = workerEvent("worker.removed.body", storeName),
     type = NotificationType.Negative,
     category = "workers",
     metadata = mapOf("operationId" to "worker_removed_$workerId", "workerId" to workerId.toString()),
@@ -6399,15 +6125,15 @@ private fun notifyWorkerRemovalRequestCreatedInsideTransaction(
   workerId: UUID,
   nowMillis: Long
 ) {
-  val requesterName = userDisplayNameOrPublicIdInsideTransaction(requesterUserId).ifBlank { "A store manager" }
-  val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId).ifBlank { "The worker" }
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val requesterName = userDisplayNameOrPublicIdInsideTransaction(requesterUserId)
+  val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId)
+  val storeName = storeDisplayNameInsideTransaction(storeId)
 
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
-    title = "Removal request",
-    message = "$requesterName asks to end your worker access to $storeName. Please confirm or decline.",
+    title = EventMessageReference("worker.removal_request.title"),
+    message = workerEvent("worker.removal_request.body", storeName, requesterName, "manager"),
     type = NotificationType.Neutral,
     category = "workers",
     metadata = mapOf(
@@ -6425,8 +6151,8 @@ private fun notifyWorkerRemovalRequestCreatedInsideTransaction(
       insertServerNotificationInsideTransaction(
         userId = recipientId,
         storeId = storeId,
-        title = "Removal request sent",
-        message = "$workerName will decide whether to end worker access to $storeName.",
+        title = EventMessageReference("worker.removal_request_sent.title"),
+        message = workerEvent("worker.removal_request_sent.body", storeName, workerName),
         type = NotificationType.Neutral,
         category = "workers",
         metadata = mapOf(
@@ -6449,18 +6175,14 @@ private fun notifyWorkerRemovalDecisionInsideTransaction(
   accepted: Boolean,
   nowMillis: Long
 ) {
-  val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId).ifBlank { "The worker" }
-  val storeName = storeDisplayNameInsideTransaction(storeId).ifBlank { "this store" }
+  val workerName = userDisplayNameOrPublicIdInsideTransaction(workerUserId)
+  val storeName = storeDisplayNameInsideTransaction(storeId)
 
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
-    title = if (accepted) "Removal confirmed" else "Removal declined",
-    message = if (accepted) {
-      "Your worker access to $storeName ended after your confirmation."
-    } else {
-      "You declined the request to end your worker access to $storeName."
-    },
+    title = EventMessageReference(if (accepted) "worker.removal_confirmed.title" else "worker.removal_declined.title"),
+    message = workerEvent(if (accepted) "worker.removal_confirmed.body" else "worker.removal_declined.body", storeName),
     type = if (accepted) NotificationType.Positive else NotificationType.Neutral,
     category = "workers",
     metadata = mapOf(
@@ -6479,12 +6201,8 @@ private fun notifyWorkerRemovalDecisionInsideTransaction(
       insertServerNotificationInsideTransaction(
         userId = recipientId,
         storeId = storeId,
-        title = if (accepted) "Worker removal confirmed" else "Worker kept access",
-        message = if (accepted) {
-          "$workerName confirmed removal and no longer has worker access to $storeName."
-        } else {
-          "$workerName declined removal and keeps worker access to $storeName."
-        },
+        title = EventMessageReference(if (accepted) "worker.manager_removal_confirmed.title" else "worker.manager_removal_declined.title"),
+        message = workerEvent(if (accepted) "worker.manager_removal_confirmed.body" else "worker.manager_removal_declined.body", storeName, workerName),
         type = if (accepted) NotificationType.Positive else NotificationType.Neutral,
         category = "workers",
         metadata = mapOf(
@@ -6600,23 +6318,11 @@ private fun ResultRow.toStoreWorkerDataModel(): StoreWorkerDataModel {
 private fun String?.toWorkshiftPasswordHashOrNull(): String? =
   this?.takeIf { it.isNotBlank() }?.let { Pw.hash(it.toCharArray()) }
 
-private fun passwordRequirementMessage(): List<LocalizedStringDataModel> = simpleMessage(
-  main = "Password must be 8 or more symbols long and contain at least one digit and one special symbol",
-  ru = "Пароль должен быть длиной 8 или более символов и содержать хотя бы одну цифру и один специальный символ",
-  kk = "Құпия сөз ұзындығы 8 немесе одан да көп таңбадан тұруы және кемінде бір сан мен бір арнайы таңбадан тұруы керек"
-)
+private fun passwordRequirementMessage(): List<LocalizedStringDataModel> = eventMessage("message.password_must_be_8_or_more_symbols_long_and_contain_at")
 
-private fun accountPasswordRequiredMessage(): List<LocalizedStringDataModel> = simpleMessage(
-  main = "Account password is required to change the workshift password",
-  ru = "Для изменения пароля смены нужен пароль аккаунта",
-  kk = "Ауысым құпия сөзін өзгерту үшін аккаунт құпия сөзі қажет"
-)
+private fun accountPasswordRequiredMessage(): List<LocalizedStringDataModel> = eventMessage("message.account_password_is_required_to_change_the_workshift_password")
 
-private fun accountPasswordIncorrectMessage(): List<LocalizedStringDataModel> = simpleMessage(
-  main = "Account password is incorrect",
-  ru = "Пароль аккаунта неверный",
-  kk = "Аккаунт құпия сөзі дұрыс емес"
-)
+private fun accountPasswordIncorrectMessage(): List<LocalizedStringDataModel> = eventMessage("message.account_password_is_incorrect")
 
 private fun ResultRow.toWorkshiftDataModel(): WorkshiftDataModel {
   val displayName = "${this[Users.firstName]} ${this[Users.lastName]}".trim()
@@ -6711,7 +6417,7 @@ private fun endWorkshiftForUserInsideTransaction(
         action = OPERATION_LOG_ACTION_ENDED,
         entityType = OPERATION_LOG_ENTITY_WORKSHIFT,
         entityId = workshiftId.toString(),
-        title = simpleMessage("Workshift ended", ru = "Смена завершена", kk = "Ауысым аяқталды"),
+        title = eventMessage("message.workshift_ended"),
         details = simpleMessage(workerUserId.toString()),
         metadata = buildMap {
           put("workshift_id", workshiftId.toString())
@@ -7168,73 +6874,25 @@ private fun supplierOrderStatusAllowedFromSupplier(
 }
 
 private fun supplierOrderStatusBlockedMessage(requestedStatus: SupplierOrderStatusDataModel): List<LocalizedStringDataModel> = when (requestedStatus) {
-  SupplierOrderStatusDataModel.Packed -> simpleMessage(
-    main = "Confirm delivery time, at least one accepted quantity, and positive offered prices before packing this supplier order",
-    ru = "Перед сборкой заказа подтвердите время доставки, хотя бы одно принятое количество и положительные цены поставщика",
-    kk = "Жинамас бұрын жеткізу уақытын, кемінде бір қабылданған санды және оң жеткізуші бағаларын растаңыз"
-  )
-  SupplierOrderStatusDataModel.InDelivery -> simpleMessage(
-    main = "Pack this supplier order before starting delivery",
-    ru = "Сначала соберите заказ поставщика, затем запускайте доставку",
-    kk = "Жеткізуді бастамас бұрын жеткізуші тапсырысын жинаңыз"
-  )
+  SupplierOrderStatusDataModel.Packed -> eventMessage("message.confirm_delivery_time_at_least_one_accepted_quantity_and_positive_offered")
+  SupplierOrderStatusDataModel.InDelivery -> eventMessage("message.pack_this_supplier_order_before_starting_delivery")
   SupplierOrderStatusDataModel.PartiallyDelivered,
-  SupplierOrderStatusDataModel.Delivered -> simpleMessage(
-    main = "Receive supplier deliveries from the store receiving screen",
-    ru = "Принимайте поставки на стороне магазина через экран приёмки",
-    kk = "Жеткізуші жеткізілімдерін дүкеннің қабылдау экранынан қабылдаңыз"
-  )
-  SupplierOrderStatusDataModel.Confirmed -> simpleMessage(
-    main = "Fill accepted quantities, offered prices, and confirmed delivery time before confirming this supplier order",
-    ru = "Перед подтверждением заказа заполните принятые количества, цены поставщика и подтверждённое время доставки",
-    kk = "Жеткізуші тапсырысын растау алдында қабылданған санды, бағаны және жеткізу уақытын толтырыңыз"
-  )
+  SupplierOrderStatusDataModel.Delivered -> eventMessage("message.receive_supplier_deliveries_from_the_store_receiving_screen")
+  SupplierOrderStatusDataModel.Confirmed -> eventMessage("message.fill_accepted_quantities_offered_prices_and_confirmed_delivery_time_before_confirming")
   SupplierOrderStatusDataModel.Draft,
   SupplierOrderStatusDataModel.Sent,
-  SupplierOrderStatusDataModel.SeenBySupplier -> simpleMessage(
-    main = "Supplier order cannot move backward to that status",
-    ru = "Заказ поставщика нельзя вернуть в этот статус",
-    kk = "Жеткізуші тапсырысын бұл мәртебеге кері қайтаруға болмайды"
-  )
+  SupplierOrderStatusDataModel.SeenBySupplier -> eventMessage("message.supplier_order_cannot_move_backward_to_that_status")
   SupplierOrderStatusDataModel.IssueReported,
-  SupplierOrderStatusDataModel.Cancelled -> simpleMessage(
-    main = "This supplier order is already closed",
-    ru = "Этот заказ поставщика уже закрыт",
-    kk = "Бұл жеткізуші тапсырысы жабылған"
-  )
+  SupplierOrderStatusDataModel.Cancelled -> eventMessage("message.this_supplier_order_is_already_closed")
 }
 
 private fun supplierOrderStatusSuccessMessage(updatedStatus: SupplierOrderStatusDataModel): List<LocalizedStringDataModel> = when (updatedStatus) {
-  SupplierOrderStatusDataModel.SeenBySupplier -> simpleMessage(
-    main = "Supplier order marked as seen",
-    ru = "Заказ поставщику отмечен как просмотренный",
-    kk = "Жеткізуші тапсырысы қаралды деп белгіленді"
-  )
-  SupplierOrderStatusDataModel.Packed -> simpleMessage(
-    main = "Supplier order packed",
-    ru = "Заказ поставщика собран",
-    kk = "Жеткізуші тапсырысы жиналды"
-  )
-  SupplierOrderStatusDataModel.InDelivery -> simpleMessage(
-    main = "Supplier delivery started",
-    ru = "Доставка поставщика запущена",
-    kk = "Жеткізуші жеткізілімі басталды"
-  )
-  SupplierOrderStatusDataModel.IssueReported -> simpleMessage(
-    main = "Supplier issue reported",
-    ru = "Проблема поставщика отмечена",
-    kk = "Жеткізуші мәселесі белгіленді"
-  )
-  SupplierOrderStatusDataModel.Cancelled -> simpleMessage(
-    main = "Supplier order cancelled",
-    ru = "Заказ поставщика отменён",
-    kk = "Жеткізуші тапсырысы тоқтатылды"
-  )
-  else -> simpleMessage(
-    main = "Supplier order status updated",
-    ru = "Статус заказа поставщика обновлён",
-    kk = "Жеткізуші тапсырысының мәртебесі жаңартылды"
-  )
+  SupplierOrderStatusDataModel.SeenBySupplier -> eventMessage("message.supplier_order_marked_as_seen")
+  SupplierOrderStatusDataModel.Packed -> eventMessage("message.supplier_order_packed")
+  SupplierOrderStatusDataModel.InDelivery -> eventMessage("message.supplier_delivery_started")
+  SupplierOrderStatusDataModel.IssueReported -> eventMessage("message.supplier_issue_reported")
+  SupplierOrderStatusDataModel.Cancelled -> eventMessage("message.supplier_order_cancelled")
+  else -> eventMessage("message.supplier_order_status_updated")
 }
 
 private fun supplierOrderStatusPartialSuccessMessage(
@@ -7243,16 +6901,12 @@ private fun supplierOrderStatusPartialSuccessMessage(
   requestedCount: Int
 ): List<LocalizedStringDataModel> {
   val action = when (status) {
-    SupplierOrderStatusDataModel.SeenBySupplier -> Triple("marked as seen", "отмечены просмотренными", "қаралды деп белгіленді")
-    SupplierOrderStatusDataModel.Packed -> Triple("marked as packed", "отмечены собранными", "жиналды деп белгіленді")
-    SupplierOrderStatusDataModel.InDelivery -> Triple("moved into delivery", "переданы в доставку", "жеткізуге жіберілді")
-    else -> Triple("updated", "обновлены", "жаңартылды")
+    SupplierOrderStatusDataModel.SeenBySupplier -> "seen"
+    SupplierOrderStatusDataModel.Packed -> "packed"
+    SupplierOrderStatusDataModel.InDelivery -> "delivery"
+    else -> "updated"
   }
-  return simpleMessage(
-    main = "$updatedCount of $requestedCount selected orders were ${action.first}. The remaining orders were skipped because their current status, response, or agreement no longer permits this step.",
-    ru = "$updatedCount из $requestedCount выбранных заказов ${action.second}. Остальные пропущены: их текущий статус, ответ или договор уже не разрешает этот шаг.",
-    kk = "$requestedCount таңдалған тапсырыстың $updatedCount ${action.third}. Қалғандары өткізіліп жіберілді: олардың ағымдағы күйі, жауабы немесе келісімі бұл қадамға енді рұқсат бермейді."
-  )
+  return eventMessage("supplier.orders.partial.$action", "updatedCount" to updatedCount.toString(), "requestedCount" to requestedCount.toString())
 }
 
 private fun List<SupplierOrderWithLinesDataModel>.withSupplierDeskSnapshotsInsideTransaction(): List<SupplierOrderWithLinesDataModel> {
@@ -7373,36 +7027,12 @@ private fun supplierDashboardDeliveryBucketRank(bucketId: String): Int = when (b
 }
 
 private fun supplierDashboardDeliveryBucketTitle(bucketId: String): List<LocalizedStringDataModel> = when (bucketId) {
-  "overdue" -> simpleMessage(
-    main = "Overdue promises",
-    ru = "Просроченные обещания",
-    kk = "Кешіккен уәделер"
-  )
-  "today" -> simpleMessage(
-    main = "Due today",
-    ru = "На сегодня",
-    kk = "Бүгінге"
-  )
-  "tomorrow" -> simpleMessage(
-    main = "Due tomorrow",
-    ru = "На завтра",
-    kk = "Ертеңге"
-  )
-  "week" -> simpleMessage(
-    main = "This week",
-    ru = "На этой неделе",
-    kk = "Осы аптада"
-  )
-  "later" -> simpleMessage(
-    main = "Later",
-    ru = "Позже",
-    kk = "Кейін"
-  )
-  else -> simpleMessage(
-    main = "No promised date",
-    ru = "Без обещанной даты",
-    kk = "Уәде күні жоқ"
-  )
+  "overdue" -> eventMessage("message.overdue_promises")
+  "today" -> eventMessage("message.due_today")
+  "tomorrow" -> eventMessage("message.due_tomorrow")
+  "week" -> eventMessage("message.this_week")
+  "later" -> eventMessage("message.later")
+  else -> eventMessage("message.no_promised_date")
 }
 
 
@@ -15631,11 +15261,7 @@ private suspend fun RoutingCall.receiveSupplierContractRevisionActionOrNull(): S
   }.getOrNull()
 }
 
-private fun supplierContractRevisionConflictMessage(): List<LocalizedStringDataModel> = simpleMessage(
-  main = "This contract changed. Refresh it before acting on this revision.",
-  ru = "Договор изменился. Обновите его перед действием с этой редакцией.",
-  kk = "Келісім өзгерді. Осы нұсқамен әрекет етпес бұрын оны жаңартыңыз."
-)
+private fun supplierContractRevisionConflictMessage(): List<LocalizedStringDataModel> = eventMessage("message.this_contract_changed_refresh_it_before_acting_on_this_revision")
 
 private fun String.canonicalSupplierContractUuidOrNull(): String? =
   trim().takeIf { it.isNotBlank() }?.let { value ->
@@ -15684,11 +15310,7 @@ private fun SupplierPartnershipContractDataModel.validationFailureForSupplierCon
       SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM,
       SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP
     )) {
-    return simpleMessage(
-      main = "Choose a valid contract scope",
-      ru = "Выберите корректную область договора",
-      kk = "Келісімнің дұрыс ауқымын таңдаңыз"
-    )
+    return eventMessage("message.choose_a_valid_contract_scope")
   }
 
   val rawSelectedGoodsIds = goodsItemIds
@@ -15696,28 +15318,16 @@ private fun SupplierPartnershipContractDataModel.validationFailureForSupplierCon
     .filter { it.isNotBlank() }
   val canonicalSelectedGoodsIds = rawSelectedGoodsIds.map { it.canonicalSupplierContractUuidOrNull() }
   if (canonicalSelectedGoodsIds.any { it == null }) {
-    return simpleMessage(
-      main = "One or more contract goods are invalid",
-      ru = "Один или несколько товаров договора указаны неверно",
-      kk = "Келісімдегі бір немесе бірнеше тауар қате көрсетілген"
-    )
+    return eventMessage("message.one_or_more_contract_goods_are_invalid")
   }
   val selectedGoodsIds = canonicalSelectedGoodsIds.filterNotNull().distinct()
 
   when (requestedScope) {
     SUPPLIER_CONTRACT_SCOPE_GOODS_ITEM -> if (selectedGoodsIds.size != 1) {
-      return simpleMessage(
-        main = "Select exactly one goods item for an item contract",
-        ru = "Для договора на товар выберите ровно один товар",
-        kk = "Тауар келісімі үшін дәл бір тауарды таңдаңыз"
-      )
+      return eventMessage("message.select_exactly_one_goods_item_for_an_item_contract")
     }
     SUPPLIER_CONTRACT_SCOPE_GOODS_GROUP -> if (selectedGoodsIds.isEmpty()) {
-      return simpleMessage(
-        main = "Select at least one goods item for a goods-group contract",
-        ru = "Для договора на группу выберите хотя бы один товар",
-        kk = "Тауарлар тобының келісімі үшін кемінде бір тауарды таңдаңыз"
-      )
+      return eventMessage("message.select_at_least_one_goods_item_for_a_goods_group_contract")
     }
   }
 
@@ -15728,21 +15338,13 @@ private fun SupplierPartnershipContractDataModel.validationFailureForSupplierCon
     rawPriceTermGoodsIds.any { it.isBlank() } ||
     priceTermGoodsIds.size != rawPriceTermGoodsIds.size
   ) {
-    return simpleMessage(
-      main = "Every active price line must reference a valid goods item",
-      ru = "Каждая активная строка цены должна ссылаться на корректный товар",
-      kk = "Әр белсенді баға жолы дұрыс тауарға сілтеме жасауы керек"
-    )
+    return eventMessage("message.every_active_price_line_must_reference_a_valid_goods_item")
   }
   if (
     requestedScope != SUPPLIER_CONTRACT_SCOPE_PARTNERSHIP &&
     priceTermGoodsIds.any { it !in selectedGoodsIds }
   ) {
-    return simpleMessage(
-      main = "Contract price lines must belong to the selected goods",
-      ru = "Строки цен договора должны относиться к выбранным товарам",
-      kk = "Келісімнің баға жолдары таңдалған тауарларға тиесілі болуы керек"
-    )
+    return eventMessage("message.contract_price_lines_must_belong_to_the_selected_goods")
   }
 
   if (priceTerms.any { term ->
@@ -15751,11 +15353,7 @@ private fun SupplierPartnershipContractDataModel.validationFailureForSupplierCon
         term.minOrderQuantity.isInvalidProvidedSupplierContractQuantity() ||
         term.packageQuantity.isInvalidProvidedSupplierContractQuantity()
     }) {
-    return simpleMessage(
-      main = "Contract prices and quantities must be finite positive values",
-      ru = "Цены и количества в договоре должны быть конечными положительными значениями",
-      kk = "Келісімдегі бағалар мен мөлшерлер шекті оң мәндер болуы керек"
-    )
+    return eventMessage("message.contract_prices_and_quantities_must_be_finite_positive_values")
   }
 
   val allGoodsUuids = (selectedGoodsIds + priceTermGoodsIds)
@@ -15772,11 +15370,7 @@ private fun SupplierPartnershipContractDataModel.validationFailureForSupplierCon
       .map { it[StockItems.id] }
       .toSet()
     if (existingGoodsIds.size != allGoodsUuids.toSet().size) {
-      return simpleMessage(
-        main = "One or more contract goods are no longer available in this Store",
-        ru = "Один или несколько товаров договора больше недоступны в этом магазине",
-        kk = "Келісімдегі бір немесе бірнеше тауар бұл дүкенде енді қолжетімсіз"
-      )
+      return eventMessage("message.one_or_more_contract_goods_are_no_longer_available_in_this")
     }
   }
 
@@ -15995,11 +15589,7 @@ private fun UpdateBuilder<*>.setSupplierContractUpdateColumns(clean: SupplierPar
   this[SupplierPartnershipContracts.isActive] = clean.isActive
 }
 
-private fun supplierContractGuardFailureMessage(): List<LocalizedStringDataModel> = simpleMessage(
-  main = "Pending supplier/store contract must be accepted before supply can continue",
-  ru = "Ожидающий договор магазина и поставщика должен быть принят до продолжения поставки",
-  kk = "Жеткізу жалғасуы үшін дүкен мен жеткізушінің күтіп тұрған келісімі қабылдануы керек"
-)
+private fun supplierContractGuardFailureMessage(): List<LocalizedStringDataModel> = eventMessage("message.pending_supplier_store_contract_must_be_accepted_before_supply_can_continue")
 
 private fun supplierContractBlocksStoreSupplyInsideTransaction(
   storeId: UUID,
@@ -16123,30 +15713,14 @@ private fun SupplierDataModel.cleanedForStorage(ownerUserId: UUID? = null, exist
 private fun supplierProfileValidationMessage(
   issues: Set<SupplierProfileValidationIssue>
 ): List<LocalizedStringDataModel>? = when {
-  SupplierProfileValidationIssue.MissingName in issues -> simpleMessage(
-    main = "Supplier name is required",
-    ru = "Укажите название поставщика",
-    kk = "Жеткізуші атауын көрсетіңіз"
-  )
-  SupplierProfileValidationIssue.InvalidEmail in issues -> simpleMessage(
-    main = "Supplier email address is invalid",
-    ru = "Некорректный email поставщика",
-    kk = "Жеткізушінің email мекенжайы қате"
-  )
+  SupplierProfileValidationIssue.MissingName in issues -> eventMessage("message.supplier_name_is_required")
+  SupplierProfileValidationIssue.InvalidEmail in issues -> eventMessage("message.supplier_email_address_is_invalid")
   SupplierProfileValidationIssue.TooManyNames in issues ||
     SupplierProfileValidationIssue.TooManyPhones in issues ||
-    SupplierProfileValidationIssue.TooManyEmails in issues -> simpleMessage(
-      main = "Supplier profile contains too many contact or name values",
-      ru = "В профиле поставщика слишком много имён или контактов",
-      kk = "Жеткізуші профилінде атаулар немесе байланыстар тым көп"
-    )
+    SupplierProfileValidationIssue.TooManyEmails in issues -> eventMessage("message.supplier_profile_contains_too_many_contact_or_name_values")
   SupplierProfileValidationIssue.NameTooLong in issues ||
     SupplierProfileValidationIssue.PhoneTooLong in issues ||
-    SupplierProfileValidationIssue.EmailTooLong in issues -> simpleMessage(
-      main = "Supplier profile contains a value that is too long",
-      ru = "В профиле поставщика есть слишком длинное значение",
-      kk = "Жеткізуші профилінде тым ұзын мән бар"
-    )
+    SupplierProfileValidationIssue.EmailTooLong in issues -> eventMessage("message.supplier_profile_contains_a_value_that_is_too_long")
   else -> null
 }
 
@@ -17783,11 +17357,7 @@ private fun addStockForTransactionLineInsideTransaction(
     it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
     it[StockBatchesV2.additionalNotes] = if (isReturnTransaction) returnedNoStockBatchNote else null
     it[StockBatchesV2.additionalNotesLocalized] = if (isReturnTransaction) {
-      simpleMessage(
-        main = "Returned items with no previous stock batch",
-        ru = "Возвраты без предыдущей складской партии",
-        kk = "Алдыңғы қойма партиясы жоқ қайтарымдар"
-      )
+      eventMessage("message.returned_items_with_no_previous_stock_batch")
     } else {
       emptyList()
     }
@@ -18111,10 +17681,10 @@ fun Application.module() {
   install(StatusPages) {
     exception<AitaAuthContactConflictException> { call, cause ->
       val message = when (cause.conflict) {
-        AuthContactConflict.PHONE -> simpleMessage(main = "This phone number is already in use", en = "This phone number is already in use", ru = "Этот номер телефона уже используется", kk = "Бұл телефон нөмірі қолданылып жатыр")
-        AuthContactConflict.EMAIL -> simpleMessage(main = "This email is already in use", en = "This email is already in use", ru = "Этот email уже используется", kk = "Бұл email қолданылып жатыр")
-        AuthContactConflict.EXTRA_LIMIT -> simpleMessage(main = "Only one extra email is allowed. Remove the existing one first.", en = "Only one extra email is allowed. Remove the existing one first.", ru = "Можно добавить один дополнительный email. Сначала удалите прежний.", kk = "Бір қосымша email қосуға болады. Алдымен бұрынғысын жойыңыз.")
-        AuthContactConflict.MAIN_EMAIL_VERIFICATION -> simpleMessage(main = "Verify the new address as your extra email before making it the main email.", en = "Verify the new address as your extra email before making it the main email.", ru = "Сначала подтвердите новый адрес как дополнительный email, затем сделайте его основным.", kk = "Жаңа мекенжайды негізгі email етпес бұрын қосымша email ретінде растаңыз.")
+        AuthContactConflict.PHONE -> eventMessage("message.this_phone_number_is_already_in_use")
+        AuthContactConflict.EMAIL -> eventMessage("message.this_email_is_already_in_use")
+        AuthContactConflict.EXTRA_LIMIT -> eventMessage("message.only_one_extra_email_is_allowed_remove_the_existing_one_first")
+        AuthContactConflict.MAIN_EMAIL_VERIFICATION -> eventMessage("message.verify_the_new_address_as_your_extra_email_before_making_it")
       }
       call.safeGenericResponseNoPayload(status = HttpStatusCode.Conflict, message = message)
     }
@@ -18123,11 +17693,7 @@ fun Application.module() {
       call.response.headers.append(HttpHeaders.RetryAfter, cause.retryAfterSeconds.coerceIn(1L, 3600L).toString())
       call.safeGenericResponseNoPayload(
         status = HttpStatusCode.TooManyRequests,
-        message = simpleMessage(
-          main = "Too many authentication attempts. Try again later.",
-          ru = "Слишком много попыток входа или запросов кода. Попробуйте позже.",
-          kk = "Кіру әрекеттері немесе код сұраулары тым көп. Кейінірек қайталаңыз."
-        )
+        message = eventMessage("message.too_many_authentication_attempts_try_again_later")
       )
     }
 
@@ -18141,11 +17707,7 @@ fun Application.module() {
     exception<BadRequestException> { call, cause ->
       call.safeGenericResponseNoPayload(
         status = HttpStatusCode.BadRequest,
-        message = simpleMessage(
-          main = "Bad request",
-          ru = "Неверный запрос",
-          kk = "Қате сұрау"
-        ),
+        message = eventMessage("message.bad_request"),
         logMessage = "Bad request: ${cause.message}"
       )
     }
@@ -18163,11 +17725,7 @@ fun Application.module() {
       }
       call.safeGenericResponseNoPayload(
         status = HttpStatusCode.InternalServerError,
-        message = simpleMessage(
-          main = "Internal server error",
-          ru = "Внутренняя ошибка сервера",
-          kk = "Сервердің ішкі қатесі"
-        ),
+        message = eventMessage("message.internal_server_error"),
         logMessage = "Unhandled server error",
         throwable = cause
       )
@@ -18519,11 +18077,7 @@ fun Application.module() {
           if (!body.location.isResolvedAddress()) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Select a verified address before opening the map",
-                ru = "Перед открытием карты выберите проверенный адрес",
-                kk = "Картаны ашпас бұрын тексерілген мекенжайды таңдаңыз"
-              )
+              eventMessage("message.select_a_verified_address_before_opening_the_map")
             )
           }
           val inferredUrl = call.inferredPublicServerUrl()
@@ -18560,11 +18114,7 @@ fun Application.module() {
           call.genericResponse(
             HttpStatusCode.OK,
             result,
-            simpleMessage(
-              main = if (result.changedCount > 0) "Store addresses refreshed" else "Store addresses are current",
-              ru = if (result.changedCount > 0) "Адреса магазинов обновлены" else "Адреса магазинов актуальны",
-              kk = if (result.changedCount > 0) "Дүкен мекенжайлары жаңартылды" else "Дүкен мекенжайлары өзекті"
-            )
+            eventMessage(if (result.changedCount > 0) "address.stores_refreshed" else "address.stores_current")
           )
         }
       }
@@ -18667,7 +18217,7 @@ fun Application.module() {
           val body = call.receiveAita<UserAuthSignUpDataModel>()
           val phoneNumber = kz.aita.auth.normalizeAitaPhoneAlias(body.phoneNumber)?.removePrefix("+")
             ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-              message = simpleMessage(main = "Invalid phone number", ru = "Некорректный номер телефона", kk = "Телефон нөмірі дұрыс емес"))
+              message = eventMessage("message.invalid_phone_number"))
           val email = body.email.trim().lowercase()
           val cleanPassword = body.password.trim()
 
@@ -18827,11 +18377,7 @@ fun Application.module() {
         try {
           val body = call.receiveAita<UserAuthLogInDataModel>()
 
-          val invalidCredentialsMessage = simpleMessage(
-            main = "Invalid login or password",
-            ru = "Неверный логин или пароль",
-            kk = "Логин немесе құпиясөз қате"
-          )
+          val invalidCredentialsMessage = eventMessage("message.invalid_login_or_password")
 
           val resolvedUserId = resolveAdvancedAuthUser(body.login)
             ?: return@post call.genericResponseNoPayload(
@@ -18857,12 +18403,7 @@ fun Application.module() {
           if (advancedAuthSecondFactorEnabled(user[Users.id])) {
             return@post call.genericResponseNoPayload(
               status = HttpStatusCode(428, "Precondition Required"),
-              message = simpleMessage(
-                main = "Two-factor authentication is enabled. Use the updated AITA login screen.",
-                en = "Two-factor authentication is enabled. Use the updated AITA login screen.",
-                ru = "Двухфакторная аутентификация включена. Используйте обновлённый экран входа AITA.",
-                kk = "Екі факторлы аутентификация қосылған. Жаңартылған AITA кіру экранын пайдаланыңыз."
-              )
+              message = eventMessage("message.two_factor_authentication_is_enabled_use_the_updated_aita_login_screen")
             )
           }
 
@@ -18875,7 +18416,7 @@ fun Application.module() {
               (profile == null || kz.aita.auth.aitaLoginSecondFactor(profile[AuthSecurityProfiles.totpEnabledAtMillis] != null,
                 profile[AuthSecurityProfiles.totpRequiredForLogin], profile[AuthSecurityProfiles.emailRequiredForLogin]) == kz.aita.auth.AitaLoginSecondFactor.NONE)
           } ?: return@post call.genericResponseNoPayload(HttpStatusCode(428, "Precondition Required"),
-            message = simpleMessage(main = "Sign in again using the updated AITA login screen.", ru = "Войдите заново через обновлённый экран входа AITA.", kk = "Жаңартылған AITA кіру экраны арқылы қайта кіріңіз."))
+            message = eventMessage("message.sign_in_again_using_the_updated_aita_login_screen"))
 
           call.genericTokenPairResponse(HttpStatusCode.OK, tokenPair)
         } catch (throwable: Throwable) {
@@ -18908,12 +18449,7 @@ fun Application.module() {
         if (!readinessOk) {
           return@get call.genericResponseNoPayload(
             status = HttpStatusCode.ServiceUnavailable,
-            message = simpleMessage(
-              main = "Server is starting or repairing itself. Try again shortly.",
-              en = "Server is starting or repairing itself. Try again shortly.",
-              ru = "Сервер запускается или восстанавливается. Повторите чуть позже.",
-              kk = "Сервер іске қосылып немесе қалпына келіп жатыр. Сәл кейін қайталаңыз."
-            )
+            message = eventMessage("message.server_is_starting_or_repairing_itself_try_again_shortly")
           )
         }
 
@@ -18926,12 +18462,7 @@ fun Application.module() {
         }
         call.genericResponseNoPayload(
           status = HttpStatusCode.OK,
-          message = simpleMessage(
-            main = "Server connection available",
-            en = "Server connection available",
-            ru = "Сервер доступен",
-            kk = "Сервер қолжетімді"
-          )
+          message = eventMessage("message.server_connection_available")
         )
       }
 
@@ -18991,21 +18522,12 @@ fun Application.module() {
           if (throwable is IllegalAccessException) {
             call.genericResponseNoPayload(
               status = HttpStatusCode.Unauthorized,
-              message = simpleMessage(
-                main = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
-                en = "Cloud sign-in expired. Sign in again to sync. Your local data stays available.",
-                ru = "Срок облачного входа истёк. Войдите снова для синхронизации. Локальные данные останутся доступны.",
-                kk = "Бұлттық кіру мерзімі аяқталды. Синхрондау үшін қайта кіріңіз. Жергілікті деректер қолжетімді болып қалады."
-              )
+              message = eventMessage("message.cloud_sign_in_expired_sign_in_again_to_sync_your_local")
             )
           } else {
             call.safeGenericResponseNoPayload(
               status = HttpStatusCode.InternalServerError,
-              message = simpleMessage(
-                main = "Server could not refresh session. Try again.",
-                ru = "Сервер не смог обновить сеанс. Попробуйте ещё раз.",
-                kk = "Сервер сеансты жаңарта алмады. Қайталап көріңіз."
-              ),
+              message = eventMessage("message.server_could_not_refresh_session_try_again"),
               logMessage = "Refresh token rotation failed",
               throwable = throwable
             )
@@ -19019,12 +18541,7 @@ fun Application.module() {
         call.checkPrincipal() ?: return@get
         call.genericResponseNoPayload(
           status = HttpStatusCode.OK,
-          message = simpleMessage(
-            main = "Cloud session active",
-            en = "Cloud session active",
-            ru = "Облачный сеанс активен",
-            kk = "Бұлттық сеанс белсенді"
-          )
+          message = eventMessage("message.cloud_session_active")
         )
       }
 
@@ -19441,6 +18958,9 @@ fun Application.module() {
         post("/add") {
           val userId = call.checkPrincipal() ?: return@post
           val body = call.receiveAita<NotificationDataModel>()
+          val resources = serverEventResourceCatalogue()
+          val titleText = eventTextForStorage(body.title, body.titleTranslations, body.titleTemplate, resources)
+          val messageText = eventTextForStorage(body.message, body.messageTranslations, body.messageTemplate, resources)
           val now = System.currentTimeMillis()
           val storeId = body.storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
           val category = body.category.ifBlank { body.type.name.lowercase() }
@@ -19476,7 +18996,6 @@ fun Application.module() {
               .selectAll()
               .where {
                 (Notifications.userId eq userId) and
-                   (Notifications.message eq body.message) and
                    (Notifications.type eq body.type.name) and
                    (Notifications.category eq category) and
                    (Notifications.notificationSource eq source) and
@@ -19484,15 +19003,24 @@ fun Application.module() {
                    (if (storeId == null) Notifications.storeId.isNull() else Notifications.storeId eq storeId)
               }
               .orderBy(Notifications.createdAtMillis, SortOrder.DESC)
-              .limit(1)
-              .firstOrNull()
+              .limit(100)
+              .firstOrNull { row ->
+                val oldMessage = eventTextForStorage(row[Notifications.message], row[Notifications.messageTranslations], row[Notifications.messageTemplate], resources)
+                val oldTitle = eventTextForStorage(row[Notifications.title], row[Notifications.titleTranslations], row[Notifications.titleTemplate], resources)
+                eventTextIdentity(oldMessage) == eventTextIdentity(messageText) &&
+                  eventTextIdentity(oldTitle) == eventTextIdentity(titleText)
+              }
 
             val finalNotificationId = existingDuplicate?.get(Notifications.id) ?: requestedNotificationId
 
             if (existingDuplicate != null) {
               Notifications.update({ (Notifications.id eq finalNotificationId) and (Notifications.userId eq userId) }) {
-                it[title] = body.title
-                it[message] = body.message
+                it[title] = titleText.fallback
+                it[Notifications.titleTemplate] = titleText.reference
+                it[Notifications.titleTranslations] = titleText.translations
+                it[message] = messageText.fallback
+                it[Notifications.messageTemplate] = messageText.reference
+                it[Notifications.messageTranslations] = messageText.translations
                 it[type] = body.type.name
                 it[Notifications.category] = category
                 it[notificationSource] = source
@@ -19508,8 +19036,12 @@ fun Application.module() {
                 it[id] = finalNotificationId
                 it[Notifications.userId] = userId
                 it[Notifications.storeId] = storeId
-                it[title] = body.title
-                it[message] = body.message
+                it[title] = titleText.fallback
+                it[Notifications.titleTemplate] = titleText.reference
+                it[Notifications.titleTranslations] = titleText.translations
+                it[message] = messageText.fallback
+                it[Notifications.messageTemplate] = messageText.reference
+                it[Notifications.messageTranslations] = messageText.translations
                 it[type] = body.type.name
                 it[Notifications.category] = category
                 it[notificationSource] = source
@@ -19993,12 +19525,7 @@ fun Application.module() {
               action = OPERATION_LOG_ACTION_CREATED,
               entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
               entityId = id.toString(),
-              title = simpleMessage(
-                main = "Stock item added: $insertedItemName",
-                en = "Stock item added: $insertedItemName",
-                ru = "Товар добавлен: $insertedItemName",
-                kk = "Тауар қосылды: $insertedItemName"
-              ),
+              title = eventMessage("message.stock_item_added_2", "insertedItemName" to (insertedItemName).toString()),
               details = stockItemChangeDetails(listOf("created", "name", "barcodes", "prices", "promotions", "conditions")),
               metadata = mapOf(
                 "goods_item_id" to id.toString(),
@@ -20017,19 +19544,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.Created,
               payload = item,
-              message = simpleMessage(
-                main = "Goods item added",
-                ru = "Товар добавлен",
-                kk = "Тауар қосылды"
-              )
+              message = eventMessage("message.goods_item_added")
             )
           } ?: call.genericResponseNoPayload(
             status = HttpStatusCode.Conflict,
-            message = simpleMessage(
-              main = "Invalid stock item or duplicated barcode",
-              ru = "Некорректный товар или повторяющийся штрихкод",
-              kk = "Қате тауар немесе қайталанған штрихкод"
-            )
+            message = eventMessage("message.invalid_stock_item_or_duplicated_barcode")
           )
         }
 
@@ -20189,12 +19708,7 @@ fun Application.module() {
                 action = OPERATION_LOG_ACTION_UPDATED,
                 entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
                 entityId = id.toString(),
-                title = simpleMessage(
-                  main = "Stock item updated: $updatedItemName",
-                  en = "Stock item updated: $updatedItemName",
-                  ru = "Товар обновлён: $updatedItemName",
-                  kk = "Тауар жаңартылды: $updatedItemName"
-                ),
+                title = eventMessage("message.stock_item_updated_2", "updatedItemName" to (updatedItemName).toString()),
                 details = stockItemChangeDetails(changedFields),
                 metadata = mapOf(
                   "goods_item_id" to id.toString(),
@@ -20214,19 +19728,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = item,
-              message = simpleMessage(
-                main = "Goods item updated",
-                ru = "Товар обновлён",
-                kk = "Тауар жаңартылды"
-              )
+              message = eventMessage("message.goods_item_updated")
             )
           } ?: call.genericResponseNoPayload(
             status = HttpStatusCode.Conflict,
-            message = stockItemChangeFailure ?: simpleMessage(
-              main = "Invalid stock item or duplicated barcode",
-              ru = "Некорректный товар или повторяющийся штрихкод",
-              kk = "Қате тауар немесе қайталанған штрихкод"
-            )
+            message = stockItemChangeFailure ?: eventMessage("message.invalid_stock_item_or_duplicated_barcode")
           )
         }
 
@@ -20273,18 +19779,8 @@ fun Application.module() {
               action = OPERATION_LOG_ACTION_DELETED,
               entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
               entityId = id.toString(),
-              title = simpleMessage(
-                main = "Stock item deleted: $deletedItemName",
-                en = "Stock item deleted: $deletedItemName",
-                ru = "Товар удалён: $deletedItemName",
-                kk = "Тауар жойылды: $deletedItemName"
-              ),
-              details = simpleMessage(
-                main = "Removed stock item and its batch links from the active catalog.",
-                en = "Removed stock item and its batch links from the active catalog.",
-                ru = "Товар и его связи с партиями удалены из активного каталога.",
-                kk = "Тауар және оның партиялармен байланыстары белсенді каталогтан жойылды."
-              ),
+              title = eventMessage("message.stock_item_deleted_2", "deletedItemName" to (deletedItemName).toString()),
+              details = eventMessage("message.removed_stock_item_and_its_batch_links_from_the_active_catalog"),
               metadata = mapOf(
                 "goods_item_id" to id.toString(),
                 "goods_name" to deletedItemName,
@@ -20576,18 +20072,8 @@ fun Application.module() {
               action = OPERATION_LOG_ACTION_MOVED,
               entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
               entityId = sourceBatchId.toString(),
-              title = simpleMessage(
-                main = "Batch moved out: $sourceItemName",
-                en = "Batch moved out: $sourceItemName",
-                ru = "Партия отправлена: $sourceItemName",
-                kk = "Партия жіберілді: $sourceItemName"
-              ),
-              details = simpleMessage(
-                main = "Quantity: $moveQuantityText",
-                en = "Quantity: $moveQuantityText",
-                ru = "Количество: $moveQuantityText",
-                kk = "Саны: $moveQuantityText"
-              ),
+              title = eventMessage("message.batch_moved_out", "sourceItemName" to (sourceItemName).toString()),
+              details = eventMessage("message.quantity", "moveQuantityText" to (moveQuantityText).toString()),
               metadata = moveMetadata,
               now = now
             )
@@ -20597,18 +20083,8 @@ fun Application.module() {
               action = OPERATION_LOG_ACTION_MOVED,
               entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
               entityId = destinationBatchId.toString(),
-              title = simpleMessage(
-                main = if (requiresAcceptance) "Batch sent en route: $destinationItemName" else "Batch moved in: $destinationItemName",
-                en = if (requiresAcceptance) "Batch sent en route: $destinationItemName" else "Batch moved in: $destinationItemName",
-                ru = if (requiresAcceptance) "Партия в пути: $destinationItemName" else "Партия принята перемещением: $destinationItemName",
-                kk = if (requiresAcceptance) "Партия жолда: $destinationItemName" else "Партия ауыстырумен қабылданды: $destinationItemName"
-              ),
-              details = simpleMessage(
-                main = "Quantity: $moveQuantityText",
-                en = "Quantity: $moveQuantityText",
-                ru = "Количество: $moveQuantityText",
-                kk = "Саны: $moveQuantityText"
-              ),
+              title = eventMessage(if (requiresAcceptance) "log.batch.en_route" else "log.batch.moved_in", "name" to destinationItemName),
+              details = eventMessage("message.quantity", "moveQuantityText" to (moveQuantityText).toString()),
               metadata = moveMetadata + mapOf(
                 "goods_item_id" to destinationGoodsItemId.toString(),
                 "batch_id" to destinationBatchId.toString(),
@@ -20643,12 +20119,7 @@ fun Application.module() {
               status = HttpStatusCode.OK,
               payload = it,
               message = if (it.requiresAcceptance) {
-                listOf(
-                  LocalizedStringDataModel("main", "Batch sent en route. Receiving branch must accept it."),
-                  LocalizedStringDataModel("en", "Batch sent en route. Receiving branch must accept it."),
-                  LocalizedStringDataModel("ru", "Партия отправлена в пути. Принимающий филиал должен подтвердить получение."),
-                  LocalizedStringDataModel("kk", "Партия жолға шықты. Қабылдайтын филиал қабылдауды растауы керек.")
-                )
+                eventMessage("message.batch_sent_en_route_receiving_branch_must_accept_it")
               } else getResponse("74").message
             )
           } ?: call.genericResponseNoPayload(
@@ -20823,18 +20294,8 @@ fun Application.module() {
               action = decisionAction,
               entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
               entityId = destinationBatchId.toString(),
-              title = simpleMessage(
-                main = if (request.accept) "Incoming batch accepted: $destinationItemNameForDecision" else "Incoming batch declined: $destinationItemNameForDecision",
-                en = if (request.accept) "Incoming batch accepted: $destinationItemNameForDecision" else "Incoming batch declined: $destinationItemNameForDecision",
-                ru = if (request.accept) "Входящая партия принята: $destinationItemNameForDecision" else "Входящая партия отклонена: $destinationItemNameForDecision",
-                kk = if (request.accept) "Кіріс партия қабылданды: $destinationItemNameForDecision" else "Кіріс партия қабылданбады: $destinationItemNameForDecision"
-              ),
-              details = simpleMessage(
-                main = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
-                en = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
-                ru = "Количество: $decisionQuantityText" + (decisionNote?.let { " · Заметка: $it" } ?: ""),
-                kk = "Саны: $decisionQuantityText" + (decisionNote?.let { " · Ескертпе: $it" } ?: "")
-              ),
+              title = eventMessage(if (request.accept) "log.batch.incoming_accepted" else "log.batch.incoming_declined", "name" to destinationItemNameForDecision),
+              details = eventMessage(batchDecisionDetailsMessageReference(decisionQuantityText, decisionNote)),
               metadata = decisionMetadata,
               now = now
             )
@@ -20845,18 +20306,8 @@ fun Application.module() {
                 action = OPERATION_LOG_ACTION_DECLINED,
                 entityType = OPERATION_LOG_ENTITY_STOCK_BATCH,
                 entityId = sourceBatchId.toString(),
-                title = simpleMessage(
-                  main = "Batch move declined and returned: $sourceItemNameForDecision",
-                  en = "Batch move declined and returned: $sourceItemNameForDecision",
-                  ru = "Перемещение партии отклонено, остаток возвращён: $sourceItemNameForDecision",
-                  kk = "Партия ауыстыруы қабылданбады, қалдық қайтарылды: $sourceItemNameForDecision"
-                ),
-                details = simpleMessage(
-                  main = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
-                  en = "Quantity: $decisionQuantityText" + (decisionNote?.let { " · Note: $it" } ?: ""),
-                  ru = "Количество: $decisionQuantityText" + (decisionNote?.let { " · Заметка: $it" } ?: ""),
-                  kk = "Саны: $decisionQuantityText" + (decisionNote?.let { " · Ескертпе: $it" } ?: "")
-                ),
+                title = eventMessage("message.batch_move_declined_and_returned", "sourceItemNameForDecision" to (sourceItemNameForDecision).toString()),
+                details = eventMessage(batchDecisionDetailsMessageReference(decisionQuantityText, decisionNote)),
                 metadata = decisionMetadata + mapOf(
                   "goods_item_id" to sourceGoodsItemId.toString(),
                   "batch_id" to sourceBatchId.toString(),
@@ -20895,19 +20346,9 @@ fun Application.module() {
               status = HttpStatusCode.OK,
               payload = it,
               message = if (it.movement.status == StockBatchMovementStatusDataModel.Accepted) {
-                listOf(
-                  LocalizedStringDataModel("main", "Incoming batch accepted."),
-                  LocalizedStringDataModel("en", "Incoming batch accepted."),
-                  LocalizedStringDataModel("ru", "Входящая партия принята."),
-                  LocalizedStringDataModel("kk", "Кіріс партия қабылданды.")
-                )
+                eventMessage("message.incoming_batch_accepted")
               } else {
-                listOf(
-                  LocalizedStringDataModel("main", "Incoming batch declined and returned to source."),
-                  LocalizedStringDataModel("en", "Incoming batch declined and returned to source."),
-                  LocalizedStringDataModel("ru", "Входящая партия отклонена и возвращена источнику."),
-                  LocalizedStringDataModel("kk", "Кіріс партия қабылданбады және бастапқы қоймаға қайтарылды.")
-                )
+                eventMessage("message.incoming_batch_declined_and_returned_to_source")
               }
             )
           } ?: call.genericResponseNoPayload(
@@ -21287,11 +20728,7 @@ fun Application.module() {
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            simpleMessage(
-              main = "Cannot update stock batch",
-              ru = "Не удалось обновить партию товара",
-              kk = "Тауар партиясын жаңарту мүмкін болмады"
-            )
+            eventMessage("message.cannot_update_stock_batch")
           )
         }
 
@@ -21453,12 +20890,7 @@ fun Application.module() {
                 action = OPERATION_LOG_ACTION_UPDATED,
                 entityType = OPERATION_LOG_ENTITY_STOCK_ITEM,
                 entityId = goodsItemId.toString(),
-                title = simpleMessage(
-                  main = "Active shelf batch changed: $itemName",
-                  en = "Active shelf batch changed: $itemName",
-                  ru = "Активная партия на полке изменена: $itemName",
-                  kk = "Сөредегі белсенді партия өзгерді: $itemName"
-                ),
+                title = eventMessage("message.active_shelf_batch_changed", "itemName" to (itemName).toString()),
                 details = stockItemChangeDetails(listOf("active shelf batch")),
                 metadata = mapOf(
                   "goods_item_id" to goodsItemId.toString(),
@@ -21483,11 +20915,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = if (changed) simpleMessage(
-                main = "Shelf batch selected",
-                ru = "Партия на полке выбрана",
-                kk = "Сөредегі партия таңдалды"
-              ) else null
+              message = if (changed) eventMessage("message.shelf_batch_selected") else null
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -21504,11 +20932,7 @@ fun Application.module() {
           if (!rawSupplierId.isNullOrBlank() && requestedSupplierId == null) {
             call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier identity is invalid",
-                ru = "Идентификатор поставщика недействителен",
-                kk = "Жеткізуші идентификаторы жарамсыз"
-              )
+              eventMessage("message.supplier_identity_is_invalid")
             )
             return
           }
@@ -21536,11 +20960,7 @@ fun Application.module() {
           if (result == null) {
             call.genericResponseNoPayload(
               HttpStatusCode.Forbidden,
-              simpleMessage(
-                main = "Supplier identity is not available to this account",
-                ru = "Профиль поставщика недоступен этому аккаунту",
-                kk = "Жеткізуші профилі бұл аккаунтқа қолжетімсіз"
-              )
+              eventMessage("message.supplier_identity_is_not_available_to_this_account")
             )
             return
           }
@@ -21548,11 +20968,7 @@ fun Application.module() {
           call.genericResponse(
             status = HttpStatusCode.OK,
             payload = result,
-            message = simpleMessage(
-              main = "Supplier price book loaded",
-              ru = "Книга цен поставщика загружена",
-              kk = "Жеткізуші бағалар кітабы жүктелді"
-            )
+            message = eventMessage("message.supplier_price_book_loaded")
           )
         }
 
@@ -21571,11 +20987,7 @@ fun Application.module() {
           val storeId = call.headerUuid("store_id")
             ?: return@get call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Store link is missing or invalid",
-                ru = "Связь с магазином отсутствует или недействительна",
-                kk = "Дүкен байланысы жоқ немесе жарамсыз"
-              )
+              eventMessage("message.store_link_is_missing_or_invalid")
             )
 
           val result = newSuspendedTransaction(aitaServerIoContext) {
@@ -21599,11 +21011,7 @@ fun Application.module() {
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.Forbidden,
-            simpleMessage(
-              main = "You cannot view this supplier price book",
-              ru = "У вас нет доступа к этому прайс-листу поставщика",
-              kk = "Бұл жеткізуші баға тізімін көруге рұқсатыңыз жоқ"
-            )
+            eventMessage("message.you_cannot_view_this_supplier_price_book")
           )
         }
 
@@ -21614,11 +21022,7 @@ fun Application.module() {
           if (!numericPrice.isFinite() || numericPrice <= 0.0) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier price must be greater than zero",
-                ru = "Цена поставщика должна быть больше нуля",
-                kk = "Жеткізуші бағасы нөлден жоғары болуы керек"
-              )
+              eventMessage("message.supplier_price_must_be_greater_than_zero")
             )
           }
 
@@ -21634,11 +21038,7 @@ fun Application.module() {
           if (invalidOptionalQuantity) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Minimum order and package size must be greater than zero",
-                ru = "Минимальный заказ и размер упаковки должны быть больше нуля",
-                kk = "Ең аз тапсырыс пен қаптама мөлшері нөлден жоғары болуы керек"
-              )
+              eventMessage("message.minimum_order_and_package_size_must_be_greater_than_zero")
             )
           }
 
@@ -21648,11 +21048,7 @@ fun Application.module() {
           if (storeId == null || supplierId == null || goodsItemId == null) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Store, supplier, or product link is invalid",
-                ru = "Связь с магазином, поставщиком или товаром недействительна",
-                kk = "Дүкен, жеткізуші немесе тауар байланысы жарамсыз"
-              )
+              eventMessage("message.store_supplier_or_product_link_is_invalid")
             )
           }
 
@@ -21710,19 +21106,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Supplier price saved",
-                ru = "Цена поставщика сохранена",
-                kk = "Жеткізуші бағасы сақталды"
-              )
+              message = eventMessage("message.supplier_price_saved")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.Forbidden,
-            simpleMessage(
-              main = "You cannot edit this supplier offer",
-              ru = "У вас нет доступа к редактированию этого предложения",
-              kk = "Бұл жеткізуші ұсынысын өзгертуге рұқсатыңыз жоқ"
-            )
+            eventMessage("message.you_cannot_edit_this_supplier_offer")
           )
         }
 
@@ -21732,11 +21120,7 @@ fun Application.module() {
           val storeId = call.headerUuid("store_id")
             ?: return@delete call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Store link is missing or invalid",
-                ru = "Связь с магазином отсутствует или недействительна",
-                kk = "Дүкен байланысы жоқ немесе жарамсыз"
-              )
+              eventMessage("message.store_link_is_missing_or_invalid")
             )
 
           val deleted = newSuspendedTransaction(aitaServerIoContext) {
@@ -21769,19 +21153,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Supplier prices deleted",
-                ru = "Цены поставщика удалены",
-                kk = "Жеткізуші бағалары өшірілді"
-              )
+              message = eventMessage("message.supplier_prices_deleted")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.Forbidden,
-            simpleMessage(
-              main = "You cannot delete supplier offers for this store",
-              ru = "У вас нет доступа к удалению предложений поставщика для этого магазина",
-              kk = "Бұл дүкеннің жеткізуші ұсыныстарын өшіруге рұқсатыңыз жоқ"
-            )
+            eventMessage("message.you_cannot_delete_supplier_offers_for_this_store")
           )
         }
       }
@@ -21903,19 +21279,11 @@ fun Application.module() {
           when (activeResult) {
             0 -> call.genericResponseNoPayload(
               HttpStatusCode.OK,
-              message = simpleMessage(
-                main = "Active store saved",
-                ru = "Активный магазин сохранён",
-                kk = "Белсенді дүкен сақталды"
-              )
+              message = eventMessage("message.active_store_saved")
             )
 
             else -> call.genericResponseNoPayload(HttpStatusCode.Forbidden,
-              message = simpleMessage(
-                main = "This store is no longer available to your account",
-                ru = "Этот магазин больше не доступен вашему аккаунту",
-                kk = "Бұл дүкен енді аккаунтыңызға қолжетімсіз"
-              )
+              message = eventMessage("message.this_store_is_no_longer_available_to_your_account")
             )
           }
         }
@@ -21939,22 +21307,14 @@ fun Application.module() {
           if (!validateStoreAddress(submittedBody)) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              message = simpleMessage(
-                main = "Select an address from suggestions before saving",
-                ru = "Перед сохранением выберите адрес из подсказок",
-                kk = "Сақтамас бұрын мекенжайды ұсыныстардан таңдаңыз"
-              )
+              message = eventMessage("message.select_an_address_from_suggestions_before_saving")
             )
           }
 
           if (!validateStoreLegalId(submittedBody)) {
             return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              message = simpleMessage(
-                main = "Legal ID format is invalid",
-                ru = "Неверный формат юридического ID",
-                kk = "Заңды ID пішімі қате"
-              )
+              message = eventMessage("message.legal_id_format_is_invalid")
             )
           }
 
@@ -22093,11 +21453,7 @@ fun Application.module() {
           if (!validateStoreAddress(submittedBody)) {
             return@put call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              message = simpleMessage(
-                main = "Select an address from suggestions before saving",
-                ru = "Перед сохранением выберите адрес из подсказок",
-                kk = "Сақтамас бұрын мекенжайды ұсыныстардан таңдаңыз"
-              )
+              message = eventMessage("message.select_an_address_from_suggestions_before_saving")
             )
           }
 
@@ -22161,11 +21517,7 @@ fun Application.module() {
           if (!validateStoreLegalId(body)) {
             return@put call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              message = simpleMessage(
-                main = "Legal ID format is invalid",
-                ru = "Неверный формат юридического ID",
-                kk = "Заңды ID пішімі қате"
-              )
+              message = eventMessage("message.legal_id_format_is_invalid")
             )
           }
 
@@ -22359,44 +21711,28 @@ fun Application.module() {
           val supplierId = runCatching { UUID.fromString(body.id.trim()) }.getOrNull()
             ?: return@put call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier profile ID is invalid",
-                ru = "Некорректный идентификатор профиля поставщика",
-                kk = "Жеткізуші профилінің идентификаторы қате"
-              )
+              eventMessage("message.supplier_profile_id_is_invalid")
             )
           supplierProfileValidationMessage(body.supplierProfileValidationIssues())?.let { message ->
             return@put call.genericResponseNoPayload(HttpStatusCode.BadRequest, message)
           }
 
           var failureStatus = HttpStatusCode.Forbidden
-          var failureMessage = simpleMessage(
-            main = "You cannot edit this supplier profile",
-            ru = "У вас нет права редактировать этот профиль поставщика",
-            kk = "Бұл жеткізуші профилін өңдеуге құқығыңыз жоқ"
-          )
+          var failureMessage = eventMessage("message.you_cannot_edit_this_supplier_profile")
           var profileChanged = false
           val updated = newSuspendedTransaction(aitaServerIoContext) {
             lockSupplierProfileInsideTransaction(supplierId)
             val row = Suppliers.selectAll().where { Suppliers.id eq supplierId }.singleOrNull()
             if (row == null) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Supplier profile was not found",
-                ru = "Профиль поставщика не найден",
-                kk = "Жеткізуші профилі табылмады"
-              )
+              failureMessage = eventMessage("message.supplier_profile_was_not_found")
               return@newSuspendedTransaction null
             }
             val existing = row.toSupplierDataModel()
             if (!existing.userIds.contains(userId.toString())) return@newSuspendedTransaction null
             if (!existing.isActive) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "This supplier profile is inactive",
-                ru = "Этот профиль поставщика неактивен",
-                kk = "Бұл жеткізуші профилі белсенді емес"
-              )
+              failureMessage = eventMessage("message.this_supplier_profile_is_inactive")
               return@newSuspendedTransaction null
             }
 
@@ -22446,19 +21782,11 @@ fun Application.module() {
           val supplierId = runCatching { UUID.fromString(rawSupplierId) }.getOrNull()
             ?: return@delete call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier profile ID is invalid",
-                ru = "Некорректный идентификатор профиля поставщика",
-                kk = "Жеткізуші профилінің идентификаторы қате"
-              )
+              eventMessage("message.supplier_profile_id_is_invalid")
             )
 
           var failureStatus = HttpStatusCode.Forbidden
-          var failureMessage = simpleMessage(
-            main = "You cannot delete this supplier profile",
-            ru = "У вас нет права удалить этот профиль поставщика",
-            kk = "Бұл жеткізуші профилін жоюға құқығыңыз жоқ"
-          )
+          var failureMessage = eventMessage("message.you_cannot_delete_this_supplier_profile")
           var profileChanged = false
           var realtimeUserIds: List<String> = emptyList()
           val deleted = newSuspendedTransaction(aitaServerIoContext) {
@@ -22466,11 +21794,7 @@ fun Application.module() {
             val row = Suppliers.selectAll().where { Suppliers.id eq supplierId }.singleOrNull()
             if (row == null) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Supplier profile was not found",
-                ru = "Профиль поставщика не найден",
-                kk = "Жеткізуші профилі табылмады"
-              )
+              failureMessage = eventMessage("message.supplier_profile_was_not_found")
               return@newSuspendedTransaction false
             }
             val supplier = row.toSupplierDataModel()
@@ -22486,11 +21810,7 @@ fun Application.module() {
 
             if (commercialHistory.total > 0L) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "Only an unused supplier profile can be deleted; profiles with order, agreement, offer, or stock history are kept for audit",
-                ru = "Удалить можно только неиспользованный профиль; профили с историей заказов, договоров, предложений или складских партий сохраняются для аудита",
-                kk = "Тек пайдаланылмаған профильді жоюға болады; тапсырыс, келісім, ұсыныс немесе қойма партияларының тарихы бар профильдер аудит үшін сақталады"
-              )
+              failureMessage = eventMessage("message.only_an_unused_supplier_profile_can_be_deleted_profiles_with_order")
               return@newSuspendedTransaction false
             }
 
@@ -22527,22 +21847,14 @@ fun Application.module() {
             runCatching { UUID.fromString(it) }.getOrNull()
               ?: return@get call.genericResponseNoPayload(
                 HttpStatusCode.BadRequest,
-                simpleMessage(
-                  main = "Store ID is invalid",
-                  ru = "Некорректный идентификатор магазина",
-                  kk = "Дүкен идентификаторы қате"
-                )
+                eventMessage("message.store_id_is_invalid")
               )
           }
           val supplierId = rawSupplierId.takeIf { it.isNotBlank() }?.let {
             runCatching { UUID.fromString(it) }.getOrNull()
               ?: return@get call.genericResponseNoPayload(
                 HttpStatusCode.BadRequest,
-                simpleMessage(
-                  main = "Supplier ID is invalid",
-                  ru = "Некорректный идентификатор поставщика",
-                  kk = "Жеткізуші идентификаторы қате"
-                )
+                eventMessage("message.supplier_id_is_invalid")
               )
           }
 
@@ -22606,27 +21918,15 @@ fun Application.module() {
             result != null -> call.genericListResponse(
               status = HttpStatusCode.OK,
               payload = result,
-              message = simpleMessage(
-                main = "Supplier contracts loaded",
-                ru = "Договоры с поставщиками загружены",
-                kk = "Жеткізуші келісімдері жүктелді"
-              )
+              message = eventMessage("message.supplier_contracts_loaded")
             )
             forbidden -> call.genericResponseNoPayload(
               HttpStatusCode.Forbidden,
-              simpleMessage(
-                main = "You do not have access to these supplier contracts",
-                ru = "У вас нет доступа к этим договорам с поставщиками",
-                kk = "Бұл жеткізуші келісімдеріне қолжетімділігіңіз жоқ"
-              )
+              eventMessage("message.you_do_not_have_access_to_these_supplier_contracts")
             )
             else -> call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Could not load supplier contracts",
-                ru = "Не удалось загрузить договоры с поставщиками",
-                kk = "Жеткізуші келісімдерін жүктеу мүмкін болмады"
-              )
+              eventMessage("message.could_not_load_supplier_contracts")
             )
           }
         }
@@ -22637,39 +21937,23 @@ fun Application.module() {
           val storeId = runCatching { UUID.fromString(body.storeId.trim()) }.getOrNull()
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Choose a valid partner Store",
-                ru = "Выберите корректный магазин-партнёр",
-                kk = "Дұрыс серіктес дүкенді таңдаңыз"
-              )
+              eventMessage("message.choose_a_valid_partner_store")
             )
           val supplierId = runCatching { UUID.fromString(body.supplierId.trim()) }.getOrNull()
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Choose a valid supplier profile",
-                ru = "Выберите корректный профиль поставщика",
-                kk = "Дұрыс жеткізуші профилін таңдаңыз"
-              )
+              eventMessage("message.choose_a_valid_supplier_profile")
             )
 
           var failureStatus = HttpStatusCode.BadRequest
-          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
-            main = "Cannot save supplier contract",
-            ru = "Не удалось сохранить договор с поставщиком",
-            kk = "Жеткізуші келісімін сақтау мүмкін болмады"
-          )
+          var failureMessage: List<LocalizedStringDataModel> = eventMessage("message.cannot_save_supplier_contract")
           val result = newSuspendedTransaction(aitaServerIoContext) {
             if (Stores.select(Stores.id).where {
                 (Stores.id eq storeId) and (Stores.isActive eq true)
               }.empty()
             ) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Partner Store was not found",
-                ru = "Магазин-партнёр не найден",
-                kk = "Серіктес дүкен табылмады"
-              )
+              failureMessage = eventMessage("message.partner_store_was_not_found")
               return@newSuspendedTransaction null
             }
             if (Suppliers.select(Suppliers.id).where {
@@ -22677,11 +21961,7 @@ fun Application.module() {
               }.empty()
             ) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Supplier profile was not found",
-                ru = "Профиль поставщика не найден",
-                kk = "Жеткізуші профилі табылмады"
-              )
+              failureMessage = eventMessage("message.supplier_profile_was_not_found")
               return@newSuspendedTransaction null
             }
 
@@ -22694,11 +21974,7 @@ fun Application.module() {
             val canSupplierEdit = userHasSupplierAccessInsideTransaction(userId, supplierId)
             if (!canStoreEdit && !canSupplierEdit) {
               failureStatus = HttpStatusCode.Forbidden
-              failureMessage = simpleMessage(
-                main = "You cannot edit this supplier contract",
-                ru = "У вас нет права редактировать этот договор",
-                kk = "Бұл жеткізуші келісімін өзгертуге құқығыңыз жоқ"
-              )
+              failureMessage = eventMessage("message.you_cannot_edit_this_supplier_contract")
               return@newSuspendedTransaction null
             }
 
@@ -22720,22 +21996,14 @@ fun Application.module() {
             lockSupplierProfileInsideTransaction(supplierId)
             if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "Supplier profile is no longer active",
-                ru = "Профиль поставщика больше не активен",
-                kk = "Жеткізуші профилі енді белсенді емес"
-              )
+              failureMessage = eventMessage("message.supplier_profile_is_no_longer_active")
               return@newSuspendedTransaction null
             }
             val requestedId = body.id.trim().takeIf { it.isNotBlank() }?.let {
               runCatching { UUID.fromString(it) }.getOrNull()
                 ?: run {
                   failureStatus = HttpStatusCode.BadRequest
-                  failureMessage = simpleMessage(
-                    main = "Supplier contract ID is invalid",
-                    ru = "Некорректный идентификатор договора",
-                    kk = "Жеткізуші келісімінің идентификаторы қате"
-                  )
+                  failureMessage = eventMessage("message.supplier_contract_id_is_invalid")
                   return@newSuspendedTransaction null
                 }
             }
@@ -22751,20 +22019,12 @@ fun Application.module() {
                   rowWithRequestedId[SupplierPartnershipContracts.supplierId] != supplierId
               )) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "This contract belongs to a different Store or supplier relationship",
-                ru = "Этот договор относится к другому магазину или поставщику",
-                kk = "Бұл келісім басқа дүкенге немесе жеткізушіге тиесілі"
-              )
+              failureMessage = eventMessage("message.this_contract_belongs_to_a_different_store_or_supplier_relationship")
               return@newSuspendedTransaction null
             }
             if (rowWithRequestedId != null && !rowWithRequestedId[SupplierPartnershipContracts.isActive]) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "Archived contract cannot be edited",
-                ru = "Архивный договор нельзя редактировать",
-                kk = "Мұрағатталған келісімді өзгертуге болмайды"
-              )
+              failureMessage = eventMessage("message.archived_contract_cannot_be_edited")
               return@newSuspendedTransaction null
             }
             if (rowWithRequestedId != null) {
@@ -22809,11 +22069,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = contract,
-              message = simpleMessage(
-                main = "Contract proposal sent",
-                ru = "Предложение договора отправлено",
-                kk = "Келісім ұсынысы жіберілді"
-              )
+              message = eventMessage("message.contract_proposal_sent")
             )
           } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
@@ -22823,29 +22079,17 @@ fun Application.module() {
           val action = call.receiveSupplierContractRevisionActionOrNull()
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier contract action is invalid",
-                ru = "Некорректное действие с договором",
-                kk = "Жеткізуші келісімімен әрекет қате"
-              )
+              eventMessage("message.supplier_contract_action_is_invalid")
             )
           val contractId = action.contractId.canonicalSupplierContractUuidOrNull()
             ?.let { UUID.fromString(it) }
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier contract ID is invalid",
-                ru = "Некорректный идентификатор договора",
-                kk = "Жеткізуші келісімінің идентификаторы қате"
-              )
+              eventMessage("message.supplier_contract_id_is_invalid")
             )
 
           var failureStatus = HttpStatusCode.Conflict
-          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
-            main = "This contract cannot be accepted now",
-            ru = "Сейчас этот договор нельзя принять",
-            kk = "Бұл келісімді қазір қабылдау мүмкін емес"
-          )
+          var failureMessage: List<LocalizedStringDataModel> = eventMessage("message.this_contract_cannot_be_accepted_now")
           val result = newSuspendedTransaction(aitaServerIoContext) {
             lockSupplierContractInsideTransaction(contractId)
             val existing = SupplierPartnershipContracts
@@ -22854,11 +22098,7 @@ fun Application.module() {
               .singleOrNull()
             if (existing == null) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Supplier contract was not found",
-                ru = "Договор с поставщиком не найден",
-                kk = "Жеткізуші келісімі табылмады"
-              )
+              failureMessage = eventMessage("message.supplier_contract_was_not_found")
               return@newSuspendedTransaction null
             }
             if (
@@ -22871,11 +22111,7 @@ fun Application.module() {
             }
             if (!existing[SupplierPartnershipContracts.isActive]) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "Archived contract cannot be accepted",
-                ru = "Архивный договор нельзя принять",
-                kk = "Мұрағатталған келісімді қабылдауға болмайды"
-              )
+              failureMessage = eventMessage("message.archived_contract_cannot_be_accepted")
               return@newSuspendedTransaction null
             }
 
@@ -22884,11 +22120,7 @@ fun Application.module() {
               SUPPLIER_CONTRACT_STATUS_PENDING_STORE -> SUPPLIER_CONTRACT_SIDE_STORE
               else -> {
                 failureStatus = HttpStatusCode.Conflict
-                failureMessage = simpleMessage(
-                  main = "This contract is not waiting for acceptance",
-                  ru = "Этот договор не ожидает принятия",
-                  kk = "Бұл келісім қабылдауды күтіп тұрған жоқ"
-                )
+                failureMessage = eventMessage("message.this_contract_is_not_waiting_for_acceptance")
                 return@newSuspendedTransaction null
               }
             }
@@ -22906,11 +22138,7 @@ fun Application.module() {
             }
             if (!permitted) {
               failureStatus = HttpStatusCode.Forbidden
-              failureMessage = simpleMessage(
-                main = "The other side must accept this contract",
-                ru = "Этот договор должна принять другая сторона",
-                kk = "Бұл келісімді екінші тарап қабылдауы керек"
-              )
+              failureMessage = eventMessage("message.the_other_side_must_accept_this_contract")
               return@newSuspendedTransaction null
             }
 
@@ -22961,11 +22189,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = contract,
-              message = simpleMessage(
-                main = if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Contract is active" else "Contract accepted",
-                ru = if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Договор активен" else "Договор принят",
-                kk = if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "Келісім белсенді" else "Келісім қабылданды"
-              )
+              message = eventMessage(if (contract.status == SUPPLIER_CONTRACT_STATUS_ACTIVE) "supplier.contract.active" else "supplier.contract.accepted")
             )
           } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
@@ -22975,29 +22199,17 @@ fun Application.module() {
           val action = call.receiveSupplierContractRevisionActionOrNull()
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier contract action is invalid",
-                ru = "Некорректное действие с договором",
-                kk = "Жеткізуші келісімімен әрекет қате"
-              )
+              eventMessage("message.supplier_contract_action_is_invalid")
             )
           val contractId = action.contractId.canonicalSupplierContractUuidOrNull()
             ?.let { UUID.fromString(it) }
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier contract ID is invalid",
-                ru = "Некорректный идентификатор договора",
-                kk = "Жеткізуші келісімінің идентификаторы қате"
-              )
+              eventMessage("message.supplier_contract_id_is_invalid")
             )
 
           var failureStatus = HttpStatusCode.Conflict
-          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
-            main = "Only a pending proposal can be declined",
-            ru = "Отклонить можно только ожидающее предложение",
-            kk = "Тек күтіп тұрған ұсыныстан бас тартуға болады"
-          )
+          var failureMessage: List<LocalizedStringDataModel> = eventMessage("message.only_a_pending_proposal_can_be_declined")
           val result = newSuspendedTransaction(aitaServerIoContext) {
             lockSupplierContractInsideTransaction(contractId)
             val existing = SupplierPartnershipContracts
@@ -23006,11 +22218,7 @@ fun Application.module() {
               .singleOrNull()
             if (existing == null) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Supplier contract was not found",
-                ru = "Договор с поставщиком не найден",
-                kk = "Жеткізуші келісімі табылмады"
-              )
+              failureMessage = eventMessage("message.supplier_contract_was_not_found")
               return@newSuspendedTransaction null
             }
             if (
@@ -23038,11 +22246,7 @@ fun Application.module() {
             val canSupplier = userHasSupplierAccessInsideTransaction(userId, supplierId)
             if (!canStore && !canSupplier) {
               failureStatus = HttpStatusCode.Forbidden
-              failureMessage = simpleMessage(
-                main = "You cannot decline this supplier contract",
-                ru = "У вас нет права отклонить этот договор",
-                kk = "Бұл жеткізуші келісімінен бас тартуға құқығыңыз жоқ"
-              )
+              failureMessage = eventMessage("message.you_cannot_decline_this_supplier_contract")
               return@newSuspendedTransaction null
             }
 
@@ -23069,11 +22273,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = contract,
-              message = simpleMessage(
-                main = "Contract declined",
-                ru = "Договор отклонён",
-                kk = "Келісім қабылданбады"
-              )
+              message = eventMessage("message.contract_declined")
             )
           } ?: call.genericResponseNoPayload(failureStatus, failureMessage)
         }
@@ -23083,29 +22283,17 @@ fun Application.module() {
           val action = call.receiveSupplierContractRevisionActionOrNull()
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier contract action is invalid",
-                ru = "Некорректное действие с договором",
-                kk = "Жеткізуші келісімімен әрекет қате"
-              )
+              eventMessage("message.supplier_contract_action_is_invalid")
             )
           val contractId = action.contractId.canonicalSupplierContractUuidOrNull()
             ?.let { UUID.fromString(it) }
             ?: return@post call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier contract ID is invalid",
-                ru = "Некорректный идентификатор договора",
-                kk = "Жеткізуші келісімінің идентификаторы қате"
-              )
+              eventMessage("message.supplier_contract_id_is_invalid")
             )
 
           var failureStatus = HttpStatusCode.Forbidden
-          var failureMessage: List<LocalizedStringDataModel> = simpleMessage(
-            main = "You cannot archive this supplier contract",
-            ru = "У вас нет права архивировать этот договор",
-            kk = "Бұл жеткізуші келісімін мұрағаттауға құқығыңыз жоқ"
-          )
+          var failureMessage: List<LocalizedStringDataModel> = eventMessage("message.you_cannot_archive_this_supplier_contract")
           var archivedStoreId: String? = null
           var archiveChanged = false
           val archived = newSuspendedTransaction(aitaServerIoContext) {
@@ -23116,11 +22304,7 @@ fun Application.module() {
               .singleOrNull()
             if (existing == null) {
               failureStatus = HttpStatusCode.NotFound
-              failureMessage = simpleMessage(
-                main = "Supplier contract was not found",
-                ru = "Договор с поставщиком не найден",
-                kk = "Жеткізуші келісімі табылмады"
-              )
+              failureMessage = eventMessage("message.supplier_contract_was_not_found")
               return@newSuspendedTransaction false
             }
             val storeId = existing[SupplierPartnershipContracts.storeId]
@@ -23153,11 +22337,7 @@ fun Application.module() {
                 SUPPLIER_CONTRACT_STATUS_DECLINED
               )) {
               failureStatus = HttpStatusCode.Conflict
-              failureMessage = simpleMessage(
-                main = "Decline a pending proposal before archiving it",
-                ru = "Перед архивацией отклоните ожидающее предложение",
-                kk = "Мұрағаттамас бұрын күтіп тұрған ұсыныстан бас тартыңыз"
-              )
+              failureMessage = eventMessage("message.decline_a_pending_proposal_before_archiving_it")
               return@newSuspendedTransaction false
             }
 
@@ -23180,11 +22360,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = contractId.toString(),
-              message = simpleMessage(
-                main = "Contract archived",
-                ru = "Договор архивирован",
-                kk = "Келісім архивтелді"
-              )
+              message = eventMessage("message.contract_archived")
             )
           } else {
             call.genericResponseNoPayload(failureStatus, failureMessage)
@@ -23204,11 +22380,7 @@ fun Application.module() {
           if (!rawSupplierId.isNullOrBlank() && requestedSupplierId == null) {
             return@get call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier identity is invalid",
-                ru = "Идентификатор поставщика недействителен",
-                kk = "Жеткізуші идентификаторы жарамсыз"
-              )
+              eventMessage("message.supplier_identity_is_invalid")
             )
           }
 
@@ -23225,22 +22397,14 @@ fun Application.module() {
           if (dashboard == null) {
             return@get call.genericResponseNoPayload(
               HttpStatusCode.Forbidden,
-              simpleMessage(
-                main = "Supplier identity is not available to this account",
-                ru = "Профиль поставщика недоступен этому аккаунту",
-                kk = "Жеткізуші профилі бұл аккаунтқа қолжетімсіз"
-              )
+              eventMessage("message.supplier_identity_is_not_available_to_this_account")
             )
           }
 
           call.genericResponse(
             status = HttpStatusCode.OK,
             payload = dashboard,
-            message = simpleMessage(
-              main = "Supplier dashboard loaded",
-              ru = "Панель поставщика загружена",
-              kk = "Жеткізуші панелі жүктелді"
-            )
+            message = eventMessage("message.supplier_dashboard_loaded")
           )
         }
 
@@ -23257,21 +22421,13 @@ fun Application.module() {
           if (!rawStoreId.isNullOrBlank() && storeId == null) {
             return@get call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Store ID is invalid",
-                ru = "Некорректный идентификатор магазина",
-                kk = "Дүкен идентификаторы қате"
-              )
+              eventMessage("message.store_id_is_invalid")
             )
           }
           if (!rawSupplierId.isNullOrBlank() && supplierId == null) {
             return@get call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "Supplier ID is invalid",
-                ru = "Некорректный идентификатор поставщика",
-                kk = "Жеткізуші идентификаторы қате"
-              )
+              eventMessage("message.supplier_id_is_invalid")
             )
           }
           val shouldMarkSeen = call.request.headers["mark_seen"]
@@ -23353,19 +22509,11 @@ fun Application.module() {
             call.genericListResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Supplier orders loaded",
-                ru = "Заказы поставщикам загружены",
-                kk = "Жеткізуші тапсырыстары жүктелді"
-              )
+              message = eventMessage("message.supplier_orders_loaded")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.Forbidden,
-            simpleMessage(
-              main = "Supplier identity or Store is not available to this account",
-              ru = "Профиль поставщика или магазин недоступны этому аккаунту",
-              kk = "Жеткізуші профилі немесе дүкен бұл аккаунтқа қолжетімсіз"
-            )
+            eventMessage("message.supplier_identity_or_store_is_not_available_to_this_account")
           )
         }
 
@@ -23430,19 +22578,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.Created,
               payload = it,
-              message = simpleMessage(
-                main = "Supplier order created",
-                ru = "Заказ поставщику создан",
-                kk = "Жеткізушіге тапсырыс жасалды"
-              )
+              message = eventMessage("message.supplier_order_created")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            failureMessage ?: simpleMessage(
-              main = "Cannot create supplier order",
-              ru = "Не удалось создать заказ поставщику",
-              kk = "Жеткізушіге тапсырыс жасау мүмкін болмады"
-            )
+            failureMessage ?: eventMessage("message.cannot_create_supplier_order")
           )
         }
 
@@ -23641,19 +22781,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Supplier order updated",
-                ru = "Заказ поставщику обновлён",
-                kk = "Жеткізуші тапсырысы жаңартылды"
-              )
+              message = eventMessage("message.supplier_order_updated")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            failureMessage ?: simpleMessage(
-              main = "Cannot update supplier order",
-              ru = "Не удалось обновить заказ поставщику",
-              kk = "Жеткізуші тапсырысын жаңарту мүмкін болмады"
-            )
+            failureMessage ?: eventMessage("message.cannot_update_supplier_order")
           )
         }
 
@@ -23670,11 +22802,7 @@ fun Application.module() {
           if (orderIds.isEmpty()) {
             return@put call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              simpleMessage(
-                main = "No supplier orders selected",
-                ru = "Заказы поставщику не выбраны",
-                kk = "Жеткізуші тапсырыстары таңдалмады"
-              )
+              eventMessage("message.no_supplier_orders_selected")
             )
           }
 
@@ -23686,11 +22814,7 @@ fun Application.module() {
               .where { (SupplierOrders.id inList orderIds) and (SupplierOrders.isActive eq true) }
               .associateBy { row -> row[SupplierOrders.id] }
             if (rowsById.isEmpty()) {
-              failureMessage = simpleMessage(
-                main = "Selected supplier orders were not found",
-                ru = "Выбранные заказы поставщику не найдены",
-                kk = "Таңдалған жеткізуші тапсырыстары табылмады"
-              )
+              failureMessage = eventMessage("message.selected_supplier_orders_were_not_found")
               return@newSuspendedTransaction emptyList<SupplierOrderWithLinesDataModel>()
             }
 
@@ -23771,11 +22895,7 @@ fun Application.module() {
             updated == null -> call.respondAitaUnauthorized()
             updated.isEmpty() -> call.genericResponseNoPayload(
               HttpStatusCode.BadRequest,
-              failureMessage ?: simpleMessage(
-                main = "Could not update selected supplier orders",
-                ru = "Не удалось обновить выбранные заказы поставщику",
-                kk = "Таңдалған жеткізуші тапсырыстарын жаңарту мүмкін болмады"
-              )
+              failureMessage ?: eventMessage("message.could_not_update_selected_supplier_orders")
             )
             else -> {
               updated
@@ -23842,11 +22962,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = orderId.toString(),
-              message = simpleMessage(
-                main = "Supplier order cancelled",
-                ru = "Заказ поставщику отменён",
-                kk = "Жеткізуші тапсырысы тоқтатылды"
-              )
+              message = eventMessage("message.supplier_order_cancelled_2")
             )
           } else {
             call.respondAitaUnauthorized()
@@ -23957,19 +23073,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Supplier order received",
-                ru = "Заказ поставщика принят",
-                kk = "Жеткізуші тапсырысы қабылданды"
-              )
+              message = eventMessage("message.supplier_order_received")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            failureMessage ?: simpleMessage(
-              main = "Cannot receive supplier order",
-              ru = "Не удалось принять заказ поставщика",
-              kk = "Жеткізуші тапсырысын қабылдау мүмкін болмады"
-            )
+            failureMessage ?: eventMessage("message.cannot_receive_supplier_order")
           )
         }
       }
@@ -23986,11 +23094,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Finance dashboard loaded",
-                ru = "Финансы загружены",
-                kk = "Қаржы жүктелді"
-              )
+              message = eventMessage("message.finance_dashboard_loaded")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24042,19 +23146,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Top-up invoice created",
-                ru = "Счёт на пополнение создан",
-                kk = "Толтыру шоты жасалды"
-              )
+              message = eventMessage("message.top_up_invoice_created")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            simpleMessage(
-              main = "Cannot create top-up invoice",
-              ru = "Не удалось создать счёт на пополнение",
-              kk = "Толтыру шотын жасау мүмкін болмады"
-            )
+            eventMessage("message.cannot_create_top_up_invoice")
           )
         }
 
@@ -24097,19 +23193,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Balance topped up",
-                ru = "Баланс пополнен",
-                kk = "Баланс толтырылды"
-              )
+              message = eventMessage("message.balance_topped_up")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            simpleMessage(
-              main = "Cannot confirm payment",
-              ru = "Не удалось подтвердить платёж",
-              kk = "Төлемді растау мүмкін болмады"
-            )
+            eventMessage("message.cannot_confirm_payment")
           )
         }
       }
@@ -24121,11 +23209,7 @@ fun Application.module() {
           call.genericListResponse(
             status = HttpStatusCode.OK,
             payload = defaultStoreSubscriptionPlans(),
-            message = simpleMessage(
-              main = "Subscription plans loaded",
-              ru = "Планы подписки загружены",
-              kk = "Жазылым жоспарлары жүктелді"
-            )
+            message = eventMessage("message.subscription_plans_loaded")
           )
         }
 
@@ -24140,11 +23224,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Store subscription loaded",
-                ru = "Подписка магазина загружена",
-                kk = "Дүкен жазылымы жүктелді"
-              )
+              message = eventMessage("message.store_subscription_loaded")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24211,19 +23291,11 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Subscription updated",
-                ru = "Подписка обновлена",
-                kk = "Жазылым жаңартылды"
-              )
+              message = eventMessage("message.subscription_updated")
             )
           } ?: call.genericResponseNoPayload(
             HttpStatusCode.BadRequest,
-            simpleMessage(
-              main = "Cannot update subscription. Check balance and permissions.",
-              ru = "Не удалось обновить подписку. Проверьте баланс и права.",
-              kk = "Жазылымды жаңарту мүмкін болмады. Баланс пен құқықтарды тексеріңіз."
-            )
+            eventMessage("message.cannot_update_subscription_check_balance_and_permissions")
           )
         }
       }
@@ -24394,7 +23466,7 @@ fun Application.module() {
 
           val phoneNumber = kz.aita.auth.normalizeAitaPhoneAlias(newAccount.phoneNumber)?.removePrefix("+")
             ?: return@put call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-              message = simpleMessage(main = "Invalid phone number", ru = "Некорректный номер телефона", kk = "Телефон нөмірі дұрыс емес"))
+              message = eventMessage("message.invalid_phone_number"))
           val email = newAccount.email.trim().lowercase()
           val firstName = newAccount.firstName.trim()
           val lastName = newAccount.lastName.trim()
@@ -24487,8 +23559,7 @@ fun Application.module() {
             }
 
             "security_confirmation" -> call.genericResponseNoPayload(HttpStatusCode.BadRequest,
-              message = simpleMessage(main = "Confirm this change with your current security method.",
-                ru = "Подтвердите изменение текущим способом защиты.", kk = "Өзгерісті ағымдағы қауіпсіздік тәсілімен растаңыз."))
+              message = eventMessage("message.confirm_this_change_with_your_current_security_method"))
             "unauthorized", "password_mismatch" -> call.respondAitaUnauthorized()
 
             "phone_number_and_email_clash" -> call.genericResponseNoPayload(
@@ -24561,7 +23632,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.Created,
               it,
-              simpleMessage("Debtor saved", ru = "Должник сохранён", kk = "Борышкер сақталды")
+              eventMessage("message.debtor_saved")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24615,7 +23686,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.OK,
               it,
-              simpleMessage("Debtor updated", ru = "Должник обновлён", kk = "Борышкер жаңартылды")
+              eventMessage("message.debtor_updated")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24647,7 +23718,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.OK,
               it,
-              simpleMessage("Debtor deleted", ru = "Должник удалён", kk = "Борышкер өшірілді")
+              eventMessage("message.debtor_deleted")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24712,7 +23783,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.OK,
               it,
-              simpleMessage("Debt payment saved", ru = "Оплата долга сохранена", kk = "Қарыз төлемі сақталды")
+              eventMessage("message.debt_payment_saved")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24762,11 +23833,7 @@ fun Application.module() {
             }
 
             if (!amount.isFinite() || amount <= 0.0) {
-              failureMessage = simpleMessage(
-                main = "Amount must be greater than zero",
-                ru = "Сумма должна быть больше нуля",
-                kk = "Сома нөлден көп болуы керек"
-              )
+              failureMessage = eventMessage("message.amount_must_be_greater_than_zero")
               return@newSuspendedTransaction null
             }
 
@@ -24881,11 +23948,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Worker role templates loaded",
-                ru = "Шаблоны ролей работников загружены",
-                kk = "Қызметкер рөлінің үлгілері жүктелді"
-              )
+              message = eventMessage("message.worker_role_templates_loaded")
             )
           } ?: call.respondAitaUnauthorized()
         }
@@ -24920,11 +23983,7 @@ fun Application.module() {
               .map { it.copy(value = it.value.trim().take(64)) }
               .filter { it.value.isNotBlank() }
               .ifEmpty {
-                failureMessage = simpleMessage(
-                  main = "Role name is required",
-                  ru = "Укажите название роли",
-                  kk = "Рөл атауын көрсетіңіз"
-                )
+                failureMessage = eventMessage("message.role_name_is_required")
                 return@newSuspendedTransaction null
               }
             val cleanDescription = body.description
@@ -24970,11 +24029,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Worker role template saved",
-                ru = "Шаблон роли работника сохранён",
-                kk = "Қызметкер рөлінің үлгісі сақталды"
-              )
+              message = eventMessage("message.worker_role_template_saved")
             )
           } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
         }
@@ -25018,11 +24073,7 @@ fun Application.module() {
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Worker role template deleted",
-                ru = "Шаблон роли работника удалён",
-                kk = "Қызметкер рөлінің үлгісі жойылды"
-              )
+              message = eventMessage("message.worker_role_template_deleted")
             )
           } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
         }
@@ -25090,11 +24141,7 @@ fun Application.module() {
             }
 
             if (storeRow[Stores.ownerUserIds].contains(userId.toString())) {
-              failureMessage = simpleMessage(
-                main = "You already own this store",
-                ru = "Вы уже владеете этим магазином",
-                kk = "Сіз бұл дүкеннің иесісіз"
-              )
+              failureMessage = eventMessage("message.you_already_own_this_store")
               return@newSuspendedTransaction null
             }
 
@@ -25204,11 +24251,7 @@ fun Application.module() {
             }
 
             if (storeRow[Stores.ownerUserIds].contains(invitedUserId.toString())) {
-              failureMessage = simpleMessage(
-                main = "User already owns this store",
-                ru = "Пользователь уже владеет этим магазином",
-                kk = "Пайдаланушы бұл дүкеннің иесі"
-              )
+              failureMessage = eventMessage("message.user_already_owns_this_store")
               return@newSuspendedTransaction null
             }
 
@@ -25512,20 +24555,12 @@ fun Application.module() {
 
             when (currentStatus) {
               WORKER_REQUEST_STATUS_DECLINED -> {
-                failureMessage = simpleMessage(
-                  main = "This employment request has already been declined",
-                  ru = "Эта заявка на работу уже отклонена",
-                  kk = "Бұл жұмысқа өтінім бұрын қабылданбаған"
-                )
+                failureMessage = eventMessage("message.this_employment_request_has_already_been_declined")
                 return@newSuspendedTransaction null
               }
               WORKER_REQUEST_STATUS_INVITED -> alreadyOffered = true
               WORKER_REQUEST_STATUS_ACCEPTED -> {
-                failureMessage = simpleMessage(
-                  main = "This employment request has already been accepted",
-                  ru = "Эта заявка на работу уже принята",
-                  kk = "Бұл жұмысқа өтінім бұрын қабылданған"
-                )
+                failureMessage = eventMessage("message.this_employment_request_has_already_been_accepted")
                 return@newSuspendedTransaction null
               }
             }
@@ -25566,11 +24601,7 @@ fun Application.module() {
 
           request?.let {
             publishWorkerRealtimeBundle(it.storeId, if (alreadyOffered) "employment_offer_already_waiting" else "employment_offer_sent")
-            call.genericResponse(HttpStatusCode.OK, payload = it, message = simpleMessage(
-              main = if (alreadyOffered) "Job offer is already waiting for worker" else "Job offer sent to worker",
-              ru = if (alreadyOffered) "Предложение работы уже ожидает работника" else "Предложение работы отправлено работнику",
-              kk = if (alreadyOffered) "Жұмыс ұсынысы қызметкерді күтіп тұр" else "Жұмыс ұсынысы қызметкерге жіберілді"
-            ))
+            call.genericResponse(HttpStatusCode.OK, payload = it, message = eventMessage(if (alreadyOffered) "worker.offer.already_waiting" else "worker.offer.sent"))
           } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
         }
 
@@ -25618,11 +24649,7 @@ fun Application.module() {
 
             when (existingRequestRow[StoreWorkerRequests.status]) {
               WORKER_REQUEST_STATUS_ACCEPTED -> {
-                failureMessage = simpleMessage(
-                  main = "This employment request has already been accepted",
-                  ru = "Эта заявка на работу уже принята",
-                  kk = "Бұл жұмысқа өтінім бұрын қабылданған"
-                )
+                failureMessage = eventMessage("message.this_employment_request_has_already_been_accepted")
                 return@newSuspendedTransaction null
               }
               WORKER_REQUEST_STATUS_DECLINED -> alreadyDeclined = true
@@ -25785,11 +24812,7 @@ fun Application.module() {
             }
 
             if (workerUserId == userId) {
-              failureMessage = simpleMessage(
-                main = "You cannot request your own removal here",
-                ru = "Нельзя запросить собственное удаление здесь",
-                kk = "Бұл жерден өзіңізді алып тастауды сұрай алмайсыз"
-              )
+              failureMessage = eventMessage("message.you_cannot_request_your_own_removal_here")
               return@newSuspendedTransaction null
             }
 
@@ -25862,15 +24885,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.OK,
               payload = it,
-              message = if (alreadyPending) simpleMessage(
-                main = "Removal request is already waiting",
-                ru = "Запрос на удаление уже ожидает ответа",
-                kk = "Алып тастау сұрауы жауап күтуде"
-              ) else simpleMessage(
-                main = "Removal request sent",
-                ru = "Запрос на удаление отправлен",
-                kk = "Алып тастау сұрауы жіберілді"
-              )
+              message = if (alreadyPending) eventMessage("message.removal_request_is_already_waiting") else eventMessage("message.removal_request_sent")
             )
           } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
         }
@@ -25973,11 +24988,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Removal confirmed",
-                ru = "Удаление подтверждено",
-                kk = "Алып тастау расталды"
-              )
+              message = eventMessage("message.removal_confirmed")
             )
           } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
         }
@@ -26045,11 +25056,7 @@ fun Application.module() {
             call.genericResponse(
               HttpStatusCode.OK,
               payload = it,
-              message = simpleMessage(
-                main = "Removal request declined",
-                ru = "Запрос на удаление отклонён",
-                kk = "Алып тастау сұрауы қабылданбады"
-              )
+              message = eventMessage("message.removal_request_declined")
             )
           } ?: call.genericResponseNoPayload(HttpStatusCode.Conflict, failureMessage ?: getResponse("3").message)
         }
@@ -26231,7 +25238,7 @@ fun Application.module() {
               action = OPERATION_LOG_ACTION_STARTED,
               entityType = OPERATION_LOG_ENTITY_WORKSHIFT,
               entityId = workshiftId.toString(),
-              title = simpleMessage("Workshift started", ru = "Смена начата", kk = "Ауысым басталды"),
+              title = eventMessage("message.workshift_started"),
               details = simpleMessage(membershipRow[Users.publicId]),
               metadata = mapOf("worker_user_id" to workerUserId.toString(), "membership_id" to membershipRow[StoreWorkerMemberships.id].toString()),
               now = now
@@ -26459,11 +25466,7 @@ fun Application.module() {
               }
 
               if (body.goodsInTransaction.isEmpty()) {
-                transactionFailureMessage = simpleMessage(
-                  main = "Transaction has no items",
-                  ru = "В транзакции нет товаров",
-                  kk = "Транзакцияда тауарлар жоқ"
-                )
+                transactionFailureMessage = eventMessage("message.transaction_has_no_items")
                 return@newSuspendedTransaction null
               }
 
@@ -26482,31 +25485,11 @@ fun Application.module() {
 
               if (normalizedGoodsInTransaction == null) {
                 transactionFailureMessage = when (normalizedGoodsResult.errorCode) {
-                  "wholesale_minimum" -> simpleMessage(
-                    main = "Wholesale minimum quantity was not reached",
-                    ru = "Минимальное количество для опта не набрано",
-                    kk = "Көтерме үшін ең аз санға жеткен жоқ"
-                  )
-                  "price_unavailable" -> simpleMessage(
-                    main = "Transaction price is not available",
-                    ru = "Цена для транзакции недоступна",
-                    kk = "Транзакция бағасы қолжетімсіз"
-                  )
-                  "promotion_restriction" -> simpleMessage(
-                    main = "Promotion restriction is not satisfied",
-                    ru = "Условие промо-периода не выполнено",
-                    kk = "Промо-кезең шарты орындалмады"
-                  )
-                  "return_batch_not_found" -> simpleMessage(
-                    main = "Selected return stock batch was not found",
-                    ru = "Выбранная партия для возврата не найдена",
-                    kk = "Қайтарым үшін таңдалған қойма партиясы табылмады"
-                  )
-                  else -> simpleMessage(
-                    main = "Not enough stock or item barcode was not found",
-                    ru = "Недостаточно товара на складе или штрихкод не найден",
-                    kk = "Қоймада тауар жеткіліксіз немесе штрихкод табылмады"
-                  )
+                  "wholesale_minimum" -> eventMessage("message.wholesale_minimum_quantity_was_not_reached")
+                  "price_unavailable" -> eventMessage("message.transaction_price_is_not_available")
+                  "promotion_restriction" -> eventMessage("message.promotion_restriction_is_not_satisfied")
+                  "return_batch_not_found" -> eventMessage("message.selected_return_stock_batch_was_not_found")
+                  else -> eventMessage("message.not_enough_stock_or_item_barcode_was_not_found")
                 }
                 return@newSuspendedTransaction null
               }
@@ -26521,11 +25504,7 @@ fun Application.module() {
                 .let { kotlin.math.floor(it * 100.0) / 100.0 }
 
               if (transactionTotal > 0.0 && uploadedPaymentTotal + 0.01 < transactionTotal) {
-                transactionFailureMessage = simpleMessage(
-                  main = "Payment amount is not enough",
-                  ru = "Суммы оплаты недостаточно",
-                  kk = "Төлем сомасы жеткіліксіз"
-                )
+                transactionFailureMessage = eventMessage("message.payment_amount_is_not_enough")
                 return@newSuspendedTransaction null
               }
 
@@ -26542,11 +25521,7 @@ fun Application.module() {
 
               if (!stockMutationOk) {
                 rollback()
-                transactionFailureMessage = simpleMessage(
-                  main = "Not enough stock or item barcode was not found",
-                  ru = "Недостаточно товара на складе или штрихкод не найден",
-                  kk = "Қоймада тауар жеткіліксіз немесе штрихкод табылмады"
-                )
+                transactionFailureMessage = eventMessage("message.not_enough_stock_or_item_barcode_was_not_found")
                 return@newSuspendedTransaction null
               }
 
@@ -26596,7 +25571,7 @@ fun Application.module() {
                 now = timeMillis
               )
 
-              val transactionTypeText = operationLogTransactionTypeHumanText(transactionToSave.type)
+              val transactionTypeReference = transactionTypeMessageReference(transactionToSave.type)
 
               insertOperationLogInsideTransaction(
                 actorUserId = userId,
@@ -26604,18 +25579,8 @@ fun Application.module() {
                 action = OPERATION_LOG_ACTION_COMPLETED,
                 entityType = OPERATION_LOG_ENTITY_TRANSACTION,
                 entityId = id.toString(),
-                title = simpleMessage(
-                  main = "${transactionTypeText.main} completed",
-                  en = "${transactionTypeText.en} completed",
-                  ru = "${transactionTypeText.ru} завершена",
-                  kk = "${transactionTypeText.kk} аяқталды"
-                ),
-                details = simpleMessage(
-                  main = "${transactionTypeText.main} • $transactionTotal",
-                  en = "${transactionTypeText.en} • $transactionTotal",
-                  ru = "${transactionTypeText.ru} • $transactionTotal",
-                  kk = "${transactionTypeText.kk} • $transactionTotal"
-                ),
+                title = eventMessage(EventMessageReference("log.transaction.completed", children = mapOf("type" to listOf(transactionTypeReference)))),
+                details = eventMessage(EventMessageReference("log.transaction.summary", arguments = mapOf("total" to transactionTotal.toString()), children = mapOf("type" to listOf(transactionTypeReference)))),
                 metadata = mapOf("type" to transactionToSave.type, "total" to transactionTotal.toString(), "cash" to transactionToSave.paidCash.toString(), "card" to transactionToSave.paidCard.toString()),
                 now = timeMillis
               )
@@ -26634,11 +25599,7 @@ fun Application.module() {
               call.genericResponse(
                 status = HttpStatusCode.Created,
                 payload = it,
-                message = simpleMessage(
-                  main = "Transaction completed",
-                  ru = "Транзакция завершена",
-                  kk = "Транзакция аяқталды"
-                )
+                message = eventMessage("message.transaction_completed")
               )
             } ?: run {
               transactionFailureMessage?.let { message ->
@@ -26652,11 +25613,7 @@ fun Application.module() {
           } catch (throwable: Throwable) {
             call.safeGenericResponseNoPayload(
               status = HttpStatusCode.Conflict,
-              message = simpleMessage(
-                main = "Could not complete transaction. Please refresh stock and try again.",
-                ru = "Не удалось завершить транзакцию. Обновите склад и попробуйте снова.",
-                kk = "Транзакцияны аяқтау мүмкін болмады. Қойманы жаңартып, қайталап көріңіз."
-              ),
+              message = eventMessage("message.could_not_complete_transaction_please_refresh_stock_and_try_again"),
               logMessage = "Transaction completion failed",
               throwable = throwable
             )

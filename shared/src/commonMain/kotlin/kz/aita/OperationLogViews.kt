@@ -67,12 +67,7 @@ private fun publishLogScope(family: Boolean, next: OperationLogScopeState) {
     }
 }
 
-private fun operationLogReadFailureMessage(): List<LocalizedStringDataModel> = listOf(
-    LocalizedStringDataModel("main", "Could not refresh operation logs. Try again when connected."),
-    LocalizedStringDataModel("en", "Could not refresh operation logs. Try again when connected."),
-    LocalizedStringDataModel("ru", "Не удалось обновить журнал. Повторите при подключении."),
-    LocalizedStringDataModel("kk", "Журнал жаңартылмады. Байланыс орнағанда қайталаңыз.")
-)
+private fun operationLogReadFailureMessage(): List<LocalizedStringDataModel> = eventMessage("message.could_not_refresh_operation_logs_try_again_when_connected")
 
 /** The two readers/caches never overwrite each other, including a delayed refresh from another tab. */
 internal fun loadOperationLogScope(

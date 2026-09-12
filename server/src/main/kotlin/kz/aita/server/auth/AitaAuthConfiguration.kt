@@ -1,5 +1,6 @@
 package kz.aita.server.auth
 
+import kz.aita.eventMessage
 import kz.aita.LocalizedStringDataModel
 import kz.aita.auth.AitaAuthCapabilitiesDataModel
 import java.nio.charset.StandardCharsets
@@ -133,38 +134,11 @@ internal class AitaAuthUnavailableException(val reason: AitaAuthUnavailableReaso
  * StatusPages must not depend on a private helper inside the authentication service.
  */
 internal fun authUnavailableMessage(reason: AitaAuthUnavailableReason): List<LocalizedStringDataModel> {
-    fun localized(main: String, ru: String, kk: String): List<LocalizedStringDataModel> = listOf(
-        LocalizedStringDataModel("main", main),
-        LocalizedStringDataModel("en", main),
-        LocalizedStringDataModel("ru", ru),
-        LocalizedStringDataModel("kk", kk)
-    )
-
     return when (reason) {
-        AitaAuthUnavailableReason.EMAIL_DELIVERY -> localized(
-            "Email delivery is temporarily unavailable. Try later or use your password.",
-            "Письма временно не отправляются. Попробуйте позже или войдите по паролю.",
-            "Хаттар уақытша жіберілмейді. Кейінірек қайталаңыз немесе құпия сөзбен кіріңіз."
-        )
-        AitaAuthUnavailableReason.DISABLED -> localized(
-            "Code sign-in is not enabled. Use your password.",
-            "Вход по коду не включён. Используйте пароль.",
-            "Кодпен кіру қосылмаған. Құпия сөзді пайдаланыңыз."
-        )
-        AitaAuthUnavailableReason.SECURITY_CONFIGURATION -> localized(
-            "Account security needs server setup. Contact the administrator.",
-            "Безопасность аккаунта требует настройки сервера. Обратитесь к администратору.",
-            "Аккаунт қауіпсіздігі серверді баптауды қажет етеді. Әкімшіге хабарласыңыз."
-        )
-        AitaAuthUnavailableReason.EMAIL_CONFIGURATION -> localized(
-            "Email codes are not configured. Use your password.",
-            "Отправка кодов на email не настроена. Используйте пароль.",
-            "Email кодтарын жіберу бапталмаған. Құпия сөзді пайдаланыңыз."
-        )
-        AitaAuthUnavailableReason.RECOVERY_DISABLED -> localized(
-            "Password recovery is not enabled.",
-            "Восстановление пароля не включено.",
-            "Құпия сөзді қалпына келтіру қосылмаған."
-        )
+        AitaAuthUnavailableReason.EMAIL_DELIVERY -> eventMessage("auth.message.email_delivery_is_temporarily_unavailable_try_later_or_use_your_password")
+        AitaAuthUnavailableReason.DISABLED -> eventMessage("auth.message.code_sign_in_is_not_enabled_use_your_password")
+        AitaAuthUnavailableReason.SECURITY_CONFIGURATION -> eventMessage("auth.message.account_security_needs_server_setup_contact_the_administrator")
+        AitaAuthUnavailableReason.EMAIL_CONFIGURATION -> eventMessage("auth.message.email_codes_are_not_configured_use_your_password")
+        AitaAuthUnavailableReason.RECOVERY_DISABLED -> eventMessage("auth.message.password_recovery_is_not_enabled")
     }
 }

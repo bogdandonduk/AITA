@@ -2157,48 +2157,100 @@ internal fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboard
         SupplierBackorderWatchCardIntroContent(
             item = item
         )
-        SupplierBackorderWatchCardMetricLines(
-            item = item
+        val section = sectionTabsWidget(
+            stateKey = "supplier-backorder:${item.backorderId.ifBlank { item.goodsItemId }}",
+            tabs = listOf(
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("owner", authUiText("Owner & timing", "Ответственный и сроки", "Жауапты және мерзімдер")),
+                TabContent("outcome", authUiText("Outcome & risk", "Результат и риск", "Нәтиже және тәуекел")),
+                TabContent("followup", authUiText("Follow-up", "Сопровождение", "Бақылау")),
+                TabContent("closure", authUiText("Closure & ledger", "Закрытие и учёт", "Жабу және есеп")),
+                TabContent("promise", authUiText("Commands & promises", "Действия и обещания", "Әрекеттер мен уәделер")),
+                TabContent("wave", authUiText("Waves & load", "Волны и нагрузка", "Толқындар және жүктеме")),
+                TabContent("allocation", authUiText("Impact & allocation", "Влияние и распределение", "Әсер және бөлу")),
+                TabContent("exception", authUiText("Exceptions & causes", "Исключения и причины", "Ерекше жағдайлар және себептер")),
+                TabContent("verification", authUiText("Verification & release", "Проверка и выпуск", "Тексеру және шығару")),
+                TabContent("plan", authUiText("Plan & attention", "План и внимание", "Жоспар және назар")),
+                TabContent("closeout", authUiText("Seal & closeout", "Фиксация и завершение", "Бекіту және аяқтау")),
+                TabContent("audit", authUiText("Reopen & audit", "Повторное открытие и аудит", "Қайта ашу және аудит")),
+                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(vertical = stateValues.marginTextField / 2),
         )
-        SupplierBackorderWatchCardGuideOwnerClockProofContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideOutcomeRiskConfidenceContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideFollowupHandoffContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideClosureLedgerTriageContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideCommandPromiseContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideWaveLoadContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideImpactAllocationContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideExceptionCauseContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideVerifyReleaseContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuidePlanAttentionContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideSealCloseoutContent(
-            item = item
-        )
-        SupplierBackorderWatchCardGuideReopenAuditContent(
-            item = item
-        )
-        SupplierBackorderWatchCardActions(
-            item = item
-        )
+
+        if (section == "overview") {
+            SupplierBackorderWatchCardMetricLines(
+                item = item
+            )
+        }
+        if (section == "owner") {
+            SupplierBackorderWatchCardGuideOwnerClockProofContent(
+                item = item
+            )
+        }
+        if (section == "outcome") {
+            SupplierBackorderWatchCardGuideOutcomeRiskConfidenceContent(
+                item = item
+            )
+        }
+        if (section == "followup") {
+            SupplierBackorderWatchCardGuideFollowupHandoffContent(
+                item = item
+            )
+        }
+        if (section == "closure") {
+            SupplierBackorderWatchCardGuideClosureLedgerTriageContent(
+                item = item
+            )
+        }
+        if (section == "promise") {
+            SupplierBackorderWatchCardGuideCommandPromiseContent(
+                item = item
+            )
+        }
+        if (section == "wave") {
+            SupplierBackorderWatchCardGuideWaveLoadContent(
+                item = item
+            )
+        }
+        if (section == "allocation") {
+            SupplierBackorderWatchCardGuideImpactAllocationContent(
+                item = item
+            )
+        }
+        if (section == "exception") {
+            SupplierBackorderWatchCardGuideExceptionCauseContent(
+                item = item
+            )
+        }
+        if (section == "verification") {
+            SupplierBackorderWatchCardGuideVerifyReleaseContent(
+                item = item
+            )
+        }
+        if (section == "plan") {
+            SupplierBackorderWatchCardGuidePlanAttentionContent(
+                item = item
+            )
+        }
+        if (section == "closeout") {
+            SupplierBackorderWatchCardGuideSealCloseoutContent(
+                item = item
+            )
+        }
+        if (section == "audit") {
+            SupplierBackorderWatchCardGuideReopenAuditContent(
+                item = item
+            )
+        }
+        if (section == "actions") {
+            SupplierBackorderWatchCardActions(
+                item = item
+            )
+        }
     }
 }
 

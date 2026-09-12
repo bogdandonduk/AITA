@@ -79,7 +79,8 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
         seedSupplierCustomersNavigation(
             searchQuery = searchQuery,
             filterId = filterId,
-            sortId = sortId
+            sortId = sortId,
+            revealResults = false
         )
     }
 
@@ -202,7 +203,22 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
             onBack = selectedPartner?.let { { selectedPartnerKey = null } }
         )
 
+        val section = if (selectedPartner == null) sectionTabsWidget(
+            stateKey = "supplier-partners:${focusedSupplierId.orEmpty()}",
+            tabs = listOf(
+                TabContent("partners", localizedStringResource(1453, "Partner stores")),
+                TabContent("health", authUiText("Portfolio health", "Состояние партнёров", "Серіктестердің жағдайы"))
+            ),
+            modifier = Modifier
+                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
+            selectedId = navigationState[SUPPLIER_WORKSPACE_SECTION_STATE_KEY] ?: "partners",
+            onSelected = { NavigationScreenModel.Supplier.Customers.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to it) },
+        ) else "partners"
+
         LazyColumn(
+            state = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Customers.Main, "sections:${focusedSupplierId.orEmpty()}:${selectedPartnerKey.orEmpty()}:$section"),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -251,126 +267,137 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                 }
 
                 if (selectedPartner == null) {
-                    item(key = "metrics") {
-                        SupplierOrdersMetrics(metrics = metrics) { metric ->
-                            searchQuery = ""
-                            filterId = metric.filterId
-                            selectedPartnerKey = null
+                    if (section == "partners") {
+                        item(key = "metrics") {
+                            SupplierOrdersMetrics(metrics = metrics) { metric ->
+                                searchQuery = ""
+                                filterId = metric.filterId
+                                selectedPartnerKey = null
+                            }
                         }
                     }
 
-                    if (partnerItems.isNotEmpty()) {
-                        item(key = "partner-portfolio-health") {
-                            SupplierPartnerPortfolioHealthCard(
-                                summary = partnerPortfolioHealth,
-                                onNextStep = {
-                                    selectedPartnerKey = null
-                                    when (partnerPortfolioHealth.nextStep) {
-                                        SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION -> {
-                                            searchQuery = ""
-                                            filterId = SUPPLIER_CUSTOMERS_FILTER_ATTENTION
-                                            sortId = SUPPLIER_CUSTOMERS_SORT_ACTION
-                                        }
-                                        SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA -> {
-                                            refreshSupplierModeWorkspace(includeContracts = true, force = true)
-                                        }
-                                        SupplierPartnerPortfolioNextStep.BUILD_OFFERS -> {
-                                            coroutineScope.launch {
-                                                Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
+                    if (section == "health") {
+                        if (partnerItems.isEmpty()) {
+                            item { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                        } else {
+                            item(key = "partner-portfolio-health") {
+                                SupplierPartnerPortfolioHealthCard(
+                                    summary = partnerPortfolioHealth,
+                                    onNextStep = {
+                                        selectedPartnerKey = null
+                                        when (partnerPortfolioHealth.nextStep) {
+                                            SupplierPartnerPortfolioNextStep.REVIEW_ATTENTION -> {
+                                                NavigationScreenModel.Supplier.Customers.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to "partners")
+                                                searchQuery = ""
+                                                filterId = SUPPLIER_CUSTOMERS_FILTER_ATTENTION
+                                                sortId = SUPPLIER_CUSTOMERS_SORT_ACTION
                                             }
-                                        }
-                                        SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS -> {
-                                            coroutineScope.launch {
-                                                Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                                            SupplierPartnerPortfolioNextStep.REFRESH_RELATIONSHIP_DATA -> {
+                                                refreshSupplierModeWorkspace(includeContracts = true, force = true)
                                             }
-                                        }
-                                        SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS -> {
-                                            coroutineScope.launch {
-                                                Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main)
+                                            SupplierPartnerPortfolioNextStep.BUILD_OFFERS -> {
+                                                coroutineScope.launch {
+                                                    Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main)
+                                                }
+                                            }
+                                            SupplierPartnerPortfolioNextStep.COMPLETE_AGREEMENTS -> {
+                                                coroutineScope.launch {
+                                                    Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
+                                                }
+                                            }
+                                            SupplierPartnerPortfolioNextStep.OPEN_INSIGHTS -> {
+                                                coroutineScope.launch {
+                                                    Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main)
+                                                }
                                             }
                                         }
                                     }
+                                )
+                            }
+                        }
+                    }
+
+                    if (section == "health") {
+                        item(key = "workflow-links") {
+                            SupplierCustomersWorkflowLinks()
+                        }
+                    }
+
+                    if (section == "partners") {
+                        item(key = "filters") {
+                            SupplierCustomersFilterPanel(
+                                searchQuery = searchQuery,
+                                filterId = filterId,
+                                sortId = sortId,
+                                resultCount = filteredPartners.size,
+                                totalCount = partnerItems.size,
+                                expanded = filtersExpanded,
+                                onSearchChanged = {
+                                    searchQuery = it
+                                    selectedPartnerKey = null
+                                },
+                                onFilterChanged = {
+                                    filterId = it.ifBlank { SUPPLIER_CUSTOMERS_FILTER_ALL }
+                                    selectedPartnerKey = null
+                                },
+                                onSortChanged = {
+                                    sortId = it.ifBlank { SUPPLIER_CUSTOMERS_SORT_ACTION }
+                                    selectedPartnerKey = null
+                                },
+                                onExpandedChanged = { filtersExpanded = it },
+                                onClear = {
+                                    searchQuery = ""
+                                    filterId = SUPPLIER_CUSTOMERS_FILTER_ALL
+                                    sortId = SUPPLIER_CUSTOMERS_SORT_ACTION
+                                    selectedPartnerKey = null
                                 }
                             )
                         }
-                    }
 
-                    item(key = "workflow-links") {
-                        SupplierCustomersWorkflowLinks()
-                    }
-
-                    item(key = "filters") {
-                        SupplierCustomersFilterPanel(
-                            searchQuery = searchQuery,
-                            filterId = filterId,
-                            sortId = sortId,
-                            resultCount = filteredPartners.size,
-                            totalCount = partnerItems.size,
-                            expanded = filtersExpanded,
-                            onSearchChanged = {
-                                searchQuery = it
-                                selectedPartnerKey = null
-                            },
-                            onFilterChanged = {
-                                filterId = it.ifBlank { SUPPLIER_CUSTOMERS_FILTER_ALL }
-                                selectedPartnerKey = null
-                            },
-                            onSortChanged = {
-                                sortId = it.ifBlank { SUPPLIER_CUSTOMERS_SORT_ACTION }
-                                selectedPartnerKey = null
-                            },
-                            onExpandedChanged = { filtersExpanded = it },
-                            onClear = {
-                                searchQuery = ""
-                                filterId = SUPPLIER_CUSTOMERS_FILTER_ALL
-                                sortId = SUPPLIER_CUSTOMERS_SORT_ACTION
-                                selectedPartnerKey = null
-                            }
-                        )
-                    }
-
-                    when {
-                        relationshipDataPending -> {
-                            item(key = "loading") {
-                                MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    text = localizedStringResource(1141, "Please wait…")
-                                )
-                            }
-                        }
-
-                        partnerItems.isEmpty() -> {
-                            item(key = "empty") {
-                                MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    text = localizedStringResource(2388, "No store partners yet"),
-                                    subText = localizedStringResource(
-                                        2389,
-                                        "A store appears here after an order, saved offer, or contract connects it to one of your supplier profiles."
-                                    ),
-                                    subTextSize = stateValues.smallTextSize
-                                )
-                            }
-                        }
-
-                        filteredPartners.isEmpty() -> {
-                            item(key = "filtered-empty") {
-                                MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    text = localizedStringResource(
-                                        2387,
-                                        "No partner matches these filters"
+                        when {
+                            relationshipDataPending -> {
+                                item(key = "loading") {
+                                    MessageText(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        text = localizedStringResource(1141, "Please wait…")
                                     )
-                                )
+                                }
                             }
-                        }
 
-                        else -> {
-                            items(filteredPartners, key = { it.partnerKey }) { partner ->
-                                SupplierPartnerCompactCard(
-                                    partner = partner,
-                                    onOpen = { selectedPartnerKey = partner.partnerKey }
-                                )
+                            partnerItems.isEmpty() -> {
+                                item(key = "empty") {
+                                    MessageText(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        text = localizedStringResource(2388, "No store partners yet"),
+                                        subText = localizedStringResource(
+                                            2389,
+                                            "A store appears here after an order, saved offer, or contract connects it to one of your supplier profiles."
+                                        ),
+                                        subTextSize = stateValues.smallTextSize
+                                    )
+                                }
+                            }
+
+                            filteredPartners.isEmpty() -> {
+                                item(key = "filtered-empty") {
+                                    MessageText(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        text = localizedStringResource(
+                                            2387,
+                                            "No partner matches these filters"
+                                        )
+                                    )
+                                }
+                            }
+
+                            else -> {
+                                items(filteredPartners, key = { it.partnerKey }) { partner ->
+                                    SupplierPartnerCompactCard(
+                                        partner = partner,
+                                        onOpen = { selectedPartnerKey = partner.partnerKey }
+                                    )
+                                }
                             }
                         }
                     }

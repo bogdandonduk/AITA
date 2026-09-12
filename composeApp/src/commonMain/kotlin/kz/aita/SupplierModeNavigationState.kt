@@ -10,13 +10,16 @@ internal const val SUPPLIER_DISPATCH_SORT_STATE_KEY = "supplier_dispatch_sort_v2
 internal suspend fun seedSupplierCustomersNavigation(
     searchQuery: String = "",
     filterId: String = SUPPLIER_CUSTOMERS_FILTER_ALL,
-    sortId: String = SUPPLIER_CUSTOMERS_SORT_ACTION
+    sortId: String = SUPPLIER_CUSTOMERS_SORT_ACTION,
+    revealResults: Boolean = true
 ) {
-    NavigationScreenModel.Supplier.Customers.Main.setStates(
+    NavigationScreenModel.Supplier.Customers.Main.setStates(*supplierWorkspaceNavigationSeed(
+        resultSectionId = "partners",
+        revealResults = revealResults,
         NavigationScreenModel.KEY_STATE_SEARCH_QUERY to searchQuery.trim(),
         SUPPLIER_CUSTOMERS_FILTER_STATE_KEY to filterId.ifBlank { SUPPLIER_CUSTOMERS_FILTER_ALL },
         SUPPLIER_CUSTOMERS_SORT_STATE_KEY to sortId.ifBlank { SUPPLIER_CUSTOMERS_SORT_ACTION }
-    )
+    ).toTypedArray())
 }
 
 internal suspend fun seedSupplierContractsNavigation(

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.*
@@ -491,6 +492,14 @@ class ImeWithAction(
     companion object {
 
         val Default: ImeWithAction = ImeWithAction(ImeAction.Companion.Next)
+    }
+
+    fun getKeyboardActionHandler(): KeyboardActionHandler? = action?.let { callback ->
+        when (ime) {
+            ImeAction.Go, ImeAction.Search, ImeAction.Send, ImeAction.Previous, ImeAction.Next, ImeAction.Done ->
+                KeyboardActionHandler { callback() }
+            else -> null
+        }
     }
 
     fun getKeyboardActions(): KeyboardActions {
@@ -2026,11 +2035,19 @@ fun AppConfiguration.genericTextField(
         )
 
         CompositionLocalProvider(LocalTextSelectionColors provides textSelectionColors) {
-            BasicTextField(
+            AitaEditableText(
+                identityKey = textFieldIdentityKey,
                 value = displayedTextFieldValue,
                 onValueChange = onValueChange@ { rawValue ->
+                    if (rawValue.text == textFieldValue.text) {
+                        // Native cursor/selection dragging must not invoke text validators,
+                        // barcode completion or parent payment mutations.
+                        textFieldValue = rawValue
+                        savePersistentTextFieldMeta(rawValue, isFocused)
+                        return@onValueChange rawValue
+                    }
                     lastLocalTextEditMillis = getCurrentTimeMillis()
-                    val nextText = onTransformValue?.invoke(rawValue.text) ?: rawValue.text
+                    val nextText = rawValue.text
                     val nextSelection = if (nextText == rawValue.text) {
                         rawValue.selection
                     } else {
@@ -2055,10 +2072,10 @@ fun AppConfiguration.genericTextField(
                         }
                         savePersistentTextDraft("")
                         savePersistentTextFieldMeta(emptyValue, isFocused)
-                        return@onValueChange
+                        return@onValueChange emptyValue
                     }
 
-                    dispatchAcceptedTextInput(nextText, onFilterValue, onValueChange) {
+                    dispatchAcceptedTextInput(nextText, null, onValueChange) {
                         textFieldValue = nextValue
                         stateKey?.let { key ->
                             coroutineScope.launch { stateHost?.setState(key to nextText) }
@@ -2066,6 +2083,7 @@ fun AppConfiguration.genericTextField(
                         savePersistentTextDraft(nextText)
                         savePersistentTextFieldMeta(nextValue, isFocused)
                     }
+                    textFieldValue
                 },
                 enabled = enabled,
                 readOnly = readOnly,
@@ -2096,15 +2114,15 @@ fun AppConfiguration.genericTextField(
                     keyboardType = keyboardType,
                     imeAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).ime
                 ),
-                keyboardActions = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).getKeyboardActions(),
+                onKeyboardAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).getKeyboardActionHandler(),
                 textStyle = TextStyle(
                     fontSize = textSize,
                     lineHeight = (textSize.value * 1.28f).sp,
                     color = textColor
                 ),
-                visualTransformation = {
-                    visualTransformation(displayedTextFieldValue)
-                },
+                visualTransformation = visualTransformation,
+                inputFilter = onFilterValue,
+                inputTransform = onTransformValue,
                 singleLine = singleLine,
                 cursorBrush = SolidColor(selectionBackgroundColor),
                 decorationBox = { innerTextField ->
@@ -2171,9 +2189,15 @@ fun AppConfiguration.genericTextField(
                             }
 
                             CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
+                                val hasBuiltInEndAction = (showClearButton && displayedTextFieldValue.text.isNotEmpty()) ||
+                                    (trailingIcon == null && (trailingIconExtraPath != null || trailingIconExtraLeadingPath != null))
+                                val trailingInset = if (hasBuiltInEndAction) {
+                                    (12.dp - (stateValues.textFieldHeight - stateValues.iconSize) / 2).coerceAtLeast(4.dp)
+                                } else 12.dp
                                 Row(
                                     modifier = Modifier
-                                        .fillMaxHeight(),
+                                        .fillMaxHeight()
+                                        .padding(end = trailingInset),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     AnimatedVisibility(
