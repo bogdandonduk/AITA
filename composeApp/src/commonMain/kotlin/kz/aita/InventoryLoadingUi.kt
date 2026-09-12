@@ -1,7 +1,6 @@
 package kz.aita
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -31,13 +30,10 @@ internal fun AppConfiguration.InventoryLoadFeedback(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (status.loading && !compact) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(if (compact) 18.dp else 26.dp),
-                color = stateValues.AccentColor,
-                strokeWidth = 2.dp
-            )
-            Spacer(Modifier.height(8.dp))
+        if ((status.loading || emptyText == null) && status.failure == null && !status.cacheWriteFailed &&
+            !status.accessDenied && !(compact && offline)) {
+            LoadingSkeleton(Modifier.fillMaxWidth(), rows = if (compact) 1 else 4, compact = compact)
+            return@Column
         }
         Text(
             text = message,

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -218,9 +217,8 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
     }
     val trailingContent: (@Composable () -> Unit)? = if (state.isSuggesting || state.isResolving) {
         {
-            CircularProgressIndicator(
+            AitaBusyIndicator(
                 modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
                 color = stateValues.AccentColor
             )
         }

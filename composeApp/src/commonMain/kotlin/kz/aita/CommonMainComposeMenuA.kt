@@ -149,6 +149,13 @@ fun AppConfiguration.MessageText(
     subTextSize: TextUnit = stateValues.textSize
 ) {
     val cleanSubText = subText?.takeIf { it.isNotBlank() }
+    if (text == localizedStringResource(1141, "Please wait…") && cleanSubText == null) {
+        BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+            val compact = maxHeight < 100.dp
+            LoadingSkeleton(Modifier.fillMaxWidth().padding(if (compact) 8.dp else 16.dp), rows = if (compact) 1 else 3, compact = compact)
+        }
+        return
+    }
 
     Column(
         modifier = modifier
@@ -4350,10 +4357,8 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        if (selected.loading) androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp), color = stateValues.AccentColor, strokeWidth = 2.dp
-                        )
-                        Text(
+                        if (selected.failure == null) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 4)
+                        else Text(
                             text = selected.failure?.extractLocalizedString(stateValues.appLanguage)
                                 ?: localizedStringResource(1141, "Please wait…"),
                             color = if (selected.failure != null) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
@@ -4602,125 +4607,8 @@ internal fun AppConfiguration.subscriptionStatusText(status: String): String {
 }
 
 @Composable
-fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
-    val activeStoreId = stateValues.activeStoreId
-    val subscriptionState by activeStoreSubscriptionState.value.collectAsState()
-    val plansState by subscriptionPlansState.value.collectAsState()
-    val chargesState by activeStoreSubscriptionChargesState.value.collectAsState()
-    val walletState by userWalletState.value.collectAsState()
-
-    LaunchedEffect(activeStoreId) {
-        getSubscriptionPlans()
-        activeStoreId?.let { getStoreSubscription(it) }
-        getUserFinanceDashboard()
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = stateValues.stringSubscription,
-            iconPath = stateValues.drawablePathIconSubscription,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
-        )
-
-        val section = sectionTabsWidget(
-            stateKey = "subscription:${activeStoreId.orEmpty()}",
-            tabs = listOf(
-                TabContent("current", localizedStringResource(587, "Current subscription")),
-                TabContent("plans", authUiText("Plans", "Тарифы", "Тарифтер")),
-                TabContent("charges", localizedStringResource(589, "Subscription charges"))
-            ),
-            modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .align(Alignment.CenterHorizontally)
-                .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
-        )
-
-        LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.StoreSubscriptionPlans, section),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .align(Alignment.CenterHorizontally)
-                .padding(stateValues.marginTextField),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
-        ) {
-            if (section == "current") {
-                item(key = "MenuStoreSubscriptionPlansScreen:$section:0") {
-                    val subscription = (subscriptionState as? DataState.Success<StoreSubscriptionStateDataModel>)?.payload
-                    val wallet = (walletState as? DataState.Success<UserWalletDataModel>)?.payload
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
-                            .clip(RoundedCornerShape(stateValues.cornerRadius))
-                            .background(stateValues.BackgroundColor)
-                            .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                            .padding(stateValues.marginTextFieldGroup)
-                    ) {
-                        Text(
-                            text = localizedStringResource(587, "Current subscription"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = subscriptionStatusText(subscription?.status ?: SUBSCRIPTION_STATUS_INACTIVE),
-                            color = stateValues.AccentColor,
-                            fontSize = stateValues.accentTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = localizedStringResource(588, "Balance") + ": " + ((wallet?.available ?: 0.0).aitaMoney(wallet?.currencyCode ?: "KZT")),
-                            color = stateValues.PlaceholderTextColor,
-                            fontSize = stateValues.smallTextSize
-                        )
-                    }
-                }
-            }
-
-            if (section == "plans") {
-                val plans = (plansState as? DataState.Success<List<StoreSubscriptionPlanDataModel>>)?.payload.orEmpty()
-                if (plans.isEmpty()) {
-                    item(key = "MenuStoreSubscriptionPlansScreen:$section:1") { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
-                } else {
-                    items(plans, key = { it.id }) { plan ->
-                        SubscriptionPlanCard(plan = plan, activeStoreId = activeStoreId)
-                    }
-                }
-            }
-
-            if (section == "charges") {
-                val charges = (chargesState as? DataState.Success<List<StoreSubscriptionChargeDataModel>>)?.payload.orEmpty()
-                if (charges.isEmpty()) {
-                    item(key = "MenuStoreSubscriptionPlansScreen:$section:2") { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
-                } else {
-                    item(key = "MenuStoreSubscriptionPlansScreen:$section:3") {
-                        Text(
-                            text = localizedStringResource(589, "Subscription charges"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = stateValues.marginTextFieldGroup)
-                        )
-                    }
-                    items(charges.take(20), key = { it.id }) { charge ->
-                        FinanceLedgerCard(
-                            title = charge.planId,
-                            subtitle = charge.status,
-                            amountText = "-${charge.amount.aitaMoney(charge.currencyCode)}",
-                            timeMillis = charge.createdAtMillis
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun AppConfiguration.MenuStoresScreen() {
+    val selectedLocationHasAccess = rememberStoreSubscriptionAccess()
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -4857,8 +4745,8 @@ fun AppConfiguration.MenuStoresScreen() {
                                 ) {
                                     StoreWidget(
                                         store = store,
-                                        onDelete = if (isOwner) { { storeToDelete -> deleteStore(storeToDelete) } } else null,
-                                        onEdit = if (canManageStore) {
+                                        onDelete = if (isOwner && isActive && selectedLocationHasAccess) { { storeToDelete -> deleteStore(storeToDelete) } } else null,
+                                        onEdit = if (canManageStore && isActive && selectedLocationHasAccess) {
                                             {
                                                 coroutineScope.launch {
                                                     NavigationScreenModel.Menu.AddEditStore.setState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID to store.id)
@@ -4882,8 +4770,8 @@ fun AppConfiguration.MenuStoresScreen() {
                                             StoreWidget(
                                                 modifier = Modifier.padding(start = stateValues.marginTextField),
                                                 store = branch,
-                                                onDelete = if (isOwner) { { branchToDelete -> deleteStore(branchToDelete) } } else null,
-                                                onEdit = if (canManageBranches) {
+                                                onDelete = if (isOwner && branchIsActive && selectedLocationHasAccess) { { branchToDelete -> deleteStore(branchToDelete) } } else null,
+                                                onEdit = if (canManageBranches && branchIsActive && selectedLocationHasAccess) {
                                                     {
                                                         coroutineScope.launch {
                                                             NavigationScreenModel.Menu.AddEditStore.setState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID to branch.id)
@@ -4940,20 +4828,21 @@ fun AppConfiguration.MenuStoresScreen() {
 
 @Composable
 fun AppConfiguration.MenuScreen() {
+    val subscriptionAccess = rememberStoreSubscriptionAccess()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
         if (stateValues.isNarrowScreen) {
-            AnimatedContent(
+            AitaLiveMenuPane(
                 modifier = Modifier
                     .weight(1f),
-                targetState = stateValues.navigationScreensMenuLeft,
-                transitionSpec = aitaStackTransitionSpec(),
+                navigationStack = stateValues.navigationScreensMenuLeft,
                 label = "menuNavigationNarrow"
             ) { navigationStack ->
                 val model = navigationStack.last()
-                when (model) {
+                if (menuDestinationRequiresStoreSubscription(model) && !subscriptionAccess) SubscriptionRequiredPane()
+                else when (model) {
                     is NavigationScreenModel.Menu.List -> {
                         MenuListScreen()
                     }
@@ -5046,15 +4935,15 @@ fun AppConfiguration.MenuScreen() {
                 modifier = Modifier
                     .weight(1f)
             ) {
-                AnimatedContent(
+                AitaLiveMenuPane(
                     modifier = Modifier
                         .weight(0.2f),
-                    targetState = stateValues.navigationScreensMenuLeft,
-                    transitionSpec = aitaStackTransitionSpec(),
+                    navigationStack = stateValues.navigationScreensMenuLeft,
                     label = "menuNavigationLeft"
                 ) { navigationStack ->
                     val model = navigationStack.last()
-                    when (model) {
+                    if (menuDestinationRequiresStoreSubscription(model) && !subscriptionAccess) SubscriptionRequiredPane()
+                    else when (model) {
                         is NavigationScreenModel.Menu.List -> {
                             MenuListScreen()
                         }
@@ -5143,15 +5032,15 @@ fun AppConfiguration.MenuScreen() {
                     }
                 }
 
-                AnimatedContent(
+                AitaLiveMenuPane(
                     modifier = Modifier
                         .weight(1f),
-                    targetState = stateValues.navigationScreensMenuRight,
-                    transitionSpec = aitaStackTransitionSpec(),
+                    navigationStack = stateValues.navigationScreensMenuRight,
                     label = "menuNavigationRight"
                 ) { navigationStack ->
                     val model = navigationStack.last()
-                    when (model) {
+                    if (menuDestinationRequiresStoreSubscription(model) && !subscriptionAccess) SubscriptionRequiredPane()
+                    else when (model) {
                         is NavigationScreenModel.Menu.List -> {
                             MenuListScreen()
                         }
@@ -5269,7 +5158,21 @@ internal fun AppConfiguration.currentUserOwnsActiveStoreForUi(): Boolean {
     return stateValues.stores.orEmpty().isEmpty()
 }
 
+/** Billing is separate from role authorization: even an owner needs the selected location's access. */
+internal fun menuDestinationRequiresStoreSubscription(model: NavigationScreenModel): Boolean = when (model) {
+    NavigationScreenModel.Menu.TransactionHistory,
+    NavigationScreenModel.Menu.TransactionHistoryReceiptPreview,
+    NavigationScreenModel.Menu.OperationLogs, NavigationScreenModel.Menu.Analytics,
+    NavigationScreenModel.Menu.Workers, NavigationScreenModel.Menu.AddEditWorker,
+    NavigationScreenModel.Menu.Suppliers, NavigationScreenModel.Menu.AddEditSupplier,
+    NavigationScreenModel.Menu.Debtors, NavigationScreenModel.Menu.CloseDebt,
+    NavigationScreenModel.Menu.GoodsCategories, NavigationScreenModel.Menu.AddEditGoodsCategory,
+    NavigationScreenModel.Menu.Devices -> true
+    else -> false // Account, store selection/creation, recovery and billing remain reachable.
+}
+
 internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenModel.Menu): Boolean {
+    if (menuDestinationRequiresStoreSubscription(model) && !currentStoreHasSubscriptionAccess(stateValues.activeStoreId)) return false
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return when (model) {
@@ -5283,7 +5186,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
         NavigationScreenModel.Menu.Debtors -> activeOwnerFallback || currentUserCanViewDebtors(activeStoreId) || currentUserCanManageDebtorPayments(activeStoreId)
         NavigationScreenModel.Menu.GoodsCategories -> activeOwnerFallback || currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.StoreSubscription,
-        NavigationScreenModel.Menu.StoreSubscriptionPlans -> activeOwnerFallback || currentUserOwnsStore(activeStoreId) || currentUserHasStorePermission(activeStoreId, STORE_PERMISSION_SUBSCRIPTION_MANAGE)
+        NavigationScreenModel.Menu.StoreSubscriptionPlans -> true // Members see access; only billing managers can change it.
         else -> true
     }
 }
@@ -5321,6 +5224,7 @@ internal fun AppConfiguration.filteredMenuDestinations(): List<NavigationScreenM
 }
 
 internal fun AppConfiguration.filteredMainBottomDestinations(): List<NavigationScreenModel> {
+    if (!currentStoreHasSubscriptionAccess(stateValues.activeStoreId)) return listOf(NavigationScreenModel.Menu.Main)
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return Navigation.bottomNavBarScreensStore.filter { model ->
@@ -5937,6 +5841,7 @@ internal fun AppConfiguration.AppModeQuickSwitchMenuTile() {
 
 @Composable
 fun AppConfiguration.MenuListScreen() {
+    val subscriptionAccess = rememberStoreSubscriptionAccess()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -5951,7 +5856,7 @@ fun AppConfiguration.MenuListScreen() {
                 ActiveWorkshiftMenuTile(workshift = workshift)
             }
 
-            if (shouldBlockAppForWorkshift()) {
+            if (subscriptionAccess && shouldBlockAppForWorkshift()) {
                 NoActiveWorkshiftMenuTile()
             }
         }
@@ -6342,36 +6247,6 @@ internal fun AppConfiguration.subscriptionPeriodText(unit: String, count: Int): 
     }
 
     return if (count <= 1) unitText else "$count $unitText"
-}
-
-@Composable
-internal fun AppConfiguration.SubscriptionPlanCard(plan: StoreSubscriptionPlanDataModel, activeStoreId: String?) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(stateValues.BackgroundColor)
-            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-            .padding(stateValues.marginTextFieldGroup),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(plan.name.visibleLocalizedString(stateValues.appLanguage, plan.id), color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
-        Text(plan.description.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        Text(plan.price.aitaMoney(plan.currencyCode) + " / " + subscriptionPeriodText(plan.periodUnit, plan.periodCount), color = stateValues.AccentColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-        Text("${localizedStringResource(595, "Branches")}: ${plan.maxBranches} · ${stateValues.stringWorkers}: ${plan.maxWorkers} · ${localizedStringResource(596, "Stock items")}: ${plan.maxStockItems}", color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        actionButton(
-            text = localizedStringResource(597, "Activate plan"),
-            iconPath = stateValues.drawablePathIconCheck,
-            enabled = !activeStoreId.isNullOrBlank(),
-            confirmationRequired = true,
-            onClick = {
-                activeStoreId?.let {
-                    updateStoreSubscription(StoreSubscriptionUpdateRequestDataModel(storeId = it, planId = plan.id, autoRenew = true, activateNow = true))
-                }
-            }
-        )
-    }
 }
 
 internal fun securitySessionDateTimeText(millis: Long): String {

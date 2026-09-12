@@ -1610,7 +1610,7 @@ fun AppConfiguration.TransactionSelectionScreen(
             title = stateValues.stringSelect,
             trailingIcons = if (stateValues.isNarrowScreen) {
                 listOf(
-                    Triple(stateValues.drawablePathIconStock, stateValues.drawableResIconStock.value) {
+                    Triple(stockAddIconPath(), stockAddIconFallback()) {
                         openQuickStockAddSheet(
                             transactionTypeIndex = context.transactionTypeIndex,
                             clientId = context.clientId

@@ -318,36 +318,15 @@ data class StoreSubscriptionPlanDataModel(
     val maxBranches: Int = 1,
     val maxWorkers: Int = 1,
     val maxStockItems: Int = 1000,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val regionCode: String = "KZ",
+    val priceVersion: Long = 1L,
+    val hidden: Boolean = false
 ) {
     val price: Double get() = priceMinor / 100.0
 }
 
-fun defaultStoreSubscriptionPlans(): List<StoreSubscriptionPlanDataModel> = listOf(
-    StoreSubscriptionPlanDataModel(
-        id = "standard_monthly_kzt",
-        name = listOf(
-            LocalizedStringDataModel("main", "Standard"),
-            LocalizedStringDataModel("en", "Standard"),
-            LocalizedStringDataModel("ru", "Стандартный"),
-            LocalizedStringDataModel("kk", "Стандартты")
-        ),
-        description = listOf(
-            LocalizedStringDataModel("main", "3 branches, 21 workers, 1000 stock items"),
-            LocalizedStringDataModel("en", "3 branches, 21 workers, 1000 stock items"),
-            LocalizedStringDataModel("ru", "3 филиала, 21 сотрудник, 1000 товаров на складе"),
-            LocalizedStringDataModel("kk", "3 филиал, 21 қызметкер, қоймада 1000 тауар")
-        ),
-        priceMinor = 799000L,
-        currencyCode = "KZT",
-        periodUnit = SUBSCRIPTION_PERIOD_MONTH,
-        periodCount = 1,
-        maxBranches = 3,
-        maxWorkers = 21,
-        maxStockItems = 1000,
-        isActive = true
-    )
-)
+fun defaultStoreSubscriptionPlans(): List<StoreSubscriptionPlanDataModel> = listOf(basicStoreSubscriptionPlan())
 
 @kotlinx.serialization.Serializable
 data class StoreSubscriptionStateDataModel(
@@ -363,7 +342,12 @@ data class StoreSubscriptionStateDataModel(
     val nextChargeAtMillis: Long? = null,
     val cancelledAtMillis: Long? = null,
     val pastDueSinceMillis: Long? = null,
-    val updatedAtMillis: Long = 0L
+    val updatedAtMillis: Long = 0L,
+    val accessKind: String = SUBSCRIPTION_ACCESS_PAID,
+    val regionCode: String = "KZ",
+    val renewalPriceMinor: Long = 0L,
+    val currencyCode: String = "KZT",
+    val revision: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -389,14 +373,27 @@ data class StoreSubscriptionUpdateRequestDataModel(
     val storeId: String,
     val planId: String,
     val autoRenew: Boolean = true,
-    val activateNow: Boolean = true
+    val activateNow: Boolean = true,
+    val promoCode: String = "",
+    val commandId: String = "",
+    val expectedRevision: Long? = null,
+    val expectedChargeMinor: Long? = null,
+    val expectedCurrencyCode: String? = null,
+    val expectedPriceVersion: Long? = null,
+    val quoteValidUntilMillis: Long? = null,
+    val expectedRegularPriceMinor: Long? = null,
+    val expectedAccessKind: String? = null,
+    val expectedDurationMillis: Long? = null
 )
 
 @kotlinx.serialization.Serializable
 data class SubscriptionDashboardDataModel(
     val subscription: StoreSubscriptionStateDataModel,
     val charges: List<StoreSubscriptionChargeDataModel>,
-    val plans: List<StoreSubscriptionPlanDataModel>
+    val plans: List<StoreSubscriptionPlanDataModel>,
+    val canManage: Boolean = false,
+    val billingWallet: UserWalletDataModel? = null,
+    val serverTimeMillis: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -475,9 +472,6 @@ val activeStoreSubscriptionChargesState = MutableDataStateFlow<List<StoreSubscri
 private val getUserFinanceDashboardMutex = Mutex()
 private val createTopUpPaymentMutex = Mutex()
 private val confirmDevelopmentTopUpMutex = Mutex()
-private val getSubscriptionPlansMutex = Mutex()
-private val getStoreSubscriptionMutex = Mutex()
-private val updateStoreSubscriptionMutex = Mutex()
 
 // Read operations deliberately enter their mutex instead of checking isLocked before launch.
 // Mutex.isLocked is only a snapshot: a second caller can race past it, while a caller that sees
@@ -504,20 +498,27 @@ fun getDebtors(
     storeId: String,
     onCompleted: ((DataState<List<DebtorDataModel>>) -> Unit)? = null
 ) {
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return }
     GlobalScope.launch(Dispatchers.ourIo) {
         getDebtorsMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@withLock }
             val response = networkRequest<List<DebtorDataModel>, Unit>(
                 method = HttpMethod.Get,
                 endpointUrl = globalAppConfigurationState.payloadValue.getDebtorsPath.first,
-                headers = mapOf("store_id" to storeId)
+                headers = mapOf("store_id" to storeId),
+                expectedSessionGeneration = owner.sessionGeneration
             )
 
+            inventoryStateMutex.withLock publication@ {
+                if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@publication }
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
                 debtorsState.emit(DataState.Success(response.payload, response.message))
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            }
             }
         }
     }
@@ -3171,12 +3172,16 @@ fun getTransactions(storeId: String) {
 fun getUserFinanceDashboard(
     onCompleted: ((DataState<UserFinanceDashboardDataModel>) -> Unit)? = null
 ) {
+    val generation = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
         getUserFinanceDashboardMutex.withLock {
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             val response = networkRequest<UserFinanceDashboardDataModel, Unit>(
                 method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getUserFinanceDashboardPath.first
+                endpointUrl = globalAppConfigurationState.payloadValue.getUserFinanceDashboardPath.first,
+                expectedSessionGeneration = generation
             )
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
 
             if (response.negative || response.payload == null) {
                 if (!response.transportFailure) postInAppNotification(response.message, NotificationType.Negative)
@@ -3197,7 +3202,6 @@ private suspend fun applyUserFinanceDashboard(
     userWalletState.emit(DataState.Success(payload.wallet, message))
     userWalletLedgerState.emit(DataState.Success(payload.ledger, message))
     paymentIntentsState.emit(DataState.Success(payload.paymentIntents, message))
-    subscriptionPlansState.emit(DataState.Success(payload.subscriptionPlans, message))
 }
 
 fun createTopUpPayment(
@@ -3253,77 +3257,35 @@ fun confirmDevelopmentTopUpPayment(
     }
 }
 
-fun getSubscriptionPlans(
-    onCompleted: ((DataState<List<StoreSubscriptionPlanDataModel>>) -> Unit)? = null
-) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        getSubscriptionPlansMutex.withLock {
-            val response = networkRequest<List<StoreSubscriptionPlanDataModel>, Unit>(
-                method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getSubscriptionPlansPath.first
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                subscriptionPlansState.emit(DataState.Success(response.payload, response.message))
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
-            }
-        }
+fun getSubscriptionPlans(onCompleted: ((DataState<List<StoreSubscriptionPlanDataModel>>) -> Unit)? = null) {
+    val store = activeStoreIdState.value
+    if (store == null) {
+        subscriptionPlansState.emit(DataState.Success(emptyList()))
+        onCompleted?.invoke(DataState.Success(emptyList()))
+        return
+    }
+    getStoreSubscription(store) { result ->
+        onCompleted?.invoke(when (result) {
+            is DataState.Success -> DataState.Success(result.payload.plans, result.message)
+            is DataState.Empty -> DataState.Empty(result.message)
+        })
     }
 }
 
-fun getStoreSubscription(
-    storeId: String,
-    onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
-) {
+fun getStoreSubscription(storeId: String, onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null) {
+    val owner = inventoryOwners.current
     GlobalScope.launch(Dispatchers.ourIo) {
-        getStoreSubscriptionMutex.withLock {
-            val response = networkRequest<SubscriptionDashboardDataModel, Unit>(
-                method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first,
-                headers = mapOf("store_id" to storeId)
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
-                activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
-                subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
-            }
-        }
+        val response = refreshStoreSubscriptionNow(storeId)
+        if (inventoryOwnerIsCurrent(owner)) onCompleted?.invoke(response.toSubscriptionDataState())
     }
 }
 
-fun updateStoreSubscription(
-    request: StoreSubscriptionUpdateRequestDataModel,
-    onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null
-) {
+fun updateStoreSubscription(request: StoreSubscriptionUpdateRequestDataModel,
+    onCompleted: ((DataState<SubscriptionDashboardDataModel>) -> Unit)? = null) {
+    val owner = inventoryOwners.current
     GlobalScope.launch(Dispatchers.ourIo) {
-        updateStoreSubscriptionMutex.withLock {
-            val response = networkRequest<SubscriptionDashboardDataModel, StoreSubscriptionUpdateRequestDataModel>(
-                method = HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.updateStoreSubscriptionPath.first,
-                body = request,
-                headers = mapOf("store_id" to request.storeId)
-            )
-
-            if (response.negative || response.payload == null) {
-                postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty(response.message))
-            } else {
-                activeStoreSubscriptionState.emit(DataState.Success(response.payload.subscription, response.message))
-                activeStoreSubscriptionChargesState.emit(DataState.Success(response.payload.charges, response.message))
-                subscriptionPlansState.emit(DataState.Success(response.payload.plans, response.message))
-                getUserFinanceDashboard()
-                postInAppNotification(response.message, NotificationType.Positive)
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
-            }
-        }
+        val response = submitStoreSubscriptionNow(request)
+        if (inventoryOwnerIsCurrent(owner)) onCompleted?.invoke(response.toSubscriptionDataState())
     }
 }
 
@@ -3412,20 +3374,27 @@ fun getStoreWorkers(
     storeId: String,
     onCompleted: ((DataState<List<StoreWorkerDataModel>>) -> Unit)? = null
 ) {
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return }
     GlobalScope.launch(Dispatchers.ourIo) {
         getStoreWorkersMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@withLock }
             val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
                 method = HttpMethod.Get,
                 endpointUrl = globalAppConfigurationState.payloadValue.getStoreWorkersPath.first,
-                headers = mapOf("store_id" to storeId)
+                headers = mapOf("store_id" to storeId),
+                expectedSessionGeneration = owner.sessionGeneration
             )
 
+            inventoryStateMutex.withLock publication@ {
+                if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@publication }
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
                 storeWorkerMembershipsState.emit(DataState.Success(response.payload, response.message))
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            }
             }
         }
     }
@@ -3434,12 +3403,16 @@ fun getStoreWorkers(
 fun getMyWorkerMemberships(
     onCompleted: ((DataState<List<StoreWorkerDataModel>>) -> Unit)? = null
 ) {
+    val generation = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
         getMyWorkerMembershipsMutex.withLock {
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             val response = networkRequest<List<StoreWorkerDataModel>, Unit>(
                 method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerMembershipsPath.first
+                endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerMembershipsPath.first,
+                expectedSessionGeneration = generation
             )
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
 
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
@@ -3456,20 +3429,27 @@ fun getIncomingWorkerRequests(
     storeId: String,
     onCompleted: ((DataState<List<StoreWorkerRequestDataModel>>) -> Unit)? = null
 ) {
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return }
     GlobalScope.launch(Dispatchers.ourIo) {
         getIncomingWorkerRequestsMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@withLock }
             val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
                 method = HttpMethod.Get,
                 endpointUrl = globalAppConfigurationState.payloadValue.getIncomingWorkerRequestsPath.first,
-                headers = mapOf("store_id" to storeId)
+                headers = mapOf("store_id" to storeId),
+                expectedSessionGeneration = owner.sessionGeneration
             )
 
+            inventoryStateMutex.withLock publication@ {
+                if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@publication }
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
                 incomingWorkerRequestsState.emit(DataState.Success(response.payload, response.message))
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            }
             }
         }
     }
@@ -3478,12 +3458,16 @@ fun getIncomingWorkerRequests(
 fun getMyWorkerRequests(
     onCompleted: ((DataState<List<StoreWorkerRequestDataModel>>) -> Unit)? = null
 ) {
+    val generation = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
         getMyWorkerRequestsMutex.withLock {
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             val response = networkRequest<List<StoreWorkerRequestDataModel>, Unit>(
                 method = HttpMethod.Get,
-                endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerRequestsPath.first
+                endpointUrl = globalAppConfigurationState.payloadValue.getMyWorkerRequestsPath.first,
+                expectedSessionGeneration = generation
             )
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
 
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
@@ -4287,22 +4271,29 @@ fun getCurrentWorkshift(
     onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
 ) {
     val id = storeId?.takeIf { it.isNotBlank() } ?: return
+    val owner = inventoryOwners.current
+    if (owner.storeId != id || !inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return }
     GlobalScope.launch(Dispatchers.ourIo) {
         getCurrentWorkshiftMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@withLock }
             val response = networkRequest<WorkshiftDataModel, Unit>(
                 endpointUrl = globalAppConfigurationState.payloadValue.getCurrentWorkshiftPath.first,
                 method = HttpMethod.Get,
-                headers = mapOf("store_id" to id)
+                headers = mapOf("store_id" to id),
+                expectedSessionGeneration = owner.sessionGeneration
             )
 
+            inventoryStateMutex.withLock publication@ {
+                if (!inventoryOwnerIsCurrent(owner)) { onCompleted?.invoke(DataState.Empty()); return@publication }
             if (response.negative || response.payload == null) {
-                if (!response.transportFailure && response.httpStatusCode != HttpStatusCode.Unauthorized.value) {
+                if (!response.transportFailure && response.httpStatusCode != HttpStatusCode.Unauthorized.value && response.httpStatusCode != 402) {
                     activeWorkshiftState.emit(DataState.Empty(response.message))
                 }
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
                 activeWorkshiftState.emit(DataState.Success(response.payload, response.message))
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
+            }
             }
         }
     }
@@ -7029,19 +7020,15 @@ const val APP_MODE_SUPPLIER = 2
 const val APP_MODE_MANUFACTURER = 3
 
 /**
- * The non-Store workspaces remain implemented in source, but mode selection is deliberately
- * disabled in the public release until those workspaces are reopened for users. Keeping the gate
- * in shared state prevents a previously persisted Supplier/Buyer/Manufacturer mode from trapping
- * a user in a workspace whose selector is hidden from the Menu.
+ * Public workspaces: Store and Supplier. Buyer/Manufacturer foundations remain in source,
+ * but persisted unsupported modes fall back to Store rather than trapping a user in a hidden mode.
  */
-const val APP_MODE_SELECTION_PUBLICLY_ENABLED = false
+const val APP_MODE_SELECTION_PUBLICLY_ENABLED = true
 
 private fun normalizeAppModePreference(modeId: Int?): Int {
     if (!APP_MODE_SELECTION_PUBLICLY_ENABLED) return APP_MODE_STORE
     return when (modeId) {
-        APP_MODE_BUYER -> APP_MODE_BUYER
         APP_MODE_SUPPLIER -> APP_MODE_SUPPLIER
-        APP_MODE_MANUFACTURER -> APP_MODE_MANUFACTURER
         else -> APP_MODE_STORE
     }
 }
@@ -12583,8 +12570,10 @@ private suspend fun loadLocalNetworkCache() {
     )
 }
 
-private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
-    val storeId = activeStoreIdState.value.orEmpty()
+private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel? {
+    val owner = inventoryOwners.current
+    val storeId = owner.storeId ?: return null
+    if (!inventoryOwnerIsCurrent(owner) || !currentStoreHasSubscriptionAccess(storeId)) return null
     return LocalNetworkSnapshotDataModel(
         storeId = storeId,
         stock = stockState.payloadValue.orEmpty(),
@@ -12595,17 +12584,18 @@ private fun localNetworkSnapshot(): LocalNetworkSnapshotDataModel {
         debtors = debtorsState.payloadValue.orEmpty(),
         cashRegister = cashRegisterState.payloadValue,
         updatedAtMillis = getCurrentTimeMillis()
-    )
+    ).takeIf { inventoryOwnerIsCurrent(owner) && currentStoreHasSubscriptionAccess(storeId) }
 }
 
 private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotDataModel) {
     val message = localNetworkMessage(734, "Local branch state updated", "Локальное состояние филиала обновлено", "Филиалдың жергілікті күйі жаңартылды")
     val owner = inventoryOwners.current
-    if (snapshot.storeId != owner.storeId || !inventoryOwnerIsCurrent(owner)) return
+    if (snapshot.storeId != owner.storeId || !inventoryOwnerIsCurrent(owner) ||
+        !currentStoreHasSubscriptionAccess(snapshot.storeId)) return
     val stock = if (snapshot.stockLoaded) filterRecentlyDeletedStockItems(snapshot.stock) else null
     val batches = if (snapshot.stockBatchesLoaded) filterRecentlyDeletedStockBatches(snapshot.stockBatches) else null
     inventoryStateMutex.withLock {
-        if (!inventoryOwnerIsCurrent(owner)) return
+        if (!inventoryOwnerIsCurrent(owner) || !currentStoreHasSubscriptionAccess(snapshot.storeId)) return
         stock?.let {
             stockState.emit(DataState.Success(it, message))
             stockLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local)
@@ -12614,13 +12604,13 @@ private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotData
             stockBatchesState.emit(DataState.Success(it, message))
             stockBatchesLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local)
         }
-    }
-    transactionsState.emit(DataState.Success(snapshot.transactions, message))
-    snapshot.transactions.forEach(::reconcileLatestReceiptIdentity)
-    debtorsState.emit(DataState.Success(snapshot.debtors, message))
-    snapshot.cashRegister?.let {
-        cashRegisterState.emit(DataState.Success(it, message))
-        cashRegisterAmountState.emit(it.currentAmount)
+        transactionsState.emit(DataState.Success(snapshot.transactions, message))
+        snapshot.transactions.forEach(::reconcileLatestReceiptIdentity)
+        debtorsState.emit(DataState.Success(snapshot.debtors, message))
+        snapshot.cashRegister?.let {
+            cashRegisterState.emit(DataState.Success(it, message))
+            cashRegisterAmountState.emit(it.currentAmount)
+        }
     }
 }
 
@@ -12650,13 +12640,17 @@ private fun localNetworkEnvelope(type: String, operation: LocalNetworkQueuedOper
 private suspend fun broadcastLocalNetworkSnapshot() {
     val state = localNetworkState.value
     if (!state.enabled || state.role != LOCAL_NETWORK_ROLE_SERVER) return
-    val envelope = localNetworkEnvelope("state", snapshot = localNetworkSnapshot())
+    val owner = inventoryOwners.current
+    val snapshot = localNetworkSnapshot() ?: return
+    val envelope = localNetworkEnvelope("state", snapshot = snapshot)
     val text = jsonBase.encodeToString(envelope)
     localNetworkDevicesState.value
         .filter { it.deviceId != state.deviceId && it.host.isNotBlank() }
         .forEach { device ->
             GlobalScope.launch(Dispatchers.ourIo) {
-                runCatching { LocalAitaLanTransport.send(device.host, device.port, text, 1500) }
+                if (inventoryOwnerIsCurrent(owner) && currentStoreHasSubscriptionAccess(snapshot.storeId)) {
+                    runCatching { LocalAitaLanTransport.send(device.host, device.port, text, 1500) }
+                }
             }
         }
 }
@@ -12932,6 +12926,9 @@ private suspend fun handleLocalNetworkOperation(operation: LocalNetworkQueuedOpe
         when (operation.operationType) {
             LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE -> {
                 val transaction = jsonBase.decodeFromString<TransactionDataModel>(operation.bodyJson).withClientOperationId()
+                if (transaction.storeId != activeStoreIdState.value ||
+                    operation.storeId != transaction.storeId || !currentStoreHasSubscriptionAccess(transaction.storeId))
+                    return localNetworkEnvelope("ack", operation = operation, accepted = false, error = "SUBSCRIPTION_REQUIRED")
                 val opId = operation.id.ifBlank { transaction.clientOperationId }
                 val serverOrderedOperation = operation.copy(
                     id = opId,
@@ -13215,6 +13212,11 @@ private suspend fun sendOperationToLocalServer(operation: LocalNetworkQueuedOper
 }
 
 private suspend fun queueTransactionThroughLocalNetwork(transaction: TransactionDataModel): TransactionDataModel? {
+    if (!currentStoreHasSubscriptionAccess(transaction.storeId)) {
+        postInAppNotification(eventMessage("subscription.required"), NotificationType.Negative)
+        return null
+    }
+
     if (localNetworkState.value.enabled && !localBranchNetworkAllowedForActiveStore()) {
         postInAppNotification(localBranchNetworkRestrictionMessage(), NotificationType.Negative)
         return null
@@ -13650,15 +13652,18 @@ internal suspend fun observeActiveInventoryData() {
         val storeId = owner.storeId ?: return@collectLatest
         loadCachedStoreScopedData(storeId, owner)
         if (!inventoryOwnerIsCurrent(owner)) return@collectLatest
+        restoreStoreSubscriptionCache(storeId)
+        refreshStoreSubscriptionNow(storeId)
+        if (!inventoryOwnerIsCurrent(owner)) return@collectLatest
+        getMyWorkerMemberships()
+        getMyWorkerRequests()
+        if (!currentStoreHasSubscriptionAccess(storeId)) return@collectLatest
         getStock(storeId)
         getStockBatches(storeId)
         getTransactions(storeId)
         getCashRegister(storeId)
         getStoreWorkers(storeId)
         getIncomingWorkerRequests(storeId)
-        getMyWorkerMemberships()
-        getMyWorkerRequests()
-        getStoreSubscription(storeId)
     }
 }
 
@@ -13979,25 +13984,37 @@ internal fun supplierRealtimeEntityChangesProfiles(entity: String?): Boolean =
     cleanRealtimeEntity(entity).isSupplierProfileRealtimeEntity()
 
 internal fun realtimeUpdateIsRelevantToCurrentContext(
-    entity: String?,
-    updateStoreId: String?,
-    activeStoreId: String?,
-    appMode: Int
-): Boolean {
-    val cleanUpdateStoreId = updateStoreId.orEmpty().trim()
-    if (cleanUpdateStoreId.isBlank()) return true
+    entity: String?, updateStoreId: String?, activeStoreId: String?, appMode: Int,
+    familyStoreIds: Set<String> = emptySet()
+): Boolean = realtimeScopeMatches(cleanRealtimeEntity(entity), updateStoreId.orEmpty().trim(),
+    activeStoreId?.trim(), familyStoreIds,
+    appMode == APP_MODE_SUPPLIER || appMode == APP_MODE_MANUFACTURER)
 
-    val cleanEntity = cleanRealtimeEntity(entity)
-    if (
-        cleanEntity.isSupplierRealtimeEntity() &&
-        (appMode == APP_MODE_SUPPLIER || appMode == APP_MODE_MANUFACTURER)
-    ) {
-        // A Supplier workspace spans several partner Stores, so its Store-specific commercial
-        // events remain relevant even when no Store is selected as the Store-mode workspace.
-        return true
+private fun currentRealtimeStoreFamily(): Set<String> {
+    val selected = activeStoreIdState.value ?: return emptySet()
+    val stores = storesState.payloadValue.orEmpty().flattenStoresWithBranches()
+    val root = stores.firstOrNull { it.id == selected }?.rootStoreId() ?: selected
+    return stores.filter { it.rootStoreId() == root }.map { it.id }.toSet() + selected + root
+}
+
+private val realtimeInventoryReads = TrailingInvalidationRunner<InventoryOwner>()
+
+private suspend fun refreshInventoryAfterRealtimeInvalidation() {
+    val owner = inventoryOwners.current
+    if (!inventoryOwnerIsCurrent(owner)) return
+    realtimeInventoryReads.invalidate(owner, GlobalScope, Dispatchers.ourIo) {
+        // The currently running read may have taken its snapshot BEFORE this invalidation.
+        // Join it first, then ask for a fresh snapshot, rather than joining and losing the event.
+        stockRead.jobFor(owner)?.join()
+        stockBatchesRead.jobFor(owner)?.join()
+        if (inventoryOwnerIsCurrent(owner)) {
+            val storeId = requireNotNull(owner.storeId)
+            getStock(storeId)
+            getStockBatches(storeId)
+            stockRead.jobFor(owner)?.join()
+            stockBatchesRead.jobFor(owner)?.join()
+        }
     }
-
-    return activeStoreId.orEmpty().trim().equals(cleanUpdateStoreId, ignoreCase = true)
 }
 
 private fun rememberRealtimeUpdateIdLocked(updateId: String?): Boolean {
@@ -14022,12 +14039,12 @@ private fun realtimeUpdateRequiresBroadRefresh(entity: String, reason: String): 
         reason == "connection_sync" ||
         reason == "websocket_connected"
 
-private fun refreshEverythingFromServerAfterRealtimeUpdate() {
+private suspend fun refreshEverythingFromServerAfterRealtimeUpdate() {
     AnalyticsWorkspace.refreshServerTotalsIfNeeded()
     lastRealtimeBroadRefreshAtMillis = getCurrentTimeMillis()
 
     getGlobalAppConfiguration(loadAll = false)
-    getUser(forceLogOut = false)
+    getUser(forceLogOut = false, applyServerActiveStore = false)
     getStores()
     getSuppliers()
     getGenericGoodsCategories()
@@ -14040,7 +14057,6 @@ private fun refreshEverythingFromServerAfterRealtimeUpdate() {
     getMyWorkerMemberships()
     getMyWorkerRequests()
     getUserFinanceDashboard()
-    getSubscriptionPlans()
     if (appModeState.value == APP_MODE_SUPPLIER || appModeState.value == APP_MODE_MANUFACTURER) {
         val focusedSupplierId = effectiveActiveSupplierProfileId()
         if (focusedSupplierId.isNullOrBlank()) getMySupplierSideOrders()
@@ -14051,20 +14067,21 @@ private fun refreshEverythingFromServerAfterRealtimeUpdate() {
     }
 
     activeStoreIdState.value?.let { storeId ->
-        getStock(storeId)
-        getStockBatches(storeId)
+        refreshStoreSubscriptionNow(storeId)
+        if (!currentStoreHasSubscriptionAccess(storeId)) return@let
+        refreshInventoryAfterRealtimeInvalidation()
         getTransactions(storeId)
         getDebtors(storeId)
         getCashRegister(storeId)
         getCurrentWorkshift(storeId)
         getStoreWorkers(storeId)
         getIncomingWorkerRequests(storeId)
-        getStoreSubscription(storeId)
         getOperationLogs(storeId, OPERATION_LOG_SCOPE_CURRENT)
+        getOperationLogs(storeId, OPERATION_LOG_SCOPE_ROOT)
     }
 }
 
-private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
+private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     val cleanEntities = entities.map(::cleanRealtimeEntity).toSet()
     if (cleanEntities.isEmpty() || "all" in cleanEntities) {
         refreshEverythingFromServerAfterRealtimeUpdate()
@@ -14078,7 +14095,7 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     }
 
     if (anyEntityMatches("config")) getGlobalAppConfiguration(loadAll = false)
-    if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false)
+    if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false, applyServerActiveStore = false)
     if (anyEntityMatches("stores")) getStores()
 
     // Profile mutations and dashboard invalidations share the `suppliers/...` namespace, but they
@@ -14112,7 +14129,7 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
             getSupplierModeDashboard(supplierId = focusedSupplierId)
         }
     } else {
-        activeStoreId?.let { storeId ->
+        activeStoreId?.takeIf { currentStoreHasSubscriptionAccess(it) }?.let { storeId ->
             if (supplierOrdersChanged) getSupplierOrders(storeId)
             if (supplierPricesChanged) getSupplierGoodsPrices(storeId)
             if (supplierContractsChanged) getSupplierContracts(storeId = storeId)
@@ -14133,22 +14150,23 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     }
     if (anyEntityMatches("finance")) getUserFinanceDashboard()
     if (anyEntityMatches("subscriptions")) {
-        getSubscriptionPlans()
-        activeStoreId?.let { getStoreSubscription(it) }
+        activeStoreId?.let {
+            refreshStoreSubscriptionNow(it)
+            if (currentStoreHasSubscriptionAccess(it)) refreshInventoryAfterRealtimeInvalidation()
+        }
     }
     if (anyEntityMatches("workers")) {
         getMyWorkerMemberships()
         getMyWorkerRequests()
-        activeStoreId?.let { storeId ->
+        activeStoreId?.takeIf { currentStoreHasSubscriptionAccess(it) }?.let { storeId ->
             getStoreWorkers(storeId)
             getIncomingWorkerRequests(storeId)
         }
     }
 
-    activeStoreId?.let { storeId ->
+    activeStoreId?.takeIf { currentStoreHasSubscriptionAccess(it) }?.let { storeId ->
         if (anyEntityMatches("stock", "stockbatches", "stock/availability", "transactions/cart")) {
-            getStock(storeId)
-            getStockBatches(storeId)
+            refreshInventoryAfterRealtimeInvalidation()
         }
 
         if (anyEntityMatches("transactions", "stock", "stockbatches", "cashregister")) AnalyticsWorkspace.refreshServerTotalsIfNeeded()
@@ -14156,8 +14174,7 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
             getTransactions(storeId)
             getCashRegister(storeId)
             getDebtors(storeId)
-            getStock(storeId)
-            getStockBatches(storeId)
+            refreshInventoryAfterRealtimeInvalidation()
         }
 
         if (anyEntityMatches("debtors")) getDebtors(storeId)
@@ -14166,6 +14183,7 @@ private fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
 
         if (cleanEntities.any { it !in setOf("notifications", "security", "support") }) {
             getOperationLogs(storeId, OPERATION_LOG_SCOPE_CURRENT)
+            getOperationLogs(storeId, OPERATION_LOG_SCOPE_ROOT)
         }
     }
 }
@@ -14194,8 +14212,13 @@ private suspend fun scheduleRealtimeRefresh(
         if (!force && !rememberRealtimeUpdateIdLocked(updateId)) return@withLock
         val hadBroad = "all" in realtimePendingRefreshEntities
         val broad = realtimeUpdateRequiresBroadRefresh(cleanEntity, cleanReason)
-        val minInterval = if (cleanReason in setOf("connected", "websocket_connected", "connection_sync"))
-            REALTIME_CONNECTED_REFRESH_MIN_INTERVAL_MILLIS else REALTIME_BROAD_REFRESH_MIN_INTERVAL_MILLIS
+        // Catch-up timers are throttled. An actual committed mutation must never sit behind
+        // a recent reconnect's 20/30-second broad-refresh cooldown.
+        val minInterval = when {
+            cleanReason in setOf("connected", "websocket_connected", "connection_sync") -> REALTIME_CONNECTED_REFRESH_MIN_INTERVAL_MILLIS
+            cleanReason in setOf("heartbeat_catchup", "connection_poll", "heartbeat") -> REALTIME_BROAD_REFRESH_MIN_INTERVAL_MILLIS
+            else -> 0L
+        }
         if (broad) {
             realtimePendingRefreshEntities.clear()
             realtimePendingRefreshEntities.add("all")
@@ -14818,6 +14841,7 @@ fun startRealtimeUpdates() {
                                             // Every completed reconnect requests a catch-up. The scheduler coalesces it
                                             // at a bounded trailing edge rather than losing missed events under a cooldown.
                                             launchCloudConnectionReconciliation("websocket_connected", false)
+                                            var lastAntiEntropyAt = getCurrentTimeMillis()
 
                                             while (isActive) {
                                                 val received = if (usesHeartbeat) {
@@ -14836,7 +14860,12 @@ fun startRealtimeUpdates() {
                                                 if (update?.type == "heartbeat") {
                                                     if (realtimeUpdatesJob.owns(thisJob)) markCloudTransportReachableForNotifications(
                                                         authenticated = true, authRefreshRequired = false, forceRecovery = true)
-                                                    continue // Heartbeats are not inventory mutations; never trigger entity reloads.
+                                                    val now = getCurrentTimeMillis()
+                                                    if (now - lastAntiEntropyAt >= 120_000L || now < lastAntiEntropyAt) {
+                                                        lastAntiEntropyAt = now
+                                                        scheduleRealtimeRefresh(reason = "connection_sync", entity = "all")
+                                                    }
+                                                    continue // A heartbeat is not itself a mutation; catch-up is bounded to two minutes.
                                                 }
                                                 if (
                                                     update != null &&
@@ -14845,7 +14874,8 @@ fun startRealtimeUpdates() {
                                                         entity = update.entity,
                                                         updateStoreId = update.storeId,
                                                         activeStoreId = activeStoreIdState.value,
-                                                        appMode = appModeState.value
+                                                        appMode = appModeState.value,
+                                                        familyStoreIds = currentRealtimeStoreFamily()
                                                     )
                                                 ) {
                                                     scheduleRealtimeRefresh(
@@ -16322,8 +16352,10 @@ fun syncPendingNotificationsToServer() {
 }
 
 fun getNotifications() {
+    val generation = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
         getNotificationsMutex.withLock {
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             if (getStoredUserAuthTokens?.invoke() == null) return@withLock
 
             val localPending = notificationsState.payloadValue.orEmpty()
@@ -16331,8 +16363,10 @@ fun getNotifications() {
 
             val response = networkRequest<List<NotificationDataModel>, Unit>(
                 method = HttpMethod.Get,
-                endpointUrl = "notifications/get"
+                endpointUrl = "notifications/get",
+                expectedSessionGeneration = generation
             )
+            if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
 
             if (!response.negative) {
                 val serverNotifications = response.payload.orEmpty().filterNot { it.isLocalOnlyNotification() }
@@ -17004,6 +17038,7 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
     userWalletState.emit(DataState.Empty())
     userWalletLedgerState.emit(DataState.Empty())
     paymentIntentsState.emit(DataState.Empty())
+    clearStoreSubscriptionRuntime()
     activeStoreSubscriptionState.emit(DataState.Empty())
     activeStoreSubscriptionChargesState.emit(DataState.Empty())
 
@@ -17210,7 +17245,7 @@ internal suspend fun refreshUserAccountNow(
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
 
-    activeStoreIdState.value?.let { storeId ->
+    activeStoreIdState.value?.takeIf { currentStoreHasSubscriptionAccess(it) }?.let { storeId ->
         if (stockState.payloadValue == null || stockLoadStatusState.value.failure != null) getStock(storeId)
         if (stockBatchesState.payloadValue == null || stockBatchesLoadStatusState.value.failure != null) getStockBatches(storeId)
     }
@@ -17301,6 +17336,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
     expectedSessionGeneration: Long? = null
 ): ResponseDataModel<Response> {
     activeNetworkOperationsState.update { it + 1 }
+    val requestStartedAtMillis = getCurrentTimeMillis()
 
     return try {
         if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
@@ -17309,6 +17345,13 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
             return cloudSessionExpiredResponse()
 
+        val subscriptionStoreId = subscriptionRequestStoreId(endpointUrl, headers, query)
+        val subscriptionFailure = checkStoreSubscriptionForNetwork(endpointUrl, subscriptionStoreId)
+        if (subscriptionFailure != null) return ResponseDataModel(
+            message = subscriptionFailure, payload = null, negative = true, httpStatusCode = 402)
+        val scopedHeaders = if (subscriptionStoreId != null && storeSubscriptionRequiredForEndpoint(endpointUrl) &&
+            headers.keys.none { it.equals("store_id", true) || it.equals("store-id", true) })
+            headers + ("store_id" to subscriptionStoreId) else headers
         val protectedEndpoint = cloudEndpointRequiresAuthentication(endpointUrl)
         if (protectedEndpoint) {
             // All concurrent protected startup requests queue behind one authenticated session check.
@@ -17358,7 +17401,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
         for ((index, resolvedServerUrl) in serverUrlCandidates.withIndex()) {
             var authRetryUsedForCandidate = false
-            val requestHeaders = currentClientDeviceInfoHeaders() + headers
+            val requestHeaders = currentClientDeviceInfoHeaders() + scopedHeaders
 
             retrySameServer@ while (true) {
                 val tokensBeforeRequest = getStoredUserAuthTokens?.invoke()
@@ -17426,6 +17469,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
                     val decodedResponse = decodeNetworkResponseDataModel<Response>(rawBody, response.status)
                         .withAitaTransportFailureFromStatus(response.status)
+                    if (response.status.value == 402 && subscriptionStoreId != null)
+                        invalidateStoreSubscriptionAccess(subscriptionStoreId, requestStartedAtMillis)
 
                     if (response.status.isAitaServerUnhealthyForClientBanner() || decodedResponse.transportFailure) {
                         val failureResponse = decodedResponse.copy(transportFailure = true)
@@ -17982,6 +18027,7 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
             val response = networkRequest<StoreDataModel, StoreDataModel>(
                 HttpMethod.Put,
                 endpointUrl = globalAppConfigurationState.payloadValue.updateStoresPath.first,
+                headers = mapOf("store_id" to store.id),
                 body = store
             )
 
@@ -20564,7 +20610,8 @@ data class RealtimeUpdateDataModel(
     val userId: String? = null,
     val reason: String? = null,
     val createdAtMillis: Long = 0L,
-    val heartbeatIntervalMillis: Long = 0L
+    val heartbeatIntervalMillis: Long = 0L,
+    val sequence: Long? = null
 )
 
 @kotlinx.serialization.Serializable

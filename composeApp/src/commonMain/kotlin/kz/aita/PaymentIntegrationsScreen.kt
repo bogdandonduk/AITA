@@ -74,7 +74,10 @@ internal fun PaymentIntegrationsWorkspace(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = onBack, enabled = !busy) { Text(strings.back) }
                         Spacer(Modifier.weight(1f))
-                        OutlinedButton(onClick = onRefresh, enabled = !busy) { Text(strings.refresh) }
+                        OutlinedButton(onClick = onRefresh, enabled = !busy) {
+                            if (state.loading) { AitaBusyIndicator(Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
+                            Text(strings.refresh)
+                        }
                     }
                     Text(strings.title, style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(4.dp))
@@ -96,6 +99,11 @@ internal fun PaymentIntegrationsWorkspace(
                     enabled = !busy,
                     onSelect = onSelectEnvironment,
                 )
+            }
+
+            if (state.loading && state.balance == null && state.integrations.isEmpty() && state.capabilities.isEmpty()) {
+                item { AitaLoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 5) }
+                return@LazyColumn
             }
 
             item {
@@ -171,9 +179,6 @@ internal fun PaymentIntegrationsWorkspace(
             item { Spacer(Modifier.height(20.dp)) }
         }
 
-        if (state.loading) {
-            CircularProgressIndicator(Modifier.align(Alignment.Center))
-        }
     }
 
     editingProvider?.let { provider ->

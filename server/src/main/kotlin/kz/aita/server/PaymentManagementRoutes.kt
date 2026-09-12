@@ -11,6 +11,8 @@ import kotlinx.coroutines.CancellationException
 import kz.aita.payments.management.*
 import kz.aita.server.payments.*
 import java.sql.Connection
+import java.util.UUID
+import kz.aita.server.subscriptions.SubscriptionRepository
 import java.util.concurrent.ConcurrentHashMap
 
 private const val PAYMENT_MANAGEMENT_ROUTE_MARKER = "aita-payment-management-v1"
@@ -206,6 +208,11 @@ private suspend fun withPaymentAccess(
             if (!PaymentStoreAccess.canAccess(principal, storeId, db)) {
                 db.rollback()
                 return@use PaymentRouteResponse(PaymentApiErrorDto("STORE_ACCESS_DENIED", "You do not have access to this Store"), HttpStatusCode.Forbidden)
+            }
+            val physicalStoreId = runCatching { UUID.fromString(storeId) }.getOrNull()
+            if (physicalStoreId == null || !SubscriptionRepository(db).hasAccess(physicalStoreId, System.currentTimeMillis())) {
+                db.rollback()
+                return@use PaymentRouteResponse(PaymentApiErrorDto("SUBSCRIPTION_REQUIRED", "This location needs an active subscription"), HttpStatusCode.PaymentRequired)
             }
             val result = block(db, actor, storeId)
             if (result.status.value in 200..399) db.commit() else db.rollback()

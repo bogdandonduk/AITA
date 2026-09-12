@@ -2,6 +2,9 @@
 
 package kz.aita.server
 
+import kz.aita.server.subscriptions.*
+import org.jetbrains.exposed.sql.transactions.TransactionManager
+
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
@@ -31,14 +34,21 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kz.aita.*
@@ -1074,6 +1084,7 @@ suspend fun RoutingCall.checkPrincipal(): UUID? {
     return null
   }
 
+  enforceRequestSubscription(userId)
   return userId
 }
 
@@ -3744,6 +3755,8 @@ private fun prewarmSharedRuntimeSerializers() {
     "kz.aita.StoreSubscriptionStateDataModel",
     "kz.aita.StoreSubscriptionChargeDataModel",
     "kz.aita.StoreSubscriptionUpdateRequestDataModel",
+    "kz.aita.StoreSubscriptionQuoteRequestDataModel",
+    "kz.aita.StoreSubscriptionQuoteDataModel",
     "kz.aita.SubscriptionDashboardDataModel",
     "kz.aita.UserFinanceDashboardDataModel",
     "kz.aita.TransactionPaymentDraftDataModel",
@@ -3996,49 +4009,56 @@ fun main(args: Array<String>) {
 }
 
 private object RealtimeServerBus {
-  private const val DUPLICATE_COALESCE_WINDOW_MILLIS = 260L
-  private const val RECENT_KEY_CLEANUP_WINDOW_MILLIS = 30_000L
-
   private val updates = MutableSharedFlow<RealtimeUpdateDataModel>(
-    replay = 128,
-    extraBufferCapacity = 192,
-    onBufferOverflow = BufferOverflow.DROP_OLDEST
-  )
-  private val recentPublishedAtByKey = ConcurrentHashMap<String, Long>()
-
+    replay = 128, extraBufferCapacity = 192, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+  private val publication = Mutex()
+  private var sequence = 0L
   val sharedUpdates = updates.asSharedFlow()
 
-  suspend fun publish(
-    entity: String = "all",
-    storeId: String? = null,
-    userId: String? = null,
-    reason: String? = null
-  ) {
-    val now = System.currentTimeMillis()
-    val cleanEntity = entity.trim().ifBlank { "all" }
-    val cleanStoreId = storeId?.trim()?.takeIf { it.isNotBlank() }
-    val cleanUserId = userId?.trim()?.takeIf { it.isNotBlank() }
-    val cleanReason = reason?.trim()?.takeIf { it.isNotBlank() }
-    val coalescingKey = listOf(cleanEntity, cleanStoreId.orEmpty(), cleanUserId.orEmpty(), cleanReason.orEmpty()).joinToString("|")
-    val previous = recentPublishedAtByKey.put(coalescingKey, now)
-    if (previous != null && now - previous < DUPLICATE_COALESCE_WINDOW_MILLIS) return
-
-    if (recentPublishedAtByKey.size > 512) {
-      recentPublishedAtByKey.entries.removeIf { (_, time) -> now - time > RECENT_KEY_CLEANUP_WINDOW_MILLIS }
+  suspend fun publish(entity: String = "all", storeId: String? = null,
+    userId: String? = null, reason: String? = null) {
+    publication.withLock {
+      sequence += 1L
+      val cleanStore = storeId?.trim()?.takeIf(String::isNotBlank)
+      val cleanUser = userId?.trim()?.takeIf(String::isNotBlank)
+      val update = RealtimeUpdateDataModel(id = UUID.randomUUID().toString(), type = "changed",
+        entity = entity.trim().ifBlank { "all" }, storeId = cleanStore, userId = cleanUser,
+        // A global invalidation carries no relationship IDs or actor-specific facts.
+        reason = if (cleanStore == null && cleanUser == null) "shared_state_changed" else reason,
+        createdAtMillis = System.currentTimeMillis(), sequence = sequence)
+      if (!updates.tryEmit(update)) updates.emit(update)
     }
-
-    val update = RealtimeUpdateDataModel(
-      id = UUID.randomUUID().toString(),
-      type = "changed",
-      entity = cleanEntity,
-      storeId = cleanStoreId,
-      userId = cleanUserId,
-      reason = cleanReason,
-      createdAtMillis = now
-    )
-
-    if (!updates.tryEmit(update)) updates.emit(update)
   }
+}
+
+private fun realtimeSessionStillValidInsideTransaction(userId: UUID, sessionId: UUID): Boolean {
+  val row = RefreshSessions.selectAll().where { (RefreshSessions.id eq sessionId) and (RefreshSessions.userId eq userId) }
+    .singleOrNull() ?: return false
+  // Use the same session validity as HTTP authentication. Rotation closes the old socket;
+  // the owned client reconnects with its replacement token. Never keep a revoked ancestor alive.
+  return !row[RefreshSessions.securityInvalidated] && row[RefreshSessions.revokedAt] == null &&
+    row[RefreshSessions.expiresAt] > java.time.Instant.now()
+}
+
+private fun realtimeAudienceAllowsInsideTransaction(userId: UUID, update: RealtimeUpdateDataModel): Boolean {
+  update.userId?.takeIf(String::isNotBlank)?.let { return it.equals(userId.toString(), ignoreCase = true) }
+  val storeText = update.storeId?.takeIf(String::isNotBlank) ?: return true // Sanitized invalidation only.
+  val storeId = runCatching { UUID.fromString(storeText) }.getOrNull() ?: return false
+  if (userHasStoreAccessInsideTransaction(userId, storeId)) return true
+  val entity = update.entity.lowercase()
+  // Branch members consume the parent's common catalogue; they do not gain another branch's API access.
+  if (entity.substringBefore('/') in setOf("stock", "stockbatches", "all", "stores")) {
+    val root = activeRootStoreIdForAccessInsideTransaction(storeId)
+    if (root == storeId && activeBranchStoreIdsAccessibleToUserInsideTransaction(userId, storeId).isNotEmpty()) return true
+  }
+  if (!entity.startsWith("supplier")) return false
+  val supplierIds = when {
+    entity.startsWith("supplierorders") -> SupplierOrders.select(SupplierOrders.supplierId).where { SupplierOrders.storeId eq storeId }.map { it[SupplierOrders.supplierId] }
+    entity.startsWith("suppliercontracts") -> SupplierPartnershipContracts.select(SupplierPartnershipContracts.supplierId).where { SupplierPartnershipContracts.storeId eq storeId }.map { it[SupplierPartnershipContracts.supplierId] }
+    entity.startsWith("suppliergoodsprices") -> SupplierGoodsPrices.select(SupplierGoodsPrices.supplierId).where { SupplierGoodsPrices.storeId eq storeId }.map { it[SupplierGoodsPrices.supplierId] }
+    else -> emptyList()
+  }
+  return supplierIds.distinct().any { userHasSupplierAccessInsideTransaction(userId, it) }
 }
 
 /** Published only AFTER the security reset transaction commits. Replayed events are harmless:
@@ -4071,7 +4091,6 @@ private suspend fun publishStockRealtimeBundle(storeId: String?, reason: String)
   RealtimeServerBus.publish(entity = "stock/availability", storeId = cleanStoreId, reason = reason)
   RealtimeServerBus.publish(entity = "transactions/cart", storeId = cleanStoreId, reason = reason)
   RealtimeServerBus.publish(entity = "notifications", storeId = cleanStoreId, reason = reason)
-  RealtimeServerBus.publish(entity = "all", storeId = cleanStoreId, reason = reason)
 }
 
 private suspend fun publishStockRealtimeBundle(storeIds: Iterable<String?>, reason: String) {
@@ -4255,38 +4274,10 @@ private fun ResultRow.toTopUpPaymentIntentDataModel(): TopUpPaymentIntentDataMod
   metadata = this[TopUpPaymentIntents.metadata]
 )
 
-private fun ResultRow.toStoreSubscriptionStateDataModel(): StoreSubscriptionStateDataModel = StoreSubscriptionStateDataModel(
-  id = this[StoreSubscriptionStates.id].toString(),
-  storeId = this[StoreSubscriptionStates.storeId].toString(),
-  ownerUserId = this[StoreSubscriptionStates.ownerUserId].toString(),
-  planId = this[StoreSubscriptionStates.planId],
-  status = this[StoreSubscriptionStates.status],
-  autoRenew = this[StoreSubscriptionStates.autoRenew],
-  startedAtMillis = this[StoreSubscriptionStates.startedAtMillis],
-  currentPeriodStartMillis = this[StoreSubscriptionStates.currentPeriodStartMillis],
-  currentPeriodEndMillis = this[StoreSubscriptionStates.currentPeriodEndMillis],
-  nextChargeAtMillis = this[StoreSubscriptionStates.nextChargeAtMillis],
-  cancelledAtMillis = this[StoreSubscriptionStates.cancelledAtMillis],
-  pastDueSinceMillis = this[StoreSubscriptionStates.pastDueSinceMillis],
-  updatedAtMillis = this[StoreSubscriptionStates.updatedAtMillis]
-)
-
-private fun ResultRow.toStoreSubscriptionChargeDataModel(): StoreSubscriptionChargeDataModel = StoreSubscriptionChargeDataModel(
-  id = this[StoreSubscriptionChargeEvents.id].toString(),
-  storeId = this[StoreSubscriptionChargeEvents.storeId].toString(),
-  userId = this[StoreSubscriptionChargeEvents.userId].toString(),
-  planId = this[StoreSubscriptionChargeEvents.planId],
-  amountMinor = this[StoreSubscriptionChargeEvents.amountMinor],
-  currencyCode = this[StoreSubscriptionChargeEvents.currencyCode],
-  periodStartMillis = this[StoreSubscriptionChargeEvents.periodStartMillis],
-  periodEndMillis = this[StoreSubscriptionChargeEvents.periodEndMillis],
-  status = this[StoreSubscriptionChargeEvents.status],
-  walletLedgerEntryId = this[StoreSubscriptionChargeEvents.walletLedgerEntryId],
-  createdAtMillis = this[StoreSubscriptionChargeEvents.createdAtMillis],
-  note = this[StoreSubscriptionChargeEvents.note]
-)
-
 private fun ensureUserWalletInsideTransaction(userId: UUID): UserWalletDataModel? {
+  // One lock order for wallet creation, top-ups and subscription debits. A missing wallet row
+  // cannot itself be locked, so serialize writers on its owning user first.
+  if (Users.select(Users.id).where { Users.id eq userId }.forUpdate().singleOrNull() == null) return null
   val existing = UserWallets
     .selectAll()
     .where { UserWallets.userId eq userId }
@@ -4331,8 +4322,8 @@ private fun addWalletLedgerInsideTransaction(
 ): WalletLedgerEntryDataModel? {
   val wallet = ensureUserWalletInsideTransaction(userId) ?: return null
   val before = wallet.balanceMinor
-  val after = before + amountMinor
-  if (after < 0L) return null
+  val after = runCatching { Math.addExact(before, amountMinor) }.getOrNull() ?: return null
+  if (after < wallet.reservedMinor.coerceAtLeast(0L)) return null
   val now = System.currentTimeMillis()
   val entryId = UUID.randomUUID()
 
@@ -4398,135 +4389,34 @@ private fun ownerUserIdForStoreInsideTransaction(storeId: UUID): UUID? {
     ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 }
 
-private fun nextPeriodEndMillis(start: Long, plan: StoreSubscriptionPlanDataModel): Long {
-  val days = when (plan.periodUnit) {
-    SUBSCRIPTION_PERIOD_YEAR -> 365L * plan.periodCount.coerceAtLeast(1)
-    else -> 30L * plan.periodCount.coerceAtLeast(1)
-  }
-  return start + days * 24L * 60L * 60L * 1000L
-}
+private fun subscriptionRepositoryInsideTransaction(): SubscriptionRepository =
+  SubscriptionRepository(TransactionManager.current().connection.connection as java.sql.Connection)
 
-private fun ensureStoreSubscriptionInsideTransaction(storeId: UUID): StoreSubscriptionStateDataModel? {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
-  StoreSubscriptionStates
-    .selectAll()
-    .where { StoreSubscriptionStates.storeId eq rootStoreId }
-    .singleOrNull()
-    ?.let { return it.toStoreSubscriptionStateDataModel() }
+private fun subscriptionCanManageInsideTransaction(userId: UUID, storeId: UUID): Boolean =
+  isStoreOwnerInsideTransaction(userId, storeId) ||
+    userHasStorePermissionInsideTransaction(userId, storeId, STORE_PERMISSION_SUBSCRIPTION_MANAGE)
 
-  val ownerId = ownerUserIdForStoreInsideTransaction(rootStoreId) ?: return null
-  val id = UUID.randomUUID()
-  val now = System.currentTimeMillis()
-  StoreSubscriptionStates.insert {
-    it[StoreSubscriptionStates.id] = id
-    it[StoreSubscriptionStates.storeId] = rootStoreId
-    it[StoreSubscriptionStates.ownerUserId] = ownerId
-    it[StoreSubscriptionStates.planId] = ""
-    it[StoreSubscriptionStates.status] = SUBSCRIPTION_STATUS_INACTIVE
-    it[StoreSubscriptionStates.autoRenew] = false
-    it[StoreSubscriptionStates.updatedAtMillis] = now
-  }
-  return StoreSubscriptionStates
-    .selectAll()
-    .where { StoreSubscriptionStates.id eq id }
-    .single()
-    .toStoreSubscriptionStateDataModel()
-}
-
-private fun subscriptionDashboardInsideTransaction(storeId: UUID): SubscriptionDashboardDataModel? {
-  val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
-  val subscription = ensureStoreSubscriptionInsideTransaction(rootStoreId) ?: return null
-  val charges = StoreSubscriptionChargeEvents
-    .selectAll()
-    .where { StoreSubscriptionChargeEvents.storeId eq rootStoreId }
-    .orderBy(StoreSubscriptionChargeEvents.createdAtMillis, SortOrder.DESC)
-    .limit(100)
-    .map { it.toStoreSubscriptionChargeDataModel() }
-  return SubscriptionDashboardDataModel(
-    subscription = subscription,
-    charges = charges,
-    plans = defaultStoreSubscriptionPlans()
-  )
-}
-
-private fun chargeSubscriptionInsideTransaction(subscription: StoreSubscriptionStateDataModel, now: Long): Boolean {
-  val plan = defaultStoreSubscriptionPlans().firstOrNull { it.id == subscription.planId && it.isActive } ?: return false
-  if (!subscription.autoRenew || subscription.status == SUBSCRIPTION_STATUS_CANCELLED) return false
-  val nextCharge = subscription.nextChargeAtMillis ?: subscription.currentPeriodEndMillis ?: return false
-  if (nextCharge > now) return true
-  val userId = runCatching { UUID.fromString(subscription.ownerUserId) }.getOrNull() ?: return false
-  val storeId = runCatching { UUID.fromString(subscription.storeId) }.getOrNull() ?: return false
-  val periodStart = nextCharge
-  val periodEnd = nextPeriodEndMillis(periodStart, plan)
-  val ledger = addWalletLedgerInsideTransaction(
-    userId = userId,
-    type = WALLET_LEDGER_SUBSCRIPTION_CHARGE,
-    amountMinor = -plan.priceMinor,
-    referenceType = "store_subscription",
-    referenceId = subscription.id,
-    note = "${plan.id} renewal"
-  )
-  val chargeId = UUID.randomUUID()
-
-  if (ledger == null) {
-    StoreSubscriptionStates.update({ StoreSubscriptionStates.id eq UUID.fromString(subscription.id) }) {
-      it[StoreSubscriptionStates.status] = SUBSCRIPTION_STATUS_PAST_DUE
-      it[StoreSubscriptionStates.pastDueSinceMillis] = subscription.pastDueSinceMillis ?: now
-      it[StoreSubscriptionStates.updatedAtMillis] = now
-    }
-    StoreSubscriptionChargeEvents.insert {
-      it[StoreSubscriptionChargeEvents.id] = chargeId
-      it[StoreSubscriptionChargeEvents.storeId] = storeId
-      it[StoreSubscriptionChargeEvents.userId] = userId
-      it[StoreSubscriptionChargeEvents.planId] = plan.id
-      it[StoreSubscriptionChargeEvents.amountMinor] = plan.priceMinor
-      it[StoreSubscriptionChargeEvents.currencyCode] = plan.currencyCode
-      it[StoreSubscriptionChargeEvents.periodStartMillis] = periodStart
-      it[StoreSubscriptionChargeEvents.periodEndMillis] = periodEnd
-      it[StoreSubscriptionChargeEvents.status] = "failed_insufficient_balance"
-      it[StoreSubscriptionChargeEvents.walletLedgerEntryId] = ""
-      it[StoreSubscriptionChargeEvents.createdAtMillis] = now
-      it[StoreSubscriptionChargeEvents.note] = "Insufficient balance"
-    }
-    return false
-  }
-
-  StoreSubscriptionStates.update({ StoreSubscriptionStates.id eq UUID.fromString(subscription.id) }) {
-    it[StoreSubscriptionStates.status] = SUBSCRIPTION_STATUS_ACTIVE
-    it[StoreSubscriptionStates.currentPeriodStartMillis] = periodStart
-    it[StoreSubscriptionStates.currentPeriodEndMillis] = periodEnd
-    it[StoreSubscriptionStates.nextChargeAtMillis] = periodEnd
-    it[StoreSubscriptionStates.pastDueSinceMillis] = null
-    it[StoreSubscriptionStates.updatedAtMillis] = now
-  }
-  StoreSubscriptionChargeEvents.insert {
-    it[StoreSubscriptionChargeEvents.id] = chargeId
-    it[StoreSubscriptionChargeEvents.storeId] = storeId
-    it[StoreSubscriptionChargeEvents.userId] = userId
-    it[StoreSubscriptionChargeEvents.planId] = plan.id
-    it[StoreSubscriptionChargeEvents.amountMinor] = plan.priceMinor
-    it[StoreSubscriptionChargeEvents.currencyCode] = plan.currencyCode
-    it[StoreSubscriptionChargeEvents.periodStartMillis] = periodStart
-    it[StoreSubscriptionChargeEvents.periodEndMillis] = periodEnd
-    it[StoreSubscriptionChargeEvents.status] = "paid"
-    it[StoreSubscriptionChargeEvents.walletLedgerEntryId] = ledger.id
-    it[StoreSubscriptionChargeEvents.createdAtMillis] = now
-    it[StoreSubscriptionChargeEvents.note] = "Auto-renewal"
-  }
-  return true
-}
-
-private fun runDueSubscriptionRenewalsOnce() {
-  org.jetbrains.exposed.sql.transactions.transaction {
+private suspend fun runDueSubscriptionRenewalsOnce(onFailure: (UUID, Throwable) -> Unit) {
+  val ids = newSuspendedTransaction(aitaServerIoContext) {
+    val repository = subscriptionRepositoryInsideTransaction()
     val now = System.currentTimeMillis()
-    StoreSubscriptionStates
-      .selectAll()
-      .where {
-        (StoreSubscriptionStates.autoRenew eq true) and
-           (StoreSubscriptionStates.status inList listOf(SUBSCRIPTION_STATUS_ACTIVE, SUBSCRIPTION_STATUS_PAST_DUE))
+    (repository.dueStoreIds(now) + repository.expiredStoreIds(now)).distinct()
+  }
+  // Failure of one location does not roll back OR starve the remaining locations.
+  for (id in ids) {
+    try {
+      val owner = newSuspendedTransaction(aitaServerIoContext) {
+        val repository = subscriptionRepositoryInsideTransaction()
+        val location = repository.lockLocation(id) ?: return@newSuspendedTransaction null
+        val now = System.currentTimeMillis()
+        location.ownerId.takeIf { repository.renew(location, now) || repository.expire(location, now) }
       }
-      .map { it.toStoreSubscriptionStateDataModel() }
-      .forEach { chargeSubscriptionInsideTransaction(it, now) }
+      if (owner != null) {
+        RealtimeServerBus.publish(entity = "subscriptions", storeId = id.toString(), reason = "subscription_period_changed")
+        RealtimeServerBus.publish(entity = "finance", userId = owner.toString(), reason = "subscription_period_changed")
+      }
+    } catch (cancelled: CancellationException) { throw cancelled }
+    catch (failure: Exception) { onFailure(id, failure) }
   }
 }
 
@@ -4536,9 +4426,10 @@ private fun Application.startSubscriptionRenewalDaemon(backgroundScope: Coroutin
   subscriptionRenewalDaemonStarted = true
   backgroundScope.launch {
     while (true) {
-      runCatching { runDueSubscriptionRenewalsOnce() }
-        .onFailure { log.error("Subscription renewal daemon iteration failed", it) }
-      delay(60_000L)
+      try { runDueSubscriptionRenewalsOnce { store, failure -> log.error("Subscription period processing failed for $store", failure) } }
+      catch (cancelled: CancellationException) { throw cancelled }
+      catch (failure: Exception) { log.error("Subscription renewal daemon iteration failed", failure) }
+      delay(10_000L)
     }
   }
 }
@@ -4686,6 +4577,63 @@ private fun RoutingCall.matchesAnyInventoryContextStoreIdInsideTransaction(userI
   return activeStoreId == null || storeIds.any { storesShareInventoryRootInsideTransaction(activeStoreId, it) }
 }
 
+private fun requireStoreSubscriptionInsideTransaction(storeId: UUID) {
+  if (!subscriptionRepositoryInsideTransaction().hasAccess(storeId, System.currentTimeMillis()))
+    throw SubscriptionFailure("subscription.required", 402)
+}
+
+private suspend fun RoutingCall.enforceRequestSubscription(userId: UUID) {
+  val path = request.path().trim('/').lowercase()
+  if (!storeSubscriptionRequiredForEndpoint(path)) return
+  // Joining a paid workplace is allowed before the applicant has an active store. The target
+  // comes from the employment request, not whichever store another device selected last.
+  if (path in setOf("workers/request", "workers/invitations/accept")) return
+  val storeId = headerUuid("store_id") ?: headerUuid("store-id")
+    ?: throw SubscriptionFailure("subscription.verify", 402)
+  newSuspendedTransaction(aitaServerIoContext) {
+    if (!userHasStoreAccessInsideTransaction(userId, storeId))
+      throw SubscriptionFailure("subscription.required", 403)
+    requireStoreSubscriptionInsideTransaction(storeId)
+  }
+}
+
+/** A paid header must never authorize an unpaid body target. The original route still verifies
+ * business permissions and inventory-family relationships; this only checks paid entitlement.
+ * Top-level scopes only: nested sale item snapshots are not independent billable stores.
+ */
+internal suspend fun RoutingCall.enforceSubscriptionBody(body: JsonElement) {
+  val path = request.path().trim('/').lowercase()
+  if (!storeSubscriptionRequiredForEndpoint(path)) return
+  val nodes = if (body is JsonArray) body.toList() else listOf(body)
+  newSuspendedTransaction(aitaServerIoContext) {
+    val targets = linkedSetOf<UUID>()
+    for (node in nodes) {
+      val record = node as? JsonObject
+      fun text(key: String): String? = (record?.get(key) as? JsonPrimitive)?.contentOrNull
+      fun add(value: String?) { value?.let { runCatching { UUID.fromString(it) }.getOrNull() }?.let(targets::add) }
+      if (path == "stores/delete") add((node as? JsonPrimitive)?.contentOrNull)
+      if (path == "stores/update") add(text("id"))
+      if (path == "workers/request") {
+        text("storeId")?.let(::resolveStoreIdByPublicOrPrivateIdInsideTransaction)?.let(targets::add)
+      } else add(text("storeId"))
+      add(text("sourceStoreId"))
+      add(text("destinationStoreId"))
+      add(text("targetStoreId"))
+      if (path.startsWith("workers/")) {
+        text("requestId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }?.let { id ->
+          StoreWorkerRequests.select(StoreWorkerRequests.storeId).where { StoreWorkerRequests.id eq id }
+            .singleOrNull()?.get(StoreWorkerRequests.storeId)?.let(targets::add)
+        }
+        text("workerId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }?.let { id ->
+          StoreWorkerMemberships.select(StoreWorkerMemberships.storeId).where { StoreWorkerMemberships.id eq id }
+            .singleOrNull()?.get(StoreWorkerMemberships.storeId)?.let(targets::add)
+        }
+      }
+    }
+    targets.forEach(::requireStoreSubscriptionInsideTransaction)
+  }
+}
+
 internal suspend inline fun <reified T : Any> RoutingCall.receiveAita(): T {
   return withAitaServerRuntimeClassLoader("receive:${request.httpMethod.value}:${request.path()}:${T::class.qualifiedName}") {
     runCatching { receive<T>() }.getOrElse { throwable ->
@@ -4693,6 +4641,8 @@ internal suspend inline fun <reified T : Any> RoutingCall.receiveAita(): T {
         refreshSharedRuntimeSerializersAfterClassLoadingFailure("receive:${T::class.qualifiedName}", throwable)
       }
       throw throwable
+    }.also { value ->
+      if (storeSubscriptionRequiredForEndpoint(request.path())) enforceSubscriptionBody(jsonBase.encodeToJsonElement(value))
     }
   }
 }
@@ -4717,6 +4667,8 @@ private suspend inline fun <reified T : Any> RoutingCall.receiveOneOrList(): Lis
         refreshSharedRuntimeSerializersAfterClassLoadingFailure("receive-one-or-list:${T::class.qualifiedName}", throwable)
       }
       throw throwable
+    }.also { values ->
+      if (storeSubscriptionRequiredForEndpoint(request.path())) enforceSubscriptionBody(jsonBase.encodeToJsonElement(values))
     }
   }
 }
@@ -4921,12 +4873,15 @@ private fun activeBranchStoreIdsAccessibleToUserInsideTransaction(userId: UUID, 
 
 private fun stockVisibleStoreIdsForUserInsideTransaction(userId: UUID, storeId: UUID): List<UUID> {
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
+  val now = System.currentTimeMillis()
+  val repository = subscriptionRepositoryInsideTransaction()
+  fun paid(ids: List<UUID>): List<UUID> = ids.filter { repository.hasAccess(it, now) }
   if (userHasRootInventoryScopeInsideTransaction(userId, rootStoreId)) {
-    return stockVisibleStoreIdsInsideTransaction(rootStoreId)
+    return paid(stockVisibleStoreIdsInsideTransaction(rootStoreId))
   }
 
   if (storeId == rootStoreId) {
-    return activeBranchStoreIdsAccessibleToUserInsideTransaction(userId, rootStoreId)
+    return paid(activeBranchStoreIdsAccessibleToUserInsideTransaction(userId, rootStoreId))
   }
 
   val activeBranchExists = Stores
@@ -4937,7 +4892,7 @@ private fun stockVisibleStoreIdsForUserInsideTransaction(userId: UUID, storeId: 
 
   if (!activeBranchExists || !userHasStoreAccessInsideTransaction(userId, storeId)) return emptyList()
 
-  return listOf(storeId)
+  return paid(listOf(storeId))
 }
 
 private fun userHasStoreAccessInsideTransaction(
@@ -5169,6 +5124,10 @@ private fun userHasRequiredActiveWorkshiftInsideTransaction(userId: UUID, storeI
 
 private fun userCanUseStoreActionInsideTransaction(userId: UUID, storeId: UUID, permission: String, requireWorkshift: Boolean = true): Boolean {
   if (!userHasStorePermissionInsideTransaction(userId, storeId, permission)) return false
+  // Permission anchors used to edit a branch may be its parent. Its OWN body/header entitlement
+  // is enforced above; do not charge the parent a second time just to prove management authority.
+  if (permission !in setOf(STORE_PERMISSION_STORE_MANAGE, STORE_PERMISSION_BRANCHES_MANAGE, STORE_PERMISSION_SUBSCRIPTION_MANAGE) &&
+      !subscriptionRepositoryInsideTransaction().hasAccess(storeId, System.currentTimeMillis())) return false
   if (requireWorkshift && !userHasRequiredActiveWorkshiftInsideTransaction(userId, storeId)) return false
   return true
 }
@@ -17679,6 +17638,11 @@ fun Application.module() {
   }
 
   install(StatusPages) {
+    exception<SubscriptionFailure> { call, cause ->
+      if (cause.httpStatus == 429) call.response.headers.append(HttpHeaders.RetryAfter, "60")
+      call.safeGenericResponseNoPayload(HttpStatusCode.fromValue(cause.httpStatus), eventMessage(cause.key))
+    }
+
     exception<AitaAuthContactConflictException> { call, cause ->
       val message = when (cause.conflict) {
         AuthContactConflict.PHONE -> eventMessage("message.this_phone_number_is_already_in_use")
@@ -17882,6 +17846,8 @@ fun Application.module() {
       method in setOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Delete) &&
       !path.startsWith("/rt/") &&
       !path.startsWith("/auth/", ignoreCase = true) &&
+      // A checkout preview does not change stock, money, or entitlement.
+      !path.trimEnd('/').equals("/subscriptions/store/quote", ignoreCase = true) &&
       (status == null || status in 200..299)
     ) {
       val storeId = call.request.header("store_id")
@@ -17889,6 +17855,11 @@ fun Application.module() {
         ?: call.request.queryParameters["store_id"]
 
       val entityPath = path.trim('/').ifBlank { "all" }
+      val realtimeActorId = call.principal<JWTPrincipal>()?.subject
+      val personalMutation = entityPath.substringBefore('/').lowercase() in setOf("user", "notifications", "finance", "security", "support")
+      // A deleted row no longer exists for the normal store audience lookup. This sanitized
+      // collection invalidation lets former members remove the vanished location immediately.
+      val storeCollectionMutation = entityPath.substringBefore('/').equals("stores", ignoreCase = true)
 
       // Supplier commercial routes publish one relationship-scoped event from the authoritative
       // database result. Supplier profile mutations likewise publish one owner-targeted event. Their
@@ -17901,7 +17872,8 @@ fun Application.module() {
       ) {
         RealtimeServerBus.publish(
           entity = entityPath,
-          storeId = storeId,
+          storeId = if (personalMutation || storeCollectionMutation) null else storeId,
+          userId = if (personalMutation) realtimeActorId else null,
           reason = "mutation"
         )
       }
@@ -17944,6 +17916,7 @@ fun Application.module() {
                 metadata = mapOf("http_method" to methodText, "http_path" to entityPath)
               )
             }
+            RealtimeServerBus.publish(entity = "logs", storeId = logStoreId.toString(), reason = "operation_log_committed")
           }.onFailure { throwable ->
             this@module.environment.log.error("Failed to write operation log", throwable)
           }
@@ -18150,30 +18123,28 @@ fun Application.module() {
 
 
           val collector = launch {
+            var previousSequence: Long? = null
             RealtimeServerBus.sharedUpdates.collect { update ->
               try {
-                val targetUserId = update.userId?.trim()?.takeIf { it.isNotBlank() }
-                if (targetUserId == null || targetUserId.equals(userId.toString(), ignoreCase = true)) {
-                  if (update.entity == "auth/security" && update.reason == "authenticator_recovered") {
-                    val invalidated = newSuspendedTransaction(aitaServerIoContext) {
-                      RefreshSessions.select(RefreshSessions.securityInvalidated).where { RefreshSessions.id eq sessionId }
-                        .singleOrNull()?.get(RefreshSessions.securityInvalidated) != false
-                    }
-                    if (invalidated) close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Sign in again"))
-                    return@collect
-                  }
-                  sendRealtimeUpdate(update)
+                // Compare BEFORE audience filtering, otherwise legitimate private events look like loss.
+                val nextSequence = update.sequence
+                val gap = realtimeSequenceHasGap(previousSequence, nextSequence)
+                if (nextSequence != null) previousSequence = nextSequence
+                val allowed = newSuspendedTransaction(aitaServerIoContext) {
+                  if (!realtimeSessionStillValidInsideTransaction(userId, sessionId)) null
+                  else realtimeAudienceAllowsInsideTransaction(userId, update)
                 }
+                if (allowed == null) {
+                  close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Sign in again"))
+                  return@collect
+                }
+                if (gap) sendRealtimeUpdate(RealtimeUpdateDataModel(id = UUID.randomUUID().toString(),
+                  entity = "all", reason = "connection_sync", createdAtMillis = System.currentTimeMillis()))
+                if (allowed) sendRealtimeUpdate(update) // Includes every session of the mutating account.
               } catch (throwable: Throwable) {
-                  if (throwable is kotlinx.coroutines.CancellationException) throw throwable
-                if (throwable.isExpectedRealtimeDisconnect()) {
-                  call.application.environment.log.debug(
-                    "Realtime WebSocket send stopped after normal disconnect: ${throwable.message ?: throwable::class.simpleName}"
-                  )
-                  cancel("Realtime client disconnected", throwable)
-                } else {
-                  throw throwable
-                }
+                if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+                if (throwable.isExpectedRealtimeDisconnect()) cancel("Realtime client disconnected", throwable)
+                else throw throwable
               }
             }
           }
@@ -18189,6 +18160,13 @@ fun Application.module() {
                   heartbeat = launch {
                     while (isActive) {
                       delay(30_000L)
+                      val sessionValid = newSuspendedTransaction(aitaServerIoContext) {
+                        realtimeSessionStillValidInsideTransaction(userId, sessionId)
+                      }
+                      if (!sessionValid) {
+                        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Sign in again"))
+                        break
+                      }
                       sendRealtimeUpdate(RealtimeUpdateDataModel(type = "heartbeat", entity = "connection",
                         createdAtMillis = System.currentTimeMillis()))
                     }
@@ -19062,6 +19040,7 @@ fun Application.module() {
 
           RealtimeServerBus.publish(
             entity = "notifications",
+            userId = userId.toString(),
             storeId = saved.storeId,
             reason = operationId?.let { "operation_notification" } ?: "notification"
           )
@@ -19099,7 +19078,7 @@ fun Application.module() {
               .map { it.toNotificationDataModel() }
           }
 
-          RealtimeServerBus.publish(entity = "notifications", reason = "notification_read")
+          RealtimeServerBus.publish(entity = "notifications", userId = userId.toString(), reason = "notification_read")
           call.genericResponse(HttpStatusCode.OK, updated)
         }
       }
@@ -23070,6 +23049,7 @@ fun Application.module() {
               reason = "supplier_order_received",
               mutationId = it.order.id
             )
+            publishStockRealtimeBundle(it.order.storeId, "supplier_order_received")
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
@@ -23206,97 +23186,80 @@ fun Application.module() {
     route("/subscriptions") {
       authenticate("auth-jwt") {
         get("/plans") {
-          call.genericListResponse(
-            status = HttpStatusCode.OK,
-            payload = defaultStoreSubscriptionPlans(),
-            message = eventMessage("message.subscription_plans_loaded")
-          )
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = call.headerUuid("store_id") ?: return@get call.genericListResponse(
+            status = HttpStatusCode.OK, payload = emptyList<StoreSubscriptionPlanDataModel>())
+          val plans = newSuspendedTransaction(aitaServerIoContext) {
+            val repository = subscriptionRepositoryInsideTransaction()
+            val location = repository.lockLocation(storeId) ?: return@newSuspendedTransaction null
+            if (!userHasStoreAccessInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
+            repository.plans(location.region)
+          } ?: return@get call.genericResponseNoPayload(HttpStatusCode.Forbidden, eventMessage("subscription.required"))
+          call.genericListResponse(HttpStatusCode.OK, plans)
         }
 
         get("/store/get") {
           val userId = call.checkPrincipal() ?: return@get
           val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
           val dashboard = newSuspendedTransaction(aitaServerIoContext) {
-            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false) && !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUBSCRIPTION_MANAGE, requireWorkshift = false)) return@newSuspendedTransaction null
-            subscriptionDashboardInsideTransaction(storeId)
+            val repository = subscriptionRepositoryInsideTransaction()
+            val location = repository.lockLocation(storeId) ?: return@newSuspendedTransaction null
+            if (!userHasStoreAccessInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
+            repository.dashboard(location, subscriptionCanManageInsideTransaction(userId, storeId), System.currentTimeMillis())
+          } ?: return@get call.genericResponseNoPayload(HttpStatusCode.Forbidden, eventMessage("subscription.required"))
+          call.genericResponse(HttpStatusCode.OK, dashboard)
+        }
+
+        get("/store/command") {
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = call.headerUuid("store_id") ?: return@get call.respondAitaUnauthorized()
+          val command = subscriptionCommandUuid(call.request.queryParameters["commandId"].orEmpty())
+          val dashboard = newSuspendedTransaction(aitaServerIoContext) {
+            val repository = subscriptionRepositoryInsideTransaction()
+            val location = repository.lockLocation(storeId) ?: return@newSuspendedTransaction null
+            if (!subscriptionCanManageInsideTransaction(userId, storeId) || !repository.commandRecorded(storeId, userId, command))
+              return@newSuspendedTransaction null
+            repository.dashboard(location, canManage = true, now = System.currentTimeMillis())
           }
-          dashboard?.let {
-            call.genericResponse(
-              status = HttpStatusCode.OK,
-              payload = it,
-              message = eventMessage("message.store_subscription_loaded")
-            )
-          } ?: call.respondAitaUnauthorized()
+          if (dashboard == null) call.genericResponseNoPayload(HttpStatusCode.NotFound, eventMessage("subscription.result_unknown"))
+          else call.genericResponse(HttpStatusCode.OK, dashboard)
+        }
+
+        post("/store/quote") {
+          val userId = call.checkPrincipal() ?: return@post
+          if (!SubscriptionAttemptLimiter.allow(userId, mutation = false))
+            throw SubscriptionFailure("subscription.rate_limited", 429)
+          val body = call.receiveAita<StoreSubscriptionQuoteRequestDataModel>()
+          val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+            ?: throw SubscriptionFailure("subscription.command_invalid", 400)
+          val quote = newSuspendedTransaction(aitaServerIoContext) {
+            val repository = subscriptionRepositoryInsideTransaction()
+            val location = repository.lockLocation(storeId) ?: return@newSuspendedTransaction null
+            if (!subscriptionCanManageInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
+            repository.quote(location, body, System.currentTimeMillis())
+          } ?: return@post call.genericResponseNoPayload(HttpStatusCode.Forbidden, eventMessage("subscription.required"))
+          call.genericResponse(HttpStatusCode.OK, quote)
         }
 
         post("/store/update") {
           val userId = call.checkPrincipal() ?: return@post
+          if (!SubscriptionAttemptLimiter.allow(userId, mutation = true))
+            throw SubscriptionFailure("subscription.rate_limited", 429)
           val body = call.receiveAita<StoreSubscriptionUpdateRequestDataModel>()
           val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
-            ?: return@post call.respondAitaUnauthorized()
-
-          val dashboard = newSuspendedTransaction(aitaServerIoContext) {
-            val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
-            if (!isStoreOwnerInsideTransaction(userId, rootStoreId) && !userCanUseStoreActionInsideTransaction(userId, rootStoreId, STORE_PERMISSION_SUBSCRIPTION_MANAGE, requireWorkshift = false)) return@newSuspendedTransaction null
-            val plan = defaultStoreSubscriptionPlans().firstOrNull { it.id == body.planId && it.isActive }
-              ?: return@newSuspendedTransaction null
-            val subscription = ensureStoreSubscriptionInsideTransaction(rootStoreId) ?: return@newSuspendedTransaction null
+            ?: throw SubscriptionFailure("subscription.command_invalid", 400)
+          val result = newSuspendedTransaction(aitaServerIoContext) {
+            val repository = subscriptionRepositoryInsideTransaction()
+            val location = repository.lockLocation(storeId) ?: return@newSuspendedTransaction null
+            if (!subscriptionCanManageInsideTransaction(userId, storeId)) return@newSuspendedTransaction null
             val now = System.currentTimeMillis()
-            val periodStart = now
-            val periodEnd = nextPeriodEndMillis(periodStart, plan)
-
-            if (body.activateNow) {
-              val ledger = addWalletLedgerInsideTransaction(
-                userId = userId,
-                type = WALLET_LEDGER_SUBSCRIPTION_CHARGE,
-                amountMinor = -plan.priceMinor,
-                referenceType = "store_subscription",
-                referenceId = subscription.id,
-                note = "${plan.id} activation"
-              ) ?: return@newSuspendedTransaction null
-
-              StoreSubscriptionChargeEvents.insert {
-                it[StoreSubscriptionChargeEvents.id] = UUID.randomUUID()
-                it[StoreSubscriptionChargeEvents.storeId] = rootStoreId
-                it[StoreSubscriptionChargeEvents.userId] = userId
-                it[StoreSubscriptionChargeEvents.planId] = plan.id
-                it[StoreSubscriptionChargeEvents.amountMinor] = plan.priceMinor
-                it[StoreSubscriptionChargeEvents.currencyCode] = plan.currencyCode
-                it[StoreSubscriptionChargeEvents.periodStartMillis] = periodStart
-                it[StoreSubscriptionChargeEvents.periodEndMillis] = periodEnd
-                it[StoreSubscriptionChargeEvents.status] = "paid"
-                it[StoreSubscriptionChargeEvents.walletLedgerEntryId] = ledger.id
-                it[StoreSubscriptionChargeEvents.createdAtMillis] = now
-                it[StoreSubscriptionChargeEvents.note] = "Initial subscription activation"
-              }
-            }
-
-            StoreSubscriptionStates.update({ StoreSubscriptionStates.id eq UUID.fromString(subscription.id) }) {
-              it[StoreSubscriptionStates.planId] = plan.id
-              it[StoreSubscriptionStates.status] = SUBSCRIPTION_STATUS_ACTIVE
-              it[StoreSubscriptionStates.autoRenew] = body.autoRenew
-              it[StoreSubscriptionStates.startedAtMillis] = subscription.startedAtMillis ?: now
-              it[StoreSubscriptionStates.currentPeriodStartMillis] = periodStart
-              it[StoreSubscriptionStates.currentPeriodEndMillis] = periodEnd
-              it[StoreSubscriptionStates.nextChargeAtMillis] = periodEnd
-              it[StoreSubscriptionStates.cancelledAtMillis] = null
-              it[StoreSubscriptionStates.pastDueSinceMillis] = null
-              it[StoreSubscriptionStates.updatedAtMillis] = now
-            }
-
-            subscriptionDashboardInsideTransaction(rootStoreId)
-          }
-
-          dashboard?.let {
-            call.genericResponse(
-              status = HttpStatusCode.OK,
-              payload = it,
-              message = eventMessage("message.subscription_updated")
-            )
-          } ?: call.genericResponseNoPayload(
-            HttpStatusCode.BadRequest,
-            eventMessage("message.cannot_update_subscription_check_balance_and_permissions")
-          )
+            repository.update(location, userId, body, now)
+            repository.dashboard(location, canManage = true, now = now) to location.ownerId
+          } ?: return@post call.genericResponseNoPayload(HttpStatusCode.Forbidden, eventMessage("subscription.required"))
+          // Publish only after transaction commit; the subscriber may fetch immediately.
+          RealtimeServerBus.publish(entity = "subscriptions", storeId = storeId.toString(), reason = "subscription_updated")
+          RealtimeServerBus.publish(entity = "finance", userId = result.second.toString(), reason = "subscription_updated")
+          call.genericResponse(HttpStatusCode.OK, result.first, eventMessage("subscription.updated"))
         }
       }
     }
@@ -24099,8 +24062,7 @@ fun Application.module() {
           val result = newSuspendedTransaction(aitaServerIoContext) {
             val requestStoreIds = storeGroupIdsInsideTransaction(rootStoreIdForAccessInsideTransaction(storeId))
               .filter { candidateStoreId ->
-                isStoreOwnerInsideTransaction(userId, candidateStoreId) ||
-                   userCanUseStoreActionInsideTransaction(userId, candidateStoreId, STORE_PERMISSION_WORKERS_DECIDE_REQUESTS, requireWorkshift = false)
+                userCanUseStoreActionInsideTransaction(userId, candidateStoreId, STORE_PERMISSION_WORKERS_DECIDE_REQUESTS, requireWorkshift = false)
               }
               .distinct()
 
@@ -25611,6 +25573,7 @@ fun Application.module() {
             }
 
           } catch (throwable: Throwable) {
+            if (throwable is SubscriptionFailure) throw throwable
             call.safeGenericResponseNoPayload(
               status = HttpStatusCode.Conflict,
               message = eventMessage("message.could_not_complete_transaction_please_refresh_stock_and_try_again"),

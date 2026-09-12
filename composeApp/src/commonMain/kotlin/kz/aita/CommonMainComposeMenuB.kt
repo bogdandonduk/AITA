@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
@@ -2261,12 +2260,7 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
 )
 
 internal fun appModeIsAvailableInCurrentRelease(optionModeId: Int, currentModeId: Int): Boolean =
-    optionModeId in setOf(
-        APP_MODE_STORE,
-        APP_MODE_BUYER,
-        APP_MODE_SUPPLIER,
-        APP_MODE_MANUFACTURER
-    )
+    optionModeId in setOf(APP_MODE_STORE, APP_MODE_SUPPLIER)
 
 internal fun AppConfiguration.availableAppModeOptions(currentModeId: Int): List<AppModeOptionUiModel> =
     appModeOptions().filter { option -> appModeIsAvailableInCurrentRelease(option.modeId, currentModeId) }
@@ -4966,6 +4960,12 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
             }
         )
 
+        val editedLocationHasAccess = rememberStoreSubscriptionAccess(editedStore?.id)
+        if (editedStore != null && !editedLocationHasAccess) {
+            SubscriptionRequiredPane(Modifier.weight(1f))
+            return@Column
+        }
+
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditStore),
             modifier = Modifier
@@ -5471,9 +5471,8 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
                 label = "cloudConnectionRefreshState"
             ) { refreshing ->
                 if (refreshing) {
-                    CircularProgressIndicator(
+                    AitaBusyIndicator(
                         modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
                         color = stateValues.AccentTextColor
                     )
                 } else {
@@ -5666,6 +5665,7 @@ internal fun List<NotificationDataModel>.compactForPopupDisplay(): List<Notifica
 
 @Composable
 fun AppConfiguration.MainScreen() {
+    val subscriptionAccess = rememberStoreSubscriptionAccess()
     val showNavigationBar = stateValues.navigationScreensMain.last().run {
         this !is NavigationScreenModel.Splash && this !is NavigationScreenModel.UserAuth
     }
@@ -5681,11 +5681,11 @@ fun AppConfiguration.MainScreen() {
     val activeWorkshiftForGate by activeWorkshiftState.payload.collectAsState()
     val myMembershipsForGate by myWorkerMembershipsState.payload.collectAsState()
 
-    LaunchedEffect(stateValues.activeStoreId, stateValues.userAccount?.id, myMembershipsForGate?.size, activeWorkshiftForGate?.id) {
+    LaunchedEffect(stateValues.activeStoreId, stateValues.userAccount?.id, stateValues.appModeId, subscriptionAccess, myMembershipsForGate?.size, activeWorkshiftForGate?.id) {
         val storeId = stateValues.activeStoreId
         if (stateValues.userAccount != null && !storeId.isNullOrBlank()) {
             getMyWorkerMemberships()
-            getCurrentWorkshift(storeId)
+            if (stateValues.appModeId == APP_MODE_STORE && subscriptionAccess) getCurrentWorkshift(storeId)
         }
     }
 
@@ -5776,7 +5776,10 @@ fun AppConfiguration.MainScreen() {
                 // Route-only identity: preferences and refreshed data never recreate this tree.
                 // Do not keep an outgoing live transaction/auth/supplier owner for animation.
                 key(mainDestination.route) {
-                    when (mainDestination) {
+                    if (stateValues.appModeId == APP_MODE_STORE && !subscriptionAccess &&
+                        (mainDestination is NavigationScreenModel.Stock || mainDestination is NavigationScreenModel.Transaction)) {
+                        SubscriptionRequiredPane()
+                    } else when (mainDestination) {
                         is NavigationScreenModel.Splash -> SplashScreen()
                         is NavigationScreenModel.UserAuth -> UserAuthScreen()
                         is NavigationScreenModel.Notifications -> NotificationsScreen()
@@ -5791,7 +5794,7 @@ fun AppConfiguration.MainScreen() {
 
             val blockingWorkshiftGate = shouldBlockAppForWorkshift() &&
                 stateValues.navigationScreensMain.last() is NavigationScreenModel.Transaction
-            if (blockingWorkshiftGate || workshiftStartDialogVisible) {
+            if (subscriptionAccess && stateValues.appModeId == APP_MODE_STORE && (blockingWorkshiftGate || workshiftStartDialogVisible)) {
                 WorkshiftGateOverlay(blockingTransactionScreen = blockingWorkshiftGate)
             }
 

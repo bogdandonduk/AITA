@@ -163,7 +163,8 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
                         if (!authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != owner) return@launch
                         val result = withTimeoutOrNull(30_000L) { AitaAdvancedAuthenticationClient.updateLoginPolicy(request) }
                         if (authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id == owner) {
-                            if (result != null && !result.negative && result.payload != null) onUpdated(result.payload)
+                            val updatedSettings = result?.payload
+                            if (result != null && !result.negative && updatedSettings != null) onUpdated(updatedSettings)
                             else error = result?.let { authResponseText(it) } ?: authUiText("Refresh settings before retrying", "Обновите настройки перед повтором", "Қайталаудан бұрын баптауларды жаңартыңыз")
                         }
                     } catch (cancel: CancellationException) { throw cancel }

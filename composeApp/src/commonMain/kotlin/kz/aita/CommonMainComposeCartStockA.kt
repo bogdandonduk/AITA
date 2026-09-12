@@ -849,7 +849,7 @@ fun AppConfiguration.TransactionCartScreen() {
             },
             trailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
                 add(
-                    Triple(stateValues.drawablePathIconStock, stateValues.drawableResIconStock.value) {
+                    Triple(stockAddIconPath(), stockAddIconFallback()) {
                         openQuickStockAddSheet(
                             transactionTypeIndex = context.transactionTypeIndex,
                             clientId = context.clientId
@@ -5207,7 +5207,7 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
 
     AitaBottomSheet(
         title = localizedStringResource(636, "Quick add item"),
-        iconPath = stateValues.drawablePathIconAdd,
+        iconPath = stockAddIconPath(),
         onDismiss = onDismiss
     ) {
         Column(

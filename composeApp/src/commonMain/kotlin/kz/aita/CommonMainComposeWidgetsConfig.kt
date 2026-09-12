@@ -374,6 +374,8 @@ internal fun localDrawableResourceForPath(
         "136_1" -> Res.drawable._136_1
         "137_0" -> Res.drawable._137_0
         "137_1" -> Res.drawable._137_1
+        "138_0" -> Res.drawable._138_0
+        "138_1" -> Res.drawable._138_1
         else -> fallbackRes
     }
 }
@@ -971,7 +973,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                         text = itemName,
                         fontSize = stateValues.titleTextSize,
                         fontWeight = FontWeight.Bold,
-                        color = textColor,
+                        color = changedValueColor(goodsItem.name, "${stateValues.userAccount?.id}:${stateValues.activeStoreId}:${goodsItem.id}:name:$language", textColor),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1258,7 +1260,15 @@ internal fun AppConfiguration.StockCardInfoLine(
     textColor: Color
 ) {
     if (value.isBlank()) return
-
+    if (value == localizedStringResource(1141, "Please wait…")) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("$title:", color = textColor, fontSize = stateValues.textSize)
+            LoadingSkeleton(Modifier.weight(1f), rows = 1, compact = true)
+        }
+        return
+    }
+    val displayedColor = changedValueColor(value,
+        "${stateValues.userAccount?.id}:${stateValues.activeStoreId}:${stateValues.appLanguage}:$title", textColor)
     Text(
         text = buildAnnotatedString {
             append("$title: ")
@@ -1267,7 +1277,7 @@ internal fun AppConfiguration.StockCardInfoLine(
             }
         },
         fontSize = stateValues.textSize,
-        color = textColor,
+        color = displayedColor,
         fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
         style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
         maxLines = 2,
@@ -5881,7 +5891,7 @@ fun AppConfiguration.actionButton(
     val effectiveLoading = loading || autoLoadingActive
     val originalTextPresent = text.isNotEmpty() && text.isNotBlank()
     val genericLoadingText = localizedStringResource(1141, "Please wait…")
-    val displayedText = if (effectiveLoading && originalTextPresent) loadingText ?: genericLoadingText else if (effectiveLoading) "" else text
+    val displayedText = if (effectiveLoading && originalTextPresent) loadingText?.takeUnless { it == genericLoadingText } ?: text else text
     val visuallyEnabled = isEnabled && !effectiveLoading
 
     val backgroundColor by animateColorAsState(
@@ -6011,10 +6021,9 @@ fun AppConfiguration.actionButton(
                 label = "actionButtonIconState"
             ) { showLoading ->
                 if (showLoading) {
-                    CircularProgressIndicator(
+                    AitaBusyIndicator(
                         modifier = Modifier.size(iconSize),
                         color = textColor,
-                        strokeWidth = 2.dp
                     )
                 } else {
                     icon?.invoke() ?: inferredIconPath?.run {
