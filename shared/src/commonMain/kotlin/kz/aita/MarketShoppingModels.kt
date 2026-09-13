@@ -77,7 +77,8 @@ data class MarketShoppingCommand(
     val units: Int,
     val basis: MarketShoppingBasis? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val replaceOfferId: String? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER) val reviewedSubtotalMinor: Long? = null
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val reviewedSubtotalMinor: Long? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val basketChange: MarketBasketChange? = null
 )
 
 @Serializable
@@ -157,6 +158,10 @@ fun MarketShoppingSnapshot.shoppingGroups(): List<MarketShoppingGroup> = lines
 
 /** One shape check shared by the journal, UI and server. UUID parsing stays at the server boundary. */
 fun MarketShoppingCommand.isValidMarketShoppingCommand(): Boolean {
+    val basket = basketChange
+    if (basket != null) return marketDiscoveryId(commandId) == commandId && expectedRevision >= 0L &&
+        expectedRevision < Long.MAX_VALUE && offerId.isEmpty() && units == 0 && basis == null &&
+        replaceOfferId == null && reviewedSubtotalMinor == null && basket.isValidBasketChange()
     if (commandId.isBlank() || offerId.isBlank() || expectedRevision < 0L || units !in 0..MARKET_SHOPPING_MAX_UNITS) return false
     if (units == 0) return basis == null && replaceOfferId == null && reviewedSubtotalMinor == null
     if (basis?.isValidMarketBasis() != true) return false

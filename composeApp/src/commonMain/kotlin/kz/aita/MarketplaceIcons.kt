@@ -10,6 +10,7 @@ internal fun AppConfiguration.marketIconPath(id: Int): String {
 internal fun AppConfiguration.marketIconFallback(id: Int): DrawableResource {
     val dark = normalizeAppThemePreference(stateValues.appThemeId) == 1L
     return when(id) {
+        18 -> if(dark) Res.drawable._18_1 else Res.drawable._18_0
         140 -> if(dark) Res.drawable._140_1 else Res.drawable._140_0
         141 -> if(dark) Res.drawable._141_1 else Res.drawable._141_0
         142 -> if(dark) Res.drawable._142_1 else Res.drawable._142_0

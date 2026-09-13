@@ -19,6 +19,10 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         private set
     var changing by mutableStateOf(false)
         private set
+    var checking by mutableStateOf(false)
+        private set
+    var notice by mutableStateOf<List<LocalizedStringDataModel>?>(null)
+        private set
     var fresh by mutableStateOf(false)
         private set
     var error by mutableStateOf<List<LocalizedStringDataModel>?>(null)
@@ -32,7 +36,7 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
     private var reviewNotice = false
     var active = true
     val refreshRequests = Channel<Unit>(Channel.CONFLATED)
-    val canChange: Boolean get() = active && owner?.isCurrent() == true && snapshot != null && pending == null && !changing
+    val canChange: Boolean get() = active && owner?.isCurrent() == true && snapshot != null && pending == null && !changing && !checking
 
     private fun accept(result: MarketShoppingClientResult) {
         if (!active || owner?.isCurrent() != true) return
@@ -52,6 +56,8 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
             pending = result.pending
         } else if (result.pending != null) pending = result.pending
         if (result.error != null || !reviewNotice) error = result.error
+        if (result.notice != null) notice = result.notice
+        if (pending == null || result.error != null) notice = null
         fresh = result.fresh
     }
     suspend fun run() {
@@ -78,10 +84,17 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         val command = selection.reviewedReplacement(current, candidate, newClientSideUuidString()) ?: return null
         return if (send(command)) command.commandId else null
     }
+    fun applyBasket(command: MarketShoppingCommand): Boolean {
+        val current = snapshot ?: return false
+        val basket = command.basketChange ?: return false
+        if (basket.basketIntentError(current, command.expectedRevision) != null) return false
+        return send(command)
+    }
     private fun send(command: MarketShoppingCommand): Boolean {
         val owned = owner ?: return false
         if (!canChange || !command.isValidMarketShoppingCommand()) return false
         changing = true
+        notice = null
         scope.launch {
             try { accept(MarketShoppingDelivery.change(owned, command)) }
             catch (cancelled: CancellationException) { throw cancelled }
@@ -91,10 +104,23 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         }
         return true
     }
+    fun checkResult() {
+        val owned = owner ?: return
+        if (changing || checking || pending == null || !active || !owned.isCurrent()) return
+        checking = true
+        notice = null
+        scope.launch {
+            try { accept(MarketShoppingDelivery.checkResult(owned)) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { if (active && owned.isCurrent()) error = eventMessage("market.shopping_result_failed") }
+            finally { checking = false }
+        }
+    }
     fun retry() {
         val owned = owner ?: return
-        if (changing || !active) return
+        if (changing || checking || !active) return
         changing = true
+        notice = null
         scope.launch {
             try { accept(MarketShoppingDelivery.retry(owned)) }
             catch (cancelled: CancellationException) { throw cancelled }

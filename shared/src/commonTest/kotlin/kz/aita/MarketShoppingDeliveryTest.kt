@@ -16,7 +16,9 @@ class MarketShoppingDeliveryTest {
     }
     private val command = MarketShoppingCommand("command", 0, "offer", 1, MarketShoppingBasis(null, "KZT", "piece", 1.0))
     private fun snapshot(revision: Long = 1) = MarketShoppingSnapshot("buyer", revision, checkedAtMillis = revision + 1)
-    private fun outcome(request: MarketShoppingCommand = command) = MarketShoppingOutcome(request.commandId, true, 1, snapshot = snapshot())
+    private fun outcome(request: MarketShoppingCommand = command) = MarketShoppingOutcome(request.commandId, true, 1,
+        snapshot = snapshot().copy(lines = if (request.units == 0) emptyList() else listOf(MarketShoppingQuotedLine(
+            MarketShoppingLine(request.offerId, "shop", "Product", "Shop", request.units, requireNotNull(request.basis))))))
     private fun <T> ok(data: T) = ResponseDataModel(null, data, false, 200)
     private class Memory {
         val data = mutableMapOf<String, String?>()
@@ -184,4 +186,44 @@ class MarketShoppingDeliveryTest {
         assertFalse(changing.await().acknowledged)
         assertEquals(0, sends); assertNull(memory.journal())
     }
+    @Test fun apparentlySuccessfulButMissingQuantityCannotRetireTheJournal() = runTest {
+        for (lookup in listOf(false,true)) {
+            val memory = Memory(); val owner = Owner()
+            val store = MarketShoppingDeliveryStore(memory::get,memory::put,{ ok(snapshot()) },
+                { _, value -> if (lookup) ResponseDataModel(null,null,true,503)
+                    else ok(outcome(value).copy(snapshot = snapshot())) },
+                lookupRemote = { _, value -> ok(MarketShoppingCommandLookup(value.commandId,100,
+                    outcome(value).copy(snapshot = snapshot()))) })
+            val result = store.change(owner,command)
+            assertFalse(result.acknowledged); assertNotNull(memory.journal()?.pending)
+            if (lookup) { assertFalse(store.checkResult(owner).acknowledged); assertNotNull(memory.journal()?.pending) }
+        }
+    }
+    @Test fun cacheReadFinishingAfterAnAccountSwitchDoesNotPublishTheOldJournal() = runTest {
+        val memory = Memory(); val owner = Owner()
+        memory.data["buyer-shopping-journal-v1:buyer"] = jsonBase.encodeToString(MarketShoppingJournal("buyer",snapshot()))
+        val store = MarketShoppingDeliveryStore({ key -> owner.current = false; memory.get(key) },memory::put,
+            { ok(snapshot()) },{ _, value -> ok(outcome(value)) })
+        val result = store.cached(owner)
+        assertNull(result.snapshot); assertNull(result.pending)
+        assertEquals("buyer",memory.journal()?.accountId)
+    }
+    @Test fun acknowledgedWriteBelongsToOriginalAccountButCannotPublishAfterSwitch() = runTest {
+        val memory = Memory(); val owner = Owner(); var signals = 0
+        val store = MarketShoppingDeliveryStore(memory::get, { key,value ->
+            memory.put(key,value)
+            if (memory.journal()?.pending == null) owner.current = false
+        }, { ok(snapshot()) },{ _, value -> ok(outcome(value)) },{ signals++ })
+        val result = store.change(owner,command)
+        assertNull(result.snapshot); assertFalse(result.acknowledged); assertEquals(0,signals)
+        assertNull(memory.journal()?.pending); assertEquals(1L,memory.journal()?.snapshot?.revision)
+    }
+    @Test fun refreshWriteCannotReturnPreviousAccountsSnapshotAfterSwitch() = runTest {
+        val memory = Memory(); val owner = Owner()
+        val store = MarketShoppingDeliveryStore(memory::get,{ key,value -> memory.put(key,value); owner.current = false },
+            { ok(snapshot()) },{ _, value -> ok(outcome(value)) })
+        assertNull(store.refresh(owner).snapshot)
+        assertEquals("buyer",memory.journal()?.snapshot?.userId)
+    }
+
 }

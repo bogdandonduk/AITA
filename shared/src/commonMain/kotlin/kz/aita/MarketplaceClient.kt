@@ -86,3 +86,44 @@ suspend fun loadMarketComparison(scope: MarketRequestScope, request: MarketCompa
     return networkRequest(HttpMethod.Post, endpointUrl = "market/compare", body = request,
         expectedSessionGeneration = scope.generation)
 }
+
+/** A separate endpoint cannot be mistaken by an older server for a legacy unfiltered browse. */
+suspend fun loadMarketDiscovery(scope: MarketRequestScope, request: MarketDiscoveryRequest): ResponseDataModel<MarketDiscoveryResult> {
+    if (!scope.isCurrent()) return cloudSessionExpiredResponse()
+    if (!request.isValidDiscoveryRequest()) return ResponseDataModel(eventMessage("market.discovery_invalid"), null, true, 400)
+    val response = networkRequest<MarketDiscoveryResult, MarketDiscoveryRequest>(HttpMethod.Post, endpointUrl = "market/discovery",
+        body = request.copy(query = requireNotNull(request.query.normalizedDiscoveryQuery())), expectedSessionGeneration = scope.generation)
+    return if (response.httpStatusCode == 404) response.copy(message = eventMessage("market.discovery_upgrade"), payload = null, negative = true) else response
+}
+
+/** Read-only endpoint: never downgrade to an older command or unfiltered offer route. */
+suspend fun loadMarketBasketPlan(scope: MarketRequestScope, request: MarketBasketRequest): ResponseDataModel<MarketBasketResult> =
+    readOwnedMarketBasket(scope, request) { normalized ->
+        networkRequest<MarketBasketResult, MarketBasketRequest>(HttpMethod.Post, endpointUrl = "market/shopping-list/plan",
+            body = normalized, expectedSessionGeneration = scope.generation)
+    }
+
+suspend fun loadMarketShoppingActivity(owner: MarketAccountScope, request: MarketShoppingActivityRequest) =
+    readOwnedShoppingActivity(owner, request) {
+        networkRequest<MarketShoppingActivityPage, MarketShoppingActivityRequest>(io.ktor.http.HttpMethod.Post,
+            endpointUrl = "market/shopping-list/activity", body = it, expectedSessionGeneration = owner.generation)
+    }
+
+suspend fun loadMarketShoppingActivitySearch(owner: MarketAccountScope, request: MarketShoppingActivitySearchRequest) =
+    readOwnedShoppingActivitySearch(owner, request) {
+        networkRequest<MarketShoppingActivitySearchPage, MarketShoppingActivitySearchRequest>(io.ktor.http.HttpMethod.Post,
+            endpointUrl = "market/shopping-list/activity/search", body = it, expectedSessionGeneration = owner.generation)
+    }
+
+suspend fun loadMarketShoppingActivityDetail(owner: MarketAccountScope, summary: MarketShoppingActivityEntry) =
+    readOwnedShoppingActivityDetail(owner, summary) {
+        networkRequest<MarketShoppingActivityEntry, Unit>(io.ktor.http.HttpMethod.Get,
+            endpointUrl = "market/shopping-list/activity/$it", expectedSessionGeneration = owner.generation)
+    }
+
+/** Read-only endpoint: never downgrade to an older command or unfiltered offer route. */
+suspend fun loadMarketBasketPlan(scope: MarketRequestScope, request: MarketBasketRequest): ResponseDataModel<MarketBasketResult> =
+    readOwnedMarketBasket(scope, request) { normalized ->
+        networkRequest<MarketBasketResult, MarketBasketRequest>(HttpMethod.Post, endpointUrl = "market/shopping-list/plan",
+            body = normalized, expectedSessionGeneration = scope.generation)
+    }

@@ -8,6 +8,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.sql.Connection
 import java.sql.ResultSet
+import java.sql.SQLException
 import java.util.UUID
 
 internal class MarketFailure(val key: String, val status: Int) : RuntimeException(key)
@@ -19,9 +20,28 @@ internal fun marketUuid(value: String): UUID = runCatching { UUID.fromString(val
 internal class MarketplaceRepository(private val db: Connection,
     private val ownsStore: (UUID, UUID) -> Boolean) {
     init { check(!db.autoCommit) }
+    private var basketReadStartedNanos: Long? = null
+
+    /** Per-request wall budget, not just a per-statement timeout multiplied by every batch. */
+    fun <T> withBasketReadBudget(work: () -> T): T {
+        check(basketReadStartedNanos == null)
+        basketReadStartedNanos = System.nanoTime()
+        try { return work() }
+        catch (failure: SQLException) {
+            if (failure.sqlState == "57014") marketFail("market.basket_busy", 503)
+            throw failure
+        } finally { basketReadStartedNanos = null }
+    }
+    private fun basketQueryTimeoutSeconds(): Int? {
+        val started = basketReadStartedNanos ?: return null
+        val remaining = 8_000_000_000L - (System.nanoTime() - started)
+        if (remaining <= 0L) marketFail("market.basket_busy", 503)
+        return ((remaining + 999_999_999L) / 1_000_000_000L).toInt().coerceIn(1, 5)
+    }
 
     private fun <T> query(sql: String, vararg args: Any?, map: (ResultSet) -> T): List<T> =
         db.prepareStatement(sql).use { statement ->
+            basketQueryTimeoutSeconds()?.let { statement.queryTimeout = it }
             args.forEachIndexed { i, value -> statement.setObject(i + 1, value) }
             statement.executeQuery().use { rows -> buildList { while (rows.next()) add(map(rows)) } }
         }
@@ -152,6 +172,75 @@ internal class MarketplaceRepository(private val db: Connection,
         val page = rows.take(40)
         return MarketPage(project(user, page, now), if (rows.size > 40) page.last().listing.id else null, now)
     }
+    /** Complete filtered window and counts from the SAME repeatable-read transaction. The legacy
+     * browse route remains compatible; new clients never fall back to unfiltered legacy results. */
+    fun discover(user: UUID, request: MarketDiscoveryRequest): MarketDiscoveryResult {
+        if (!request.isValidDiscoveryRequest()) marketFail("market.discovery_invalid")
+        val input = request.query.normalizedDiscoveryQuery() ?: marketFail("market.discovery_invalid")
+        val catalogue = discoveryCategories()
+        val tree = MarketCategoryTree(catalogue.categories)
+        val descendants = input.categoryId?.let { category ->
+            tree.subtreeIds(category).takeIf { it.isNotEmpty() } ?: marketFail("market.category_changed", 409)
+        }
+        val now = System.currentTimeMillis()
+        val conditions = mutableListOf(publicPredicate)
+        val args = mutableListOf<Any?>(now, now)
+        // Terms are ANDed across public title/description. SQL wildcard characters are literal;
+        // no private item name, note, purchase cost or supplier field participates in discovery.
+        if (input.text.isNotEmpty()) {
+            val barcode = marketCanonicalGtin(input.text)
+            if (barcode != null) { conditions += "l.gtin=?"; args += barcode }
+            else input.text.split(' ').distinct().forEach { term ->
+                conditions += "(strpos(lower(l.title),lower(?))>0 OR strpos(lower(l.description),lower(?))>0)"
+                args += term; args += term
+            }
+        }
+        if (input.city.isNotEmpty()) { conditions += "lower(f.city)=lower(?)"; args += input.city }
+        input.storefrontId?.let { conditions += "l.store_id=?"; args += marketUuid(it) }
+        if (descendants != null) {
+            // pgJDBC escapes a literal question mark as ??. The server receives the indexable
+            // JSONB ?| operator, not a second bind parameter or a string-concatenated SQL fragment.
+            conditions += "(i.category_ids::jsonb ??| ?::text[])"
+            args += descendants.joinToString(",", "{", "}") // UUID-only IDs, passed as ONE bound value.
+        }
+        val joins = publicJoins + if (input.savedOnly) " JOIN buyer_saved_offers b ON b.listing_id=l.id" else ""
+        if (input.savedOnly) { conditions += "b.user_id=?"; args += user }
+        val where = conditions.joinToString(" AND ")
+        val counts = query("SELECT count(*),count(DISTINCT l.store_id) $joins WHERE $where", *args.toTypedArray()) {
+            it.getLong(1) to it.getLong(2)
+        }.single()
+        val ordering = when (input.sort) {
+            MARKET_DISCOVERY_TITLE -> "lower(l.title),l.id"
+            else -> if (input.savedOnly) "b.created_at_millis DESC,l.id" else "l.created_at_millis DESC,l.id"
+        }
+        val rows = candidates("SELECT l.* $joins WHERE $where ORDER BY $ordering LIMIT ?", args + request.limit)
+        val publicCategoryIds = tree.byId.keys
+        val offers = project(user, rows, now, publicCategoryIds = publicCategoryIds, selectedCategoryIds = descendants)
+        // Unavailable is global to this user's saved set, NOT the number excluded by their filters.
+        val unavailable = if (!input.savedOnly) 0 else query("""SELECT count(*) FROM buyer_saved_offers b
+            WHERE b.user_id=? AND NOT EXISTS(SELECT 1 $publicJoins WHERE $publicPredicate AND l.id=b.listing_id)""",
+            user, now, now) { it.getLong(1).coerceAtMost(Int.MAX_VALUE.toLong()).toInt() }.single()
+        return MarketDiscoveryResult(input, request.limit,
+            MarketPage(offers, rows.lastOrNull()?.listing?.id?.takeIf { counts.first > rows.size }, now, unavailable),
+            counts.first, counts.second, catalogue.version, catalogue.categories.takeUnless { request.knownCategoryVersion == catalogue.version })
+    }
+
+    private fun discoveryCategories(): MarketCategoryCatalogue {
+        val rows = query("SELECT id,name,type_ids FROM generic_goods_categories ORDER BY id LIMIT ${MARKET_CATEGORY_MAX_COUNT + 1}") { row ->
+            val names = jsonBase.decodeFromString<List<LocalizedStringDataModel>>(row.getString("name"))
+                .filter { it.language.isNotBlank() && it.value.isNotBlank() }.take(12)
+                .map { LocalizedStringDataModel(it.language.take(12), it.value.take(480)) }
+            val ancestors = jsonBase.decodeFromString<List<String>>(row.getString("type_ids"))
+                .mapNotNull(::marketDiscoveryId).distinct().takeLast(64)
+            MarketCategory(row.getString("id"), names, ancestors)
+        }
+        if (rows.size > MARKET_CATEGORY_MAX_COUNT) marketFail("market.categories_unavailable", 503)
+        val categories = rows.filter { it.name.isNotEmpty() }
+        val version = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(jsonBase.encodeToString(categories).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        return MarketCategoryCatalogue(version, categories)
+    }
+
     /** Dedicated same-product search, independent of the discovery grid's loaded window.
      * Candidate keyset is bounded before price projection; empty compatible pages can still continue.
      * Real stock/price changes are checked under this route's repeatable-read snapshot.
@@ -173,6 +262,49 @@ internal class MarketplaceRepository(private val db: Connection,
         val quotes = quoteShopping(user, listOf(reference) + compatible, now)
         return MarketComparisonPage(selection, quotes.first(), quotes.drop(1),
             if (candidates.size > MARKET_COMPARISON_PAGE_CANDIDATES) scanned.last().listing.id else null, now, place)
+    }
+
+    internal data class BasketCandidates(val choices: List<MarketBasketChoice>, val limitedSourceIds: List<String>, val checked: Int)
+
+    /** One bounded index-driven lateral scan per demand, then batch price reads. The original
+     * account list supplies all identities. A candidate can never borrow another user's intent.
+     * UUID order is intentionally not called price order; the cap is disclosed in the result.
+     */
+    fun basketCandidates(user: UUID, source: MarketShoppingSnapshot, city: String): BasketCandidates {
+        val fixed = source.basketFixedLines().map { it.offerId }.toSet()
+        val eligible = source.lines.map { it.line }.filter { it.offerId !in fixed }
+        if (eligible.isEmpty()) return BasketCandidates(emptyList(), emptyList(), 0)
+        val allIds = source.lines.map { marketUuid(it.line.offerId) }
+        val args = mutableListOf<Any?>()
+        eligible.forEach { args.add(marketUuid(it.offerId)); args.add(it.basis.gtin); args.add(marketUuid(it.storeId)) }
+        args.add(source.checkedAtMillis); args.add(source.checkedAtMillis)
+        args.addAll(allIds)
+        if (city.isNotEmpty()) args.add(city)
+        val sourceById = eligible.associateBy { it.offerId }
+        val rows = query("""SELECT w.source_offer_id,c.* FROM
+            (VALUES ${eligible.joinToString(",") { "(?::uuid,?::text,?::uuid)" }}) w(source_offer_id,gtin,source_store_id)
+            CROSS JOIN LATERAL (SELECT l.*,f.display_name AS shop_name $publicJoins
+                WHERE $publicPredicate AND l.gtin=w.gtin AND l.store_id<>w.source_store_id
+                AND l.id NOT IN (${allIds.joinToString(",") { "?" }})
+                ${if (city.isNotEmpty()) "AND lower(f.city)=lower(?)" else ""}
+                ORDER BY l.id LIMIT ${MARKET_BASKET_CANDIDATES_PER_LINE + 1}) c
+            ORDER BY w.source_offer_id,c.id""", *args.toTypedArray()) { row ->
+            val sourceId = row.getString("source_offer_id")
+            val line = sourceById.getValue(sourceId)
+            sourceId to line.copy(offerId = row.getString("id"), storeId = row.getString("store_id"),
+                title = row.getString("title"), shopName = row.getString("shop_name"), updatedAtMillis = row.getLong("updated_at_millis"))
+        }
+        val limited = rows.groupBy { it.first }.filterValues { it.size > MARKET_BASKET_CANDIDATES_PER_LINE }.keys.sorted()
+        val scanned = rows.groupBy { it.first }.values.flatMap { it.take(MARKET_BASKET_CANDIDATES_PER_LINE) }
+        // The same barcode can occur with different units/amounts. Group requested multiples so
+        // quoteShopping's offerId->quantity map cannot give one source another source's quantity.
+        val quotes = scanned.groupBy { it.second.units }.values.flatMap { sameUnits ->
+            sameUnits.chunked(MARKET_SHOPPING_MAX_LINES).flatMap { batch ->
+                val priced = quoteShopping(user, batch.map { it.second }, source.checkedAtMillis)
+                batch.zip(priced).map { (entry, quote) -> MarketBasketChoice(entry.first, quote) }
+            }
+        }
+        return BasketCandidates(quotes, limited, scanned.size)
     }
 
     /** Same public visibility predicate for details, list estimates and the browse page. */
@@ -310,7 +442,8 @@ internal class MarketplaceRepository(private val db: Connection,
                 updatedAtMillis=row.getLong("updated_at_millis"))
         }
     }
-    private fun project(user: UUID, candidates: List<Candidate>, now: Long, requestedUnits: Map<String, Int> = emptyMap()): List<MarketOffer> {
+    private fun project(user: UUID, candidates: List<Candidate>, now: Long, requestedUnits: Map<String, Int> = emptyMap(),
+        publicCategoryIds: Set<String>? = null, selectedCategoryIds: Set<String>? = null): List<MarketOffer> {
         if(candidates.isEmpty()) return emptyList()
         val itemIds=candidates.map { marketUuid(it.listing.goodsItemId) }.distinct()
         val storeIds=candidates.map { marketUuid(it.listing.storeId) }.distinct()
@@ -340,7 +473,8 @@ internal class MarketplaceRepository(private val db: Connection,
             // A later stock barcode change must not silently keep a stale comparison identity alive.
             val publicGtin = listing.gtin?.takeIf { it in item.standardBarcodeValues().mapNotNull(::marketCanonicalGtin) }
             MarketOffer(listing.id,shop,listing.title,listing.description,publicGtin,
-                categoryIds=item.categoryIds.take(16),priceMinor=minor,currencyCode=currency.takeIf { minor!=null },
+                categoryIds=item.categoryIds.filter { publicCategoryIds == null || it in publicCategoryIds }.distinct()
+                    .sortedBy { if (selectedCategoryIds == null || it in selectedCategoryIds) 0 else 1 }.take(16),priceMinor=minor,currencyCode=currency.takeIf { minor!=null },
                 pricedAmount=priced.takeIf { minor!=null },unitId=batch?.quantity?.id?.takeIf { minor!=null },
                 unitName=if(minor==null) emptyList() else batch?.quantity?.immutableUnitName.orEmpty().take(12)
                     .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) },

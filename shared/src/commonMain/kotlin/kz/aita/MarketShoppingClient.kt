@@ -18,7 +18,8 @@ data class MarketShoppingClientResult(
     val accepted: Boolean = false,
     val fresh: Boolean = false,
     val journalRevision: Long = -1L,
-    val acknowledgedCommandId: String? = null
+    val acknowledgedCommandId: String? = null,
+    val notice: List<LocalizedStringDataModel>? = null
 )
 
 /** Injectable journal/transport boundary: the production instance below owns the one writer.
@@ -29,7 +30,10 @@ class MarketShoppingDeliveryStore(
     private val writeValue: suspend (String, String?) -> Unit,
     private val loadRemote: suspend (MarketAccountScope) -> ResponseDataModel<MarketShoppingSnapshot>,
     private val sendRemote: suspend (MarketAccountScope, MarketShoppingCommand) -> ResponseDataModel<MarketShoppingOutcome>,
-    private val onChanged: () -> Unit = {}
+    private val onChanged: () -> Unit = {},
+    private val lookupRemote: suspend (MarketAccountScope, MarketShoppingCommand) -> ResponseDataModel<MarketShoppingCommandLookup> = { _, _ ->
+        ResponseDataModel(eventMessage("market.shopping_result_upgrade"), null, true, 404)
+    }
 ) {
     private val sender = Mutex()
     private val writer = Mutex()
@@ -55,9 +59,12 @@ class MarketShoppingDeliveryStore(
 
     suspend fun cached(scope: MarketAccountScope): MarketShoppingClientResult = writer.withLock {
         if (!scope.isCurrent()) return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_denied"))
-        try { result(read(scope.accountId)) }
+        try {
+            val journal = read(scope.accountId)
+            if (scope.isCurrent()) result(journal) else MarketShoppingClientResult()
+        }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { MarketShoppingClientResult(error = eventMessage("market.shopping_storage")) }
+        catch (_: Exception) { if (scope.isCurrent()) MarketShoppingClientResult(error = eventMessage("market.shopping_storage")) else MarketShoppingClientResult() }
     }
 
     suspend fun refresh(scope: MarketAccountScope): MarketShoppingClientResult {
@@ -75,8 +82,9 @@ class MarketShoppingDeliveryStore(
             val next = journal.withSnapshot(data)
             try { if (scope.isCurrent()) write(next) }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { return@withLock result(next, "market.shopping_storage").copy(fresh = true, journalRevision = journal.localRevision) }
-            result(next).copy(fresh = true)
+            catch (_: Exception) { return@withLock if (scope.isCurrent())
+                result(next, "market.shopping_storage").copy(fresh = true, journalRevision = journal.localRevision) else MarketShoppingClientResult() }
+            if (scope.isCurrent()) result(next).copy(fresh = true) else MarketShoppingClientResult()
         }
     }
 
@@ -92,11 +100,15 @@ class MarketShoppingDeliveryStore(
             // A storage read or another writer may have suspended while the account/session
             // changed. Never prepare new work for an owner that is no longer current.
             if (!scope.isCurrent() || (current.pending != null && current.pending != pending)) return@prepare current
+            if (command.basketChange != null && current.pending != pending &&
+                current.snapshot?.let { command.basketChange.basketIntentError(it, command.expectedRevision) } != null)
+                return@prepare current
             try { current.prepare(pending).also { write(it) } }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
         } ?: return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_storage"))
-        if (prepared.pending != pending) return@withLock result(prepared, "market.shopping_pending")
+        if (prepared.pending != pending) return@withLock result(prepared,
+            if (prepared.pending == null && command.basketChange != null) "market.shopping_changed" else "market.shopping_pending")
         submit(scope, pending, prepared.localRevision)
     }
 
@@ -108,6 +120,35 @@ class MarketShoppingDeliveryStore(
         catch (_: Exception) { return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_storage")) }
         val pending = journal.pending ?: return@withLock result(journal)
         submit(scope, pending, journal.localRevision)
+    }
+
+    /** Does not retry the write. A missing record leaves the original pending identity intact,
+     * even if the review is now expired: an earlier in-flight transaction can still commit.
+     */
+    suspend fun checkResult(scope: MarketAccountScope): MarketShoppingClientResult = sender.withLock {
+        if (!scope.isCurrent()) return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_denied"))
+        val journal = try { writer.withLock { read(scope.accountId) } }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { return@withLock MarketShoppingClientResult(error = eventMessage("market.shopping_storage")) }
+        if (!scope.isCurrent()) return@withLock MarketShoppingClientResult()
+        val pending = journal.pending ?: return@withLock result(journal)
+        val response = try { lookupRemote(scope, pending.command) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { return@withLock if (scope.isCurrent()) result(journal, "market.shopping_result_failed") else MarketShoppingClientResult() }
+        if (!scope.isCurrent()) return@withLock MarketShoppingClientResult()
+        val lookup = response.payload
+        if (response.negative || lookup?.isValidShoppingLookup(pending.command, scope.accountId) != true)
+            return@withLock result(journal).copy(error = if (response.httpStatusCode == 404) eventMessage("market.shopping_result_upgrade")
+                else response.message ?: eventMessage("market.shopping_result_failed"))
+        val outcome = lookup.outcome
+        if (outcome == null) return@withLock writer.withLock latestRead@{
+            val latest = try { read(scope.accountId) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { return@latestRead result(journal, "market.shopping_storage") }
+            if (!scope.isCurrent()) return@latestRead MarketShoppingClientResult()
+            result(latest).copy(notice = eventMessage("market.shopping_not_recorded"))
+        }
+        acknowledgeRecorded(scope, pending, outcome, journal.localRevision)
     }
 
     private suspend fun submit(scope: MarketAccountScope, pending: PendingMarketShoppingCommand, preparedRevision: Long): MarketShoppingClientResult {
@@ -122,15 +163,20 @@ class MarketShoppingDeliveryStore(
         catch (_: Exception) { return unresolved() }
         if (!scope.isCurrent()) return unresolved(null)
         val outcome = response.payload
-        val valid = !response.negative && outcome != null && outcome.commandId == pending.command.commandId &&
-            outcome.snapshot.isValidMarketShoppingSnapshot(scope.accountId) &&
-            (if (outcome.accepted) outcome.appliedRevision?.let { it in 0..outcome.snapshot.revision } == true && outcome.errorKey == null
-                else outcome.appliedRevision == null && !outcome.errorKey.isNullOrBlank())
+        val valid = !response.negative && outcome != null && pending.command.isValidShoppingOutcome(outcome, scope.accountId)
         if (!valid || outcome == null) {
             // A later 4xx cannot disprove a previous response-lost commit. Only a recorded outcome
             // retires the local identity. Unknown/malformed responses keep recovery visible.
-            return unresolved(response.message ?: eventMessage("market.shopping_pending"))
+            return unresolved(if (pending.command.basketChange != null && response.httpStatusCode == 404)
+                eventMessage("market.basket_apply_upgrade") else response.message ?: eventMessage("market.shopping_pending"))
         }
+        return acknowledgeRecorded(scope, pending, outcome, preparedRevision)
+    }
+
+    private suspend fun acknowledgeRecorded(scope: MarketAccountScope, pending: PendingMarketShoppingCommand,
+        outcome: MarketShoppingOutcome, preparedRevision: Long): MarketShoppingClientResult {
+        fun unresolved(error: List<LocalizedStringDataModel>?) = MarketShoppingClientResult(
+            pending = pending, error = error, journalRevision = preparedRevision)
         return writer.withLock {
             val journal = try { read(scope.accountId) }
             catch (cancelled: CancellationException) { throw cancelled }
@@ -140,8 +186,12 @@ class MarketShoppingDeliveryStore(
             try { write(next) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
-                return@withLock MarketShoppingClientResult(outcome.snapshot, pending, eventMessage("market.shopping_storage"), fresh = true, journalRevision = journal.localRevision)
+                return@withLock if (scope.isCurrent()) MarketShoppingClientResult(outcome.snapshot, pending,
+                    eventMessage("market.shopping_storage"), fresh = true, journalRevision = journal.localRevision) else MarketShoppingClientResult()
             }
+            // Persist an already-validated outcome for its original account, but never publish
+            // the old account's result/signal after a suspended write crosses an owner change.
+            if (!scope.isCurrent()) return@withLock MarketShoppingClientResult()
             onChanged()
             result(next, outcome.errorKey).copy(acknowledged = true, accepted = outcome.accepted, fresh = true, acknowledgedCommandId = pending.command.commandId)
         }
@@ -153,9 +203,12 @@ object MarketShoppingDelivery {
         loadRemote = { scope -> networkRequest<MarketShoppingSnapshot, Unit>(HttpMethod.Get,
             endpointUrl = "market/shopping-list", expectedSessionGeneration = scope.generation) },
         sendRemote = { scope, command -> networkRequest<MarketShoppingOutcome, MarketShoppingCommand>(HttpMethod.Put,
-            endpointUrl = if (command.replaceOfferId == null) "market/shopping-list" else "market/shopping-list/replace",
+            endpointUrl = command.shoppingMutationEndpoint(),
             body = command, expectedSessionGeneration = scope.generation) },
-        onChanged = MarketplaceSignals::changed)
+        onChanged = MarketplaceSignals::changed,
+        lookupRemote = { scope, command -> networkRequest<MarketShoppingCommandLookup, MarketShoppingCommand>(HttpMethod.Post,
+            endpointUrl = "market/shopping-list/result", body = command, expectedSessionGeneration = scope.generation) })
+    suspend fun checkResult(scope: MarketAccountScope) = withContext(Dispatchers.ourIo) { store.checkResult(scope) }
     suspend fun cached(scope: MarketAccountScope) = withContext(Dispatchers.ourIo) { store.cached(scope) }
     suspend fun refresh(scope: MarketAccountScope) = withContext(Dispatchers.ourIo) { store.refresh(scope) }
     suspend fun change(scope: MarketAccountScope, command: MarketShoppingCommand) = withContext(Dispatchers.ourIo) { store.change(scope, command) }

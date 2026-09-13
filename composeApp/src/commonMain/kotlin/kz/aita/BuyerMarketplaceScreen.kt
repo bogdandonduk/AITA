@@ -28,14 +28,18 @@ internal fun AppConfiguration.marketPriceLabel(offer: MarketOffer): String {
     return "${marketMoneyLabel(minor, offer.currencyCode.orEmpty())} / $amount $unit"
 }
 
-private data class BuyerBrowseQuery(val search: String, val city: String, val shopId: String?,
-    val savedOnly: Boolean)
+private data class BuyerReturnPoint(val query: MarketDiscoveryQuery, val search: String, val city: String,
+    val limit: Int, val index: Int, val offset: Int)
 
 @Stable
 private class BuyerBrowseData {
+    var active = true
     var page by mutableStateOf<MarketPage?>(null)
+    var result by mutableStateOf<MarketDiscoveryResult?>(null)
     var shop by mutableStateOf<MarketStorefront?>(null)
     var loading by mutableStateOf(true)
+    var fresh by mutableStateOf(false)
+    var countsFresh by mutableStateOf(false)
     var gone by mutableStateOf(false)
     var failure by mutableStateOf<List<LocalizedStringDataModel>?>(null)
 }
@@ -50,65 +54,122 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     val shopping = rememberMarketShoppingUiState()
     val scope = rememberCoroutineScope()
     val home = NavigationScreenModel.Buyer.Main.Home
-    var search by rememberSaveable(account) { mutableStateOf("") }
-    var city by rememberSaveable(account) { mutableStateOf("") }
+    var search by rememberSaveable(account, savedOnly) { mutableStateOf("") }
+    var city by rememberSaveable(account, savedOnly) { mutableStateOf("") }
+    var appliedSearch by rememberSaveable(account, savedOnly) { mutableStateOf("") }
+    var appliedCity by rememberSaveable(account, savedOnly) { mutableStateOf("") }
+    var categoryId by rememberSaveable(account, savedOnly) { mutableStateOf<String?>(null) }
+    var sort by rememberSaveable(account, savedOnly) { mutableStateOf(MARKET_DISCOVERY_RECENT) }
+    var limit by rememberSaveable(account, savedOnly) { mutableStateOf(MARKET_DISCOVERY_PAGE_SIZE) }
     var shopId by remember(account, savedOnly) { mutableStateOf(if (savedOnly) null else home.state.value["market-shop:$account"]?.takeIf { it.isNotBlank() }) }
+    var returnPoint by remember(account, generation, savedOnly) { mutableStateOf<BuyerReturnPoint?>(null) }
+    var scrollRestore by remember(account, generation, savedOnly) { mutableStateOf<BuyerReturnPoint?>(null) }
+    var catalogue by remember(account, generation) { mutableStateOf<MarketCategoryCatalogue?>(null) }
+    val latestCatalogue by rememberUpdatedState(catalogue)
+    var choosingCategory by remember(account, generation, savedOnly) { mutableStateOf(false) }
     var compareTo by remember(account, generation, savedOnly) { mutableStateOf<MarketComparisonSelection?>(null) }
     var openedId by remember(account, generation, savedOnly) { mutableStateOf<String?>(null) }
     var savingId by remember(account, generation) { mutableStateOf<String?>(null) }
     var saveFailure by remember(account, generation) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     val fence = remember(account, generation) { MarketSavedReadFence() }
-    val dialogOpen = openedId != null || compareTo != null
-    val latestDialogOpen by rememberUpdatedState(dialogOpen)
-    val query = BuyerBrowseQuery(search.trim(), if (shopId == null) city.trim() else "", shopId, savedOnly && shopId == null)
+    // Category selection uses a local catalogue; unlike product dialogues it does not own I/O.
+    val dialogOwnsReads = openedId != null || compareTo != null
+    val latestDialogOwnsReads by rememberUpdatedState(dialogOwnsReads)
+    val rawQuery = MarketDiscoveryQuery(appliedSearch, if (shopId == null) appliedCity else "", shopId, categoryId, savedOnly && shopId == null, sort)
+    val query = rawQuery.normalizedDiscoveryQuery() ?: rawQuery
     val data = remember(account, generation, query) { BuyerBrowseData() }
-    var wantedPages by remember(account, generation, query) { mutableStateOf(1) }
-    val latestWantedPages by rememberUpdatedState(wantedPages)
+    val latestLimit by rememberUpdatedState(limit)
     val requests = remember(account, generation, query) { Channel<Unit>(Channel.CONFLATED) }
     val gridState = rememberLazyGridState()
+    val inputPending = search != appliedSearch || (shopId == null && city != appliedCity)
+    LaunchedEffect(account, savedOnly, search, city, shopId) {
+        delay(350)
+        if (appliedSearch != search || appliedCity != city) {
+            appliedSearch = search; appliedCity = city; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
+        }
+    }
     fun visitShop(shop: MarketStorefront) {
-        openedId = null; compareTo = null; shopId = shop.storeId; search = ""
+        if (shopId == null) returnPoint = BuyerReturnPoint(query, appliedSearch, appliedCity, limit,
+            gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
+        openedId = null; compareTo = null; shopId = shop.storeId
+        search = ""; appliedSearch = ""; categoryId = null; sort = MARKET_DISCOVERY_RECENT
+        limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
         if (!savedOnly) home.setStateNow("market-shop:$account" to shop.storeId)
     }
-    DisposableEffect(requests) { onDispose { requests.close() } }
-    LaunchedEffect(requests, revision, wantedPages, dialogOpen) { if (!dialogOpen) requests.trySend(Unit) }
+    fun leaveShop() {
+        val point = returnPoint
+        shopId = null; returnPoint = null
+        search = point?.search.orEmpty(); appliedSearch = point?.search.orEmpty()
+        city = point?.city ?: city; appliedCity = point?.city ?: city
+        categoryId = point?.query?.categoryId; sort = point?.query?.sort ?: MARKET_DISCOVERY_RECENT
+        limit = point?.limit ?: MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = point
+        if (!savedOnly) home.setStateNow("market-shop:$account" to "")
+    }
+    fun clearFilters() {
+        search = ""; appliedSearch = ""; city = ""; appliedCity = ""; categoryId = null
+        limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
+    }
+    DisposableEffect(data, requests) { onDispose { data.active = false; requests.close() } }
+    LaunchedEffect(requests, revision, limit, dialogOwnsReads) { if (!dialogOwnsReads) requests.trySend(Unit) }
     LaunchedEffect(requests) {
         val owned = owner ?: run { data.loading = false; return@LaunchedEffect }
         for (ignored in requests) {
-            delay(220)
+            delay(180)
             while (requests.tryReceive().isSuccess) { /* coalesce before starting this read */ }
-            if (latestDialogOpen) continue // The dialogue owns its own fresh read; reload this window when it closes.
-            data.loading = true
+            if (latestDialogOwnsReads) continue
+            data.loading = true; data.fresh = false; data.countsFresh = false
             val readRevision = fence.capture()
             try {
-                if (query.shopId != null) {
-                    val result = loadMarketShop(owned, query.shopId)
-                    val shop = result.payload
-                    if (result.negative || shop == null) {
-                        if (owned.isCurrent()) {
-                            data.failure = result.message ?: eventMessage("market.shop_unavailable")
-                            if (result.httpStatusCode == 404 || result.httpStatusCode == 403) { data.gone = true; data.page = null; data.shop = null }
+                val requestedShop = query.storefrontId
+                if (requestedShop != null) {
+                    val response = loadMarketShop(owned, requestedShop)
+                    val shop = response.payload
+                    if (response.negative || shop == null) {
+                        if (data.active && owned.isCurrent()) {
+                            data.failure = response.message ?: eventMessage("market.shop_unavailable")
+                            if (response.httpStatusCode == 404 || response.httpStatusCode == 403) {
+                                data.gone = true; data.page = null; data.result = null; data.shop = null
+                            }
                         }
                         continue
                     }
-                    if (owned.isCurrent()) { data.shop = shop; data.gone = false }
+                    if (data.active && owned.isCurrent()) { data.shop = shop; data.gone = false }
                 }
-                val result = if (query.savedOnly) loadMarketSaved(owned) else readMarketPageWindow(latestWantedPages) { after ->
-                    loadMarketOffers(owned, query.search, query.city, after, storefrontId = query.shopId)
-                }
-                if (owned.isCurrent()) {
-                    val value = result.payload
-                    if (!result.negative && value != null) { data.page = fence.reconcile(value, readRevision, query.savedOnly); data.failure = null }
-                    else data.failure = result.message ?: eventMessage("market.refresh_failed")
+                val cached = latestCatalogue
+                val request = MarketDiscoveryRequest(query, latestLimit, cached?.version)
+                val response = loadMarketDiscovery(owned, request)
+                if (data.active && owned.isCurrent()) {
+                    val result = response.payload
+                    val checked = if (response.negative) null else result?.validatedDiscovery(request, cached)
+                    if (checked != null) {
+                        catalogue = checked.catalogue
+                        data.result = checked.result
+                        data.page = fence.reconcile(checked.result.page, readRevision, query.savedOnly)
+                        data.failure = null; data.fresh = true; data.countsFresh = fence.capture() == readRevision
+                        if (!data.countsFresh) requests.trySend(Unit) // a bookmark changed DURING the read
+                    } else data.failure = response.message ?: eventMessage("market.page_changed")
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (owned.isCurrent()) data.failure = eventMessage("market.refresh_failed") }
+            catch (_: Exception) { if (data.active && owned.isCurrent()) data.failure = eventMessage("market.refresh_failed") }
             finally { data.loading = false }
         }
     }
     LaunchedEffect(requests) { while (isActive) { delay(30_000); requests.trySend(Unit) } }
-    LaunchedEffect(query) { gridState.scrollToItem(0) }
+    LaunchedEffect(query) {
+        if (scrollRestore?.query != query) { scrollRestore = null; gridState.scrollToItem(0) }
+    }
+    LaunchedEffect(query, data.page, scrollRestore) {
+        val point = scrollRestore
+        if (point != null && point.query == query && data.page != null) {
+            gridState.scrollToItem(point.index, point.offset); scrollRestore = null
+        }
+    }
 
+    fun acknowledgeSaved(page: MarketPage) {
+        data.page = fence.acknowledgeDiscoverySaved(data.page, page, query.savedOnly)
+        data.countsFresh = false
+        MarketplaceSignals.changed(); requests.trySend(Unit)
+    }
     fun setSaved(offer: MarketOffer) {
         val owned = owner ?: return
         if (savingId != null || !owned.isCurrent()) return
@@ -116,16 +177,11 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         savingId = offer.id; saveFailure = null
         scope.launch {
             try {
-                val result = updateMarketSaved(owned, offer.id, desired)
+                val response = updateMarketSaved(owned, offer.id, desired)
                 if (owned.isCurrent()) {
-                    val value = result.payload
-                    if (!result.negative && value != null) {
-                        fence.acknowledgeSnapshot(value.offers.map { it.id }.toSet(), value.unavailableSavedCount)
-                        data.page = if (query.savedOnly) value else data.page?.let { current ->
-                            current.copy(offers = current.offers.map { if (it.id == offer.id) it.copy(saved = desired) else it })
-                        }
-                        MarketplaceSignals.changed()
-                    } else saveFailure = result.message ?: eventMessage("market.refresh_failed")
+                    val value = response.payload
+                    if (!response.negative && value != null) acknowledgeSaved(value)
+                    else saveFailure = response.message ?: eventMessage("market.refresh_failed") ?: eventMessage("market.refresh_failed")
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { if (owned.isCurrent()) saveFailure = eventMessage("market.refresh_failed") }
@@ -134,73 +190,99 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     }
 
     val rows = data.page?.offers.orEmpty()
+    val selectedCategory = catalogue?.categories?.firstOrNull { it.id == categoryId }
     Column(Modifier.fillMaxSize().aitaWidthCap(1440.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ScreenAppBarWidget(title = when {
             shopId != null -> data.shop?.displayName ?: authUiText("Shop window", "Витрина", "Витрина")
             savedOnly -> authUiText("Saved offers", "Сохранённое", "Сақталғандар")
             else -> "AITA Market"
-        }, iconPath = marketIconPath(when { savedOnly && shopId == null -> 140; else -> 139 }))
+        }, iconPath = marketIconPath(if (savedOnly && shopId == null) 140 else 139))
         LazyVerticalGrid(columns = GridCells.Adaptive(250.dp), state = gridState, modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item(key = "browse-header", span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(authUiText("Discover local shops · plan your list · confirm at the shop",
-                        "Находите магазины · планируйте список · уточняйте в магазине",
-                        "Дүкендерді табыңыз · тізімді жоспарлаңыз · дүкеннен нақтылаңыз"),
-                        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     if (shopId != null) {
                         data.shop?.let { shop ->
                             Text("${shop.city} · ${shop.publicAddress}", color = stateValues.TextColor, fontSize = stateValues.textSize)
                             if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
                         actionButton(text = if (savedOnly) authUiText("Back to saved", "К сохранённому", "Сақталғандарға оралу")
-                            else authUiText("All shops", "Все магазины", "Барлық дүкендер"), fillMaxWidthIfTextPresent = false,
-                            autoLoading = false, confirmationRequired = false, onClick = {
-                                shopId = null; search = ""; if (!savedOnly) home.setStateNow("market-shop:$account" to "")
-                            })
+                            else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу"), fillMaxWidthIfTextPresent = false,
+                            autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
                     }
-                    if (!query.savedOnly) BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
                         if (maxWidth > 720.dp && shopId == null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             aitaFormTextField(Modifier.weight(2f), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод"),
-                                identityKey = "market-search:$account", autoFocus = false)
+                                identityKey = "market-search:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
                             aitaFormTextField(Modifier.weight(1f), city, { city = it.take(100) }, authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"),
-                                identityKey = "market-city:$account", autoFocus = false)
+                                identityKey = "market-city:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
                         } else Column {
                             aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод"),
-                                identityKey = "market-search:$account", autoFocus = false)
+                                identityKey = "market-search:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
                             if (shopId == null) aitaFormTextField(Modifier.fillMaxWidth(), city, { city = it.take(100) },
-                                authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"), identityKey = "market-city:$account", autoFocus = false)
+                                authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"), identityKey = "market-city:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
                         }
                     }
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        actionButton(text = selectedCategory?.name?.visibleLocalizedString(stateValues.appLanguage, "")?.substringAfterLast(" / ")
+                            ?: if (categoryId == null) authUiText("All categories", "Все категории", "Барлық санаттар")
+                                else authUiText("Selected category", "Выбранная категория", "Таңдалған санат"),
+                            iconPath = marketIconPath(18), iconRes = marketIconFallback(18), autoLoading = false, confirmationRequired = false,
+                            fillMaxWidthIfTextPresent = false, enabled = catalogue != null, onClick = { choosingCategory = true })
+                        if (categoryId != null) actionButton(text = authUiText("Clear category", "Сбросить категорию", "Санатты алып тастау"),
+                            autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                            enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
+                            onClick = { categoryId = null; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null })
+                        if (search.isNotEmpty() || city.isNotEmpty() || categoryId != null) actionButton(text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау"),
+                            autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                            enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = ::clearFilters)
+                    }
+                    sectionTabsWidget("market-sort:$account:$savedOnly", listOf(
+                        TabContent(MARKET_DISCOVERY_RECENT, if (query.savedOnly) authUiText("Recently saved", "Недавно сохранённые", "Жақында сақталған")
+                            else authUiText("Newest listings", "Новые предложения", "Жаңа ұсыныстар")),
+                        TabContent(MARKET_DISCOVERY_TITLE, authUiText("By name", "По названию", "Атауы бойынша"))),
+                        selectedId = sort, onSelected = { sort = it; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null })
+                    Text(authUiText("Categories include their subcategories. Counts are published offers, not available stock or a reservation.",
+                        "Категории включают подкатегории. Счётчики показывают опубликованные предложения, не остатки и не резерв.",
+                        "Санаттар ішкі санаттарды қамтиды. Санақ жарияланған ұсыныстарды көрсетеді, қор не резерв емес."),
+                        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     if (data.failure != null || saveFailure != null) Text((saveFailure ?: data.failure).orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
                         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     MarketShoppingFeedback(shopping)
                 }
             }
-            if (data.page == null && data.loading) items(6) {
-                LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 240.dp), rows = 4)
-            } else if (rows.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+            if (data.page == null && data.loading) items(6) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 240.dp), rows = 4) }
+            else if (rows.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     CpImage(Modifier.size(64.dp), url = marketIconPath(if (query.savedOnly) 140 else 139), fallbackRes = marketIconFallback(if (query.savedOnly) 140 else 139), contentDescription = null, tintColor = stateValues.AccentColor)
                     Text(when {
                         data.gone -> authUiText("This shop is no longer available", "Этот магазин больше недоступен", "Бұл дүкен енді қолжетімсіз")
+                        data.page == null && data.failure != null -> authUiText("Could not load these results", "Не удалось загрузить результаты", "Бұл нәтижелерді жүктеу мүмкін болмады")
                         data.page == null -> authUiText("Connect to load shop windows", "Подключитесь, чтобы загрузить витрины", "Витриналарды жүктеу үшін қосылыңыз")
-                        else -> authUiText("No matching published offers", "Подходящих опубликованных предложений нет", "Сәйкес жарияланған ұсыныстар жоқ")
+                        else -> authUiText("No published offers match these filters", "Опубликованных предложений по этим фильтрам нет", "Бұл сүзгілерге сәйкес жарияланған ұсыныстар жоқ")
                     }, Modifier.padding(16.dp), color = stateValues.TextColor, fontSize = stateValues.accentTextSize)
-                    if (query.savedOnly) Text(authUiText("Save offers with the bookmark on a product card.", "Сохраняйте предложения закладкой на карточке товара.", "Тауар карточкасындағы бетбелгі арқылы ұсыныстарды сақтаңыз."),
+                    if (query.savedOnly) Text(authUiText("Save offers with the bookmark on a product card. Filtering does not remove bookmarks.",
+                        "Сохраняйте предложения закладкой на карточке товара. Фильтры не удаляют закладки.", "Тауар карточкасындағы бетбелгі арқылы сақтаңыз. Сүзгілер бетбелгілерді жоймайды."),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 }
-            } else items(rows, key = { it.id }) { offer ->
-                MarketOfferCard(offer, savingId != null, shopping, onOpen = { openedId = offer.id }, onSaved = { setSaved(offer) },
+            }
+            items(rows, key = { it.id }) { offer ->
+                MarketOfferCard(offer, savingId != null, shopping, canUseEstimate = data.fresh && !inputPending,
+                    onOpen = { openedId = offer.id }, onSaved = { setSaved(offer) },
                     onCompare = { compareTo = offer.comparisonSelection() }, onShop = { visitShop(offer.storefront) })
             }
             if (data.page?.nextId != null) item(key = "more", span = { GridItemSpan(maxLineSpan) }) {
-                if (wantedPages < 10) actionButton(text = authUiText("More offers", "Ещё предложения", "Тағы ұсыныстар"), enabled = !data.loading,
-                    autoLoading = false, confirmationRequired = false, onClick = { wantedPages++ })
-                else Text(authUiText("Showing the first 400 offers. Refine your search to explore more.", "Показаны первые 400 предложений. Уточните поиск, чтобы найти другие.", "Алғашқы 400 ұсыныс көрсетілді. Басқаларын табу үшін іздеуді нақтылаңыз."),
+                if (limit < MARKET_DISCOVERY_MAX_OFFERS) actionButton(text = authUiText("More offers", "Ещё предложения", "Тағы ұсыныстар"), enabled = !data.loading && !inputPending,
+                    autoLoading = false, confirmationRequired = false, onClick = { limit = (limit + MARKET_DISCOVERY_PAGE_SIZE).coerceAtMost(MARKET_DISCOVERY_MAX_OFFERS) })
+                else Text(authUiText("Showing the first 400 matches. Refine the category, city or search to explore more.",
+                    "Показаны первые 400 совпадений. Уточните категорию, город или поиск, чтобы найти другие.", "Алғашқы 400 сәйкестік көрсетілді. Басқаларын табу үшін санатты, қаланы не іздеуді нақтылаңыз."),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             }
             if (query.savedOnly && (data.page?.unavailableSavedCount ?: 0) > 0) item(key = "unavailable-saved", span = { GridItemSpan(maxLineSpan) }) {
+                Text(authUiText("Unavailable across all saved offers; items merely hidden by these filters are not included.",
+                    "Недоступные среди всех сохранённых: предложения, скрытые только фильтрами, сюда не входят.",
+                    "Барлық сақталғандар арасындағы қолжетімсіздер: тек сүзгі жасырған ұсыныстар бұл санға кірмейді."),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 actionButton(text = authUiText("Remove unavailable saved offers (${data.page?.unavailableSavedCount})",
                     "Убрать недоступные предложения (${data.page?.unavailableSavedCount})", "Қолжетімсіз ұсыныстарды жою (${data.page?.unavailableSavedCount})"),
                     enabled = savingId == null, autoLoading = false, confirmationRequired = true, onClick = {
@@ -209,14 +291,10 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                             savingId = "clear"
                             scope.launch {
                                 try {
-                                    val result = clearUnavailableMarketSaved(owned)
+                                    val response = clearUnavailableMarketSaved(owned)
                                     if (owned.isCurrent()) {
-                                        val value = result.payload
-                                        if (!result.negative && value != null) {
-                                            fence.acknowledgeSnapshot(value.offers.map { it.id }.toSet(), value.unavailableSavedCount)
-                                            data.page = value; MarketplaceSignals.changed()
-                                        }
-                                        else saveFailure = result.message
+                                        val value = response.payload
+                                        if (!response.negative && value != null) acknowledgeSaved(value) else saveFailure = response.message ?: eventMessage("market.refresh_failed")
                                     }
                                 } catch (cancelled: CancellationException) { throw cancelled }
                                 catch (_: Exception) { if (owned.isCurrent()) saveFailure = eventMessage("market.refresh_failed") }
@@ -226,21 +304,32 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                     })
             }
         }
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(if (data.page == null) authUiText("Waiting for offers", "Ожидаем предложения", "Ұсыныстар күтілуде")
-                else authUiText("${rows.size} loaded offers", "Предложений загружено: ${rows.size}", "${rows.size} ұсыныс жүктелді"),
-                Modifier.weight(1f), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            val counts = data.result
+            Column(Modifier.weight(1f)) {
+                Text(when {
+                    inputPending -> authUiText("Searching…", "Поиск…", "Іздеу…")
+                    data.loading -> authUiText("Updating matches…", "Обновляем результаты…", "Нәтижелер жаңартылуда…")
+                    data.countsFresh && counts != null -> authUiText("${rows.size} of ${counts.totalOffers} offers · ${counts.totalShops} shops",
+                        "${rows.size} из ${counts.totalOffers} предложений · магазинов: ${counts.totalShops}", "${counts.totalOffers} ұсыныстың ${rows.size} ұсынысы · ${counts.totalShops} дүкен")
+                    data.page != null -> authUiText("${rows.size} shown · refresh needed", "Показано: ${rows.size} · обновите", "${rows.size} көрсетілді · жаңартыңыз")
+                    else -> authUiText("Waiting for offers", "Ожидаем предложения", "Ұсыныстар күтілуде")
+                }, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                data.page?.checkedAtMillis?.let { Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
+            }
             actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false,
-                autoLoading = false, enabled = !data.loading, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
+                autoLoading = false, enabled = !data.loading && !inputPending, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
         }
     }
+    if (choosingCategory) catalogue?.let { loaded -> MarketCategoryPickerDialog(loaded, categoryId, onDismiss = { choosingCategory = false },
+        onSelected = { id -> categoryId = id; choosingCategory = false; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null }) }
     openedId?.let { id -> MarketOfferDetailDialog(id, shopping, onDismiss = { openedId = null }, onVisitShop = ::visitShop,
         onCompare = { offer -> openedId = null; compareTo = offer.comparisonSelection() }) }
-    compareTo?.let { target -> MarketComparisonDialog(target, shopping, onDismiss = { compareTo = null }, onVisitShop = ::visitShop, initialCity = city) }
+    compareTo?.let { target -> MarketComparisonDialog(target, shopping, onDismiss = { compareTo = null }, onVisitShop = ::visitShop, initialCity = appliedCity) }
 }
 
 @Composable
-private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean, shopping: MarketShoppingUiState,
+private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean, shopping: MarketShoppingUiState, canUseEstimate: Boolean,
     onOpen: () -> Unit, onSaved: () -> Unit, onCompare: () -> Unit, onShop: () -> Unit) {
     val scope = rememberCoroutineScope()
     val inList = shopping.contains(offer.id)
@@ -266,12 +355,12 @@ private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean
             else authUiText("Confirm availability", "Уточните наличие", "Бар-жоғын нақтылаңыз"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         actionButton(text = if (inList) authUiText("In your list", "В вашем списке", "Сіздің тізіміңізде") else authUiText("Add to list", "В список покупок", "Тізімге қосу"),
             iconPath = marketIconPath(143), iconRes = marketIconFallback(143), autoLoading = false, confirmationRequired = false,
-            enabled = inList || (shopping.canChange && offer.shoppingBasis() != null), onClick = {
+            enabled = inList || (canUseEstimate && shopping.canChange && offer.shoppingBasis() != null), onClick = {
                 if (inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
                 else shopping.change(offer.id, 1, offer.shoppingBasis())
             })
         if (offer.comparisonSelection() != null) actionButton(text = authUiText("Compare", "Сравнить", "Салыстыру"),
-            iconPath = marketIconPath(141), iconRes = marketIconFallback(141), autoLoading = false, confirmationRequired = false,
+            iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = canUseEstimate, autoLoading = false, confirmationRequired = false,
             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = onCompare)
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,16 +21,34 @@ import kotlinx.coroutines.launch
 
 internal fun marketMoneyLabel(minor: Long, currency: String) = "${minor / 100}.${(minor % 100).toString().padStart(2, '0')} $currency"
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AppConfiguration.MarketShoppingFeedback(state: MarketShoppingUiState) {
     state.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), Modifier.fillMaxWidth().padding(12.dp),
         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
-    if (state.pending != null) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(authUiText("Unconfirmed list change", "Неподтверждённое изменение списка", "Тізім өзгерісі расталмады"),
-            Modifier.weight(1f), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        actionButton(text = authUiText("Retry", "Повторить", "Қайталау"), autoLoading = false, confirmationRequired = false,
-            fillMaxWidthIfTextPresent = false, enabled = !state.changing, loading = state.changing, onClick = { state.retry() })
+    state.notice?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), Modifier.fillMaxWidth().padding(12.dp),
+        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
+    val pending = state.pending
+    if (pending != null) Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(authUiText("Unconfirmed list change · check first without resending", "Неподтверждённое изменение · проверьте без повторной отправки", "Расталмаған өзгеріс · қайта жібермей тексеріңіз"),
+            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(authUiText("Change reference", "Номер изменения", "Өзгеріс нөмірі"),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                SelectionContainer { Text(pending.command.commandId, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
+            }
+            ClipboardCopyButton(textToCopy = pending.command.commandId)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            actionButton(text = authUiText("Check result", "Проверить результат", "Нәтижені тексеру"), autoLoading = false,
+                confirmationRequired = false, fillMaxWidthIfTextPresent = false, enabled = !state.changing && !state.checking,
+                loading = state.checking, onClick = { state.checkResult() })
+            actionButton(text = authUiText("Retry same change", "Повторить ту же команду", "Сол өзгерісті қайталау"), autoLoading = false,
+                confirmationRequired = false, fillMaxWidthIfTextPresent = false, enabled = !state.changing && !state.checking,
+                loading = state.changing, onClick = { state.retry() })
+        }
     }
 }
 
@@ -41,6 +60,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
     val scope = rememberCoroutineScope()
     var openedId by remember(account, generation) { mutableStateOf<String?>(null) }
     var comparison by remember(account, generation) { mutableStateOf<MarketComparisonSelection?>(null) }
+    var planning by remember(account, generation) { mutableStateOf(false) }
+    var comparisonCity by remember(account, generation) { mutableStateOf("") }
+    val activityNavigation = remember(account, generation) { MarketShoppingActivityNavigation() }
     val groups = state.snapshot?.shoppingGroups().orEmpty()
     Column(Modifier.fillMaxSize().aitaWidthCap(1120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         ScreenAppBarWidget(title = authUiText("Shopping list", "Список покупок", "Сатып алу тізімі"), iconPath = marketIconPath(143))
@@ -51,72 +73,84 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         val section = sectionTabsWidget("buyer-shopping:$account", listOf(
             TabContent("list", authUiText("Items", "Товары", "Тауарлар")),
-            TabContent("estimate", authUiText("By shop", "По магазинам", "Дүкен бойынша"))))
+            TabContent("estimate", authUiText("By shop", "По магазинам", "Дүкен бойынша")),
+            TabContent("activity", authUiText("Activity", "История", "Тарих"))))
         MarketShoppingFeedback(state)
-        if (state.snapshot == null && state.loading) {
-            LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 5)
-            Spacer(Modifier.weight(1f))
-        } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (state.snapshot?.lines.isNullOrEmpty()) item {
-                Column(Modifier.fillMaxWidth().padding(vertical = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    CpImage(Modifier.size(64.dp), url = marketIconPath(143), fallbackRes = marketIconFallback(143), contentDescription = null, tintColor = stateValues.AccentColor)
-                    Text(if (state.snapshot == null) authUiText("Connect to load your list", "Подключитесь, чтобы загрузить список", "Тізімді жүктеу үшін қосылыңыз")
-                        else authUiText("Start with something you need", "Начните с нужного товара", "Қажетті тауардан бастаңыз"),
-                        Modifier.padding(16.dp), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-                    actionButton(text = authUiText("Explore the market", "Открыть маркет", "Маркетке өту"), confirmationRequired = false, autoLoading = false,
-                        onClick = { scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) } })
-                }
-            }
-            if (section == "list") items(state.snapshot?.lines.orEmpty(), key = { it.line.offerId }) { row ->
-                ShoppingLineCard(row, state, onOpen = { openedId = row.line.offerId }, onCompare = {
-                    state.snapshot?.revision?.let { comparison = row.line.comparisonSelection(it) }
-                })
-            } else {
-                items(groups, key = { "${it.storeId}:${it.currencyCode}" }) { group ->
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.AccentColor.copy(alpha = 0.06f)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(group.shopName, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-                        Text(authUiText("Estimated items subtotal", "Предварительная сумма товаров", "Тауарлардың алдын ала сомасы"),
-                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        Text(group.pricedSubtotalMinor?.let { marketMoneyLabel(it, group.currencyCode) }
-                            ?: authUiText("Needs review", "Требует проверки", "Тексеру қажет"),
-                            color = changedValueColor(group.pricedSubtotalMinor, "shopping:${group.storeId}:${group.currencyCode}", stateValues.AccentColor),
-                            fontWeight = FontWeight.Bold, fontSize = stateValues.titleTextSize)
-                        Text(authUiText("${group.lines.size - group.unpricedLines} of ${group.lines.size} lines priced",
-                            "Рассчитано строк: ${group.lines.size - group.unpricedLines} из ${group.lines.size}",
-                            "${group.lines.size} жолдың ${group.lines.size - group.unpricedLines} жолы есептелді"),
-                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        if (group.unpricedLines > 0) Text(authUiText("Incomplete: ${group.unpricedLines} lines are excluded. They are not free.",
-                            "Неполная сумма: ${group.unpricedLines} строк не включены. Это не бесплатные товары.",
-                            "Сома толық емес: ${group.unpricedLines} жол кірмейді. Олар тегін емес."), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-                        actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту"), iconPath = marketIconPath(139),
-                            iconRes = marketIconFallback(139), autoLoading = false, confirmationRequired = false, onClick = {
-                                NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to group.storeId)
-                                scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
-                            })
+        if (section == "activity") {
+            MarketShoppingActivityPanel(activityNavigation, Modifier.weight(1f).fillMaxWidth())
+        } else {
+            if (state.snapshot == null && state.loading) {
+                LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 5)
+                Spacer(Modifier.weight(1f))
+            } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (state.snapshot?.lines.isNullOrEmpty()) item {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        CpImage(Modifier.size(64.dp), url = marketIconPath(143), fallbackRes = marketIconFallback(143), contentDescription = null, tintColor = stateValues.AccentColor)
+                        Text(if (state.snapshot == null) authUiText("Connect to load your list", "Подключитесь, чтобы загрузить список", "Тізімді жүктеу үшін қосылыңыз")
+                            else authUiText("Start with something you need", "Начните с нужного товара", "Қажетті тауардан бастаңыз"),
+                            Modifier.padding(16.dp), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                        actionButton(text = authUiText("Explore the market", "Открыть маркет", "Маркетке өту"), confirmationRequired = false, autoLoading = false,
+                            onClick = { scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) } })
                     }
                 }
-                if (groups.isNotEmpty()) item {
-                    Text(authUiText("Each currency stays separate. Delivery, service fees and cross-item basket discounts are not included. No stock is held and no payment is made.",
-                        "Валюты не смешиваются. Доставка, сервисные сборы и скидки на корзину не включены. Остатки не резервируются, оплата не производится.",
-                        "Валюталар араластырылмайды. Жеткізу, қызмет алымы және себет жеңілдіктері кірмейді. Қор резервтелмейді, төлем жасалмайды."),
+                if (!state.snapshot?.lines.isNullOrEmpty()) item(key = "plan-basket") {
+                    actionButton(text = authUiText("Compare whole basket", "Сравнить всю корзину", "Бүкіл себетті салыстыру"),
+                        iconPath = marketIconPath(141), iconRes = marketIconFallback(141),
+                        enabled = !state.changing && state.pending == null, autoLoading = false, confirmationRequired = false,
+                        onClick = { planning = true })
+                }
+                if (section == "list") items(state.snapshot?.lines.orEmpty(), key = { it.line.offerId }) { row ->
+                    ShoppingLineCard(row, state, onOpen = { openedId = row.line.offerId }, onCompare = {
+                        comparisonCity = ""
+                        state.snapshot?.revision?.let { comparison = row.line.comparisonSelection(it) }
+                    })
+                } else {
+                    items(groups, key = { "${it.storeId}:${it.currencyCode}" }) { group ->
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(stateValues.AccentColor.copy(alpha = 0.06f)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(group.shopName, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                            Text(authUiText("Estimated items subtotal", "Предварительная сумма товаров", "Тауарлардың алдын ала сомасы"),
+                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            Text(group.pricedSubtotalMinor?.let { marketMoneyLabel(it, group.currencyCode) }
+                                ?: authUiText("Needs review", "Требует проверки", "Тексеру қажет"),
+                                color = changedValueColor(group.pricedSubtotalMinor, "shopping:${group.storeId}:${group.currencyCode}", stateValues.AccentColor),
+                                fontWeight = FontWeight.Bold, fontSize = stateValues.titleTextSize)
+                            Text(authUiText("${group.lines.size - group.unpricedLines} of ${group.lines.size} lines priced",
+                                "Рассчитано строк: ${group.lines.size - group.unpricedLines} из ${group.lines.size}",
+                                "${group.lines.size} жолдың ${group.lines.size - group.unpricedLines} жолы есептелді"),
+                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            if (group.unpricedLines > 0) Text(authUiText("Incomplete: ${group.unpricedLines} lines are excluded. They are not free.",
+                                "Неполная сумма: ${group.unpricedLines} строк не включены. Это не бесплатные товары.",
+                                "Сома толық емес: ${group.unpricedLines} жол кірмейді. Олар тегін емес."), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                            actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту"), iconPath = marketIconPath(139),
+                                iconRes = marketIconFallback(139), autoLoading = false, confirmationRequired = false, onClick = {
+                                    NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to group.storeId)
+                                    scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+                                })
+                        }
+                    }
+                    if (groups.isNotEmpty()) item {
+                        Text(authUiText("Each currency stays separate. Delivery, service fees and cross-item basket discounts are not included. No stock is held and no payment is made.",
+                            "Валюты не смешиваются. Доставка, сервисные сборы и скидки на корзину не включены. Остатки не резервируются, оплата не производится.",
+                            "Валюталар араластырылмайды. Жеткізу, қызмет алымы және себет жеңілдіктері кірмейді. Қор резервтелмейді, төлем жасалмайды."),
+                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (state.fresh) authUiText("Server estimate", "Расчёт сервера", "Сервер есебі")
+                        else if (state.snapshot == null) authUiText("Waiting for your list", "Ожидаем список", "Тізім күтілуде")
+                        else authUiText("Saved estimate · refresh needed", "Сохранённый расчёт · обновите", "Сақталған есеп · жаңартыңыз"),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    state.snapshot?.checkedAtMillis?.takeIf { it > 0 }?.let {
+                        Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    }
                 }
+                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                    enabled = !state.loading, loading = state.loading, confirmationRequired = false, onClick = { state.refresh(userInitiated = true) })
             }
-        }
-        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(if (state.fresh) authUiText("Server estimate", "Расчёт сервера", "Сервер есебі")
-                    else if (state.snapshot == null) authUiText("Waiting for your list", "Ожидаем список", "Тізім күтілуде")
-                    else authUiText("Saved estimate · refresh needed", "Сохранённый расчёт · обновите", "Сақталған есеп · жаңартыңыз"),
-                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                state.snapshot?.checkedAtMillis?.takeIf { it > 0 }?.let {
-                    Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                }
-            }
-            actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false, autoLoading = false,
-                enabled = !state.loading, loading = state.loading, confirmationRequired = false, onClick = { state.refresh(userInitiated = true) })
         }
     }
     openedId?.let { id -> MarketOfferDetailDialog(id, state, onDismiss = { openedId = null }, onVisitShop = { shop ->
@@ -125,11 +159,19 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
         scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
     }, onCompare = { offer ->
         openedId = null
+        comparisonCity = ""
         val current = state.snapshot
         comparison = current?.let { snapshot -> snapshot.lines.firstOrNull { it.line.offerId == offer.id }?.line?.comparisonSelection(snapshot.revision) }
             ?: offer.comparisonSelection()
     }) }
-    comparison?.let { selection -> MarketComparisonDialog(selection, state, onDismiss = { comparison = null }, onVisitShop = { shop ->
+    if (planning) MarketBasketPlanDialog(state, onDismiss = { planning = false }, onCompare = { selected, city ->
+        planning = false; comparisonCity = city; comparison = selected
+    }, onVisitShop = { shop ->
+        planning = false
+        NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
+        scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+    })
+    comparison?.let { selection -> MarketComparisonDialog(selection, state, initialCity = comparisonCity, onDismiss = { comparison = null }, onVisitShop = { shop ->
         comparison = null
         NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
         scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }

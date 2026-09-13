@@ -2542,7 +2542,10 @@ internal fun AppConfiguration.aitaFormTextField(
     showClearButton: Boolean = true,
     autoFocus: Boolean = false,
     onTransformValue: ((String) -> String)? = null,
-    placeholderContent: (@Composable () -> Unit)? = null
+    placeholderContent: (@Composable () -> Unit)? = null,
+    // Opt in for synchronous screen-owned filters: back navigation and clamps must replace the
+    // accepted value even while focused. Existing form callers retain their prior behaviour.
+    parentOwnsValue: Boolean = false
 ): GenericTextFieldContent {
     var revealPassword by remember(identityKey) { mutableStateOf(false) }
     val effectiveTextColor = if (enabled) stateValues.TextColor else stateValues.DisabledColor
@@ -2553,6 +2556,7 @@ internal fun AppConfiguration.aitaFormTextField(
         identityKey = identityKey,
         enabled = enabled,
         valueInitial = value,
+        parentOwnsValue = parentOwnsValue,
         retainTextAcrossRecreation = !sensitive,
         persistTextDraft = !sensitive,
         textColor = effectiveTextColor,
