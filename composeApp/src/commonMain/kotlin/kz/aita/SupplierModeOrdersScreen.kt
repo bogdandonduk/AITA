@@ -244,19 +244,22 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(254, "Orders"),
-            iconPath = stateValues.drawablePathIconAppModeSupplier,
-            iconRes = stateValues.drawableResIconAppModeSupplier.value
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(254, "Orders"),
+                iconPath = stateValues.drawablePathIconAppModeSupplier,
+                iconRes = stateValues.drawableResIconAppModeSupplier.value
+            )
+        }
+    ) {
         val section = sectionTabsWidget(
             stateKey = "supplier-orders:${focusedSupplierId.orEmpty()}",
             tabs = listOf(
                 TabContent("orders", localizedStringResource(254, "Orders")),
-                TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық")),
-                TabContent("promises", authUiText("Delivery promises", "Сроки доставки", "Жеткізу мерзімдері"))
+                TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық", "Даярдык")),
+                TabContent("promises", authUiText("Delivery promises", "Сроки доставки", "Жеткізу мерзімдері", "Жеткирүү убадалары"))
             ),
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -331,7 +334,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
 
                 if (section == "readiness") {
                     if (supplierReadiness == null) {
-                        item { MessageText(Modifier.fillMaxWidth(), authUiText("No readiness data yet", "Данные о готовности пока не загружены", "Дайындық деректері әлі жүктелмеген")) }
+                        item { MessageText(Modifier.fillMaxWidth(), authUiText("No readiness data yet", "Данные о готовности пока не загружены", "Дайындық деректері әлі жүктелмеген", "Даярдык боюнча маалымат азырынча жок")) }
                     }
                     supplierReadiness?.let { readiness ->
                         item(key = "supplier-order-readiness-board") {

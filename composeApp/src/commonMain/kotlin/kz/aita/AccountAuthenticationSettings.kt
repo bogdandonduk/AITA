@@ -100,7 +100,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 if (withTimeoutOrNull(45_000L) { action(); true } != true) {
                     error = authUiText("Request timed out. Refresh settings before retrying.",
                         "Время ожидания истекло. Обновите настройки перед повтором.",
-                        "Күту уақыты аяқталды. Қайталаудан бұрын баптауларды жаңартыңыз.")
+                        "Күту уақыты аяқталды. Қайталаудан бұрын баптауларды жаңартыңыз.", "Суроо-талаптын күтүү убактысы бүттү. Кайра аракет кылуудан мурун жөндөөлөрдү жаңыртыңыз.")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -108,7 +108,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 error = authUiText(
                     "Request failed. Try again.",
                     "Запрос не выполнен. Повторите.",
-                    "Сұрау орындалмады. Қайталаңыз."
+                    "Сұрау орындалмады. Қайталаңыз.", "Суроо-талап аткарылган жок. Кайра аракет кылыңыз."
                 )
             } finally {
                 loading = false
@@ -143,7 +143,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 error = authUiText(
                     "Could not load settings. Retry.",
                     "Не удалось загрузить настройки. Повторите.",
-                    "Баптаулар жүктелмеді. Қайталаңыз."
+                    "Баптаулар жүктелмеді. Қайталаңыз.", "Жөндөөлөрдү жүктөө мүмкүн болгон жок. Кайра аракет кылыңыз."
                 )
             } finally {
                 loading = false
@@ -178,33 +178,33 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 modifier = Modifier.size(stateValues.iconSize),
                 url = stateValues.drawablePathIconSecurity,
                 fallbackRes = stateValues.drawableResIconSecurity.value,
-                contentDescription = authUiText("Sign-in and security", "Вход и безопасность", "Кіру және қауіпсіздік"),
+                contentDescription = authUiText("Sign-in and security", "Вход и безопасность", "Кіру және қауіпсіздік", "Кирүү жана коопсуздук"),
                 tintColor = stateValues.AccentColor
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
+                    text = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік", "Кирүү жана коопсуздук"),
                     color = stateValues.TextColor,
                     fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = when {
-                        settings?.loginSecondFactor != null && settings?.loginSecondFactor != AitaLoginSecondFactor.NONE -> authUiText("Two-factor sign-in is on", "Двухфакторный вход включён", "Екі факторлы кіру қосулы")
-                        settings?.authenticatorEnabled == true -> authUiText("Authenticator connected · login 2FA off", "Аутентификатор подключён · 2FA при входе выключена", "Аутентификатор қосылған · кіру 2FA өшірулі")
-                        settings != null -> authUiText("Password, email code and recovery settings", "Пароль, код из письма и восстановление", "Құпия сөз, email коды және қалпына келтіру")
-                        else -> authUiText("Manage secure ways to sign in", "Управление безопасными способами входа", "Қауіпсіз кіру тәсілдерін басқару")
+                        settings?.loginSecondFactor != null && settings?.loginSecondFactor != AitaLoginSecondFactor.NONE -> authUiText("Two-factor sign-in is on", "Двухфакторный вход включён", "Екі факторлы кіру қосулы", "Эки факторлуу кирүү күйүк")
+                        settings?.authenticatorEnabled == true -> authUiText("Authenticator connected · login 2FA off", "Аутентификатор подключён · 2FA при входе выключена", "Аутентификатор қосылған · кіру 2FA өшірулі", "Аутентификатор туташкан · кирүүдөгү 2FA өчүк")
+                        settings != null -> authUiText("Password, email code and recovery settings", "Пароль, код из письма и восстановление", "Құпия сөз, email коды және қалпына келтіру", "Сырсөз, электрондук почта коду жана калыбына келтирүү жөндөөлөрү")
+                        else -> authUiText("Manage secure ways to sign in", "Управление безопасными способами входа", "Қауіпсіз кіру тәсілдерін басқару", "Кирүүнүн коопсуз ыкмаларын башкаруу")
                     },
                     color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize
                 )
             }
-            if (expanded) AuthSecurityIconAction(authUiText("Refresh", "Обновить", "Жаңарту"),
+            if (expanded) AuthSecurityIconAction(authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"),
                 stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value,
                 !loading && editor == AccountAuthEditor.NONE, ::load)
             if (collapsible) {
                 QuietAction(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; clearSensitive() } }) {
-                    Text(if (expanded) authUiText("Close", "Закрыть", "Жабу") else authUiText("Manage", "Управлять", "Басқару"))
+                    Text(if (expanded) authUiText("Close", "Закрыть", "Жабу", "Жабуу") else authUiText("Manage", "Управлять", "Басқару", "Башкаруу"))
                 }
             }
         }
@@ -219,24 +219,24 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 }
 
                 settings?.let { current ->
-                    AuthSettingsInfoRow(authUiText("Main phone number", "Основной номер телефона", "Негізгі телефон нөмірі"),
+                    AuthSettingsInfoRow(authUiText("Main phone number", "Основной номер телефона", "Негізгі телефон нөмірі", "Негизги телефон номери"),
                         current.mainPhoneNumber.ifBlank { stateValues.userAccount?.phoneNumber.orEmpty() }
-                            .ifBlank { authUiText("Not configured", "Не настроен", "Бапталмаған") })
-                    AuthSettingsInfoRow(authUiText("Main email", "Основной email", "Негізгі email"), current.email)
+                            .ifBlank { authUiText("Not configured", "Не настроен", "Бапталмаған", "Жөндөлгөн эмес") })
+                    AuthSettingsInfoRow(authUiText("Main email", "Основной email", "Негізгі email", "Негизги электрондук почта"), current.email)
                     AuthSettingsInfoRow(
-                        authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
-                        current.phoneLoginAlias ?: authUiText("Not configured", "Не настроен", "Бапталмаған")
+                        authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі", "Кошумча телефон номери"),
+                        current.phoneLoginAlias ?: authUiText("Not configured", "Не настроен", "Бапталмаған", "Жөндөлгөн эмес")
                     )
-                    AuthSettingsInfoRow(authUiText("Extra email", "Дополнительный email", "Қосымша email"),
-                        current.additionalLoginEmails.joinToString("\n").ifBlank { authUiText("Not configured", "Не настроен", "Бапталмаған") })
+                    AuthSettingsInfoRow(authUiText("Extra email", "Дополнительный email", "Қосымша email", "Кошумча электрондук почта"),
+                        current.additionalLoginEmails.joinToString("\n").ifBlank { authUiText("Not configured", "Не настроен", "Бапталмаған", "Жөндөлгөн эмес") })
                     AuthSettingsInfoRow(
-                        authUiText("Authenticator", "Аутентификатор", "Аутентификатор"),
-                        if (current.authenticatorEnabled) authUiText("Connected", "Подключён", "Қосылған") else authUiText("Off", "Выключен", "Өшірулі"),
+                        authUiText("Authenticator", "Аутентификатор", "Аутентификатор", "Аутентификатор"),
+                        if (current.authenticatorEnabled) authUiText("Connected", "Подключён", "Қосылған", "Туташкан") else authUiText("Off", "Выключен", "Өшірулі", "Өчүк"),
                         accent = current.authenticatorEnabled
                     )
                     if (current.authenticatorEnabled) {
                         AuthSettingsInfoRow(
-                            authUiText("Recovery codes remaining", "Осталось резервных кодов", "Қалған қалпына келтіру кодтары"),
+                            authUiText("Recovery codes remaining", "Осталось резервных кодов", "Қалған қалпына келтіру кодтары", "Калган калыбына келтирүү коддору"),
                             current.recoveryCodesRemaining.toString()
                         )
                     }
@@ -246,8 +246,8 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                 clearSensitive(); requestedLoginRequirement = required; editor = AccountAuthEditor.TOTP_POLICY
                             }
                             if (current.loginSecondFactor != AitaLoginSecondFactor.NONE) AuthQuietAction(
-                                if (current.loginSecondFactor == AitaLoginSecondFactor.EMAIL) authUiText("Email code", "Код из письма", "Email коды")
-                                else authUiText("Authenticator", "Аутентификатор", "Аутентификатор"), !loading) {
+                                if (current.loginSecondFactor == AitaLoginSecondFactor.EMAIL) authUiText("Email code", "Код из письма", "Email коды", "Электрондук почтадагы код")
+                                else authUiText("Authenticator", "Аутентификатор", "Аутентификатор", "Аутентификатор"), !loading) {
                                 clearSensitive(); requestedLoginRequirement = true; editor = AccountAuthEditor.TOTP_POLICY
                             }
                         }
@@ -263,9 +263,9 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = if (settings?.authenticatorEnabled == true) {
-                                authUiText("Disable authenticator", "Отключить аутентификатор", "Аутентификаторды өшіру")
+                                authUiText("Disable authenticator", "Отключить аутентификатор", "Аутентификаторды өшіру", "Аутентификаторду өчүрүү")
                             } else {
-                                authUiText("Enable authenticator", "Включить аутентификатор", "Аутентификаторды қосу")
+                                authUiText("Enable authenticator", "Включить аутентификатор", "Аутентификаторды қосу", "Аутентификаторду күйгүзүү")
                             },
                             iconPath = stateValues.drawablePathIconSecurity,
                             enabled = !loading &&
@@ -276,7 +276,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     info = authUiText(
                                         "Authenticator protection is not enabled on this server yet.",
                                         "Защита аутентификатором пока не включена на этом сервере.",
-                                        "Аутентификатор қорғанысы бұл серверде әзірге қосылмаған."
+                                        "Аутентификатор қорғанысы бұл серверде әзірге қосылмаған.", "Бул серверде аутентификатор менен коргоо азырынча иштетиле элек."
                                     )
                                 }
                             }
@@ -292,7 +292,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             actionButton(
                                 autoLoading = false,
                                 modifier = Modifier.fillMaxWidth(),
-                                text = authUiText("Generate new recovery codes", "Создать новые резервные коды", "Жаңа қалпына келтіру кодтарын жасау"),
+                                text = authUiText("Generate new recovery codes", "Создать новые резервные коды", "Жаңа қалпына келтіру кодтарын жасау", "Жаңы калыбына келтирүү коддорун түзүү"),
                                 iconPath = stateValues.drawablePathIconPassword,
                                 enabled = !loading &&
                                     authAvailability.authenticator == AitaAuthFeatureAvailability.AVAILABLE,
@@ -300,7 +300,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     info = authUiText(
                                         "Recovery codes are managed together with authenticator protection.",
                                         "Резервные коды управляются вместе с защитой аутентификатором.",
-                                        "Қалпына келтіру кодтары аутентификатор қорғанысымен бірге басқарылады."
+                                        "Қалпына келтіру кодтары аутентификатор қорғанысымен бірге басқарылады.", "Калыбына келтирүү коддору аутентификатор коргоосу менен бирге башкарылат."
                                     )
                                 }
                             ) { clearSensitive(); editor = AccountAuthEditor.RECOVERY_CODES }
@@ -308,7 +308,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                         actionButton(
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
-                            text = authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
+                            text = authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі", "Кошумча телефон номери"),
                             iconPath = stateValues.drawablePathIconPhone,
                             enabled = !loading &&
                                 settings != null &&
@@ -318,19 +318,19 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     info = authUiText(
                                         "An extra phone number becomes available when secure email confirmation is enabled on the server.",
                                         "Дополнительный номер телефона станет доступен после включения защищённого подтверждения по email на сервере.",
-                                        "Қосымша телефон нөмірі серверде қауіпсіз email растауы қосылғанда қолжетімді болады."
+                                        "Қосымша телефон нөмірі серверде қауіпсіз email растауы қосылғанда қолжетімді болады.", "Серверде электрондук почта аркылуу коопсуз ырастоо күйгүзүлгөндө кошумча телефон номерин колдонууга болот."
                                     )
                                 }
                             }
                         ) { clearSensitive(); phoneAlias = settings?.phoneLoginAlias.orEmpty(); editor = AccountAuthEditor.PHONE }
                         actionButton(autoLoading = false, modifier = Modifier.fillMaxWidth(),
-                            text = authUiText("Extra email", "Дополнительный email", "Қосымша email"),
+                            text = authUiText("Extra email", "Дополнительный email", "Қосымша email", "Кошумча электрондук почта"),
                             iconPath = stateValues.drawablePathIconEmail,
                             enabled = !loading && settings != null && capabilities?.additionalEmailLoginEnabled == true,
-                            onDisabledClick = { info = authUiText("Update the server and enable email confirmation", "Обновите сервер и включите подтверждение email", "Серверді жаңартып, email растауын қосыңыз") }
+                            onDisabledClick = { info = authUiText("Update the server and enable email confirmation", "Обновите сервер и включите подтверждение email", "Серверді жаңартып, email растауын қосыңыз", "Серверди жаңыртып, электрондук почта аркылуу ырастоону күйгүзүңүз") }
                         ) { clearSensitive(); editor = AccountAuthEditor.EMAIL }
                         if (settings?.authenticatorEnabled == true) {
-                            AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?"), !loading) {
+                            AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?", "Аутентификаторду жоготтуңузбу?"), !loading) {
                                 clearSensitive(); editor = AccountAuthEditor.TOTP_RECOVERY
                             }
                         }
@@ -357,7 +357,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             text = authUiText(
                                 "Confirm your password.",
                                 "Подтвердите пароль.",
-                                "Құпия сөзіңізді растаңыз."
+                                "Құпия сөзіңізді растаңыз.", "Сырсөзүңүздү ырастатыңыз."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
@@ -379,7 +379,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             text = authUiText(
                                 "Continue",
                                 "Продолжить",
-                                "Жалғастыру"
+                                "Жалғастыру", "Улантуу"
                             ),
                             enabled = !loading && currentPassword.isNotBlank() &&
                                 (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()) &&
@@ -411,7 +411,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                         LaunchedEffect(data?.setupId, setupCountdown.expired, loading) {
                             if (data != null && setupCountdown.expired && !loading) {
                                 setup = null; setupCode = ""; editor = AccountAuthEditor.TOTP_ENABLE
-                                error = authUiText("Setup expired. Start again.", "Срок настройки истёк. Начните заново.", "Баптау мерзімі аяқталды. Қайта бастаңыз.")
+                                error = authUiText("Setup expired. Start again.", "Срок настройки истёк. Начните заново.", "Баптау мерзімі аяқталды. Қайта бастаңыз.", "Жөндөө мөөнөтү бүттү. Кайра баштаңыз.")
                             }
                         }
                         data?.let { AuthenticatorSetupQr(it) }
@@ -419,7 +419,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             text = authUiText(
                                 "Scan the QR code, then enter the authenticator code.",
                                 "Отсканируйте QR-код и введите код аутентификатора.",
-                                "QR кодты сканерлеп, аутентификатор кодын енгізіңіз."
+                                "QR кодты сканерлеп, аутентификатор кодын енгізіңіз.", "QR кодду сканерлеп, андан кийин аутентификатордун кодун киргизиңиз."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
@@ -457,7 +457,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                         contentDescription = authUiText(
                                             "Copy manual setup key",
                                             "Скопировать ключ ручной настройки",
-                                            "Қолмен баптау кілтін көшіру"
+                                            "Қолмен баптау кілтін көшіру", "Кол менен жөндөө ачкычын көчүрүү"
                                         )
                                     )
                                 }
@@ -465,7 +465,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     text = authUiText(
                                         "Manual key · keep private",
                                         "Ручной ключ · не сообщайте никому",
-                                        "Қолмен енгізу кілті · құпия сақтаңыз"
+                                        "Қолмен енгізу кілті · құпия сақтаңыз", "Кол менен киргизүү ачкычы · купуя сактаңыз"
                                     ),
                                     color = stateValues.PlaceholderTextColor,
                                     fontSize = stateValues.smallTextSize,
@@ -482,7 +482,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                             text = authUiText(
                                                 "Authenticator setup link",
                                                 "Ссылка настройки аутентификатора",
-                                                "Аутентификаторды баптау сілтемесі"
+                                                "Аутентификаторды баптау сілтемесі", "Аутентификаторду жөндөө шилтемеси"
                                             ),
                                             color = stateValues.PlaceholderTextColor,
                                             fontSize = stateValues.smallTextSize,
@@ -493,7 +493,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                             contentDescription = authUiText(
                                                 "Copy authenticator setup link",
                                                 "Скопировать ссылку настройки аутентификатора",
-                                                "Аутентификаторды баптау сілтемесін көшіру"
+                                                "Аутентификаторды баптау сілтемесін көшіру", "Аутентификаторду жөндөө шилтемесин көчүрүү"
                                             )
                                         )
                                     }
@@ -507,7 +507,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             modifier = Modifier.fillMaxWidth(),
                             value = setupCode,
                             onValueChange = { setupCode = it },
-                            titleText = authUiText("Authenticator code", "Код аутентификатора", "Аутентификатор коды"),
+                            titleText = authUiText("Authenticator code", "Код аутентификатора", "Аутентификатор коды", "Аутентификатор коду"),
                             placeholderText = "000000",
                             identityKey = "account-authenticator-setup-code",
                             enabled = !loading,
@@ -520,7 +520,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                         actionButton(
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
-                            text = authUiText("Confirm and enable", "Подтвердить и включить", "Растау және қосу"),
+                            text = authUiText("Confirm and enable", "Подтвердить и включить", "Растау және қосу", "Ырастоо жана күйгүзүү"),
                             enabled = !loading && data != null && !setupCountdown.expired && setupCode.length == 6,
                             loading = loading
                         ) {
@@ -535,7 +535,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                         securityRevision = (settings?.securityRevision ?: 0L) + 1L,
                                         recoveryCodesRemaining = it.recoveryCodes.size
                                     )
-                                    info = authUiText("Authenticator enabled. Save the recovery codes now.", "Аутентификатор включён. Сохраните резервные коды сейчас.", "Аутентификатор қосылды. Қалпына келтіру кодтарын қазір сақтаңыз.")
+                                    info = authUiText("Authenticator enabled. Save the recovery codes now.", "Аутентификатор включён. Сохраните резервные коды сейчас.", "Аутентификатор қосылды. Қалпына келтіру кодтарын қазір сақтаңыз.", "Аутентификатор күйгүзүлдү. Калыбына келтирүү коддорун азыр сактап алыңыз.")
                                     editor = AccountAuthEditor.NONE
                                     setup = null
                                     setupCode = ""
@@ -563,9 +563,9 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             autoLoading = false,
                             modifier = Modifier.fillMaxWidth(),
                             text = if (editor == AccountAuthEditor.TOTP_DISABLE) {
-                                authUiText("Disable authenticator", "Отключить аутентификатор", "Аутентификаторды өшіру")
+                                authUiText("Disable authenticator", "Отключить аутентификатор", "Аутентификаторды өшіру", "Аутентификаторду өчүрүү")
                             } else {
-                                authUiText("Generate new codes", "Создать новые коды", "Жаңа кодтар жасау")
+                                authUiText("Generate new codes", "Создать новые коды", "Жаңа кодтар жасау", "Жаңы коддорду түзүү")
                             },
                             enabled = !loading && currentPassword.isNotBlank() && secondFactor.isNotBlank(),
                             loading = loading,
@@ -578,7 +578,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     response.payload?.let {
                                         clearSensitive()
                                         settings = it
-                                        info = authUiText("Authenticator disabled", "Аутентификатор отключён", "Аутентификатор өшірілді")
+                                        info = authUiText("Authenticator disabled", "Аутентификатор отключён", "Аутентификатор өшірілді", "Аутентификатор өчүрүлдү")
                                         editor = AccountAuthEditor.NONE
                                     } ?: run { error = authResponseText(response) }
                                 } else {
@@ -586,7 +586,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     response.payload?.let {
                                         recoveryCodes = it.recoveryCodes
                                         settings = settings?.copy(recoveryCodesRemaining = it.recoveryCodes.size)
-                                        info = authUiText("New recovery codes generated. The previous codes no longer work.", "Новые резервные коды созданы. Старые коды больше не работают.", "Жаңа қалпына келтіру кодтары жасалды. Ескі кодтар енді жұмыс істемейді.")
+                                        info = authUiText("New recovery codes generated. The previous codes no longer work.", "Новые резервные коды созданы. Старые коды больше не работают.", "Жаңа қалпына келтіру кодтары жасалды. Ескі кодтар енді жұмыс істемейді.", "Жаңы калыбына келтирүү коддору түзүлдү. Мурунку коддор эми иштебейт.")
                                         editor = AccountAuthEditor.NONE
                                         currentPassword = ""
                                         secondFactor = ""
@@ -594,7 +594,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                 }
                             }
                         }
-                        AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?"), !loading) {
+                        AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?", "Аутентификаторду жоготтуңузбу?"), !loading) {
                             clearSensitive(); editor = AccountAuthEditor.TOTP_RECOVERY
                         }
                         QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
@@ -605,7 +605,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             text = authUiText(
                                 "An extra number for sign-in; your main number stays unchanged.",
                                 "Дополнительный номер для входа; основной номер не изменится.",
-                                "Кіруге арналған қосымша нөмір; негізгі нөмір өзгермейді."
+                                "Кіруге арналған қосымша нөмір; негізгі нөмір өзгермейді.", "Кирүү үчүн кошумча номер; негизги номериңиз өзгөрбөйт."
                             ),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
@@ -616,16 +616,16 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                 enabled = !loading, persistSelection = false,
                                 selectedIndexInitial = if (phoneAction == AitaPhoneAliasAction.REMOVE) "remove" else "set",
                                 tabs = listOf(
-                                    TabContent("set", authUiText("Set or replace", "Установить или заменить", "Орнату немесе ауыстыру")) { phoneAction = AitaPhoneAliasAction.ADD_OR_REPLACE },
-                                    TabContent("remove", authUiText("Remove", "Удалить", "Жою")) { phoneAction = AitaPhoneAliasAction.REMOVE }
+                                    TabContent("set", authUiText("Set or replace", "Установить или заменить", "Орнату немесе ауыстыру", "Коюу же алмаштыруу")) { phoneAction = AitaPhoneAliasAction.ADD_OR_REPLACE },
+                                    TabContent("remove", authUiText("Remove", "Удалить", "Жою", "Алып салуу")) { phoneAction = AitaPhoneAliasAction.REMOVE }
                                 )
                             )
                             val phoneForm = remember { object : StateHost() {} }
                             val phoneField = if (phoneAction == AitaPhoneAliasAction.ADD_OR_REPLACE) {
                                 countrySelectionPhoneNumberTextField(
                                     modifier = Modifier.fillMaxWidth(), valueInitial = phoneAlias,
-                                    titleText = authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі"),
-                                    placeholderText = authUiText("Enter an extra phone number", "Введите дополнительный номер", "Қосымша телефон нөмірін енгізіңіз"),
+                                    titleText = authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі", "Кошумча телефон номери"),
+                                    placeholderText = authUiText("Enter an extra phone number", "Введите дополнительный номер", "Қосымша телефон нөмірін енгізіңіз", "Кошумча телефон номерин киргизиңиз"),
                                     stateHost = phoneForm, stateKey = "account_phone_alias", identityKey = "account_phone_alias",
                                     enabled = !loading, autoFocus = false, imeWithAction = ImeWithAction(ImeAction.Next),
                                     retainTextAcrossRecreation = false, persistTextDraft = false,
@@ -644,7 +644,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             actionButton(
                                 autoLoading = false,
                                 modifier = Modifier.weight(1f),
-                                text = authUiText("Get code", "Получить код", "Код алу"),
+                                text = authUiText("Get code", "Получить код", "Код алу", "Код алуу"),
                                 enabled = !loading && currentPassword.isNotBlank() &&
                                     (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()) &&
                                     (phoneAction == AitaPhoneAliasAction.REMOVE || phoneField?.value?.text?.isNotBlank() == true),
@@ -664,16 +664,16 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     secondFactor = ""
                                 }
                             }
-                                AuthSecurityIconAction(authUiText("Done", "Готово", "Дайын"), stateValues.drawablePathIconCheck,
+                                AuthSecurityIconAction(authUiText("Done", "Готово", "Дайын", "Даяр"), stateValues.drawablePathIconCheck,
                                     stateValues.drawableResIconCheck.value, !loading) { clearSensitive(); editor = AccountAuthEditor.NONE }
                             }
                         } else {
                             AuthEmailCodeEntry(
                                 value = phoneCode, flow = phoneFlow, busy = loading,
                                 onValueChange = { phoneCode = it; error = "" },
-                                confirmText = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау"),
+                                confirmText = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау", "Өзгөртүүнү ырастоо"),
                                 identity = "account-phone-email-confirmation-code",
-                                trailingAction = { AuthSecurityIconAction(authUiText("Done", "Готово", "Дайын"), stateValues.drawablePathIconCheck,
+                                trailingAction = { AuthSecurityIconAction(authUiText("Done", "Готово", "Дайын", "Даяр"), stateValues.drawablePathIconCheck,
                                     stateValues.drawableResIconCheck.value, !loading) { clearSensitive(); editor = AccountAuthEditor.NONE } },
                                 onSubmit = {
                                     val request = AitaPhoneAliasConfirmRequestDataModel(phoneFlowId, phoneCode)
@@ -681,7 +681,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                         val response = AitaAdvancedAuthenticationClient.confirmPhoneAlias(request)
                                         response.payload?.takeIf { !response.negative }?.let {
                                             clearSensitive(); settings = it; phoneAlias = it.phoneLoginAlias.orEmpty()
-                                            info = authUiText("Extra phone number updated", "Дополнительный номер обновлён", "Қосымша телефон нөмірі жаңартылды")
+                                            info = authUiText("Extra phone number updated", "Дополнительный номер обновлён", "Қосымша телефон нөмірі жаңартылды", "Кошумча телефон номери жаңыртылды")
                                             editor = AccountAuthEditor.NONE
                                         } ?: run { error = authResponseText(response) }
                                     }
@@ -731,7 +731,7 @@ internal fun AppConfiguration.SensitiveAuthConfirmationFields(
         modifier = Modifier.fillMaxWidth(),
         value = currentPassword,
         onValueChange = onPasswordChange,
-        titleText = authUiText("Current password", "Текущий пароль", "Ағымдағы құпия сөз"),
+        titleText = authUiText("Current password", "Текущий пароль", "Ағымдағы құпия сөз", "Учурдагы сырсөз"),
         placeholderText = stateValues.stringEnterPassword,
         identityKey = "account-security-current-password",
         keyboardType = KeyboardType.Password,
@@ -746,7 +746,7 @@ internal fun AppConfiguration.SensitiveAuthConfirmationFields(
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             value = secondFactor,
             onValueChange = onSecondFactorChange,
-            titleText = authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды"),
+            titleText = authUiText("Authenticator or recovery code", "Код аутентификатора или резервный код", "Аутентификатор немесе қалпына келтіру коды", "Аутентификатор же калыбына келтирүү коду"),
             placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(enabled) },
             identityKey = "account-security-second-factor",
             keyboardType = KeyboardType.Ascii,
@@ -781,12 +781,12 @@ private fun AppConfiguration.RecoveryCodesPanel(codes: List<String>) {
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
-                    authUiText("Save these recovery codes now", "Сохраните резервные коды сейчас", "Қалпына келтіру кодтарын қазір сақтаңыз"),
+                    authUiText("Save these recovery codes now", "Сохраните резервные коды сейчас", "Қалпына келтіру кодтарын қазір сақтаңыз", "Бул калыбына келтирүү коддорун азыр сактап алыңыз"),
                     color = stateValues.TextColor,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    authUiText("Each code works once. They will not be shown again after you close this card.", "Каждый код действует один раз. После закрытия карточки они больше не будут показаны.", "Әр код бір рет жұмыс істейді. Карточканы жапқаннан кейін олар қайта көрсетілмейді."),
+                    authUiText("Each code works once. They will not be shown again after you close this card.", "Каждый код действует один раз. После закрытия карточки они больше не будут показаны.", "Әр код бір рет жұмыс істейді. Карточканы жапқаннан кейін олар қайта көрсетілмейді.", "Ар бир код бир гана жолу иштейт. Бул карточканы жапкандан кийин алар кайра көрсөтүлбөйт."),
                     color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize
                 )
@@ -796,7 +796,7 @@ private fun AppConfiguration.RecoveryCodesPanel(codes: List<String>) {
                 contentDescription = authUiText(
                     "Copy all recovery codes",
                     "Скопировать все резервные коды",
-                    "Барлық қалпына келтіру кодтарын көшіру"
+                    "Барлық қалпына келтіру кодтарын көшіру", "Бардык калыбына келтирүү коддорун көчүрүү"
                 )
             )
         }
@@ -815,11 +815,11 @@ private fun AppConfiguration.AuthenticatorLoginRequirementToggle(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету"),
+            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету", "Кирүүдө 2FA талап кылуу"),
                 color = stateValues.TextColor, fontSize = stateValues.textSize)
 
         }
-        val label = authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету")
+        val label = authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету", "Кирүүдө 2FA талап кылуу")
         Switch(modifier = Modifier.semantics { contentDescription = label },
             checked = checked, onCheckedChange = onCheckedChange, enabled = enabled,
             colors = SwitchDefaults.colors(checkedTrackColor = stateValues.AccentColor,

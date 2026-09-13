@@ -87,7 +87,7 @@ internal fun AitaLoadingSkeleton(
 @Composable
 internal fun AppConfiguration.LoadingSkeleton(modifier: Modifier = Modifier, rows: Int = 3, compact: Boolean = false) =
     AitaLoadingSkeleton(modifier, rows, compact, stateValues.TextColor,
-        authUiText("Loading", "Загрузка", "Жүктелуде"))
+        authUiText("Loading", "Загрузка", "Жүктелуде", "Жүктөлүүдө"))
 
 /** Actions keep their label/size; dots communicate pending work without pretending to be data. */
 @Composable
@@ -165,7 +165,9 @@ internal fun AitaLiveMenuPane(
     val destination = navigationStack.lastOrNull() ?: return
     val target = AitaSceneMotionTarget(label, destination.route, navigationStack.map { it.route })
     val paneWidth = (destination as? NavigationScreenModel.Menu)?.let(::menuPaneMaximumWidth) ?: 1200.dp
-    Box(modifier.aitaWidthCap(paneWidth).aitaSceneMotion(target)) {
-        key(destination.route) { content(navigationStack) }
+    CompositionLocalProvider(LocalAitaScreenContentMaximumWidth provides paneWidth) {
+        Box(modifier.fillMaxSize().aitaSceneMotion(target)) {
+            key(destination.route) { content(navigationStack) }
+        }
     }
 }

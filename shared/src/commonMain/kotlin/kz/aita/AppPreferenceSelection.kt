@@ -32,3 +32,11 @@ internal fun resolveAppPreferenceChoice(
     )
     return AppPreferenceDecision(chosen, pending != null || override.touched || base != server)
 }
+
+/** Reject wrong-owner elsewhere; only the actual normalized intent can settle its journal. */
+internal fun appPreferenceAcknowledges(expected: UserPreferencesDataModel, received: UserPreferencesDataModel): Boolean {
+    val language = canonicalLanguageCode(received.appLanguage)
+    if (language != "system" && language !in SUPPORTED_APP_LANGUAGES) return false
+    return normalizeAppLanguagePreference(expected.appLanguage) == language &&
+        expected.appThemeId == received.appThemeId && expected.appSizeModeId == received.appSizeModeId
+}

@@ -183,13 +183,16 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
         )
     )
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(1338, "Catalog"),
-            iconPath = stateValues.drawablePathIconSupplierCatalog,
-            iconRes = stateValues.drawableResIconSupplierCatalog.value
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(1338, "Catalog"),
+                iconPath = stateValues.drawablePathIconSupplierCatalog,
+                iconRes = stateValues.drawableResIconSupplierCatalog.value
+            )
+        }
+    ) {
         LazyColumn(
             modifier = Modifier
                 .weight(1f)

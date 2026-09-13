@@ -764,12 +764,12 @@ internal fun AppConfiguration.SupplierPartnerDetail(
         val section = sectionTabsWidget(
             stateKey = "supplier-partner-detail:${partner.partnerKey}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
-                TabContent("work", authUiText("Work", "Работа", "Жұмыс")),
-                TabContent("commercial", authUiText("Commercial", "Коммерция", "Коммерция")),
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
+                TabContent("work", authUiText("Work", "Работа", "Жұмыс", "Иш")),
+                TabContent("commercial", authUiText("Commercial", "Коммерция", "Коммерция", "Соода")),
                 TabContent("orders", localizedStringResource(254, "Orders")),
-                TabContent("agreements", authUiText("Agreements", "Соглашения", "Келісімдер")),
-                TabContent("offers", authUiText("Offers", "Предложения", "Ұсыныстар"))
+                TabContent("agreements", authUiText("Agreements", "Соглашения", "Келісімдер", "Макулдашуулар")),
+                TabContent("offers", authUiText("Offers", "Предложения", "Ұсыныстар", "Сунуштар"))
             ),
             modifier = Modifier
                 .fillMaxWidth()

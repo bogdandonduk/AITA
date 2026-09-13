@@ -316,16 +316,19 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
         else -> null
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        if (showAppBar) {
-            ScreenAppBarWidget(
-                title = appBarTitle,
-                iconPath = stateValues.drawablePathIconSupplierContracts,
-                iconRes = stateValues.drawableResIconSupplierContracts.value,
-                onBack = closeFocusedContent
-            )
+    AitaScreenColumn(
+        modifier = modifier.fillMaxSize(),
+        appBar = {
+            if (showAppBar) {
+                ScreenAppBarWidget(
+                    title = appBarTitle,
+                    iconPath = stateValues.drawablePathIconSupplierContracts,
+                    iconRes = stateValues.drawableResIconSupplierContracts.value,
+                    onBack = closeFocusedContent
+                )
+            }
         }
-
+    ) {
         LazyColumn(
             modifier = Modifier
                 .weight(1f)

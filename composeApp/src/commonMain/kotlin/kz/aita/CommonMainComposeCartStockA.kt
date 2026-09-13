@@ -830,52 +830,53 @@ fun AppConfiguration.GoodsItemInCartWidget(
 
 @Composable
 fun AppConfiguration.TransactionCartScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        val context = rememberTransactionContext()
+    val context = rememberTransactionContext()
 
-        ScreenAppBarWidget(
-            title = transactionTitle(
-                context.transactionTypeIndex,
-                stateValues.stringSale,
-                stateValues.stringReturn,
-                stateValues.stringSupply
-            ),
-            iconPath = when (context.transactionTypeIndex) {
-                0 -> stateValues.drawablePathIconTransactionSale
-                1 -> stateValues.drawablePathIconTransactionReturn
-                else -> stateValues.drawablePathIconTransactionSupply
-            },
-            trailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
-                add(
-                    Triple(stockAddIconPath(), stockAddIconFallback()) {
-                        openQuickStockAddSheet(
-                            transactionTypeIndex = context.transactionTypeIndex,
-                            clientId = context.clientId
-                        )
-                    }
-                )
-
-                if (stateValues.isNarrowScreen) {
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = transactionTitle(
+                    context.transactionTypeIndex,
+                    stateValues.stringSale,
+                    stateValues.stringReturn,
+                    stateValues.stringSupply
+                ),
+                iconPath = when (context.transactionTypeIndex) {
+                    0 -> stateValues.drawablePathIconTransactionSale
+                    1 -> stateValues.drawablePathIconTransactionReturn
+                    else -> stateValues.drawablePathIconTransactionSupply
+                },
+                trailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
                     add(
-                        Triple(
-                            stateValues.drawablePathIconTransactionSelection,
-                            stateValues.drawableResIconTransactionSelection.value
-                        ) {
-                            coroutineScope.launch {
-                                when (context.transactionTypeIndex) {
-                                    0 -> Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Selection)
-                                    1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Selection)
-                                    else -> Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Selection)
-                                }
-                            }
+                        Triple(stockAddIconPath(), stockAddIconFallback()) {
+                            openQuickStockAddSheet(
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId
+                            )
                         }
                     )
-                }
-            }
-        )
 
+                    if (stateValues.isNarrowScreen) {
+                        add(
+                            Triple(
+                                stateValues.drawablePathIconTransactionSelection,
+                                stateValues.drawableResIconTransactionSelection.value
+                            ) {
+                                coroutineScope.launch {
+                                    when (context.transactionTypeIndex) {
+                                        0 -> Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Selection)
+                                        1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Selection)
+                                        else -> Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Selection)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            )
+        }
+    ) {
         val goodsInCart by getCartState(
             context.transactionTypeIndex,
             context.clientId
@@ -1973,23 +1974,24 @@ fun AppConfiguration.StockWarehouseScreen() {
         )
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
-            .fillMaxSize()
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringStock,
-            iconPath = stateValues.drawablePathIconStock,
-            trailingIcons = listOf(
-                Triple(
-                    sortActionIconPath(),
-                    sortActionIconFallback()
-                ) {
-                    sortMenuExpanded = !sortMenuExpanded
-                }
+            .fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringStock,
+                iconPath = stateValues.drawablePathIconStock,
+                trailingIcons = listOf(
+                    Triple(
+                        sortActionIconPath(),
+                        sortActionIconFallback()
+                    ) {
+                        sortMenuExpanded = !sortMenuExpanded
+                    }
+                )
             )
-        )
-
+        }
+    ) {
         AnimatedVisibility(visible = sortMenuExpanded) {
             Column(
                 modifier = Modifier
@@ -3873,7 +3875,8 @@ internal fun defaultStockPromotion(language: String): StockPromotionDataModel = 
     id = "promo_${getCurrentTimeMillis()}",
     title = listOf(
         LocalizedStringDataModel("main", "Promo"),
-        LocalizedStringDataModel(language.takeIf { it.isNotBlank() } ?: DEFAULT_APP_LANGUAGE, "Promo")
+        LocalizedStringDataModel(language.takeIf { it.isNotBlank() } ?: DEFAULT_APP_LANGUAGE,
+            if (normalizeAppLanguagePreference(language) == "ky") "Акция" else "Promo")
     ).distinctBy { it.language },
     type = STOCK_PROMOTION_TYPE_DISCOUNT,
     mode = STOCK_PROMOTION_MODE_PERCENT,
@@ -3895,7 +3898,7 @@ internal fun AppConfiguration.StockPromotionListEditor(
         ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
         ?: QuantityDataModel(
             id = "0",
-            immutableUnitName = listOf(LocalizedStringDataModel("main", "pcs")),
+            immutableUnitName = listOf(LocalizedStringDataModel("main", "pcs"), LocalizedStringDataModel("ky", "даана")),
             total = 1.0,
             pricedAmount = 1.0,
             roundTotal = true

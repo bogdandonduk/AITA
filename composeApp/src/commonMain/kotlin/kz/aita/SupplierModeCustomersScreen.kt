@@ -195,19 +195,22 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
         )
     )
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = selectedPartner?.title ?: localizedStringResource(1453, "Partner stores"),
-            iconPath = stateValues.drawablePathIconSupplierPartners,
-            iconRes = stateValues.drawableResIconSupplierPartners.value,
-            onBack = selectedPartner?.let { { selectedPartnerKey = null } }
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = selectedPartner?.title ?: localizedStringResource(1453, "Partner stores"),
+                iconPath = stateValues.drawablePathIconSupplierPartners,
+                iconRes = stateValues.drawableResIconSupplierPartners.value,
+                onBack = selectedPartner?.let { { selectedPartnerKey = null } }
+            )
+        }
+    ) {
         val section = if (selectedPartner == null) sectionTabsWidget(
             stateKey = "supplier-partners:${focusedSupplierId.orEmpty()}",
             tabs = listOf(
                 TabContent("partners", localizedStringResource(1453, "Partner stores")),
-                TabContent("health", authUiText("Portfolio health", "Состояние партнёров", "Серіктестердің жағдайы"))
+                TabContent("health", authUiText("Portfolio health", "Состояние партнёров", "Серіктестердің жағдайы", "Өнөктөштөрдүн жалпы абалы"))
             ),
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)

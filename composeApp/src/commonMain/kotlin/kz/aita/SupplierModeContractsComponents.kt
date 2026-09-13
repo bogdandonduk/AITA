@@ -1210,11 +1210,11 @@ internal fun AppConfiguration.SupplierContractDetail(
         val section = sectionTabsWidget(
             stateKey = "supplier-contract-detail:${contract.id}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
-                TabContent("acceptance", authUiText("Acceptance", "Согласование", "Келісу")),
-                TabContent("terms", authUiText("Terms", "Условия", "Шарттар")),
-                TabContent("products", authUiText("Products", "Товары", "Тауарлар")),
-                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер"))
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
+                TabContent("acceptance", authUiText("Acceptance", "Согласование", "Келісу", "Кабыл алуу")),
+                TabContent("terms", authUiText("Terms", "Условия", "Шарттар", "Шарттар")),
+                TabContent("products", authUiText("Products", "Товары", "Тауарлар", "Товарлар")),
+                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер", "Аракеттер"))
             ),
             modifier = Modifier
                 .fillMaxWidth()

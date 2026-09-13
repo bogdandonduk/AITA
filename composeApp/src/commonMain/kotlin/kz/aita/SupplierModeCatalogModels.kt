@@ -553,7 +553,7 @@ internal fun AppConfiguration.buildSupplierCatalogItems(
                 ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
                 ?: QuantityDataModel(
                     id = "0",
-                    immutableUnitName = listOf(LocalizedStringDataModel("main", "unit")),
+                    immutableUnitName = listOf(LocalizedStringDataModel("main", "unit"), LocalizedStringDataModel("ky", "бирдик")),
                     total = 1.0,
                     pricedAmount = 1.0,
                     roundTotal = false

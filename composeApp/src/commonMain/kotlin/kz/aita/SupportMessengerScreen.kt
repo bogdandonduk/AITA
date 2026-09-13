@@ -57,16 +57,20 @@ fun AppConfiguration.MenuSupportScreen() {
         val canAgent=companyCanOpenSupport(employment,account)
         val tab=selected.takeUnless { it=="agent" && !canAgent } ?: "chat"
         LaunchedEffect(canAgent) { if(!canAgent && selected=="agent") selected="chat" }
-        Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally) {
-            ScreenAppBarWidget(title=localizedStringResource(813,"Support"),iconPath=stateValues.drawablePathIconSupport,
-                onBack={ coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+        AitaScreenColumn(
+            Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,
+            appBar = {
+                ScreenAppBarWidget(title=localizedStringResource(813,"Support"),iconPath=stateValues.drawablePathIconSupport,
+                    onBack={ coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+            }
+        ) {
             tabRowWidget(Modifier.widthIn(max=960.dp).fillMaxWidth().padding(horizontal=stateValues.marginTextField,vertical=4.dp),
                 tabs=buildList {
                     add(TabContent("faq",localizedStringResource(814,"FAQ")) { selected=it })
-                    add(TabContent("chat",authUiText("Chats","Чаты","Чаттар")) { selected=it })
-                    if(canAgent) add(TabContent("agent",authUiText("Agent","Специалист","Маман")) { selected=it })
+                    add(TabContent("chat",authUiText("Chats","Чаты","Чаттар", "Чаттар")) { selected=it })
+                    if(canAgent) add(TabContent("agent",authUiText("Agent","Специалист","Маман", "Агент")) { selected=it })
                 },selectedIndexInitial=tab)
-            if(account==null) MessageText(text=authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз"))
+            if(account==null) MessageText(text=authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз", "Колдоого кайрылуу үчүн кириңиз"))
             else if(tab=="faq") SupportHelpPane(Modifier.weight(1f))
             else key(account,tab) {
                 SupportInboxPane(account,tab=="agent",employment?.capabilities.orEmpty(),Modifier.weight(1f))
@@ -137,12 +141,12 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
     }
     Column(modifier.widthIn(max=1080.dp).fillMaxWidth()) {
         if(agent) tabRowWidget(Modifier.fillMaxWidth().padding(horizontal=8.dp),tabs=buildList {
-            add(TabContent("open",authUiText("Open","Открытые","Ашық")) { filter=it; metrics=false })
-            add(TabContent("unassigned",authUiText("Unassigned","Без специалиста","Тағайындалмаған")) { filter=it; metrics=false })
-            add(TabContent("mine",authUiText("Mine","Мои","Менікі")) { filter=it; metrics=false })
-            add(TabContent("closed",authUiText("Closed","Закрытые","Жабық")) { filter=it; metrics=false })
+            add(TabContent("open",authUiText("Open","Открытые","Ашық", "Ачуу")) { filter=it; metrics=false })
+            add(TabContent("unassigned",authUiText("Unassigned","Без специалиста","Тағайындалмаған", "Дайындалган эмес")) { filter=it; metrics=false })
+            add(TabContent("mine",authUiText("Mine","Мои","Менікі", "Менин")) { filter=it; metrics=false })
+            add(TabContent("closed",authUiText("Closed","Закрытые","Жабық", "Жабык")) { filter=it; metrics=false })
             if(CompanyCapability.SUPPORT_METRICS in capabilities)
-                add(TabContent("metrics",authUiText("Metrics","Показатели","Көрсеткіштер")) { metrics=true })
+                add(TabContent("metrics",authUiText("Metrics","Показатели","Көрсеткіштер", "Көрсөткүчтөр")) { metrics=true })
         },selectedIndexInitial=if(metrics) "metrics" else filter,textSize=stateValues.smallTextSize)
         if(metrics && CompanyCapability.SUPPORT_METRICS in capabilities) {
             SupportMetricsPane(Modifier.weight(1f),account); return@Column
@@ -152,17 +156,17 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                 if(split) Modifier.width(300.dp).fillMaxHeight() else Modifier.fillMaxSize()
             ) {
                 Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Text(if(agent) authUiText("Support inbox","Обращения","Өтініштер") else authUiText("Your conversations","Ваши диалоги","Сіздің диалогтарыңыз"),
+                    Text(if(agent) authUiText("Support inbox","Обращения","Өтініштер", "Колдоонун кирген маектери") else authUiText("Your conversations","Ваши диалоги","Сіздің диалогтарыңыз", "Маектериңиз"),
                         Modifier.weight(1f),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.textSize)
                     if(!agent) actionButton(text="",iconPath=stateValues.drawablePathIconAdd,
-                        iconContentDescription=authUiText("New conversation","Новый диалог","Жаңа диалог"),autoLoading=false,
+                        iconContentDescription=authUiText("New conversation","Новый диалог","Жаңа диалог", "Жаңы маек"),autoLoading=false,
                         onClick={ composing=true; selected=null })
                 }
                 feedback?.let { SupportInlineError(it) }
                 if(loading) LoadingSkeleton(Modifier.fillMaxWidth(),rows=4)
                 else LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                     if(tickets.isEmpty()) item {
-                        MessageText(Modifier.fillParentMaxWidth().padding(24.dp),authUiText("No conversations here yet","Здесь пока нет диалогов","Мұнда әзірге диалог жоқ"))
+                        MessageText(Modifier.fillParentMaxWidth().padding(24.dp),authUiText("No conversations here yet","Здесь пока нет диалогов","Мұнда әзірге диалог жоқ", "Бул жерде маектер азырынча жок"))
                     }
                     items(tickets,key={ it.id }) { ticket ->
                         val unread=if(agent) ticket.unreadForAgentCount else ticket.unreadForUserCount
@@ -184,7 +188,7 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                         }
                     }
                     if(page?.nextBeforeId!=null) item {
-                        actionButton(text=authUiText("Older conversations","Более ранние диалоги","Бұрынғы диалогтар"),loading=loadingMore,autoLoading=false,
+                        actionButton(text=authUiText("Older conversations","Более ранние диалоги","Бұрынғы диалогтар", "Эски маектер"),loading=loadingMore,autoLoading=false,
                             enabled=!loadingMore,onClick={
                                 val cursor=page ?: return@actionButton
                                 val generation=currentAuthenticatedSessionGeneration(); val requestedFilter=filter; val requestedEpoch=pageEpoch
@@ -211,8 +215,8 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                     if(split) Modifier.weight(1f).fillMaxHeight() else Modifier.fillMaxSize(),
                     onBack={ selected=null; composing=false },onCreated={ selected=it; composing=false; refresh++ })
             } else if(split) Box(Modifier.weight(1f).fillMaxHeight(),contentAlignment=Alignment.Center) {
-                MessageText(Modifier.padding(32.dp),authUiText("Choose a conversation","Выберите диалог","Диалогты таңдаңыз"),
-                    authUiText("Messages stay together, from the first question to the solution.","От первого вопроса до решения — всё в одном диалоге.","Алғашқы сұрақтан шешімге дейін — барлығы бір диалогта."))
+                MessageText(Modifier.padding(32.dp),authUiText("Choose a conversation","Выберите диалог","Диалогты таңдаңыз", "Маекти тандаңыз"),
+                    authUiText("Messages stay together, from the first question to the solution.","От первого вопроса до решения — всё в одном диалоге.","Алғашқы сұрақтан шешімге дейін — барлығы бір диалогта.", "Алгачкы суроодон чечимге чейин билдирүүлөр бир жерде сакталат."))
             }
         }
     }
@@ -325,13 +329,13 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
     }
     Column(modifier.imePadding()) {
         Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            actionButton(text=authUiText("Chats","Чаты","Чаттар"),fillMaxWidthIfTextPresent=false,autoLoading=false,onClick=onBack)
+            actionButton(text=authUiText("Chats","Чаты","Чаттар", "Чаттар"),fillMaxWidthIfTextPresent=false,autoLoading=false,onClick=onBack)
             Column(Modifier.weight(1f)) {
-                Text(ticket?.subject ?: authUiText("New conversation","Новый диалог","Жаңа диалог"),color=stateValues.TextColor,
+                Text(ticket?.subject ?: authUiText("New conversation","Новый диалог","Жаңа диалог", "Жаңы маек"),color=stateValues.TextColor,
                     fontSize=stateValues.textSize,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
-                ticket?.let { Text(if(it.status=="closed") authUiText("Closed","Закрыт","Жабық")
-                    else if(it.assignedAgentUserId==null) authUiText("Waiting for an agent","Ожидает специалиста","Маман күтілуде")
-                    else authUiText("Assigned to an agent","Назначен специалист","Маман тағайындалды"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize) }
+                ticket?.let { Text(if(it.status=="closed") authUiText("Closed","Закрыт","Жабық", "Жабык")
+                    else if(it.assignedAgentUserId==null) authUiText("Waiting for an agent","Ожидает специалиста","Маман күтілуде", "Агентти күтүүдө")
+                    else authUiText("Assigned to an agent","Назначен специалист","Маман тағайындалды", "Агентке дайындалды"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize) }
             }
         }
         ticket?.let { current ->
@@ -340,9 +344,9 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
             val canResolve=!agent || (current.userId!=account && CompanyCapability.SUPPORT_RESOLVE in capabilities && (mine || manager))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 if(agent && !mine && current.status!="closed" && CompanyCapability.SUPPORT_CLAIM in capabilities && current.userId!=account)
-                    actionButton(text=authUiText("Take conversation","Взять в работу","Жұмысқа алу"),fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,loading=acting,onClick={ act("claim") })
-                if(agent && mine && CompanyCapability.SUPPORT_CLAIM in capabilities) actionButton(text=authUiText("Release","Освободить","Босату"),fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,onClick={ act("release") })
-                if(canResolve) actionButton(text=if(current.status=="closed") authUiText("Reopen","Открыть снова","Қайта ашу") else authUiText("Resolve","Решено","Шешілді"),
+                    actionButton(text=authUiText("Take conversation","Взять в работу","Жұмысқа алу", "Маекти өзүңүзгө алуу"),fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,loading=acting,onClick={ act("claim") })
+                if(agent && mine && CompanyCapability.SUPPORT_CLAIM in capabilities) actionButton(text=authUiText("Release","Освободить","Босату", "Бошотуу"),fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,onClick={ act("release") })
+                if(canResolve) actionButton(text=if(current.status=="closed") authUiText("Reopen","Открыть снова","Қайта ашу", "Кайра ачуу") else authUiText("Resolve","Решено","Шешілді", "Чечүү"),
                     fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",onClick={ act(if(current.status=="closed") "reopen" else "close") })
             }
         }
@@ -350,16 +354,16 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if(loading) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp),rows=4)
             else if(ticketId==null && pending==null) Column(Modifier.align(Alignment.Center).padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-                Text(authUiText("Let’s work it out","Давайте разберёмся","Бірге шешейік"),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
+                Text(authUiText("Let’s work it out","Давайте разберёмся","Бірге шешейік", "Бирге чечели"),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
-                Text(authUiText("Tell us what happened. Never send passwords, sign-in codes or payment secrets.","Расскажите, что случилось. Не отправляйте пароли, коды входа и платёжные секреты.","Не болғанын айтыңыз. Құпия сөздерді, кіру кодтарын және төлем құпияларын жібермеңіз."),
+                Text(authUiText("Tell us what happened. Never send passwords, sign-in codes or payment secrets.","Расскажите, что случилось. Не отправляйте пароли, коды входа и платёжные секреты.","Не болғанын айтыңыз. Құпия сөздерді, кіру кодтарын және төлем құпияларын жібермеңіз.", "Эмне болгонун айтып бериңиз. Сырсөздөрдү, кирүү коддорун же төлөмдүн жашыруун маалыматын эч качан жөнөтпөңүз."),
                     color=stateValues.PlaceholderTextColor,fontSize=stateValues.textSize)
             } else LazyColumn(state=list,reverseLayout=true,modifier=Modifier.fillMaxSize(),contentPadding=PaddingValues(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                 pending?.takeUnless { waiting -> messages.any { it.clientMessageId=="v2:$account:${waiting.commandId}" } }
                     ?.let { waiting -> item(key="pending:${waiting.commandId}") {
                     Column(Modifier.fillMaxWidth().padding(vertical=6.dp),horizontalAlignment=Alignment.End) {
                         SelectionContainer { Text(waiting.body,Modifier.widthIn(max=520.dp).padding(10.dp),color=stateValues.TextColor,fontSize=stateValues.textSize) }
-                        Text(if(sending) authUiText("Sending…","Отправка…","Жіберілуде…") else authUiText("Not confirmed · retry below","Не подтверждено · повторите ниже","Расталмады · төменде қайталаңыз"),
+                        Text(if(sending) authUiText("Sending…","Отправка…","Жіберілуде…", "Жөнөтүлүүдө…") else authUiText("Not confirmed · retry below","Не подтверждено · повторите ниже","Расталмады · төменде қайталаңыз", "Ырасталган жок · төмөндөн кайталаңыз"),
                             color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                     }
                 } }
@@ -376,7 +380,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                     }
                 }
                 before?.let { cursor -> item(key="older") {
-                    actionButton(text=authUiText("Earlier messages","Более ранние сообщения","Бұрынғы хабарламалар"),autoLoading=false,loading=loadingMore,enabled=!loadingMore,onClick={
+                    actionButton(text=authUiText("Earlier messages","Более ранние сообщения","Бұрынғы хабарламалар", "Мурунку билдирүүлөр"),autoLoading=false,loading=loadingMore,enabled=!loadingMore,onClick={
                         loadingMore=true
                         scope.launch {
                             try {
@@ -394,19 +398,19 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                 } }
             }
             if(hasNew) Box(Modifier.align(Alignment.BottomCenter).padding(10.dp)) {
-                actionButton(text=authUiText("New messages ↓","Новые сообщения ↓","Жаңа хабарламалар ↓"),fillMaxWidthIfTextPresent=false,autoLoading=false,
+                actionButton(text=authUiText("New messages ↓","Новые сообщения ↓","Жаңа хабарламалар ↓", "Жаңы билдирүүлөр ↓"),fillMaxWidthIfTextPresent=false,autoLoading=false,
                     onClick={ hasNew=false; scope.launch { list.animateScrollToItem(0) } })
             }
         }
         if(ticketId==null) tabRowWidget(Modifier.fillMaxWidth().padding(horizontal=8.dp),tabs=listOf(
-            TabContent("general",authUiText("General","Общее","Жалпы")) { category=it },
-            TabContent("technical",authUiText("Technical","Техника","Техника")) { category=it },
-            TabContent("billing",authUiText("Billing","Оплата","Төлем")) { category=it },
-            TabContent("account",authUiText("Account","Аккаунт","Аккаунт")) { category=it },
-            TabContent("operations",authUiText("Operations","Работа магазина","Дүкен жұмысы")) { category=it }
+            TabContent("general",authUiText("General","Общее","Жалпы", "Жалпы")) { category=it },
+            TabContent("technical",authUiText("Technical","Техника","Техника", "Техникалык")) { category=it },
+            TabContent("billing",authUiText("Billing","Оплата","Төлем", "Төлөм жана жазылуу")) { category=it },
+            TabContent("account",authUiText("Account","Аккаунт","Аккаунт", "Аккаунт")) { category=it },
+            TabContent("operations",authUiText("Operations","Работа магазина","Дүкен жұмысы", "Операциялар")) { category=it }
         ),selectedIndexInitial=category,textSize=stateValues.smallTextSize)
         val canSend=if(ticketId==null) !agent else ticket?.let { supportCanReply(it,account,agent,capabilities) }==true
-        if(!canSend) Text(authUiText("Reopen or take this conversation to reply.","Откройте диалог или возьмите его в работу, чтобы ответить.","Жауап беру үшін диалогты ашыңыз немесе жұмысқа алыңыз."),
+        if(!canSend) Text(authUiText("Reopen or take this conversation to reply.","Откройте диалог или возьмите его в работу, чтобы ответить.","Жауап беру үшін диалогты ашыңыз немесе жұмысқа алыңыз.", "Жооп берүү үчүн бул маекти кайра ачыңыз же өзүңүзгө алыңыз."),
             Modifier.padding(12.dp),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
         Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=6.dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
             genericTextField(modifier=Modifier.weight(1f).heightIn(max=160.dp),valueInitial=draft,
@@ -419,7 +423,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                     applyChange()
                 })
             actionButton(text="",iconPath=supportSendIconPath(),iconRes=supportSendIconFallback(),autoLoading=false,confirmationRequired=false,
-                iconContentDescription=if(pending!=null) authUiText("Retry saved message","Повторить сохранённое сообщение","Сақталған хабарламаны қайталау") else localizedStringResource(825,"Send"),
+                iconContentDescription=if(pending!=null) authUiText("Retry saved message","Повторить сохранённое сообщение","Сақталған хабарламаны қайталау", "Сакталган билдирүүнү кайра жөнөтүү") else localizedStringResource(825,"Send"),
                 enabled=canSend && draftLoaded && !sending && (pending!=null || (draft.isNotBlank() && '\u0000' !in draft)),loading=sending,onClick={
                     if(sending) return@actionButton
                     val command=pending ?: PendingSupportMessage(account,newClientSideUuidString(),ticketId,agent,draft.trim(),category,
@@ -450,7 +454,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                     }
                 })
         }
-        if(pending!=null && !sending) Text(authUiText("Send retries the saved message. Your newer draft is kept separately.","Кнопка повторит сохранённое сообщение. Новый черновик остаётся отдельно.","Батырма сақталған хабарламаны қайталайды. Жаңа мәтін бөлек сақталады."),
+        if(pending!=null && !sending) Text(authUiText("Send retries the saved message. Your newer draft is kept separately.","Кнопка повторит сохранённое сообщение. Новый черновик остаётся отдельно.","Батырма сақталған хабарламаны қайталайды. Жаңа мәтін бөлек сақталады.", "«Жөнөтүү» сакталган билдирүүнү кайра жөнөтөт. Жаңы долбооруңуз өзүнчө сакталат."),
             Modifier.padding(horizontal=14.dp,vertical=4.dp),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
     }
 }
@@ -464,15 +468,15 @@ private fun AppConfiguration.SupportConversationBubble(message: SupportMessageDa
     BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=if(mine) Alignment.CenterEnd else Alignment.CenterStart) {
         Column(Modifier.widthIn(max=maxWidth*0.86f).clip(shape).background(if(agentMessage) stateValues.AccentColor else Color.Transparent)
             .border(if(agentMessage) 0.dp else stateValues.unfocusedBorderWidth,stateValues.PlaceholderTextColor.copy(alpha=0.2f),shape).padding(horizontal=12.dp,vertical=9.dp)) {
-            if(!mine) Text(message.senderDisplayName.ifBlank { authUiText("Support team","Поддержка","Қолдау") },color=foreground,fontWeight=FontWeight.Bold,fontSize=stateValues.smallTextSize)
+            if(!mine) Text(message.senderDisplayName.ifBlank { authUiText("Support team","Поддержка","Қолдау", "Колдоо тобу") },color=foreground,fontWeight=FontWeight.Bold,fontSize=stateValues.smallTextSize)
             SelectionContainer { Text(message.body,color=foreground,fontSize=stateValues.textSize) }
             if(message.attachments.isNotEmpty()) SelectionContainer {
-                Text(authUiText("Attachments","Вложения","Тіркемелер")+"\n"+message.attachments.joinToString("\n"),
+                Text(authUiText("Attachments","Вложения","Тіркемелер", "Тиркемелер")+"\n"+message.attachments.joinToString("\n"),
                     Modifier.padding(top=6.dp),color=foreground,fontSize=stateValues.smallTextSize)
             }
             val read=if(agentMessage) message.readByCustomerAtMillis!=null else message.readByAgentAtMillis!=null
             val receipt=if(!mine) "" else " · "+
-                (if(read) authUiText("Read","Прочитано","Оқылды") else authUiText("Sent","Отправлено","Жіберілді"))
+                (if(read) authUiText("Read","Прочитано","Оқылды", "Окуу") else authUiText("Sent","Отправлено","Жіберілді", "Жөнөтүлдү"))
             Text(supportTime(message.createdAtMillis)+receipt,
                 Modifier.align(Alignment.End).padding(top=5.dp),color=foreground.copy(alpha=0.75f),fontSize=stateValues.smallTextSize)
         }
@@ -494,19 +498,19 @@ private fun AppConfiguration.SupportMetricsPane(modifier: Modifier,account: Stri
         val metrics=data
         if(metrics==null && error==null) LoadingSkeleton(rows=4)
         else if(metrics!=null) {
-            Text(authUiText("Team · last 30 days","Команда · последние 30 дней","Топ · соңғы 30 күн"),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.accentTextSize)
+            Text(authUiText("Team · last 30 days","Команда · последние 30 дней","Топ · соңғы 30 күн", "Команда · акыркы 30 күн"),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.accentTextSize)
             listOf(
-                authUiText("Open now","Открыто сейчас","Қазір ашық") to metrics.open.toString(),
-                authUiText("Unassigned now","Без специалиста сейчас","Қазір тағайындалмаған") to metrics.unassigned.toString(),
-                authUiText("Replies","Ответов","Жауаптар") to metrics.repliesLast30Days.toString(),
-                authUiText("Resolutions","Закрытий","Шешілгендер") to metrics.resolvedLast30Days.toString(),
-                authUiText("Average first reply (minutes)","Первый ответ в среднем (минуты)","Орташа алғашқы жауап (минут)") to
+                authUiText("Open now","Открыто сейчас","Қазір ашық", "Азыр ачуу") to metrics.open.toString(),
+                authUiText("Unassigned now","Без специалиста сейчас","Қазір тағайындалмаған", "Азыр дайындалган эмес") to metrics.unassigned.toString(),
+                authUiText("Replies","Ответов","Жауаптар", "Жооптор") to metrics.repliesLast30Days.toString(),
+                authUiText("Resolutions","Закрытий","Шешілгендер", "Чечимдер") to metrics.resolvedLast30Days.toString(),
+                authUiText("Average first reply (minutes)","Первый ответ в среднем (минуты)","Орташа алғашқы жауап (минут)", "Биринчи жооптун орточо убактысы (мүнөт)") to
                     (metrics.averageFirstResponseMillis?.let { (it/60_000).toString() } ?: "—")
             ).forEach { (label,value) -> Row(Modifier.fillMaxWidth()) {
                 Text(label,Modifier.weight(1f),color=stateValues.TextColor,fontSize=stateValues.textSize)
                 Text(value,color=stateValues.AccentColor,fontWeight=FontWeight.Bold,fontSize=stateValues.textSize)
             } }
-            Text(authUiText("Only recorded agent activity is counted. Historical work is not estimated.","Учитываются только записанные действия специалистов. Старые показатели не выдумываются.","Тек жазылған маман әрекеттері есептеледі. Бұрынғы көрсеткіштер болжанбайды."),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
+            Text(authUiText("Only recorded agent activity is counted. Historical work is not estimated.","Учитываются только записанные действия специалистов. Старые показатели не выдумываются.","Тек жазылған маман әрекеттері есептеледі. Бұрынғы көрсеткіштер болжанбайды.", "Агенттин катталган аракеттери гана эсептелет. Мурунку иш болжол менен эсептелбейт."),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
         }
     }
 }

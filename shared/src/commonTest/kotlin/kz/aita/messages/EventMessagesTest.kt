@@ -15,7 +15,7 @@ class EventMessagesTest {
         EventMessages.templates.values.forEach { template ->
             val names = placeholders.findAll(template.en).map { it.groupValues[1] }.toSet()
             val reference = EventMessageReference(template.key, names.associateWith { "original \$amount {literal} 🛒" })
-            listOf("en", "ru", "kk").forEach { language ->
+            listOf("en", "ru", "kk", "ky").forEach { language ->
                 val rendered = assertNotNull(EventMessages.render(reference, language), "${template.key}: $language")
                 assertTrue(rendered.isNotBlank(), template.key)
                 names.forEach { assertTrue(rendered.contains("original \$amount {literal} 🛒"), template.key) }
@@ -44,7 +44,7 @@ class EventMessagesTest {
         val name = "Sale {person} <script>alert(1)</script> \$199 🛒"
         val reference = EventMessageReference("worker.request.body", children = mapOf(
             "person" to listOf(eventFact(name)), "store" to listOf(eventFact("Көк дүкен"))))
-        listOf("en", "ru", "kk").forEach { language ->
+        listOf("en", "ru", "kk", "ky").forEach { language ->
             val text = assertNotNull(EventMessages.render(reference, language))
             assertTrue(text.contains(name)); assertTrue(text.contains("Көк дүкен"))
         }
@@ -92,7 +92,7 @@ class EventMessagesTest {
     @Test fun localizedCompatibilityListCarriesOnlyOneReference() {
         val reference = EventMessageReference("message.stock_item_added")
         val values = EventMessages.localized(reference)
-        assertEquals(listOf("main", "en", "ru", "kk"), values.map { it.language })
+        assertEquals(listOf("main", "en", "ru", "kk", "ky"), values.map { it.language })
         assertEquals(1, values.count { it.messageTemplate != null })
         assertEquals(reference, values.explicitEventMessageReference())
     }
@@ -152,7 +152,7 @@ class EventMessagesTest {
         val reference = EventMessageReference("message.stock_item_added")
         val rendered = eventTextCompatibilityValues(reference, emptyList())
         assertEquals("Товар добавлен", rendered.first { it.language == "ru" }.value)
-        assertEquals(4, rendered.size)
+        assertEquals(listOf("main", "en", "ru", "kk", "ky"), rendered.map { it.language })
     }
 
     @Test fun fileNotificationLabelsTranslateButPathsStayLiteral() {

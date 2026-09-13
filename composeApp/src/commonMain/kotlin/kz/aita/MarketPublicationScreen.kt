@@ -95,18 +95,22 @@ internal fun AppConfiguration.MarketPublicationScreen() {
     }
     val subscriptionAccess=rememberStoreSubscriptionAccess(store)
     if(!subscriptionAccess) { SubscriptionRequiredPane(); return }
-    Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally) {
-        ScreenAppBarWidget(title=authUiText("Shop window","Витрина","Витрина"),iconPath=marketIconPath(142),
-            onBack={ uiScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+    AitaScreenColumn(
+        Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(title=authUiText("Shop window","Витрина","Витрина", "Дүкөн витринасы"),iconPath=marketIconPath(142),
+                onBack={ uiScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+        }
+    ) {
         val section=sectionTabsWidget(stateKey="market-publisher:$account:$store",tabs=listOf(
-            TabContent("storefront",authUiText("Storefront","Магазин","Дүкен")),
-            TabContent("listings",authUiText("Listings","Товары","Тауарлар"))),modifier=Modifier.fillMaxWidth().padding(12.dp))
+            TabContent("storefront",authUiText("Storefront","Магазин","Дүкен", "Витрина")),
+            TabContent("listings",authUiText("Listings","Товары","Тауарлар", "Жарыялар"))),modifier=Modifier.fillMaxWidth().padding(12.dp))
         LazyColumn(Modifier.weight(1f).fillMaxWidth().aitaWidthCap(760.dp).padding(horizontal=16.dp),
             contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item("notice") {
                 Text(authUiText("Opt-in preview. Publish only public shop information. A listing shares its title, description, barcode, categories and current retail price/availability—not your costs, private notes or exact stock count. It does not accept orders.",
                     "Предварительная версия с добровольной публикацией. Указывайте только публичные данные. Витрина показывает название, описание, штрихкод, категории, розничную цену и наличие — не закупочные цены, заметки или точные остатки. Заказы пока не принимаются.",
-                    "Ерікті жариялауы бар алдын ала нұсқа. Тек жария деректерді көрсетіңіз. Витрина атауды, сипаттаманы, штрихкодты, санаттарды, бөлшек бағаны және бар-жоғын көрсетеді — өзіндік құнды, жеке жазбаларды не нақты қор санын емес. Тапсырыс әзірге қабылданбайды."),
+                    "Ерікті жариялауы бар алдын ала нұсқа. Тек жария деректерді көрсетіңіз. Витрина атауды, сипаттаманы, штрихкодты, санаттарды, бөлшек бағаны және бар-жоғын көрсетеді — өзіндік құнды, жеке жазбаларды не нақты қор санын емес. Тапсырыс әзірге қабылданбайды.", "Ыктыярдуу алдын ала мүмкүнчүлүк. Дүкөн жөнүндө коомдук маалыматты гана жарыялаңыз. Жарыя аталышын, сүрөттөмөсүн, штрихкодун, категорияларын жана учурдагы чекене баасын/бар-жогун бөлүшөт; чыгымдарыңызды, купуя эскертмелерди же так товар санын эмес. Ал тапшырык кабыл албайт."),
                     color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
             }
             if(feedback!=null) item("feedback") { Text(feedback.orEmpty().visibleLocalizedString(stateValues.appLanguage,""),
@@ -114,24 +118,24 @@ internal fun AppConfiguration.MarketPublicationScreen() {
             if(remoteRevision!=loadedRemoteRevision && dashboard!=null) item("changed") {
                 Text(authUiText("Updates are available. Reload when ready; your draft has not been overwritten.",
                     "Есть обновления. Перезагрузите данные, когда будете готовы: ваш черновик не перезаписан.",
-                    "Жаңартулар бар. Дайын болғанда қайта жүктеңіз: жобаңыз өзгертілген жоқ."),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
+                    "Жаңартулар бар. Дайын болғанда қайта жүктеңіз: жобаңыз өзгертілген жоқ.", "Жаңыртуулар бар. Даяр болгондо кайра жүктөңүз; долбооруңуздун үстүнөн жазылган жок."),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
             }
             if(dashboard==null) item("loading") {
                 if(loading) LoadingSkeleton(Modifier.fillMaxWidth(),rows=4)
-                else actionButton(text=authUiText("Reload","Загрузить снова","Қайта жүктеу"),autoLoading=false,confirmationRequired=false,onClick={ refresh++ })
+                else actionButton(text=authUiText("Reload","Загрузить снова","Қайта жүктеу", "Кайра жүктөө"),autoLoading=false,confirmationRequired=false,onClick={ refresh++ })
             } else if(section=="storefront") {
                 val value=draft.storefront ?: dashboard!!.storefront
-                item("name") { MarketEditorField(value.displayName,authUiText("Public shop name","Публичное название","Дүкеннің жария атауы"),"$draftKey:shop",!saving) {
+                item("name") { MarketEditorField(value.displayName,authUiText("Public shop name","Публичное название","Дүкеннің жария атауы", "Дүкөндүн коомдук аталышы"),"$draftKey:shop",!saving) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(displayName=it.take(120)),storefrontDirty=true)) } }
-                item("city") { MarketEditorField(value.city,authUiText("City","Город","Қала"),"$draftKey:city",!saving) {
+                item("city") { MarketEditorField(value.city,authUiText("City","Город","Қала", "Шаар"),"$draftKey:city",!saving) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(city=it.take(100)),storefrontDirty=true)) } }
-                item("address") { MarketEditorField(value.publicAddress,authUiText("Public pickup address","Публичный адрес самовывоза","Алып кету мекенжайы"),"$draftKey:address",!saving) {
+                item("address") { MarketEditorField(value.publicAddress,authUiText("Public pickup address","Публичный адрес самовывоза","Алып кету мекенжайы", "Коомдук алып кетүү дареги"),"$draftKey:address",!saving) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(publicAddress=it.take(400)),storefrontDirty=true)) } }
-                item("pickup") { MarketEditorField(value.pickupNote,authUiText("Pickup instructions","Условия самовывоза","Алып кету нұсқаулары"),"$draftKey:pickup",!saving,multiline=true) {
+                item("pickup") { MarketEditorField(value.pickupNote,authUiText("Pickup instructions","Условия самовывоза","Алып кету нұсқаулары", "Алып кетүү көрсөтмөлөрү"),"$draftKey:pickup",!saving,multiline=true) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(pickupNote=it.take(1000)),storefrontDirty=true)) } }
-                item("published") { MarketPublishToggle(authUiText("Visible in Buyer mode","Видно в режиме покупателя","Сатып алушы режимінде көрінеді"),value.published,!saving) {
+                item("published") { MarketPublishToggle(authUiText("Visible in Buyer mode","Видно в режиме покупателя","Сатып алушы режимінде көрінеді", "Сатып алуучу режиминде көрүнөт"),value.published,!saving) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(published=it),storefrontDirty=true)) } }
-                item("save") { actionButton(text=authUiText("Save storefront","Сохранить витрину","Витринаны сақтау"),iconPath=marketIconPath(142),iconRes=marketIconFallback(142),
+                item("save") { actionButton(text=authUiText("Save storefront","Сохранить витрину","Витринаны сақтау", "Витринаны сактоо"),iconPath=marketIconPath(142),iconRes=marketIconFallback(142),
                     enabled=!saving && !loading,loading=saving,autoLoading=false,confirmationRequired=value.published && dashboard?.storefront?.published!=true,onClick={
                         val owner=captureMarketRequestScope(store)
                         if(owner!=null && !saving && !loading) { val snapshot=value; saving=true; uiScope.launch {
@@ -148,31 +152,31 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                         } }
                     }) }
             } else {
-                item("choose") { actionButton(text=authUiText("Choose stock item","Выбрать товар со склада","Қордан тауар таңдау"),enabled=!saving && dashboard!!.storefront.revision>0L,
+                item("choose") { actionButton(text=authUiText("Choose stock item","Выбрать товар со склада","Қордан тауар таңдау", "Кампадагы товарды тандаңыз"),enabled=!saving && dashboard!!.storefront.revision>0L,
                     iconPath=stateValues.drawablePathIconStock,autoLoading=false,confirmationRequired=draft.listingDirty,onClick={ selectItem=true }) }
-                if(dashboard!!.storefront.revision==0L) item("first") { Text(authUiText("Save the storefront first, even as an unpublished draft.","Сначала сохраните магазин — можно без публикации.","Алдымен дүкенді сақтаңыз — жарияламауға да болады."),color=stateValues.PlaceholderTextColor) }
+                if(dashboard!!.storefront.revision==0L) item("first") { Text(authUiText("Save the storefront first, even as an unpublished draft.","Сначала сохраните магазин — можно без публикации.","Алдымен дүкенді сақтаңыз — жарияламауға да болады.", "Адегенде витринаны, жок дегенде жарыяланбаган долбоор катары сактаңыз."),color=stateValues.PlaceholderTextColor) }
                 draft.listing?.let { listing ->
-                    item("title") { MarketEditorField(listing.title,authUiText("Public product title","Публичное название товара","Тауардың жария атауы"),"$draftKey:${listing.goodsItemId}:title",!saving) {
+                    item("title") { MarketEditorField(listing.title,authUiText("Public product title","Публичное название товара","Тауардың жария атауы", "Товардын коомдук аталышы"),"$draftKey:${listing.goodsItemId}:title",!saving) {
                         edit(draft.copy(listing=(draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing).copy(title=it.take(180)),listingDirty=true)) } }
-                    item("description") { MarketEditorField(listing.description,authUiText("Public description","Публичное описание","Жария сипаттама"),"$draftKey:${listing.goodsItemId}:description",!saving,multiline=true) {
+                    item("description") { MarketEditorField(listing.description,authUiText("Public description","Публичное описание","Жария сипаттама", "Коомдук сүрөттөмө"),"$draftKey:${listing.goodsItemId}:description",!saving,multiline=true) {
                         edit(draft.copy(listing=(draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing).copy(description=it.take(2000)),listingDirty=true)) } }
                     item("barcode") {
                         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                            Text(authUiText("Comparable barcode","Штрихкод для сравнения","Салыстыру штрихкоды")+": "+listing.gtin.orEmpty().ifBlank { "—" },
+                            Text(authUiText("Comparable barcode","Штрихкод для сравнения","Салыстыру штрихкоды", "Салыштырууга жарактуу штрихкод")+": "+listing.gtin.orEmpty().ifBlank { "—" },
                                 color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                             val sourceItem=stateValues.stock.orEmpty().firstOrNull { it.id==listing.goodsItemId }
                             val sourceGtin=sourceItem?.standardBarcodeValues()?.firstNotNullOfOrNull(::marketCanonicalGtin)
                             if(sourceItem!=null && sourceGtin!=listing.gtin) actionButton(
-                                text=authUiText("Use current stock barcode","Использовать текущий штрихкод","Қазіргі қор штрихкодын пайдалану"),
+                                text=authUiText("Use current stock barcode","Использовать текущий штрихкод","Қазіргі қор штрихкодын пайдалану", "Товардын учурдагы штрихкодун колдонуу"),
                                 enabled=!saving,autoLoading=false,confirmationRequired=true,onClick={
                                     val current=draft.listing?.takeIf { it.goodsItemId==listing.goodsItemId } ?: listing
                                     edit(draft.copy(listing=current.copy(gtin=sourceGtin),listingDirty=true))
                                 })
                         }
                     }
-                    item("listingVisible") { MarketPublishToggle(authUiText("Publish this product","Опубликовать этот товар","Осы тауарды жариялау"),listing.published,!saving) {
+                    item("listingVisible") { MarketPublishToggle(authUiText("Publish this product","Опубликовать этот товар","Осы тауарды жариялау", "Бул товарды жарыялоо"),listing.published,!saving) {
                         edit(draft.copy(listing=(draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing).copy(published=it),listingDirty=true)) } }
-                    item("listingSave") { actionButton(text=authUiText("Save listing","Сохранить товар","Тауарды сақтау"),enabled=!saving && !loading,loading=saving,autoLoading=false,
+                    item("listingSave") { actionButton(text=authUiText("Save listing","Сохранить товар","Тауарды сақтау", "Жарыяны сактоо"),enabled=!saving && !loading,loading=saving,autoLoading=false,
                         confirmationRequired=listing.published && dashboard!!.listings.none { it.id==listing.id && it.published },onClick={
                             val owner=captureMarketRequestScope(store)
                             if(owner!=null && !saving && !loading) { val snapshot=listing; saving=true; uiScope.launch {
@@ -195,7 +199,7 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text(listing.title,color=stateValues.TextColor,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
-                            Text(if(listing.published) authUiText("Published","Опубликован","Жарияланған") else authUiText("Hidden","Скрыт","Жасырылған"),
+                            Text(if(listing.published) authUiText("Published","Опубликован","Жарияланған", "Жарыяланган") else authUiText("Hidden","Скрыт","Жасырылған", "Жашырылган"),
                                 color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                         }
                         actionButton(text=stateValues.stringEdit,fillMaxWidthIfTextPresent=false,enabled=!saving,autoLoading=false,confirmationRequired=draft.listingDirty,
@@ -203,14 +207,14 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                     }
                 }
             }
-            item("refresh") { actionButton(text=if(dirty) authUiText("Discard draft and reload","Сбросить черновик и обновить","Жобаны тастап, жаңарту") else authUiText("Reload","Обновить","Жаңарту"),
+            item("refresh") { actionButton(text=if(dirty) authUiText("Discard draft and reload","Сбросить черновик и обновить","Жобаны тастап, жаңарту", "Долбоорду таштап, кайра жүктөө") else authUiText("Reload","Обновить","Жаңарту", "Кайра жүктөө"),
                 enabled=!saving && !loading,autoLoading=false,confirmationRequired=dirty,onClick={ edit(MarketEditorDraft()); refresh++ }) }
         }
     }
     if(selectItem) Dialog(onDismissRequest={ selectItem=false }) {
         Column(Modifier.fillMaxWidth().aitaWidthCap(640.dp).heightIn(max=stateValues.screenHeight*0.8f)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor).padding(16.dp)) {
-            MarketEditorField(itemSearch,authUiText("Find stock item","Найти товар","Тауар іздеу"),"$draftKey:select",true) { itemSearch=it.take(120) }
+            MarketEditorField(itemSearch,authUiText("Find stock item","Найти товар","Тауар іздеу", "Кампадагы товарды табуу"),"$draftKey:select",true) { itemSearch=it.take(120) }
             val items=stateValues.stock.orEmpty().filter { it.isActive && (itemSearch.isBlank() ||
                 it.name.any { name -> name.value.contains(itemSearch,true) } || it.standardBarcodeValues().any { code -> code.contains(itemSearch,true) }) }.take(100)
             LazyColumn(Modifier.weight(1f,fill=false).fillMaxWidth()) {
@@ -222,9 +226,9 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                         selectItem=false
                     }.padding(12.dp),color=stateValues.TextColor,fontSize=stateValues.textSize) }
             }
-            Text(authUiText("Showing up to 100 matches. Refine the search to find another product.","До 100 совпадений. Уточните поиск, чтобы найти другой товар.","100 сәйкестікке дейін. Басқа тауарды табу үшін іздеуді нақтылаңыз."),
+            Text(authUiText("Showing up to 100 matches. Refine the search to find another product.","До 100 совпадений. Уточните поиск, чтобы найти другой товар.","100 сәйкестікке дейін. Басқа тауарды табу үшін іздеуді нақтылаңыз.", "Эң көп 100 дал келүү көрсөтүлөт. Башка товарды табуу үчүн издөөнү тактаңыз."),
                 color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-            actionButton(text=authUiText("Close","Закрыть","Жабу"),autoLoading=false,confirmationRequired=false,onClick={ selectItem=false })
+            actionButton(text=authUiText("Close","Закрыть","Жабу", "Жабуу"),autoLoading=false,confirmationRequired=false,onClick={ selectItem=false })
         }
     }
 }

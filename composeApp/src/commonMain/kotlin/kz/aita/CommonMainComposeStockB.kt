@@ -478,14 +478,15 @@ fun AppConfiguration.StockBatchEditor(
         ?: defaultUnit
     val selectedQuantityAllowsFraction = selectedQuantityUnit.allowsFractionalStockQuantityInput()
 
-    Column(
-        modifier = modifier.fillMaxSize()
+    AitaScreenColumn(
+        modifier = modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = if (existingBatch == null) localizedStringResource(194, "Add batch") else localizedStringResource(195, "Edit batch"),
+                onBack = onCancel
+            )
+        }
     ) {
-        ScreenAppBarWidget(
-            title = if (existingBatch == null) localizedStringResource(194, "Add batch") else localizedStringResource(195, "Edit batch"),
-            onBack = onCancel
-        )
-
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -2735,7 +2736,7 @@ internal fun AppConfiguration.stockLanguageDomains(): List<SelectableDomain> {
         iconRes = null
     )
 
-    return (listOf(defaultDomain) + stateValues.globalAppConfiguration.languages.map { language ->
+    return (listOf(defaultDomain) + stateValues.globalAppConfiguration.languages.withBundledAppLanguages().map { language ->
         SelectableDomain(
             id = language.language,
             displayId = language.language.uppercase().toLocalizedSingleMain(),

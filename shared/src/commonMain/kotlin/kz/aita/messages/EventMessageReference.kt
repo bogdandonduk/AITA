@@ -15,19 +15,40 @@ internal data class EventMessageTemplate(
     val en: String,
     val ru: String,
     val kk: String,
-    val childSeparator: String = " • "
+    val childSeparator: String = " • ",
+    val ky: String? = null,
+    val tg: String? = null,
+    val uz: String? = null
 ) {
     fun text(language: String): String = when (eventMessageLanguage(language)) {
         "ru" -> ru
         "kk" -> kk
+        "ky" -> ky ?: en
+        "tg" -> tg ?: en
+        "uz" -> uz ?: en
         else -> en
+    }
+
+    fun exactText(language: String): String? = when (eventMessageLanguage(language)) {
+        "en" -> en
+        "ru" -> ru
+        "kk" -> kk
+        "ky" -> ky
+        "tg" -> tg ?: structuralText()
+        "uz" -> uz ?: structuralText()
+        else -> null
+    }
+
+    // A join or immutable fact contains no language-specific words. Its children still need
+    // exact translations, and fact values must never be interpreted as another template.
+    private fun structuralText(): String? = en.takeIf {
+        Regex("\\{[a-zA-Z][a-zA-Z0-9_]{0,63}\\}").replace(it, "").none(Char::isLetter)
     }
 }
 
 internal fun eventMessageLanguage(language: String): String =
-    language.replace('_', '-').substringBefore('-').lowercase().let {
-        if (it == "ru" || it == "kk") it else "en"
-    }
+    if (canonicalLanguageCode(language) == "system") effectiveAppLanguage(language)
+    else canonicalLanguageCode(language).takeIf { it in SUPPORTED_APP_LANGUAGES } ?: "en"
 
 /** Shared by server writes, API compatibility rendering, offline caches, popups and history. */
 object EventMessages {
@@ -36,7 +57,10 @@ object EventMessages {
             check(definitions.map { it.key }.toSet().size == definitions.size) { "Duplicate event message key" }
             definitions.forEach { definition ->
                 val keys = placeholders(definition.en)
-                check(keys == placeholders(definition.ru) && keys == placeholders(definition.kk)) {
+                check(definition.ky != null && keys == placeholders(definition.ru) &&
+                    keys == placeholders(definition.kk) && keys == placeholders(definition.ky) &&
+                    (definition.tg == null || keys == placeholders(definition.tg)) &&
+                    (definition.uz == null || keys == placeholders(definition.uz))) {
                     "Inconsistent event message parameters: ${definition.key}"
                 }
             }
@@ -50,7 +74,18 @@ object EventMessages {
         reference: EventMessageReference?,
         language: String,
         resourceLookup: (Long) -> List<LocalizedStringDataModel>? = { null }
-    ): String? = renderChecked(reference, language, resourceLookup, 0, RenderBudget())
+    ): String? = renderChecked(reference, language, resourceLookup, 0, RenderBudget(), exact = false)
+
+    /** Null means untranslated, not permission to label English as the requested language. */
+    fun renderExact(
+        reference: EventMessageReference?,
+        language: String,
+        resourceLookup: (Long) -> List<LocalizedStringDataModel>? = { null }
+    ): String? {
+        val requested = canonicalLanguageCode(language)
+        if (requested != "main" && requested != "system" && requested !in SUPPORTED_APP_LANGUAGES) return null
+        return renderChecked(reference, language, resourceLookup, 0, RenderBudget(), exact = true)
+    }
 
     private class RenderBudget(var nodes: Int = 256, var characters: Int = 65_536)
 
@@ -59,7 +94,8 @@ object EventMessages {
         language: String,
         resourceLookup: (Long) -> List<LocalizedStringDataModel>?,
         depth: Int,
-        budget: RenderBudget
+        budget: RenderBudget,
+        exact: Boolean
     ): String? {
         if (reference == null || --budget.nodes < 0 || depth > 6 || reference.key.length > 160 ||
             reference.arguments.size + reference.children.size > 32 ||
@@ -68,14 +104,19 @@ object EventMessages {
         val resourceId = reference.key.removePrefix("resource.").toLongOrNull()
             ?.takeIf { reference.key.startsWith("resource.") }
         val template = templates[reference.key]
-        val resourceText = resourceId?.let(resourceLookup)?.rawEventLocalizedText(language)
-        val pattern = resourceText ?: template?.text(language) ?: return null
+        val resourceText = resourceId?.let { id ->
+            val values = resourceLookup(id)
+            val selected = eventMessageLanguage(language)
+            values?.exactLocalizedValue(selected) ?: bundledTranslatedStringResource(id, selected)
+                ?: if (exact) null else values?.rawEventLocalizedText(selected)
+        }
+        val pattern = resourceText ?: (if (exact) template?.exactText(language) else template?.text(language)) ?: return null
         val required = placeholders(pattern)
         if (reference.arguments.keys.intersect(reference.children.keys).isNotEmpty() ||
             (reference.arguments.keys + reference.children.keys) != required) return null
         val values = reference.arguments.toMutableMap()
         for ((name, children) in reference.children) {
-            val rendered = children.map { renderChecked(it, language, resourceLookup, depth + 1, budget) ?: return null }
+            val rendered = children.map { renderChecked(it, language, resourceLookup, depth + 1, budget, exact) ?: return null }
             values[name] = rendered.joinToString(template?.childSeparator ?: " • ")
         }
         // One substitution pass. A name/note containing "{amount}" remains literal data.
@@ -91,8 +132,8 @@ object EventMessages {
     fun isRecognized(reference: EventMessageReference?): Boolean = render(reference, "en") != null
 
     fun localized(reference: EventMessageReference): List<LocalizedStringDataModel> =
-        listOf("main", "en", "ru", "kk").mapNotNull { language ->
-            render(reference, language)?.let { text ->
+        (listOf("main") + SUPPORTED_APP_LANGUAGES).mapNotNull { language ->
+            renderExact(reference, language)?.let { text ->
                 LocalizedStringDataModel(language, text, messageTemplate = reference.takeIf { language == "main" })
             }
         }

@@ -38,6 +38,6 @@ $codePanel
 <tr><td style="padding-top:24px"><div style="height:1px;background-color:#eeeff2"></div></td></tr>
 <tr><td align="center" style="padding-top:20px;font-size:13px;line-height:21px;color:#777c85">${safe(footer)}</td></tr>
 </table></td></tr></table></td></tr>
-<tr><td align="center" style="padding:0 16px 28px;font-size:12px;line-height:18px;color:#777c85">AITA · ${safe(if (language == "ru") "Безопасность аккаунта" else if (language == "kk") "Аккаунт қауіпсіздігі" else "Account security")}</td></tr>
+<tr><td align="center" style="padding:0 16px 28px;font-size:12px;line-height:18px;color:#777c85">AITA · ${safe(if (language == "ru") "Безопасность аккаунта" else if (language == "kk") "Аккаунт қауіпсіздігі" else if (language == "tg") "Амнияти ҳисоб" else if (language == "ky") "Аккаунттун коопсуздугу" else if (language == "uz") "Hisob xavfsizligi" else "Account security")}</td></tr>
 </table></body></html>"""
 }

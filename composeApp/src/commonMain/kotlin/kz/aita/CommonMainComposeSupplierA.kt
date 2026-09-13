@@ -1415,13 +1415,16 @@ internal fun AppConfiguration.SupplierPlaceholderScreen(
     iconPath: String,
     iconRes: DrawableResource?
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = title,
-            iconPath = iconPath,
-            iconRes = iconRes
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = title,
+                iconPath = iconPath,
+                iconRes = iconRes
+            )
+        }
+    ) {
         LazyColumn(
             modifier = Modifier
                 .weight(1f)

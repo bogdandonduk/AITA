@@ -298,40 +298,7 @@ internal fun AppConfiguration.AuthTinyChoiceChip(
 internal fun AppConfiguration.AuthPreferencesChooser(
     modifier: Modifier = Modifier
 ) {
-    val languages = stateValues.globalAppConfiguration.languages.ifEmpty {
-        listOf(
-            AppLanguageDataModel(
-                language = "ru",
-                name = listOf(
-                    LocalizedStringDataModel("main", "Russian"),
-                    LocalizedStringDataModel("en", "Russian"),
-                    LocalizedStringDataModel("ru", "Русский"),
-                    LocalizedStringDataModel("kk", "Орысша")
-                ),
-                flagDrawablePath = "png/flag_ru.png"
-            ),
-            AppLanguageDataModel(
-                language = "kk",
-                name = listOf(
-                    LocalizedStringDataModel("main", "Kazakh"),
-                    LocalizedStringDataModel("en", "Kazakh"),
-                    LocalizedStringDataModel("ru", "Казахский"),
-                    LocalizedStringDataModel("kk", "Қазақша")
-                ),
-                flagDrawablePath = "png/flag_kz.png"
-            ),
-            AppLanguageDataModel(
-                language = "en",
-                name = listOf(
-                    LocalizedStringDataModel("main", "English"),
-                    LocalizedStringDataModel("en", "English"),
-                    LocalizedStringDataModel("ru", "Английский"),
-                    LocalizedStringDataModel("kk", "Ағылшынша")
-                ),
-                flagDrawablePath = "png/flag_en.png"
-            )
-        )
-    }.sortedBy {
+    val languages = stateValues.globalAppConfiguration.languages.withBundledAppLanguages().sortedBy {
         when (it.language.lowercase()) {
             "ru" -> 0
             "kk" -> 1
@@ -348,7 +315,8 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                     LocalizedStringDataModel("main", "Light"),
                     LocalizedStringDataModel("en", "Light"),
                     LocalizedStringDataModel("ru", "Светлая"),
-                    LocalizedStringDataModel("kk", "Жарық")
+                    LocalizedStringDataModel("kk", "Жарық"),
+                    LocalizedStringDataModel("ky", "Жарык")
                 )
             ),
             AppThemeDataModel(
@@ -357,7 +325,8 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                     LocalizedStringDataModel("main", "Dark"),
                     LocalizedStringDataModel("en", "Dark"),
                     LocalizedStringDataModel("ru", "Темная"),
-                    LocalizedStringDataModel("kk", "Қараңғы")
+                    LocalizedStringDataModel("kk", "Қараңғы"),
+                    LocalizedStringDataModel("ky", "Караңгы")
                 )
             )
         )
@@ -389,9 +358,14 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                AuthTinyChoiceChip(
+                    selected = stateValues.appLanguagePreference == "system",
+                    label = stateValues.stringSystemLanguage,
+                    contentDescription = stateValues.stringSystemLanguage
+                ) { setAuthScreenAppLocale("system") }
                 languages.forEach { language ->
                     AuthTinyChoiceChip(
-                        selected = stateValues.appLanguage == language.language,
+                        selected = stateValues.appLanguagePreference == language.language,
                         label = language.language.uppercase(),
                         iconPath = language.flagDrawablePath,
                         iconRes = language.mapIconRes(),
@@ -1595,42 +1569,43 @@ internal fun buildTransactionSelectionSmartSets(
 fun AppConfiguration.TransactionSelectionScreen(
     onBarcodeCaptureFocusRequested: (() -> Unit)? = null
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        val context = rememberTransactionContext()
+    val context = rememberTransactionContext()
 
-        val canGoBack = when (context.transactionTypeIndex) {
-            0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
-            1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
-            else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
-        }
+    val canGoBack = when (context.transactionTypeIndex) {
+        0 -> !Navigation.TransactionSale.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
+        1 -> !Navigation.TransactionReturn.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
+        else -> !Navigation.TransactionSupply.isVeryFirstScreen(stateValues.isNarrowScreen, context.clientId)
+    }
 
-        ScreenAppBarWidget(
-            title = stateValues.stringSelect,
-            trailingIcons = if (stateValues.isNarrowScreen) {
-                listOf(
-                    Triple(stockAddIconPath(), stockAddIconFallback()) {
-                        openQuickStockAddSheet(
-                            transactionTypeIndex = context.transactionTypeIndex,
-                            clientId = context.clientId
-                        )
-                    }
-                )
-            } else emptyList(),
-            onBack = if (canGoBack) {
-                {
-                    coroutineScope.launch {
-                        when (context.transactionTypeIndex) {
-                            0 -> Navigation.TransactionSale.pop()
-                            1 -> Navigation.TransactionReturn.pop()
-                            else -> Navigation.TransactionSupply.pop()
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringSelect,
+                trailingIcons = if (stateValues.isNarrowScreen) {
+                    listOf(
+                        Triple(stockAddIconPath(), stockAddIconFallback()) {
+                            openQuickStockAddSheet(
+                                transactionTypeIndex = context.transactionTypeIndex,
+                                clientId = context.clientId
+                            )
+                        }
+                    )
+                } else emptyList(),
+                onBack = if (canGoBack) {
+                    {
+                        coroutineScope.launch {
+                            when (context.transactionTypeIndex) {
+                                0 -> Navigation.TransactionSale.pop()
+                                1 -> Navigation.TransactionReturn.pop()
+                                else -> Navigation.TransactionSupply.pop()
+                            }
                         }
                     }
-                }
-            } else null
-        )
-
+                } else null
+            )
+        }
+    ) {
         val goodsInCart by getCartState(
             context.transactionTypeIndex,
             context.clientId
@@ -3027,36 +3002,37 @@ internal fun AppConfiguration.StockQuantityQuickFillButtons(
 
 @Composable
 fun AppConfiguration.TransactionReceiptPreviewScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        val context = rememberTransactionContext()
-        val receiptScope = rememberCoroutineScope()
-        var activeReceiptAction by remember(stateValues.userAccount?.id, context.transactionTypeIndex, context.clientId) {
-            mutableStateOf<String?>(null)
-        }
-        val receiptLanguage = stateValues.appLanguage
-        val draftCreatedAt = remember(stateValues.userAccount?.id, stateValues.activeStoreId, context.transactionTypeIndex, context.clientId) {
-            getCurrentTimeMillis()
-        }
-        val darkActionIcons = stateValues.appThemeId == 1L
-        val completeReceiptIconPath = if (darkActionIcons) "svg/125_1.svg" else "svg/125_0.svg"
-        val completeReceiptIconRes = if (darkActionIcons) Res.drawable._125_1 else Res.drawable._125_0
+    val context = rememberTransactionContext()
+    val receiptScope = rememberCoroutineScope()
+    var activeReceiptAction by remember(stateValues.userAccount?.id, context.transactionTypeIndex, context.clientId) {
+        mutableStateOf<String?>(null)
+    }
+    val receiptLanguage = stateValues.appLanguage
+    val draftCreatedAt = remember(stateValues.userAccount?.id, stateValues.activeStoreId, context.transactionTypeIndex, context.clientId) {
+        getCurrentTimeMillis()
+    }
+    val darkActionIcons = stateValues.appThemeId == 1L
+    val completeReceiptIconPath = if (darkActionIcons) "svg/125_1.svg" else "svg/125_0.svg"
+    val completeReceiptIconRes = if (darkActionIcons) Res.drawable._125_1 else Res.drawable._125_0
 
-        ScreenAppBarWidget(
-            title = stateValues.stringReceipt,
-            iconPath = stateValues.drawablePathIconReceipt,
-            onBack = {
-                coroutineScope.launch {
-                    when (context.transactionTypeIndex) {
-                        0 -> Navigation.TransactionSale.pop()
-                        1 -> Navigation.TransactionReturn.pop()
-                        else -> Navigation.TransactionSupply.pop()
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringReceipt,
+                iconPath = stateValues.drawablePathIconReceipt,
+                onBack = {
+                    coroutineScope.launch {
+                        when (context.transactionTypeIndex) {
+                            0 -> Navigation.TransactionSale.pop()
+                            1 -> Navigation.TransactionReturn.pop()
+                            else -> Navigation.TransactionSupply.pop()
+                        }
                     }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val goodsInCart by getCartState(
             context.transactionTypeIndex,
             context.clientId
@@ -5347,24 +5323,25 @@ internal fun AppConfiguration.TransactionDebtText(
 
 @Composable
 fun AppConfiguration.TransactionPaymentScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        val context = rememberTransactionContext()
+    val context = rememberTransactionContext()
 
-        ScreenAppBarWidget(
-            title = stateValues.stringPayment,
-            onBack = {
-                coroutineScope.launch {
-                    when (context.transactionTypeIndex) {
-                        0 -> Navigation.TransactionSale.pop()
-                        1 -> Navigation.TransactionReturn.pop()
-                        else -> Navigation.TransactionSupply.pop()
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringPayment,
+                onBack = {
+                    coroutineScope.launch {
+                        when (context.transactionTypeIndex) {
+                            0 -> Navigation.TransactionSale.pop()
+                            1 -> Navigation.TransactionReturn.pop()
+                            else -> Navigation.TransactionSupply.pop()
+                        }
                     }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val goodsInCart by getCartState(
             context.transactionTypeIndex,
             context.clientId

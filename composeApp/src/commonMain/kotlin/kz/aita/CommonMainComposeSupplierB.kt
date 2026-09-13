@@ -2160,20 +2160,20 @@ internal fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboard
         val section = sectionTabsWidget(
             stateKey = "supplier-backorder:${item.backorderId.ifBlank { item.goodsItemId }}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
-                TabContent("owner", authUiText("Owner & timing", "Ответственный и сроки", "Жауапты және мерзімдер")),
-                TabContent("outcome", authUiText("Outcome & risk", "Результат и риск", "Нәтиже және тәуекел")),
-                TabContent("followup", authUiText("Follow-up", "Сопровождение", "Бақылау")),
-                TabContent("closure", authUiText("Closure & ledger", "Закрытие и учёт", "Жабу және есеп")),
-                TabContent("promise", authUiText("Commands & promises", "Действия и обещания", "Әрекеттер мен уәделер")),
-                TabContent("wave", authUiText("Waves & load", "Волны и нагрузка", "Толқындар және жүктеме")),
-                TabContent("allocation", authUiText("Impact & allocation", "Влияние и распределение", "Әсер және бөлу")),
-                TabContent("exception", authUiText("Exceptions & causes", "Исключения и причины", "Ерекше жағдайлар және себептер")),
-                TabContent("verification", authUiText("Verification & release", "Проверка и выпуск", "Тексеру және шығару")),
-                TabContent("plan", authUiText("Plan & attention", "План и внимание", "Жоспар және назар")),
-                TabContent("closeout", authUiText("Seal & closeout", "Фиксация и завершение", "Бекіту және аяқтау")),
-                TabContent("audit", authUiText("Reopen & audit", "Повторное открытие и аудит", "Қайта ашу және аудит")),
-                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер"))
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
+                TabContent("owner", authUiText("Owner & timing", "Ответственный и сроки", "Жауапты және мерзімдер", "Жооптуу жана мөөнөттөр")),
+                TabContent("outcome", authUiText("Outcome & risk", "Результат и риск", "Нәтиже және тәуекел", "Натыйжа жана тобокелдик")),
+                TabContent("followup", authUiText("Follow-up", "Сопровождение", "Бақылау", "Кийинки аракеттер")),
+                TabContent("closure", authUiText("Closure & ledger", "Закрытие и учёт", "Жабу және есеп", "Жабуу жана эсеп журналы")),
+                TabContent("promise", authUiText("Commands & promises", "Действия и обещания", "Әрекеттер мен уәделер", "Буйруктар жана убадалар")),
+                TabContent("wave", authUiText("Waves & load", "Волны и нагрузка", "Толқындар және жүктеме", "Толкундар жана жүктөм")),
+                TabContent("allocation", authUiText("Impact & allocation", "Влияние и распределение", "Әсер және бөлу", "Таасир жана бөлүштүрүү")),
+                TabContent("exception", authUiText("Exceptions & causes", "Исключения и причины", "Ерекше жағдайлар және себептер", "Өзгөчө учурлар жана себептер")),
+                TabContent("verification", authUiText("Verification & release", "Проверка и выпуск", "Тексеру және шығару", "Текшерүү жана бошотуу")),
+                TabContent("plan", authUiText("Plan & attention", "План и внимание", "Жоспар және назар", "План жана көңүл буруу")),
+                TabContent("closeout", authUiText("Seal & closeout", "Фиксация и завершение", "Бекіту және аяқтау", "Бекитүү жана жыйынтыктоо")),
+                TabContent("audit", authUiText("Reopen & audit", "Повторное открытие и аудит", "Қайта ашу және аудит", "Кайра ачуу жана текшерүү")),
+                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер", "Аракеттер"))
             ),
             modifier = Modifier
                 .fillMaxWidth()

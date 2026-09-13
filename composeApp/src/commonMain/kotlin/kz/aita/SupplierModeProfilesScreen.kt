@@ -178,27 +178,62 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
         }
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            if (editorOpen) {
+                ScreenAppBarWidget(
+                    title = if (editedSupplierId.isBlank()) localizedStringResource(2492, "Add profile") else localizedStringResource(2502, "Edit profile"),
+                    iconPath = stateValues.drawablePathIconSuppliers,
+                    iconRes = stateValues.drawableResIconSuppliers.value,
+                    onBack = {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Supplier.Identity.Main.removeState(editorPhoneStateKey)
+                            NavigationScreenModel.Supplier.Identity.Main.setStates(
+                                SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "0",
+                                SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
+                                SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to ""
+                            )
+                        }
+                    }
+                )
+            } else {
+                ScreenAppBarWidget(
+                    title = localizedStringResource(2490, "Supplier profiles"),
+                    iconPath = stateValues.drawablePathIconSuppliers,
+                    iconRes = stateValues.drawableResIconSuppliers.value,
+                    trailingIcons = listOf(
+                        Triple(stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value) {
+                            refreshProfiles(true)
+                        },
+                        Triple(stateValues.drawablePathIconAdd, stateValues.drawableResIconAdd.value) {
+                            coroutineScope.launch {
+                                NavigationScreenModel.Supplier.Identity.Main.setStates(
+                                    SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
+                                    SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
+                                    SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
+                                )
+                            }
+                        }
+                    ),
+                    onBack = {
+                        coroutineScope.launch {
+                            val target = supplierProfileEditorReturnScreen(returnRoute)
+                            NavigationScreenModel.Supplier.Identity.Main.setStates(
+                                SUPPLIER_PROFILE_RETURN_ROUTE_STATE_KEY to "",
+                                SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "0",
+                                SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
+                                SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to ""
+                            )
+                            Navigation.goMain(target)
+                        }
+                    }
+                )
+            }
+        }
     ) {
         if (editorOpen) {
-            ScreenAppBarWidget(
-                title = if (editedSupplierId.isBlank()) localizedStringResource(2492, "Add profile") else localizedStringResource(2502, "Edit profile"),
-                iconPath = stateValues.drawablePathIconSuppliers,
-                iconRes = stateValues.drawableResIconSuppliers.value,
-                onBack = {
-                    coroutineScope.launch {
-                        NavigationScreenModel.Supplier.Identity.Main.removeState(editorPhoneStateKey)
-                        NavigationScreenModel.Supplier.Identity.Main.setStates(
-                            SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "0",
-                            SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
-                            SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to ""
-                        )
-                    }
-                }
-            )
-
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -245,46 +280,14 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
                     }
                 }
             }
-            return@Column
+            return@AitaScreenColumn
         }
-
-        ScreenAppBarWidget(
-            title = localizedStringResource(2490, "Supplier profiles"),
-            iconPath = stateValues.drawablePathIconSuppliers,
-            iconRes = stateValues.drawableResIconSuppliers.value,
-            trailingIcons = listOf(
-                Triple(stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value) {
-                    refreshProfiles(true)
-                },
-                Triple(stateValues.drawablePathIconAdd, stateValues.drawableResIconAdd.value) {
-                    coroutineScope.launch {
-                        NavigationScreenModel.Supplier.Identity.Main.setStates(
-                            SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "1",
-                            SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
-                            SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to getCurrentTimeMillis().toString()
-                        )
-                    }
-                }
-            ),
-            onBack = {
-                coroutineScope.launch {
-                    val target = supplierProfileEditorReturnScreen(returnRoute)
-                    NavigationScreenModel.Supplier.Identity.Main.setStates(
-                        SUPPLIER_PROFILE_RETURN_ROUTE_STATE_KEY to "",
-                        SUPPLIER_PROFILE_EDITOR_OPEN_STATE_KEY to "0",
-                        SUPPLIER_PROFILE_EDITOR_ID_STATE_KEY to "",
-                        SUPPLIER_PROFILE_EDITOR_SESSION_STATE_KEY to ""
-                    )
-                    Navigation.goMain(target)
-                }
-            }
-        )
 
         val section = sectionTabsWidget(
             stateKey = "supplier-profiles:${currentUserId.orEmpty()}",
             tabs = listOf(
-                TabContent("profiles", authUiText("Profiles", "Профили", "Профильдер")),
-                TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық"))
+                TabContent("profiles", authUiText("Profiles", "Профили", "Профильдер", "Профилдер")),
+                TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық", "Даярдык"))
             ),
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)

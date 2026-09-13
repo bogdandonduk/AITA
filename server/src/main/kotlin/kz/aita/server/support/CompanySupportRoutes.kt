@@ -35,7 +35,7 @@ private suspend fun publishSupportChange(customer: String) {
 
 private suspend inline fun <reified T> RoutingCall.supportResult(
     status: HttpStatusCode = HttpStatusCode.OK,
-    crossinline after: suspend (T) -> Unit = {},
+    noinline after: suspend (T) -> Unit = {},
     crossinline work: CompanySupportRepository.() -> T
 ) {
     try {

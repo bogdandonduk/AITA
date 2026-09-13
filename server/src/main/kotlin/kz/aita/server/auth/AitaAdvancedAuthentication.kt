@@ -407,7 +407,7 @@ internal class AitaAdvancedAuthService(
             it[AuthOneTimeChallenges.purpose] = purpose
             it[AuthOneTimeChallenges.identifierHash] = identifierHash
             it[AuthOneTimeChallenges.requestIpHash] = ipHash
-            it[AuthOneTimeChallenges.locale] = locale.take(16).ifBlank { "en" }
+            it[AuthOneTimeChallenges.locale] = normalizeAuthEmailLocale(locale)
             it[AuthOneTimeChallenges.codeHash] = crypto.hmac("code:$publicId", code)
             // V95 stores one immutable encrypted provider request, not a second plaintext/delivery code.
             it[AuthOneTimeChallenges.codeCiphertext] = ""

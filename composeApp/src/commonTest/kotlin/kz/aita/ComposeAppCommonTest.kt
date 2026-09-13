@@ -74,14 +74,17 @@ class ComposeAppCommonTest {
     }
 
     @Test
-    fun appModeMenuDestinationIsHiddenAndCannotBeRestoredForThisRelease() {
-        assertFalse(APP_MODE_SELECTION_PUBLICLY_ENABLED)
-        assertTrue(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+    fun appModeMenuDestinationRespectsReleaseFlagWhenRestored() {
+        assertEquals(!APP_MODE_SELECTION_PUBLICLY_ENABLED, NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+        val expected = if (APP_MODE_SELECTION_PUBLICLY_ENABLED) {
+            listOf(NavigationScreenModel.Menu.UserAccount, NavigationScreenModel.Menu.AppMode)
+        } else {
+            listOf(NavigationScreenModel.Menu.UserAccount)
+        }
         assertEquals(
-            NavigationScreenModel.Menu.UserAccount,
+            expected,
             listOf(NavigationScreenModel.Menu.AppMode.route)
                 .toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount)
-                .single()
         )
     }
 

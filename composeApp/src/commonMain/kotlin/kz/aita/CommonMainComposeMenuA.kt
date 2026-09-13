@@ -1725,17 +1725,20 @@ fun AppConfiguration.MenuWorkersScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = stateValues.stringWorkers,
-            iconPath = stateValues.drawablePathIconWorkers,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringWorkers,
+                iconPath = stateValues.drawablePathIconWorkers,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val selectedTab = tabRowWidget(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
@@ -1770,7 +1773,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                     add(TabContent("invite", localizedStringResource(505, "Invite worker")))
                 }
                 if (activeStoreId != null && currentUserCanManageWorkerRoleTemplates(activeStoreId)) {
-                    add(TabContent("roles", authUiText("Role templates", "Шаблоны ролей", "Рөл үлгілері")))
+                    add(TabContent("roles", authUiText("Role templates", "Шаблоны ролей", "Рөл үлгілері", "Роль шаблондору")))
                 }
             }
             else -> emptyList()
@@ -2416,39 +2419,40 @@ internal fun AppConfiguration.WorkerInviteStatusCard(
 fun AppConfiguration.MenuUserAccountScreen() {
     var logoutConfirmationShown by rememberSaveable { mutableStateOf(false) }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringUserAccount,
+                iconPath = stateValues.drawablePathIconUserAccount,
+                trailingIcons = listOf(
+                    Triple(
+                        stateValues.drawablePathIconSecurity,
+                        stateValues.drawableResIconSecurity.value
+                    ) {
+                        coroutineScope.launch {
+                            Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
+                        }
+                    },
+                    Triple(
+                        stateValues.drawablePathIconExit,
+                        stateValues.drawableResIconExit.value
+                    ) {
+                        logoutConfirmationShown = true
+                    },
+                ),
+                onBack = if (!Navigation.Menu.isVeryFirstScreen(stateValues.isNarrowScreen)) {
+                    {
+                        coroutineScope.launch {
+                            Navigation.Menu.pop(stateValues.isNarrowScreen)
+                        }
+                    }
+                } else null
+            )
+        }
     ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringUserAccount,
-            iconPath = stateValues.drawablePathIconUserAccount,
-            trailingIcons = listOf(
-                Triple(
-                    stateValues.drawablePathIconSecurity,
-                    stateValues.drawableResIconSecurity.value
-                ) {
-                    coroutineScope.launch {
-                        Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen)
-                    }
-                },
-                Triple(
-                    stateValues.drawablePathIconExit,
-                    stateValues.drawableResIconExit.value
-                ) {
-                    logoutConfirmationShown = true
-                },
-            ),
-            onBack = if (!Navigation.Menu.isVeryFirstScreen(stateValues.isNarrowScreen)) {
-                {
-                    coroutineScope.launch {
-                        Navigation.Menu.pop(stateValues.isNarrowScreen)
-                    }
-                }
-            } else null
-        )
-
         if (logoutConfirmationShown) {
             ModalDialogWidget(
                 title = localizedStringResource(719, "Log out?"),
@@ -2474,50 +2478,6 @@ fun AppConfiguration.MenuUserAccountScreen() {
             item {
                 val outerSpace = 16.dp
                 val innerSpace = 8.dp
-
-                stateValues.userAccount?.let { account ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                            .clip(RoundedCornerShape(stateValues.cornerRadius))
-                            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor, RoundedCornerShape(stateValues.cornerRadius))
-                            .background(stateValues.BackgroundColor)
-                            .padding(stateValues.marginTextFieldGroup),
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = localizedStringResource(504, "Your public worker ID"),
-                                color = stateValues.PlaceholderTextColor,
-                                fontSize = stateValues.smallTextSize
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    modifier = Modifier.weight(1f, fill = false),
-                                    text = account.visibleWorkerInviteId(),
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.titleTextSize,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                ClipboardCopyButton(textToCopy = account.visibleWorkerInviteId())
-                            }
-                            Text(
-                                text = localizedStringResource(518, "Use this ID when a store owner invites you as a worker"),
-                                color = stateValues.PlaceholderTextColor,
-                                fontSize = stateValues.smallTextSize
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(innerSpace))
-                }
 
                 val phoneNumberTextFieldContent = countrySelectionPhoneNumberTextField(
                     valueInitial = stateValues.userAccount?.phoneNumber,
@@ -2697,7 +2657,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
                                     workerAccountIds = stateValues.userAccount?.workerAccountIds,
                                     supplierAccountIds = stateValues.userAccount?.supplierAccountIds,
                                     activeStoreId = stateValues.userAccount?.activeStoreId,
-                                    appLanguage = stateValues.appLanguage,
+                                    appLanguage = stateValues.appLanguagePreference,
                                     appThemeId = stateValues.appThemeId,
                                     appSizeModeId = stateValues.appSizeModeId,
                                     createdAt = 0L,
@@ -2819,7 +2779,7 @@ internal fun AppConfiguration.transactionHistoryFallbackQuantity(line: GoodsItem
     val fallback = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()
         ?: QuantityDataModel(
             id = "unit",
-            immutableUnitName = listOf(LocalizedStringDataModel("main", "unit")),
+            immutableUnitName = listOf(LocalizedStringDataModel("main", "unit"), LocalizedStringDataModel("ky", "бирдик")),
             total = 1.0,
             pricedAmount = 1.0,
             roundTotal = false
@@ -3497,20 +3457,21 @@ internal fun AppConfiguration.TransactionHistoryCard(
 
 @Composable
 fun AppConfiguration.MenuTransactionHistoryScreen() {
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
-            .fillMaxSize()
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringTransactionHistory,
-            iconPath = stateValues.drawablePathIconTransactionHistory,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+            .fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringTransactionHistory,
+                iconPath = stateValues.drawablePathIconTransactionHistory,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val transactionsPayload by transactionsState.payload.collectAsState()
         val activeStoreId = stateValues.activeStoreId
 
@@ -3815,17 +3776,20 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
     val receiptScope = rememberCoroutineScope()
     var activeReceiptAction by remember { mutableStateOf<String?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(418, "Receipt preview"),
-            iconPath = stateValues.drawablePathIconReceipt,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(418, "Receipt preview"),
+                iconPath = stateValues.drawablePathIconReceipt,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         if (snapshotForScreen == null) {
             MessageText(
                 modifier = Modifier
@@ -3833,7 +3797,7 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
                     .weight(1f),
                 text = localizedStringResource(13, "Not found")
             )
-            return@Column
+            return@AitaScreenColumn
         }
 
         LazyColumn(
@@ -3978,6 +3942,7 @@ internal fun SupplierDataModel.visibleSupplierName(language: String): String {
     val fallback = when (language.lowercase()) {
         "ru" -> "Поставщик"
         "kk" -> "Жеткізуші"
+        "ky" -> "Жеткирүүчү"
         else -> "Supplier"
     }
     return name.visibleLocalizedString(language, id.ifBlank { fallback })
@@ -4278,14 +4243,17 @@ fun AppConfiguration.MenuOperationLogsScreen() {
     fun scopeLabel(label: String, records: List<OperationLogDataModel>?) =
         records?.let { tabLabelWithCount(label, it.size) } ?: "$label (…)"
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(662, "Operation logs"),
-            iconPath = stateValues.drawablePathIconLog,
-            trailingIcons = listOf(Triple(stateValues.drawablePathIconRefresh, refreshIcon, ::refreshBothScopes)),
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(662, "Operation logs"),
+                iconPath = stateValues.drawablePathIconLog,
+                trailingIcons = listOf(Triple(stateValues.drawablePathIconRefresh, refreshIcon, ::refreshBothScopes)),
+                onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.OperationLogs),
             modifier = Modifier.fillMaxSize(),
@@ -4417,44 +4385,45 @@ fun AppConfiguration.MenuSuppliersScreen() {
         if (selectedTab == "contracts") sortMenuExpanded = false
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = if (selectedTab == "contracts") {
-                localizedStringResource(1479, "Supplier contracts")
-            } else {
-                stateValues.stringSuppliers
-            },
-            iconPath = if (selectedTab == "contracts") {
-                stateValues.drawablePathIconSupplierContracts
-            } else {
-                stateValues.drawablePathIconSuppliers
-            },
-            iconRes = if (selectedTab == "contracts") {
-                stateValues.drawableResIconSupplierContracts.value
-            } else {
-                stateValues.drawableResIconSuppliers.value
-            },
-            trailingIcons = if (selectedTab == "contracts") emptyList() else listOf(
-                Triple(sortActionIconPath(), sortActionIconFallback()) {
-                    sortMenuExpanded = !sortMenuExpanded
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = if (selectedTab == "contracts") {
+                    localizedStringResource(1479, "Supplier contracts")
+                } else {
+                    stateValues.stringSuppliers
                 },
-                Triple(stateValues.drawablePathIconAdd, stateValues.drawableResIconAdd.value) {
+                iconPath = if (selectedTab == "contracts") {
+                    stateValues.drawablePathIconSupplierContracts
+                } else {
+                    stateValues.drawablePathIconSuppliers
+                },
+                iconRes = if (selectedTab == "contracts") {
+                    stateValues.drawableResIconSupplierContracts.value
+                } else {
+                    stateValues.drawableResIconSuppliers.value
+                },
+                trailingIcons = if (selectedTab == "contracts") emptyList() else listOf(
+                    Triple(sortActionIconPath(), sortActionIconFallback()) {
+                        sortMenuExpanded = !sortMenuExpanded
+                    },
+                    Triple(stateValues.drawablePathIconAdd, stateValues.drawableResIconAdd.value) {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to "")
+                            Navigation.Menu.go(NavigationScreenModel.Menu.AddEditSupplier, stateValues.isNarrowScreen)
+                        }
+                    }
+                ),
+                onBack = {
                     coroutineScope.launch {
-                        NavigationScreenModel.Menu.AddEditSupplier.setState("edited_supplier_id" to "")
-                        Navigation.Menu.go(NavigationScreenModel.Menu.AddEditSupplier, stateValues.isNarrowScreen)
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
                     }
                 }
-            ),
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
-                }
-            }
-        )
-
+            )
+        }
+    ) {
         AnimatedVisibility(visible = sortMenuExpanded && selectedTab != "contracts") {
             Column(
                 modifier = Modifier
@@ -4609,32 +4578,33 @@ internal fun AppConfiguration.subscriptionStatusText(status: String): String {
 @Composable
 fun AppConfiguration.MenuStoresScreen() {
     val selectedLocationHasAccess = rememberStoreSubscriptionAccess()
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringStores,
-            iconPath = stateValues.drawablePathIconStores,
-            trailingIcons = listOf(
-                Triple(
-                    stateValues.drawablePathIconAdd,
-                    stateValues.drawableResIconAdd.value
-                ) {
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringStores,
+                iconPath = stateValues.drawablePathIconStores,
+                trailingIcons = listOf(
+                    Triple(
+                        stateValues.drawablePathIconAdd,
+                        stateValues.drawableResIconAdd.value
+                    ) {
+                        coroutineScope.launch {
+                            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
+                            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_PARENT_STORE_ID)
+                            Navigation.Menu.go(NavigationScreenModel.Menu.AddEditStore, stateValues.isNarrowScreen)
+                        }
+                    },
+                ),
+                onBack = {
                     coroutineScope.launch {
-                        NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
-                        NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_PARENT_STORE_ID)
-                        Navigation.Menu.go(NavigationScreenModel.Menu.AddEditStore, stateValues.isNarrowScreen)
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
                     }
-                },
-            ),
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val storesStateValue = stateValues.storesState
         val currentUserId = stateValues.userAccount?.id.orEmpty()
         var storeTabId by rememberSaveable { mutableStateOf("owned") }
@@ -4830,6 +4800,7 @@ fun AppConfiguration.MenuStoresScreen() {
 fun AppConfiguration.MenuScreen() {
     val subscriptionAccess = rememberStoreSubscriptionAccess()
     Column(
+        modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
@@ -4852,6 +4823,9 @@ fun AppConfiguration.MenuScreen() {
                     }
                     is NavigationScreenModel.Menu.UserAccount -> {
                         MenuUserAccountScreen()
+                    }
+                    is NavigationScreenModel.Menu.Work -> {
+                        MenuWorkScreen()
                     }
                     is NavigationScreenModel.Menu.Notifications -> {
                         NotificationsScreen(
@@ -4956,6 +4930,9 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.UserAccount -> {
                             MenuUserAccountScreen()
                         }
+                        is NavigationScreenModel.Menu.Work -> {
+                            MenuWorkScreen()
+                        }
                         is NavigationScreenModel.Menu.Notifications -> {
                             NotificationsScreen(
                                 onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
@@ -5053,6 +5030,9 @@ fun AppConfiguration.MenuScreen() {
                         }
                         is NavigationScreenModel.Menu.UserAccount -> {
                             MenuUserAccountScreen()
+                        }
+                        is NavigationScreenModel.Menu.Work -> {
+                            MenuWorkScreen()
                         }
                         is NavigationScreenModel.Menu.Notifications -> {
                             NotificationsScreen(
@@ -5196,11 +5176,15 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
     }
 }
 
-internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationScreenModel.Menu> = when (stateValues.appModeId) {
+internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationScreenModel.Menu> =
+    menuDestinationsForAppMode(stateValues.appModeId)
+
+internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel.Menu> = when (modeId) {
     APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
-        NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
+        NavigationScreenModel.Menu.Work,
+        NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.Finances,
         NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
@@ -5210,8 +5194,9 @@ internal fun AppConfiguration.menuDestinationsForCurrentMode(): List<NavigationS
     )
     APP_MODE_BUYER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
-        NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.AppMode,
+        NavigationScreenModel.Menu.Work,
+        NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.Finances,
         NavigationScreenModel.Menu.Security,
         NavigationScreenModel.Menu.Support,
@@ -5738,126 +5723,18 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
 }
 
 @Composable
-internal fun AppConfiguration.AppModeQuickSwitchMenuTile() {
-    val coroutineScope = rememberCoroutineScope()
-    val currentMode = appModeOptions().firstOrNull { option ->
-        option.modeId == stateValues.appModeId
-    }
-    val modeTitle = currentMode?.title ?: stateValues.stringAppMode
-    val modeSubtitle = currentMode?.subtitle
-        ?: localizedStringResource(2536, "Choose the workspace that matches what you are doing now.")
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = stateValues.marginTextField,
-                end = stateValues.marginTextField,
-                top = stateValues.marginTextField
-            )
-            .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(stateValues.AccentColor.copy(alpha = 0.10f))
-            .border(
-                stateValues.focusedBorderWidth,
-                stateValues.AccentColor.copy(alpha = 0.75f),
-                RoundedCornerShape(stateValues.cornerRadius)
-            )
-            .aitaClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = stateValues.AccentColor)
-            ) {
-                coroutineScope.launch {
-                    Navigation.Menu.go(
-                        NavigationScreenModel.Menu.AppMode,
-                        stateValues.isNarrowScreen
-                    )
-                }
-            }
-            .padding(stateValues.marginTextFieldGroup),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                .background(stateValues.AccentColor.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center
-        ) {
-            CpImage(
-                modifier = Modifier.size(34.dp),
-                url = currentMode?.iconPath ?: stateValues.drawablePathIconSwitch,
-                fallbackRes = currentMode?.iconRes ?: stateValues.drawableResIconSwitch.value,
-                contentDescription = modeTitle,
-                tintColor = null
-            )
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = localizedStringResource(2534, "Current app mode"),
-                color = stateValues.PlaceholderTextColor,
-                fontSize = stateValues.smallTextSize,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = modeTitle,
-                color = stateValues.AccentColor,
-                fontSize = stateValues.accentTextSize,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = modeSubtitle,
-                color = stateValues.TextColor,
-                fontSize = stateValues.smallTextSize,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            CpImage(
-                modifier = Modifier.size(26.dp),
-                url = stateValues.drawablePathIconSwitch,
-                fallbackRes = stateValues.drawableResIconSwitch.value,
-                contentDescription = localizedStringResource(2535, "Switch mode"),
-                tintColor = stateValues.AccentColor
-            )
-            Text(
-                text = localizedStringResource(2535, "Switch mode"),
-                color = stateValues.AccentColor,
-                fontSize = stateValues.smallTextSize,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
 fun AppConfiguration.MenuListScreen() {
     val subscriptionAccess = rememberStoreSubscriptionAccess()
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringMenu,
+                iconPath = stateValues.drawablePathIconMenu
+            )
+        }
     ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringMenu,
-            iconPath = stateValues.drawablePathIconMenu
-        )
-
         if (subscriptionAccess && stateValues.appModeId == APP_MODE_STORE) {
             stateValues.activeWorkshift?.takeIf { it.isActive && it.endedAtMillis == null && it.storeId == stateValues.activeStoreId }?.let { workshift ->
                 ActiveWorkshiftMenuTile(workshift = workshift)
@@ -5873,16 +5750,9 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
-            if (!NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi()) {
-                item(key = "app-mode-quick-switch") {
-                    AppModeQuickSwitchMenuTile()
-                }
-            }
-
             items(
-                filteredMenuDestinations().filterNot { model ->
-                    model == NavigationScreenModel.Menu.AppMode
-                }
+                items = filteredMenuDestinations(),
+                key = { model -> model.route }
             ) { model ->
                 Row(
                     modifier = Modifier
@@ -5919,7 +5789,7 @@ fun AppConfiguration.MenuListScreen() {
                             modifier = Modifier.size(stateValues.iconSize),
                             url = model.iconPath,
                             fallbackRes = model.iconRes,
-                            contentDescription = stateValues.stringBack,
+                            contentDescription = model.name,
                             tintColor = if (isActive)
                                 stateValues.AccentColor
                             else
@@ -5952,19 +5822,21 @@ fun AppConfiguration.MenuListScreen() {
 
 @Composable
 fun AppConfiguration.MenuGoodsCategoriesScreen() {
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
-            .fillMaxSize()
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringGoodsCategories,
-            iconPath = stateValues.drawablePathIconGoodsCategories,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+            .fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringGoodsCategories,
+                iconPath = stateValues.drawablePathIconGoodsCategories,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
+            )
+        }
+    ) {
     }
 }
 
@@ -5986,13 +5858,16 @@ fun AppConfiguration.MenuFinancesScreen() {
         getUserFinanceDashboard()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = stateValues.stringFinances,
-            iconPath = stateValues.drawablePathIconFinances,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringFinances,
+                iconPath = stateValues.drawablePathIconFinances,
+                onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
+            )
+        }
+    ) {
         val section = sectionTabsWidget(
             stateKey = "finances:${stateValues.userAccount?.id.orEmpty()}",
             tabs = listOf(

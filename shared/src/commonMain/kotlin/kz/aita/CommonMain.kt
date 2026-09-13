@@ -123,15 +123,13 @@ const val SUBSCRIPTION_PERIOD_MONTH = "month"
 const val SUBSCRIPTION_PERIOD_YEAR = "year"
 
 const val DEFAULT_APP_LANGUAGE = "ru"
+val SUPPORTED_APP_LANGUAGES: List<String> = listOf("en", "ru", "kk", "tg", "ky", "uz")
 const val DEFAULT_APP_THEME_ID = 0L
 const val DEFAULT_APP_SIZE_MODE_ID = 0L
 
 fun normalizeAppLanguagePreference(language: String?): String {
-    val value = language?.trim()?.lowercase().orEmpty()
-    return when (value) {
-        "system", "en", "ru", "kk" -> value
-        else -> DEFAULT_APP_LANGUAGE
-    }
+    val value = canonicalLanguageCode(language)
+    return if (value == "system" || value in SUPPORTED_APP_LANGUAGES) value else DEFAULT_APP_LANGUAGE
 }
 
 fun normalizeAppThemePreference(themeId: Long?): Long {
@@ -207,7 +205,8 @@ fun defaultPaymentProviders(): List<PaymentProviderConfigDataModel> = listOf(
             LocalizedStringDataModel("main", "Kaspi invoice"),
             LocalizedStringDataModel("en", "Kaspi invoice"),
             LocalizedStringDataModel("ru", "Счёт Kaspi"),
-            LocalizedStringDataModel("kk", "Kaspi шоты")
+            LocalizedStringDataModel("kk", "Kaspi шоты"),
+            LocalizedStringDataModel("ky", "Kaspi төлөм эсеби")
         ),
         countryLocales = listOf("kz"),
         currencyCodes = listOf("KZT"),
@@ -218,7 +217,8 @@ fun defaultPaymentProviders(): List<PaymentProviderConfigDataModel> = listOf(
         description = listOf(
             LocalizedStringDataModel("main", "Prepared integration placeholder. Real API call is disabled until merchant credentials are connected."),
             LocalizedStringDataModel("ru", "Заготовка интеграции. Реальный вызов API отключён до подключения данных мерчанта."),
-            LocalizedStringDataModel("kk", "Интеграция дайындығы. Мерчант деректері қосылғанша нақты API шақыруы өшірулі.")
+            LocalizedStringDataModel("kk", "Интеграция дайындығы. Мерчант деректері қосылғанша нақты API шақыруы өшірулі."),
+            LocalizedStringDataModel("ky", "Даярдалган интеграциянын орду. Соодагердин кирүү маалыматы туташтырылганга чейин чыныгы API чакыруусу өчүрүлгөн.")
         )
     ),
     PaymentProviderConfigDataModel(
@@ -227,7 +227,8 @@ fun defaultPaymentProviders(): List<PaymentProviderConfigDataModel> = listOf(
             LocalizedStringDataModel("main", "Manual development top-up"),
             LocalizedStringDataModel("en", "Manual development top-up"),
             LocalizedStringDataModel("ru", "Тестовое ручное пополнение"),
-            LocalizedStringDataModel("kk", "Қолмен тест толтыру")
+            LocalizedStringDataModel("kk", "Қолмен тест толтыру"),
+            LocalizedStringDataModel("ky", "Иштеп чыгуу үчүн кол менен сыноо толуктоосу")
         ),
         enabled = true,
         sandbox = true
@@ -2079,14 +2080,16 @@ fun saleMethodLocalizedName(saleMethodId: String): List<LocalizedStringDataModel
             LocalizedStringDataModel("main", "Wholesale"),
             LocalizedStringDataModel("en", "Wholesale"),
             LocalizedStringDataModel("ru", "Оптом"),
-            LocalizedStringDataModel("kk", "Көтерме")
+            LocalizedStringDataModel("kk", "Көтерме"),
+            LocalizedStringDataModel("ky", "Дүң")
         )
     } else {
         listOf(
             LocalizedStringDataModel("main", "Retail"),
             LocalizedStringDataModel("en", "Retail"),
             LocalizedStringDataModel("ru", "Розница"),
-            LocalizedStringDataModel("kk", "Бөлшек")
+            LocalizedStringDataModel("kk", "Бөлшек"),
+            LocalizedStringDataModel("ky", "Чекене")
         )
     }
 
@@ -7203,7 +7206,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "Казакстан"
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "Казакстан")
                 ),
                 flagDrawablePath = "png/flag_kz.png",
                 phoneNumberCode = "7",
@@ -7224,7 +7228,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                             LocalizedStringDataModel(
                                 language = "kk",
                                 value = "теңге"
-                            )
+                            ),
+                            LocalizedStringDataModel("ky", "теңге")
                         )
                     ),
                 ),
@@ -7242,7 +7247,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                             LocalizedStringDataModel(
                                 "kk",
                                 "Астана"
-                            )
+                            ),
+                            LocalizedStringDataModel("ky", "Астана")
                         ),
                         51.1667, 71.4333,
                         51.0230, 71.2660,
@@ -7305,7 +7311,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "Ағылшынша"
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "Англисче")
                 ),
                 "png/flag_en.png"
             ),
@@ -7323,7 +7330,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "Орысша"
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "Орусча")
                 ),
                 "png/flag_ru.png"
             ),
@@ -7341,7 +7349,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "Қазақша"
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "Казакча")
                 ),
                 "png/flag_kz.png"
             )
@@ -7361,7 +7370,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "Жарық"
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "Жарык")
                 )
             ),
             AppThemeDataModel(
@@ -7378,7 +7388,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "Қараңғы"
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "Караңгы")
                 )
             )
         ),
@@ -7397,7 +7408,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "шт."
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "даана")
                 ),
                 roundTotal = true
             ),
@@ -7415,7 +7427,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                     LocalizedStringDataModel(
                         "kk",
                         "кг."
-                    )
+                    ),
+                    LocalizedStringDataModel("ky", "кг")
                 ),
                 roundTotal = false
             )
@@ -8259,16 +8272,8 @@ fun getGoodsCategories() {
 }
 
 fun List<LocalizedStringGroupDataModel>?.extractString(id: Long, language: String): String? {
-    val values = this
-        ?.find { it.id == id }
-        ?.values
-        ?: return null
-
-    return values.extractLocalizedString(language)
-        ?: values.extractLocalizedString("main")
-        ?: values.extractLocalizedString(DEFAULT_APP_LANGUAGE)
-        ?: values.extractLocalizedString("en")
-        ?: values.firstOrNull { it.value.isNotBlank() }?.value
+    val values = this?.find { it.id == id }?.values
+    return resolveLocalizedResource(id, language, values, null)
 }
 
 fun List<StylizedDimensionGroupDataModel>.extractValue(id: Long, sizeModeId: Long): Float? {
@@ -8332,18 +8337,22 @@ fun List<RemoteResponseDataModel>.extractExceptionMessage(id: String): List<Loca
 }
 
 fun List<LocalizedStringDataModel>.extractLocalizedString(language: String): String? {
-    val targetLanguage = if (language == "system") getSystemLocaleLanguage() else language
+    val targetLanguage = if (canonicalLanguageCode(language) == "system") effectiveAppLanguage(language) else canonicalLanguageCode(language)
 
     explicitEventMessageReference()?.let { reference ->
+        EventMessages.renderExact(reference, targetLanguage) { id ->
+            stringsState.payloadValue?.find { it.id == id }?.values
+        }?.let { return it }
+        // A template's English fallback must not replace an authored Tajik/Uzbek value.
+        exactLocalizedValue(targetLanguage)?.let { return it }
         EventMessages.render(reference, targetLanguage) { id ->
             stringsState.payloadValue?.find { it.id == id }?.values
         }?.let { return it }
     }
-    return find { it.language.equals(targetLanguage, ignoreCase = true) }?.value
-        ?: find { it.language.equals(targetLanguage.substringBefore('-').substringBefore('_'), ignoreCase = true) }?.value
-        ?: find { it.language.equals("main", ignoreCase = true) }?.value
-        ?: find { it.language.equals("en", ignoreCase = true) }?.value
-        ?: firstOrNull()?.value
+    return exactLocalizedValue(targetLanguage)
+        ?: exactLocalizedValue("main")
+        ?: exactLocalizedValue("en")
+        ?: firstOrNull { it.value.isNotBlank() }?.value
 }
 
 fun localizedStringResourceMessage(
@@ -8364,7 +8373,10 @@ fun localizedStringResourceMessage(
             LocalizedStringDataModel("kk", kk)
         )
     val reference = EventMessageReference("resource.$id")
-    return values.mapIndexed { index, value ->
+    val completeValues = values.withMissingLocalizedValues(listOf("tg", "ky", "uz").mapNotNull { language ->
+        bundledTranslatedStringResource(id, language)?.let { LocalizedStringDataModel(language, it) }
+    })
+    return completeValues.mapIndexed { index, value ->
         value.copy(messageTemplate = reference.takeIf { index == 0 })
     }
 
@@ -8388,9 +8400,7 @@ fun String.toLocalizedSingleMain(): List<LocalizedStringDataModel> {
 
 fun String?.toLocalizedUserNote(language: String = appLanguageState.value): List<LocalizedStringDataModel> {
     val cleanValue = this?.trim()?.takeIf { it.isNotBlank() } ?: return emptyList()
-    val cleanLanguage = normalizeAppLanguagePreference(language)
-        .takeIf { it.isNotBlank() && !it.equals("system", ignoreCase = true) }
-        ?: DEFAULT_APP_LANGUAGE
+    val cleanLanguage = effectiveAppLanguage(language)
     return listOf("main", cleanLanguage)
         .distinctBy { it.lowercase() }
         .map { LocalizedStringDataModel(it, cleanValue) }
@@ -8760,7 +8770,8 @@ suspend fun updateStrings(
     resourceStrings: List<LocalizedStringGroupDataModel>
 ) {
     withContext(Dispatchers.Default) {
-        val language = appLanguageState.value
+        val language = effectiveAppLanguage(appLanguageState.value)
+        val strings = mergeLocalizedStringGroups(strings, resourceStrings)
         stringAppNameState.emit(
             strings.extractString(0, language) ?: resourceStrings.extractString(
                 0,
@@ -12860,7 +12871,8 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
             additionalNotesLocalized = listOf(
                 LocalizedStringDataModel("main", "Returned items with no previous stock batch"),
                 LocalizedStringDataModel("ru", "Возвраты без предыдущей складской партии"),
-                LocalizedStringDataModel("kk", "Алдыңғы қойма партиясы жоқ қайтарымдар")
+                LocalizedStringDataModel("kk", "Алдыңғы қойма партиясы жоқ қайтарымдар"),
+                LocalizedStringDataModel("ky", "Мурунку кампа партиясы жок кайтарылган товарлар")
             ),
             createdAtMillis = now,
             updatedAtMillis = now,
@@ -17426,7 +17438,8 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 
         for ((index, resolvedServerUrl) in serverUrlCandidates.withIndex()) {
             var authRetryUsedForCandidate = false
-            val requestHeaders = currentClientDeviceInfoHeaders() + scopedHeaders
+            val requestHeaders = mapOf(HttpHeaders.AcceptLanguage to effectiveAppLanguage(appLanguageState.value)) +
+                currentClientDeviceInfoHeaders() + scopedHeaders
 
             retrySameServer@ while (true) {
                 val tokensBeforeRequest = getStoredUserAuthTokens?.invoke()
@@ -19512,19 +19525,22 @@ fun defaultLegalIdFormats(): List<LegalIdFormatDataModel> = listOf(
             LocalizedStringDataModel("main", "BIN"),
             LocalizedStringDataModel("en", "BIN"),
             LocalizedStringDataModel("ru", "БИН"),
-            LocalizedStringDataModel("kk", "БИН")
+            LocalizedStringDataModel("kk", "БИН"),
+            LocalizedStringDataModel("ky", "БИН")
         ),
         label = listOf(
             LocalizedStringDataModel("main", "Business Identification Number"),
             LocalizedStringDataModel("en", "Business Identification Number"),
             LocalizedStringDataModel("ru", "Бизнес-идентификационный номер"),
-            LocalizedStringDataModel("kk", "Бизнес сәйкестендіру нөмірі")
+            LocalizedStringDataModel("kk", "Бизнес сәйкестендіру нөмірі"),
+            LocalizedStringDataModel("ky", "Бизнес идентификациялык номери")
         ),
         placeholder = listOf(
             LocalizedStringDataModel("main", "12 digits"),
             LocalizedStringDataModel("en", "12 digits"),
             LocalizedStringDataModel("ru", "12 цифр"),
-            LocalizedStringDataModel("kk", "12 сан")
+            LocalizedStringDataModel("kk", "12 сан"),
+            LocalizedStringDataModel("ky", "12 цифра")
         ),
         length = 12,
         digitsOnly = true,
@@ -19537,19 +19553,22 @@ fun defaultLegalIdFormats(): List<LegalIdFormatDataModel> = listOf(
             LocalizedStringDataModel("main", "TIN"),
             LocalizedStringDataModel("en", "TIN"),
             LocalizedStringDataModel("ru", "ИНН / РМА"),
-            LocalizedStringDataModel("kk", "СТН / РМА")
+            LocalizedStringDataModel("kk", "СТН / РМА"),
+            LocalizedStringDataModel("ky", "ИНН")
         ),
         label = listOf(
             LocalizedStringDataModel("main", "Taxpayer Identification Number"),
             LocalizedStringDataModel("en", "Taxpayer Identification Number"),
             LocalizedStringDataModel("ru", "Идентификационный номер налогоплательщика"),
-            LocalizedStringDataModel("kk", "Салық төлеушінің сәйкестендіру нөмірі")
+            LocalizedStringDataModel("kk", "Салық төлеушінің сәйкестендіру нөмірі"),
+            LocalizedStringDataModel("ky", "Салык төлөөчүнүн идентификациялык номери")
         ),
         placeholder = listOf(
             LocalizedStringDataModel("main", "9 digits"),
             LocalizedStringDataModel("en", "9 digits"),
             LocalizedStringDataModel("ru", "9 цифр"),
-            LocalizedStringDataModel("kk", "9 сан")
+            LocalizedStringDataModel("kk", "9 сан"),
+            LocalizedStringDataModel("ky", "9 цифра")
         ),
         length = 9,
         digitsOnly = true,

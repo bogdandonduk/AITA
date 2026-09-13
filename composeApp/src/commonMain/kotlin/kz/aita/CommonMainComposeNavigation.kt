@@ -294,6 +294,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             ?: when (stateValues.appLanguage.lowercase()) {
                 "ru" -> "Не удалось сохранить товар"
                 "kk" -> "Тауарды сақтау мүмкін болмады"
+                "ky" -> "Товарды сактоо мүмкүн болгон жок"
                 else -> "Could not save stock item"
             }
 
@@ -519,23 +520,24 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         )
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = if (isEditingStockItem) stateValues.stringEditGoodsItem else stateValues.stringAddGoodsItem,
-            iconPath = if (isEditingStockItem) stateValues.drawablePathIconEdit else stateValues.drawablePathIconAdd,
-            trailingIcons = stockAddEditTrailingIcons,
-            onBack = if (showStockEditorBack) {
-                {
-                    coroutineScope.launch {
-                        leaveStockEditor()
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = if (isEditingStockItem) stateValues.stringEditGoodsItem else stateValues.stringAddGoodsItem,
+                iconPath = if (isEditingStockItem) stateValues.drawablePathIconEdit else stateValues.drawablePathIconAdd,
+                trailingIcons = stockAddEditTrailingIcons,
+                onBack = if (showStockEditorBack) {
+                    {
+                        coroutineScope.launch {
+                            leaveStockEditor()
+                        }
                     }
-                }
-            } else null
-        )
-
+                } else null
+            )
+        }
+    ) {
         StockAddEditTabs(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f),
@@ -1139,7 +1141,7 @@ fun AppConfiguration.LocalizedStringListEditor(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        stateValues.globalAppConfiguration.languages.forEach { language ->
+        stateValues.globalAppConfiguration.languages.withBundledAppLanguages().forEach { language ->
             val current = values.find { it.language == language.language }?.value.orEmpty()
 
             SimpleTextInput(
@@ -1249,6 +1251,9 @@ internal fun String.toVoiceInputLanguageTag(): String {
     return when (lower) {
         "main", "system", "default" -> ""
         "ru", "ru-ru" -> "ru-RU"
+        "ky", "ky-kg" -> "ky-KG"
+        "tg", "tg-tj" -> "tg-TJ"
+        "uz", "uz-uz", "uz-latn", "uz-latn-uz" -> "uz-UZ"
         "kk", "kk-kz", "kz", "kz-kz" -> "kk-KZ"
         "en", "en-us", "en-gb" -> if (lower == "en-gb") "en-GB" else "en-US"
         else -> {
@@ -1269,7 +1274,7 @@ internal fun AppConfiguration.voiceInputLanguageTags(): List<String> = buildList
     }
 
     addCandidate(stateValues.appLanguage)
-    stateValues.globalAppConfiguration.languages.forEach { language ->
+    stateValues.globalAppConfiguration.languages.withBundledAppLanguages().forEach { language ->
         addCandidate(language.language)
     }
     addCandidate("ru")
@@ -1280,7 +1285,7 @@ internal fun AppConfiguration.voiceInputLanguageTags(): List<String> = buildList
 internal fun AppConfiguration.voiceInputLanguageDisplayName(languageTag: String): String {
     val tag = languageTag.toVoiceInputLanguageTag().ifBlank { languageTag.trim() }
     val code = tag.substringBefore('-').lowercase()
-    val configured = stateValues.globalAppConfiguration.languages.firstOrNull { language ->
+    val configured = stateValues.globalAppConfiguration.languages.withBundledAppLanguages().firstOrNull { language ->
         val configuredTag = language.language.toVoiceInputLanguageTag()
         configuredTag.equals(tag, ignoreCase = true) ||
             configuredTag.substringBefore('-').equals(code, ignoreCase = true) ||
@@ -1467,7 +1472,8 @@ fun AppConfiguration.BarcodeTextInput(
                 LocalizedStringDataModel("main", localizedStringResource(984, "Camera access was denied")),
                 LocalizedStringDataModel("en", "Camera access was denied"),
                 LocalizedStringDataModel("ru", "Доступ к камере запрещён"),
-                LocalizedStringDataModel("kk", "Камераға рұқсат берілмеді")
+                LocalizedStringDataModel("kk", "Камераға рұқсат берілмеді"),
+                LocalizedStringDataModel("ky", "Камерага кирүүгө уруксат берилген жок")
             ),
             NotificationType.Negative,
             transient = true
@@ -2128,11 +2134,11 @@ fun AppConfiguration.ScreenAppBarWidget(
     onBack: (() -> Unit)? = null
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
     ) {
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .foregroundTactileShadow(cornerRadius = cornerRadius, elevated = false)
                 .run {
                     if (stateValues.isNarrowScreen)
@@ -2345,7 +2351,8 @@ fun AppConfiguration.searchTextField(
                     LocalizedStringDataModel("main", localizedStringResource(984, "Camera access was denied")),
                     LocalizedStringDataModel("en", "Camera access was denied"),
                     LocalizedStringDataModel("ru", "Доступ к камере запрещён"),
-                    LocalizedStringDataModel("kk", "Камераға рұқсат берілмеді")
+                    LocalizedStringDataModel("kk", "Камераға рұқсат берілмеді"),
+                    LocalizedStringDataModel("ky", "Камерага кирүүгө уруксат берилген жок")
                 ),
                 NotificationType.Negative,
                 transient = true
@@ -2678,17 +2685,17 @@ sealed class NavigationScreenModel(
 
         sealed class Main(route: String): Buyer(route) {
             data object Home: Main("BuyerMainHomeNavigationScreenModelRoute") {
-                override val name get() = with(AppConfiguration) { authUiText("Market", "Маркет", "Маркет") }
+                override val name get() = with(AppConfiguration) { authUiText("Market", "Маркет", "Маркет", "Маркет") }
                 override val iconPath get() = AppConfiguration.marketIconPath(139)
                 override val iconRes get() = AppConfiguration.marketIconFallback(139)
             }
             data object Saved: Main("BuyerMainSavedNavigationScreenModelRoute") {
-                override val name get() = with(AppConfiguration) { authUiText("Saved", "Сохранённое", "Сақталғандар") }
+                override val name get() = with(AppConfiguration) { authUiText("Saved", "Сохранённое", "Сақталғандар", "Сакталды") }
                 override val iconPath get() = AppConfiguration.marketIconPath(140)
                 override val iconRes get() = AppConfiguration.marketIconFallback(140)
             }
             data object Shopping: Main("BuyerMainShoppingNavigationScreenModelRoute") {
-                override val name get() = with(AppConfiguration) { authUiText("List", "Покупки", "Тізім") }
+                override val name get() = with(AppConfiguration) { authUiText("List", "Покупки", "Тізім", "Тизме") }
                 override val iconPath get() = AppConfiguration.marketIconPath(143)
                 override val iconRes get() = AppConfiguration.marketIconFallback(143)
             }
@@ -2973,6 +2980,16 @@ sealed class NavigationScreenModel(
             const val KEY_STATE_CONFIRMATION_PASSWORD: String = "keyState_confirmationPassword"
         }
 
+        /** Personal identity, not the permission-gated store Workers management screen. */
+        data object Work: Menu("MenuWorkNavigationScreenModelRoute") {
+            override val iconPath: String
+                get() = AppConfiguration.stateValues.drawablePathIconWorkers
+            override val name: String
+                get() = with(AppConfiguration) { localizedStringResource(2658, "Work") }
+            override val iconRes: DrawableResource
+                get() = AppConfiguration.stateValues.drawableResIconWorkers.value
+        }
+
         data object Notifications: Menu("MenuNotificationsNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconTransactionHistory
@@ -3001,7 +3018,7 @@ sealed class NavigationScreenModel(
         }
 
         data object ShopWindow: Menu("MenuShopWindowNavigationScreenModelRoute") {
-            override val name get() = with(AppConfiguration) { authUiText("Shop window", "Витрина", "Витрина") }
+            override val name get() = with(AppConfiguration) { authUiText("Shop window", "Витрина", "Витрина", "Дүкөн витринасы") }
             override val iconPath get() = AppConfiguration.marketIconPath(142)
             override val iconRes get() = AppConfiguration.marketIconFallback(142)
         }
@@ -3154,7 +3171,7 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.drawablePathIconSecurity
             override val name: String
                 get() = with(AppConfiguration) {
-                    authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік")
+                    authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік", "Кирүү жана коопсуздук")
                 }
             override val iconRes: DrawableResource
                 get() = AppConfiguration.stateValues.drawableResIconSecurity.value
@@ -3273,6 +3290,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.Main,
     NavigationScreenModel.Menu.List,
     NavigationScreenModel.Menu.UserAccount,
+    NavigationScreenModel.Menu.Work,
     NavigationScreenModel.Menu.Notifications,
     NavigationScreenModel.Menu.Finances,
     NavigationScreenModel.Menu.AppMode,
@@ -3389,9 +3407,8 @@ internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreen
 }
 
 /**
- * App-mode switching is intentionally kept implemented but hidden from the public Menu for the
- * current release. Keeping the gate here also prevents restored navigation or indirect callers
- * from reopening the selector until the feature is deliberately enabled again.
+ * Respect the release's app-mode availability flag for both menu rows and restored routes.
+ * When disabled, indirect callers must not reopen the selector either.
  */
 internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
     this == NavigationScreenModel.Menu.AppMode && !APP_MODE_SELECTION_PUBLICLY_ENABLED
@@ -6227,8 +6244,9 @@ object Navigation {
 
         val listScreens = listOf(
             NavigationScreenModel.Menu.UserAccount,
-            NavigationScreenModel.Menu.Notifications,
             NavigationScreenModel.Menu.AppMode,
+            NavigationScreenModel.Menu.Work,
+            NavigationScreenModel.Menu.Notifications,
             NavigationScreenModel.Menu.Finances,
             NavigationScreenModel.Menu.StoreSubscription,
             NavigationScreenModel.Menu.ShopWindow,

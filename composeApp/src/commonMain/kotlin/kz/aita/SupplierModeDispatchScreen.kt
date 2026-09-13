@@ -249,20 +249,23 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = selectedRun?.storeTitle ?: localizedStringResource(1556, "Dispatch"),
-            iconPath = stateValues.drawablePathIconSupplierDispatch,
-            iconRes = stateValues.drawableResIconSupplierDispatch.value,
-            onBack = selectedRun?.let {
-                {
-                    selectedRunKey = null
-                    feedbackMessage = null
-                    feedbackType = null
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = selectedRun?.storeTitle ?: localizedStringResource(1556, "Dispatch"),
+                iconPath = stateValues.drawablePathIconSupplierDispatch,
+                iconRes = stateValues.drawableResIconSupplierDispatch.value,
+                onBack = selectedRun?.let {
+                    {
+                        selectedRunKey = null
+                        feedbackMessage = null
+                        feedbackType = null
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val supplierPromiseWatch = androidx.compose.runtime.remember(
             filteredRuns,
             supplierPromiseNowEpochMillis,

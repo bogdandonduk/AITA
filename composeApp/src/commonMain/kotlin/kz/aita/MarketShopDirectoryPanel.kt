@@ -100,39 +100,39 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item(key = "shop-search", span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(authUiText("Find a shop, then explore its window", "Найдите магазин и откройте его витрину", "Дүкенді тауып, витринасын ашыңыз"),
+                Text(authUiText("Find a shop, then explore its window", "Найдите магазин и откройте его витрину", "Дүкенді тауып, витринасын ашыңыз", "Дүкөндү таап, андан кийин анын витринасын караңыз"),
                     color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     if (maxWidth > 720.dp) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         aitaFormTextField(Modifier.weight(2f), navigation.text, { navigation.text = it.take(120) },
-                            authUiText("Shop name or pickup address", "Магазин или адрес выдачи", "Дүкен атауы немесе алу мекенжайы"),
+                            authUiText("Shop name or pickup address", "Магазин или адрес выдачи", "Дүкен атауы немесе алу мекенжайы", "Дүкөндүн аталышы же алып кетүү дареги"),
                             identityKey = "shop-directory-name:$account", autoFocus = false, parentOwnsValue = true)
                         aitaFormTextField(Modifier.weight(1f), navigation.city, { navigation.city = it.take(100) },
-                            authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"),
+                            authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес", "Шаар · милдеттүү эмес"),
                             identityKey = "shop-directory-city:$account", autoFocus = false, parentOwnsValue = true)
                     } else Column {
                         aitaFormTextField(Modifier.fillMaxWidth(), navigation.text, { navigation.text = it.take(120) },
-                            authUiText("Shop name or pickup address", "Магазин или адрес выдачи", "Дүкен атауы немесе алу мекенжайы"),
+                            authUiText("Shop name or pickup address", "Магазин или адрес выдачи", "Дүкен атауы немесе алу мекенжайы", "Дүкөндүн аталышы же алып кетүү дареги"),
                             identityKey = "shop-directory-name:$account", autoFocus = false, parentOwnsValue = true)
                         aitaFormTextField(Modifier.fillMaxWidth(), navigation.city, { navigation.city = it.take(100) },
-                            authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес"),
+                            authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес", "Шаар · милдеттүү эмес"),
                             identityKey = "shop-directory-city:$account", autoFocus = false, parentOwnsValue = true)
                     }
                 }
                 Text(authUiText("Each card is a published physical shop. Counts are published offers, not stock, opening hours or reservations. For product/category search, use Products.",
                     "Каждая карточка — опубликованный физический магазин. Числа показывают предложения, не остатки, часы работы или резерв. Товары и категории ищите во вкладке «Товары».",
-                    "Әр карточка — жарияланған нақты дүкен. Сандар ұсыныстарды көрсетеді, қор, жұмыс уақыты не резерв емес. Тауар мен санатты «Тауарлар» қойындысынан іздеңіз."),
+                    "Әр карточка — жарияланған нақты дүкен. Сандар ұсыныстарды көрсетеді, қор, жұмыс уақыты не резерв емес. Тауар мен санатты «Тауарлар» қойындысынан іздеңіз.", "Ар бир карточка — жарыяланган чыныгы дүкөн. Сандар товар калдыгын, иш убактысын же резервди эмес, жарыяланган сунуштарды көрсөтөт. Товар же категория издөө үчүн «Товарлар» бөлүмүн колдонуңуз."),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 if (navigation.text.isNotEmpty() || navigation.city.isNotEmpty()) actionButton(
-                    text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау"), fillMaxWidthIfTextPresent = false,
+                    text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"), fillMaxWidthIfTextPresent = false,
                     autoLoading = false, confirmationRequired = false, onClick = { navigation.text = ""; navigation.city = "" })
                 data.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
             }
         }
         if (result == null && data.loading) items(4) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 180.dp), rows = 4) }
         else if (result?.shops.isNullOrEmpty()) item(key = "shops-empty", span = { GridItemSpan(maxLineSpan) }) {
-            Text(if (data.error != null || result == null) authUiText("Connect to load published shops", "Подключитесь для загрузки магазинов", "Жарияланған дүкендерді жүктеу үшін қосылыңыз")
-                else authUiText("No published shops match yet. Try another city or clear the filters.", "Опубликованных магазинов пока нет. Попробуйте другой город или сбросьте фильтры.", "Сәйкес жарияланған дүкендер әзірше жоқ. Басқа қаланы көріңіз немесе сүзгілерді тазалаңыз."),
+            Text(if (data.error != null || result == null) authUiText("Connect to load published shops", "Подключитесь для загрузки магазинов", "Жарияланған дүкендерді жүктеу үшін қосылыңыз", "Жарыяланган дүкөндөрдү жүктөө үчүн туташыңыз")
+                else authUiText("No published shops match yet. Try another city or clear the filters.", "Опубликованных магазинов пока нет. Попробуйте другой город или сбросьте фильтры.", "Сәйкес жарияланған дүкендер әзірше жоқ. Басқа қаланы көріңіз немесе сүзгілерді тазалаңыз.", "Дал келген жарыяланган дүкөндөр азырынча жок. Башка шаарды тандаңыз же чыпкаларды тазалаңыз."),
                 Modifier.padding(vertical = 24.dp), color = stateValues.TextColor, fontSize = stateValues.textSize)
         }
         items(result?.shops.orEmpty(), key = { it.storefront.storeId }) { entry ->
@@ -150,33 +150,33 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
                 SelectionContainer { Text(shop.publicAddress, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
                 if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Text(if (entry.publishedOffers == 0L) authUiText("No published offers yet", "Пока нет опубликованных предложений", "Жарияланған ұсыныстар әзірше жоқ")
-                    else authUiText("${entry.publishedOffers} published offers", "Опубликованных предложений: ${entry.publishedOffers}", "${entry.publishedOffers} жарияланған ұсыныс"),
+                Text(if (entry.publishedOffers == 0L) authUiText("No published offers yet", "Пока нет опубликованных предложений", "Жарияланған ұсыныстар әзірше жоқ", "Жарыяланган сунуштар азырынча жок")
+                    else authUiText("${entry.publishedOffers} published offers", "Опубликованных предложений: ${entry.publishedOffers}", "${entry.publishedOffers} жарияланған ұсыныс", "${entry.publishedOffers} жарыяланган сунуш"),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                actionButton(text = authUiText("View shop", "Открыть магазин", "Дүкенді ашу"), enabled = canVisit,
+                actionButton(text = authUiText("View shop", "Открыть магазин", "Дүкенді ашу", "Дүкөндү көрүү"), enabled = canVisit,
                     autoLoading = false, confirmationRequired = false, onClick = { if (owner?.isCurrent() == true) onVisit(shop) })
             }
         }
         item(key = "shops-footer", span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(when {
-                    inputPending -> authUiText("Applying search…", "Применяем поиск…", "Іздеу қолданылуда…")
-                    data.loading -> authUiText("Updating shops…", "Обновляем магазины…", "Дүкендер жаңартылуда…")
-                    fresh && result != null -> authUiText("${result.shops.size} of ${result.totalShops} shops · by name", "${result.shops.size} из ${result.totalShops} магазинов · по названию", "${result.totalShops} дүкеннің ${result.shops.size} дүкені · атауы бойынша")
-                    else -> authUiText("Shops · refresh needed", "Магазины · требуется обновление", "Дүкендер · жаңарту қажет")
+                    inputPending -> authUiText("Applying search…", "Применяем поиск…", "Іздеу қолданылуда…", "Издөө колдонулууда…")
+                    data.loading -> authUiText("Updating shops…", "Обновляем магазины…", "Дүкендер жаңартылуда…", "Дүкөндөр жаңыртылууда…")
+                    fresh && result != null -> authUiText("${result.shops.size} of ${result.totalShops} shops · by name", "${result.shops.size} из ${result.totalShops} магазинов · по названию", "${result.totalShops} дүкеннің ${result.shops.size} дүкені · атауы бойынша", "${result.totalShops} дүкөндүн ${result.shops.size} дүкөнү · аталышы боюнча")
+                    else -> authUiText("Shops · refresh needed", "Магазины · требуется обновление", "Дүкендер · жаңарту қажет", "Дүкөндөр · жаңыртуу керек")
                 }, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 result?.let { Text(receiptUiDateTime(it.checkedAtMillis), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), enabled = !data.loading && !inputPending,
+                    actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), enabled = !data.loading && !inputPending,
                         loading = data.loading, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
                         onClick = { requests.trySend(Unit) })
                     if (result != null && result.totalShops > result.shops.size && wanted.limit < MARKET_SHOPS_MAX_WINDOW)
-                        actionButton(text = authUiText("More shops", "Ещё магазины", "Тағы дүкендер"), enabled = fresh,
+                        actionButton(text = authUiText("More shops", "Ещё магазины", "Тағы дүкендер", "Дагы дүкөндөр"), enabled = fresh,
                             autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
                             onClick = { navigation.request = wanted.copy(limit = wanted.limit + MARKET_SHOPS_PAGE_SIZE) })
                 }
                 if (result != null && result.totalShops > MARKET_SHOPS_MAX_WINDOW && wanted.limit == MARKET_SHOPS_MAX_WINDOW)
-                    Text(authUiText("First 200 matches. Refine the city or shop name to explore more.", "Первые 200 совпадений. Уточните город или название магазина для поиска других.", "Алғашқы 200 сәйкестік. Басқаларын көру үшін қаланы не дүкен атауын нақтылаңыз."),
+                    Text(authUiText("First 200 matches. Refine the city or shop name to explore more.", "Первые 200 совпадений. Уточните город или название магазина для поиска других.", "Алғашқы 200 сәйкестік. Басқаларын көру үшін қаланы не дүкен атауын нақтылаңыз.", "Алгачкы 200 дал келүү. Көбүрөөк көрүү үчүн шаарды же дүкөндүн аталышын тактаңыз."),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             }
         }

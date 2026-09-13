@@ -42,11 +42,11 @@ internal fun AppConfiguration.AuthenticatorRecoveryEditor(
         val next = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 if (withTimeoutOrNull(45_000L) { block(); true } != true && owner.isCurrent() && attempt == generation) {
-                    error = authUiText("Request timed out. Check the result before retrying.", "Время ожидания истекло. Проверьте результат перед повтором.", "Күту уақыты аяқталды. Қайталаудан бұрын нәтижені тексеріңіз.")
+                    error = authUiText("Request timed out. Check the result before retrying.", "Время ожидания истекло. Проверьте результат перед повтором.", "Күту уақыты аяқталды. Қайталаудан бұрын нәтижені тексеріңіз.", "Суроо-талаптын күтүү убактысы бүттү. Кайра аракет кылуудан мурун натыйжаны текшериңиз.")
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) {
-                if (owner.isCurrent() && attempt == generation) error = authUiText("Request failed. Try again.", "Запрос не выполнен. Повторите.", "Сұрау орындалмады. Қайталаңыз.")
+                if (owner.isCurrent() && attempt == generation) error = authUiText("Request failed. Try again.", "Запрос не выполнен. Повторите.", "Сұрау орындалмады. Қайталаңыз.", "Суроо-талап аткарылган жок. Кайра аракет кылыңыз.")
             } finally {
                 if (attempt == generation) { busy = false; action = null }
             }
@@ -64,7 +64,7 @@ internal fun AppConfiguration.AuthenticatorRecoveryEditor(
     fun requestCode() {
         val who = normalizeAitaLoginIdentifier(identifier)?.value
         if (who == null || password.isBlank()) {
-            error = authUiText("Enter your login and current password", "Введите логин и текущий пароль", "Логин мен қазіргі құпия сөзді енгізіңіз")
+            error = authUiText("Enter your login and current password", "Введите логин и текущий пароль", "Логин мен қазіргі құпия сөзді енгізіңіз", "Логиниңизди жана учурдагы сырсөзүңүздү киргизиңиз")
             return
         }
         val request = AitaAuthenticatorRecoveryRequestDataModel(who, password, stateValues.appLanguage)
@@ -78,32 +78,32 @@ internal fun AppConfiguration.AuthenticatorRecoveryEditor(
     DisposableEffect(Unit) { onDispose { action?.cancel() } }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(authUiText("Recover authenticator access", "Восстановить доступ к аутентификатору", "Аутентификаторға қолжетімділікті қалпына келтіру"),
+        Text(authUiText("Recover authenticator access", "Восстановить доступ к аутентификатору", "Аутентификаторға қолжетімділікті қалпына келтіру", "Аутентификаторго кирүүнү калыбына келтирүү"),
             color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
         if (complete) {
             Text(authUiText("Authenticator removed. All sessions and old recovery codes were revoked. Sign in again, then connect a new authenticator.",
                 "Аутентификатор удалён. Все сеансы входа и старые резервные коды отозваны. Войдите заново и подключите новый аутентификатор.",
-                "Аутентификатор жойылды. Барлық кіру сеанстары мен ескі резервтік кодтар қайтарып алынды. Қайта кіріп, жаңа аутентификаторды қосыңыз."),
+                "Аутентификатор жойылды. Барлық кіру сеанстары мен ескі резервтік кодтар қайтарып алынды. Қайта кіріп, жаңа аутентификаторды қосыңыз.", "Аутентификатор алынып салынды. Бардык сессиялар жана эски калыбына келтирүү коддору жокко чыгарылды. Кайра кирип, жаңы аутентификатор туташтырыңыз."),
                 color = stateValues.AccentColor, fontSize = stateValues.textSize)
-            AuthQuietAction(authUiText("Done", "Готово", "Дайын"), onClick = ::cancel)
+            AuthQuietAction(authUiText("Done", "Готово", "Дайын", "Даяр"), onClick = ::cancel)
         } else {
             Text(authUiText("Confirm your current password and a code sent to your main email. This removes the lost authenticator and ends all sign-in sessions.",
                 "Подтвердите текущий пароль и код из письма на основной email. Это удалит потерянный аутентификатор и завершит все сеансы входа.",
-                "Қазіргі құпия сөзді және негізгі email мекенжайына жіберілген кодты растаңыз. Бұл жоғалған аутентификаторды жойып, барлық кіру сеанстарын аяқтайды."),
+                "Қазіргі құпия сөзді және негізгі email мекенжайына жіберілген кодты растаңыз. Бұл жоғалған аутентификаторды жойып, барлық кіру сеанстарын аяқтайды.", "Учурдагы сырсөзүңүздү жана негизги электрондук почтаңызга жөнөтүлгөн кодду ырастатыңыз. Бул жоголгон аутентификаторду алып салып, бардык кирүү сессияларын аяктатат."),
                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             val current = flow
             if (current == null) {
                 aitaFormTextField(modifier = Modifier.fillMaxWidth(), value = identifier, onValueChange = { identifier = it; error = "" },
-                    titleText = authUiText("Email or full phone number", "Email или полный номер телефона", "Email немесе толық телефон нөмірі"),
-                    placeholderText = authUiText("Your account login", "Логин аккаунта", "Аккаунт логині"),
+                    titleText = authUiText("Email or full phone number", "Email или полный номер телефона", "Email немесе толық телефон нөмірі", "Электрондук почта же толук телефон номери"),
+                    placeholderText = authUiText("Your account login", "Логин аккаунта", "Аккаунт логині", "Аккаунтуңуздун логини"),
                     identityKey = "totp-recovery-identifier", sensitive = true, enabled = !busy && editableIdentifier,
                     keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, leadingIconPath = stateValues.drawablePathIconEmail)
                 aitaFormTextField(modifier = Modifier.fillMaxWidth(), value = password, onValueChange = { password = it; error = "" },
-                    titleText = authUiText("Current password", "Текущий пароль", "Қазіргі құпия сөз"), placeholderText = stateValues.stringEnterPassword,
+                    titleText = authUiText("Current password", "Текущий пароль", "Қазіргі құпия сөз", "Учурдагы сырсөз"), placeholderText = stateValues.stringEnterPassword,
                     identityKey = "totp-recovery-password", enabled = !busy, sensitive = true, password = true,
                     keyboardType = KeyboardType.Password, imeAction = ImeAction.Go, onImeAction = ::requestCode,
                     leadingIconPath = stateValues.drawablePathIconPassword)
-                actionButton(modifier = Modifier.fillMaxWidth(), text = authUiText("Send recovery code", "Получить код восстановления", "Қалпына келтіру кодын алу"),
+                actionButton(modifier = Modifier.fillMaxWidth(), text = authUiText("Send recovery code", "Получить код восстановления", "Қалпына келтіру кодын алу", "Калыбына келтирүү кодун жөнөтүү"),
                     enabled = !busy, loading = busy, autoLoading = false, onClick = ::requestCode)
             } else {
                 AuthEmailCodeEntry(code, current, busy, { code = it; error = "" }, onSubmit = {
@@ -123,7 +123,7 @@ internal fun AppConfiguration.AuthenticatorRecoveryEditor(
                 }, onResend = {
                     val request = AitaEmailCodeResendRequestDataModel(current.flowId, stateValues.appLanguage)
                     launchAction { acceptFlow(AitaAdvancedAuthenticationClient.resendAuthenticatorRecovery(request)) }
-                }, confirmText = authUiText("Reset authenticator", "Сбросить аутентификатор", "Аутентификаторды қалпына келтіру"), identity = "totp-recovery-email-code")
+                }, confirmText = authUiText("Reset authenticator", "Сбросить аутентификатор", "Аутентификаторды қалпына келтіру", "Аутентификаторду баштапкы абалга келтирүү"), identity = "totp-recovery-email-code")
             }
             if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
             AuthQuietAction(stateValues.stringCancel, !busy, ::cancel)

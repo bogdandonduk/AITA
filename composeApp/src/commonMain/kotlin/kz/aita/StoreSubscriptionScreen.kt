@@ -51,7 +51,7 @@ internal fun AppConfiguration.SubscriptionRequiredPane(modifier: Modifier = Modi
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         if (store != null && loading == store) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 3)
         else MessageText(Modifier.fillMaxWidth(), if (store == null)
-            authUiText("Choose a location", "Выберите торговую точку", "Сауда нүктесін таңдаңыз")
+            authUiText("Choose a location", "Выберите торговую точку", "Сауда нүктесін таңдаңыз", "Жайды тандаңыз")
             else eventMessage(if (gate == StoreSubscriptionGate.Checking) "subscription.verify" else "subscription.required")
                 .visibleLocalizedString(stateValues.appLanguage, ""))
         Spacer(Modifier.height(16.dp))
@@ -124,19 +124,23 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
             if (recovered != null && recovered.negative) { feedback = recovered.message; feedbackNegative = true }
         }
     }
-    Column(Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(title = stateValues.stringSubscription, iconPath = stateValues.drawablePathIconSubscription,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+    AitaScreenColumn(
+        Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(title = stateValues.stringSubscription, iconPath = stateValues.drawablePathIconSubscription,
+                onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+        }
+    ) {
         if (storeId == null) {
             SubscriptionRequiredPane(Modifier.weight(1f))
-            return@Column
+            return@AitaScreenColumn
         }
         val store = stateValues.stores.orEmpty().flattenStoresWithBranches().firstOrNull { it.id == storeId }
         Text(store?.name?.visibleLocalizedString(stateValues.appLanguage, storeId) ?: storeId,
             Modifier.align(Alignment.CenterHorizontally).padding(stateValues.marginTextField),
             color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
         val tabs = listOf(TabContent("current", localizedStringResource(587, "Current subscription")),
-            TabContent("plans", authUiText("Plans", "Тарифы", "Тарифтер"))) +
+            TabContent("plans", authUiText("Plans", "Тарифы", "Тарифтер", "Тарифтер"))) +
             if (dashboard?.canManage == true) listOf(TabContent("charges", localizedStringResource(589, "Subscription charges"))) else emptyList()
         val section = sectionTabsWidget(stateKey = "location-subscription:$accountId:$storeId", tabs = tabs,
             modifier = Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField))
@@ -164,17 +168,17 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                     SubscriptionSurface {
                         Text(eventMessage("subscription.result_unknown").visibleLocalizedString(stateValues.appLanguage, ""),
                             color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
-                        actionButton(text = authUiText("Check request status", "Проверить результат запроса", "Сұрау нәтижесін тексеру"),
+                        actionButton(text = authUiText("Check request status", "Проверить результат запроса", "Сұрау нәтижесін тексеру", "Суроо-талаптын абалын текшерүү"),
                             loading = busy, autoLoading = false, confirmationRequired = false, onClick = { launchAction {
                                 val response = recoverPendingSubscriptionCommand(storeId)
                                 feedback = response?.message; feedbackNegative = response?.negative == true
                             } })
                         pendingRequest?.let { request ->
-                            actionButton(text = authUiText("Retry the same request", "Повторить тот же запрос", "Сол сұрауды қайталау"),
+                            actionButton(text = authUiText("Retry the same request", "Повторить тот же запрос", "Сол сұрауды қайталау", "Ошол эле суроо-талапты кайталоо"),
                                 loading = busy, autoLoading = false, confirmationRequired = false,
                                 onClick = { launchAction { submit(request) } })
                         }
-                        actionButton(text = authUiText("Refresh and review again", "Обновить и проверить заново", "Жаңартып, қайта тексеру"),
+                        actionButton(text = authUiText("Refresh and review again", "Обновить и проверить заново", "Жаңартып, қайта тексеру", "Жаңыртып, кайра карап чыгуу"),
                             loading = busy, autoLoading = false, confirmationRequired = true, onClick = { launchAction {
                                 if (reviewSubscriptionAfterUnknownResult(storeId)) { pendingRequest = null; quote = null; feedback = null }
                             } })
@@ -185,39 +189,39 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                     val lifetime = hasAccess && current.accessKind == SUBSCRIPTION_ACCESS_LIFETIME
                     val plan = dashboard.plans.firstOrNull { it.id == current.planId }
                     SubscriptionSurface(lifetime) {
-                        Text(if (lifetime) authUiText("Lifetime access", "Бессрочный доступ", "Мерзімсіз қолжетімділік")
+                        Text(if (lifetime) authUiText("Lifetime access", "Бессрочный доступ", "Мерзімсіз қолжетімділік", "Мөөнөтсүз мүмкүнчүлүк")
                             else plan?.name?.visibleLocalizedString(stateValues.appLanguage, "Basic") ?: "Basic",
                             color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
                         Text(if (hasAccess) localizedStringResource(812, "active") else
-                            authUiText("Not active for this location", "Для этой точки не активна", "Бұл нүктеде белсенді емес"),
+                            authUiText("Not active for this location", "Для этой точки не активна", "Бұл нүктеде белсенді емес", "Бул жай үчүн активдүү эмес"),
                             color = if (hasAccess) stateValues.AccentColor else stateValues.PlaceholderTextColor, fontSize = stateValues.accentTextSize)
                         Text(authUiText("Access belongs to this location only. Branches subscribe separately.",
                             "Доступ действует только для этой точки. У каждого филиала своя подписка.",
-                            "Қолжетімділік тек осы нүктеге арналған. Әр филиалға бөлек жазылым қажет."),
+                            "Қолжетімділік тек осы нүктеге арналған. Әр филиалға бөлек жазылым қажет.", "Мүмкүнчүлүк ушул жайга гана таандык. Филиалдар өзүнчө жазылат."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        if (lifetime) Text(authUiText("Unlocked by promo code · no renewal charges", "Активирован промокодом · без списаний за продление", "Промокодпен қосылған · ұзарту төлемі жоқ"),
+                        if (lifetime) Text(authUiText("Unlocked by promo code · no renewal charges", "Активирован промокодом · без списаний за продление", "Промокодпен қосылған · ұзарту төлемі жоқ", "Промокод менен ачылды · узартуу акысы алынбайт"),
                             color = if (stateValues.BackgroundColor.luminance() > 0.5f) Color(0xFF007D8B) else Color(0xFF63E0ED), fontSize = stateValues.textSize)
                         else current.currentPeriodEndMillis?.let { end ->
-                            Text(authUiText("Access until", "Доступ до", "Қолжетімділік мерзімі") + ": " + securitySessionDateTimeText(end),
+                            Text(authUiText("Access until", "Доступ до", "Қолжетімділік мерзімі", "Мүмкүнчүлүк аяктайт") + ": " + securitySessionDateTimeText(end),
                                 color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
                         }
                         if (dashboard.canManage) {
                             val wallet = dashboard.billingWallet
-                            Text(authUiText("Billing owner's balance", "Баланс владельца для оплаты", "Төлем жасайтын иесінің балансы") + ": " +
+                            Text(authUiText("Billing owner's balance", "Баланс владельца для оплаты", "Төлем жасайтын иесінің балансы", "Төлөөчү ээсинин балансы") + ": " +
                                 (wallet?.let { it.available.aitaMoney(it.currencyCode) } ?: "—"),
                                 color = changedValueColor(wallet?.balanceMinor, "$accountId:$storeId:billing-wallet"), fontSize = stateValues.smallTextSize)
                             if ((hasAccess || current.autoRenew) && current.accessKind == SUBSCRIPTION_ACCESS_PAID) {
-                                Text(authUiText("Regular renewal", "Обычное продление", "Әдеттегі ұзарту") + ": " + current.renewalPriceMinor.fromMinorCurrencyUnits().aitaMoney(current.currencyCode),
+                                Text(authUiText("Regular renewal", "Обычное продление", "Әдеттегі ұзарту", "Кезектеги узартуу") + ": " + current.renewalPriceMinor.fromMinorCurrencyUnits().aitaMoney(current.currencyCode),
                                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                actionButton(text = if (current.autoRenew) authUiText("Turn off renewal", "Отключить продление", "Ұзартуды өшіру")
-                                    else authUiText("Enable paid renewal", "Включить платное продление", "Ақылы ұзартуды қосу"),
+                                actionButton(text = if (current.autoRenew) authUiText("Turn off renewal", "Отключить продление", "Ұзартуды өшіру", "Узартууну өчүрүү")
+                                    else authUiText("Enable paid renewal", "Включить платное продление", "Ақылы ұзартуды қосу", "Акы төлөнүүчү узартууну күйгүзүү"),
                                     enabled = !busy && pendingId == null, loading = busy, autoLoading = false, confirmationRequired = true,
                                     onClick = { launchAction { submit(StoreSubscriptionUpdateRequestDataModel(storeId, current.planId,
                                         autoRenew = !current.autoRenew, activateNow = false, commandId = newClientSideUuidString(), expectedRevision = current.revision)) } })
                             }
                         } else Text(authUiText("Only the owner or subscription manager can activate or change billing.",
                             "Подключить подписку и изменить оплату может владелец или управляющий подпиской.",
-                            "Жазылымды иесі немесе жазылым басқарушысы ғана қосып, төлемді өзгерте алады."),
+                            "Жазылымды иесі немесе жазылым басқарушысы ғана қосып, төлемді өзгерте алады.", "Төлөмдөрдү ээси же жазылууну башкаруучу гана иштетип же өзгөртө алат."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         actionButton(text = localizedStringResource(237, "Refresh"), autoLoading = false, loading = busy, confirmationRequired = false,
                             onClick = { launchAction { refreshStoreSubscriptionNow(storeId) } })
@@ -236,11 +240,11 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                                 genericTextField(valueInitial = promo, identityKey = "subscription-promo:$accountId:$storeId", parentOwnsValue = true,
                                     enabled = !busy && pendingId == null, autoFocus = false, enableVoiceInput = false,
                                     retainTextAcrossRecreation = false, persistTextDraft = false,
-                                    placeholderText = authUiText("Promo code (optional)", "Промокод (необязательно)", "Промокод (міндетті емес)"),
+                                    placeholderText = authUiText("Promo code (optional)", "Промокод (необязательно)", "Промокод (міндетті емес)", "Промокод (милдеттүү эмес)"),
                                     leadingIconPath = stateValues.drawablePathIconSubscription,
                                     onValueChange = { value, apply -> promo = value.take(96); quote = null; pendingRequest = null; apply() })
                                 val reviewed = quote
-                                if (reviewed == null) actionButton(text = authUiText("Review offer", "Проверить предложение", "Ұсынысты тексеру"),
+                                if (reviewed == null) actionButton(text = authUiText("Review offer", "Проверить предложение", "Ұсынысты тексеру", "Сунушту кароо"),
                                     enabled = !busy && pendingId == null, loading = busy, autoLoading = false, confirmationRequired = false,
                                     onClick = { launchAction {
                                         val response = quoteStoreSubscriptionNow(StoreSubscriptionQuoteRequestDataModel(storeId, plan.id, promo))
@@ -251,28 +255,28 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                                     } })
                                 else {
                                     Text(when (reviewed.accessKind) {
-                                        SUBSCRIPTION_ACCESS_LIFETIME -> authUiText("Lifetime access · no expiry", "Бессрочный доступ · без срока окончания", "Мерзімсіз қолжетімділік")
-                                        SUBSCRIPTION_ACCESS_TIMED -> authUiText("Access period", "Период доступа", "Қолжетімділік мерзімі") + ": " +
-                                            ((reviewed.durationMillis ?: 0L) / 86_400_000.0).toStockMoneyText() + " " + authUiText("days", "дней", "күн")
+                                        SUBSCRIPTION_ACCESS_LIFETIME -> authUiText("Lifetime access · no expiry", "Бессрочный доступ · без срока окончания", "Мерзімсіз қолжетімділік", "Мөөнөтсүз мүмкүнчүлүк · бүтүү күнү жок")
+                                        SUBSCRIPTION_ACCESS_TIMED -> authUiText("Access period", "Период доступа", "Қолжетімділік мерзімі", "Мүмкүнчүлүк мөөнөтү") + ": " +
+                                            ((reviewed.durationMillis ?: 0L) / 86_400_000.0).toStockMoneyText() + " " + authUiText("days", "дней", "күн", "күн")
                                         else -> plan.name.visibleLocalizedString(stateValues.appLanguage, "Basic")
                                     }, color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
-                                    Text(authUiText("Charged now", "Списание сейчас", "Қазір алынатын төлем") + ": " + reviewed.chargeMinor.fromMinorCurrencyUnits().aitaMoney(reviewed.currencyCode),
+                                    Text(authUiText("Charged now", "Списание сейчас", "Қазір алынатын төлем", "Азыр алынган төлөм") + ": " + reviewed.chargeMinor.fromMinorCurrencyUnits().aitaMoney(reviewed.currencyCode),
                                         color = stateValues.AccentColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
                                     if (reviewed.canAutoRenew) Row(verticalAlignment = Alignment.CenterVertically) {
                                         AitaRoundCheckbox(autoRenew, { autoRenew = it }, enabled = !busy && pendingId == null)
-                                        Text(authUiText("Automatically renew at", "Автопродление за", "Автоматты ұзарту бағасы") + " " +
+                                        Text(authUiText("Automatically renew at", "Автопродление за", "Автоматты ұзарту бағасы", "Автоматтык узартуу убактысы") + " " +
                                             reviewed.regularPriceMinor.fromMinorCurrencyUnits().aitaMoney(reviewed.currencyCode) + " / " + subscriptionPeriodText(plan.periodUnit, plan.periodCount),
                                             color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
                                     }
-                                    else Text(authUiText("No automatic paid renewal", "Без автоматического платного продления", "Автоматты ақылы ұзарту жоқ"),
+                                    else Text(authUiText("No automatic paid renewal", "Без автоматического платного продления", "Автоматты ақылы ұзарту жоқ", "Автоматтык акы төлөнүүчү узартуу жок"),
                                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                     if (hasAccess && reviewed.accessKind == SUBSCRIPTION_ACCESS_LIFETIME) Text(
                                         authUiText("Lifetime access replaces the remaining paid period. No automatic refund is issued.",
                                             "Бессрочный доступ заменит оставшийся оплаченный период. Автоматического возврата нет.",
-                                            "Мерзімсіз қолжетімділік қалған ақылы кезеңді ауыстырады. Автоматты қайтарым жасалмайды."),
+                                            "Мерзімсіз қолжетімділік қалған ақылы кезеңді ауыстырады. Автоматты қайтарым жасалмайды.", "Мөөнөтсүз мүмкүнчүлүк акы төлөнгөн калган мезгилдин ордуна келет. Автоматтык түрдө акча кайтарылбайт."),
                                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                    actionButton(text = if (reviewed.chargeMinor == 0L) authUiText("Activate access", "Активировать доступ", "Қолжетімділікті қосу")
-                                        else authUiText("Pay and activate", "Оплатить и подключить", "Төлеп, қосу"),
+                                    actionButton(text = if (reviewed.chargeMinor == 0L) authUiText("Activate access", "Активировать доступ", "Қолжетімділікті қосу", "Мүмкүнчүлүктү иштетүү")
+                                        else authUiText("Pay and activate", "Оплатить и подключить", "Төлеп, қосу", "Төлөө жана иштетүү"),
                                         enabled = !busy && pendingId == null, loading = busy, autoLoading = false, confirmationRequired = true,
                                         onClick = { launchAction { submit(StoreSubscriptionUpdateRequestDataModel(storeId, reviewed.planId,
                                             autoRenew = autoRenew && reviewed.canAutoRenew, activateNow = true, promoCode = quotedPromo,
@@ -289,10 +293,10 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                 if (section == "charges" && dashboard.canManage) {
                     if (dashboard.charges.isEmpty()) item("no-charges") { MessageText(text = stateValues.stringListEmpty) }
                     items(dashboard.charges, key = { it.id }) { charge ->
-                        FinanceLedgerCard(title = if (charge.planId == SUBSCRIPTION_LIFETIME_PLAN) authUiText("Lifetime access", "Бессрочный доступ", "Мерзімсіз қолжетімділік") else "Basic",
-                            subtitle = if (charge.status == "promo_grant") authUiText("Promo code activated", "Активировано промокодом", "Промокодпен қосылған") else when (charge.status) {
-                                "paid" -> authUiText("Paid", "Оплачено", "Төленді")
-                                "failed" -> authUiText("Payment failed", "Оплата не прошла", "Төлем орындалмады")
+                        FinanceLedgerCard(title = if (charge.planId == SUBSCRIPTION_LIFETIME_PLAN) authUiText("Lifetime access", "Бессрочный доступ", "Мерзімсіз қолжетімділік", "Мөөнөтсүз мүмкүнчүлүк") else "Basic",
+                            subtitle = if (charge.status == "promo_grant") authUiText("Promo code activated", "Активировано промокодом", "Промокодпен қосылған", "Промокод иштетилди") else when (charge.status) {
+                                "paid" -> authUiText("Paid", "Оплачено", "Төленді", "Төлөндү")
+                                "failed" -> authUiText("Payment failed", "Оплата не прошла", "Төлем орындалмады", "Төлөм өтпөй калды")
                                 else -> charge.status
                             },
                             amountText = (if (charge.amountMinor == 0L) "" else "−") + charge.amount.aitaMoney(charge.currencyCode), timeMillis = charge.createdAtMillis)

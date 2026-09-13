@@ -18,7 +18,7 @@ class AitaAuthEmailBrandingTest {
     @Test fun allNewMailPurposesUseTheSameLocalBranding() {
         for (purpose in listOf("PASSWORDLESS_LOGIN", "PASSWORD_RECOVERY", "PHONE_ALIAS", "EMAIL_ALIAS",
             "TOTP_RECOVERY", "TOTP_RESET_NOTICE", "LOGIN_EMAIL_FACTOR", "SECURITY_EMAIL_PROOF")) {
-            for (locale in listOf("en", "ru", "kk")) {
+            for (locale in listOf("en", "ru", "kk", "ky", "ky-KG")) {
                 val copy = aitaAuthEmailCopy(purpose, locale, "001234", 10)
                 assertTrue(copy.html.contains("src=\"cid:aita-logo\""))
                 assertEquals(AitaAuthEmailBranding.images, copy.inlineImages)

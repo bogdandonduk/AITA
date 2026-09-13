@@ -255,20 +255,21 @@ fun AppConfiguration.MenuSecurityScreen() {
         }
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік"),
-            iconPath = stateValues.drawablePathIconSecurity,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = authUiText("Sign-in & security", "Вход и безопасность", "Кіру және қауіпсіздік", "Кирүү жана коопсуздук"),
+                iconPath = stateValues.drawablePathIconSecurity,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -278,9 +279,9 @@ fun AppConfiguration.MenuSecurityScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 selectedIndexInitial = selectedSecurityTab,
                 tabs = listOf(
-                    TabContent("signin", authUiText("Sign-in", "Вход", "Кіру")),
-                    TabContent("sessions", tabLabelWithCount(authUiText("Sessions", "Сессии", "Сессиялар"), sessions.size)),
-                    TabContent("history", tabLabelWithCount(authUiText("History", "История", "Тарих"), history.size))
+                    TabContent("signin", authUiText("Sign-in", "Вход", "Кіру", "Кирүү")),
+                    TabContent("sessions", tabLabelWithCount(authUiText("Sessions", "Сессии", "Сессиялар", "Сессиялар"), sessions.size)),
+                    TabContent("history", tabLabelWithCount(authUiText("History", "История", "Тарих", "Тарых"), history.size))
                 ),
                 unselectedContainerColor = stateValues.BackgroundColor
             )
@@ -522,20 +523,21 @@ fun AppConfiguration.MenuDevicesScreen() {
         refreshLabelPrinters(showNotification = false)
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringDevices,
-            iconPath = stateValues.drawablePathIconDevices,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringDevices,
+                iconPath = stateValues.drawablePathIconDevices,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val section = sectionTabsWidget(
             stateKey = "devices",
             tabs = listOf(
@@ -687,19 +689,19 @@ fun AppConfiguration.MenuDevicesScreen() {
 
                         if (receiptPrinterError.isNotBlank()) Text(receiptPrinterError,
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-                        if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…"),
+                        if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…", "Принтерлер изделүүдө…"),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         if (getPlatformName().startsWith("jvm", ignoreCase = true)) {
-                            AuthQuietAction(authUiText("Enter printer address", "Ввести адрес принтера", "Принтер мекенжайын енгізу"),
+                            AuthQuietAction(authUiText("Enter printer address", "Ввести адрес принтера", "Принтер мекенжайын енгізу", "Принтердин дарегин киргизиңиз"),
                                 !printingReceipt && !savingReceiptPrinter) { showManualReceiptTarget = !showManualReceiptTarget }
                             if (showManualReceiptTarget) {
                                 aitaFormTextField(value = manualReceiptTarget, onValueChange = { manualReceiptTarget = it },
-                                    titleText = authUiText("Queue or address", "Очередь или адрес", "Кезек немесе мекенжай"),
+                                    titleText = authUiText("Queue or address", "Очередь или адрес", "Кезек немесе мекенжай", "Кезек же дарек"),
                                     placeholderText = "print-service:XP-58 (copy 1)", identityKey = "receipt-manual-target",
                                     enabled = !savingReceiptPrinter && !printingReceipt, keyboardType = KeyboardType.Ascii)
                                 Text("print-service:XP-58 (copy 1) · tcp://192.168.1.50:9100 · serial:COM3",
                                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                actionButton(text = authUiText("Use this printer", "Выбрать принтер", "Осы принтерді таңдау"),
+                                actionButton(text = authUiText("Use this printer", "Выбрать принтер", "Осы принтерді таңдау", "Бул принтерди колдонуу"),
                                     enabled = !savingReceiptPrinter && !printingReceipt && manualReceiptTarget.isNotBlank(),
                                     loading = savingReceiptPrinter, autoLoading = false) { selectReceiptPrinter(manualReceiptTarget) }
                             }
@@ -1215,25 +1217,26 @@ internal fun AppConfiguration.SupportFaqCard(entry: SupportFaqEntry) {
 fun AppConfiguration.MenuDebtorsScreen() {
     var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringDebtors,
+                iconPath = stateValues.drawablePathIconDebtors,
+                trailingIcons = listOf(
+                    Triple(sortActionIconPath(), sortActionIconFallback()) {
+                        sortMenuExpanded = !sortMenuExpanded
+                    }
+                ),
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
+                }
+            )
+        }
     ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringDebtors,
-            iconPath = stateValues.drawablePathIconDebtors,
-            trailingIcons = listOf(
-                Triple(sortActionIconPath(), sortActionIconFallback()) {
-                    sortMenuExpanded = !sortMenuExpanded
-                }
-            ),
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
-                }
-            }
-        )
-
         val storeId = stateValues.activeStoreId
         val debtors by debtorsState.payload.collectAsState()
 
@@ -1399,26 +1402,27 @@ fun AppConfiguration.MenuDebtorsScreen() {
 
 @Composable
 fun AppConfiguration.MenuCloseDebtScreen() {
-    Column(
+    val state by NavigationScreenModel.Menu.CloseDebt.state.collectAsState()
+    val selectedId = state["selected_debtor_id"]
+    val debtors by debtorsState.payload.collectAsState()
+    val debtor = debtors.orEmpty().find { it.id == selectedId }
+    val storeId = stateValues.activeStoreId
+    val transactions by transactionsState.payload.collectAsState()
+
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringCloseDebt,
+                iconPath = stateValues.drawablePathIconDebtors,
+                onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
+            )
+        }
     ) {
-        val state by NavigationScreenModel.Menu.CloseDebt.state.collectAsState()
-        val selectedId = state["selected_debtor_id"]
-        val debtors by debtorsState.payload.collectAsState()
-        val debtor = debtors.orEmpty().find { it.id == selectedId }
-        val storeId = stateValues.activeStoreId
-        val transactions by transactionsState.payload.collectAsState()
-
-        ScreenAppBarWidget(
-            title = stateValues.stringCloseDebt,
-            iconPath = stateValues.drawablePathIconDebtors,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
-        )
-
         if (storeId == null || debtor == null) {
             MessageText(modifier = Modifier.fillMaxSize(), text = stateValues.stringListEmpty)
-            return@Column
+            return@AitaScreenColumn
         }
 
         var receiptDialog by rememberSaveable(debtor.id) { mutableStateOf<String?>(null) }
@@ -1749,21 +1753,22 @@ fun AppConfiguration.MenuCloseDebtScreen() {
 
 @Composable
 fun AppConfiguration.MenuAppThemeScreen() {
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringAppTheme,
-            iconPath = stateValues.drawablePathIconAppTheme,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringAppTheme,
+                iconPath = stateValues.drawablePathIconAppTheme,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppTheme),
             modifier = Modifier
@@ -1785,21 +1790,22 @@ fun AppConfiguration.MenuAppThemeScreen() {
 
 @Composable
 fun AppConfiguration.MenuAppScaleScreen() {
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(910, "Interface scale"),
-            iconPath = stateValues.drawablePathIconAppScale,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(910, "Interface scale"),
+                iconPath = stateValues.drawablePathIconAppScale,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppScale),
             modifier = Modifier
@@ -1857,15 +1863,15 @@ internal fun AppConfiguration.appModeOptions(): List<AppModeOptionUiModel> = lis
     ),
     AppModeOptionUiModel(
         modeId = APP_MODE_BUYER,
-        title = authUiText("Buyer · preview", "Покупатель · предварительная версия", "Сатып алушы · алдын ала нұсқа"),
+        title = authUiText("Buyer · preview", "Покупатель · предварительная версия", "Сатып алушы · алдын ала нұсқа", "Сатып алуучу · алдын ала көрүнүш"),
         subtitle = authUiText("Browse published shop windows, save products and compare matching offers.",
-            "Смотрите витрины, сохраняйте товары и сравнивайте предложения.", "Витриналарды қарап, тауарларды сақтаңыз және ұсыныстарды салыстырыңыз."),
+            "Смотрите витрины, сохраняйте товары и сравнивайте предложения.", "Витриналарды қарап, тауарларды сақтаңыз және ұсыныстарды салыстырыңыз.", "Дүкөндөрдүн жарыяланган витриналарын карап, товарларды сактап, дал келген сунуштарды салыштырыңыз."),
         promise = authUiText("Discovery first. Ordering and online payment are not enabled yet.",
-            "Сначала — выбор товаров. Заказ и онлайн-оплата пока не подключены.", "Әзірге — тауар таңдау. Тапсырыс пен онлайн төлем әлі қосылмаған."),
+            "Сначала — выбор товаров. Заказ и онлайн-оплата пока не подключены.", "Әзірге — тауар таңдау. Тапсырыс пен онлайн төлем әлі қосылмаған.", "Азырынча издөө жана таанышуу гана. Тапшырык берүү жана онлайн төлөм иштетиле элек."),
         iconPath = marketIconPath(139),
         iconRes = marketIconFallback(139),
-        features = listOf(authUiText("Shop windows", "Витрины", "Витриналар"),
-            authUiText("Saved offers", "Сохранённое", "Сақталғандар"), authUiText("Comparison", "Сравнение", "Салыстыру"))
+        features = listOf(authUiText("Shop windows", "Витрины", "Витриналар", "Дүкөн витриналары"),
+            authUiText("Saved offers", "Сохранённое", "Сақталғандар", "Сакталган сунуштар"), authUiText("Comparison", "Сравнение", "Салыстыру", "Салыштыруу"))
     ),
     AppModeOptionUiModel(
         modeId = APP_MODE_SUPPLIER,
@@ -2050,21 +2056,22 @@ fun AppConfiguration.MenuAppModeScreen() {
         }
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringAppMode,
-            iconPath = stateValues.drawablePathIconSwitch,
-            iconRes = stateValues.drawableResIconSwitch.value,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringAppMode,
+                iconPath = stateValues.drawablePathIconSwitch,
+                iconRes = stateValues.drawableResIconSwitch.value,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppMode),
             modifier = Modifier
@@ -2158,21 +2165,22 @@ fun AppConfiguration.MenuAppModeScreen() {
 
 @Composable
 fun AppConfiguration.MenuAppLanguageScreen() {
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringAppLanguage,
-            iconPath = stateValues.drawablePathIconAppLanguage,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringAppLanguage,
+                iconPath = stateValues.drawablePathIconAppLanguage,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppLanguage),
             modifier = Modifier
@@ -2189,17 +2197,17 @@ fun AppConfiguration.MenuAppLanguageScreen() {
                     flagDrawablePath = stateValues.drawablePathIconSettings,
                     flagDrawableRes = settingsIconRes,
                     name = stateValues.stringSystemLanguage,
-                    isActive = stateValues.appLanguage == "system"
+                    isActive = stateValues.appLanguagePreference == "system"
                 )
             }
 
-            items(stateValues.globalAppConfiguration.languages) { language ->
+            items(stateValues.globalAppConfiguration.languages.withBundledAppLanguages()) { language ->
                 AppLanguageSettingsItemWidget(
                     language = language.language,
                     name = language.name.extractLocalizedString(stateValues.appLanguage) ?: language.language,
                     flagDrawablePath = language.flagDrawablePath,
                     flagDrawableRes = language.mapIconRes(),
-                    isActive = stateValues.appLanguage == language.language
+                    isActive = stateValues.appLanguagePreference == language.language
                 )
             }
         }
@@ -2618,31 +2626,32 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
 fun AppConfiguration.MenuAnalyticsScreen() {
     var showAnalyticsReportSheet by rememberSaveable { mutableStateOf(false) }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringAnalytics,
+                iconPath = stateValues.drawablePathIconAnalytics,
+                trailingIcons = listOf(
+                    Triple(stateValues.drawablePathIconAnalyticsReport, stateValues.drawableResIconAnalyticsReport.value) {
+                        showAnalyticsReportSheet = true
+                    }
+                ),
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
+                }
+            )
+        }
     ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringAnalytics,
-            iconPath = stateValues.drawablePathIconAnalytics,
-            trailingIcons = listOf(
-                Triple(stateValues.drawablePathIconAnalyticsReport, stateValues.drawableResIconAnalyticsReport.value) {
-                    showAnalyticsReportSheet = true
-                }
-            ),
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
-                }
-            }
-        )
-
         val activeStoreId = stateValues.activeStoreId
         if (!currentUserCanViewAnalytics(activeStoreId)) {
             MessageText(text = if (activeStoreId.isNullOrBlank())
-                authUiText("Select a store to view analytics", "Выберите магазин для просмотра аналитики", "Аналитиканы көру үшін дүкенді таңдаңыз")
-                else authUiText("Analytics access is not available", "Нет доступа к аналитике", "Аналитикаға қолжетімділік жоқ"))
-            return@Column
+                authUiText("Select a store to view analytics", "Выберите магазин для просмотра аналитики", "Аналитиканы көру үшін дүкенді таңдаңыз", "Талдоону көрүү үчүн дүкөндү тандаңыз")
+                else authUiText("Analytics access is not available", "Нет доступа к аналитике", "Аналитикаға қолжетімділік жоқ", "Талдоого жетүү мүмкүн эмес"))
+            return@AitaScreenColumn
         }
 
         LaunchedEffect(activeStoreId) {
@@ -2933,14 +2942,14 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         if (prepared == null) {
             MessageText(
                 modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextFieldGroup),
-                text = if (analyticsFailed) authUiText("Could not prepare analytics", "Не удалось подготовить аналитику", "Аналитиканы дайындау мүмкін болмады")
-                    else authUiText("Preparing analytics…", "Подготавливаем аналитику…", "Аналитика дайындалуда…")
+                text = if (analyticsFailed) authUiText("Could not prepare analytics", "Не удалось подготовить аналитику", "Аналитиканы дайындау мүмкін болмады", "Талдоону даярдоо мүмкүн болгон жок")
+                    else authUiText("Preparing analytics…", "Подготавливаем аналитику…", "Аналитика дайындалуда…", "Талдоо даярдалууда…")
             )
-            if (analyticsFailed) actionButton(text = authUiText("Retry", "Повторить", "Қайталау"), onClick = { AnalyticsWorkspace.retry() })
+            if (analyticsFailed) actionButton(text = authUiText("Retry", "Повторить", "Қайталау", "Кайталоо"), onClick = { AnalyticsWorkspace.retry() })
         } else {
             if (prepared.remoteOnly) MessageText(
                 modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextField),
-                text = authUiText("Server totals; detailed records require additional access", "Итоги сервера; подробные записи требуют дополнительных прав", "Сервер қорытындылары; толық жазбаларға қосымша рұқсат қажет")
+                text = authUiText("Server totals; detailed records require additional access", "Итоги сервера; подробные записи требуют дополнительных прав", "Сервер қорытындылары; толық жазбаларға қосымша рұқсат қажет", "Сервердин жалпы жыйынтыктары; толук жазуулар үчүн кошумча укук керек")
             )
             if (showAnalyticsReportSheet) {
                 val analyticsReportSnapshot = buildAnalyticsReportSnapshotForUi(
@@ -3023,7 +3032,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 }
 
                 MenuAnalyticsTab.CashRegister -> {
-                    if (!prepared.cashAvailable || !currentUserCanViewCashRegister(activeStoreId)) MessageText(text = authUiText("Detailed cash records are not available", "Подробные записи кассы недоступны", "Кассаның толық жазбалары қолжетімсіз"))
+                    if (!prepared.cashAvailable || !currentUserCanViewCashRegister(activeStoreId)) MessageText(text = authUiText("Detailed cash records are not available", "Подробные записи кассы недоступны", "Кассаның толық жазбалары қолжетімсіз", "Накталай акчанын толук жазуулары жеткиликсиз"))
                     else MenuAnalyticsCashRegisterScreen(
                         currentAmount = cashRegister?.currentAmount ?: 0.0,
                         events = scopedCashRegisterEvents,
@@ -3129,7 +3138,7 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
         val section = sectionTabsWidget(
             stateKey = "analytics:$transactionType:${stateValues.activeStoreId.orEmpty()}",
             tabs = buildList {
-                add(TabContent("overview", authUiText("Overview", "Обзор", "Шолу")))
+                add(TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")))
                 if (transactionType == "purchase" && dashboard != null) {
                     add(TabContent("revenue", localizedStringResource(680, "Top items by revenue")))
                     add(TabContent("quantity", localizedStringResource(681, "Top items by quantity")))
@@ -3298,7 +3307,7 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = stateValues.marginTextFieldGroup),
-                            text = if (summary.historyKnown) emptyText else authUiText("Detailed history is not available", "Подробная история недоступна", "Толық тарих қолжетімсіз")
+                            text = if (summary.historyKnown) emptyText else authUiText("Detailed history is not available", "Подробная история недоступна", "Толық тарих қолжетімсіз", "Толук тарых жеткиликсиз")
                         )
                     }
                 } else {
@@ -3328,7 +3337,7 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
         val section = sectionTabsWidget(
             stateKey = "analytics:stock:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
                 TabContent("slow_moving", localizedStringResource(682, "Slow-moving inventory"))
             ),
             modifier = Modifier
@@ -3417,7 +3426,7 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
         val section = sectionTabsWidget(
             stateKey = "analytics:suppliers:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
                 TabContent("rankings", localizedStringResource(703, "Top performers"))
             ),
             modifier = Modifier
@@ -3490,7 +3499,7 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
         val section = sectionTabsWidget(
             stateKey = "analytics:workers:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
                 TabContent("performance", localizedStringResource(702, "Performance"))
             ),
             modifier = Modifier
@@ -4363,21 +4372,22 @@ internal fun AppConfiguration.currentAnalyticsCurrencyCode(): String {
 
 @Composable
 fun AppConfiguration.MenuAddEditWorkerScreen() {
-    Column(
+    AitaScreenColumn(
         modifier = Modifier
             .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = stateValues.stringWorkers,
-            iconPath = stateValues.drawablePathIconWorkers,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = stateValues.stringWorkers,
+                iconPath = stateValues.drawablePathIconWorkers,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditWorker),
             modifier = Modifier
@@ -4454,21 +4464,22 @@ fun AppConfiguration.MenuAddEditSupplierScreen() {
         }
     }
 
-    Column(
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ScreenAppBarWidget(
-            title = if (editedSupplierId.isBlank()) stateValues.stringAddSupplier else stateValues.stringEditSupplier,
-            iconPath = stateValues.drawablePathIconSuppliers,
-            onBack = {
-                coroutineScope.launch {
-                    NavigationScreenModel.Menu.AddEditSupplier.removeState(editorPhoneStateKey)
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = if (editedSupplierId.isBlank()) stateValues.stringAddSupplier else stateValues.stringEditSupplier,
+                iconPath = stateValues.drawablePathIconSuppliers,
+                onBack = {
+                    coroutineScope.launch {
+                        NavigationScreenModel.Menu.AddEditSupplier.removeState(editorPhoneStateKey)
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditSupplier),
             modifier = Modifier
@@ -4537,7 +4548,7 @@ internal fun AppConfiguration.storeLanguageDomains(): List<SelectableDomain> = m
         )
     )
 
-    stateValues.globalAppConfiguration.languages.forEach { language ->
+    stateValues.globalAppConfiguration.languages.withBundledAppLanguages().forEach { language ->
         add(
             SelectableDomain(
                 id = language.language,
@@ -4552,56 +4563,57 @@ internal fun AppConfiguration.storeLanguageDomains(): List<SelectableDomain> = m
 
 @Composable
 fun AppConfiguration.MenuAddEditStoreScreen() {
-    Column(
+    val editedStoreId = NavigationScreenModel.Menu.AddEditStore.state.value[NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID]
+    val parentStoreIdFromState = NavigationScreenModel.Menu.AddEditStore.state.value[NavigationScreenModel.Menu.AddEditStore.KEY_STATE_PARENT_STORE_ID]
+    val editedStore = stateValues.stores.findStoreOrBranchForUi(editedStoreId)
+    val parentStore = stateValues.stores.findStoreOrBranchForUi(parentStoreIdFromState ?: editedStore?.parentStoreId)
+    val isBranchEditor = parentStore != null || editedStore?.isBranchStore() == true
+
+    LaunchedEffect(editedStore?.id, parentStore?.id) {
+        listOfNotNull(editedStore?.id, parentStore?.id)
+            .takeIf { it.isNotEmpty() }
+            ?.let { refreshStoreAddressLocalizations(storeIds = it) }
+    }
+
+    fun clearStoreEditorState() {
+        coroutineScope.launch {
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_PARENT_STORE_ID)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ALIAS)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_DESCRIPTION)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ADDRESS)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_LEGAL_ID)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.KEY_STATE_NAME)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.KEY_STATE_PHONE_NUMBER)
+            NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.KEY_STATE_EMAIL)
+        }
+    }
+
+    AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        val editedStoreId = NavigationScreenModel.Menu.AddEditStore.state.value[NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID]
-        val parentStoreIdFromState = NavigationScreenModel.Menu.AddEditStore.state.value[NavigationScreenModel.Menu.AddEditStore.KEY_STATE_PARENT_STORE_ID]
-        val editedStore = stateValues.stores.findStoreOrBranchForUi(editedStoreId)
-        val parentStore = stateValues.stores.findStoreOrBranchForUi(parentStoreIdFromState ?: editedStore?.parentStoreId)
-        val isBranchEditor = parentStore != null || editedStore?.isBranchStore() == true
-
-        LaunchedEffect(editedStore?.id, parentStore?.id) {
-            listOfNotNull(editedStore?.id, parentStore?.id)
-                .takeIf { it.isNotEmpty() }
-                ?.let { refreshStoreAddressLocalizations(storeIds = it) }
-        }
-
-        fun clearStoreEditorState() {
-            coroutineScope.launch {
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_EDITED_STORE_ID)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_PARENT_STORE_ID)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ALIAS)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_DESCRIPTION)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ADDRESS)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.Menu.AddEditStore.KEY_STATE_LEGAL_ID)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.KEY_STATE_NAME)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.KEY_STATE_PHONE_NUMBER)
-                NavigationScreenModel.Menu.AddEditStore.removeState(NavigationScreenModel.KEY_STATE_EMAIL)
-            }
-        }
-
-        ScreenAppBarWidget(
-            title = when {
-                editedStore != null && isBranchEditor -> localizedStringResource(534, "Edit branch")
-                editedStore != null -> stateValues.stringEditStore
-                isBranchEditor -> localizedStringResource(533, "Add branch")
-                else -> stateValues.stringAddStore
-            },
-            iconPath = stateValues.drawablePathIconAdd,
-            onBack = {
-                coroutineScope.launch {
-                    Navigation.Menu.pop(stateValues.isNarrowScreen)
-                    clearStoreEditorState()
+        horizontalAlignment = Alignment.CenterHorizontally,
+        appBar = {
+            ScreenAppBarWidget(
+                title = when {
+                    editedStore != null && isBranchEditor -> localizedStringResource(534, "Edit branch")
+                    editedStore != null -> stateValues.stringEditStore
+                    isBranchEditor -> localizedStringResource(533, "Add branch")
+                    else -> stateValues.stringAddStore
+                },
+                iconPath = stateValues.drawablePathIconAdd,
+                onBack = {
+                    coroutineScope.launch {
+                        Navigation.Menu.pop(stateValues.isNarrowScreen)
+                        clearStoreEditorState()
+                    }
                 }
-            }
-        )
-
+            )
+        }
+    ) {
         val editedLocationHasAccess = rememberStoreSubscriptionAccess(editedStore?.id)
         if (editedStore != null && !editedLocationHasAccess) {
             SubscriptionRequiredPane(Modifier.weight(1f))
-            return@Column
+            return@AitaScreenColumn
         }
 
         LazyColumn(
@@ -5437,7 +5449,7 @@ fun AppConfiguration.MainScreen() {
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds()
         ) {
-            Box(Modifier.fillMaxSize().aitaWidthCap(1600.dp).aitaSceneMotion(mainMotionTarget)) {
+            Box(Modifier.fillMaxSize().aitaSceneMotion(mainMotionTarget)) {
                 // Route-only identity: preferences and refreshed data never recreate this tree.
                 // Do not keep an outgoing live transaction/auth/supplier owner for animation.
                 key(mainDestination.route) {
@@ -5926,15 +5938,16 @@ fun AppConfiguration.NotificationsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(177, "Notifications"),
+                iconPath = stateValues.drawablePathIconTransactionHistory,
+                onBack = onBack
+            )
+        }
     ) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(177, "Notifications"),
-            iconPath = stateValues.drawablePathIconTransactionHistory,
-            onBack = onBack
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)

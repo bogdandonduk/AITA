@@ -46,8 +46,8 @@ internal fun AppConfiguration.AuthEmailDestinationPicker(
                         unselectedColor = stateValues.PlaceholderTextColor))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (destination == AitaEmailDestination.MAIN) authUiText("Main email", "Основной email", "Негізгі email")
-                        else authUiText("Extra email", "Дополнительный email", "Қосымша email"),
+                    Text(if (destination == AitaEmailDestination.MAIN) authUiText("Main email", "Основной email", "Негізгі email", "Негизги электрондук почта")
+                        else authUiText("Extra email", "Дополнительный email", "Қосымша email", "Кошумча электрондук почта"),
                         color = stateValues.TextColor, fontSize = stateValues.textSize)
                     if (address.isNotBlank()) Text(address, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 }
@@ -76,7 +76,7 @@ internal fun AppConfiguration.SecurityEmailProofInput(
             if (flow != null) {
                 aitaFormTextField(modifier = Modifier.fillMaxWidth(), value = code,
                     onValueChange = { code = it; error = "" },
-                    titleText = authUiText("Main email confirmation", "Подтверждение основного email", "Негізгі email растауы"),
+                    titleText = authUiText("Main email confirmation", "Подтверждение основного email", "Негізгі email растауы", "Негизги электрондук почта аркылуу ырастоо"),
                     placeholderText = "000000", identityKey = "security-email-${flow?.flowId}",
                     keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done,
                     leadingIconPath = stateValues.drawablePathIconEmail, sensitive = true, enabled = enabled && !busy,
@@ -84,8 +84,8 @@ internal fun AppConfiguration.SecurityEmailProofInput(
                 Text(flow?.maskedDestination.orEmpty(), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             }
             actionButton(modifier = Modifier.fillMaxWidth(),
-                text = (if (flow == null) authUiText("Get email confirmation", "Получить подтверждение по email", "Email растауын алу")
-                    else authUiText("Resend", "Ещё код", "Қайта жіберу")) +
+                text = (if (flow == null) authUiText("Get email confirmation", "Получить подтверждение по email", "Email растауын алу", "Электрондук почта аркылуу ырастоо алуу")
+                    else authUiText("Resend", "Ещё код", "Қайта жіберу", "Кайра жөнөтүү")) +
                     if (countdown.resendSeconds > 0L) " · ${countdown.resendSeconds}" else "",
                 enabled = enabled && !busy && request.currentPassword.isNotBlank() && canonicalAitaSecurityTarget(request.action, request.target) != null && countdown.resendSeconds == 0L,
                 loading = busy, autoLoading = false) {
@@ -97,16 +97,16 @@ internal fun AppConfiguration.SecurityEmailProofInput(
                             val result = withTimeoutOrNull(30_000L) { AitaAdvancedAuthenticationClient.requestSecurityEmail(request) }
                             if (authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id == owner) {
                                 if (result != null && !result.negative && result.payload != null) { flow = result.payload; code = "" }
-                                else error = result?.let { authResponseText(it) } ?: authUiText("Request timed out", "Время ожидания истекло", "Күту уақыты аяқталды")
+                                else error = result?.let { authResponseText(it) } ?: authUiText("Request timed out", "Время ожидания истекло", "Күту уақыты аяқталды", "Суроо-талаптын күтүү убактысы бүттү")
                             }
                         } catch (cancel: CancellationException) { throw cancel }
-                        catch (_: Exception) { error = authUiText("Request failed. Try again.", "Запрос не выполнен. Повторите.", "Сұрау орындалмады. Қайталаңыз.") }
+                        catch (_: Exception) { error = authUiText("Request failed. Try again.", "Запрос не выполнен. Повторите.", "Сұрау орындалмады. Қайталаңыз.", "Суроо-талап аткарылган жок. Кайра аракет кылыңыз.") }
                         finally { busy = false }
                     }
                 }
             }
             if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-            if (countdown.expired) Text(authUiText("Code expired", "Код истёк", "Код мерзімі аяқталды"), color = stateValues.ErrorColor)
+            if (countdown.expired) Text(authUiText("Code expired", "Код истёк", "Код мерзімі аяқталды", "Коддун мөөнөтү бүттү"), color = stateValues.ErrorColor)
         }
         flow?.takeIf { !busy && !countdown.expired && code.length == 6 }?.let { AitaSecurityEmailProof(it.flowId, code) }
     }
@@ -128,7 +128,7 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
     val chosen = if (required) method else AitaLoginSecondFactor.NONE
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету"),
+            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету", "Кирүүдө 2FA талап кылуу"),
                 Modifier.weight(1f), color = stateValues.TextColor, fontSize = stateValues.textSize)
             Switch(checked = required, onCheckedChange = { required = it }, enabled = !busy,
                 colors = SwitchDefaults.colors(checkedTrackColor = stateValues.AccentColor))
@@ -140,8 +140,8 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
                     role = Role.RadioButton, onClick = { method = choice }), verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = method == choice, onClick = null, enabled = !busy,
                         colors = RadioButtonDefaults.colors(selectedColor = stateValues.AccentColor, unselectedColor = stateValues.PlaceholderTextColor))
-                    Text(if (choice == AitaLoginSecondFactor.EMAIL) authUiText("Email code", "Код из письма", "Email коды")
-                        else authUiText("Authenticator", "Аутентификатор", "Аутентификатор"), color = stateValues.TextColor, fontSize = stateValues.textSize)
+                    Text(if (choice == AitaLoginSecondFactor.EMAIL) authUiText("Email code", "Код из письма", "Email коды", "Электрондук почтадагы код")
+                        else authUiText("Authenticator", "Аутентификатор", "Аутентификатор", "Аутентификатор"), color = stateValues.TextColor, fontSize = stateValues.textSize)
                 }
             }
         }
@@ -152,7 +152,7 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
             chosen.name, password, settings.securityRevision, stateValues.appLanguage), !busy) else null
         if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            actionButton(modifier = Modifier.weight(1f), text = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау"),
+            actionButton(modifier = Modifier.weight(1f), text = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау", "Өзгөртүүнү ырастоо"),
                 enabled = !busy && password.isNotBlank() && (!settings.authenticatorEnabled || aitaSecondFactorIsWellFormed(factor)) && (!needsEmail || proof != null),
                 loading = busy, autoLoading = false) {
                 val request = AitaLoginPolicyRequest(chosen, password, factor, settings.securityRevision, proof)
@@ -165,14 +165,14 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
                         if (authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id == owner) {
                             val updatedSettings = result?.payload
                             if (result != null && !result.negative && updatedSettings != null) onUpdated(updatedSettings)
-                            else error = result?.let { authResponseText(it) } ?: authUiText("Refresh settings before retrying", "Обновите настройки перед повтором", "Қайталаудан бұрын баптауларды жаңартыңыз")
+                            else error = result?.let { authResponseText(it) } ?: authUiText("Refresh settings before retrying", "Обновите настройки перед повтором", "Қайталаудан бұрын баптауларды жаңартыңыз", "Кайра аракет кылуудан мурун жөндөөлөрдү жаңыртыңыз")
                         }
                     } catch (cancel: CancellationException) { throw cancel }
-                    catch (_: Exception) { error = authUiText("Refresh settings before retrying", "Обновите настройки перед повтором", "Қайталаудан бұрын баптауларды жаңартыңыз") }
+                    catch (_: Exception) { error = authUiText("Refresh settings before retrying", "Обновите настройки перед повтором", "Қайталаудан бұрын баптауларды жаңартыңыз", "Кайра аракет кылуудан мурун жөндөөлөрдү жаңыртыңыз") }
                     finally { busy = false; factor = "" }
                 }
             }
-            AuthSecurityIconAction(authUiText("Done", "Готово", "Дайын"), stateValues.drawablePathIconCheck, stateValues.drawableResIconCheck.value, !busy, onClose)
+            AuthSecurityIconAction(authUiText("Done", "Готово", "Дайын", "Даяр"), stateValues.drawablePathIconCheck, stateValues.drawableResIconCheck.value, !busy, onClose)
         }
     }
 }
@@ -193,25 +193,25 @@ internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, p
             val response = withTimeoutOrNull(20_000L) { AitaAdvancedAuthenticationClient.settings() }
             if (authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id == owner) {
                 if (response != null && !response.negative && response.payload != null) { settings = response.payload; error = "" }
-                else error = response?.let { authResponseText(it) } ?: authUiText("Could not load security settings", "Не удалось загрузить настройки безопасности", "Қауіпсіздік баптаулары жүктелмеді")
+                else error = response?.let { authResponseText(it) } ?: authUiText("Could not load security settings", "Не удалось загрузить настройки безопасности", "Қауіпсіздік баптаулары жүктелмеді", "Коопсуздук жөндөөлөрүн жүктөө мүмкүн болгон жок")
             }
         } catch (cancel: CancellationException) { throw cancel }
-        catch (_: Exception) { error = authUiText("Could not load security settings", "Не удалось загрузить настройки безопасности", "Қауіпсіздік баптаулары жүктелмеді") }
+        catch (_: Exception) { error = authUiText("Could not load security settings", "Не удалось загрузить настройки безопасности", "Қауіпсіздік баптаулары жүктелмеді", "Коопсуздук жөндөөлөрүн жүктөө мүмкүн болгон жок") }
     }
     val current = settings
     if (error.isNotBlank()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(error, Modifier.weight(1f), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-        AuthSecurityIconAction(authUiText("Refresh", "Обновить", "Жаңарту"), stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value) { revision++ }
+        AuthSecurityIconAction(authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value) { revision++ }
     }
     if (current == null) {
-        if (error.isBlank()) Text(authUiText("Checking account security…", "Проверяем безопасность аккаунта…", "Аккаунт қауіпсіздігін тексеру…"),
+        if (error.isBlank()) Text(authUiText("Checking account security…", "Проверяем безопасность аккаунта…", "Аккаунт қауіпсіздігін тексеру…", "Аккаунттун коопсуздугу текшерилүүдө…"),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         return ProfileSecurityConfirmation(false)
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(authUiText("Security confirmation", "Подтверждение безопасности", "Қауіпсіздікті растау"),
+        Text(authUiText("Security confirmation", "Подтверждение безопасности", "Қауіпсіздікті растау", "Коопсуздукту ырастоо"),
             Modifier.weight(1f), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        AuthSecurityIconAction(authUiText("Refresh", "Обновить", "Жаңарту"), stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value) {
+        AuthSecurityIconAction(authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value) {
             settings = null; error = ""; factor = ""; revision++
         }
     }
@@ -220,7 +220,7 @@ internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, p
         current.additionalLoginEmails.none { normalizeAitaEmail(it) == requestedEmail }) {
         Text(authUiText("First verify this address as your extra email in Sign-in & security.",
             "Сначала подтвердите этот адрес как дополнительный email в разделе «Вход и безопасность».",
-            "Алдымен бұл мекенжайды «Кіру және қауіпсіздік» бөлімінде қосымша email ретінде растаңыз."),
+            "Алдымен бұл мекенжайды «Кіру және қауіпсіздік» бөлімінде қосымша email ретінде растаңыз.", "Адегенде бул даректи «Кирүү жана коопсуздук» бөлүмүндө кошумча электрондук почтаңыз катары ырастатыңыз."),
             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
         return ProfileSecurityConfirmation(false)
     }

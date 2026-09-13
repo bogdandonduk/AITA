@@ -11,7 +11,7 @@ class StoreSubscriptionPolicyTest {
         val plan = basicStoreSubscriptionPlan()
         assertEquals(799_000L, plan.priceMinor); assertEquals("KZT", plan.currencyCode)
         assertEquals("KZ", plan.regionCode); assertEquals("basic", plan.id)
-        assertFalse(plan.hidden); assertEquals(setOf("en", "ru", "kk"), plan.name.map { it.language }.toSet())
+        assertFalse(plan.hidden); assertEquals(setOf("en", "ru", "kk", "ky"), plan.name.map { it.language }.toSet())
     }
     @Test fun regionOverridesAreExplicitNotCurrencyConversion() {
         val plan = basicStoreSubscriptionPlan(12_345L, "TJS", "TJ", 8L)

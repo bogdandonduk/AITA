@@ -7,7 +7,7 @@ class AitaAuthUnavailableMessageTest {
     fun everyUnavailableReasonHasAllSupportedLanguages() {
         AitaAuthUnavailableReason.entries.forEach { reason ->
             val messages = authUnavailableMessage(reason)
-            assertEquals(listOf("main", "en", "ru", "kk"), messages.map { it.language })
+            assertEquals(listOf("main", "en", "ru", "kk", "ky"), messages.map { it.language })
             assertTrue(messages.all { it.value.isNotBlank() })
         }
     }

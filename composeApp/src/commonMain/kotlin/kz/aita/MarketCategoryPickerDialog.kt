@@ -50,7 +50,7 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CpImage(Modifier.size(32.dp), url = marketIconPath(18), fallbackRes = marketIconFallback(18), contentDescription = null, tintColor = stateValues.AccentColor)
-                Text(authUiText("Categories", "Категории", "Санаттар"), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.titleTextSize)
+                Text(authUiText("Categories", "Категории", "Санаттар", "Категориялар"), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.titleTextSize)
             }
             // Keep the field, breadcrumbs and explanation in the scrolling body. A short
             // desktop window or an open keyboard must not push the confirmation actions away.
@@ -58,10 +58,10 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
                 item(key = "category-controls") {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Find a category", "Найти категорию", "Санатты табу"),
+                        aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Find a category", "Найти категорию", "Санатты табу", "Категория табуу"),
                             identityKey = "market-category-search", sensitive = true, autoFocus = false, parentOwnsValue = true)
                         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            actionButton(text = authUiText("All categories", "Все категории", "Барлық санаттар"), autoLoading = false, confirmationRequired = false,
+                            actionButton(text = authUiText("All categories", "Все категории", "Барлық санаттар", "Бардык категориялар"), autoLoading = false, confirmationRequired = false,
                                 fillMaxWidthIfTextPresent = false, enabledColor = if (chosen == null) stateValues.AccentColor else stateValues.BackgroundColor,
                                 textColor = if (chosen == null) stateValues.AccentTextColor else stateValues.TextColor, onClick = { chosen = null; search = "" })
                             if (path.size > 4) Text("…", Modifier.padding(8.dp), color = stateValues.PlaceholderTextColor)
@@ -73,19 +73,19 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
                             }
                         }
                         if (!validChoice) Text(authUiText("The selected category was removed. Choose another or All categories.",
-                            "Выбранная категория удалена. Выберите другую или «Все категории».", "Таңдалған санат жойылды. Басқасын не «Барлық санаттар» тармағын таңдаңыз."),
+                            "Выбранная категория удалена. Выберите другую или «Все категории».", "Таңдалған санат жойылды. Басқасын не «Барлық санаттар» тармағын таңдаңыз.", "Тандалган категория алынып салынды. Башкасын же «Бардык категорияларды» тандаңыз."),
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     }
                 }
                 item(key = "category-help") {
                     Text(authUiText("Includes all subcategories. A category may have no published offers in your search area.",
                         "Включает все подкатегории. В вашей области поиска в категории может не быть опубликованных предложений.",
-                        "Барлық ішкі санаттарды қамтиды. Іздеу аймағыңызда осы санатта жарияланған ұсыныстар болмауы мүмкін."),
+                        "Барлық ішкі санаттарды қамтиды. Іздеу аймағыңызда осы санатта жарияланған ұсыныстар болмауы мүмкін.", "Бардык ички категорияларды камтыйт. Издөө аймагыңызда категориянын жарыяланган сунуштары жок болушу мүмкүн."),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 }
                 if (rows.isEmpty()) item {
-                    Text(if (search.isNotBlank()) authUiText("No matching categories", "Категории не найдены", "Сәйкес санаттар табылмады")
-                        else authUiText("No subcategories. Apply this category to view its offers.", "Подкатегорий нет. Примените категорию, чтобы открыть предложения.", "Ішкі санаттар жоқ. Ұсыныстарын көру үшін осы санатты қолданыңыз."),
+                    Text(if (search.isNotBlank()) authUiText("No matching categories", "Категории не найдены", "Сәйкес санаттар табылмады", "Дал келген категориялар жок")
+                        else authUiText("No subcategories. Apply this category to view its offers.", "Подкатегорий нет. Примените категорию, чтобы открыть предложения.", "Ішкі санаттар жоқ. Ұсыныстарын көру үшін осы санатты қолданыңыз.", "Ички категориялар жок. Сунуштарын көрүү үчүн ушул категорияны колдонуңуз."),
                         Modifier.padding(12.dp), color = stateValues.PlaceholderTextColor, fontSize = stateValues.textSize)
                 }
                 items(rows, key = { it.id }) { category ->
@@ -99,9 +99,9 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
                 }
             }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                actionButton(text = authUiText("Apply category", "Применить категорию", "Санатты қолдану"), enabled = validChoice,
+                actionButton(text = authUiText("Apply category", "Применить категорию", "Санатты қолдану", "Категорияны колдонуу"), enabled = validChoice,
                     fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false, onClick = { onSelected(chosen) })
-                actionButton(text = authUiText("Cancel", "Отмена", "Бас тарту"), fillMaxWidthIfTextPresent = false,
+                actionButton(text = authUiText("Cancel", "Отмена", "Бас тарту", "Жокко чыгаруу"), fillMaxWidthIfTextPresent = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false, onClick = onDismiss)
             }
         }

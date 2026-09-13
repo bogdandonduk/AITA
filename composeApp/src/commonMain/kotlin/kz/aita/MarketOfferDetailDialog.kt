@@ -71,8 +71,8 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
             .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             val current = offer
             if (current == null && loading) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5)
-            else if (current == null) Text(if (unavailable) authUiText("This offer is no longer available", "Предложение больше недоступно", "Ұсыныс енді қолжетімсіз")
-                else authUiText("Connect to view this offer", "Подключитесь, чтобы открыть предложение", "Ұсынысты көру үшін қосылыңыз"),
+            else if (current == null) Text(if (unavailable) authUiText("This offer is no longer available", "Предложение больше недоступно", "Ұсыныс енді қолжетімсіз", "Бул сунуш эми жеткиликсиз")
+                else authUiText("Connect to view this offer", "Подключитесь, чтобы открыть предложение", "Ұсынысты көру үшін қосылыңыз", "Бул сунушту көрүү үчүн туташыңыз"),
                 color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
             else {
                 SelectionContainer {
@@ -83,33 +83,33 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                         if (current.description.isNotBlank()) Text(current.description, color = stateValues.TextColor, fontSize = stateValues.textSize)
                         Text("${current.storefront.displayName}\n${current.storefront.city}\n${current.storefront.publicAddress}", color = stateValues.TextColor, fontSize = stateValues.textSize)
                         if (current.storefront.pickupNote.isNotBlank()) Text(current.storefront.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        Text(authUiText("Server inventory snapshot", "Снимок учётных остатков", "Есептегі қордың көрінісі") + ": " + receiptUiDateTime(current.checkedAtMillis),
+                        Text(authUiText("Server inventory snapshot", "Снимок учётных остатков", "Есептегі қордың көрінісі", "Сервердеги товар калдыгынын учурундагы көрүнүшү") + ": " + receiptUiDateTime(current.checkedAtMillis),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         Text(authUiText("A recorded-stock estimate, not a reservation. Your list is private to your account. Confirm final price and fulfilment with the shop; no order or payment is created here.",
                             "Это расчёт по учётным остаткам, не резерв. Список покупок доступен только вашему аккаунту. Уточните итоговую цену и получение в магазине: заказ и оплата здесь не создаются.",
-                            "Бұл — есептегі қор бойынша есеп, резерв емес. Тізім тек сіздің аккаунтыңызға қолжетімді. Баға мен алуды дүкеннен нақтылаңыз: мұнда тапсырыс пен төлем жасалмайды."),
+                            "Бұл — есептегі қор бойынша есеп, резерв емес. Тізім тек сіздің аккаунтыңызға қолжетімді. Баға мен алуды дүкеннен нақтылаңыз: мұнда тапсырыс пен төлем жасалмайды.", "Бул резерв эмес, катталган товар калдыгы боюнча баа. Тизмеңиз аккаунтуңузга гана көрүнөт. Акыркы бааны жана аткаруу шарттарын дүкөндөн ырастатыңыз; бул жерде тапшырык же төлөм түзүлбөйт."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
                 }
                 val inList = shopping.contains(offerId)
-                actionButton(text = if (inList) authUiText("Open your list", "Открыть список покупок", "Тізімді ашу") else authUiText("Add to shopping list", "В список покупок", "Сатып алу тізіміне қосу"),
+                actionButton(text = if (inList) authUiText("Open your list", "Открыть список покупок", "Тізімді ашу", "Тизмеңизди ачуу") else authUiText("Add to shopping list", "В список покупок", "Сатып алу тізіміне қосу", "Сатып алуу тизмесине кошуу"),
                     iconPath = marketIconPath(143), iconRes = marketIconFallback(143), autoLoading = false, confirmationRequired = false,
                     enabled = inList || (fresh && shopping.canChange && current.shoppingBasis() != null), onClick = {
                         if (inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping); onDismiss() }
                         else shopping.change(offerId, 1, current.shoppingBasis())
                     })
-                actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту"), iconPath = marketIconPath(139), iconRes = marketIconFallback(139),
+                actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), iconPath = marketIconPath(139), iconRes = marketIconFallback(139),
                     enabled = fresh, autoLoading = false, confirmationRequired = false, onClick = { onVisitShop(current.storefront) })
-                if (onCompare != null && current.comparisonSelection() != null) actionButton(text = authUiText("Compare offers", "Сравнить предложения", "Ұсыныстарды салыстыру"),
+                if (onCompare != null && current.comparisonSelection() != null) actionButton(text = authUiText("Compare offers", "Сравнить предложения", "Ұсыныстарды салыстыру", "Сунуштарды салыштыруу"),
                     iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = fresh, autoLoading = false, confirmationRequired = false,
                     onClick = { onCompare(current) })
             }
             error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
             MarketShoppingFeedback(shopping)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                actionButton(modifier = Modifier.weight(1f), text = authUiText("Refresh", "Обновить", "Жаңарту"), autoLoading = false, enabled = !loading,
+                actionButton(modifier = Modifier.weight(1f), text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), autoLoading = false, enabled = !loading,
                     loading = loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
-                actionButton(modifier = Modifier.weight(1f), text = authUiText("Close", "Закрыть", "Жабу"), autoLoading = false, confirmationRequired = false,
+                actionButton(modifier = Modifier.weight(1f), text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), autoLoading = false, confirmationRequired = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = onDismiss)
             }
         }

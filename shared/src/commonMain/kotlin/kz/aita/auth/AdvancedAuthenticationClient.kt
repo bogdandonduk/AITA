@@ -26,13 +26,13 @@ object AitaAdvancedAuthenticationClient {
     }
 
     suspend fun requestLoginCode(request: AitaEmailCodeRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeRequestDataModel>(HttpMethod.Post, "auth/login/code/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeRequestDataModel>(HttpMethod.Post, "auth/login/code/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun verifyLoginCode(request: AitaEmailCodeVerifyRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaEmailCodeVerifyRequestDataModel>(HttpMethod.Post, "auth/login/code/verify", request)
 
     suspend fun resendLoginCode(request: AitaEmailCodeResendRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/login/code/resend", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/login/code/resend", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun completeTotpLogin(request: AitaTotpLoginRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaTotpLoginRequestDataModel>(HttpMethod.Post, "auth/login/totp", request)
@@ -44,34 +44,34 @@ object AitaAdvancedAuthenticationClient {
         authRequest<AitaAuthFlowDataModel, AitaAuthenticatorPasswordRequestDataModel>(HttpMethod.Post, "auth/login/authenticator/password", request)
 
     suspend fun requestAuthenticatorRecovery(request: AitaAuthenticatorRecoveryRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaAuthenticatorRecoveryRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaAuthenticatorRecoveryRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun resendAuthenticatorRecovery(request: AitaEmailCodeResendRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/resend", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/resend", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun confirmAuthenticatorRecovery(request: AitaEmailCodeVerifyRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaEmailCodeVerifyRequestDataModel>(HttpMethod.Post, "auth/authenticator-recovery/confirm", request)
 
     suspend fun requestPasswordRecovery(request: AitaEmailCodeRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeRequestDataModel>(HttpMethod.Post, "auth/password-recovery/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeRequestDataModel>(HttpMethod.Post, "auth/password-recovery/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun verifyPasswordRecovery(request: AitaEmailCodeVerifyRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaEmailCodeVerifyRequestDataModel>(HttpMethod.Post, "auth/password-recovery/verify", request)
 
     suspend fun resendPasswordRecovery(request: AitaEmailCodeResendRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/password-recovery/resend", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/password-recovery/resend", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun resetPassword(request: AitaPasswordRecoveryResetRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaPasswordRecoveryResetRequestDataModel>(HttpMethod.Post, "auth/password-recovery/reset", request)
 
     suspend fun requestLoginEmailFactor(request: AitaLoginEmailFactorRequest) =
-        authRequest<AitaAuthFlowDataModel, AitaLoginEmailFactorRequest>(HttpMethod.Post, "auth/login/email-factor/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaLoginEmailFactorRequest>(HttpMethod.Post, "auth/login/email-factor/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun verifyLoginEmailFactor(request: AitaEmailCodeVerifyRequestDataModel) =
         authRequest<AitaAuthFlowDataModel, AitaEmailCodeVerifyRequestDataModel>(HttpMethod.Post, "auth/login/email-factor/verify", request)
 
     suspend fun requestSecurityEmail(request: AitaSecurityEmailRequest) =
-        authRequest<AitaAuthFlowDataModel, AitaSecurityEmailRequest>(HttpMethod.Post, "auth/security/email-proof/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaSecurityEmailRequest>(HttpMethod.Post, "auth/security/email-proof/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun updateLoginPolicy(request: AitaLoginPolicyRequest) =
         authRequest<AitaAuthenticationSettingsDataModel, AitaLoginPolicyRequest>(HttpMethod.Post, "auth/security/login-policy", request)
@@ -94,10 +94,10 @@ object AitaAdvancedAuthenticationClient {
         authRequest<AitaAuthFlowDataModel, AitaSensitiveSecurityActionRequestDataModel>(HttpMethod.Post, "auth/security/totp/recovery-codes/regenerate", request)
 
     suspend fun requestEmailAlias(request: AitaEmailAliasRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailAliasRequestDataModel>(HttpMethod.Post, "auth/security/email/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailAliasRequestDataModel>(HttpMethod.Post, "auth/security/email/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun resendEmailAlias(request: AitaEmailCodeResendRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/security/email/resend", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/security/email/resend", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun confirmEmailAlias(request: AitaEmailAliasConfirmRequestDataModel) =
         authRequest<AitaAuthenticationSettingsDataModel, AitaEmailAliasConfirmRequestDataModel>(HttpMethod.Post, "auth/security/email/confirm", request)
@@ -106,10 +106,10 @@ object AitaAdvancedAuthenticationClient {
         authRequest<AitaAuthenticationSettingsDataModel, AitaEmailAliasRemoveRequestDataModel>(HttpMethod.Post, "auth/security/email/remove", request)
 
     suspend fun requestPhoneAlias(request: AitaPhoneAliasRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaPhoneAliasRequestDataModel>(HttpMethod.Post, "auth/security/phone/request", request)
+        authRequest<AitaAuthFlowDataModel, AitaPhoneAliasRequestDataModel>(HttpMethod.Post, "auth/security/phone/request", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun resendPhoneAlias(request: AitaEmailCodeResendRequestDataModel) =
-        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/security/phone/resend", request)
+        authRequest<AitaAuthFlowDataModel, AitaEmailCodeResendRequestDataModel>(HttpMethod.Post, "auth/security/phone/resend", request.copy(locale = authRequestLocale(request.locale)))
 
     suspend fun confirmPhoneAlias(request: AitaPhoneAliasConfirmRequestDataModel) =
         authRequest<AitaAuthenticationSettingsDataModel, AitaPhoneAliasConfirmRequestDataModel>(HttpMethod.Post, "auth/security/phone/confirm", request)

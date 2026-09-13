@@ -51,11 +51,13 @@ fun eventTextForStorage(
 ): EventTextStorage {
     val resolved = reference ?: translations.eventMessageReferenceOrNull()
         ?: resources.referenceFor(translations) ?: legacyEventMessageReference(text) ?: resources.referenceFor(text)
-    val renderable = listOf("en", "ru", "kk").all { EventMessages.render(resolved, it, resources::values) != null }
+    val renderable = listOf("en", "ru", "kk", "ky").all { EventMessages.render(resolved, it, resources::values) != null }
     return EventTextStorage(
         reference = resolved,
         fallback = if (renderable) "" else text,
-        translations = if (renderable) emptyList() else translations
+        translations = if (renderable) translations.filter { value ->
+            value.language != "main" && EventMessages.renderExact(resolved, value.language, resources::values) == null
+        } else translations
     )
 }
 
@@ -65,12 +67,17 @@ fun eventTextCompatibilityValues(
     resources: EventResourceCatalogue = EventResourceCatalogue(emptyList())
 ): List<LocalizedStringDataModel> {
     if (reference == null) return fallback
-    val rendered = listOf("main", "en", "ru", "kk").mapNotNull { language ->
-        EventMessages.render(reference, language, resources::values)?.let { text ->
-            LocalizedStringDataModel(language, text, messageTemplate = reference.takeIf { language == "main" })
+    val rendered = (listOf("main") + SUPPORTED_APP_LANGUAGES).mapNotNull { language ->
+        EventMessages.renderExact(reference, language, resources::values)?.let { text ->
+            LocalizedStringDataModel(language, text)
         }
     }
-    return if (rendered.size == 4) rendered else fallback
+    if (rendered.isEmpty()) return fallback
+    // Keep supplied translations for languages whose structured template has not shipped yet.
+    // Do not silently discard them when rebuilding readable values for an older client.
+    return rendered.withMissingLocalizedValues(fallback).mapIndexed { index, value ->
+        value.copy(messageTemplate = reference.takeIf { index == 0 })
+    }
 }
 
 /** Include unknown fallback text in dedupe identity: an unrecognized key alone proves nothing. */

@@ -130,7 +130,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CpImage(Modifier.size(32.dp), url = marketIconPath(141), fallbackRes = marketIconFallback(141), contentDescription = null, tintColor = stateValues.AccentColor)
-                Text(authUiText("Plan your basket", "План корзины", "Себет жоспары"), Modifier.weight(1f),
+                Text(authUiText("Plan your basket", "План корзины", "Себет жоспары", "Себетиңизди пландаңыз"), Modifier.weight(1f),
                     color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -138,28 +138,28 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(authUiText("Compare first, then explicitly review shop changes. Complete coverage comes before a lower price. Each currency is planned separately.",
                             "Сначала сравните, затем явно проверьте замены магазинов. Полный состав важнее низкой цены. Каждая валюта рассчитывается отдельно.",
-                            "Алдымен салыстырып, содан кейін дүкен ауыстыруларын тексеріңіз. Толық қамту төмен бағадан маңызды. Әр валюта бөлек есептеледі."),
+                            "Алдымен салыстырып, содан кейін дүкен ауыстыруларын тексеріңіз. Толық қамту төмен бағадан маңызды. Әр валюта бөлек есептеледі.", "Адегенде салыштырып, андан кийин дүкөн өзгөртүүлөрүн атайын карап чыгыңыз. Төмөн баага караганда толук камтууга артыкчылык берилет. Ар бир валюта өзүнчө пландалат."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         aitaFormTextField(Modifier.fillMaxWidth(), cityDraft, { cityDraft = it.take(100) },
-                            authUiText("City · blank means all cities", "Город · пусто — все города", "Қала · бос болса — барлық қала"),
+                            authUiText("City · blank means all cities", "Город · пусто — все города", "Қала · бос болса — барлық қала", "Шаар · бош болсо бардык шаарлар"),
                             identityKey = "basket-city:$account", autoFocus = false, parentOwnsValue = true)
                         val normalizedCity = MarketBasketRequest(0, cityDraft).normalizedBasketRequest()?.city
-                        if (cityDraft != city) actionButton(text = authUiText("Apply city", "Применить город", "Қаланы қолдану"),
+                        if (cityDraft != city) actionButton(text = authUiText("Apply city", "Применить город", "Қаланы қолдану", "Шаарды колдонуу"),
                             enabled = normalizedCity != null && !blocked, fillMaxWidthIfTextPresent = false, autoLoading = false,
                             confirmationRequired = false, onClick = { normalizedCity?.let { city = it; cityDraft = it } })
                         if (city.isNotEmpty()) Text(authUiText("Alternatives: $city. Current list keeps its original shops, including other cities.",
                             "Альтернативы: $city. Текущий список сохраняет исходные магазины, в том числе в других городах.",
-                            "Баламалар: $city. Ағымдағы тізім бастапқы дүкендерді, соның ішінде басқа қалаларды сақтайды."),
+                            "Баламалар: $city. Ағымдағы тізім бастапқы дүкендерді, соның ішінде басқа қалаларды сақтайды.", "Башка варианттар: $city. Учурдагы тизме баштапкы дүкөндөрдү, анын ичинде башка шаарлардагы дүкөндөрдү да сактайт."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         shopping.notice?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                         data.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
-                        if (blocked) Text(authUiText("Resolve the unconfirmed list change before comparing again.", "Подтвердите незавершённое изменение списка перед сравнением.", "Қайта салыстырмас бұрын расталмаған тізім өзгерісін аяқтаңыз."),
+                        if (blocked) Text(authUiText("Resolve the unconfirmed list change before comparing again.", "Подтвердите незавершённое изменение списка перед сравнением.", "Қайта салыстырмас бұрын расталмаған тізім өзгерісін аяқтаңыз.", "Кайра салыштыруудан мурун тизменин ырастала элек өзгөртүүсүн чечиңиз."),
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     }
                 }
                 if (result == null && (data.loading || data.error == null) && !blocked) item { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5) }
                 if (result != null && group == null) item {
-                    Text(authUiText("Add products to your list first", "Сначала добавьте товары в список", "Алдымен тізімге тауар қосыңыз"), color = stateValues.TextColor, fontSize = stateValues.textSize)
+                    Text(authUiText("Add products to your list first", "Сначала добавьте товары в список", "Алдымен тізімге тауар қосыңыз", "Адегенде тизмеңизге товарларды кошуңуз"), color = stateValues.TextColor, fontSize = stateValues.textSize)
                 }
                 if (result != null && group != null && plan != null) {
                     item(key = "plans") {
@@ -167,14 +167,14 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                             if (result.currencies.size > 1) sectionTabsWidget("basket-currency:$account",
                                 result.currencies.map { TabContent(it.currencyCode, it.currencyCode) }, selectedId = group.currencyCode, onSelected = { currency = it })
                             sectionTabsWidget("basket-plan:$account", listOf(
-                                TabContent(MARKET_BASKET_CURRENT, authUiText("Current", "Сейчас", "Қазір")),
-                                TabContent(MARKET_BASKET_ONE_SHOP, authUiText("1 shop", "1 магазин", "1 дүкен")),
-                                TabContent(MARKET_BASKET_TWO_SHOPS, authUiText("Up to 2", "До 2 магазинов", "2 дүкенге дейін")),
-                                TabContent(MARKET_BASKET_LOWEST_ITEMS, authUiText("Lower total", "Меньше сумма", "Төмен сома"))),
+                                TabContent(MARKET_BASKET_CURRENT, authUiText("Current", "Сейчас", "Қазір", "Учурдагы")),
+                                TabContent(MARKET_BASKET_ONE_SHOP, authUiText("1 shop", "1 магазин", "1 дүкен", "1 дүкөн")),
+                                TabContent(MARKET_BASKET_TWO_SHOPS, authUiText("Up to 2", "До 2 магазинов", "2 дүкенге дейін", "2ге чейин")),
+                                TabContent(MARKET_BASKET_LOWEST_ITEMS, authUiText("Lower total", "Меньше сумма", "Төмен сома", "Төмөнүрөөк жалпы сумма"))),
                                 selectedId = kind, onSelected = { kind = it })
                             BasketPlanSummary(group, plan)
                             if (plan.kind != MARKET_BASKET_CURRENT && plan.changedLines > 0) {
-                                actionButton(text = authUiText("Review this plan", "Проверить этот план", "Осы жоспарды тексеру"),
+                                actionButton(text = authUiText("Review this plan", "Проверить этот план", "Осы жоспарды тексеру", "Бул планды кароо"),
                                     iconPath = marketIconPath(141), iconRes = marketIconFallback(141),
                                     enabled = fresh && shopping.canChange && plan.complete,
                                     autoLoading = false, confirmationRequired = false, onClick = {
@@ -184,7 +184,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                                     })
                                 if (!plan.complete) Text(authUiText("A whole-plan change needs every line in this currency. Missing lines are never removed to make it fit.",
                                     "Для применения плана нужны все строки в этой валюте. Недостающие товары не удаляются ради результата.",
-                                    "Жоспарды қолдану үшін осы валютадағы барлық жол қажет. Жетіспейтін тауарлар нәтиже үшін жойылмайды."),
+                                    "Жоспарды қолдану үшін осы валютадағы барлық жол қажет. Жетіспейтін тауарлар нәтиже үшін жойылмайды.", "Бүт планды өзгөртүү үчүн ушул валютадагы бардык саптар керек. Планды ылайыкташтыруу үчүн жетишпеген саптар эч качан өчүрүлбөйт."),
                                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                             }
                         }
@@ -197,11 +197,11 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     }
                     if (plan.missingOfferIds.isNotEmpty()) item(key = "missing") {
                         Column(Modifier.fillMaxWidth().background(stateValues.ErrorColor.copy(alpha = 0.05f)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(authUiText("Not covered · not free", "Не включено · не бесплатно", "Қамтылмаған · тегін емес"),
+                            Text(authUiText("Not covered · not free", "Не включено · не бесплатно", "Қамтылмаған · тегін емес", "Камтылган эмес · бекер эмес"),
                                 color = stateValues.ErrorColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
                             plan.missingOfferIds.forEach { id ->
                                 val original = result.snapshot.lines.first { it.line.offerId == id }.line
-                                Text("${original.title} · ${original.units} × ${original.basis.pricedAmount.toString().removeSuffix(".0")} ${original.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл."))}",
+                                Text("${original.title} · ${original.units} × ${original.basis.pricedAmount.toString().removeSuffix(".0")} ${original.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл.", "бирдик"))}",
                                     color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
                             }
                         }
@@ -210,31 +210,31 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(authUiText("Checked ${result.candidatesChecked} alternative listings: up to $MARKET_BASKET_CANDIDATES_PER_LINE per comparable line. UUID order, not the whole market's cheapest offers. ${result.limitedSourceOfferIds.size} lines reached that limit.",
                                 "Проверено альтернатив: ${result.candidatesChecked}, до $MARKET_BASKET_CANDIDATES_PER_LINE на сравнимую строку. Порядок по ID, не самые дешёвые предложения всего рынка. Лимит достигнут у ${result.limitedSourceOfferIds.size} строк.",
-                                "${result.candidatesChecked} балама тексерілді: салыстырылатын әр жолға $MARKET_BASKET_CANDIDATES_PER_LINE дейін. ID реті, бүкіл нарықтағы ең арзан ұсыныстар емес. ${result.limitedSourceOfferIds.size} жол шекке жетті."),
+                                "${result.candidatesChecked} балама тексерілді: салыстырылатын әр жолға $MARKET_BASKET_CANDIDATES_PER_LINE дейін. ID реті, бүкіл нарықтағы ең арзан ұсыныстар емес. ${result.limitedSourceOfferIds.size} жол шекке жетті.", "${result.candidatesChecked} башка жарыя текшерилди: ар бир салыштырылуучу сапка эң көп $MARKET_BASKET_CANDIDATES_PER_LINE. Булар бүт маркеттеги эң арзан сунуштар эмес, UUID боюнча иреттелген. ${result.limitedSourceOfferIds.size} сап ушул чекке жетти."),
                                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                             Text(authUiText("${group.eligibleShopCount} eligible shops in ${group.currencyCode}; two-shop combinations use up to ${group.pairSearchShopCount}, prioritised by coverage. Lower total may need more shops. This is not a route planner.",
                                 "Подходящих магазинов в ${group.currencyCode}: ${group.eligibleShopCount}; пары проверяются среди ${group.pairSearchShopCount}, с приоритетом состава корзины. Низкая сумма может требовать больше магазинов. Это не расчёт маршрута.",
-                                "${group.currencyCode}: ${group.eligibleShopCount} жарамды дүкен; жұптар қамту бойынша таңдалған ${group.pairSearchShopCount} дүкеннен тексеріледі. Төмен сомаға көбірек дүкен қажет болуы мүмкін. Бұл бағыт жоспарлаушы емес."),
+                                "${group.currencyCode}: ${group.eligibleShopCount} жарамды дүкен; жұптар қамту бойынша таңдалған ${group.pairSearchShopCount} дүкеннен тексеріледі. Төмен сомаға көбірек дүкен қажет болуы мүмкін. Бұл бағыт жоспарлаушы емес.", "${group.currencyCode} валютасында ${group.eligibleShopCount} ылайыктуу дүкөн; эки дүкөндүн айкалыштары камтуу деңгээлине жараша артыкчылык берилген эң көп ${group.pairSearchShopCount} дүкөндү колдонот. Төмөнүрөөк жалпы сумма үчүн көбүрөөк дүкөн талап кылынышы мүмкүн. Бул каттам пландоочу эмес."),
                                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                             if (result.fixedLines.isNotEmpty()) Text(authUiText("${result.fixedLines.size} lines have no valid barcode or repeat the same product/unit: they stay at their original shop, when priceable. Quantities are not merged.",
                                 "У ${result.fixedLines.size} строк нет корректного штрихкода или повторяется товар с той же единицей: они остаются в исходном магазине, если доступны для расчёта. Количества не объединяются.",
-                                "${result.fixedLines.size} жолда дұрыс штрихкод жоқ немесе тауар мен бірлік қайталанады: есептеу мүмкін болса, бастапқы дүкенде қалады. Сандар біріктірілмейді."),
+                                "${result.fixedLines.size} жолда дұрыс штрихкод жоқ немесе тауар мен бірлік қайталанады: есептеу мүмкін болса, бастапқы дүкенде қалады. Сандар біріктірілмейді.", "${result.fixedLines.size} сапта жарактуу штрихкод жок же бир эле товар/бирдик кайталанат: баасын эсептөөгө мүмкүн болсо, алар баштапкы дүкөнүндө калат. Сандар бириктирилбейт."),
                                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                             Text(authUiText("Same barcode, currency and selling amount; check the actual product too. Delivery, travel costs and basket discounts are excluded. No order, payment or reservation is created. Use Review this plan for one complete currency group, or Compare this item for an individual replacement.",
                                 "Одинаковые штрихкод, валюта и единица продажи; сверьте сам товар. Доставка, дорога и скидки на корзину не учтены. Заказ, оплата и резерв не создаются. Проверьте план целиком для одной валюты или отдельную замену через «Сравнить товар».",
-                                "Бірдей штрихкод, валюта және сату мөлшері; тауардың өзін де тексеріңіз. Жеткізу, жол құны мен себет жеңілдіктері кірмейді. Тапсырыс, төлем не резерв жасалмайды. Бір валютадағы толық жоспарды немесе «Тауарды салыстыру» арқылы жеке ауыстыруды тексеріңіз."),
+                                "Бірдей штрихкод, валюта және сату мөлшері; тауардың өзін де тексеріңіз. Жеткізу, жол құны мен себет жеңілдіктері кірмейді. Тапсырыс, төлем не резерв жасалмайды. Бір валютадағы толық жоспарды немесе «Тауарды салыстыру» арқылы жеке ауыстыруды тексеріңіз.", "Штрихкод, валюта жана сатуу көлөмү бирдей; товардын өзүн да текшериңиз. Жеткирүү, жол чыгымдары жана себет арзандатуулары кошулган жок. Тапшырык, төлөм же резерв түзүлбөйт. Бир толук валюта тобу үчүн «Бул планды кароону», ал эми жеке алмаштыруу үчүн «Бул товарды салыштырууну» колдонуңуз."),
                                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
                     }
                 }
             }
             FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (fresh) authUiText("Checked", "Проверено", "Тексерілді") + " · " + receiptUiDateTime(result?.snapshot?.checkedAtMillis ?: 0L)
-                    else authUiText("Refresh needed · estimates only", "Нужно обновить · только расчёт", "Жаңарту қажет · тек есеп"),
+                Text(if (fresh) authUiText("Checked", "Проверено", "Тексерілді", "Текшерилди") + " · " + receiptUiDateTime(result?.snapshot?.checkedAtMillis ?: 0L)
+                    else authUiText("Refresh needed · estimates only", "Нужно обновить · только расчёт", "Жаңарту қажет · тек есеп", "Жаңыртуу керек · болжолдуу суммалар гана"),
                     Modifier.padding(vertical = 10.dp), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
                     enabled = !data.loading && !blocked, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
-                actionButton(text = authUiText("Close", "Закрыть", "Жабу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, confirmationRequired = false, onClick = onDismiss)
             }
         }
@@ -245,20 +245,20 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
 private fun AppConfiguration.BasketPlanSummary(group: MarketBasketCurrencyPlans, plan: MarketBasketPlan) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
         .background(stateValues.AccentColor.copy(alpha = 0.07f)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(if (plan.complete) authUiText("Estimated items total", "Расчёт товаров", "Тауарлар есебі")
-            else authUiText("Partial items subtotal", "Неполная сумма товаров", "Тауарлардың толық емес сомасы"), color = stateValues.TextColor, fontSize = stateValues.textSize)
-        Text(plan.itemsSubtotalMinor?.let { marketMoneyLabel(it, group.currencyCode) } ?: authUiText("No priced lines", "Нет рассчитанных строк", "Есептелген жолдар жоқ"),
+        Text(if (plan.complete) authUiText("Estimated items total", "Расчёт товаров", "Тауарлар есебі", "Товарлардын болжолдуу жалпы суммасы")
+            else authUiText("Partial items subtotal", "Неполная сумма товаров", "Тауарлардың толық емес сомасы", "Товарлардын жарым-жартылай аралык суммасы"), color = stateValues.TextColor, fontSize = stateValues.textSize)
+        Text(plan.itemsSubtotalMinor?.let { marketMoneyLabel(it, group.currencyCode) } ?: authUiText("No priced lines", "Нет рассчитанных строк", "Есептелген жолдар жоқ", "Баасы бар саптар жок"),
             color = changedValueColor(plan.itemsSubtotalMinor, "basket:${group.currencyCode}:${plan.kind}", stateValues.AccentColor),
             fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
         val total = plan.choices.size + plan.missingOfferIds.size
         Text(authUiText("${plan.choices.size}/$total lines · ${plan.storeIds.size} shops · ${plan.changedLines} alternatives",
             "${plan.choices.size}/$total строк · магазинов: ${plan.storeIds.size} · замен: ${plan.changedLines}",
-            "${plan.choices.size}/$total жол · ${plan.storeIds.size} дүкен · ${plan.changedLines} балама"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+            "${plan.choices.size}/$total жол · ${plan.storeIds.size} дүкен · ${plan.changedLines} балама", "${plan.choices.size}/$total сап · ${plan.storeIds.size} дүкөн · ${plan.changedLines} башка вариант"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         if (plan.kind != MARKET_BASKET_CURRENT) plan.savingsAgainst(group.current)?.let { difference ->
             Text(when {
-                difference > 0 -> authUiText("${marketMoneyLabel(difference, group.currencyCode)} lower than your complete current basket", "Ниже полной текущей корзины на ${marketMoneyLabel(difference, group.currencyCode)}", "Толық ағымдағы себеттен ${marketMoneyLabel(difference, group.currencyCode)} төмен")
-                difference < 0 -> authUiText("${marketMoneyLabel(-difference, group.currencyCode)} higher than your complete current basket", "Выше полной текущей корзины на ${marketMoneyLabel(-difference, group.currencyCode)}", "Толық ағымдағы себеттен ${marketMoneyLabel(-difference, group.currencyCode)} жоғары")
-                else -> authUiText("Same complete items estimate", "Та же полная сумма товаров", "Тауарлардың толық сомасы бірдей")
+                difference > 0 -> authUiText("${marketMoneyLabel(difference, group.currencyCode)} lower than your complete current basket", "Ниже полной текущей корзины на ${marketMoneyLabel(difference, group.currencyCode)}", "Толық ағымдағы себеттен ${marketMoneyLabel(difference, group.currencyCode)} төмен", "Учурдагы толук себетиңизден ${marketMoneyLabel(difference, group.currencyCode)} арзан")
+                difference < 0 -> authUiText("${marketMoneyLabel(-difference, group.currencyCode)} higher than your complete current basket", "Выше полной текущей корзины на ${marketMoneyLabel(-difference, group.currencyCode)}", "Толық ағымдағы себеттен ${marketMoneyLabel(-difference, group.currencyCode)} жоғары", "Учурдагы толук себетиңизден ${marketMoneyLabel(-difference, group.currencyCode)} кымбат")
+                else -> authUiText("Same complete items estimate", "Та же полная сумма товаров", "Тауарлардың толық сомасы бірдей", "Толук товар курамынын болжолдуу суммасы бирдей")
             }, color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
         }
     }
@@ -269,20 +269,20 @@ private fun AppConfiguration.BasketPlanChoiceCard(source: MarketShoppingLine, ch
     onCompare: () -> Unit, onVisitShop: (MarketStorefront) -> Unit) {
     val row = choice.quote
     val offer = row.offer ?: return
-    val unit = source.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл."))
+    val unit = source.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл.", "бирдик"))
     Column(Modifier.fillMaxWidth().border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.22f),
         RoundedCornerShape(stateValues.cornerRadius)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Text(source.title, color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
-        if (offer.title != source.title) Text(authUiText("Shop label: ${offer.title}", "Название у продавца: ${offer.title}", "Сатушыдағы атауы: ${offer.title}"),
+        if (offer.title != source.title) Text(authUiText("Shop label: ${offer.title}", "Название у продавца: ${offer.title}", "Сатушыдағы атауы: ${offer.title}", "Дүкөндөгү аталышы: ${offer.title}"),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         Text("${offer.storefront.displayName} · ${offer.storefront.city}", color = stateValues.TextColor, fontSize = stateValues.textSize)
-        if (offer.id != source.offerId) Text(authUiText("Instead of ${source.shopName}", "Вместо ${source.shopName}", "${source.shopName} орнына"),
+        if (offer.id != source.offerId) Text(authUiText("Instead of ${source.shopName}", "Вместо ${source.shopName}", "${source.shopName} орнына", "${source.shopName} дүкөнүнүн ордуна"),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         Text("${source.units} × ${source.basis.pricedAmount.toString().removeSuffix(".0")} $unit · ${marketMoneyLabel(requireNotNull(row.subtotalMinor), source.basis.currencyCode)}",
             color = stateValues.AccentColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
-        if (source.basis.gtin != null) actionButton(text = authUiText("Compare this item", "Сравнить товар", "Тауарды салыстыру"),
+        if (source.basis.gtin != null) actionButton(text = authUiText("Compare this item", "Сравнить товар", "Тауарды салыстыру", "Бул товарды салыштыруу"),
             iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = fresh, autoLoading = false, confirmationRequired = false, onClick = onCompare)
-        actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту"), iconPath = marketIconPath(139), iconRes = marketIconFallback(139),
+        actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), iconPath = marketIconPath(139), iconRes = marketIconFallback(139),
             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, enabled = fresh,
             autoLoading = false, confirmationRequired = false, onClick = { onVisitShop(offer.storefront) })
     }

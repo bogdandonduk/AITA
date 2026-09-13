@@ -8,12 +8,12 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class GoodsCategoryCatalogueTest {
-    private val header = "slug\tparent_slug\ten\tru\tkk\tquantity_unit_id\n"
+    private val header = "slug\tparent_slug\ten\tru\tkk\tquantity_unit_id\tky\n"
     @Test fun packagedCatalogueHasAllTranslationsAndUniqueSlugs() {
         val definitions = GoodsCategoryCatalogue.load()
         assertEquals(644, definitions.size)
         assertEquals(definitions.size, definitions.map { it.slug }.toSet().size)
-        assertTrue(definitions.all { it.en.isNotBlank() && it.ru.isNotBlank() && it.kk.isNotBlank() })
+        assertTrue(definitions.all { it.en.isNotBlank() && it.ru.isNotBlank() && it.kk.isNotBlank() && it.ky.isNotBlank() })
         assertTrue(definitions.any { it.slug == "electronics" || it.parentSlug == "electronics" })
         assertTrue(definitions.any { it.parentSlug == "sports" })
     }
@@ -26,7 +26,7 @@ class GoodsCategoryCatalogueTest {
         original.forEach { assertEquals(it, bySlug.getValue(it.slug)) }
         val parents = categorySeedParents(complete)
         assertEquals(44, parents.count { it.value == null })
-        for (language in listOf("en", "ru", "kk")) {
+        for (language in listOf("en", "ru", "kk", "ky")) {
             val names = complete.map { seed -> seed.name.first { it.language == language }.value }
             assertEquals(names.size, names.toSet().size, "Duplicate full category path: $language")
         }
@@ -41,14 +41,17 @@ class GoodsCategoryCatalogueTest {
         assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse("") }
     }
     @Test fun duplicateSlugIsRejected() {
-        val row = "food_new\tfood\tNew\tНовое\tЖаңа\t0\n"
+        val row = "food_new\tfood\tNew\tНовое\tЖаңа\t0\tЖаңы\n"
         assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse(header + row + row) }
     }
     @Test fun missingTranslationIsRejected() {
-        assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse(header + "food_new\tfood\tNew\t\tЖаңа\t0") }
+        assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse(header + "food_new\tfood\tNew\t\tЖаңа\t0\tЖаңы") }
+    }
+    @Test fun missingKyrgyzTranslationIsRejected() {
+        assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse(header + "food_new\tfood\tNew\tНовое\tЖаңа\t0\t") }
     }
     @Test fun unsupportedUnitIsRejected() {
-        assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse(header + "food_new\tfood\tNew\tНовое\tЖаңа\t404") }
+        assertFailsWith<IllegalArgumentException> { GoodsCategoryCatalogue.parse(header + "food_new\tfood\tNew\tНовое\tЖаңа\t404\tЖаңы") }
     }
     @Test fun ancestorsAreRootFirstAndRootHasNone() {
         val parents = mapOf("root" to null, "parent" to "root", "leaf" to "parent")

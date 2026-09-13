@@ -13,7 +13,7 @@ import java.sql.Connection
 
 private suspend inline fun <reified T> RoutingCall.marketResult(
     readOnly: Boolean = false,
-    crossinline after: suspend (T) -> Unit = {},
+    noinline after: suspend (T) -> Unit = {},
     crossinline work: MarketplaceRepository.() -> T
 ) {
     response.header("Cache-Control", "private, no-store, max-age=0")

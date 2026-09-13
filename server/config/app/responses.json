@@ -17,6 +17,18 @@
       {
         "language": "kk",
         "value": "Бұл телефон нөмірі бар пайдаланушы әлдеқашан тіркелген"
+      },
+      {
+        "language": "uz",
+        "value": "Bu telefon raqamli foydalanuvchi allaqachon roʻyxatdan oʻtgan"
+      },
+      {
+        "language": "tg",
+        "value": "Корбаре бо ин рақами телефон аллакай сабти ном шудааст"
+      },
+      {
+        "language": "ky",
+        "value": "Бул телефон номери менен колдонуучу мурунтан катталган"
       }
     ]
   },
@@ -38,6 +50,18 @@
       {
         "language": "kk",
         "value": "Бұл email мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+      },
+      {
+        "language": "uz",
+        "value": "Bu elektron pochta manzilli foydalanuvchi allaqachon roʻyxatdan oʻtgan"
+      },
+      {
+        "language": "tg",
+        "value": "Корбаре бо ин суроғаи почтаи электронӣ аллакай сабти ном шудааст"
+      },
+      {
+        "language": "ky",
+        "value": "Бул электрондук почта дареги менен колдонуучу мурунтан катталган"
       }
     ]
   },
@@ -59,6 +83,18 @@
       {
         "language": "kk",
         "value": "Бұл телефон нөмірі мен email мекенжайы бар пайдаланушы әлдеқашан тіркелген"
+      },
+      {
+        "language": "uz",
+        "value": "Bu telefon raqami va elektron pochta manzilli foydalanuvchi allaqachon roʻyxatdan oʻtgan"
+      },
+      {
+        "language": "tg",
+        "value": "Корбаре бо ин рақами телефон ва суроғаи почтаи электронӣ аллакай сабти ном шудааст"
+      },
+      {
+        "language": "ky",
+        "value": "Бул телефон номери жана электрондук почта дареги менен колдонуучу мурунтан катталган"
       }
     ]
   },
@@ -80,6 +116,18 @@
       {
         "language": "kk",
         "value": "Сервердің ішкі қатесі"
+      },
+      {
+        "language": "uz",
+        "value": "Serverning ichki xatosi"
+      },
+      {
+        "language": "tg",
+        "value": "Хатои дохилии сервер"
+      },
+      {
+        "language": "ky",
+        "value": "Сервердин ички катасы"
       }
     ]
   },
@@ -101,6 +149,18 @@
       {
         "language": "kk",
         "value": "Аутентификация сәтсіз аяқталды"
+      },
+      {
+        "language": "uz",
+        "value": "Shaxsni tasdiqlash amalga oshmadi"
+      },
+      {
+        "language": "tg",
+        "value": "Санҷиши шахсият ноком шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Аныктыгын текшерүү ишке ашкан жок"
       }
     ]
   },
@@ -122,6 +182,18 @@
       {
         "language": "kk",
         "value": "Алдымен жүйеге кіріңіз"
+      },
+      {
+        "language": "uz",
+        "value": "Avval hisobga kiring"
+      },
+      {
+        "language": "tg",
+        "value": "Лутфан аввал ворид шавед"
+      },
+      {
+        "language": "ky",
+        "value": "Адегенде кириңиз"
       }
     ]
   },
@@ -143,6 +215,18 @@
       {
         "language": "kk",
         "value": "Қате құпия сөз"
+      },
+      {
+        "language": "uz",
+        "value": "Parol notoʻgʻri"
+      },
+      {
+        "language": "tg",
+        "value": "Гузарвожа нодуруст аст"
+      },
+      {
+        "language": "ky",
+        "value": "Сырсөз туура эмес"
       }
     ]
   },
@@ -164,6 +248,18 @@
       {
         "language": "kk",
         "value": "Дүкен тіркелмеген"
+      },
+      {
+        "language": "uz",
+        "value": "Doʻkon roʻyxatdan oʻtmagan"
+      },
+      {
+        "language": "tg",
+        "value": "Мағоза сабти ном нашудааст"
+      },
+      {
+        "language": "ky",
+        "value": "Дүкөн катталган эмес"
       }
     ]
   },
@@ -185,6 +281,18 @@
       {
         "language": "kk",
         "value": "Жүйеден сәтті шықтыңыз"
+      },
+      {
+        "language": "uz",
+        "value": "Hisobdan muvaffaqiyatli chiqildi"
+      },
+      {
+        "language": "tg",
+        "value": "Шумо бомуваффақият аз ҳисоб баромадед"
+      },
+      {
+        "language": "ky",
+        "value": "Аккаунттан ийгиликтүү чыктыңыз"
       }
     ]
   },
@@ -206,6 +314,18 @@
       {
         "language": "kk",
         "value": "Пайдаланушы деректері жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Foydalanuvchi maʼlumotlari yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Маълумоти корбар бомуваффақият нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдонуучу ийгиликтүү жаңыртылды"
       }
     ]
   },
@@ -227,6 +347,18 @@
       {
         "language": "kk",
         "value": "Дүкен қосылды"
+      },
+      {
+        "language": "uz",
+        "value": "Doʻkon qoʻshildi"
+      },
+      {
+        "language": "tg",
+        "value": "Мағоза бомуваффақият илова шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Дүкөн ийгиликтүү кошулду"
       }
     ]
   },
@@ -248,6 +380,18 @@
       {
         "language": "kk",
         "value": "Дүкен жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Doʻkon yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Мағоза бомуваффақият нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Дүкөн ийгиликтүү жаңыртылды"
       }
     ]
   },
@@ -269,6 +413,18 @@
       {
         "language": "kk",
         "value": "Дүкен жойылды"
+      },
+      {
+        "language": "uz",
+        "value": "Doʻkon oʻchirildi"
+      },
+      {
+        "language": "tg",
+        "value": "Мағоза бомуваффақият нест шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Дүкөн ийгиликтүү жок кылынды"
       }
     ]
   },
@@ -290,6 +446,18 @@
       {
         "language": "kk",
         "value": "Табылмады"
+      },
+      {
+        "language": "uz",
+        "value": "Topilmadi"
+      },
+      {
+        "language": "tg",
+        "value": "Ёфт нашуд"
+      },
+      {
+        "language": "ky",
+        "value": "Табылган жок"
       }
     ]
   },
@@ -311,6 +479,18 @@
       {
         "language": "kk",
         "value": "Тауар қосылды"
+      },
+      {
+        "language": "uz",
+        "value": "Zaxiraga tovar qoʻshildi"
+      },
+      {
+        "language": "tg",
+        "value": "Мол ба анбор илова шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кампага товар кошулду"
       }
     ]
   },
@@ -332,6 +512,18 @@
       {
         "language": "kk",
         "value": "Тауар жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Zaxira tovari yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Моли анбор нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кампадагы товар жаңыртылды"
       }
     ]
   },
@@ -353,6 +545,18 @@
       {
         "language": "kk",
         "value": "Тауар жойылды"
+      },
+      {
+        "language": "uz",
+        "value": "Zaxira tovari oʻchirildi"
+      },
+      {
+        "language": "tg",
+        "value": "Мол аз анбор нест шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кампадагы товар жок кылынды"
       }
     ]
   },
@@ -374,6 +578,18 @@
       {
         "language": "kk",
         "value": "Партия қосылды"
+      },
+      {
+        "language": "uz",
+        "value": "Partiya qoʻshildi"
+      },
+      {
+        "language": "tg",
+        "value": "Партия илова шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Партия кошулду"
       }
     ]
   },
@@ -395,6 +611,18 @@
       {
         "language": "kk",
         "value": "Партия жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Partiya yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Партия нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Партия жаңыртылды"
       }
     ]
   },
@@ -416,6 +644,18 @@
       {
         "language": "kk",
         "value": "Партия жойылды"
+      },
+      {
+        "language": "uz",
+        "value": "Partiya oʻchirildi"
+      },
+      {
+        "language": "tg",
+        "value": "Партия нест шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Партия жок кылынды"
       }
     ]
   },
@@ -437,6 +677,18 @@
       {
         "language": "kk",
         "value": "Белсенді сеанстар жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Faol seanslar yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Нишастҳои фаъол бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Активдүү сеанстар жүктөлдү"
       }
     ]
   },
@@ -458,6 +710,18 @@
       {
         "language": "kk",
         "value": "Сеанс тоқтатылды"
+      },
+      {
+        "language": "uz",
+        "value": "Seans bekor qilindi"
+      },
+      {
+        "language": "tg",
+        "value": "Нишаст анҷом ёфт"
+      },
+      {
+        "language": "ky",
+        "value": "Сеанс аяктады"
       }
     ]
   },
@@ -479,6 +743,18 @@
       {
         "language": "kk",
         "value": "Басқа сеанстар тоқтатылды"
+      },
+      {
+        "language": "uz",
+        "value": "Boshqa seanslar bekor qilindi"
+      },
+      {
+        "language": "tg",
+        "value": "Нишастҳои дигар анҷом ёфтанд"
+      },
+      {
+        "language": "ky",
+        "value": "Башка сеанстар аяктады"
       }
     ]
   },
@@ -500,6 +776,18 @@
       {
         "language": "kk",
         "value": "Сеанс id қажет"
+      },
+      {
+        "language": "uz",
+        "value": "Seans ID si kerak"
+      },
+      {
+        "language": "tg",
+        "value": "ID-и нишаст лозим аст"
+      },
+      {
+        "language": "ky",
+        "value": "Сеанстын ID номери керек"
       }
     ]
   },
@@ -521,6 +809,18 @@
       {
         "language": "kk",
         "value": "Ағымдағы сеансты тоқтату үшін аккаунттан шығыңыз"
+      },
+      {
+        "language": "uz",
+        "value": "Joriy seansni bekor qilish uchun hisobdan chiqing"
+      },
+      {
+        "language": "tg",
+        "value": "Барои анҷом додани нишасти ҷорӣ аз ҳисоб бароед"
+      },
+      {
+        "language": "ky",
+        "value": "Учурдагы сеансты аяктоо үчүн аккаунттан чыгыңыз"
       }
     ]
   },
@@ -542,6 +842,18 @@
       {
         "language": "kk",
         "value": "Касса жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Kassa yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Маълумоти хазина бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Касса толтурулду"
       }
     ]
   },
@@ -563,6 +875,18 @@
       {
         "language": "kk",
         "value": "Қолма-қол ақша алынды"
+      },
+      {
+        "language": "uz",
+        "value": "Kassadan pul olindi"
+      },
+      {
+        "language": "tg",
+        "value": "Пули нақд гирифта шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кассадан акча алынды"
       }
     ]
   },
@@ -584,6 +908,18 @@
       {
         "language": "kk",
         "value": "Қызметкерлер жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Xodimlar yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Кормандон бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкерлер жүктөлдү"
       }
     ]
   },
@@ -605,6 +941,18 @@
       {
         "language": "kk",
         "value": "Менің жұмыс орындарым жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Mening ishim yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Ҷойҳои кори ман бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Менин иштерим жүктөлдү"
       }
     ]
   },
@@ -626,6 +974,18 @@
       {
         "language": "kk",
         "value": "Кіріс өтінімдер жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Kelgan arizalar yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Дархостҳои воридшуда бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Кирген арыздар жүктөлдү"
       }
     ]
   },
@@ -647,6 +1007,18 @@
       {
         "language": "kk",
         "value": "Менің өтінімдерім жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Arizalarim yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Дархостҳои ман бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Менин арыздарым жүктөлдү"
       }
     ]
   },
@@ -668,6 +1040,18 @@
       {
         "language": "kk",
         "value": "Жұмысқа өтінім жіберілді"
+      },
+      {
+        "language": "uz",
+        "value": "Ishga kirish arizasi yuborildi"
+      },
+      {
+        "language": "tg",
+        "value": "Дархости кор фиристода шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Ишке орношуу арызы жөнөтүлдү"
       }
     ]
   },
@@ -689,6 +1073,18 @@
       {
         "language": "kk",
         "value": "Қызметкер қабылданды"
+      },
+      {
+        "language": "uz",
+        "value": "Xodim qabul qilindi"
+      },
+      {
+        "language": "tg",
+        "value": "Корманд қабул шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкер кабыл алынды"
       }
     ]
   },
@@ -710,6 +1106,18 @@
       {
         "language": "kk",
         "value": "Өтінім қабылданбады"
+      },
+      {
+        "language": "uz",
+        "value": "Ariza rad etildi"
+      },
+      {
+        "language": "tg",
+        "value": "Дархост рад шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Арыз четке кагылды"
       }
     ]
   },
@@ -731,6 +1139,18 @@
       {
         "language": "kk",
         "value": "Қызметкер рұқсаттары жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Xodim ruxsatlari yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Иҷозатҳои корманд нав шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкердин укуктары жаңыртылды"
       }
     ]
   },
@@ -752,6 +1172,18 @@
       {
         "language": "kk",
         "value": "Рұқсат жеткіліксіз"
+      },
+      {
+        "language": "uz",
+        "value": "Ruxsat rad etildi"
+      },
+      {
+        "language": "tg",
+        "value": "Иҷозати кофӣ нест"
+      },
+      {
+        "language": "ky",
+        "value": "Уруксат берилген жок"
       }
     ]
   },
@@ -773,6 +1205,18 @@
       {
         "language": "kk",
         "value": "Кассада қолма-қол ақша жеткіліксіз"
+      },
+      {
+        "language": "uz",
+        "value": "Kassadagi pul yetarli emas"
+      },
+      {
+        "language": "tg",
+        "value": "Дар хазина пули нақди кофӣ нест"
+      },
+      {
+        "language": "ky",
+        "value": "Кассада акча жетишсиз"
       }
     ]
   },
@@ -794,6 +1238,18 @@
       {
         "language": "kk",
         "value": "Өтінім қазірдің өзінде күтуде"
+      },
+      {
+        "language": "uz",
+        "value": "Soʻrov allaqachon kutilmoqda"
+      },
+      {
+        "language": "tg",
+        "value": "Дархост аллакай дар интизори қарор аст"
+      },
+      {
+        "language": "ky",
+        "value": "Арыз күтүп жатат"
       }
     ]
   },
@@ -815,6 +1271,18 @@
       {
         "language": "kk",
         "value": "Пайдаланушы бұл дүкеннің қызметкері"
+      },
+      {
+        "language": "uz",
+        "value": "Foydalanuvchi allaqachon ushbu doʻkon xodimi"
+      },
+      {
+        "language": "tg",
+        "value": "Корбар аллакай корманди ин мағоза аст"
+      },
+      {
+        "language": "ky",
+        "value": "Колдонуучу бул дүкөндө кызматкер болуп иштейт"
       }
     ]
   },
@@ -836,6 +1304,18 @@
       {
         "language": "kk",
         "value": "Пайдаланушы табылмады"
+      },
+      {
+        "language": "uz",
+        "value": "Foydalanuvchi topilmadi"
+      },
+      {
+        "language": "tg",
+        "value": "Корбар ёфт нашуд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдонуучу табылган жок"
       }
     ]
   },
@@ -857,6 +1337,18 @@
       {
         "language": "kk",
         "value": "Шақыру бұрыннан бар"
+      },
+      {
+        "language": "uz",
+        "value": "Taklif allaqachon mavjud"
+      },
+      {
+        "language": "tg",
+        "value": "Даъватнома аллакай ҳаст"
+      },
+      {
+        "language": "ky",
+        "value": "Чакыруу мурунтан бар"
       }
     ]
   },
@@ -878,6 +1370,18 @@
       {
         "language": "kk",
         "value": "Қызметкерге шақыру жіберілді"
+      },
+      {
+        "language": "uz",
+        "value": "Xodimga taklif yuborildi"
+      },
+      {
+        "language": "tg",
+        "value": "Даъватнома ба корманд фиристода шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкерге чакыруу жөнөтүлдү"
       }
     ]
   },
@@ -899,6 +1403,18 @@
       {
         "language": "kk",
         "value": "Қызметкер шақыруы қабылданды"
+      },
+      {
+        "language": "uz",
+        "value": "Xodim taklifi qabul qilindi"
+      },
+      {
+        "language": "tg",
+        "value": "Даъватномаи корманд қабул шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкердин чакыруусу кабыл алынды"
       }
     ]
   },
@@ -920,6 +1436,18 @@
       {
         "language": "kk",
         "value": "Қызметкер шақыруы қабылданбады"
+      },
+      {
+        "language": "uz",
+        "value": "Xodim taklifi rad etildi"
+      },
+      {
+        "language": "tg",
+        "value": "Даъватномаи корманд рад шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкердин чакыруусу четке кагылды"
       }
     ]
   },
@@ -941,6 +1469,18 @@
       {
         "language": "kk",
         "value": "Жария ID қажет"
+      },
+      {
+        "language": "uz",
+        "value": "Ochiq ID kerak"
+      },
+      {
+        "language": "tg",
+        "value": "ID-и оммавӣ лозим аст"
+      },
+      {
+        "language": "ky",
+        "value": "Коомдук ID талап кылынат"
       }
     ]
   },
@@ -962,6 +1502,18 @@
       {
         "language": "kk",
         "value": "Мекенжай қажет"
+      },
+      {
+        "language": "uz",
+        "value": "Manzil kiritilishi shart"
+      },
+      {
+        "language": "tg",
+        "value": "Суроға ҳатмист"
+      },
+      {
+        "language": "ky",
+        "value": "Дарек милдеттүү"
       }
     ]
   },
@@ -983,6 +1535,18 @@
       {
         "language": "kk",
         "value": "Заңды ID пішімі қате"
+      },
+      {
+        "language": "uz",
+        "value": "Yuridik identifikator formati notoʻgʻri"
+      },
+      {
+        "language": "tg",
+        "value": "Шакли рақами мушаххаси ҳуқуқӣ нодуруст аст"
+      },
+      {
+        "language": "ky",
+        "value": "Юридикалык идентификатордун форматы туура эмес"
       }
     ]
   },
@@ -1004,6 +1568,18 @@
       {
         "language": "kk",
         "value": "Негізгі дүкенді белсенді етіп таңдауға болады"
+      },
+      {
+        "language": "uz",
+        "value": "Bosh doʻkonni faol deb tanlash mumkin"
+      },
+      {
+        "language": "tg",
+        "value": "Мағозаи асосиро ҳамчун фаъол интихоб кардан мумкин аст"
+      },
+      {
+        "language": "ky",
+        "value": "Негизги дүкөндү активдүү кылып тандаса болот"
       }
     ]
   },
@@ -1025,6 +1601,18 @@
       {
         "language": "kk",
         "value": "Филиал сақталды"
+      },
+      {
+        "language": "uz",
+        "value": "Filial saqlandi"
+      },
+      {
+        "language": "tg",
+        "value": "Филиал захира шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Филиал сакталды"
       }
     ]
   },
@@ -1046,6 +1634,18 @@
       {
         "language": "kk",
         "value": "Филиалдар бойынша қор жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Filial zaxirasi mavjudligi yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Маълумоти захираи филиалҳо бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Филиалдагы товарлардын бар-жогу жүктөлдү"
       }
     ]
   },
@@ -1067,6 +1667,18 @@
       {
         "language": "kk",
         "value": "Партия жылжытылды"
+      },
+      {
+        "language": "uz",
+        "value": "Zaxira partiyasi koʻchirildi"
+      },
+      {
+        "language": "tg",
+        "value": "Партияи мол интиқол ёфт"
+      },
+      {
+        "language": "ky",
+        "value": "Кампа партиясы көчүрүлдү"
       }
     ]
   },
@@ -1088,6 +1700,18 @@
       {
         "language": "kk",
         "value": "Партияны жылжыту мүмкін емес. Бастапқы орынды, баратын орынды және санын тексеріңіз."
+      },
+      {
+        "language": "uz",
+        "value": "Partiyani koʻchirib boʻlmaydi. Manba, qabul qiluvchi joy va miqdorni tekshiring."
+      },
+      {
+        "language": "tg",
+        "value": "Партияро интиқол додан мумкин нест. Манбаъ, ҷойи таъинот ва миқдорро санҷед."
+      },
+      {
+        "language": "ky",
+        "value": "Партияны көчүрүүгө болбойт. Булагын, бара турган жерин жана санын текшериңиз."
       }
     ]
   },
@@ -1109,6 +1733,18 @@
       {
         "language": "kk",
         "value": "Бастапқы және баратын орын бір дүкен құрылымына жатуы керек"
+      },
+      {
+        "language": "uz",
+        "value": "Manba va qabul qiluvchi joy bir doʻkon tuzilmasiga tegishli boʻlishi kerak"
+      },
+      {
+        "language": "tg",
+        "value": "Манбаъ ва ҷойи таъинот бояд ба як сохтори мағоза тааллуқ дошта бошанд"
+      },
+      {
+        "language": "ky",
+        "value": "Булак жана бара турган жер бир эле дүкөн уюмуна таандык болушу керек"
       }
     ]
   },
@@ -1130,6 +1766,18 @@
       {
         "language": "kk",
         "value": "Қаржы жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Moliya paneli yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Маълумоти молиявӣ бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Каржы панели жүктөлдү"
       }
     ]
   },
@@ -1151,6 +1799,18 @@
       {
         "language": "kk",
         "value": "Толтыру шоты жасалды"
+      },
+      {
+        "language": "uz",
+        "value": "Balansni toʻldirish hisobi yaratildi"
+      },
+      {
+        "language": "tg",
+        "value": "Ҳисобномаи пуркунии тавозун сохта шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Балансты толуктоо эсеби түзүлдү"
       }
     ]
   },
@@ -1172,6 +1832,18 @@
       {
         "language": "kk",
         "value": "Баланс толтырылды"
+      },
+      {
+        "language": "uz",
+        "value": "Balans toʻldirildi"
+      },
+      {
+        "language": "tg",
+        "value": "Тавозун пур шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Баланс толукталды"
       }
     ]
   },
@@ -1193,6 +1865,18 @@
       {
         "language": "kk",
         "value": "Жазылым жоспарлары жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Obuna tariflari yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Тарофаҳои обуна бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Жазылуу тарифтери жүктөлдү"
       }
     ]
   },
@@ -1214,6 +1898,18 @@
       {
         "language": "kk",
         "value": "Дүкен жазылымы жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Doʻkon obunasi yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Обунаи мағоза бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Дүкөндүн жазылуусу жүктөлдү"
       }
     ]
   },
@@ -1235,6 +1931,18 @@
       {
         "language": "kk",
         "value": "Жазылым жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Obuna yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Обуна нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Жазылуу жаңыртылды"
       }
     ]
   },
@@ -1256,6 +1964,18 @@
       {
         "language": "kk",
         "value": "Жеткізуші қосылды"
+      },
+      {
+        "language": "uz",
+        "value": "Yetkazib beruvchi qoʻshildi"
+      },
+      {
+        "language": "tg",
+        "value": "Таъминкунанда илова шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Жеткирүүчү кошулду"
       }
     ]
   },
@@ -1277,6 +1997,18 @@
       {
         "language": "kk",
         "value": "Жеткізуші жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Yetkazib beruvchi yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Таъминкунанда нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Жеткирүүчү жаңыртылды"
       }
     ]
   },
@@ -1298,6 +2030,18 @@
       {
         "language": "kk",
         "value": "Жеткізуші жойылды"
+      },
+      {
+        "language": "uz",
+        "value": "Yetkazib beruvchi oʻchirildi"
+      },
+      {
+        "language": "tg",
+        "value": "Таъминкунанда нест шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Жеткирүүчү жок кылынды"
       }
     ]
   },
@@ -1319,6 +2063,18 @@
       {
         "language": "kk",
         "value": "Ағымдағы ауысым жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Joriy ish smenasi yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Басти кории ҷорӣ бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Учурдагы иш нөөмөтү жүктөлдү"
       }
     ]
   },
@@ -1340,6 +2096,18 @@
       {
         "language": "kk",
         "value": "Ауысым басталды"
+      },
+      {
+        "language": "uz",
+        "value": "Ish smenasi boshlandi"
+      },
+      {
+        "language": "tg",
+        "value": "Басти корӣ оғоз ёфт"
+      },
+      {
+        "language": "ky",
+        "value": "Иш нөөмөтү башталды"
       }
     ]
   },
@@ -1361,6 +2129,18 @@
       {
         "language": "kk",
         "value": "Ауысым аяқталды"
+      },
+      {
+        "language": "uz",
+        "value": "Ish smenasi tugadi"
+      },
+      {
+        "language": "tg",
+        "value": "Басти корӣ анҷом ёфт"
+      },
+      {
+        "language": "ky",
+        "value": "Иш нөөмөтү аяктады"
       }
     ]
   },
@@ -1382,6 +2162,18 @@
       {
         "language": "kk",
         "value": "Бұл қызметкер үшін ауысым құпия сөзі орнатылмаған"
+      },
+      {
+        "language": "uz",
+        "value": "Bu xodim uchun ish smenasi paroli belgilanmagan"
+      },
+      {
+        "language": "tg",
+        "value": "Гузарвожаи басти корӣ барои ин корманд муқаррар нашудааст"
+      },
+      {
+        "language": "ky",
+        "value": "Бул кызматкер үчүн иш нөөмөтүнүн сырсөзү коюлган эмес"
       }
     ]
   },
@@ -1403,6 +2195,18 @@
       {
         "language": "kk",
         "value": "Қызметкер деректері қате"
+      },
+      {
+        "language": "uz",
+        "value": "Xodimning kirish maʼlumotlari notoʻgʻri"
+      },
+      {
+        "language": "tg",
+        "value": "Маълумоти воридшавии корманд нодуруст аст"
+      },
+      {
+        "language": "ky",
+        "value": "Кызматкердин кирүү маалыматы туура эмес"
       }
     ]
   },
@@ -1424,6 +2228,18 @@
       {
         "language": "kk",
         "value": "Бұл ауысымды тек осы қызметкер аккаунты бастай алады"
+      },
+      {
+        "language": "uz",
+        "value": "Bu ish smenasini faqat ushbu xodim hisobi boshlay oladi"
+      },
+      {
+        "language": "tg",
+        "value": "Танҳо ҳисоби ҳамин корманд метавонад ин басти кориро оғоз кунад"
+      },
+      {
+        "language": "ky",
+        "value": "Бул иш нөөмөтүн ушул кызматкердин аккаунту гана баштай алат"
       }
     ]
   },
@@ -1445,6 +2261,18 @@
       {
         "language": "kk",
         "value": "Операциялар журналы жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Amallar jurnali yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Дафтари амалиётҳо бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Операция журналдары жүктөлдү"
       }
     ]
   },
@@ -1466,6 +2294,18 @@
       {
         "language": "kk",
         "value": "Операция журналға жазылды"
+      },
+      {
+        "language": "uz",
+        "value": "Amal qayd etildi"
+      },
+      {
+        "language": "tg",
+        "value": "Амалиёт дар дафтар сабт шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Операция журналга жазылды"
       }
     ]
   },
@@ -1487,6 +2327,18 @@
       {
         "language": "kk",
         "value": "Аналитика жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Tahlil yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Таҳлил бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Аналитика жүктөлдү"
       }
     ]
   },
@@ -1508,6 +2360,18 @@
       {
         "language": "kk",
         "value": "Қолдау өтініштері жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam murojaatlari yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Муроҷиатҳо ба дастгирӣ бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоого кайрылуулар жүктөлдү"
       }
     ]
   },
@@ -1529,6 +2393,18 @@
       {
         "language": "kk",
         "value": "Қолдау өтініші жасалды"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam murojaati yaratildi"
+      },
+      {
+        "language": "tg",
+        "value": "Муроҷиат ба дастгирӣ сохта шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоо өтүнүчү түзүлдү"
       }
     ]
   },
@@ -1550,6 +2426,18 @@
       {
         "language": "kk",
         "value": "Өтініш жабылды"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam murojaati yopildi"
+      },
+      {
+        "language": "tg",
+        "value": "Муроҷиат ба дастгирӣ пӯшида шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоо өтүнүчү жабылды"
       }
     ]
   },
@@ -1571,6 +2459,18 @@
       {
         "language": "kk",
         "value": "Өтініш қайта ашылды"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam murojaati qayta ochildi"
+      },
+      {
+        "language": "tg",
+        "value": "Муроҷиат ба дастгирӣ дубора кушода шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоо өтүнүчү кайра ачылды"
       }
     ]
   },
@@ -1592,6 +2492,18 @@
       {
         "language": "kk",
         "value": "Қолдау хабарламалары жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam xabarlari yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Паёмҳои дастгирӣ бор шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоо билдирүүлөрү жүктөлдү"
       }
     ]
   },
@@ -1613,6 +2525,18 @@
       {
         "language": "kk",
         "value": "Қолдау хабарламасы жіберілді"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam xabari yuborildi"
+      },
+      {
+        "language": "tg",
+        "value": "Паём ба дастгирӣ фиристода шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоо билдирүүсү жөнөтүлдү"
       }
     ]
   },
@@ -1634,6 +2558,18 @@
       {
         "language": "kk",
         "value": "Қолдау хабарламалары оқылған деп белгіленді"
+      },
+      {
+        "language": "uz",
+        "value": "Yordam xabarlari oʻqilgan deb belgilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Паёмҳои дастгирӣ ҳамчун хондашуда қайд шуданд"
+      },
+      {
+        "language": "ky",
+        "value": "Колдоо билдирүүлөрү окулду деп белгиленди"
       }
     ]
   },
@@ -1655,6 +2591,18 @@
       {
         "language": "kk",
         "value": "Ауысым құпия сөзі жаңартылды"
+      },
+      {
+        "language": "uz",
+        "value": "Ish smenasi paroli yangilandi"
+      },
+      {
+        "language": "tg",
+        "value": "Гузарвожаи басти корӣ нав шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Иш нөөмөтүнүн сырсөзү жаңыртылды"
       }
     ]
   },
@@ -1676,6 +2624,18 @@
       {
         "language": "kk",
         "value": "Қауіпсіздік тарихы жүктелді"
+      },
+      {
+        "language": "uz",
+        "value": "Xavfsizlik tarixi yuklandi"
+      },
+      {
+        "language": "tg",
+        "value": "Таърихи амният бор шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Коопсуздук тарыхы жүктөлдү"
       }
     ]
   },
@@ -1697,6 +2657,18 @@
       {
         "language": "kk",
         "value": "Шығару сұрауы жіберілді"
+      },
+      {
+        "language": "uz",
+        "value": "Ishdan boʻshatish soʻrovi yuborildi"
+      },
+      {
+        "language": "tg",
+        "value": "Дархости қатъи дастрасӣ фиристода шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Алып салуу өтүнүчү жөнөтүлдү"
       }
     ]
   },
@@ -1718,6 +2690,18 @@
       {
         "language": "kk",
         "value": "Шығару расталды"
+      },
+      {
+        "language": "uz",
+        "value": "Ishdan boʻshatish tasdiqlandi"
+      },
+      {
+        "language": "tg",
+        "value": "Қатъи дастрасӣ тасдиқ шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Чыгаруу ырасталды"
       }
     ]
   },
@@ -1739,6 +2723,18 @@
       {
         "language": "kk",
         "value": "Шығару қабылданбады"
+      },
+      {
+        "language": "uz",
+        "value": "Ishdan boʻshatish rad etildi"
+      },
+      {
+        "language": "tg",
+        "value": "Қатъи дастрасӣ рад шуд"
+      },
+      {
+        "language": "ky",
+        "value": "Алып салуу четке кагылды"
       }
     ]
   }

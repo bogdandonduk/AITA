@@ -10,7 +10,8 @@ internal data class GoodsCategoryDefinition(
     val en: String,
     val ru: String,
     val kk: String,
-    val quantityUnitId: String
+    val quantityUnitId: String,
+    val ky: String
 )
 
 internal object GoodsCategoryCatalogue {
@@ -22,22 +23,23 @@ internal object GoodsCategoryCatalogue {
 
     fun parse(text: String): List<GoodsCategoryDefinition> {
         val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
-        require(lines.firstOrNull() == "slug\tparent_slug\ten\tru\tkk\tquantity_unit_id") {
+        require(lines.firstOrNull() == "slug\tparent_slug\ten\tru\tkk\tquantity_unit_id\tky") {
             "Invalid goods category catalogue header"
         }
         val seen = hashSetOf<String>()
         return lines.drop(1).mapIndexed { index, line ->
             val columns = line.split('\t')
-            require(columns.size == 6) { "Invalid category columns at line ${index + 2}" }
+            require(columns.size == 7) { "Invalid category columns at line ${index + 2}" }
             val (slug, parent, en, ru, kk) = columns
             val unit = columns[5]
+            val ky = columns[6]
             require(slug.matches(Regex("[a-z][a-z0-9_]*")) && seen.add(slug)) {
                 "Invalid or duplicate category slug at line ${index + 2}"
             }
             require(parent.isEmpty() || parent.matches(Regex("[a-z][a-z0-9_]*"))) { "Invalid category parent: $slug" }
-            require(listOf(en, ru, kk).all { it.isNotBlank() && it == it.trim() }) { "Missing category translation: $slug" }
+            require(listOf(en, ru, kk, ky).all { it.isNotBlank() && it == it.trim() }) { "Missing category translation: $slug" }
             require(unit == "0" || unit == "1") { "Unknown category quantity unit: $slug" }
-            GoodsCategoryDefinition(slug, parent.takeIf(String::isNotEmpty), en, ru, kk, unit)
+            GoodsCategoryDefinition(slug, parent.takeIf(String::isNotEmpty), en, ru, kk, unit, ky)
         }
     }
 }

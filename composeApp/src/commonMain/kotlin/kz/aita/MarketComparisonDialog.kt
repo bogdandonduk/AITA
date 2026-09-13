@@ -108,8 +108,8 @@ internal fun AppConfiguration.MarketComparisonDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CpImage(Modifier.size(32.dp), url = marketIconPath(141), fallbackRes = marketIconFallback(141),
                     contentDescription = null, tintColor = stateValues.AccentColor)
-                Text(if (selected == null) authUiText("Compare shops", "Сравнить магазины", "Дүкендерді салыстыру")
-                    else authUiText("Review replacement", "Проверить замену", "Ауыстыруды тексеру"),
+                Text(if (selected == null) authUiText("Compare shops", "Сравнить магазины", "Дүкендерді салыстыру", "Дүкөндөрдү салыштыруу")
+                    else authUiText("Review replacement", "Проверить замену", "Ауыстыруды тексеру", "Алмаштырууну кароо"),
                     Modifier.weight(1f), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp),
@@ -118,10 +118,10 @@ internal fun AppConfiguration.MarketComparisonDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(authUiText("Same barcode, currency and selling unit. Compare model and packaging too: a barcode is not manufacturer verification.",
                             "Один штрихкод, валюта и единица продажи. Сверьте модель и упаковку: штрихкод не подтверждает подлинность.",
-                            "Бір штрихкод, валюта және сату бірлігі. Модель мен қаптаманы да тексеріңіз: штрихкод түпнұсқалықты растамайды."),
+                            "Бір штрихкод, валюта және сату бірлігі. Модель мен қаптаманы да тексеріңіз: штрихкод түпнұсқалықты растамайды.", "Штрихкод, валюта жана сатуу бирдиги бирдей. Моделин жана таңгагын да салыштырыңыз: штрихкод өндүрүүчү текшерилгенин билдирбейт."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         val unitLabel = page?.reference?.line?.unitName.orEmpty().visibleLocalizedString(stateValues.appLanguage,
-                            authUiText("unit", "ед.", "бірл."))
+                            authUiText("unit", "ед.", "бірл.", "бирдик"))
                         Text("${target.units} × ${target.basis.pricedAmount.toString().removeSuffix(".0")} $unitLabel · ${target.basis.currencyCode}",
                             color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
                         if (selected == null) {
@@ -129,36 +129,36 @@ internal fun AppConfiguration.MarketComparisonDialog(
                                 aitaFormTextField(Modifier.fillMaxWidth(), quantityDraft, { value ->
                                     val clean = value.trim()
                                     if (clean.length <= 3 && clean.all { it in '0'..'9' }) quantityDraft = clean
-                                }, authUiText("Number of selling units · 1–999", "Количество единиц продажи · 1–999", "Сату бірліктерінің саны · 1–999"),
+                                }, authUiText("Number of selling units · 1–999", "Количество единиц продажи · 1–999", "Сату бірліктерінің саны · 1–999", "Сатуу бирдиктеринин саны · 1–999"),
                                     identityKey = "market-compare-quantity:$account:${selection.offerId}", autoFocus = false)
                                 val enteredUnits = quantityDraft.toIntOrNull()?.takeIf { it in 1..MARKET_SHOPPING_MAX_UNITS }
                                 if (quantityDraft != units.toString()) actionButton(
-                                    text = authUiText("Apply quantity", "Применить количество", "Санды қолдану"),
+                                    text = authUiText("Apply quantity", "Применить количество", "Санды қолдану", "Санды колдонуу"),
                                     enabled = enteredUnits != null && !shopping.changing, autoLoading = false, confirmationRequired = false,
                                     onClick = { enteredUnits?.let { units = it } })
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Compare fewer units", "Сравнить меньшее количество", "Аз санды салыстыру") },
+                                    actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Compare fewer units", "Сравнить меньшее количество", "Аз санды салыстыру", "Азыраак бирдикти салыштыруу") },
                                         text = "−", fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
                                         enabled = units > 1 && !shopping.changing, onClick = { units-- })
-                                    actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Compare more units", "Сравнить большее количество", "Көп санды салыстыру") },
+                                    actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Compare more units", "Сравнить большее количество", "Көп санды салыстыру", "Көбүрөөк бирдикти салыштыруу") },
                                         text = "+", fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
                                         enabled = units < MARKET_SHOPPING_MAX_UNITS && !shopping.changing, onClick = { units++ })
                                 }
                             }
                             aitaFormTextField(Modifier.fillMaxWidth(), city, { city = it.take(100) },
-                                authUiText("City · blank means all cities", "Город · пусто — все города", "Қала · бос болса — барлық қала"),
+                                authUiText("City · blank means all cities", "Город · пусто — все города", "Қала · бос болса — барлық қала", "Шаар · бош болсо бардык шаарлар"),
                                 identityKey = "market-compare-city:$account:${selection.offerId}", autoFocus = false)
                         }
                         page?.reference?.let { reference ->
-                            Text(authUiText("Your selection", "Ваш выбор", "Сіздің таңдауыңыз"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            Text(authUiText("Your selection", "Ваш выбор", "Сіздің таңдауыңыз", "Тандооңуз"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                             Text("${reference.line.title}\n${reference.line.shopName}", color = stateValues.TextColor, fontSize = stateValues.textSize)
                             Text(reference.subtotalMinor?.let { marketMoneyLabel(it, target.basis.currencyCode) }
-                                ?: authUiText("Original estimate unavailable · selection kept", "Исходный расчёт недоступен · выбор сохранён", "Бастапқы есеп қолжетімсіз · таңдау сақталды"),
+                                ?: authUiText("Original estimate unavailable · selection kept", "Исходный расчёт недоступен · выбор сохранён", "Бастапқы есеп қолжетімсіз · таңдау сақталды", "Баштапкы болжолдуу сумма жеткиликсиз · тандоо сакталды"),
                                 color = stateValues.AccentColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
                         }
                         if (listChanged) Text(authUiText("Your list changed. Close this comparison and open it from the current line.",
                             "Список изменился. Закройте сравнение и откройте его из актуальной строки.",
-                            "Тізім өзгерді. Салыстыруды жауып, ағымдағы жолдан ашыңыз."), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                            "Тізім өзгерді. Салыстыруды жауып, ағымдағы жолдан ашыңыз.", "Тизмеңиз өзгөрдү. Бул салыштырууну жаап, аны учурдагы саптан кайра ачыңыз."), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                         data.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
                         MarketShoppingFeedback(shopping)
                     }
@@ -166,18 +166,18 @@ internal fun AppConfiguration.MarketComparisonDialog(
                 if (selected != null) item(key = "review") {
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.AccentColor.copy(alpha = 0.07f)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(authUiText("Replace with", "Заменить на", "Мынаған ауыстыру"), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
+                        Text(authUiText("Replace with", "Заменить на", "Мынаған ауыстыру", "Муну менен алмаштыруу"), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
                         Text("${selected.line.title}\n${selected.line.shopName}", color = stateValues.TextColor, fontSize = stateValues.textSize)
                         selected.offer?.storefront?.let { shop -> Text("${shop.city}\n${shop.publicAddress}", color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                         Text(selected.subtotalMinor?.let { marketMoneyLabel(it, target.basis.currencyCode) }.orEmpty(), color = stateValues.AccentColor, fontWeight = FontWeight.Bold, fontSize = stateValues.titleTextSize)
                         Text(authUiText("Only this line changes shops. Its quantity and selling unit stay the same. Other lines are not merged. This is not an order, reservation or payment; transport and fees are not included.",
                             "Только эта строка меняет магазин. Количество и единица продажи сохраняются. Другие строки не объединяются. Это не заказ, резерв или оплата; доставка и сборы не включены.",
-                            "Тек осы жолдың дүкені өзгереді. Саны мен сату бірлігі сақталады. Басқа жолдар біріктірілмейді. Бұл тапсырыс, резерв не төлем емес; жеткізу мен алымдар кірмейді."),
+                            "Тек осы жолдың дүкені өзгереді. Саны мен сату бірлігі сақталады. Басқа жолдар біріктірілмейді. Бұл тапсырыс, резерв не төлем емес; жеткізу мен алымдар кірмейді.", "Ушул сап гана дүкөндү алмаштырат. Анын саны жана сатуу бирдиги ошол бойдон калат. Башка саптар бириктирилбейт. Бул тапшырык, резерв же төлөм эмес; ташуу жана кызмат акылары кошулган жок."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         if (!reviewUnchanged && !data.loading) Text(authUiText("The reviewed offer changed. Return to offers and review it again.",
-                            "Проверенное предложение изменилось. Вернитесь к предложениям и проверьте снова.", "Тексерілген ұсыныс өзгерді. Ұсыныстарға оралып, қайта тексеріңіз."),
+                            "Проверенное предложение изменилось. Вернитесь к предложениям и проверьте снова.", "Тексерілген ұсыныс өзгерді. Ұсыныстарға оралып, қайта тексеріңіз.", "Каралган сунуш өзгөрдү. Сунуштарга кайтып, аны кайра караңыз."),
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-                        actionButton(text = authUiText("Replace this list line", "Заменить строку списка", "Тізім жолын ауыстыру"), autoLoading = false, confirmationRequired = false,
+                        actionButton(text = authUiText("Replace this list line", "Заменить строку списка", "Тізім жолын ауыстыру", "Тизменин бул сабын алмаштыруу"), autoLoading = false, confirmationRequired = false,
                             loading = shopping.changing, enabled = comparisonReady && reviewUnchanged && submittedId == null && shopping.canChange &&
                                 shopping.snapshot?.let { target.reviewedReplacement(it, selected, "review") } != null,
                             onClick = { submittedId = shopping.replace(target, selected) })
@@ -187,8 +187,8 @@ internal fun AppConfiguration.MarketComparisonDialog(
                 } else {
                     if (page == null && data.loading) item(key = "skeleton") { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5) }
                     else if (page != null && page.matches.isEmpty()) item(key = "no-matches") {
-                        Text(if (page.nextId == null) authUiText("No other matching published offers in this search.", "Других подходящих опубликованных предложений в этом поиске нет.", "Осы іздеуде басқа сәйкес жарияланған ұсыныстар жоқ.")
-                            else authUiText("No compatible offers on these pages yet. More candidates are available.", "На этих страницах пока нет совместимых предложений. Есть ещё кандидаты.", "Бұл беттерде сәйкес ұсыныстар әлі жоқ. Тағы үміткерлер бар."),
+                        Text(if (page.nextId == null) authUiText("No other matching published offers in this search.", "Других подходящих опубликованных предложений в этом поиске нет.", "Осы іздеуде басқа сәйкес жарияланған ұсыныстар жоқ.", "Бул издөөдө башка дал келген жарыяланган сунуштар жок.")
+                            else authUiText("No compatible offers on these pages yet. More candidates are available.", "На этих страницах пока нет совместимых предложений. Есть ещё кандидаты.", "Бұл беттерде сәйкес ұсыныстар әлі жоқ. Тағы үміткерлер бар.", "Бул беттерде шайкеш сунуштар азырынча жок. Дагы варианттар бар."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.textSize)
                     }
                     items(page?.matches.orEmpty(), key = { it.line.offerId }) { candidate ->
@@ -196,31 +196,31 @@ internal fun AppConfiguration.MarketComparisonDialog(
                             onReview = { review = candidate }, onVisitShop = onVisitShop)
                     }
                     if (page?.nextId != null) item(key = "more") {
-                        if (pages < MARKET_COMPARISON_MAX_PAGES) actionButton(text = authUiText("Search more offers", "Найти ещё предложения", "Тағы ұсыныстарды іздеу"),
+                        if (pages < MARKET_COMPARISON_MAX_PAGES) actionButton(text = authUiText("Search more offers", "Найти ещё предложения", "Тағы ұсыныстарды іздеу", "Дагы сунуштарды издөө"),
                             autoLoading = false, confirmationRequired = false, enabled = !data.loading, onClick = { pages++ })
                         else Text(authUiText("Search window reached: 400 candidates. Set a city to narrow the search. Unseen offers are not ranked.",
                             "Достигнут предел: 400 кандидатов. Укажите город для уточнения поиска. Непросмотренные предложения не ранжируются.",
-                            "Іздеу шегі: 400 үміткер. Іздеуді тарылту үшін қаланы көрсетіңіз. Көрсетілмеген ұсыныстар реттелмейді."),
+                            "Іздеу шегі: 400 үміткер. Іздеуді тарылту үшін қаланы көрсетіңіз. Көрсетілмеген ұсыныстар реттелмейді.", "Издөө чегине жетти: 400 вариант. Издөөнү тарытуу үчүн шаарды коюңуз. Көрүнө элек сунуштар иреттелбейт."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
                 }
                 item(key = "limits") {
                     Text(authUiText("Requested-quantity estimates, lowest loaded estimate first. Prices, publication and stock can change; nothing is reserved. No delivery costs or travel distance are compared.",
                         "Расчёт на выбранное количество, сначала меньшая из загруженных сумм. Цены, публикация и остатки могут измениться; резерва нет. Стоимость доставки и расстояние не сравниваются.",
-                        "Таңдалған санға есеп: жүктелген ең төмен сома алдымен. Баға, жарияланым мен қор өзгеруі мүмкін; резерв жоқ. Жеткізу құны мен қашықтық салыстырылмайды."),
+                        "Таңдалған санға есеп: жүктелген ең төмен сома алдымен. Баға, жарияланым мен қор өзгеруі мүмкін; резерв жоқ. Жеткізу құны мен қашықтық салыстырылмайды.", "Суралган сан үчүн болжолдуу суммалар; жүктөлгөндөрдүн эң төмөнкүсү биринчи. Баалар, жарыянын абалы жана товар калдыгы өзгөрүшү мүмкүн; эч нерсе резервге коюлбайт. Жеткирүү чыгымдары же жол аралыгы салыштырылбайт."),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 }
             }
             FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.fillMaxWidth()) {
-                    Text(if (!data.fresh) authUiText("Refresh needed", "Нужно обновить", "Жаңарту қажет")
-                        else authUiText("${page?.matches?.size ?: 0} matching offers loaded", "Загружено совпадений: ${page?.matches?.size ?: 0}", "${page?.matches?.size ?: 0} сәйкес ұсыныс жүктелді"),
+                    Text(if (!data.fresh) authUiText("Refresh needed", "Нужно обновить", "Жаңарту қажет", "Жаңыртуу керек")
+                        else authUiText("${page?.matches?.size ?: 0} matching offers loaded", "Загружено совпадений: ${page?.matches?.size ?: 0}", "${page?.matches?.size ?: 0} сәйкес ұсыныс жүктелді", "${page?.matches?.size ?: 0} дал келген сунуш жүктөлдү"),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     page?.checkedAtMillis?.let { Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                 }
-                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
                     enabled = !data.loading, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
-                actionButton(text = authUiText("Close", "Закрыть", "Жабу"), fillMaxWidthIfTextPresent = false,
+                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), fillMaxWidthIfTextPresent = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false, onClick = onDismiss)
             }
         }
@@ -237,26 +237,26 @@ private fun AppConfiguration.MarketComparisonCard(row: MarketShoppingQuotedLine,
         Text(offer.title, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
         Text("${offer.storefront.displayName} · ${offer.storefront.city}", color = stateValues.TextColor, fontSize = stateValues.textSize)
         Text(row.subtotalMinor?.let { marketMoneyLabel(it, selection.basis.currencyCode) }
-            ?: authUiText("Confirm this quantity and price", "Уточните количество и цену", "Сан мен бағаны нақтылаңыз"),
+            ?: authUiText("Confirm this quantity and price", "Уточните количество и цену", "Сан мен бағаны нақтылаңыз", "Бул санды жана бааны ырастатуу"),
             color = changedValueColor(row.subtotalMinor, "compare:${row.line.offerId}:${selection.units}", stateValues.AccentColor),
             fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
         val targetMinor = row.subtotalMinor
         if (originalMinor != null && targetMinor != null && row.status == MARKET_QUOTE_ESTIMATED) {
             val difference = originalMinor - targetMinor
             Text(when {
-                difference > 0L -> authUiText("Items estimate is ${marketMoneyLabel(difference, selection.basis.currencyCode)} lower", "Расчёт товаров ниже на ${marketMoneyLabel(difference, selection.basis.currencyCode)}", "Тауар есебі ${marketMoneyLabel(difference, selection.basis.currencyCode)} төмен")
-                difference < 0L -> authUiText("Items estimate is ${marketMoneyLabel(-difference, selection.basis.currencyCode)} higher", "Расчёт товаров выше на ${marketMoneyLabel(-difference, selection.basis.currencyCode)}", "Тауар есебі ${marketMoneyLabel(-difference, selection.basis.currencyCode)} жоғары")
-                else -> authUiText("Same items estimate", "Та же сумма товаров", "Тауар сомасы бірдей")
+                difference > 0L -> authUiText("Items estimate is ${marketMoneyLabel(difference, selection.basis.currencyCode)} lower", "Расчёт товаров ниже на ${marketMoneyLabel(difference, selection.basis.currencyCode)}", "Тауар есебі ${marketMoneyLabel(difference, selection.basis.currencyCode)} төмен", "Товарлардын болжолдуу суммасы ${marketMoneyLabel(difference, selection.basis.currencyCode)} арзан")
+                difference < 0L -> authUiText("Items estimate is ${marketMoneyLabel(-difference, selection.basis.currencyCode)} higher", "Расчёт товаров выше на ${marketMoneyLabel(-difference, selection.basis.currencyCode)}", "Тауар есебі ${marketMoneyLabel(-difference, selection.basis.currencyCode)} жоғары", "Товарлардын болжолдуу суммасы ${marketMoneyLabel(-difference, selection.basis.currencyCode)} кымбат")
+                else -> authUiText("Same items estimate", "Та же сумма товаров", "Тауар сомасы бірдей", "Товарлардын болжолдуу суммасы бирдей")
             }, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         }
-        if (selection.shoppingRevision != null) actionButton(text = if (inList) authUiText("Already in your list", "Уже в списке", "Тізімде бар")
-            else authUiText("Review replacement", "Проверить замену", "Ауыстыруды тексеру"),
+        if (selection.shoppingRevision != null) actionButton(text = if (inList) authUiText("Already in your list", "Уже в списке", "Тізімде бар", "Тизмеңизде бар")
+            else authUiText("Review replacement", "Проверить замену", "Ауыстыруды тексеру", "Алмаштырууну кароо"),
             enabled = fresh && !inList && shopping.canChange && row.status == MARKET_QUOTE_ESTIMATED && row.subtotalMinor != null,
             autoLoading = false, confirmationRequired = false, onClick = onReview)
-        else actionButton(text = if (inList) authUiText("In your list", "В вашем списке", "Сіздің тізіміңізде") else authUiText("Add this quantity to list", "Добавить это количество в список", "Осы санды тізімге қосу"),
+        else actionButton(text = if (inList) authUiText("In your list", "В вашем списке", "Сіздің тізіміңізде", "Тизмеңизде") else authUiText("Add this quantity to list", "Добавить это количество в список", "Осы санды тізімге қосу", "Бул санды тизмеге кошуу"),
             enabled = fresh && !inList && shopping.canChange, autoLoading = false, confirmationRequired = false,
             onClick = { shopping.change(offer.id, selection.units, selection.basis) })
-        actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту"), enabled = fresh,
+        actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), enabled = fresh,
             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false,
             onClick = { onVisitShop(offer.storefront) })
     }

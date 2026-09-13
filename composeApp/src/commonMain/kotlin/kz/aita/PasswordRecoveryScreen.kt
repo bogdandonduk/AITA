@@ -24,7 +24,7 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             text = authUiText(
                 "8+ characters, a digit and a symbol",
                 "От 8 символов, цифра и спецсимвол",
-                "8+ таңба, сан және арнайы таңба"
+                "8+ таңба, сан және арнайы таңба", "8+ белги, цифра жана атайын белги"
             ),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
@@ -33,7 +33,7 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             modifier = Modifier.fillMaxWidth(),
             value = newPassword,
             onValueChange = onNewPasswordChange,
-            titleText = authUiText("New password", "Новый пароль", "Жаңа құпия сөз"),
+            titleText = authUiText("New password", "Новый пароль", "Жаңа құпия сөз", "Жаңы сырсөз"),
             placeholderText = stateValues.stringEnterPassword,
             identityKey = "password-recovery-new-password",
             enabled = !busy,
@@ -47,7 +47,7 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             modifier = Modifier.fillMaxWidth(),
             value = repeatedPassword,
             onValueChange = onRepeatedPasswordChange,
-            titleText = authUiText("Repeat password", "Повторите пароль", "Құпия сөзді қайталаңыз"),
+            titleText = authUiText("Repeat password", "Повторите пароль", "Құпия сөзді қайталаңыз", "Сырсөздү кайталаңыз"),
             placeholderText = stateValues.stringRepeatPassword,
             identityKey = "password-recovery-repeated-password",
             enabled = !busy,
@@ -60,7 +60,7 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
         )
         actionButton(
             modifier = Modifier.fillMaxWidth(),
-            text = authUiText("Restore password", "Восстановить пароль", "Құпия сөзді қалпына келтіру"),
+            text = authUiText("Restore password", "Восстановить пароль", "Құпия сөзді қалпына келтіру", "Сырсөздү калыбына келтирүү"),
             enabled = !busy && newPassword.isNotBlank() && repeatedPassword.isNotBlank(),
             loading = busy,
             autoLoading = false,

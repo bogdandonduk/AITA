@@ -8,7 +8,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 
 /**
@@ -16,10 +15,10 @@ import androidx.compose.ui.unit.dp
  * actual Supplier business identities. It intentionally performs no network work.
  */
 @Composable
-internal fun SupplierRelationshipBoundaryNotice(
+internal fun AppConfiguration.SupplierRelationshipBoundaryNotice(
     modifier: Modifier = Modifier,
 ) {
-    val language = Locale.current.language.lowercase()
+    val language = normalizeAppLanguagePreference(stateValues.appLanguage)
     val copy = when {
         language.startsWith("ru") -> Triple(
             "Профиль поставщика — это компания",
@@ -30,6 +29,11 @@ internal fun SupplierRelationshipBoundaryNotice(
             "Жеткізуші профилі — бұл бизнес",
             "Дүкен мен жеткізуші арасындағы байланыс бөлек сақталады. Дүкен контактісін қосу жеткізуші бизнесін жасамауы немесе қайталамауы керек.",
             "Дүкен байланыстары",
+        )
+        language.startsWith("ky") -> Triple(
+            "Жеткирүүчү профили — бул ишкана",
+            "Дүкөн менен жеткирүүчүнүн байланышы өзүнчө сакталат. Дүкөндүн байланышын кошуу жеткирүүчү ишкананы түзбөшү же кайталабашы керек.",
+            "Дүкөндөр менен байланыштар",
         )
         else -> Triple(
             "A Supplier profile is a business identity",

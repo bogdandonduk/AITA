@@ -28,7 +28,7 @@ internal fun AppConfiguration.AuthenticatorSetupQr(setup: AitaTotpSetupDataModel
             }
         }
     }
-    val description = authUiText("Authenticator setup QR code", "QR-код настройки аутентификатора", "Аутентификатор баптау QR коды")
+    val description = authUiText("Authenticator setup QR code", "QR-код настройки аутентификатора", "Аутентификатор баптау QR коды", "Аутентификаторду жөндөөчү QR код")
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         matrix?.let { qr ->
             Canvas(Modifier.widthIn(max = 280.dp).fillMaxWidth().aspectRatio(1f)
@@ -43,7 +43,7 @@ internal fun AppConfiguration.AuthenticatorSetupQr(setup: AitaTotpSetupDataModel
                     drawRect(Color.Black, Offset(left + x * step, top + y * step), Size(step, step))
                 }
             }
-        } ?: Text(authUiText("Use the setup key below", "Используйте ключ ниже", "Төмендегі кілтті пайдаланыңыз"),
+        } ?: Text(authUiText("Use the setup key below", "Используйте ключ ниже", "Төмендегі кілтті пайдаланыңыз", "Төмөнкү жөндөө ачкычын колдонуңуз"),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
     }
 }

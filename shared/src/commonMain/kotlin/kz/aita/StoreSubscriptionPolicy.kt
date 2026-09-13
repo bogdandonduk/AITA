@@ -17,11 +17,12 @@ fun basicStoreSubscriptionPlan(
     priceVersion: Long = 1L
 ): StoreSubscriptionPlanDataModel = StoreSubscriptionPlanDataModel(
     id = SUBSCRIPTION_BASIC_PLAN,
-    name = listOf(LocalizedStringDataModel("en", "Basic"), LocalizedStringDataModel("ru", "Базовый"), LocalizedStringDataModel("kk", "Базалық")),
+    name = listOf(LocalizedStringDataModel("en", "Basic"), LocalizedStringDataModel("ru", "Базовый"), LocalizedStringDataModel("kk", "Базалық"), LocalizedStringDataModel("ky", "Базалык")),
     description = listOf(
         LocalizedStringDataModel("en", "For this location · 21 workers · 1,000 stock items. Each branch subscribes separately."),
         LocalizedStringDataModel("ru", "Для этой точки · 21 сотрудник · 1 000 товаров. Подписка каждого филиала оплачивается отдельно."),
-        LocalizedStringDataModel("kk", "Осы нүктеге · 21 қызметкер · 1 000 тауар. Әр филиалға бөлек жазылым қажет.")
+        LocalizedStringDataModel("kk", "Осы нүктеге · 21 қызметкер · 1 000 тауар. Әр филиалға бөлек жазылым қажет."),
+        LocalizedStringDataModel("ky", "Бул жай үчүн · 21 кызматкер · 1,000 товар. Ар бир филиалга өзүнчө жазылуу керек.")
     ),
     priceMinor = priceMinor, currencyCode = currencyCode, regionCode = regionCode,
     maxBranches = 1, maxWorkers = 21, maxStockItems = 1000, priceVersion = priceVersion
@@ -30,11 +31,12 @@ fun basicStoreSubscriptionPlan(
 fun lifetimeStoreSubscriptionPlan(regionCode: String, currencyCode: String): StoreSubscriptionPlanDataModel =
     basicStoreSubscriptionPlan(0L, currencyCode, regionCode).copy(
         id = SUBSCRIPTION_LIFETIME_PLAN, hidden = true,
-        name = listOf(LocalizedStringDataModel("en", "Lifetime access"), LocalizedStringDataModel("ru", "Бессрочный доступ"), LocalizedStringDataModel("kk", "Мерзімсіз қолжетімділік")),
+        name = listOf(LocalizedStringDataModel("en", "Lifetime access"), LocalizedStringDataModel("ru", "Бессрочный доступ"), LocalizedStringDataModel("kk", "Мерзімсіз қолжетімділік"), LocalizedStringDataModel("ky", "Мөөнөтсүз мүмкүнчүлүк")),
         description = listOf(
             LocalizedStringDataModel("en", "Unlocked by a promo code for this location. No renewal charges."),
             LocalizedStringDataModel("ru", "Активирован промокодом для этой точки. Без списаний за продление."),
-            LocalizedStringDataModel("kk", "Осы нүктеге промокодпен қосылған. Ұзарту үшін төлем алынбайды.")
+            LocalizedStringDataModel("kk", "Осы нүктеге промокодпен қосылған. Ұзарту үшін төлем алынбайды."),
+            LocalizedStringDataModel("ky", "Бул жай үчүн промокод менен ачылган. Узартуу үчүн төлөм алынбайт.")
         )
     )
 

@@ -1439,10 +1439,10 @@ internal fun AppConfiguration.SupplierInsightsRecoveryDeskCompactPanel(
         val section = sectionTabsWidget(
             stateKey = "supplier-recovery-desk",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
-                TabContent("checklist", authUiText("Checklist", "Чек-лист", "Тексеру тізімі")),
-                TabContent("script", authUiText("Script", "Сценарий", "Сценарий")),
-                TabContent("waves", authUiText("Recovery waves", "Волны восстановления", "Қалпына келтіру толқындары"))
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
+                TabContent("checklist", authUiText("Checklist", "Чек-лист", "Тексеру тізімі", "Текшерүү тизмеси")),
+                TabContent("script", authUiText("Script", "Сценарий", "Сценарий", "Сценарий")),
+                TabContent("waves", authUiText("Recovery waves", "Волны восстановления", "Қалпына келтіру толқындары", "Калыбына келтирүү толкундары"))
             )
         )
         if (section == "overview") {
@@ -1788,20 +1788,23 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
         ?.joinToString(" • ") { bucket -> "${supplierOrderStatusTitle(bucket.status)} ${bucket.orderCount}" }
         .orEmpty()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenAppBarWidget(
-            title = localizedStringResource(1353, "Demand radar"),
-            iconPath = stateValues.drawablePathIconSupplierDemandRadar,
-            iconRes = stateValues.drawableResIconSupplierDemandRadar.value
-        )
-
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = localizedStringResource(1353, "Demand radar"),
+                iconPath = stateValues.drawablePathIconSupplierDemandRadar,
+                iconRes = stateValues.drawableResIconSupplierDemandRadar.value
+            )
+        }
+    ) {
         val section = sectionTabsWidget(
             stateKey = "supplier-insights:${focusedSupplierId.orEmpty()}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
-                TabContent("next_moves", authUiText("Actions", "Действия", "Әрекеттер")),
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
+                TabContent("next_moves", authUiText("Actions", "Действия", "Әрекеттер", "Аракеттер")),
                 TabContent("terms", localizedStringResource(1583, "Supplier terms guard")),
-                TabContent("manufacturers", authUiText("Manufacturers", "Производители", "Өндірушілер")),
+                TabContent("manufacturers", authUiText("Manufacturers", "Производители", "Өндірушілер", "Өндүрүүчүлөр")),
                 TabContent("recovery", localizedStringResource(1816, "Backorder recovery")),
                 TabContent("backorders", localizedStringResource(1794, "Backorder watch")),
                 TabContent("demand", localizedStringResource(1353, "Demand radar"))
@@ -2363,7 +2366,7 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
         val section = sectionTabsWidget(
             stateKey = "supplier-item-orders:${activeStoreId.orEmpty()}:${goodsItem?.id.orEmpty()}",
             tabs = listOf(
-                TabContent("new_order", authUiText("New order", "Новый заказ", "Жаңа тапсырыс")),
+                TabContent("new_order", authUiText("New order", "Новый заказ", "Жаңа тапсырыс", "Жаңы тапшырык")),
                 TabContent("history", localizedStringResource(257, "History"))
             ),
             modifier = Modifier

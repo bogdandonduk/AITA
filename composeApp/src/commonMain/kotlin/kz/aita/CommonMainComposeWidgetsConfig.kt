@@ -1301,21 +1301,22 @@ internal fun AppConfiguration.StockScreenScaffold(
     iconPath: String? = stateValues.drawablePathIconStock,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        ScreenAppBarWidget(
-            title = title,
-            iconPath = iconPath,
-            onBack = if (!Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)) {
-                {
-                    coroutineScope.launch {
-                        Navigation.Stock.pop(stateValues.isNarrowScreen)
+    AitaScreenColumn(
+        modifier = Modifier.fillMaxSize(),
+        appBar = {
+            ScreenAppBarWidget(
+                title = title,
+                iconPath = iconPath,
+                onBack = if (!Navigation.Stock.isVeryFirstScreen(stateValues.isNarrowScreen)) {
+                    {
+                        coroutineScope.launch {
+                            Navigation.Stock.pop(stateValues.isNarrowScreen)
+                        }
                     }
-                }
-            } else null
-        )
-
+                } else null
+            )
+        }
+    ) {
         content()
     }
 }
@@ -1906,7 +1907,8 @@ fun AppConfiguration.genericTextField(
                                 LocalizedStringDataModel("main", message.ifBlank { localizedStringResource(1009, "Voice input is not available on this device") }),
                                 LocalizedStringDataModel("en", message.ifBlank { localizedStringResource(1009, "Voice input is not available on this device") }),
                                 LocalizedStringDataModel("ru", message.ifBlank { "Голосовой ввод недоступен" }),
-                                LocalizedStringDataModel("kk", message.ifBlank { "Дауыспен енгізу қолжетімсіз" })
+                                LocalizedStringDataModel("kk", message.ifBlank { "Дауыспен енгізу қолжетімсіз" }),
+                                LocalizedStringDataModel("ky", message.ifBlank { "Бул түзмөктө үн менен киргизүү жеткиликтүү эмес" })
                             ),
                             NotificationType.Negative,
                             transient = true
@@ -2638,7 +2640,9 @@ fun AppLanguageDataModel.mapIconRes(): DrawableResource {
     return when (language) {
         "en" -> Res.drawable.flag_en
         "ru" -> Res.drawable.flag_ru
-        "tj" -> Res.drawable.flag_tj
+        "tg", "tj" -> Res.drawable.flag_tj
+        "ky" -> Res.drawable.flag_kg
+        "uz" -> Res.drawable.flag_uz
         else -> Res.drawable.flag_kz
     }
 }
@@ -3254,6 +3258,7 @@ fun AppConfiguration.domainSelectionTextField(
     onSelectedDomainChange: ((String) -> Unit)? = null,
     onSelectedSecondaryDomainChange: ((String?) -> Unit)? = null,
     onTransformValue: ((String, String, String?) -> String)? = null,
+    secondaryDomainLeadingPadding: Dp = 0.dp,
     onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
     val primaryDomainIdsKey = remember(domains) { domains.joinToString("|") { it.id } }
@@ -3544,6 +3549,7 @@ fun AppConfiguration.domainSelectionTextField(
                 leadingIcon = selectedSecondary?.run {
                     {
                         selectableDomainWidget(
+                            modifier = Modifier.padding(start = secondaryDomainLeadingPadding),
                             domain = this,
                             state = isSecondaryDomainSelectionDropdownExpandedState,
                             showExpansion = lockedSecondaryDomainId == null,
@@ -3832,6 +3838,7 @@ object AppConfiguration {
         val colors: List<StylizedColorGroupDataModel>?
         val drawables: List<StylizedDrawablePathsGroupDataModel>?
 
+        val appLanguagePreference: String get() = appLanguage
         val appLanguage: String
         val appThemeId: Long
         val appSizeModeId: Long
@@ -4392,6 +4399,11 @@ object AppConfiguration {
         vararg keys: Any
     ) {
 
+        var systemLocaleLanguage by remember { mutableStateOf(getSystemLocaleLanguage()) }
+        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+            systemLocaleLanguage = getSystemLocaleLanguage()
+        }
+
         stateValues = object : StateValues {
             private val appearance by appAppearancePreferencesState.collectAsState()
             private val appearanceResources by uiAppearanceResourcesState.collectAsState()
@@ -4488,7 +4500,8 @@ object AppConfiguration {
             override val drawables: List<StylizedDrawablePathsGroupDataModel>? by drawablesState.payload.collectAsState()
 
             override val appModeId: Int by appModeState.collectAsState()
-            override val appLanguage: String get() = appearance.appLanguage
+            override val appLanguagePreference: String get() = appearance.appLanguage
+            override val appLanguage: String get() = effectiveAppLanguage(appearance.appLanguage, systemLocaleLanguage)
             override val appThemeId: Long get() = appearance.appThemeId
             override val appSizeModeId: Long get() = appearance.appSizeModeId
 
@@ -5431,12 +5444,13 @@ internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataMo
 
     val tajikistan = CountryDataModel(
         locale = "tj",
-        language = "tj",
+        language = "tg",
         name = listOf(
             LocalizedStringDataModel("main", "Tajikistan"),
             LocalizedStringDataModel("en", "Tajikistan"),
             LocalizedStringDataModel("ru", "Таджикистан"),
-            LocalizedStringDataModel("kk", "Тәжікстан")
+            LocalizedStringDataModel("kk", "Тәжікстан"),
+            LocalizedStringDataModel("ky", "Тажикстан")
         ),
         flagDrawablePath = "png/flag_tj.png",
         cities = listOf(
@@ -5445,7 +5459,8 @@ internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataMo
                     LocalizedStringDataModel("main", "Dushanbe"),
                     LocalizedStringDataModel("en", "Dushanbe"),
                     LocalizedStringDataModel("ru", "Душанбе"),
-                    LocalizedStringDataModel("kk", "Душанбе")
+                    LocalizedStringDataModel("kk", "Душанбе"),
+                    LocalizedStringDataModel("ky", "Душанбе")
                 ),
                 centerLatitude = 38.5606,
                 centerLongitude = 68.7778,
@@ -5459,7 +5474,8 @@ internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataMo
                     LocalizedStringDataModel("main", "Khujand"),
                     LocalizedStringDataModel("en", "Khujand"),
                     LocalizedStringDataModel("ru", "Худжанд"),
-                    LocalizedStringDataModel("kk", "Худжанд")
+                    LocalizedStringDataModel("kk", "Худжанд"),
+                    LocalizedStringDataModel("ky", "Хужанд")
                 ),
                 centerLatitude = 40.2894,
                 centerLongitude = 69.6270,
@@ -5479,7 +5495,8 @@ internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataMo
                     LocalizedStringDataModel("main", "Somoni"),
                     LocalizedStringDataModel("en", "Somoni"),
                     LocalizedStringDataModel("ru", "Сомони"),
-                    LocalizedStringDataModel("kk", "Сомони")
+                    LocalizedStringDataModel("kk", "Сомони"),
+                    LocalizedStringDataModel("ky", "Сомони")
                 )
             )
         ),
@@ -5490,7 +5507,8 @@ internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataMo
                     LocalizedStringDataModel("main", "Card"),
                     LocalizedStringDataModel("en", "Card"),
                     LocalizedStringDataModel("ru", "Карта"),
-                    LocalizedStringDataModel("kk", "Карта")
+                    LocalizedStringDataModel("kk", "Карта"),
+                    LocalizedStringDataModel("ky", "Карта")
                 )
             )
         ),
@@ -5578,6 +5596,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         autoFocus = autoFocus,
         placeholderText = placeholderText,
         keyboardType = KeyboardType.Phone,
+        secondaryDomainLeadingPadding = stateValues.textFieldIconPadding,
         imeWithAction = imeWithAction,
         contentInvalidText = stateValues.stringPhoneNumberMustBe,
         onContentValidityCheck = { text, _, selectedSecondaryId ->
@@ -5962,11 +5981,12 @@ fun AppConfiguration.actionButton(
 
     Row(
         modifier = modifier
-            .aitaWidthCap()
             .run {
                 if (!textPresent || !fillMaxWidthIfTextPresent)
-                    wrapContentWidth()
+                    // Compact/icon-only actions keep their existing bounded clickable surface.
+                    aitaWidthCap().wrapContentWidth()
                 else
+                    // A form/card owns its width; a normal action must not impose a second cap.
                     fillMaxWidth()
             }
             .run {

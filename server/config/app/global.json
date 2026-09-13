@@ -254,6 +254,18 @@
           {
             "language": "kk",
             "value": "TOO"
+          },
+          {
+            "language": "uz",
+            "value": "TOO"
+          },
+          {
+            "language": "tg",
+            "value": "TOO"
+          },
+          {
+            "language": "ky",
+            "value": "TOO"
           }
         ],
         "parameters": [
@@ -273,6 +285,18 @@
               },
               {
                 "language": "kk",
+                "value": "БИН"
+              },
+              {
+                "language": "uz",
+                "value": "BIN"
+              },
+              {
+                "language": "tg",
+                "value": "БИН"
+              },
+              {
+                "language": "ky",
                 "value": "БИН"
               }
             ],
@@ -300,6 +324,18 @@
           {
             "language": "kk",
             "value": "Казакстан"
+          },
+          {
+            "language": "uz",
+            "value": "Qozogʻiston"
+          },
+          {
+            "language": "tg",
+            "value": "Қазоқистон"
+          },
+          {
+            "language": "ky",
+            "value": "Казакстан"
           }
         ],
         "flagDrawablePath": "png/flag_kz.png",
@@ -316,6 +352,18 @@
               },
               {
                 "language": "kk",
+                "value": "Астана"
+              },
+              {
+                "language": "uz",
+                "value": "Ostona"
+              },
+              {
+                "language": "tg",
+                "value": "Остона"
+              },
+              {
+                "language": "ky",
                 "value": "Астана"
               }
             ],
@@ -338,6 +386,18 @@
               },
               {
                 "language": "kk",
+                "value": "Алматы"
+              },
+              {
+                "language": "uz",
+                "value": "Olmaota"
+              },
+              {
+                "language": "tg",
+                "value": "Алмаато"
+              },
+              {
+                "language": "ky",
                 "value": "Алматы"
               }
             ],
@@ -371,6 +431,18 @@
               {
                 "language": "kk",
                 "value": "Tеңге"
+              },
+              {
+                "language": "uz",
+                "value": "Tenge"
+              },
+              {
+                "language": "tg",
+                "value": "Тенге"
+              },
+              {
+                "language": "ky",
+                "value": "Теңге"
               }
             ]
           }
@@ -394,6 +466,18 @@
               {
                 "language": "kk",
                 "value": "Карта"
+              },
+              {
+                "language": "uz",
+                "value": "Karta"
+              },
+              {
+                "language": "tg",
+                "value": "Корт"
+              },
+              {
+                "language": "ky",
+                "value": "Карта"
               }
             ]
           },
@@ -414,6 +498,18 @@
               },
               {
                 "language": "kk",
+                "value": "QR"
+              },
+              {
+                "language": "uz",
+                "value": "QR"
+              },
+              {
+                "language": "tg",
+                "value": "QR"
+              },
+              {
+                "language": "ky",
                 "value": "QR"
               }
             ]
@@ -436,6 +532,18 @@
               {
                 "language": "kk",
                 "value": "Каспи RED"
+              },
+              {
+                "language": "uz",
+                "value": "Kaspi RED"
+              },
+              {
+                "language": "tg",
+                "value": "Kaspi RED"
+              },
+              {
+                "language": "ky",
+                "value": "Kaspi RED"
               }
             ]
           },
@@ -457,6 +565,18 @@
               {
                 "language": "kk",
                 "value": "Рахмет"
+              },
+              {
+                "language": "uz",
+                "value": "Rakhmet"
+              },
+              {
+                "language": "tg",
+                "value": "Rakhmet"
+              },
+              {
+                "language": "ky",
+                "value": "Rakhmet"
               }
             ]
           }
@@ -465,7 +585,7 @@
       },
       {
         "locale": "tj",
-        "language": "tj",
+        "language": "tg",
         "name": [
           {
             "language": "en",
@@ -478,6 +598,18 @@
           {
             "language": "kk",
             "value": "Тәжікстан"
+          },
+          {
+            "language": "uz",
+            "value": "Tojikiston"
+          },
+          {
+            "language": "tg",
+            "value": "Тоҷикистон"
+          },
+          {
+            "language": "ky",
+            "value": "Тажикстан"
           }
         ],
         "flagDrawablePath": "png/flag_tj.png",
@@ -494,6 +626,18 @@
               },
               {
                 "language": "kk",
+                "value": "Душанбе"
+              },
+              {
+                "language": "uz",
+                "value": "Dushanbe"
+              },
+              {
+                "language": "tg",
+                "value": "Душанбе"
+              },
+              {
+                "language": "ky",
                 "value": "Душанбе"
               }
             ],
@@ -517,6 +661,18 @@
               {
                 "language": "kk",
                 "value": "Худжанд"
+              },
+              {
+                "language": "uz",
+                "value": "Xoʻjand"
+              },
+              {
+                "language": "tg",
+                "value": "Хуҷанд"
+              },
+              {
+                "language": "ky",
+                "value": "Хужанд"
               }
             ],
             "centerLatitude": 40.2894,
@@ -549,6 +705,18 @@
               {
                 "language": "kk",
                 "value": "Cом"
+              },
+              {
+                "language": "uz",
+                "value": "Somoniy"
+              },
+              {
+                "language": "tg",
+                "value": "Сомонӣ"
+              },
+              {
+                "language": "ky",
+                "value": "Сомони"
               }
             ]
           }
@@ -572,6 +740,18 @@
               {
                 "language": "kk",
                 "value": "Карта"
+              },
+              {
+                "language": "uz",
+                "value": "Karta"
+              },
+              {
+                "language": "tg",
+                "value": "Корт"
+              },
+              {
+                "language": "ky",
+                "value": "Карта"
               }
             ]
           }
@@ -594,6 +774,18 @@
           {
             "language": "kk",
             "value": "Ағылшынша"
+          },
+          {
+            "language": "uz",
+            "value": "Inglizcha"
+          },
+          {
+            "language": "tg",
+            "value": "Англисӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Англисче"
           }
         ],
         "flagDrawablePath": "png/flag_en.png"
@@ -612,6 +804,18 @@
           {
             "language": "kk",
             "value": "Орысша"
+          },
+          {
+            "language": "uz",
+            "value": "Ruscha"
+          },
+          {
+            "language": "tg",
+            "value": "Русӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Орусча"
           }
         ],
         "flagDrawablePath": "png/flag_ru.png"
@@ -630,9 +834,111 @@
           {
             "language": "kk",
             "value": "Қазақша"
+          },
+          {
+            "language": "uz",
+            "value": "Qozoqcha"
+          },
+          {
+            "language": "tg",
+            "value": "Қазоқӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Казакча"
           }
         ],
         "flagDrawablePath": "png/flag_kz.png"
+      },
+      {
+        "language": "tg",
+        "name": [
+          {
+            "language": "en",
+            "value": "Tajik"
+          },
+          {
+            "language": "ru",
+            "value": "Таджикский"
+          },
+          {
+            "language": "kk",
+            "value": "Тәжікше"
+          },
+          {
+            "language": "tg",
+            "value": "Тоҷикӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Тажикче"
+          },
+          {
+            "language": "uz",
+            "value": "Tojikcha"
+          }
+        ],
+        "flagDrawablePath": "png/flag_tj.png"
+      },
+      {
+        "language": "ky",
+        "name": [
+          {
+            "language": "en",
+            "value": "Kyrgyz"
+          },
+          {
+            "language": "ru",
+            "value": "Кыргызский"
+          },
+          {
+            "language": "kk",
+            "value": "Қырғызша"
+          },
+          {
+            "language": "tg",
+            "value": "Қирғизӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Кыргызча"
+          },
+          {
+            "language": "uz",
+            "value": "Qirgʻizcha"
+          }
+        ],
+        "flagDrawablePath": "png/flag_kg.png"
+      },
+      {
+        "language": "uz",
+        "name": [
+          {
+            "language": "en",
+            "value": "Uzbek"
+          },
+          {
+            "language": "ru",
+            "value": "Узбекский"
+          },
+          {
+            "language": "kk",
+            "value": "Өзбекше"
+          },
+          {
+            "language": "tg",
+            "value": "Ӯзбекӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Өзбекче"
+          },
+          {
+            "language": "uz",
+            "value": "Oʻzbekcha"
+          }
+        ],
+        "flagDrawablePath": "png/flag_uz.png"
       }
     ],
     "themes": [
@@ -650,6 +956,18 @@
           {
             "language": "kk",
             "value": "Жарық"
+          },
+          {
+            "language": "uz",
+            "value": "Yorugʻ"
+          },
+          {
+            "language": "tg",
+            "value": "Равшан"
+          },
+          {
+            "language": "ky",
+            "value": "Жарык"
           }
         ]
       },
@@ -667,6 +985,18 @@
           {
             "language": "kk",
             "value": "Қараңғы"
+          },
+          {
+            "language": "uz",
+            "value": "Qorongʻi"
+          },
+          {
+            "language": "tg",
+            "value": "Торик"
+          },
+          {
+            "language": "ky",
+            "value": "Караңгы"
           }
         ]
       }
@@ -686,6 +1016,18 @@
           {
             "language": "kk",
             "value": "шт."
+          },
+          {
+            "language": "uz",
+            "value": "dona"
+          },
+          {
+            "language": "tg",
+            "value": "дона"
+          },
+          {
+            "language": "ky",
+            "value": "даана"
           }
         ],
         "total": 1.0,
@@ -706,6 +1048,18 @@
           {
             "language": "kk",
             "value": "кг."
+          },
+          {
+            "language": "uz",
+            "value": "kg."
+          },
+          {
+            "language": "tg",
+            "value": "кг."
+          },
+          {
+            "language": "ky",
+            "value": "кг"
           }
         ],
         "total": 1.0,
@@ -807,6 +1161,18 @@
           {
             "language": "kk",
             "value": "БИН"
+          },
+          {
+            "language": "uz",
+            "value": "BIN"
+          },
+          {
+            "language": "tg",
+            "value": "БИН"
+          },
+          {
+            "language": "ky",
+            "value": "БИН"
           }
         ],
         "label": [
@@ -825,6 +1191,18 @@
           {
             "language": "kk",
             "value": "Бизнес сәйкестендіру нөмірі"
+          },
+          {
+            "language": "uz",
+            "value": "Biznes identifikatsiya raqami"
+          },
+          {
+            "language": "tg",
+            "value": "Рақами мушаххаси соҳибкорӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Бизнес идентификациялык номери"
           }
         ],
         "placeholder": [
@@ -843,6 +1221,18 @@
           {
             "language": "kk",
             "value": "12 сан"
+          },
+          {
+            "language": "uz",
+            "value": "12 ta raqam"
+          },
+          {
+            "language": "tg",
+            "value": "12 рақам"
+          },
+          {
+            "language": "ky",
+            "value": "12 цифра"
           }
         ],
         "required": true,
@@ -873,6 +1263,18 @@
           {
             "language": "kk",
             "value": "СТН / РМА"
+          },
+          {
+            "language": "uz",
+            "value": "TIN"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "ky",
+            "value": "ИНН"
           }
         ],
         "label": [
@@ -891,6 +1293,18 @@
           {
             "language": "kk",
             "value": "Салық төлеушінің сәйкестендіру нөмірі"
+          },
+          {
+            "language": "uz",
+            "value": "Soliq toʻlovchining identifikatsiya raqami"
+          },
+          {
+            "language": "tg",
+            "value": "Рақами мушаххаси андозсупоранда"
+          },
+          {
+            "language": "ky",
+            "value": "Салык төлөөчүнүн идентификациялык номери"
           }
         ],
         "placeholder": [
@@ -909,6 +1323,18 @@
           {
             "language": "kk",
             "value": "9 сан"
+          },
+          {
+            "language": "uz",
+            "value": "9 ta raqam"
+          },
+          {
+            "language": "tg",
+            "value": "9 рақам"
+          },
+          {
+            "language": "ky",
+            "value": "9 цифра"
           }
         ],
         "required": true,
@@ -976,6 +1402,18 @@
           {
             "language": "kk",
             "value": "Kaspi шоты"
+          },
+          {
+            "language": "uz",
+            "value": "Kaspi toʻlov hisobi"
+          },
+          {
+            "language": "tg",
+            "value": "Ҳисобномаи Kaspi"
+          },
+          {
+            "language": "ky",
+            "value": "Kaspi төлөм эсеби"
           }
         ],
         "countryLocales": [
@@ -1000,6 +1438,18 @@
           {
             "language": "kk",
             "value": "Интеграция дайындығы. Мерчант деректері қосылғанша нақты API шақыруы өшірулі."
+          },
+          {
+            "language": "uz",
+            "value": "Integratsiya uchun tayyorlangan andoza. Savdogar rekvizitlari ulanmaguncha haqiqiy API soʻrovi oʻchirilgan."
+          },
+          {
+            "language": "tg",
+            "value": "Заминаи ҳамгироӣ омода аст. Дархости воқеии API то пайваст кардани маълумоти тоҷир ғайрифаъол мемонад."
+          },
+          {
+            "language": "ky",
+            "value": "Даярдалган интеграциянын орду. Соодагердин кирүү маалыматы туташтырылганга чейин чыныгы API чакыруусу өчүрүлгөн."
           }
         ]
       },
@@ -1021,6 +1471,18 @@
           {
             "language": "kk",
             "value": "Қолмен тест толтыру"
+          },
+          {
+            "language": "uz",
+            "value": "Ishlab chiqish uchun qoʻlda balans toʻldirish"
+          },
+          {
+            "language": "tg",
+            "value": "Пуркунии дастии озмоишӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Иштеп чыгуу үчүн кол менен сыноо толуктоосу"
           }
         ],
         "countryLocales": [],
@@ -1051,6 +1513,18 @@
           {
             "language": "kk",
             "value": "Стандартты"
+          },
+          {
+            "language": "uz",
+            "value": "Standart"
+          },
+          {
+            "language": "tg",
+            "value": "Стандартӣ"
+          },
+          {
+            "language": "ky",
+            "value": "Стандарттуу"
           }
         ],
         "description": [
@@ -1069,6 +1543,18 @@
           {
             "language": "kk",
             "value": "3 филиал, 21 қызметкер, қоймада 1000 тауар"
+          },
+          {
+            "language": "uz",
+            "value": "3 ta filial, 21 ta xodim, 1000 ta zaxira tovari"
+          },
+          {
+            "language": "tg",
+            "value": "3 филиал, 21 корманд, 1000 мол дар анбор"
+          },
+          {
+            "language": "ky",
+            "value": "3 филиал, 21 кызматкер, кампада 1000 товар"
           }
         ],
         "priceMinor": 799000,

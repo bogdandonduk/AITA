@@ -55,7 +55,7 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
     onSubmit: () -> Unit,
     onResend: () -> Unit,
     resendEnabled: Boolean = true,
-    confirmText: String = authUiText("Continue", "Продолжить", "Жалғастыру"),
+    confirmText: String = authUiText("Continue", "Продолжить", "Жалғастыру", "Улантуу"),
     identity: String = "auth-email-code",
     trailingAction: (@Composable () -> Unit)? = null
 ) {
@@ -63,7 +63,7 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         aitaFormTextField(
             modifier = Modifier.fillMaxWidth(), value = value, onValueChange = onValueChange,
-            titleText = authUiText("Email code", "Код из письма", "Email коды"), placeholderText = "000000",
+            titleText = authUiText("Email code", "Код из письма", "Email коды", "Электрондук почтадагы код"), placeholderText = "000000",
             identityKey = identity, enabled = !busy, sensitive = true,
             keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go,
             onImeAction = { if (!busy && !countdown.expired && value.length == 6) onSubmit() },
@@ -80,14 +80,14 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
             horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 text = when {
-                    countdown.expired -> authUiText("Code expired", "Код истёк", "Код мерзімі аяқталды")
-                    countdown.hasExpiry -> authUiText("Valid", "Действует", "Жарамды") + " " + authClock(countdown.expiresSeconds)
+                    countdown.expired -> authUiText("Code expired", "Код истёк", "Код мерзімі аяқталды", "Коддун мөөнөтү бүттү")
+                    countdown.hasExpiry -> authUiText("Valid", "Действует", "Жарамды", "Жарактуу") + " " + authClock(countdown.expiresSeconds)
                     else -> ""
                 }, color = if (countdown.expired) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
                 fontSize = stateValues.smallTextSize, modifier = Modifier.weight(1f)
             )
             AuthQuietAction(
-                text = authUiText("Resend", "Ещё код", "Қайта жіберу") +
+                text = authUiText("Resend", "Ещё код", "Қайта жіберу", "Кайра жөнөтүү") +
                     (if (countdown.resendSeconds > 0L) " · " + authClock(countdown.resendSeconds) else ""),
                 enabled = !busy && resendEnabled && countdown.resendSeconds == 0L,
                 onClick = onResend
@@ -130,7 +130,7 @@ internal fun AppConfiguration.AuthenticatorCodeEntryField(
 ) {
     aitaFormTextField(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp), value = value, onValueChange = onValueChange,
-        titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код"),
+        titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код", "Аутентификатор / калыбына келтирүү коду"),
         placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(!busy) },
         identityKey = identity, enabled = !busy, sensitive = true,
         keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go, onImeAction = onSubmit,

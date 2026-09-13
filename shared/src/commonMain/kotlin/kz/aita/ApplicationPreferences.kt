@@ -142,6 +142,14 @@ internal object AppPreferences {
             if (postFailure) postInAppNotification(response.message, NotificationType.Neutral, transient = true)
             return@withLock // Keep the journal; reconnect retries the latest choice, never replays it in UI.
         }
+        val acknowledged = requireNotNull(response.payload)
+        if (acknowledged.id != id || !appPreferenceAcknowledges(selected.value,
+                UserPreferencesDataModel(acknowledged.appLanguage, acknowledged.appThemeId, acknowledged.appSizeModeId))) {
+            // An older server may accept the request but coerce a new language to its old default.
+            // Keep the local choice and its account-scoped journal for a compatible reconnect.
+            logCloudConnectionDiagnostic("Preference response did not acknowledge the selected appearance; pending choice retained")
+            return@withLock
+        }
         storageMutex.withLock persistAck@{
             if (!ownedBy(id, generation) || dirty.value[id] != selected) return@persistAck
             val account = userAccountState.payloadValue?.takeIf { it.id == id } ?: return@persistAck

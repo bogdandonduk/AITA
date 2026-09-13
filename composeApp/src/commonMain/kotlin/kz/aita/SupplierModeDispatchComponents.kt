@@ -630,11 +630,11 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
         val section = sectionTabsWidget(
             stateKey = "supplier-dispatch-detail:${run.key}",
             tabs = listOf(
-                TabContent("overview", authUiText("Overview", "Обзор", "Шолу")),
-                TabContent("checklist", authUiText("Checklist", "Чек-лист", "Тексеру тізімі")),
-                TabContent("attention", authUiText("Attention", "Внимание", "Назар аудару")),
-                TabContent("handoff", authUiText("Driver handoff", "Передача водителю", "Жүргізушіге тапсыру")),
-                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер"))
+                TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
+                TabContent("checklist", authUiText("Checklist", "Чек-лист", "Тексеру тізімі", "Текшерүү тизмеси")),
+                TabContent("attention", authUiText("Attention", "Внимание", "Назар аудару", "Көңүл буруңуз")),
+                TabContent("handoff", authUiText("Driver handoff", "Передача водителю", "Жүргізушіге тапсыру", "Айдоочуга өткөрүп берүү")),
+                TabContent("actions", authUiText("Actions", "Действия", "Әрекеттер", "Аракеттер"))
             ),
             modifier = Modifier
                 .fillMaxWidth()

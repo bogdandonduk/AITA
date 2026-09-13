@@ -7,7 +7,10 @@ class AppearanceCatalog private constructor(
     private val colors: Map<Long, Map<Long, String>>,
     private val drawables: Map<Long, Map<Long, String>>
 ) {
-    fun string(id: Long, language: String): String? = strings[normalizeAppLanguagePreference(language)]?.get(id)
+    fun string(id: Long, language: String): String? {
+        val selected = effectiveAppLanguage(language)
+        return strings[selected]?.get(id) ?: bundledTranslatedStringResource(id, selected)
+    }
     fun dimension(id: Long, mode: Long, fallback: Float): Float = dimensions[normalizeAppSizeModePreference(mode)]?.get(id) ?: fallback
     fun color(id: Long, theme: Long): String? = colors[normalizeAppThemePreference(theme)]?.get(id)
     fun drawable(id: Long, theme: Long): String = drawables[normalizeAppThemePreference(theme)]?.get(id)
@@ -31,9 +34,10 @@ class AppearanceCatalog private constructor(
             val primaryStrings = firstById(strings) { it.id }
             val fallbackStrings = firstById(bundledStrings) { it.id }
             val stringIds = primaryStrings.keys + fallbackStrings.keys
-            val indexedStrings = listOf("en", "ru", "kk").associateWith { language ->
+            val indexedStrings = SUPPORTED_APP_LANGUAGES.associateWith { language ->
                 stringIds.mapNotNull { id ->
-                    (primaryStrings[id].extractString(id, language) ?: fallbackStrings[id].extractString(id, language))?.let { id to it }
+                    resolveLocalizedResource(id, language, primaryStrings[id]?.firstOrNull()?.values,
+                        fallbackStrings[id]?.firstOrNull()?.values)?.let { id to it }
                 }.toMap()
             }
             val primaryDimensions = firstById(dimensions) { it.id }
