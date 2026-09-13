@@ -32,6 +32,7 @@ private fun AppConfiguration.activityKind(entry: MarketShoppingActivityEntry): S
 }
 
 private fun AppConfiguration.activityStatus(entry: MarketShoppingActivityEntry): String = when {
+    entry.errorKey == "market.shopping_cancelled" -> authUiText("Cancelled", "Отменено", "Бас тартылды")
     !entry.accepted -> authUiText("Not applied", "Не применено", "Қолданылған жоқ")
     !entry.changed -> authUiText("Already matched · no list edit", "Уже совпадало · список не изменён", "Бұрыннан сәйкес · тізім өзгермеді")
     else -> authUiText("Applied to list", "Список изменён", "Тізім өзгертілді")
@@ -159,6 +160,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                             TabContent("all", authUiText("All results", "Все результаты", "Барлық нәтижелер")),
                             TabContent(MARKET_ACTIVITY_RESULT_APPLIED, authUiText("Applied", "Применено", "Қолданылды")),
                             TabContent(MARKET_ACTIVITY_RESULT_REJECTED, authUiText("Not applied", "Не применено", "Қолданылмады")),
+                            TabContent(MARKET_ACTIVITY_RESULT_CANCELLED, authUiText("Cancelled", "Отменённые", "Бас тартылған")),
                             TabContent(MARKET_ACTIVITY_RESULT_UNCHANGED, authUiText("No change", "Без изменений", "Өзгеріс жоқ"))),
                             selectedId = wanted.filter.result ?: "all", onSelected = {
                                 val current = navigation.request.filter
@@ -203,7 +205,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                     stateValues.PlaceholderTextColor.copy(alpha = 0.25f), RoundedCornerShape(stateValues.cornerRadius))
                     .padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(activityKind(entry), color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
-                    Text(activityStatus(entry), color = if (entry.accepted) stateValues.AccentColor else stateValues.ErrorColor,
+                    Text(activityStatus(entry), color = when { entry.accepted -> stateValues.AccentColor; entry.errorKey == "market.shopping_cancelled" -> stateValues.PlaceholderTextColor; else -> stateValues.ErrorColor },
                         fontSize = stateValues.smallTextSize)
                     Text(receiptUiDateTime(entry.recordedAtMillis), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     entry.previewTitle?.let { title -> Text(title, color = stateValues.TextColor, fontSize = stateValues.textSize) }
@@ -287,7 +289,7 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
                 verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(activityStatus(entry), color = if (entry.accepted) stateValues.AccentColor else stateValues.ErrorColor,
+                        Text(activityStatus(entry), color = when { entry.accepted -> stateValues.AccentColor; entry.errorKey == "market.shopping_cancelled" -> stateValues.PlaceholderTextColor; else -> stateValues.ErrorColor },
                             fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
                         Text(receiptUiDateTime(entry.recordedAtMillis), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         entry.errorKey?.let { key ->

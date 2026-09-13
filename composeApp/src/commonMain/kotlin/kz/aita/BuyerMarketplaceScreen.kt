@@ -54,6 +54,8 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     val shopping = rememberMarketShoppingUiState()
     val scope = rememberCoroutineScope()
     val home = NavigationScreenModel.Buyer.Main.Home
+    var browseSection by rememberSaveable(account) { mutableStateOf("products") }
+    val directory = remember(account, generation) { MarketShopDirectoryNavigation() }
     var search by rememberSaveable(account, savedOnly) { mutableStateOf("") }
     var city by rememberSaveable(account, savedOnly) { mutableStateOf("") }
     var appliedSearch by rememberSaveable(account, savedOnly) { mutableStateOf("") }
@@ -73,7 +75,8 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     var saveFailure by remember(account, generation) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     val fence = remember(account, generation) { MarketSavedReadFence() }
     // Category selection uses a local catalogue; unlike product dialogues it does not own I/O.
-    val dialogOwnsReads = openedId != null || compareTo != null
+    val directoryOpen = !savedOnly && shopId == null && browseSection == "shops"
+    val dialogOwnsReads = openedId != null || compareTo != null || directoryOpen
     val latestDialogOwnsReads by rememberUpdatedState(dialogOwnsReads)
     val rawQuery = MarketDiscoveryQuery(appliedSearch, if (shopId == null) appliedCity else "", shopId, categoryId, savedOnly && shopId == null, sort)
     val query = rawQuery.normalizedDiscoveryQuery() ?: rawQuery
@@ -197,6 +200,12 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
             savedOnly -> authUiText("Saved offers", "Сохранённое", "Сақталғандар")
             else -> "AITA Market"
         }, iconPath = marketIconPath(if (savedOnly && shopId == null) 140 else 139))
+        if (!savedOnly && shopId == null) sectionTabsWidget("buyer-market-sections:$account", listOf(
+            TabContent("products", authUiText("Products", "Товары", "Тауарлар")),
+            TabContent("shops", authUiText("Shops", "Магазины", "Дүкендер"))),
+            selectedId = browseSection, onSelected = { browseSection = it })
+        if (directoryOpen) MarketShopDirectoryPanel(directory, Modifier.weight(1f).fillMaxWidth(), onVisit = ::visitShop)
+        else {
         LazyVerticalGrid(columns = GridCells.Adaptive(250.dp), state = gridState, modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item(key = "browse-header", span = { GridItemSpan(maxLineSpan) }) {
@@ -207,6 +216,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                             if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
                         actionButton(text = if (savedOnly) authUiText("Back to saved", "К сохранённому", "Сақталғандарға оралу")
+                            else if (browseSection == "shops") authUiText("Back to shops", "К магазинам", "Дүкендерге оралу")
                             else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу"), fillMaxWidthIfTextPresent = false,
                             autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
                     }
@@ -319,6 +329,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
             }
             actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту"), fillMaxWidthIfTextPresent = false,
                 autoLoading = false, enabled = !data.loading && !inputPending, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
+        }
         }
     }
     if (choosingCategory) catalogue?.let { loaded -> MarketCategoryPickerDialog(loaded, categoryId, onDismiss = { choosingCategory = false },

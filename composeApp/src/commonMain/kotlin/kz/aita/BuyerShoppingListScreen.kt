@@ -2,6 +2,8 @@ package kz.aita
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,26 +30,64 @@ internal fun AppConfiguration.MarketShoppingFeedback(state: MarketShoppingUiStat
         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
     state.notice?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), Modifier.fillMaxWidth().padding(12.dp),
         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
-    val pending = state.pending
-    if (pending != null) Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+    MarketShoppingRecoveryControls(state)
+}
+
+/** The confirmation keeps its original payload, even if another view resolves it while open.
+ * Shared by the list and frozen basket review; no second live business dialogue is composed.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun AppConfiguration.MarketShoppingRecoveryControls(state: MarketShoppingUiState) {
+    val pending = state.pending ?: return
+    var reviewed by remember(state) { mutableStateOf<PendingMarketShoppingCommand?>(null) }
+    val cancelling = state.cancellingCommandId == pending.command.commandId
+    val busy = state.changing || state.checking || state.cancelling
+    val frozen = reviewed
+    Column(Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(authUiText("Unconfirmed list change · check first without resending", "Неподтверждённое изменение · проверьте без повторной отправки", "Расталмаған өзгеріс · қайта жібермей тексеріңіз"),
+        Text(if (cancelling) authUiText("Cancellation awaiting confirmation", "Ожидается подтверждение отмены", "Бас тартудың расталуы күтілуде")
+            else authUiText("Unconfirmed list change", "Неподтверждённое изменение списка", "Тізім өзгерісі расталмады"),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(authUiText("Change reference", "Номер изменения", "Өзгеріс нөмірі"),
-                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                SelectionContainer { Text(pending.command.commandId, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
-            }
+            SelectionContainer(Modifier.weight(1f)) { Text(pending.command.commandId,
+                color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
             ClipboardCopyButton(textToCopy = pending.command.commandId)
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            actionButton(text = authUiText("Check result", "Проверить результат", "Нәтижені тексеру"), autoLoading = false,
-                confirmationRequired = false, fillMaxWidthIfTextPresent = false, enabled = !state.changing && !state.checking,
-                loading = state.checking, onClick = { state.checkResult() })
-            actionButton(text = authUiText("Retry same change", "Повторить ту же команду", "Сол өзгерісті қайталау"), autoLoading = false,
-                confirmationRequired = false, fillMaxWidthIfTextPresent = false, enabled = !state.changing && !state.checking,
-                loading = state.changing, onClick = { state.retry() })
+        if (frozen != null && !cancelling) {
+            Text(authUiText("Cancel the change below? This can stop an unrecorded request, but cannot undo a change that already committed.",
+                "Отменить команду ниже? Это остановит ещё не записанный запрос, но не отменит уже применённое изменение.",
+                "Төмендегі өзгерістен бас тартасыз ба? Бұл әлі тіркелмеген сұрауды тоқтатады, бірақ қолданылған өзгерісті кері қайтармайды."),
+                color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+            SelectionContainer { Text(frozen.command.commandId, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
+            if (frozen != pending) Text(eventMessage("market.shopping_recovery_changed").visibleLocalizedString(stateValues.appLanguage, ""),
+                color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                actionButton(text = authUiText("Confirm cancellation", "Подтвердить отмену", "Бас тартуды растау"),
+                    enabled = !busy && state.active && frozen == pending, loading = state.cancelling,
+                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    onClick = { state.cancelPending(frozen.command); reviewed = null })
+                actionButton(text = authUiText("Keep pending", "Оставить ожидающим", "Күтілуде қалдыру"),
+                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    enabled = !busy, onClick = { reviewed = null })
+            }
+        } else {
+            if (cancelling) Text(authUiText("Check reads the result. Retry continues cancellation, not the original edit. Closing keeps recovery saved.",
+                "Проверка читает результат. Повтор продолжает отмену, не исходное изменение. Закрытие сохраняет восстановление.",
+                "Тексеру нәтижені оқиды. Қайталау бастапқы өзгерісті емес, бас тартуды жалғастырады. Жапқанда қалпына келтіру сақталады."),
+                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                actionButton(text = authUiText("Check result", "Проверить результат", "Нәтижені тексеру"),
+                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    enabled = !busy && state.active, loading = state.checking, onClick = { state.checkResult() })
+                actionButton(text = if (cancelling) authUiText("Retry cancellation", "Повторить отмену", "Бас тартуды қайталау")
+                    else authUiText("Retry same change", "Повторить ту же команду", "Сол өзгерісті қайталау"),
+                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    enabled = !busy && state.active, loading = state.changing, onClick = { state.retry() })
+                if (!cancelling) actionButton(text = authUiText("Cancel pending change", "Отменить ожидающее изменение", "Күтілудегі өзгерістен бас тарту"),
+                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    enabled = !busy && state.active, onClick = { reviewed = pending })
+            }
         }
     }
 }
@@ -97,7 +137,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                 if (!state.snapshot?.lines.isNullOrEmpty()) item(key = "plan-basket") {
                     actionButton(text = authUiText("Compare whole basket", "Сравнить всю корзину", "Бүкіл себетті салыстыру"),
                         iconPath = marketIconPath(141), iconRes = marketIconFallback(141),
-                        enabled = !state.changing && state.pending == null, autoLoading = false, confirmationRequired = false,
+                        enabled = state.canChange, autoLoading = false, confirmationRequired = false,
                         onClick = { planning = true })
                 }
                 if (section == "list") items(state.snapshot?.lines.orEmpty(), key = { it.line.offerId }) { row ->

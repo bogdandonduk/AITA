@@ -89,10 +89,7 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         shopping.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
                         shopping.notice?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
-                        if (ownPending) Text(authUiText("Result unconfirmed. Check result only reads the server record. Retry may submit the same saved change. Closing keeps it recoverable.",
-                            "Результат не подтверждён. Проверка только читает запись сервера. Повтор может отправить ту же команду. Закрытие сохраняет возможность восстановления.",
-                            "Нәтиже расталмады. Тексеру тек сервер жазбасын оқиды. Қайталау сол сақталған өзгерісті жібере алады. Жапқанда қалпына келтіру мүмкіндігі сақталады."),
-                            color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                        if (ownPending) MarketShoppingRecoveryControls(shopping)
                         else if (needsReview) Text(authUiText("The list, offers or review time changed. Go back and refresh before confirming a new review.",
                             "Изменились список, предложения или срок проверки. Вернитесь и обновите план перед новым подтверждением.",
                             "Тізім, ұсыныстар немесе тексеру мерзімі өзгерді. Жаңа растау алдында кері қайтып, жоспарды жаңартыңыз."),
@@ -128,17 +125,11 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
             }
             FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (ownPending) actionButton(text = authUiText("Check result", "Проверить результат", "Нәтижені тексеру"),
-                    enabled = !shopping.changing && !shopping.checking, loading = shopping.checking, autoLoading = false,
-                    confirmationRequired = false, fillMaxWidthIfTextPresent = false, onClick = { shopping.checkResult() })
-                if (ownPending) actionButton(text = authUiText("Retry same change", "Повторить эту команду", "Сол өзгерісті қайталау"),
-                    enabled = !shopping.changing && !shopping.checking, loading = shopping.changing, autoLoading = false,
-                    confirmationRequired = false, onClick = { shopping.retry() })
-                else actionButton(text = authUiText("Apply ${change.changedLines} shop changes", "Применить ${change.changedLines} замен", "${change.changedLines} ауыстыруды қолдану"),
+                if (!ownPending) actionButton(text = authUiText("Apply ${change.changedLines} shop changes", "Применить ${change.changedLines} замен", "${change.changedLines} ауыстыруды қолдану"),
                     enabled = canConfirm, loading = shopping.changing, autoLoading = false,
                     confirmationRequired = false, onClick = onConfirm)
                 actionButton(text = authUiText("Back to plans", "Назад к планам", "Жоспарларға қайту"),
-                    enabled = !shopping.changing && shopping.pending == null, fillMaxWidthIfTextPresent = false,
+                    enabled = !shopping.changing && !shopping.checking && !shopping.cancelling && shopping.pending == null, fillMaxWidthIfTextPresent = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
                     autoLoading = false, confirmationRequired = false, onClick = onBack)
                 actionButton(text = authUiText("Close", "Закрыть", "Жабу"), fillMaxWidthIfTextPresent = false,

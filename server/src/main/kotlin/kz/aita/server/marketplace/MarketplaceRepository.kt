@@ -145,11 +145,8 @@ internal class MarketplaceRepository(private val db: Connection,
         JOIN store_subscription_states e ON e.store_id=l.store_id
     """.trimIndent()
     private val publicPredicate = """
-        l.is_published AND f.is_published AND s.is_active AND (s.parent_store_id IS NULL OR p.is_active) AND i.is_active
-        AND i.store_id IN (s.id,coalesce(s.parent_store_id,s.id))
-        AND e.status='active' AND coalesce(e.current_period_start_millis,e.started_at_millis)<=?
-        AND ((e.access_kind='lifetime' AND e.plan_id='internal_lifetime' AND e.current_period_end_millis IS NULL AND NOT e.auto_renew)
-          OR (e.access_kind IN ('paid','timed') AND e.current_period_end_millis>?))
+        l.is_published AND i.is_active AND i.store_id IN (s.id,coalesce(s.parent_store_id,s.id))
+        AND ${MarketplacePublicVisibility.shopPredicate}
     """.trimIndent()
 
     private data class Candidate(val listing: MarketListing, val sourceUpdated: Long)
@@ -322,13 +319,8 @@ internal class MarketplaceRepository(private val db: Connection,
     fun publicShop(storeId: String): MarketStorefront {
         val store = marketUuid(storeId)
         val now = System.currentTimeMillis()
-        return query("""SELECT f.* FROM marketplace_storefronts f JOIN stores s ON s.id=f.store_id
-            LEFT JOIN stores p ON p.id=s.parent_store_id JOIN store_subscription_states e ON e.store_id=f.store_id
-            WHERE f.store_id=? AND f.is_published AND s.is_active AND (s.parent_store_id IS NULL OR p.is_active)
-            AND e.status='active' AND coalesce(e.current_period_start_millis,e.started_at_millis)<=?
-            AND ((e.access_kind='lifetime' AND e.plan_id='internal_lifetime' AND e.current_period_end_millis IS NULL AND NOT e.auto_renew)
-                OR (e.access_kind IN ('paid','timed') AND e.current_period_end_millis>?))""", store, now, now,
-            map = ::storefrontRow).singleOrNull() ?: marketFail("market.shop_unavailable", 404)
+        return query("SELECT f.* ${MarketplacePublicVisibility.shopJoins} WHERE f.store_id=? AND ${MarketplacePublicVisibility.shopPredicate}",
+            store, now, now, map = ::storefrontRow).singleOrNull() ?: marketFail("market.shop_unavailable", 404)
     }
 
     /** Estimates use the requested selling-unit multiples and the real retail promotion rules.

@@ -35,6 +35,7 @@ private suspend inline fun <reified T> RoutingCall.marketResult(
 
 private val basketReadGate = MarketBasketReadGate()
 private val basketApplyGate = MarketBasketReadGate()
+private val shoppingCancelGate = MarketBasketReadGate()
 
 internal fun Route.marketplaceRoutes() {
     authenticate("auth-jwt") {
@@ -43,6 +44,15 @@ internal fun Route.marketplaceRoutes() {
                 val user = call.checkPrincipal() ?: return@post
                 val body = call.receiveAita<MarketDiscoveryRequest>()
                 call.marketResult(readOnly = true) { discover(user, body) }
+            }
+            post("/shops/search") {
+                val user = call.checkPrincipal() ?: return@post
+                val body = call.receiveAita<MarketShopDirectoryRequest>()
+                call.marketResult(readOnly = true) {
+                    val db = TransactionManager.current().connection.connection as Connection
+                    db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                    MarketShopDirectoryRepository(db).search(user, body)
+                }
             }
             get("/offers") {
                 val user = call.checkPrincipal() ?: return@get
@@ -72,6 +82,27 @@ internal fun Route.marketplaceRoutes() {
                     db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
                     MarketShoppingRepository(db, this).lookup(user, body)
                 }
+            }
+            post("/shopping-list/cancel") {
+                val user = call.checkPrincipal() ?: return@post
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = shoppingCancelGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.shopping_cancel_failed"))
+                    return@post
+                }
+                try {
+                    val body = call.receiveAita<MarketShoppingCommand>()
+                    call.marketResult(after = { result: MarketShoppingOutcome ->
+                        if (!result.replayed) RealtimeServerBus.publish(
+                            entity = "market/shopping-activity", userId = user.toString(), reason = "shopping_command_cancelled")
+                    }) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'; SET LOCAL lock_timeout = '5s'") }
+                        MarketShoppingRepository(db, this).cancel(user, call.currentJwtSessionId(), body)
+                    }
+                } finally { shoppingCancelGate.release(user) }
             }
             get("/shopping-list/activity/{commandId}") {
                 val user = call.checkPrincipal() ?: return@get

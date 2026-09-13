@@ -121,9 +121,9 @@ suspend fun loadMarketShoppingActivityDetail(owner: MarketAccountScope, summary:
             endpointUrl = "market/shopping-list/activity/$it", expectedSessionGeneration = owner.generation)
     }
 
-/** Read-only endpoint: never downgrade to an older command or unfiltered offer route. */
-suspend fun loadMarketBasketPlan(scope: MarketRequestScope, request: MarketBasketRequest): ResponseDataModel<MarketBasketResult> =
-    readOwnedMarketBasket(scope, request) { normalized ->
-        networkRequest<MarketBasketResult, MarketBasketRequest>(HttpMethod.Post, endpointUrl = "market/shopping-list/plan",
-            body = normalized, expectedSessionGeneration = scope.generation)
+/** Public shop fields only, never the private merchant store-management DTO. */
+suspend fun loadMarketShopDirectory(owner: MarketAccountScope, request: MarketShopDirectoryRequest) =
+    readOwnedMarketShopDirectory(owner, request) {
+        networkRequest<MarketShopDirectoryResult, MarketShopDirectoryRequest>(HttpMethod.Post,
+            endpointUrl = "market/shops/search", body = it, expectedSessionGeneration = owner.generation)
     }

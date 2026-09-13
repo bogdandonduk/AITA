@@ -226,4 +226,55 @@ class MarketShoppingDeliveryTest {
         assertEquals("buyer",memory.journal()?.snapshot?.userId)
     }
 
+    @Test fun safeCancelRetiresOnlyAfterAValidatedServerOutcome() = runTest {
+        val memory = Memory(); val owner = Owner(); var sends = 0; var cancels = 0
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(0)) }, { _, _ ->
+            sends++; ResponseDataModel(null, null, true, 503)
+        }, cancelRemote = { _, value ->
+            cancels++; assertEquals(value, memory.journal()?.pending?.command)
+            ok(MarketShoppingOutcome(value.commandId, false, errorKey = "market.shopping_cancelled", snapshot = snapshot(0)))
+        })
+        assertNotNull(store.change(owner, command).pending)
+        val result = store.cancelPending(owner, command)
+        assertTrue(result.acknowledged); assertFalse(result.accepted); assertNull(result.error); assertNotNull(result.notice)
+        assertEquals(command.commandId, result.acknowledgedCommandId); assertEquals(1, sends); assertEquals(1, cancels)
+        assertNull(memory.journal()?.pending); assertEquals(0L, memory.journal()?.snapshot?.revision)
+    }
+    @Test fun failedOrMalformedCancelCannotDiscardTheDurableCommand() = runTest {
+        for (mode in listOf("failed", "malformed", "upgrade")) {
+            val memory = Memory(); val owner = Owner()
+            val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(0)) },
+                { _, _ -> ResponseDataModel(null, null, true, 503) }, cancelRemote = { _, value -> when (mode) {
+                    "failed" -> ResponseDataModel(null, null, true, 503)
+                    "upgrade" -> ResponseDataModel(null, null, true, 404)
+                    else -> ok(MarketShoppingOutcome("different", false, errorKey = "market.shopping_cancelled", snapshot = snapshot(0)))
+                } })
+            assertNotNull(store.change(owner, command).pending)
+            val result = store.cancelPending(owner, command)
+            assertFalse(result.acknowledged, mode); assertNotNull(result.error, mode)
+            assertEquals(command, memory.journal()?.pending?.command, mode)
+        }
+    }
+    @Test fun cancelThatLosesTheRaceToACommitReturnsAndPersistsTheOriginalSuccess() = runTest {
+        val memory = Memory(); val owner = Owner()
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(0)) },
+            { _, _ -> ResponseDataModel(null, null, true, 503) }, cancelRemote = { _, value -> ok(outcome(value).copy(replayed = true)) })
+        assertNotNull(store.change(owner, command).pending)
+        val result = store.cancelPending(owner, command)
+        assertTrue(result.acknowledged); assertTrue(result.accepted); assertNotNull(result.notice)
+        assertNull(memory.journal()?.pending); assertEquals(1L, memory.journal()?.snapshot?.revision)
+    }
+    @Test fun ownerSwitchDuringCancelNeverPublishesOrClearsAnotherSessionInMemory() = runTest {
+        val memory = Memory(); val owner = Owner(); var signals = 0
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(0)) },
+            { _, _ -> ResponseDataModel(null, null, true, 503) }, { signals++ }, cancelRemote = { _, value ->
+                owner.current = false
+                ok(MarketShoppingOutcome(value.commandId, false, errorKey = "market.shopping_cancelled", snapshot = snapshot(0)))
+            })
+        assertNotNull(store.change(owner, command).pending)
+        val result = store.cancelPending(owner, command)
+        assertFalse(result.acknowledged); assertNull(result.snapshot); assertEquals(0, signals)
+        assertNotNull(memory.journal()?.pending)
+    }
+
 }

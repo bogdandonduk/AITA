@@ -58,7 +58,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
     val requests = remember(account, generation, request) { Channel<Unit>(Channel.CONFLATED) }
     val signal by MarketplaceSignals.revision.collectAsState()
     val latestSignal by rememberUpdatedState(signal)
-    val blocked = shopping.pending != null || shopping.changing
+    val blocked = shopping.pending != null || shopping.changing || shopping.checking || shopping.cancelling
     val latestBlocked by rememberUpdatedState(blocked || review != null)
     // Across request/filter changes too: typing and toggling cannot reset the automatic cooldown.
     val lastRead = remember(account, generation) { mutableStateOf<kotlin.time.TimeMark?>(null) }
@@ -151,6 +151,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                             "Альтернативы: $city. Текущий список сохраняет исходные магазины, в том числе в других городах.",
                             "Баламалар: $city. Ағымдағы тізім бастапқы дүкендерді, соның ішінде басқа қалаларды сақтайды."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        shopping.notice?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                         data.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
                         if (blocked) Text(authUiText("Resolve the unconfirmed list change before comparing again.", "Подтвердите незавершённое изменение списка перед сравнением.", "Қайта салыстырмас бұрын расталмаған тізім өзгерісін аяқтаңыз."),
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)

@@ -88,7 +88,7 @@ class MarketShoppingActivitySearchContractTest {
     }
     @Test fun allResultPredicatesSeparateAppliedNoOpAndRejection() {
         for((filter,predicate) in listOf(MARKET_ACTIVITY_RESULT_APPLIED to "accepted=TRUE AND applied_revision>expected_revision",
-            MARKET_ACTIVITY_RESULT_REJECTED to "accepted=FALSE",MARKET_ACTIVITY_RESULT_UNCHANGED to "accepted=TRUE AND applied_revision=expected_revision")) {
+            MARKET_ACTIVITY_RESULT_REJECTED to "accepted=FALSE",MARKET_ACTIVITY_RESULT_CANCELLED to "accepted=FALSE AND error_key='market.shopping_cancelled'",MARKET_ACTIVITY_RESULT_UNCHANGED to "accepted=TRUE AND applied_revision=expected_revision")) {
             val f=Reads();f.repo.activitySearch(user,MarketShoppingActivitySearchRequest(MarketShoppingActivityFilter(result=filter)))
             assertTrue(f.seen.single().first.contains(predicate));assertEquals(listOf(user,21),f.seen.single().second)
         }

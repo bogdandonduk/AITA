@@ -99,8 +99,15 @@ class MarketBasketMutationContractTest {
             sql.startsWith("UPDATE buyer_shopping_lists SET last_command_id") -> { fence=args[0] as UUID;1 }
             sql.startsWith("INSERT INTO buyer_shopping_commands") -> {
                 assertTrue(sql.contains("basket_change")); assertTrue(sql.contains("activity_details")); val commandId=args[1] as UUID
-                recordedDetails=(args[10] as String?)?.let { jsonBase.decodeFromString<MarketShoppingActivityDetails>(it) }
-                check(commandId !in records); records[commandId]=Record(args[2] as String,args[5] as Boolean,args[6] as String?,args[7] as Long?)
+                check(commandId !in records)
+                if (sql.contains("FALSE,?,NULL,")) {
+                    assertEquals(12,args.size);assertEquals("market.shopping_cancelled",args[7])
+                    assertTrue(sql.endsWith("?::jsonb,NULL)"));recordedDetails=null
+                    records[commandId]=Record(args[2] as String,false,args[7] as String,null)
+                } else {
+                    recordedDetails=(args[10] as String?)?.let { jsonBase.decodeFromString<MarketShoppingActivityDetails>(it) }
+                    records[commandId]=Record(args[2] as String,args[5] as Boolean,args[6] as String?,args[7] as Long?)
+                }
                 recordWrites++;1
             }
             else -> error("Unexpected update: $sql")
@@ -112,6 +119,9 @@ class MarketBasketMutationContractTest {
                 if(offer==null) MarketShoppingQuotedLine(line)
                 else MarketShoppingQuotedLine(line,offer,offer.priceMinor,marketShoppingSubtotal(offer.priceMinor,line.units),MARKET_QUOTE_ESTIMATED)
             }
+        }
+        fun cancel(input:MarketShoppingCommand=command):MarketShoppingOutcome {
+            val db=connection();return MarketShoppingRepository(db,MarketplaceRepository(db){_,_->false},::quotes).cancel(user,null,input)
         }
         fun apply(input:MarketShoppingCommand=command):MarketShoppingOutcome {
             val db=connection();return MarketShoppingRepository(db,MarketplaceRepository(db){_,_->false},::quotes).applyBasket(user,null,input)
@@ -175,6 +185,46 @@ class MarketBasketMutationContractTest {
         val f=Fixture();val basket=f.command.basketChange!!
         val invalid=f.command.copy(basketChange=basket.copy(lines=basket.lines.map { it.copy(targetOfferId=basket.lines.first().targetOfferId) }))
         assertFailsWith<MarketFailure>{f.apply(invalid)};assertEquals(0,f.recordWrites);assertEquals(0,f.quoteCalls)
+    }
+
+    @Test fun cancellationRecordsOneRejectionAndDoesNotChangeListIntent() {
+        val f=Fixture();val before=f.rows.toMap();val result=f.cancel()
+        assertFalse(result.accepted);assertEquals("market.shopping_cancelled",result.errorKey)
+        assertEquals(7L,f.revision);assertEquals(before,f.rows);assertEquals(0,f.lineWrites)
+        assertEquals(1,f.recordWrites);assertEquals(id(900),f.fence);assertNull(f.recordedDetails)
+    }
+    @Test fun lateApplyCanOnlyReplayTheCancelledIdentity() {
+        val f=Fixture();f.cancel();val late=f.apply()
+        assertFalse(late.accepted);assertTrue(late.replayed);assertEquals("market.shopping_cancelled",late.errorKey)
+        assertEquals(0,f.lineWrites);assertEquals(1,f.recordWrites);assertEquals(7L,f.revision)
+    }
+    @Test fun cancellationCannotUndoAnAlreadyAppliedBasket() {
+        val f=Fixture();val first=f.apply();val before=f.rows.toMap();val result=f.cancel()
+        assertTrue(result.accepted && result.replayed);assertEquals(first.appliedRevision,result.appliedRevision)
+        assertEquals(before,f.rows);assertEquals(2,f.lineWrites);assertEquals(1,f.recordWrites)
+    }
+    @Test fun cancelledIdRejectsDifferentPayloadWithoutNewRecord() {
+        val f=Fixture();f.cancel()
+        assertEquals("market.shopping_command_mismatch",assertFailsWith<MarketFailure> {
+            f.cancel(f.command.copy(basketChange=f.command.basketChange!!.copy(city="Elsewhere")))
+        }.key)
+        assertEquals(1,f.recordWrites);assertEquals(0,f.lineWrites)
+    }
+    @Test fun cancellationDoesNotRevalidateExpiredReviewOrMissingTarget() {
+        val f=Fixture();f.offers.clear()
+        val old=f.command.copy(basketChange=f.command.basketChange!!.copy(checkedAtMillis=1))
+        assertEquals("market.shopping_cancelled",f.cancel(old).errorKey)
+        assertEquals(0,f.lineWrites);assertEquals(1,f.recordWrites)
+        assertTrue(f.cancel(old).replayed);assertEquals(1,f.recordWrites)
+    }
+    @Test fun cancellationAlsoRecordsLegacyAndReplacementShapesWithoutApplyingThem() {
+        for(replacement in listOf(false,true)) {
+            val f=Fixture();val reviewed=f.command.basketChange!!.lines.first()
+            val input=MarketShoppingCommand(id(900).toString(),7,reviewed.targetOfferId,reviewed.units,reviewed.basis,
+                replaceOfferId=reviewed.sourceOfferId.takeIf { replacement },reviewedSubtotalMinor=reviewed.reviewedSubtotalMinor.takeIf { replacement })
+            assertEquals("market.shopping_cancelled",f.cancel(input).errorKey)
+            assertEquals(7L,f.revision);assertEquals(0,f.lineWrites);assertEquals(1,f.recordWrites)
+        }
     }
 
     private fun result(rows:List<Map<String,Any?>>):ResultSet {

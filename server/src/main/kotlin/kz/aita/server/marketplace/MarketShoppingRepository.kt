@@ -60,6 +60,62 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         .digest(jsonBase.encodeToString(request).toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it.toInt() and 255) }
 
+    /** Safely retire an unresolved client command without applying it. This is deliberately a
+     * server mutation, not a local "forget": every shopping-list mutation locks the same user/list
+     * rows before consulting the immutable command table. Whichever transaction wins becomes the
+     * one authoritative outcome. A delayed copy of a command cancelled here can therefore only
+     * replay this recorded rejection; if the original write won first, this returns that outcome.
+     *
+     * Cancellation never revalidates catalogue data, review age, price or stock. The exact saved
+     * payload is hashed only to prove that the command identity still means the same request.
+     */
+    fun cancel(user: UUID, session: UUID?, request: MarketShoppingCommand): MarketShoppingOutcome {
+        check(mutationStartedNanos == null)
+        mutationStartedNanos = System.nanoTime()
+        try { return market.withBasketReadBudget { cancelInsideBudget(user, session, request) } }
+        catch (failure: MarketFailure) {
+            if (failure.key in setOf("market.basket_busy", "market.basket_apply_busy")) marketFail("market.shopping_cancel_failed", 503)
+            throw failure
+        } catch (failure: SQLException) {
+            if (failure.sqlState in setOf("57014", "55P03")) marketFail("market.shopping_cancel_failed", 503)
+            throw failure
+        } finally { mutationStartedNanos = null }
+    }
+
+    private fun cancelInsideBudget(user: UUID, session: UUID?, request: MarketShoppingCommand): MarketShoppingOutcome {
+        if (!request.isValidMarketShoppingCommand()) marketFail("market.shopping_invalid")
+        val id = marketUuid(request.commandId)
+        val basket = request.basketChange
+        val offer = if (basket == null) marketUuid(request.offerId) else null
+        val replacing = request.replaceOfferId?.let(::marketUuid)
+        val hash = commandHash(request)
+        if (query("SELECT id FROM users WHERE id=? AND is_active FOR UPDATE", user) { it.getString(1) }.isEmpty())
+            marketFail("market.shopping_denied", 403)
+        val now = System.currentTimeMillis()
+        execute("""INSERT INTO buyer_shopping_lists(user_id,created_at_millis,updated_at_millis)
+            VALUES (?,?,?) ON CONFLICT(user_id) DO NOTHING""", user, now, now)
+        // This lock is part of the same ordering as apply/applyBasket. last_command_id below forces
+        // an MVCC change even though cancelling does not change the buyer-visible list revision.
+        query("SELECT revision FROM buyer_shopping_lists WHERE user_id=? FOR UPDATE", user) { it.getLong(1) }.single()
+        val recorded = query("SELECT * FROM buyer_shopping_commands WHERE user_id=? AND command_id=?", user, id) {
+            Recorded(it.getString("request_hash"), it.getBoolean("accepted"), it.getString("error_key"),
+                it.getLong("applied_revision").let { value -> if (it.wasNull()) null else value })
+        }.singleOrNull()
+        if (recorded != null) {
+            if (recorded.hash != hash) marketFail("market.shopping_command_mismatch", 409)
+            return MarketShoppingOutcome(request.commandId, recorded.accepted, recorded.revision, true,
+                recorded.errorKey, snapshot(user))
+        }
+        execute("""INSERT INTO buyer_shopping_commands
+            (user_id,command_id,request_hash,session_id,offer_id,requested_units,expected_revision,accepted,error_key,
+                applied_revision,created_at_millis,replaced_offer_id,reviewed_subtotal_minor,basket_change,activity_details)
+            VALUES (?,?,?,?,?,?,?,FALSE,?,NULL,?,?,?,?::jsonb,NULL)""", user, id, hash, session, offer, request.units,
+            request.expectedRevision, "market.shopping_cancelled", now, replacing, request.reviewedSubtotalMinor,
+            basket?.let { jsonBase.encodeToString(it) })
+        execute("UPDATE buyer_shopping_lists SET last_command_id=? WHERE user_id=?", id, user)
+        return MarketShoppingOutcome(request.commandId, false, errorKey = "market.shopping_cancelled", snapshot = snapshot(user))
+    }
+
     /** Read-only recovery. In particular, NEVER insert a list, lock its row, validate expiry to
      * apply an unrecorded review, or infer non-delivery from a missing record in this snapshot.
      */
@@ -139,6 +195,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         }
         when (input.filter.result) {
             MARKET_ACTIVITY_RESULT_APPLIED -> predicates += "accepted=TRUE AND applied_revision>expected_revision"
+            MARKET_ACTIVITY_RESULT_CANCELLED -> predicates += "accepted=FALSE AND error_key='market.shopping_cancelled'"
             MARKET_ACTIVITY_RESULT_REJECTED -> predicates += "accepted=FALSE"
             MARKET_ACTIVITY_RESULT_UNCHANGED -> predicates += "accepted=TRUE AND applied_revision=expected_revision"
         }

@@ -11,7 +11,7 @@ import java.util.UUID
 import kotlin.test.*
 
 /** Opt-in PostgreSQL repository tests. Never point at production.
- * Uses actual V46/V101/V102/V104/V105/V106/V107/V108/V109 SQL with minimal prerequisite inventory tables, not the entire
+ * Uses actual V46/V101/V102/V104/V105/V106/V107/V108/V109/V110 SQL with minimal prerequisite inventory tables, not the entire
  * migration history or the Ktor authentication pipeline. Every test gets its own random schema.
  */
 class MarketplaceRepositoryDatabaseTest {
@@ -57,7 +57,7 @@ class MarketplaceRepositoryDatabaseTest {
                             'NEVER-PUBLIC-NOTE','[{"price":"77.77","currency":"KZT","supplierId":"NEVER-PUBLIC-SUPPLIER"}]');
                 """)
                 listOf("V46__paging_user_finances_and_store_subscriptions.sql","V101__per_location_subscriptions_and_promocodes.sql",
-                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql").forEach{exec(c,resource(it))}
+                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql").forEach{exec(c,resource(it))}
                 listOf(f.root,f.branch,f.sibling).forEach{store->exec(c,"""INSERT INTO store_subscription_states
                     (store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
                     VALUES ('$store','${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0)""")}
@@ -217,6 +217,48 @@ class MarketplaceRepositoryDatabaseTest {
         shoppingTx(f) { it.apply(f.buyer,null,command) }
         assertEquals(409,assertFailsWith<MarketFailure> { shoppingTx(f) { it.apply(f.buyer,null,command.copy(units=2)) } }.status)
         assertEquals(1,shoppingTx(f) { it.snapshot(f.buyer) }.lines.single().line.units)
+    }
+    @Test fun cancellingAnUnrecordedChangeCreatesATombstoneThatLateApplyCanOnlyReplay()=fixture { f,c ->
+        val listing=published(f);batch(f,c);val command=listCommand(f,listing)
+        val cancelled=shoppingTx(f) { it.cancel(f.buyer,null,command) }
+        assertFalse(cancelled.accepted);assertFalse(cancelled.replayed);assertEquals("market.shopping_cancelled",cancelled.errorKey)
+        assertEquals(0L,cancelled.snapshot.revision);assertTrue(cancelled.snapshot.lines.isEmpty())
+        val late=shoppingTx(f) { it.apply(f.buyer,null,command) }
+        assertTrue(late.replayed);assertFalse(late.accepted);assertEquals("market.shopping_cancelled",late.errorKey)
+        assertTrue(late.snapshot.lines.isEmpty());assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"))
+        val history=shoppingTx(f) { it.activitySearch(f.buyer,MarketShoppingActivitySearchRequest()) }
+        assertEquals(command.commandId,history.entries.single().commandId);assertFalse(history.entries.single().accepted)
+        assertEquals("market.shopping_cancelled",history.entries.single().errorKey)
+    }
+    @Test fun cancellingAfterTheOriginalCommitReturnsThatRecordedSuccessAndNeverUndoesIt()=fixture { f,c ->
+        val listing=published(f);batch(f,c);val command=listCommand(f,listing)
+        val applied=shoppingTx(f) { it.apply(f.buyer,null,command) };assertTrue(applied.accepted)
+        val cancelled=shoppingTx(f) { it.cancel(f.buyer,null,command) }
+        assertTrue(cancelled.replayed);assertTrue(cancelled.accepted);assertNull(cancelled.errorKey)
+        assertEquals(1L,cancelled.snapshot.revision);assertEquals(command.offerId,cancelled.snapshot.lines.single().line.offerId)
+        assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"))
+    }
+    @Test fun cancellationKeepsCommandIdentityBoundToTheExactSavedPayload()=fixture { f,c ->
+        val listing=published(f);batch(f,c);val command=listCommand(f,listing)
+        shoppingTx(f) { it.cancel(f.buyer,null,command) }
+        assertEquals(409,assertFailsWith<MarketFailure> { shoppingTx(f) { it.cancel(f.buyer,null,command.copy(units=2)) } }.status)
+        assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"));assertEquals("0",scalar(c,"SELECT count(*) FROM buyer_shopping_lines"))
+    }
+    @Test fun concurrentApplyAndCancelConvergeOnExactlyOneImmutableOutcome()=fixture { f,c ->
+        val listing=published(f);batch(f,c);val command=listCommand(f,listing)
+        val pool=java.util.concurrent.Executors.newFixedThreadPool(2);val start=java.util.concurrent.CountDownLatch(1)
+        try {
+            val apply=pool.submit<MarketShoppingOutcome>{start.await();shoppingTx(f){it.apply(f.buyer,null,command)}}
+            val cancel=pool.submit<MarketShoppingOutcome>{start.await();shoppingTx(f){it.cancel(f.buyer,null,command)}}
+            start.countDown()
+            val outcomes=listOf(apply.get(20,java.util.concurrent.TimeUnit.SECONDS),cancel.get(20,java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(1,outcomes.count{it.replayed});assertEquals(1,outcomes.count{!it.replayed})
+            assertEquals(outcomes.first().accepted,outcomes.last().accepted);assertEquals(outcomes.first().errorKey,outcomes.last().errorKey)
+            assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_commands"))
+            val state=shoppingTx(f){it.snapshot(f.buyer)}
+            if(outcomes.first().accepted){assertEquals(1L,state.revision);assertEquals(command.offerId,state.lines.single().line.offerId)}
+            else {assertEquals("market.shopping_cancelled",outcomes.first().errorKey);assertEquals(0L,state.revision);assertTrue(state.lines.isEmpty())}
+        } finally {start.countDown();pool.shutdownNow();pool.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS)}
     }
     @Test fun staleEditIsRecordedWithoutOverwritingTheOtherDevice()=fixture { f,c ->
         val listing=published(f);batch(f,c);val first=listCommand(f,listing)
@@ -778,6 +820,14 @@ class MarketplaceRepositoryDatabaseTest {
     }
     private fun listIds(f: Fixture,c:Connection)=scalar(c,"SELECT string_agg(offer_id::text,',' ORDER BY offer_id) FROM buyer_shopping_lines WHERE user_id='${f.buyer}'")
 
+    @Test fun reviewedBasketCanBeSafelyCancelledWithoutApplyingAnyReviewedReplacement()=fixture { f,c ->
+        val prepared=reviewedBasket(f,c);val before=listIds(f,c);val revision=scalar(c,"SELECT revision FROM buyer_shopping_lists WHERE user_id='${f.buyer}'")
+        val cancelled=shoppingTx(f){it.cancel(f.buyer,UUID.randomUUID(),prepared.command)}
+        assertFalse(cancelled.accepted);assertEquals("market.shopping_cancelled",cancelled.errorKey);assertEquals(revision,cancelled.snapshot.revision.toString())
+        assertEquals(before,listIds(f,c));assertEquals("1",scalar(c,"SELECT count(*) FROM buyer_shopping_commands WHERE basket_change IS NOT NULL AND offer_id IS NULL"))
+        val replay=shoppingTx(f){it.applyBasket(f.buyer,null,prepared.command)}
+        assertTrue(replay.replayed);assertFalse(replay.accepted);assertEquals("market.shopping_cancelled",replay.errorKey);assertEquals(before,listIds(f,c))
+    }
     @Test fun basketApplyReplacesMultipleLinesOnceWithoutStockOrPaymentChanges()=fixture { f,c ->
         val prepared=reviewedBasket(f,c);val command=prepared.command
         val created=scalar(c,"SELECT string_agg(created_at_millis::text,',' ORDER BY created_at_millis) FROM buyer_shopping_lines")
@@ -1162,6 +1212,94 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals("Public product",page.entries.single().previewTitle);assertNull(page.entries.single().details)
         val encoded=jsonBase.encodeToString(page)
         listOf("NEVER-PUBLIC","request_hash","session_id","A different current label").forEach { assertFalse(encoded.contains(it),it) }
+    }
+
+    private fun directory(f:Fixture,request:MarketShopDirectoryRequest=MarketShopDirectoryRequest()):MarketShopDirectoryResult =
+        DriverManager.getConnection(f.url,f.props).use { c ->
+            c.autoCommit=false;c.transactionIsolation=Connection.TRANSACTION_REPEATABLE_READ;c.isReadOnly=true
+            try {
+                exec(c,"SET LOCAL search_path TO ${f.schema},public");exec(c,"SET LOCAL statement_timeout='8s'")
+                MarketShopDirectoryRepository(c).search(f.buyer,request).also { c.commit() }
+            } catch(failure:Throwable) { c.rollback();throw failure }
+        }
+    @Test fun shopDirectoryInstallationPublishesNothingAndIncludesAnExplicitlyPublishedEmptyShop()=fixture { f,c ->
+        assertTrue(directory(f).shops.isEmpty());storefront(f)
+        val result=directory(f);assertEquals(1L,result.totalShops);assertEquals(0L,result.shops.single().publishedOffers)
+        assertTrue(result.isValidShopDirectoryResult(f.buyer.toString(),result.request))
+        assertEquals("0",scalar(c,"SELECT count(*) FROM transactions"))
+    }
+    @Test fun shopDirectoryNeverInheritsParentAccessAndClosesWithADisabledParent()=fixture { f,c ->
+        storefront(f);assertEquals(1L,directory(f).totalShops)
+        exec(c,"UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.branch}'")
+        assertEquals(0L,directory(f).totalShops)
+        exec(c,"UPDATE store_subscription_states SET status='active' WHERE store_id='${f.branch}'")
+        exec(c,"UPDATE stores SET is_active=FALSE WHERE id='${f.root}'")
+        assertEquals(0L,directory(f).totalShops)
+    }
+    @Test fun shopDirectoryRespectsStartTimedExpiryAndTheLifetimeShape()=fixture { f,c ->
+        storefront(f)
+        exec(c,"UPDATE store_subscription_states SET current_period_start_millis=9223372036854775806 WHERE store_id='${f.branch}'")
+        assertTrue(directory(f).shops.isEmpty())
+        exec(c,"UPDATE store_subscription_states SET current_period_start_millis=1,access_kind='timed',plan_id='basic',current_period_end_millis=2 WHERE store_id='${f.branch}'")
+        assertTrue(directory(f).shops.isEmpty())
+        exec(c,"UPDATE store_subscription_states SET access_kind='lifetime',plan_id='internal_lifetime',current_period_end_millis=NULL,auto_renew=FALSE WHERE store_id='${f.branch}'")
+        assertEquals(1L,directory(f).totalShops)
+    }
+    @Test fun shopDirectoryCountsPublicOffersNotStockAndExcludesWithdrawnOrInactiveListings()=fixture { f,c ->
+        published(f)
+        assertEquals(1L,directory(f).shops.single().publishedOffers) // no batch: not a stock count
+        exec(c,"UPDATE marketplace_listings SET is_published=FALSE")
+        assertEquals(0L,directory(f).shops.single().publishedOffers)
+        exec(c,"UPDATE marketplace_listings SET is_published=TRUE");exec(c,"UPDATE stock_items SET is_active=FALSE")
+        assertEquals(0L,directory(f).shops.single().publishedOffers)
+        exec(c,"UPDATE stock_items SET is_active=TRUE,store_id='${f.sibling}'")
+        assertEquals(0L,directory(f).shops.single().publishedOffers)
+    }
+    @Test fun shopDirectorySearchesLiteralPublicNameAndAddressButNotPrivateProductNotes()=fixture { f,c ->
+        storefront(f)
+        c.prepareStatement("UPDATE marketplace_storefronts SET display_name=?,public_address=? WHERE store_id=?").use { q ->
+            q.setString(1,"Save 50% _Shop");q.setString(2,"Door 'quote 17");q.setObject(3,f.branch);q.executeUpdate()
+        }
+        assertEquals(1L,directory(f,MarketShopDirectoryRequest("50% _shop 'quote","ASTANA")).totalShops)
+        assertEquals(0L,directory(f,MarketShopDirectoryRequest("missing%","Astana")).totalShops)
+        assertEquals(0L,directory(f,MarketShopDirectoryRequest("NEVER-PUBLIC","Astana")).totalShops)
+        assertEquals(0L,directory(f,MarketShopDirectoryRequest(city="Almaty")).totalShops)
+        assertEquals(1L,directory(f).totalShops)
+    }
+    @Test fun directoryWindowAndTotalAreDeterministicAndNeverLeakPrivateFields()=fixture { f,c ->
+        storefront(f)
+        exec(c,"""INSERT INTO stores(id,owner_user_ids) SELECT (md5('directory-store-'||n::text))::uuid,'["${f.owner}"]'::jsonb FROM generate_series(1,24) n;
+            INSERT INTO store_subscription_states(store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
+                SELECT (md5('directory-store-'||n::text))::uuid,'${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0 FROM generate_series(1,24) n;
+            INSERT INTO marketplace_storefronts(store_id,display_name,city,public_address,is_published,revision,updated_by,updated_at_millis)
+                SELECT (md5('directory-store-'||n::text))::uuid,'Same name','Astana','Public address',TRUE,1,'${f.owner}',1 FROM generate_series(1,24) n;""")
+        val first=directory(f);val second=directory(f)
+        assertEquals(25L,first.totalShops);assertEquals(20,first.shops.size);assertEquals(first.shops,second.shops)
+        val expanded=directory(f,MarketShopDirectoryRequest(limit=40));assertEquals(25,expanded.shops.size)
+        assertEquals(first.shops,expanded.shops.take(20));assertTrue(expanded.isValidShopDirectoryResult(f.buyer.toString(),expanded.request))
+        val json=jsonBase.encodeToString(expanded)
+        listOf("NEVER-PUBLIC","owner_user","supplierId","goodsItemId","quantity","supplyPrice","sessionId").forEach { assertFalse(json.contains(it),it) }
+        assertEquals("1",scalar(c,"SELECT count(*) FROM pg_indexes WHERE schemaname='${f.schema}' AND indexname='marketplace_storefronts_public_name_order'"))
+    }
+    @Test fun cancellationOfExpiredUnrecordedBasketDoesNotApplyOrNeedTheOldCatalogue()=fixture { f,c ->
+        val prepared=reviewedBasket(f,c);val before=listIds(f,c)
+        val command=prepared.command.copy(basketChange=prepared.command.basketChange!!.copy(checkedAtMillis=1L))
+        exec(c,"UPDATE marketplace_listings SET is_published=FALSE")
+        val result=shoppingTx(f){it.cancel(f.buyer,null,command)}
+        assertFalse(result.accepted);assertEquals("market.shopping_cancelled",result.errorKey);assertEquals(before,listIds(f,c))
+        assertEquals("market.shopping_cancelled",shoppingTx(f){it.applyBasket(f.buyer,null,command)}.errorKey)
+        val history=shoppingTx(f){it.activitySearch(f.buyer,MarketShoppingActivitySearchRequest(MarketShoppingActivityFilter(result=MARKET_ACTIVITY_RESULT_CANCELLED)))}
+        assertEquals(listOf(command.commandId),history.entries.map { it.commandId })
+    }
+    @Test fun cancellationArchiveFailureRollsBackAndDoesNotBlockTheOriginalCommand()=fixture { f,c ->
+        val source=published(f);batch(f,c);val command=listCommand(f,source)
+        exec(c,"""CREATE FUNCTION fail_cancel() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'}
+            BEGIN IF NEW.error_key='market.shopping_cancelled' THEN RAISE EXCEPTION 'Injected cancellation failure'; END IF; RETURN NEW; END ${'$'}${'$'};
+            CREATE TRIGGER fail_cancel BEFORE INSERT ON buyer_shopping_commands FOR EACH ROW EXECUTE FUNCTION fail_cancel();""")
+        assertFailsWith<SQLException>{shoppingTx(f){it.cancel(f.buyer,null,command)}}
+        assertEquals("0",scalar(c,"SELECT count(*) FROM buyer_shopping_commands WHERE command_id='${command.commandId}'"))
+        exec(c,"DROP TRIGGER fail_cancel ON buyer_shopping_commands")
+        assertTrue(shoppingTx(f){it.apply(f.buyer,null,command)}.accepted)
     }
 
 }

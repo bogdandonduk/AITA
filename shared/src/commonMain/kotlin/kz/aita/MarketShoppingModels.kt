@@ -95,17 +95,21 @@ data class MarketShoppingOutcome(
 data class PendingMarketShoppingCommand(val accountId: String, val command: MarketShoppingCommand)
 
 /** One atomic local KV value: an unresolved command is never cleared independently of its ack. */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class MarketShoppingJournal(
     val accountId: String,
     val snapshot: MarketShoppingSnapshot? = null,
     val pending: PendingMarketShoppingCommand? = null,
-    val localRevision: Long = 0L
+    val localRevision: Long = 0L,
+    // Local recovery intent only; never added to the immutable server command or its hash.
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val cancellingCommandId: String? = null
 )
 
 fun MarketShoppingJournal.prepare(command: PendingMarketShoppingCommand): MarketShoppingJournal {
     require(command.accountId == accountId)
     check(pending == null || pending == command) { "An earlier shopping-list change is unresolved" }
+    check(cancellingCommandId == null) { "Cancellation must be resolved before another application" }
     return if (pending == command) this else copy(pending = command, localRevision = localRevision + 1L)
 }
 
@@ -126,9 +130,25 @@ fun MarketShoppingJournal.acknowledge(command: PendingMarketShoppingCommand, out
     // Even a late ack may refresh data, but it can never retire another command.
     val nextSnapshot = snapshot.acceptShoppingSnapshot(outcome.snapshot)
     val nextPending = if (pending == command) null else pending
-    return if (snapshot == nextSnapshot && pending == nextPending) this else copy(snapshot = nextSnapshot,
-        pending = nextPending, localRevision = localRevision + 1L)
+    val nextCancellation = cancellingCommandId.takeIf { nextPending != null }
+    return if (snapshot == nextSnapshot && pending == nextPending && cancellingCommandId == nextCancellation) this
+        else copy(snapshot = nextSnapshot, pending = nextPending, cancellingCommandId = nextCancellation,
+            localRevision = localRevision + 1L)
 }
+
+/** Confirmation is bound to the exact saved payload, not whichever command is pending later.
+ * Persist this transition before calling /cancel. Once requested, Retry continues cancellation.
+ */
+fun MarketShoppingJournal.requestCancellation(expected: PendingMarketShoppingCommand): MarketShoppingJournal {
+    require(expected.accountId == accountId)
+    check(pending == expected) { "The pending change no longer matches the reviewed cancellation" }
+    check(cancellingCommandId == null || cancellingCommandId == expected.command.commandId)
+    return if (cancellingCommandId != null) this else copy(
+        cancellingCommandId = expected.command.commandId, localRevision = localRevision + 1L)
+}
+
+fun MarketShoppingJournal.hasValidCancellationIntent(): Boolean = cancellingCommandId == null ||
+    (pending != null && cancellingCommandId == pending.command.commandId && pending.accountId == accountId)
 
 /** Pure integer arithmetic; quantities/currencies are never guessed or converted. */
 fun marketShoppingSubtotal(unitPriceMinor: Long?, units: Int): Long? {

@@ -21,6 +21,10 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         private set
     var checking by mutableStateOf(false)
         private set
+    var cancellingCommandId by mutableStateOf<String?>(null)
+        private set
+    var cancelling by mutableStateOf(false)
+        private set
     var notice by mutableStateOf<List<LocalizedStringDataModel>?>(null)
         private set
     var fresh by mutableStateOf(false)
@@ -36,7 +40,7 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
     private var reviewNotice = false
     var active = true
     val refreshRequests = Channel<Unit>(Channel.CONFLATED)
-    val canChange: Boolean get() = active && owner?.isCurrent() == true && snapshot != null && pending == null && !changing && !checking
+    val canChange: Boolean get() = active && owner?.isCurrent() == true && snapshot != null && pending == null && !changing && !checking && !cancelling
 
     private fun accept(result: MarketShoppingClientResult) {
         if (!active || owner?.isCurrent() != true) return
@@ -44,20 +48,25 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         // callback; it must not swallow a valid acknowledgement or leave review stuck open.
         if (result.acknowledged && result.journalRevision >= acknowledgedJournalRevision) {
             acknowledgedJournalRevision = result.journalRevision
-            reviewNotice = !result.accepted
+            // A safe server cancellation is a neutral resolution, not a failed list edit.
+            reviewNotice = !result.accepted && result.notice == null
             acknowledgedCommandId = result.acknowledgedCommandId
             lastChangeAccepted = result.accepted
-            if (result.error != null) error = result.error
+            if (pending == null || pending?.command?.commandId == result.acknowledgedCommandId) {
+                error = result.error
+                notice = result.notice
+            }
         }
         if (result.journalRevision >= 0L && result.journalRevision < observedJournalRevision) return
         result.snapshot?.let { snapshot = snapshot.acceptShoppingSnapshot(it) }
         if (result.journalRevision >= 0L) {
             observedJournalRevision = result.journalRevision
             pending = result.pending
+            cancellingCommandId = result.cancellingCommandId
         } else if (result.pending != null) pending = result.pending
         if (result.error != null || !reviewNotice) error = result.error
         if (result.notice != null) notice = result.notice
-        if (pending == null || result.error != null) notice = null
+        else if ((pending == null && result.acknowledged) || result.error != null) notice = null
         fresh = result.fresh
     }
     suspend fun run() {
@@ -106,7 +115,7 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
     }
     fun checkResult() {
         val owned = owner ?: return
-        if (changing || checking || pending == null || !active || !owned.isCurrent()) return
+        if (changing || checking || cancelling || pending == null || !active || !owned.isCurrent()) return
         checking = true
         notice = null
         scope.launch {
@@ -116,9 +125,24 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
             finally { checking = false }
         }
     }
+    fun cancelPending(expected: MarketShoppingCommand) {
+        val owned = owner ?: return
+        if (changing || checking || cancelling || pending == null || !active || !owned.isCurrent()) return
+        if (pending?.command != expected) return
+        cancelling = true
+        error = null
+        notice = null
+        scope.launch {
+            try { accept(MarketShoppingDelivery.cancelPending(owned, expected)) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { if (active && owned.isCurrent()) error = eventMessage("market.shopping_cancel_failed") }
+            finally { cancelling = false }
+        }
+    }
+
     fun retry() {
         val owned = owner ?: return
-        if (changing || checking || !active) return
+        if (changing || checking || cancelling || !active) return
         changing = true
         notice = null
         scope.launch {
@@ -129,7 +153,7 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         }
     }
     fun refresh(userInitiated: Boolean = false) {
-        if (userInitiated) { reviewNotice = false; error = null }
+        if (userInitiated) { reviewNotice = false; error = null; notice = null }
         refreshRequests.trySend(Unit)
     }
     fun contains(offerId: String) = snapshot?.lines?.any { it.line.offerId == offerId } == true

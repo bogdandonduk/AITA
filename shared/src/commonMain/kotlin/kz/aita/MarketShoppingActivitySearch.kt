@@ -6,6 +6,7 @@ const val MARKET_ACTIVITY_SEARCH_PROTOCOL = 1
 const val MARKET_ACTIVITY_RESULT_APPLIED = "applied"
 const val MARKET_ACTIVITY_RESULT_REJECTED = "rejected"
 const val MARKET_ACTIVITY_RESULT_UNCHANGED = "unchanged"
+const val MARKET_ACTIVITY_RESULT_CANCELLED = "cancelled"
 
 /** Exact command reference, never a prefix, token, hash, or arbitrary SQL search expression. */
 fun normalizedMarketChangeReference(value: String): String? =
@@ -58,7 +59,7 @@ fun MarketShoppingActivitySearchRequest.normalizedActivitySearch(): MarketShoppi
     if (filter.kind != null && filter.kind !in setOf(MARKET_ACTIVITY_BASKET, MARKET_ACTIVITY_REPLACE,
             MARKET_ACTIVITY_REMOVE, MARKET_ACTIVITY_QUANTITY)) return null
     if (filter.result != null && filter.result !in setOf(MARKET_ACTIVITY_RESULT_APPLIED,
-            MARKET_ACTIVITY_RESULT_REJECTED, MARKET_ACTIVITY_RESULT_UNCHANGED)) return null
+            MARKET_ACTIVITY_RESULT_REJECTED, MARKET_ACTIVITY_RESULT_UNCHANGED, MARKET_ACTIVITY_RESULT_CANCELLED)) return null
     val reference = filter.commandId?.let { normalizedMarketChangeReference(it) ?: return null }
     // A direct reference deliberately has no hidden filters that could disguise an owned record
     // as missing. UI clears filters explicitly when Find reference is pressed.
@@ -72,6 +73,7 @@ fun MarketShoppingActivityFilter.matchesActivity(entry: MarketShoppingActivityEn
     (commandId == null || commandId == entry.commandId) && (kind == null || kind == entry.kind) && when (result) {
         null -> true
         MARKET_ACTIVITY_RESULT_APPLIED -> entry.accepted && entry.changed
+        MARKET_ACTIVITY_RESULT_CANCELLED -> !entry.accepted && entry.errorKey == "market.shopping_cancelled"
         MARKET_ACTIVITY_RESULT_REJECTED -> !entry.accepted
         MARKET_ACTIVITY_RESULT_UNCHANGED -> entry.accepted && !entry.changed
         else -> false
