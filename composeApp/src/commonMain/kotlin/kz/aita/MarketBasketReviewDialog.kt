@@ -31,7 +31,7 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
     shopping: MarketShoppingUiState,
     valid: Boolean,
     submitted: Boolean,
-    onConfirm: () -> Unit,
+    onConfirm: () -> Boolean,
     onBack: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -44,7 +44,8 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
         while (!expired) { delay(1_000); expired = started.elapsedNow().inWholeMilliseconds >= MARKET_BASKET_REVIEW_MAX_AGE_MILLIS }
     }
     val ownPending = shopping.pending?.command?.commandId == command.commandId
-    val needsReview = !valid || expired
+    var attemptRejected by remember(command.commandId) { mutableStateOf(false) }
+    val needsReview = !valid || expired || attemptRejected
     val canConfirm = !needsReview && !submitted && shopping.canChange
     val sources = result.snapshot.lines.associateBy { it.line.offerId }
     val group = result.currencies.first { it.currencyCode == change.currencyCode }
@@ -89,6 +90,8 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         shopping.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
                         shopping.notice?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
+                        if (attemptRejected) Text(eventMessage("market.basket_review_stale").visibleLocalizedString(stateValues.appLanguage, ""),
+                            color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                         if (ownPending) MarketShoppingRecoveryControls(shopping)
                         else if (needsReview) Text(authUiText("The list, offers or review time changed. Go back and refresh before confirming a new review.",
                             "Изменились список, предложения или срок проверки. Вернитесь и обновите план перед новым подтверждением.",
@@ -127,7 +130,15 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!ownPending) actionButton(text = authUiText("Apply ${change.changedLines} shop changes", "Применить ${change.changedLines} замен", "${change.changedLines} ауыстыруды қолдану", "Дүкөн боюнча ${change.changedLines} өзгөртүүнү колдонуу"),
                     enabled = canConfirm, loading = shopping.changing, autoLoading = false,
-                    confirmationRequired = false, onClick = onConfirm)
+                    confirmationRequired = false, onClick = {
+                        // The parent's Boolean callback performs the final live-state check.
+                        // Rendering alone cannot guard a click on an expired/invalidated review.
+                        if (!shopping.changing && !shopping.checking && !shopping.cancelling && shopping.pending == null) {
+                            if (started.elapsedNow().inWholeMilliseconds >= MARKET_BASKET_REVIEW_MAX_AGE_MILLIS || !onConfirm()) {
+                                attemptRejected = true
+                            }
+                        }
+                    })
                 actionButton(text = authUiText("Back to plans", "Назад к планам", "Жоспарларға қайту", "Тарифтерге кайтуу"),
                     enabled = !shopping.changing && !shopping.checking && !shopping.cancelling && shopping.pending == null, fillMaxWidthIfTextPresent = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,

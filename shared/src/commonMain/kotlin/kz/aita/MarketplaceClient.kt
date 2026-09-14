@@ -38,18 +38,18 @@ suspend fun loadMarketOffers(scope: MarketRequestScope, search: String = "", cit
         query=buildMap { put("q",search); put("city",city); after?.let { put("after",it) }; gtin?.let { put("gtin",it) }; storefrontId?.let { put("store",it) } },
         expectedSessionGeneration=scope.generation)
 }
-suspend fun loadMarketSaved(scope: MarketRequestScope): ResponseDataModel<MarketPage> {
-    if(!scope.isCurrent()) return cloudSessionExpiredResponse()
-    return networkRequest<MarketPage,Unit>(HttpMethod.Get,endpointUrl="market/saved",expectedSessionGeneration=scope.generation)
-}
-suspend fun updateMarketSaved(scope: MarketRequestScope, id: String, saved: Boolean): ResponseDataModel<MarketPage> {
-    if(!scope.isCurrent()) return cloudSessionExpiredResponse()
-    return networkRequest(HttpMethod.Put,endpointUrl="market/saved",body=MarketSavedUpdate(id,saved),expectedSessionGeneration=scope.generation)
-}
-suspend fun clearUnavailableMarketSaved(scope: MarketRequestScope): ResponseDataModel<MarketPage> {
-    if(!scope.isCurrent()) return cloudSessionExpiredResponse()
-    return networkRequest<MarketPage,Unit>(HttpMethod.Post,endpointUrl="market/saved/clear-unavailable",expectedSessionGeneration=scope.generation)
-}
+suspend fun loadMarketSaved(scope: MarketRequestScope): ResponseDataModel<MarketPage> =
+    readOwnedMarketSaved(scope) {
+        networkRequest<MarketPage, Unit>(HttpMethod.Get, endpointUrl = "market/saved", expectedSessionGeneration = scope.generation)
+    }
+suspend fun updateMarketSaved(scope: MarketRequestScope, id: String, saved: Boolean): ResponseDataModel<MarketPage> =
+    updateOwnedMarketSaved(scope, MarketSavedUpdate(id, saved), MarketplaceSignals::changed) { request ->
+        networkRequest(HttpMethod.Put, endpointUrl = "market/saved", body = request, expectedSessionGeneration = scope.generation)
+    }
+suspend fun clearUnavailableMarketSaved(scope: MarketRequestScope): ResponseDataModel<MarketPage> =
+    clearUnavailableOwnedMarketSaved(scope, MarketplaceSignals::changed) {
+        networkRequest<MarketPage, Unit>(HttpMethod.Post, endpointUrl = "market/saved/clear-unavailable", expectedSessionGeneration = scope.generation)
+    }
 suspend fun loadMarketPublication(scope: MarketRequestScope): ResponseDataModel<MarketPublicationDashboard> {
     if(!scope.isCurrent() || scope.storeId==null) return cloudSessionExpiredResponse()
     return networkRequest<MarketPublicationDashboard,Unit>(HttpMethod.Get,endpointUrl="market/seller",
@@ -72,6 +72,13 @@ suspend fun loadMarketOffer(scope: MarketRequestScope, id: String): ResponseData
         return ResponseDataModel(eventMessage("market.unavailable"), null, true, 404)
     return networkRequest<MarketOffer, Unit>(HttpMethod.Get, endpointUrl = "market/offers/$id", expectedSessionGeneration = scope.generation)
 }
+/** Details require a validated account-bound response; legacy card reads remain for old callers. */
+suspend fun loadMarketOfferDetail(scope: MarketRequestScope, id: String): ResponseDataModel<MarketOfferDetailResult> =
+    readOwnedMarketOfferDetail(scope, id) { normalizedId ->
+        networkRequest<MarketOfferDetailResult, Unit>(HttpMethod.Get, endpointUrl = "market/offers/$normalizedId/detail",
+            expectedSessionGeneration = scope.generation)
+    }
+
 suspend fun loadMarketShop(scope: MarketRequestScope, id: String): ResponseDataModel<MarketStorefront> {
     if (!scope.isCurrent()) return cloudSessionExpiredResponse()
     if (!id.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")))
@@ -87,14 +94,20 @@ suspend fun loadMarketComparison(scope: MarketRequestScope, request: MarketCompa
         expectedSessionGeneration = scope.generation)
 }
 
+/** One bounded read replaces the entire comparison window; never splice independently priced pages. */
+suspend fun loadMarketComparisonWindow(owner: MarketRequestScope, request: MarketComparisonWindowRequest) =
+    readOwnedMarketComparisonWindow(owner, request) { normalized ->
+        networkRequest<MarketComparisonWindowResult, MarketComparisonWindowRequest>(HttpMethod.Post,
+            endpointUrl = "market/compare/window", body = normalized, expectedSessionGeneration = owner.generation)
+    }
+
 /** A separate endpoint cannot be mistaken by an older server for a legacy unfiltered browse. */
-suspend fun loadMarketDiscovery(scope: MarketRequestScope, request: MarketDiscoveryRequest): ResponseDataModel<MarketDiscoveryResult> {
-    if (!scope.isCurrent()) return cloudSessionExpiredResponse()
-    if (!request.isValidDiscoveryRequest()) return ResponseDataModel(eventMessage("market.discovery_invalid"), null, true, 400)
-    val response = networkRequest<MarketDiscoveryResult, MarketDiscoveryRequest>(HttpMethod.Post, endpointUrl = "market/discovery",
-        body = request.copy(query = requireNotNull(request.query.normalizedDiscoveryQuery())), expectedSessionGeneration = scope.generation)
-    return if (response.httpStatusCode == 404) response.copy(message = eventMessage("market.discovery_upgrade"), payload = null, negative = true) else response
-}
+suspend fun loadMarketDiscovery(scope: MarketRequestScope, request: MarketDiscoveryRequest,
+    cachedCatalogue: MarketCategoryCatalogue? = null): ResponseDataModel<MarketDiscoverySnapshot> =
+    readOwnedMarketDiscovery(scope, request, cachedCatalogue) { normalized ->
+        networkRequest<MarketDiscoveryResult, MarketDiscoveryRequest>(HttpMethod.Post, endpointUrl = "market/discovery",
+            body = normalized, expectedSessionGeneration = scope.generation)
+    }
 
 /** Read-only endpoint: never downgrade to an older command or unfiltered offer route. */
 suspend fun loadMarketBasketPlan(scope: MarketRequestScope, request: MarketBasketRequest): ResponseDataModel<MarketBasketResult> =

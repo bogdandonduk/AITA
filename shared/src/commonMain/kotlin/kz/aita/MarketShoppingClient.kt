@@ -106,6 +106,11 @@ class MarketShoppingDeliveryStore(
             // changed. Never prepare new work for an owner that is no longer current.
             if (!scope.isCurrent() || (current.pending != null && current.pending != pending)) return@prepare current
             if (current.cancellingCommandId != null) return@prepare current
+            // Another view/queued writer can advance the durable list while this caller waits.
+            // Refuse NEW stale intent before preparing or sending it. An identical pending
+            // command is different: it may already have committed and must remain replayable.
+            if (current.pending != pending && current.snapshot?.revision?.let { it != command.expectedRevision } == true)
+                return@prepare current
             if (command.basketChange != null && current.pending != pending &&
                 current.snapshot?.let { command.basketChange.basketIntentError(it, command.expectedRevision) } != null)
                 return@prepare current
@@ -116,7 +121,7 @@ class MarketShoppingDeliveryStore(
         if (!scope.isCurrent()) return@withLock MarketShoppingClientResult()
         if (prepared.cancellingCommandId != null) return@withLock result(prepared, "market.shopping_cancel_pending")
         if (prepared.pending != pending) return@withLock result(prepared,
-            if (prepared.pending == null && command.basketChange != null) "market.shopping_changed" else "market.shopping_pending")
+            if (prepared.pending == null) "market.shopping_changed" else "market.shopping_pending")
         submit(scope, pending, prepared.localRevision)
     }
 

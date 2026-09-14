@@ -20,6 +20,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /** Details own a fresh, authorized read, not a pointer into whichever grid page is currently loaded. */
 @Composable
@@ -41,35 +43,65 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
     val remote by MarketplaceSignals.revision.collectAsState()
     val requests = remember(account, generation, offerId) { Channel<Unit>(Channel.CONFLATED) }
     val scope = rememberCoroutineScope()
+    val latestShopping by rememberUpdatedState(shopping)
+    val fence = remember(account, generation, offerId) { MarketOfferDetailReadFence() }
+    var loadedStamp by remember(account, generation, offerId) { mutableStateOf<MarketOfferDetailReadFence.Stamp?>(null) }
+    var receivedAt by remember(account, generation, offerId) { mutableStateOf<TimeMark?>(null) }
+    fun requestRefresh() {
+        // Disable old actions immediately, even before the actor consumes a conflated request.
+        fence.invalidate(); fresh = false; requests.trySend(Unit)
+    }
+    fun detailIsCurrent(revision: Long): Boolean = owner?.isCurrent() == true && fresh && !unavailable && offer != null &&
+        fence.canUse(loadedStamp, offerId, revision, receivedAt?.elapsedNow()?.inWholeMilliseconds ?: -1L, loading)
+    fun displayedOfferIsCurrent(displayed: MarketOffer): Boolean =
+        displayed == offer && detailIsCurrent(MarketplaceSignals.revision.value)
     DisposableEffect(requests) { onDispose { requests.close() } }
-    LaunchedEffect(requests, remote) { requests.trySend(Unit) }
+    LaunchedEffect(requests, remote) { requestRefresh() }
     LaunchedEffect(requests) {
         val owned = owner ?: run { loading = false; return@LaunchedEffect }
         for (ignored in requests) {
             delay(100)
             while (requests.tryReceive().isSuccess) { /* keep a trailing request only for changes during I/O */ }
+            val stamp = fence.capture(offerId, MarketplaceSignals.revision.value)
             loading = true; fresh = false
             try {
-                val response = loadMarketOffer(owned, offerId)
+                val response = loadMarketOfferDetail(owned, offerId)
                 if (owned.isCurrent()) {
-                    val data = response.payload
-                    if (!response.negative && data?.id == offerId) { offer = data; unavailable = false; fresh = true; error = null }
-                    else {
-                        error = response.message ?: eventMessage("market.refresh_failed")
-                        if (response.httpStatusCode == 404 || response.httpStatusCode == 403) { offer = null; unavailable = true }
+                    if (!fence.isCurrent(stamp, offerId, MarketplaceSignals.revision.value)) {
+                        // An invalidation can precede the Compose effect that enqueues its read.
+                        // Never publish this superseded success OR error; retain one trailing read.
+                        requests.trySend(Unit)
+                    } else {
+                        val data = response.payload
+                        if (!response.negative && data != null) {
+                            offer = data.offer; unavailable = false; error = null
+                            loadedStamp = stamp; receivedAt = TimeSource.Monotonic.markNow(); fresh = true
+                        } else {
+                            error = response.message ?: eventMessage("market.detail_failed")
+                            // A missing new route is an upgrade problem, not a withdrawn offer.
+                            if (!response.transportFailure && response.httpStatusCode == 404 &&
+                                response.message?.eventMessageReferenceOrNull()?.key == "market.unavailable") {
+                                offer = null; loadedStamp = null; receivedAt = null; unavailable = true
+                            }
+                        }
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (owned.isCurrent()) error = eventMessage("market.refresh_failed") }
-            finally { loading = false }
+            catch (_: Exception) {
+                if (owned.isCurrent()) {
+                    if (!fence.isCurrent(stamp, offerId, MarketplaceSignals.revision.value)) requests.trySend(Unit)
+                    else error = eventMessage("market.detail_failed")
+                }
+            } finally { loading = false }
         }
     }
-    LaunchedEffect(requests) { while (isActive) { delay(30_000); requests.trySend(Unit) } }
+    LaunchedEffect(requests) { while (isActive) { delay(MARKET_OFFER_DETAIL_FRESH_MILLIS); requestRefresh() } }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.padding(16.dp).fillMaxWidth().aitaWidthCap(700.dp).heightIn(max = stateValues.screenHeight * 0.88f)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor).padding(20.dp)
             .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             val current = offer
+            val detailReady = detailIsCurrent(remote)
             if (current == null && loading) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5)
             else if (current == null) Text(if (unavailable) authUiText("This offer is no longer available", "Предложение больше недоступно", "Ұсыныс енді қолжетімсіз", "Бул сунуш эми жеткиликсиз")
                 else authUiText("Connect to view this offer", "Подключитесь, чтобы открыть предложение", "Ұсынысты көру үшін қосылыңыз", "Бул сунушту көрүү үчүн туташыңыз"),
@@ -91,24 +123,33 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
                 }
+                if (!detailReady) Text(eventMessage("market.detail_stale").visibleLocalizedString(stateValues.appLanguage, ""),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 val inList = shopping.contains(offerId)
                 actionButton(text = if (inList) authUiText("Open your list", "Открыть список покупок", "Тізімді ашу", "Тизмеңизди ачуу") else authUiText("Add to shopping list", "В список покупок", "Сатып алу тізіміне қосу", "Сатып алуу тизмесине кошуу"),
                     iconPath = marketIconPath(143), iconRes = marketIconFallback(143), autoLoading = false, confirmationRequired = false,
-                    enabled = inList || (fresh && shopping.canChange && current.shoppingBasis() != null), onClick = {
-                        if (inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping); onDismiss() }
-                        else shopping.change(offerId, 1, current.shoppingBasis())
+                    enabled = inList || (detailReady && shopping.canChange && current.shoppingBasis() != null), onClick = {
+                        // A retained callback must not reuse its old membership or selling basis.
+                        if (latestShopping.contains(offerId)) scope.launch {
+                            if (owner?.isCurrent() == true) { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping); onDismiss() }
+                        }
+                        else if (displayedOfferIsCurrent(current) && latestShopping.canChange && current.shoppingBasis() != null)
+                            latestShopping.add(offerId, 1, current.shoppingBasis())
+                        else requestRefresh()
                     })
                 actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), iconPath = marketIconPath(139), iconRes = marketIconFallback(139),
-                    enabled = fresh, autoLoading = false, confirmationRequired = false, onClick = { onVisitShop(current.storefront) })
+                    enabled = detailReady, autoLoading = false, confirmationRequired = false, onClick = {
+                        if (displayedOfferIsCurrent(current)) onVisitShop(current.storefront) else requestRefresh()
+                    })
                 if (onCompare != null && current.comparisonSelection() != null) actionButton(text = authUiText("Compare offers", "Сравнить предложения", "Ұсыныстарды салыстыру", "Сунуштарды салыштыруу"),
-                    iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = fresh, autoLoading = false, confirmationRequired = false,
-                    onClick = { onCompare(current) })
+                    iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = detailReady, autoLoading = false, confirmationRequired = false,
+                    onClick = { if (displayedOfferIsCurrent(current)) onCompare(current) else requestRefresh() })
             }
             error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
             MarketShoppingFeedback(shopping)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 actionButton(modifier = Modifier.weight(1f), text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), autoLoading = false, enabled = !loading,
-                    loading = loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
+                    loading = loading, confirmationRequired = false, onClick = { requestRefresh() })
                 actionButton(modifier = Modifier.weight(1f), text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), autoLoading = false, confirmationRequired = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = onDismiss)
             }

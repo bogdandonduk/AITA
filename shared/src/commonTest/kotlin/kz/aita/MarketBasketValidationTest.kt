@@ -90,4 +90,34 @@ class MarketBasketValidationTest {
         assertNull(mixed.savingsAgainst(mixed))
     }
 
+
+    @Test fun sameShopCannotHaveDifferentPickupDetailsAcrossPlanTabs() {
+        val changed = changedPlan { plan -> plan.copy(choices = plan.choices.map { choice ->
+            val offer = requireNotNull(choice.quote.offer)
+            choice.copy(quote = choice.quote.copy(offer = offer.copy(
+                storefront = offer.storefront.copy(pickupNote = "Different pickup"))))
+        }) }
+        assertFalse(valid(changed))
+    }
+    @Test fun sameOfferCannotHaveDifferentPricesEvenWhenBothTotalsAreCorrect() {
+        val changed = changedPlan { plan -> plan.copy(itemsSubtotalMinor = 400L,
+            choices = plan.choices.map { choice -> choice.copy(quote = choice.quote.copy(
+                offer = choice.quote.offer?.copy(priceMinor = 400L), unitPriceMinor = 400L, subtotalMinor = 400L)) }) }
+        assertFalse(valid(changed))
+    }
+    @Test fun currentAndAlternativeLinesAtTheSameShopMustAgreeOnPublicMetadata() {
+        val second = BasketTestData.row(2, shop = 10)
+        val input = BasketTestData.snapshot(row, second)
+        val alternative = BasketTestData.alternative(row, 10, 100).let { choice ->
+            val offer = requireNotNull(choice.quote.offer)
+            choice.copy(quote = choice.quote.copy(offer = offer.copy(
+                storefront = offer.storefront.copy(publicAddress = "Other address"))))
+        }
+        val mixed = BasketTestData.plan(input, listOf(alternative))
+        assertFalse(mixed.isValidBasketResult(BasketTestData.account, mixed.request))
+    }
+    @Test fun repeatedIdenticalPublicOffersAcrossPlansRemainValid() {
+        assertEquals(result.currencies.single().oneShop.choices, result.currencies.single().lowestItems.choices)
+        assertTrue(valid(result))
+    }
 }

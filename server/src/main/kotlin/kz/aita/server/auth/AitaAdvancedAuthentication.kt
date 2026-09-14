@@ -1,6 +1,7 @@
 package kz.aita.server.auth
 
 import kz.aita.eventMessage
+import kz.aita.normalizeAuthEmailLocale
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*

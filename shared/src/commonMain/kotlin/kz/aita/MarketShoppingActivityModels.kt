@@ -94,12 +94,16 @@ fun MarketShoppingActivityEntry.isValidShoppingActivityEntry(): Boolean {
         if (accepted && !changed) return false
     } else {
         if (reviewedLines != 1 || changedLines > 1 || (kind == MARKET_ACTIVITY_REMOVE) != (requestedUnits == 0)) return false
+        // A single-line outcome cannot claim both "unchanged" and an edited line (or vice versa).
+        if (changedLines != if (changed) 1 else 0) return false
         if (kind == MARKET_ACTIVITY_REPLACE && (reviewedSubtotalMinor == null || (accepted && !changed))) return false
     }
     val history = details ?: return true
     if (history.lines.size > reviewedLines || (changed && history.lines.isEmpty())) return false
     if (history.lines.any { it.before == null && it.after == null ||
             it.before?.validActivityLine() == false || it.after?.validActivityLine() == false }) return false
+    val capturedTitle = history.lines.firstOrNull()?.let { it.after?.title ?: it.before?.title }
+    if (previewTitle != null && previewTitle != capturedTitle) return false
     val previous = history.lines.mapNotNull { it.before?.offerId }
     val following = history.lines.mapNotNull { it.after?.offerId }
     if (previous.distinct().size != previous.size || following.distinct().size != following.size) return false
@@ -111,12 +115,16 @@ fun MarketShoppingActivityEntry.isValidShoppingActivityEntry(): Boolean {
         } && history.lines.count { it.before?.offerId != it.after?.offerId } == changedLines
         MARKET_ACTIVITY_REPLACE -> history.lines.size == 1 && history.lines.single().let {
             val before = it.before; val after = it.after
-            before != null && after != null && before.offerId != after.offerId && before.units == after.units && before.basis == after.basis
+            before != null && after != null && before.offerId != after.offerId && before.units == after.units &&
+                after.units == requestedUnits && before.basis == after.basis && before.storeId != after.storeId
         }
-        MARKET_ACTIVITY_REMOVE -> history.lines.all { it.after == null && it.before != null }
+        MARKET_ACTIVITY_REMOVE -> history.lines.size == changedLines && history.lines.all { it.after == null && it.before != null }
         else -> history.lines.size == 1 && history.lines.single().let {
             val next = it.after
-            next != null && next.units == requestedUnits && (it.before == null || it.before.offerId == next.offerId)
+            val previousLine = it.before
+            next != null && next.units == requestedUnits &&
+                (previousLine == null || previousLine.copy(units = next.units, updatedAtMillis = next.updatedAtMillis) == next) &&
+                changed == (previousLine?.units != next.units)
         }
     }
 }

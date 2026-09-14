@@ -650,13 +650,13 @@ class MarketplaceRepositoryDatabaseTest {
         (1..20).forEach { category(c,it) };published(f);tag(c,f.item,*(1..20).toList().toIntArray())
         val query=MarketDiscoveryQuery(categoryId=catId(20).toString());val result=discover(f,query)
         assertTrue(catId(20).toString() in result.page.offers.single().categoryIds)
-        assertNotNull(result.validatedDiscovery(MarketDiscoveryRequest(query),null))
+        assertNotNull(result.validatedDiscovery(MarketDiscoveryRequest(query),null,f.buyer.toString()))
     }
     @Test fun discoveryIncludesPublishedOffersWithoutInventingPriceOrStock() = fixture { f,_ ->
         published(f);val result=discover(f)
         assertEquals(1L,result.totalOffers);assertNull(result.page.offers.single().priceMinor)
         assertEquals(MARKET_AVAILABILITY_CONFIRM,result.page.offers.single().availability)
-        assertNotNull(result.validatedDiscovery(MarketDiscoveryRequest(MarketDiscoveryQuery()),null))
+        assertNotNull(result.validatedDiscovery(MarketDiscoveryRequest(MarketDiscoveryQuery()),null,f.buyer.toString()))
     }
     @Test fun discoveryExpiredBranchDoesNotInheritTheParentsAccess() = fixture { f,c ->
         published(f);exec(c,"UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.branch}'")
@@ -673,6 +673,72 @@ class MarketplaceRepositoryDatabaseTest {
         discover(f,MarketDiscoveryQuery(categoryId=catId(1).toString(),savedOnly=true))
         assertEquals(before,scalar(c,"SELECT count(*) FROM marketplace_publication_events"))
         assertEquals("0",scalar(c,"SELECT count(*) FROM buyer_shopping_lists"));assertEquals("0",scalar(c,"SELECT count(*) FROM buyer_saved_offers"))
+    }
+
+    @Test fun discoveryEmptyShopWindowKeepsThePublicHeaderAndAuthenticatedOwner() = fixture { f,_ ->
+        published(f)
+        val query = MarketDiscoveryQuery(text = "no matching product", storefrontId = f.branch.toString(), city = "ignored city")
+        val result = discover(f, query)
+        assertEquals(f.buyer.toString(), result.accountId)
+        assertEquals("Public pickup door", result.storefront?.publicAddress)
+        assertTrue(result.page.offers.isEmpty()); assertEquals(0L, result.totalOffers); assertEquals(0L, result.totalShops)
+        assertNotNull(result.validatedDiscovery(MarketDiscoveryRequest(query), null, f.buyer.toString()))
+    }
+    @Test fun discoveryWithdrawnShopIsNotAnEmptySuccessfulWindow() = fixture { f,c ->
+        published(f)
+        exec(c, "UPDATE marketplace_storefronts SET is_published=FALSE,revision=revision+1 WHERE store_id='${f.branch}'")
+        val failure = assertFailsWith<MarketFailure> { discover(f, MarketDiscoveryQuery(storefrontId = f.branch.toString())) }
+        assertEquals(404, failure.status); assertEquals("market.shop_unavailable", failure.key)
+        assertEquals(0L, discover(f).totalOffers) // the unscoped public catalogue still works
+    }
+    @Test fun discoveryExpiredShopCannotBorrowItsParentsPublishedHeader() = fixture { f,c ->
+        published(f)
+        exec(c, "UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.branch}'")
+        assertEquals(404, assertFailsWith<MarketFailure> {
+            discover(f, MarketDiscoveryQuery(storefrontId = f.branch.toString()))
+        }.status)
+    }
+    @Test fun discoverySavedMarkersAreBoundToTheSameAuthenticatedAccountAsTheHeader() = fixture { f,_ ->
+        val listing = published(f)
+        tx(f) { it.updateSaved(f.buyer, MarketSavedUpdate(listing.id, true)) }
+        val wanted = MarketDiscoveryRequest(MarketDiscoveryQuery(storefrontId = f.branch.toString()))
+        val buyer = tx(f) { it.discover(f.buyer, wanted) }
+        val other = tx(f) { it.discover(f.owner, wanted) }
+        assertEquals(f.buyer.toString(), buyer.accountId); assertTrue(buyer.page.offers.single().saved)
+        assertEquals(f.owner.toString(), other.accountId); assertFalse(other.page.offers.single().saved)
+        assertEquals(buyer.storefront, other.storefront)
+        assertNull(other.validatedDiscovery(wanted, null, f.buyer.toString()))
+    }
+    @Test fun discoveryHeaderAndOffersDoNotMixAConcurrentPublicationChange() = fixture { f,c ->
+        published(f)
+        var changed = false
+        val wanted = MarketDiscoveryRequest(MarketDiscoveryQuery(storefrontId = f.branch.toString()))
+        val result = DriverManager.getConnection(f.url, f.props).use { connection ->
+            connection.autoCommit = false
+            connection.transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ
+            connection.isReadOnly = true
+            try {
+                exec(connection, "SET LOCAL search_path TO ${f.schema},public")
+                exec(connection, "SET LOCAL statement_timeout='8s'")
+                val proxy = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(Connection::class.java)) { _, method, args ->
+                    // Commit after the header is read but before the offer count/window is read.
+                    if (!changed && method.name == "prepareStatement" &&
+                        (args?.firstOrNull() as? String)?.startsWith("SELECT count(*),count(DISTINCT l.store_id)") == true) {
+                        exec(c, "UPDATE marketplace_storefronts SET display_name='New name',public_address='New door',is_published=FALSE,revision=revision+1 WHERE store_id='${f.branch}'")
+                        changed = true
+                    }
+                    try { method.invoke(connection, *(args ?: emptyArray())) }
+                    catch (failure: java.lang.reflect.InvocationTargetException) { throw failure.targetException }
+                } as Connection
+                val repository = MarketplaceRepository(proxy) { _, _ -> false }
+                repository.withDiscoveryReadBudget { repository.discover(f.buyer, wanted) }.also { connection.commit() }
+            } catch (failure: Throwable) { connection.rollback(); throw failure }
+        }
+        assertTrue(changed); assertEquals("Public shop", result.storefront?.displayName)
+        assertEquals("Public pickup door", result.storefront?.publicAddress)
+        assertEquals(result.storefront, result.page.offers.single().storefront)
+        assertNotNull(result.validatedDiscovery(wanted, null, f.buyer.toString()))
+        assertEquals(404, assertFailsWith<MarketFailure> { discover(f, wanted.query) }.status)
     }
 
     private fun basket(f:Fixture, revision:Long=1, city:String="", buyer:UUID=f.buyer):MarketBasketResult =
@@ -1300,6 +1366,297 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals("0",scalar(c,"SELECT count(*) FROM buyer_shopping_commands WHERE command_id='${command.commandId}'"))
         exec(c,"DROP TRIGGER fail_cancel ON buyer_shopping_commands")
         assertTrue(shoppingTx(f){it.apply(f.buyer,null,command)}.accepted)
+    }
+
+
+    /** Match the two /saved write routes; repeat the WHOLE transaction after SSI failure.
+     * pinFirstSnapshot is only a test barrier, never a production transaction callback.
+     */
+    private fun savedTx(f: Fixture, pinFirstSnapshot: ((Connection) -> Unit)? = null,
+        block: (MarketplaceRepository) -> MarketPage): MarketPage {
+        repeat(3) { attempt ->
+            try {
+                return DriverManager.getConnection(f.url, f.props).use { c ->
+                    c.autoCommit = false; c.transactionIsolation = Connection.TRANSACTION_SERIALIZABLE
+                    try {
+                        exec(c, "SET LOCAL search_path TO ${f.schema},public")
+                        exec(c, "SET LOCAL statement_timeout='8s'; SET LOCAL lock_timeout='5s'")
+                        if (attempt == 0) pinFirstSnapshot?.invoke(c)
+                        val market = MarketplaceRepository(c) { user, store -> user == f.owner && store in setOf(f.root, f.branch, f.sibling) }
+                        block(market).also { c.commit() }
+                    } catch (failure: Throwable) { c.rollback(); throw failure }
+                }
+            } catch (failure: SQLException) {
+                if (attempt == 2 || failure.sqlState !in setOf("40001", "40P01")) throw failure
+            }
+        }
+        error("Unreachable")
+    }
+
+    @Test fun savedMutationSnapshotsConfirmTheExactRequestedAbsoluteState() = fixture { f, _ ->
+        val offer = published(f)
+        val saved = savedTx(f) { it.updateSaved(f.buyer, MarketSavedUpdate(offer.id, true)) }
+        assertTrue(saved.acknowledgesMarketSavedUpdate(MarketSavedUpdate(offer.id, true)))
+        val duplicate = savedTx(f) { it.updateSaved(f.buyer, MarketSavedUpdate(offer.id, true)) }
+        assertEquals(listOf(offer.id), duplicate.offers.map { it.id })
+        val removed = savedTx(f) { it.updateSaved(f.buyer, MarketSavedUpdate(offer.id, false)) }
+        assertTrue(removed.acknowledgesMarketSavedUpdate(MarketSavedUpdate(offer.id, false)))
+    }
+
+    @Test fun parallelSavesFromTheSameSnapshotCannotExceedTheAccountLimit() = fixture { f, c ->
+        val first = published(f); val second = copyPublic(f, c, "Second candidate")
+        // Unavailable bookmarks count toward the same limit; do not silently purge them.
+        exec(c, """INSERT INTO stock_items(id,store_id)
+            SELECT md5('saved-cap-item-'||n::text)::uuid,'${f.root}' FROM generate_series(1,99) n;
+            INSERT INTO marketplace_listings(id,store_id,goods_item_id,title,is_published,created_at_millis,updated_at_millis,updated_by)
+            SELECT md5('saved-cap-listing-'||n::text)::uuid,'${f.branch}',md5('saved-cap-item-'||n::text)::uuid,'Withdrawn '||n::text,FALSE,1,1,'${f.owner}'
+            FROM generate_series(1,99) n;
+            INSERT INTO buyer_saved_offers(user_id,listing_id,created_at_millis)
+            SELECT '${f.buyer}',md5('saved-cap-listing-'||n::text)::uuid,1 FROM generate_series(1,99) n;""")
+        val ready = java.util.concurrent.CountDownLatch(2)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val replies = listOf(first, second).map { offer -> pool.submit<String> {
+                try {
+                    val result = savedTx(f, { connection ->
+                        // Force BOTH snapshots to see 99 before either tries its account lock.
+                        assertEquals("99", scalar(connection, "SELECT count(*) FROM buyer_saved_offers WHERE user_id='${f.buyer}'"))
+                        ready.countDown(); check(ready.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    }) { it.updateSaved(f.buyer, MarketSavedUpdate(offer.id, true)) }
+                    assertTrue(result.acknowledgesMarketSavedUpdate(MarketSavedUpdate(offer.id, true)))
+                    "saved"
+                } catch (failure: MarketFailure) { failure.key }
+            } }.map { it.get(20, java.util.concurrent.TimeUnit.SECONDS) }
+            assertEquals(listOf("market.saved_limit", "saved"), replies.sorted())
+            assertEquals("100", scalar(c, "SELECT count(*) FROM buyer_saved_offers WHERE user_id='${f.buyer}'"))
+            assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_saved_offers WHERE user_id='${f.owner}'"))
+            val result = tx(f) { it.saved(f.buyer) }
+            assertEquals(99, result.unavailableSavedCount); assertEquals(1, result.offers.size)
+            assertTrue(result.isValidMarketSavedSnapshot())
+        } finally { pool.shutdownNow(); pool.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS) }
+    }
+
+    @Test fun savedCleanupKeepsOtherAccountsAndAvailableBookmarks() = fixture { f, c ->
+        val kept = published(f); val gone = copyPublic(f, c, "Withdrawn")
+        for (user in listOf(f.buyer, f.owner)) for (offer in listOf(kept, gone))
+            savedTx(f) { it.updateSaved(user, MarketSavedUpdate(offer.id, true)) }
+        tx(f) { it.updateListing(f.owner, null, MarketListingUpdate(gone.copy(published = false))) }
+        val result = savedTx(f) { it.clearUnavailableSaved(f.buyer) }
+        assertTrue(result.isValidMarketSavedSnapshot()); assertEquals(0, result.unavailableSavedCount)
+        assertTrue(result.unavailableSavedCleared); assertNull(result.savedMutation)
+        assertEquals(listOf(kept.id), result.offers.map { it.id })
+        assertEquals("2", scalar(c, "SELECT count(*) FROM buyer_saved_offers WHERE user_id='${f.owner}'"))
+        assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_shopping_commands"))
+        assertEquals("0", scalar(c, "SELECT count(*) FROM transactions"))
+    }
+
+    @Test fun savedCleanupRejectsAnAccountThatNoLongerExists() = fixture { f, _ ->
+        val failure = assertFailsWith<MarketFailure> { savedTx(f) { it.clearUnavailableSaved(UUID.randomUUID()) } }
+        assertEquals(403, failure.status)
+    }
+
+    private fun comparisonWindowRequest(f: Fixture, source: MarketListing, limit: Int = 40) = MarketComparisonWindowRequest(
+        MarketComparisonSelection(source.id, tx(f) { it.offer(f.buyer, source.id) }.shoppingBasis()!!, 2), candidateLimit = limit)
+
+    @Test fun comparisonWindowQuotesOneScopeAndRequestedQuantityWithoutWrites() = fixture { f, c ->
+        val source = published(f); batch(f, c, total = 10.0); val target = alternative(f, c)
+        val request = comparisonWindowRequest(f, source).copy(city = "  Astana  ")
+        val result = shoppingTx(f) { it.comparisonWindow(f.buyer, request) }
+        assertTrue(result.isValidComparisonWindowResult(f.buyer.toString(), request))
+        assertEquals(1, result.candidatesChecked); assertFalse(result.moreCandidates)
+        assertEquals(39998L, result.reference.subtotalMinor); assertEquals(30000L, result.matches.single().subtotalMinor)
+        assertEquals(target.id, result.matches.single().line.offerId)
+        assertEquals(result.checkedAtMillis, result.matches.single().offer!!.checkedAtMillis)
+        assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_shopping_commands"))
+        assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_shopping_lists"))
+        assertEquals("0", scalar(c, "SELECT count(*) FROM transactions"))
+    }
+
+    @Test fun comparisonWindowExpandsPastIncompatibleCandidatesWithoutAnEmptyEndState() = fixture { f, c ->
+        val source = published(f); batch(f, c, total = 10.0); val target = alternative(f, c)
+        repeat(41) { n ->
+            val item = UUID.randomUUID(); val id = UUID(0, n + 1L)
+            exec(c, """INSERT INTO stock_items(id,store_id,barcodes,sale_prices)
+                VALUES ('$item','${f.root}','["4006381333931"]','[{"price":"100","currency":"KZT","supplierId":""}]');
+                INSERT INTO marketplace_listings(id,store_id,goods_item_id,title,gtin,is_published,revision,created_at_millis,updated_at_millis,updated_by)
+                VALUES ('$id','${f.sibling}','$item','Unpriced candidate','04006381333931',TRUE,1,1,1,'${f.owner}');""")
+        }
+        val request = comparisonWindowRequest(f, source)
+        val first = shoppingTx(f) { it.comparisonWindow(f.buyer, request) }
+        assertTrue(first.matches.isEmpty()); assertEquals(40, first.candidatesChecked); assertTrue(first.moreCandidates)
+        val expanded = shoppingTx(f) { it.comparisonWindow(f.buyer, request.copy(candidateLimit = 80)) }
+        assertTrue(expanded.isValidComparisonWindowResult(f.buyer.toString(), request.copy(candidateLimit = 80)))
+        assertEquals(42, expanded.candidatesChecked); assertFalse(expanded.moreCandidates)
+        assertEquals(target.id, expanded.matches.single().line.offerId)
+    }
+
+    @Test fun comparisonWindowQuotesMoreThanFiftyCandidatesInBoundedBatches() = fixture { f, c ->
+        val source = published(f); batch(f, c, total = 10.0); storefront(f.copy(branch = f.sibling))
+        val quantity = jsonBase.encodeToString(QuantityDataModel("piece", listOf(LocalizedStringDataModel("en", "piece")), 10.0, 1.0, true))
+        exec(c, """INSERT INTO stock_items(id,store_id,barcodes,sale_prices)
+            SELECT md5('compare-item-'||n::text)::uuid,'${f.root}',barcodes,sale_prices
+                FROM stock_items CROSS JOIN generate_series(1,65) n WHERE id='${f.item}';
+            INSERT INTO marketplace_listings(id,store_id,goods_item_id,title,gtin,is_published,revision,created_at_millis,updated_at_millis,updated_by)
+            SELECT md5('compare-offer-'||n::text)::uuid,'${f.sibling}',md5('compare-item-'||n::text)::uuid,
+                'Public comparison '||n::text,'04006381333931',TRUE,1,1,1,'${f.owner}' FROM generate_series(1,65) n;
+            INSERT INTO stock_batches(id,store_id,goods_item_id,quantity,status)
+            SELECT md5('compare-batch-'||n::text)::uuid,'${f.sibling}',md5('compare-item-'||n::text)::uuid,
+                '$quantity'::jsonb,
+                'Delivered' FROM generate_series(1,65) n;""")
+        val request = comparisonWindowRequest(f, source, 80)
+        val result = shoppingTx(f) { it.comparisonWindow(f.buyer, request) }
+        assertEquals(65, result.candidatesChecked); assertEquals(65, result.matches.size); assertFalse(result.moreCandidates)
+        assertTrue(result.isValidComparisonWindowResult(f.buyer.toString(), request))
+    }
+
+    @Test fun comparisonWindowWithdrawnReferenceIsBoundToItsOwnersListRevision() = fixture { f, c ->
+        val source = published(f); batch(f, c, total = 10.0); alternative(f, c)
+        val request = comparisonWindowRequest(f, source)
+        shoppingTx(f) { it.apply(f.buyer, null, listCommand(f, source, units = 2)) }
+        exec(c, "DELETE FROM marketplace_listings WHERE id='${source.id}'")
+        val owned = request.copy(selection = request.selection.copy(shoppingRevision = 1L))
+        val result = shoppingTx(f) { it.comparisonWindow(f.buyer, owned) }
+        assertNull(result.reference.offer); assertEquals(1, result.matches.size)
+        assertTrue(result.isValidComparisonWindowResult(f.buyer.toString(), owned))
+        assertEquals(409, assertFailsWith<MarketFailure> { shoppingTx(f) { it.comparisonWindow(f.owner, owned) } }.status)
+        assertEquals(409, assertFailsWith<MarketFailure> { shoppingTx(f) { it.comparisonWindow(f.buyer,
+            owned.copy(selection = owned.selection.copy(shoppingRevision = 2L))) } }.status)
+        assertEquals(404, assertFailsWith<MarketFailure> { shoppingTx(f) { it.comparisonWindow(f.buyer, request) } }.status)
+    }
+
+    @Test fun comparisonWindowKeepsOneDatabaseSnapshotAcrossAnInterleavedPriceCommit() = fixture { f, c ->
+        val source = published(f); batch(f, c, total = 10.0); alternative(f, c)
+        val request = comparisonWindowRequest(f, source)
+        var interleaved = false
+        val result = DriverManager.getConnection(f.url, f.props).use { connection ->
+            connection.autoCommit = false; connection.transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ
+            connection.isReadOnly = true
+            try {
+                exec(connection, "SET LOCAL search_path TO ${f.schema},public")
+                exec(connection, "SET LOCAL statement_timeout='8s'")
+                val proxy = java.lang.reflect.Proxy.newProxyInstance(Connection::class.java.classLoader, arrayOf(Connection::class.java)) { _, method, args ->
+                    if (method.name == "prepareStatement" && (args?.firstOrNull() as? String)?.contains("ORDER BY l.id LIMIT ?") == true && !interleaved) {
+                        // The reference has already established the reader's snapshot. A separate
+                        // connection commits before candidate projection; no sleeps/timing guesses.
+                        interleaved = true
+                        exec(c, """UPDATE stock_batches SET sale_price_override='{"price":"1","currency":"KZT","supplierId":""}'
+                            WHERE store_id='${f.sibling}'""")
+                    }
+                    try { method.invoke(connection, *(args ?: emptyArray())) }
+                    catch (failure: java.lang.reflect.InvocationTargetException) { throw failure.targetException }
+                } as Connection
+                val market = MarketplaceRepository(proxy) { _, _ -> false }
+                MarketShoppingRepository(proxy, market).comparisonWindow(f.buyer, request).also { connection.commit() }
+            } catch (failure: Throwable) { connection.rollback(); throw failure }
+        }
+        assertTrue(interleaved); assertEquals(30000L, result.matches.single().subtotalMinor)
+        assertTrue(result.isValidComparisonWindowResult(f.buyer.toString(), request))
+        val later = shoppingTx(f) { it.comparisonWindow(f.buyer, request) }
+        assertEquals(200L, later.matches.single().subtotalMinor)
+        assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_shopping_commands"))
+    }
+
+    @Test fun comparisonWindowKeepsCityAndPhysicalLocationVisibilityFilters() = fixture { f, c ->
+        val source = published(f); batch(f, c, total = 10.0); alternative(f, c)
+        val request = comparisonWindowRequest(f, source)
+        exec(c, "UPDATE marketplace_storefronts SET city='Almaty' WHERE store_id='${f.sibling}'")
+        assertEquals(0, shoppingTx(f) { it.comparisonWindow(f.buyer, request.copy(city = "Astana")) }.candidatesChecked)
+        assertEquals(1, shoppingTx(f) { it.comparisonWindow(f.buyer, request.copy(city = "almaty")) }.matches.size)
+        exec(c, "UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.sibling}'")
+        assertEquals(0, shoppingTx(f) { it.comparisonWindow(f.buyer, request) }.candidatesChecked)
+    }
+
+    @Test fun detailEnvelopeBindsOnlyTheRequestingBuyersSavedMarker() = fixture { f, c ->
+        val listing = published(f); batch(f, c)
+        savedTx(f) { it.updateSaved(f.buyer, MarketSavedUpdate(listing.id, true)) }
+        val own = tx(f) { it.withOfferDetailReadBudget { it.offerDetail(f.buyer, listing.id) } }
+        val other = tx(f) { it.withOfferDetailReadBudget { it.offerDetail(f.owner, listing.id) } }
+        assertEquals(f.buyer.toString(), own.accountId); assertTrue(own.offer.saved)
+        assertEquals(f.owner.toString(), other.accountId); assertFalse(other.offer.saved)
+        assertTrue(own.isValidOfferDetailResult(f.buyer.toString(), listing.id))
+        assertTrue(other.isValidOfferDetailResult(f.owner.toString(), listing.id))
+        val encoded = jsonBase.encodeToString(own)
+        for (privateValue in listOf("NEVER-PUBLIC-NOTE", "NEVER-PUBLIC-SUPPLIER", "goodsItemId", "supplyPrice"))
+            assertFalse(privateValue in encoded)
+        assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_shopping_lists"))
+        assertEquals("0", scalar(c, "SELECT count(*) FROM buyer_shopping_commands"))
+        assertEquals("1", scalar(c, "SELECT count(*) FROM buyer_saved_offers"))
+    }
+
+    @Test fun withdrawnListingAndPrivateShopCannotBeReadThroughDetailEnvelope() = fixture { f, c ->
+        val listing = published(f)
+        exec(c, "UPDATE marketplace_listings SET is_published=FALSE WHERE id='${listing.id}'")
+        val withdrawn = assertFailsWith<MarketFailure> { tx(f) { it.offerDetail(f.buyer, listing.id) } }
+        assertEquals(404, withdrawn.status); assertEquals("market.unavailable", withdrawn.key)
+        exec(c, "UPDATE marketplace_listings SET is_published=TRUE WHERE id='${listing.id}'")
+        exec(c, "UPDATE marketplace_storefronts SET is_published=FALSE WHERE store_id='${f.branch}'")
+        assertEquals(404, assertFailsWith<MarketFailure> { tx(f) { it.offerDetail(f.buyer, listing.id) } }.status)
+    }
+
+    @Test fun detailWithNoSellableStockIsVisibleWithoutAnInventedPrice() = fixture { f, c ->
+        val listing = published(f)
+        batch(f, c, expires = System.currentTimeMillis() - 1)
+        val result = tx(f) { it.offerDetail(f.buyer, listing.id) }
+        assertTrue(result.isValidOfferDetailResult(f.buyer.toString(), listing.id))
+        assertNull(result.offer.priceMinor); assertNull(result.offer.currencyCode); assertNull(result.offer.shoppingBasis())
+        assertEquals(MARKET_AVAILABILITY_CONFIRM, result.offer.availability)
+    }
+
+    @Test fun detailRetainsOnePublicSnapshotAcrossConcurrentWithdrawal() = fixture { f, c ->
+        val listing = published(f); batch(f, c)
+        var changed = false
+        val value = DriverManager.getConnection(f.url, f.props).use { connection ->
+            connection.autoCommit = false; connection.transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ
+            connection.isReadOnly = true
+            try {
+                exec(connection, "SET LOCAL search_path TO ${f.schema},public")
+                exec(connection, "SET LOCAL statement_timeout='8s'")
+                val proxy = java.lang.reflect.Proxy.newProxyInstance(javaClass.classLoader, arrayOf(Connection::class.java)) { _, method, args ->
+                    // Visibility has already been read; change the header before its projection.
+                    if (!changed && method.name == "prepareStatement" &&
+                        (args?.firstOrNull() as? String)?.startsWith("SELECT * FROM marketplace_storefronts") == true) {
+                        exec(c, "UPDATE marketplace_storefronts SET public_address='New door',is_published=FALSE,revision=revision+1 WHERE store_id='${f.branch}'")
+                        changed = true
+                    }
+                    try { method.invoke(connection, *(args ?: emptyArray())) }
+                    catch (failure: java.lang.reflect.InvocationTargetException) { throw failure.targetException }
+                } as Connection
+                val repo = MarketplaceRepository(proxy) { _, _ -> false }
+                repo.withOfferDetailReadBudget { repo.offerDetail(f.buyer, listing.id) }.also { connection.commit() }
+            } catch (failure: Throwable) { connection.rollback(); throw failure }
+        }
+        assertTrue(changed); assertEquals("Public pickup door", value.offer.storefront.publicAddress)
+        assertTrue(value.isValidOfferDetailResult(f.buyer.toString(), listing.id))
+        assertEquals(404, assertFailsWith<MarketFailure> { tx(f) { it.offerDetail(f.buyer, listing.id) } }.status)
+    }
+
+    @Test fun frozenRemovalLosingToQuantityEditCannotDeleteTheNewIntent() = fixture { f,c ->
+        val listing = published(f); batch(f,c)
+        val added = shoppingTx(f) { it.apply(f.buyer, null, listCommand(f, listing, units = 2)) }
+        val reviewed = requireNotNull(added.snapshot.reviewShoppingLine(added.snapshot.lines.single().line))
+        val removal = requireNotNull(reviewed.command(added.snapshot, 0, UUID.randomUUID().toString()))
+        shoppingTx(f) { it.apply(f.buyer, null, listCommand(f, listing, revision = 1, units = 8)) }
+        val rejected = shoppingTx(f) { it.apply(f.buyer, null, removal) }
+        assertFalse(rejected.accepted); assertEquals("market.shopping_changed", rejected.errorKey)
+        assertEquals(8, rejected.snapshot.lines.single().line.units); assertEquals(2L, rejected.snapshot.revision)
+        val replay = shoppingTx(f) { it.apply(f.buyer, null, removal) }
+        assertTrue(replay.replayed); assertFalse(replay.accepted)
+        assertEquals(8, replay.snapshot.lines.single().line.units)
+        assertEquals("3", scalar(c, "SELECT count(*) FROM buyer_shopping_commands"))
+        assertEquals(3.0, scalar(c, "SELECT quantity->>'total' FROM stock_batches").toDouble())
+    }
+    @Test fun frozenQuantityEditLosingToRemovalCannotResurrectTheItem() = fixture { f,c ->
+        val listing = published(f); batch(f,c)
+        val added = shoppingTx(f) { it.apply(f.buyer, null, listCommand(f, listing, units = 2)) }
+        val reviewed = requireNotNull(added.snapshot.reviewShoppingLine(added.snapshot.lines.single().line))
+        val increment = requireNotNull(reviewed.command(added.snapshot, 3, UUID.randomUUID().toString()))
+        shoppingTx(f) { it.apply(f.buyer, null, listCommand(f, listing, revision = 1, units = 0)) }
+        val rejected = shoppingTx(f) { it.apply(f.buyer, null, increment) }
+        assertFalse(rejected.accepted); assertEquals("market.shopping_changed", rejected.errorKey)
+        assertTrue(rejected.snapshot.lines.isEmpty()); assertEquals(2L, rejected.snapshot.revision)
+        val replay = shoppingTx(f) { it.apply(f.buyer, null, increment) }
+        assertTrue(replay.replayed); assertTrue(replay.snapshot.lines.isEmpty())
+        assertEquals("3", scalar(c, "SELECT count(*) FROM buyer_shopping_commands"))
     }
 
 }

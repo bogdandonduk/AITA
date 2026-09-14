@@ -40,6 +40,7 @@ private class BuyerBrowseData {
     var loading by mutableStateOf(true)
     var fresh by mutableStateOf(false)
     var countsFresh by mutableStateOf(false)
+    var readRevision by mutableStateOf(-1L)
     var gone by mutableStateOf(false)
     var failure by mutableStateOf<List<LocalizedStringDataModel>?>(null)
 }
@@ -113,7 +114,9 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
     }
     DisposableEffect(data, requests) { onDispose { data.active = false; requests.close() } }
-    LaunchedEffect(requests, revision, limit, dialogOwnsReads) { if (!dialogOwnsReads) requests.trySend(Unit) }
+    LaunchedEffect(requests, revision, limit, dialogOwnsReads) {
+        if (!dialogOwnsReads) { data.fresh = false; data.countsFresh = false; requests.trySend(Unit) }
+    }
     LaunchedEffect(requests) {
         val owned = owner ?: run { data.loading = false; return@LaunchedEffect }
         for (ignored in requests) {
@@ -122,42 +125,49 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
             if (latestDialogOwnsReads) continue
             data.loading = true; data.fresh = false; data.countsFresh = false
             val readRevision = fence.capture()
+            val startedRevision = MarketplaceSignals.revision.value
             try {
-                val requestedShop = query.storefrontId
-                if (requestedShop != null) {
-                    val response = loadMarketShop(owned, requestedShop)
-                    val shop = response.payload
-                    if (response.negative || shop == null) {
-                        if (data.active && owned.isCurrent()) {
-                            data.failure = response.message ?: eventMessage("market.shop_unavailable")
-                            if (response.httpStatusCode == 404 || response.httpStatusCode == 403) {
-                                data.gone = true; data.page = null; data.result = null; data.shop = null
-                            }
-                        }
-                        continue
-                    }
-                    if (data.active && owned.isCurrent()) { data.shop = shop; data.gone = false }
-                }
                 val cached = latestCatalogue
                 val request = MarketDiscoveryRequest(query, latestLimit, cached?.version)
-                val response = loadMarketDiscovery(owned, request)
+                val response = loadMarketDiscovery(owned, request, cached)
                 if (data.active && owned.isCurrent()) {
-                    val result = response.payload
-                    val checked = if (response.negative) null else result?.validatedDiscovery(request, cached)
-                    if (checked != null) {
+                    val checked = response.payload
+                    val latestWanted = MarketDiscoveryRequest(query, latestLimit)
+                    val refreshQueued = requests.tryReceive().isSuccess
+                    // Reject superseded failures too: an old 404 must not erase a newer scope.
+                    val superseded = latestDialogOwnsReads || refreshQueued || request.limit != latestLimit ||
+                        startedRevision != MarketplaceSignals.revision.value
+                    if (superseded) {
+                        requests.trySend(Unit)
+                    } else if (!response.negative && checked != null &&
+                        checked.result.matchesDiscoveryRead(latestWanted, startedRevision, MarketplaceSignals.revision.value)) {
                         catalogue = checked.catalogue
-                        data.result = checked.result
+                        data.result = checked.result; data.shop = checked.result.storefront; data.gone = false
                         data.page = fence.reconcile(checked.result.page, readRevision, query.savedOnly)
-                        data.failure = null; data.fresh = true; data.countsFresh = fence.capture() == readRevision
-                        if (!data.countsFresh) requests.trySend(Unit) // a bookmark changed DURING the read
-                    } else data.failure = response.message ?: eventMessage("market.page_changed")
+                        val savedChangedDuringRead = fence.capture() != readRevision
+                        data.failure = null; data.fresh = true; data.readRevision = startedRevision
+                        data.countsFresh = !savedChangedDuringRead && savingId == null
+                        if (savedChangedDuringRead) requests.trySend(Unit) // a bookmark changed DURING the read
+                    } else {
+                        data.failure = response.message ?: eventMessage("market.page_changed")
+                        if (!response.transportFailure && response.httpStatusCode in setOf(401, 403, 404)) {
+                            data.page = null; data.result = null; data.shop = null
+                            data.gone = query.storefrontId != null &&
+                                response.message?.eventMessageReferenceOrNull()?.key == "market.shop_unavailable"
+                        }
+                    }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { if (data.active && owned.isCurrent()) data.failure = eventMessage("market.refresh_failed") }
             finally { data.loading = false }
         }
     }
-    LaunchedEffect(requests) { while (isActive) { delay(30_000); requests.trySend(Unit) } }
+    LaunchedEffect(requests) {
+        while (isActive) {
+            delay(30_000)
+            if (!latestDialogOwnsReads) { data.fresh = false; data.countsFresh = false; requests.trySend(Unit) }
+        }
+    }
     LaunchedEffect(query) {
         if (scrollRestore?.query != query) { scrollRestore = null; gridState.scrollToItem(0) }
     }
@@ -168,23 +178,27 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         }
     }
 
+    fun catalogueIsCurrent(currentRevision: Long = MarketplaceSignals.revision.value): Boolean =
+        data.active && data.fresh && !data.loading && !inputPending && !latestDialogOwnsReads && owner?.isCurrent() == true &&
+            data.result?.matchesDiscoveryRead(MarketDiscoveryRequest(query, limit), data.readRevision, currentRevision) == true
+
     fun acknowledgeSaved(page: MarketPage) {
         data.page = fence.acknowledgeDiscoverySaved(data.page, page, query.savedOnly)
         data.countsFresh = false
-        MarketplaceSignals.changed(); requests.trySend(Unit)
+        requests.trySend(Unit) // the owned mutation boundary also invalidates on an uncertain reply
     }
     fun setSaved(offer: MarketOffer) {
         val owned = owner ?: return
-        if (savingId != null || !owned.isCurrent()) return
+        if (savingId != null || !owned.isCurrent() || !catalogueIsCurrent()) return
         val desired = !offer.saved
-        savingId = offer.id; saveFailure = null
+        savingId = offer.id; saveFailure = null; data.countsFresh = false
         scope.launch {
             try {
                 val response = updateMarketSaved(owned, offer.id, desired)
                 if (owned.isCurrent()) {
                     val value = response.payload
                     if (!response.negative && value != null) acknowledgeSaved(value)
-                    else saveFailure = response.message ?: eventMessage("market.refresh_failed") ?: eventMessage("market.refresh_failed")
+                    else saveFailure = response.message ?: eventMessage("market.saved_unconfirmed")
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { if (owned.isCurrent()) saveFailure = eventMessage("market.refresh_failed") }
@@ -192,6 +206,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         }
     }
 
+    val catalogueReady = catalogueIsCurrent(revision)
     val rows = data.page?.offers.orEmpty()
     val selectedCategory = catalogue?.categories?.firstOrNull { it.id == categoryId }
     AitaScreenColumn(
@@ -282,12 +297,12 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 }
             }
             items(rows, key = { it.id }) { offer ->
-                MarketOfferCard(offer, savingId != null, shopping, canUseEstimate = data.fresh && !inputPending,
-                    onOpen = { openedId = offer.id }, onSaved = { setSaved(offer) },
-                    onCompare = { compareTo = offer.comparisonSelection() }, onShop = { visitShop(offer.storefront) })
+                MarketOfferCard(offer, savingId != null || !catalogueReady, shopping, canUseEstimate = catalogueReady,
+                    estimateIsCurrent = { catalogueIsCurrent() }, onOpen = { openedId = offer.id }, onSaved = { setSaved(offer) },
+                    onCompare = { if (catalogueIsCurrent()) compareTo = offer.comparisonSelection() }, onShop = { visitShop(offer.storefront) })
             }
             if (data.page?.nextId != null) item(key = "more", span = { GridItemSpan(maxLineSpan) }) {
-                if (limit < MARKET_DISCOVERY_MAX_OFFERS) actionButton(text = authUiText("More offers", "Ещё предложения", "Тағы ұсыныстар", "Дагы сунуштар"), enabled = !data.loading && !inputPending,
+                if (limit < MARKET_DISCOVERY_MAX_OFFERS) actionButton(text = authUiText("More offers", "Ещё предложения", "Тағы ұсыныстар", "Дагы сунуштар"), enabled = catalogueReady,
                     autoLoading = false, confirmationRequired = false, onClick = { limit = (limit + MARKET_DISCOVERY_PAGE_SIZE).coerceAtMost(MARKET_DISCOVERY_MAX_OFFERS) })
                 else Text(authUiText("Showing the first 400 matches. Refine the category, city or search to explore more.",
                     "Показаны первые 400 совпадений. Уточните категорию, город или поиск, чтобы найти другие.", "Алғашқы 400 сәйкестік көрсетілді. Басқаларын табу үшін санатты, қаланы не іздеуді нақтылаңыз.", "Алгачкы 400 дал келүү көрсөтүлдү. Көбүрөөк көрүү үчүн категорияны, шаарды же издөөнү тактаңыз."),
@@ -300,10 +315,10 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 actionButton(text = authUiText("Remove unavailable saved offers (${data.page?.unavailableSavedCount})",
                     "Убрать недоступные предложения (${data.page?.unavailableSavedCount})", "Қолжетімсіз ұсыныстарды жою (${data.page?.unavailableSavedCount})", "Жеткиликсиз сакталган сунуштарды алып салуу (${data.page?.unavailableSavedCount})"),
-                    enabled = savingId == null, autoLoading = false, confirmationRequired = true, onClick = {
+                    enabled = savingId == null && catalogueReady && data.countsFresh, autoLoading = false, confirmationRequired = true, onClick = {
                         val owned = owner
-                        if (owned != null && owned.isCurrent() && savingId == null) {
-                            savingId = "clear"
+                        if (owned != null && owned.isCurrent() && savingId == null && data.countsFresh && catalogueIsCurrent()) {
+                            savingId = "clear"; saveFailure = null; data.countsFresh = false
                             scope.launch {
                                 try {
                                     val response = clearUnavailableMarketSaved(owned)
@@ -325,7 +340,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 Text(when {
                     inputPending -> authUiText("Searching…", "Поиск…", "Іздеу…", "Изделүүдө…")
                     data.loading -> authUiText("Updating matches…", "Обновляем результаты…", "Нәтижелер жаңартылуда…", "Дал келүүлөр жаңыртылууда…")
-                    data.countsFresh && counts != null -> authUiText("${rows.size} of ${counts.totalOffers} offers · ${counts.totalShops} shops",
+                    catalogueReady && data.countsFresh && counts != null -> authUiText("${rows.size} of ${counts.totalOffers} offers · ${counts.totalShops} shops",
                         "${rows.size} из ${counts.totalOffers} предложений · магазинов: ${counts.totalShops}", "${counts.totalOffers} ұсыныстың ${rows.size} ұсынысы · ${counts.totalShops} дүкен", "${counts.totalOffers} сунуштун ${rows.size} сунушу · ${counts.totalShops} дүкөн")
                     data.page != null -> authUiText("${rows.size} shown · refresh needed", "Показано: ${rows.size} · обновите", "${rows.size} көрсетілді · жаңартыңыз", "${rows.size} көрсөтүлдү · жаңыртуу керек")
                     else -> authUiText("Waiting for offers", "Ожидаем предложения", "Ұсыныстар күтілуде", "Сунуштарды күтүүдө")
@@ -333,7 +348,9 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 data.page?.checkedAtMillis?.let { Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
             }
             actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false,
-                autoLoading = false, enabled = !data.loading && !inputPending, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
+                autoLoading = false, enabled = !data.loading && !inputPending, loading = data.loading, confirmationRequired = false, onClick = {
+                    data.fresh = false; data.countsFresh = false; requests.trySend(Unit)
+                })
         }
         }
     }
@@ -346,7 +363,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
 
 @Composable
 private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean, shopping: MarketShoppingUiState, canUseEstimate: Boolean,
-    onOpen: () -> Unit, onSaved: () -> Unit, onCompare: () -> Unit, onShop: () -> Unit) {
+    estimateIsCurrent: () -> Boolean, onOpen: () -> Unit, onSaved: () -> Unit, onCompare: () -> Unit, onShop: () -> Unit) {
     val scope = rememberCoroutineScope()
     val inList = shopping.contains(offer.id)
     Column(Modifier.fillMaxWidth().heightIn(min = 310.dp).foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
@@ -373,7 +390,7 @@ private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean
             iconPath = marketIconPath(143), iconRes = marketIconFallback(143), autoLoading = false, confirmationRequired = false,
             enabled = inList || (canUseEstimate && shopping.canChange && offer.shoppingBasis() != null), onClick = {
                 if (inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
-                else shopping.change(offer.id, 1, offer.shoppingBasis())
+                else if (estimateIsCurrent()) shopping.add(offer.id, 1, offer.shoppingBasis())
             })
         if (offer.comparisonSelection() != null) actionButton(text = authUiText("Compare", "Сравнить", "Салыстыру", "Салыштыруу"),
             iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = canUseEstimate, autoLoading = false, confirmationRequired = false,

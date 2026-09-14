@@ -235,11 +235,22 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
 
     private data class Recorded(val hash: String, val accepted: Boolean, val errorKey: String?, val revision: Long?)
     fun comparison(user: UUID, request: MarketComparisonRequest): MarketComparisonPage {
-        val selection = request.selection
+        val now = System.currentTimeMillis()
+        return market.compare(user, request, comparisonReference(user, request.selection, now), now)
+    }
+
+    /** Resolve the buyer's immutable intent once, then quote the whole window without writes. */
+    fun comparisonWindow(user: UUID, request: MarketComparisonWindowRequest): MarketComparisonWindowResult = market.withComparisonReadBudget {
+        val input = request.normalizedComparisonWindowRequest() ?: marketFail("market.comparison_window_invalid")
+        val now = System.currentTimeMillis()
+        val reference = comparisonReference(user, input.selection, now)
+        market.compareWindow(user, input, reference, now)
+    }
+
+    private fun comparisonReference(user: UUID, selection: MarketComparisonSelection, now: Long): MarketShoppingLine {
         if (!selection.isValidMarketComparison()) marketFail("market.comparison_invalid")
         val sourceId = marketUuid(selection.offerId)
-        val now = System.currentTimeMillis()
-        val reference = if (selection.shoppingRevision != null) {
+        return if (selection.shoppingRevision != null) {
             if (revision(user) != selection.shoppingRevision) marketFail("market.shopping_changed", 409)
             val line = lines(user).firstOrNull { it.offerId == sourceId.toString() } ?: marketFail("market.shopping_changed", 409)
             if (line.units != selection.units || line.basis != selection.basis) marketFail("market.shopping_changed", 409)
@@ -250,7 +261,6 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
             MarketShoppingLine(offer.id, offer.storefront.storeId, offer.title, offer.storefront.displayName,
                 selection.units, selection.basis, offer.unitName, offer.sourceUpdatedAtMillis)
         }
-        return market.compare(user, request, reference, now)
     }
 
     /** A separate endpoint keeps older servers from ignoring replacement fields and merely ADDING. */

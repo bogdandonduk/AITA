@@ -61,6 +61,9 @@ class LanguageRuntimeContractsTest(unittest.TestCase):
         self.assertEqual(12,source.count('request.copy(locale = authRequestLocale(request.locale))'))
         self.assertIn('HttpHeaders.AcceptLanguage to effectiveAppLanguage(appLanguageState.value)',(SHARED/'CommonMain.kt').read_text())
         self.assertIn('it[AuthOneTimeChallenges.locale] = normalizeAuthEmailLocale(locale)',(SERVER/'auth/AitaAdvancedAuthentication.kt').read_text())
+        auth=(SERVER/'auth/AitaAdvancedAuthentication.kt').read_text()
+        self.assertIn('import kz.aita.normalizeAuthEmailLocale', auth)
+        self.assertIn('fun normalizeAuthEmailLocale(locale: String?): String', (SHARED/'AppLanguageRuntime.kt').read_text())
 
     def test_coerced_preferences_are_not_acknowledged(self):
         source=(SHARED/'ApplicationPreferences.kt').read_text()

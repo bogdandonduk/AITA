@@ -40,7 +40,10 @@ data class MarketDiscoveryResult(
     val totalOffers: Long,
     val totalShops: Long,
     val categoryVersion: String,
-    val categories: List<MarketCategory>? = null
+    val categories: List<MarketCategory>? = null,
+    // Added fields remain nullable when decoding an older server; absence is not proof of scope.
+    val accountId: String? = null,
+    val storefront: MarketStorefront? = null
 )
 
 data class MarketDiscoverySnapshot(val result: MarketDiscoveryResult, val catalogue: MarketCategoryCatalogue)
@@ -86,13 +89,24 @@ fun MarketCategoryCatalogue.isValidMarketCatalogue(): Boolean = version.matches(
  * than labelling an unfiltered response as selected-category results (including an older server). */
 fun MarketDiscoveryResult.validatedDiscovery(
     request: MarketDiscoveryRequest,
-    cachedCatalogue: MarketCategoryCatalogue?
+    cachedCatalogue: MarketCategoryCatalogue?,
+    expectedAccountId: String
 ): MarketDiscoverySnapshot? {
-    if (!request.isValidDiscoveryRequest() || query != request.query.normalizedDiscoveryQuery() || limit != request.limit ||
+    if (expectedAccountId.isBlank() || accountId != expectedAccountId || !request.isValidDiscoveryRequest() || query != request.query.normalizedDiscoveryQuery() || limit != request.limit ||
         totalOffers < 0 || totalShops < 0 || totalShops > totalOffers || page.checkedAtMillis <= 0 ||
         page.unavailableSavedCount < 0 || page.offers.size != minOf(totalOffers, limit.toLong()).toInt() ||
         page.offers.map { it.id }.distinct().size != page.offers.size ||
-        (page.nextId != null) != (totalOffers > page.offers.size)) return null
+        (page.nextId != null) != (totalOffers > page.offers.size) || page.savedMutation != null ||
+        page.unavailableSavedCleared || (totalOffers > 0L && totalShops == 0L)) return null
+    // Even an empty shop window carries the SAME public header as its offers. Never combine an
+    // earlier /shops/{id} response with a later /discovery page or silently lose a withdrawn shop.
+    val shop = storefront
+    if (query.storefrontId == null) {
+        if (shop != null) return null
+    } else if (shop?.isValidPublicMarketShop() != true || shop.storeId != query.storefrontId ||
+        totalShops != (if (totalOffers == 0L) 0L else 1L) || page.offers.any { it.storefront != shop }) return null
+    if (query.savedOnly && (page.unavailableSavedCount > MARKET_SAVED_MAX_OFFERS ||
+        totalOffers > MARKET_SAVED_MAX_OFFERS - page.unavailableSavedCount)) return null
     val catalogue = categories?.let { MarketCategoryCatalogue(categoryVersion, it) }
         ?: cachedCatalogue?.takeIf { it.version == categoryVersion && request.knownCategoryVersion == categoryVersion }
         ?: return null
@@ -104,16 +118,22 @@ fun MarketDiscoveryResult.validatedDiscovery(
     if (page.nextId != null && page.nextId != page.offers.lastOrNull()?.id) return null
     if (totalShops < page.offers.map { it.storefront.storeId }.distinct().size || (!query.savedOnly && page.unavailableSavedCount != 0)) return null
     if (page.offers.any { offer -> marketDiscoveryId(offer.id) != offer.id ||
-        marketDiscoveryId(offer.storefront.storeId) != offer.storefront.storeId || !offer.storefront.published ||
-        offer.checkedAtMillis != page.checkedAtMillis || offer.title.isBlank() || offer.title.length > 180 ||
+        !offer.storefront.isValidPublicMarketShop() || offer.description.length > 2000 ||
+        (offer.gtin != null && marketCanonicalGtin(offer.gtin) != offer.gtin) ||
+        (query.city.isNotEmpty() && !query.city.equals(offer.storefront.city, ignoreCase = true)) ||
+        offer.categoryIds.distinct().size != offer.categoryIds.size || offer.checkedAtMillis != page.checkedAtMillis || offer.title.isBlank() || offer.title.length > 180 ||
         offer.sourceUpdatedAtMillis < 0 || offer.categoryIds.size > 16 || offer.categoryIds.any { it !in knownIds } ||
         (selectedIds != null && offer.categoryIds.none { it in selectedIds }) || !offer.hasValidDiscoveryPrice() ||
         (query.storefrontId != null && offer.storefront.storeId != query.storefrontId) || (query.savedOnly && !offer.saved) ||
         offer.availability !in setOf(MARKET_AVAILABILITY_RECORDED, MARKET_AVAILABILITY_CONFIRM) }) return null
+    // A repeated shop identity must not display different pickup addresses/revisions on its cards.
+    if (page.offers.groupBy { it.storefront.storeId }.values.any { rows ->
+        rows.any { it.storefront != rows.first().storefront }
+    }) return null
     return MarketDiscoverySnapshot(this, catalogue)
 }
 
-private fun MarketOffer.hasValidDiscoveryPrice(): Boolean {
+internal fun MarketOffer.hasValidDiscoveryPrice(): Boolean {
     val price = priceMinor
     if (price == null) return currencyCode == null && pricedAmount == null && unitId == null && unitName.isEmpty()
     return price in 0L..1_000_000_000_000L && currencyCode?.matches(Regex("[A-Z]{3}")) == true &&

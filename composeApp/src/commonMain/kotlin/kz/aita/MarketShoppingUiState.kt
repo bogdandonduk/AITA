@@ -84,9 +84,34 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
             finally { loading = false }
         }
     }
-    fun change(offerId: String, units: Int, basis: MarketShoppingBasis?) {
-        val current = snapshot ?: return
-        send(MarketShoppingCommand(newClientSideUuidString(), current.revision, offerId, units, if (units == 0) null else basis))
+    /** Add buttons cannot turn into quantity replacement when their rendered state is old. */
+    fun add(offerId: String, units: Int, basis: MarketShoppingBasis?): Boolean {
+        if (!canChange) return false
+        val current = snapshot ?: return false
+        val command = current.newShoppingLineCommand(offerId, units, basis, newClientSideUuidString())
+        if (command == null) {
+            notice = eventMessage(when {
+                contains(offerId) -> "market.shopping_already_listed"
+                current.lines.size >= MARKET_SHOPPING_MAX_LINES -> "market.shopping_limit"
+                else -> "market.shopping_invalid"
+            })
+            return false
+        }
+        return send(command)
+    }
+    fun changeLine(review: MarketShoppingLineReview, units: Int): Boolean {
+        if (!canChange) return false
+        val command = review.command(snapshot, units, newClientSideUuidString())
+        if (command == null) { requireNewLineReview(); return false }
+        return send(command)
+    }
+    fun compareLine(review: MarketShoppingLineReview): MarketComparisonSelection? {
+        if (!canChange) return null
+        return review.comparison(snapshot).also { if (it == null) requireNewLineReview() }
+    }
+    private fun requireNewLineReview() {
+        notice = eventMessage("market.shopping_edit_changed")
+        refresh()
     }
     fun replace(selection: MarketComparisonSelection, candidate: MarketShoppingQuotedLine): String? {
         val current = snapshot ?: return null

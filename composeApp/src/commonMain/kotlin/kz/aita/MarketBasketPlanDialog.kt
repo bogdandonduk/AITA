@@ -23,14 +23,22 @@ import kotlin.time.TimeSource
 
 @Stable
 private class MarketBasketView {
+    var active = true
     var result by mutableStateOf<MarketBasketResult?>(null)
     var loading by mutableStateOf(false)
-    var loadedSignal by mutableStateOf(-1L)
+    var loadedStamp by mutableStateOf<MarketBasketPlanReadFence.Stamp?>(null)
     var error by mutableStateOf<List<LocalizedStringDataModel>?>(null)
+    val fence = MarketBasketPlanReadFence()
+    var startedAt: kotlin.time.TimeMark? = null
+    // Switching plan/currency retires old row/button callbacks without spending a network read.
+    var presentation by mutableStateOf(Any())
+
+    fun invalidate() { fence.invalidate(); loadedStamp = null; presentation = Any() }
+    fun select() { presentation = Any() }
 }
 
 private data class FrozenBasketReview(val result: MarketBasketResult, val command: MarketShoppingCommand,
-    val signal: Long, val started: kotlin.time.TimeMark)
+    val stamp: MarketBasketPlanReadFence.Stamp, val started: kotlin.time.TimeMark)
 
 /** Planning stays read-only. A separate frozen review applies all selected-currency changes as
  * one command. Only one live dialog body is composed; reviews never follow changing estimates.
@@ -52,58 +60,95 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
     var currency by remember(account, generation) { mutableStateOf("") }
     var review by remember(account, generation) { mutableStateOf<FrozenBasketReview?>(null) }
     var submittedId by remember(account, generation) { mutableStateOf<String?>(null) }
-    val listRevision = shopping.snapshot?.revision
-    val request = listRevision?.let { MarketBasketRequest(it, city) }
+    val request = shopping.snapshot?.revision?.let { MarketBasketRequest(it, city) }
     val data = remember(account, generation, request) { MarketBasketView() }
-    val requests = remember(account, generation, request) { Channel<Unit>(Channel.CONFLATED) }
+    val requests = remember(data) { Channel<Unit>(Channel.CONFLATED) }
     val signal by MarketplaceSignals.revision.collectAsState()
-    val latestSignal by rememberUpdatedState(signal)
-    val blocked = shopping.pending != null || shopping.changing || shopping.checking || shopping.cancelling
-    val latestBlocked by rememberUpdatedState(blocked || review != null)
+    val latestDismiss by rememberUpdatedState(onDismiss)
+    val latestCompare by rememberUpdatedState(onCompare)
+    val latestVisitShop by rememberUpdatedState(onVisitShop)
     // Across request/filter changes too: typing and toggling cannot reset the automatic cooldown.
     val lastRead = remember(account, generation) { mutableStateOf<kotlin.time.TimeMark?>(null) }
-    DisposableEffect(requests) { onDispose { requests.close() } }
-    LaunchedEffect(requests, signal, blocked, review) { if (!blocked && review == null) requests.trySend(Unit) }
-    LaunchedEffect(requests) {
+    fun shoppingBlocked(): Boolean = shopping.pending != null || shopping.changing || shopping.checking || shopping.cancelling
+    fun wantedNow(): MarketBasketRequest? = shopping.snapshot?.revision?.let { MarketBasketRequest(it, city) }
+    fun queueRefresh() {
+        if (!data.active || owner?.isCurrent() != true) return
+        data.invalidate() // Retire displayed actions before the cooldown, not when I/O starts.
+        requests.trySend(Unit)
+    }
+    fun planIsCurrent(displayed: MarketBasketResult? = data.result, presentation: Any = data.presentation,
+        currentSignal: Long = MarketplaceSignals.revision.value): Boolean = data.fence.canUse(
+        data.loadedStamp, data.result, wantedNow(), currentSignal, shopping.snapshot,
+        data.startedAt?.elapsedNow()?.inWholeMilliseconds ?: -1L,
+        !data.active || owner?.isCurrent() != true || !shopping.active || shoppingBlocked() || review != null ||
+            data.loading || data.error != null || data.result !== displayed || data.presentation !== presentation)
+    fun reviewIsCurrent(frozen: FrozenBasketReview): Boolean = data.fence.canConfirm(
+        frozen.stamp, frozen.result, frozen.command, wantedNow(), MarketplaceSignals.revision.value,
+        shopping.snapshot, frozen.started.elapsedNow().inWholeMilliseconds,
+        !data.active || owner?.isCurrent() != true || !shopping.canChange || data.loading || data.error != null)
+    fun requireFreshPlan() {
+        queueRefresh()
+        if (data.active && owner?.isCurrent() == true) data.error = eventMessage("market.basket_plan_stale")
+    }
+    val blocked = shoppingBlocked()
+    DisposableEffect(data) { onDispose { data.active = false; data.invalidate(); requests.close() } }
+    LaunchedEffect(data, signal, blocked, review) {
+        if (review == null) {
+            data.invalidate()
+            if (!blocked) queueRefresh()
+        }
+    }
+    LaunchedEffect(data) {
         val owned = owner ?: run { data.error = eventMessage("market.shopping_denied"); return@LaunchedEffect }
-        val wanted = request ?: run { data.error = eventMessage("market.basket_invalid"); return@LaunchedEffect }
+        val wanted = request?.normalizedBasketRequest() ?: run { data.error = eventMessage("market.basket_invalid"); return@LaunchedEffect }
         for (ignored in requests) {
             delay(200)
             val waitMillis = lastRead.value?.let { (10_000L - it.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L) } ?: 0L
             if (waitMillis > 0) delay(waitMillis)
-            while (requests.tryReceive().isSuccess) { /* keep the newest pre-read signal; I/O arrivals stay queued */ }
-            if (!owned.isCurrent()) break
-            if (latestBlocked) continue
-            val startingSignal = latestSignal
-            data.loading = true; data.loadedSignal = -1L
-            lastRead.value = TimeSource.Monotonic.markNow()
+            while (requests.tryReceive().isSuccess) { /* I/O arrivals keep one trailing refresh. */ }
+            if (!data.active || !owned.isCurrent()) break
+            if (shoppingBlocked() || review != null || wantedNow() != wanted) continue
+            val stamp = data.fence.capture(wanted, MarketplaceSignals.revision.value)
+            val started = TimeSource.Monotonic.markNow()
+            data.loading = true; data.loadedStamp = null
+            lastRead.value = started
+            fun stillOwnsRead(): Boolean = data.fence.isCurrent(stamp, wantedNow(), MarketplaceSignals.revision.value) &&
+                !shoppingBlocked() && review == null
             try {
                 val response = loadMarketBasketPlan(owned, wanted)
-                if (owned.isCurrent()) {
+                if (!data.active || !owned.isCurrent()) break
+                if (!stillOwnsRead()) {
+                    // A late error must not erase the newer view or trigger its list refresh.
+                    if (!shoppingBlocked() && review == null) queueRefresh()
+                } else {
                     val result = response.payload
                     if (!response.negative && result != null) {
-                        data.result = result; data.error = null
-                        // An invalidation DURING the read leaves this result visibly stale until
-                        // the queued trailing read succeeds. It cannot re-enable review actions.
-                        data.loadedSignal = startingSignal
+                        data.result = result; data.error = null; data.loadedStamp = stamp
+                        data.startedAt = started; data.select()
                     } else {
                         data.error = response.message ?: eventMessage("market.basket_refresh")
-                        if (response.httpStatusCode in setOf(401, 403, 404, 409)) data.result = null
-                        if (response.httpStatusCode == 409) shopping.refresh()
-                        if (response.httpStatusCode == 429) delay(30_000)
+                        if (!response.transportFailure && response.httpStatusCode in setOf(401, 403, 404, 409)) data.result = null
+                        if (!response.transportFailure && response.httpStatusCode == 409) shopping.refresh()
+                        if (!response.transportFailure && response.httpStatusCode == 429) delay(30_000)
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (owned.isCurrent()) data.error = eventMessage("market.basket_refresh") }
-            finally { data.loading = false }
+            catch (_: Exception) {
+                if (data.active && owned.isCurrent()) {
+                    if (!stillOwnsRead()) { if (!shoppingBlocked() && review == null) queueRefresh() }
+                    else data.error = eventMessage("market.basket_refresh")
+                }
+            } finally { if (data.active) data.loading = false }
         }
     }
-    LaunchedEffect(requests) { while (isActive) { delay(60_000); if (!latestBlocked) requests.trySend(Unit) } }
+    LaunchedEffect(data) {
+        while (isActive) { delay(MARKET_BASKET_PLAN_FRESH_MILLIS); if (!shoppingBlocked() && review == null) queueRefresh() }
+    }
     LaunchedEffect(shopping.acknowledgedCommandId, submittedId, shopping.changing, shopping.pending) {
         val submitted = submittedId
         if (submitted != null && shopping.acknowledgedCommandId == submitted) {
-            if (shopping.lastChangeAccepted) onDismiss()
-            else { submittedId = null; review = null; requests.trySend(Unit) }
+            if (shopping.lastChangeAccepted) latestDismiss()
+            else { submittedId = null; review = null; queueRefresh() }
         } else if (submitted != null && !shopping.changing && shopping.pending == null) {
             submittedId = null // A local preparation failure has no network success to assume.
         }
@@ -111,20 +156,28 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
     val frozen = review
     if (frozen != null) {
         MarketBasketReviewDialog(frozen.result, frozen.command, frozen.started, shopping,
-            valid = owner?.isCurrent() == true && frozen.signal == signal &&
-                shopping.snapshot?.revision == frozen.command.expectedRevision,
-            submitted = submittedId != null, onConfirm = {
-                if (shopping.applyBasket(frozen.command)) submittedId = frozen.command.commandId
-            }, onBack = { review = null; submittedId = null; requests.trySend(Unit) }, onDismiss = onDismiss)
+            valid = reviewIsCurrent(frozen), submitted = submittedId != null, onConfirm = {
+                // Re-evaluate live state and the original read age even if the button's last
+                // rendered enabled value was true. Never create a new ID for this review.
+                if (review !== frozen || submittedId != null || !reviewIsCurrent(frozen)) false
+                else if (shopping.applyBasket(frozen.command)) {
+                    submittedId = frozen.command.commandId
+                    true
+                } else false
+            }, onBack = {
+                if (data.active && owner?.isCurrent() == true && review === frozen && !shoppingBlocked()) {
+                    review = null; submittedId = null; queueRefresh()
+                }
+            }, onDismiss = latestDismiss)
         return
     }
     val result = data.result
+    val presentation = data.presentation
     val group = result?.currencies?.firstOrNull { it.currencyCode == currency } ?: result?.currencies?.firstOrNull()
     val plan = group?.plan(kind)
-    val fresh = !blocked && !data.loading && owner?.isCurrent() == true && result != null &&
-        result.snapshot.revision == listRevision && data.loadedSignal == signal && data.error == null
+    val fresh = planIsCurrent(currentSignal = signal)
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = latestDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxWidth().aitaWidthCap(960.dp).fillMaxHeight(0.92f).padding(12.dp)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
@@ -146,7 +199,14 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                         val normalizedCity = MarketBasketRequest(0, cityDraft).normalizedBasketRequest()?.city
                         if (cityDraft != city) actionButton(text = authUiText("Apply city", "Применить город", "Қаланы қолдану", "Шаарды колдонуу"),
                             enabled = normalizedCity != null && !blocked, fillMaxWidthIfTextPresent = false, autoLoading = false,
-                            confirmationRequired = false, onClick = { normalizedCity?.let { city = it; cityDraft = it } })
+                            confirmationRequired = false, onClick = {
+                                if (data.active && owner?.isCurrent() == true && !shoppingBlocked()) {
+                                    // The draft may have changed since the Apply button was rendered.
+                                    MarketBasketRequest(0, cityDraft).normalizedBasketRequest()?.city?.let {
+                                        data.invalidate(); city = it; cityDraft = it; queueRefresh()
+                                    }
+                                }
+                            })
                         if (city.isNotEmpty()) Text(authUiText("Alternatives: $city. Current list keeps its original shops, including other cities.",
                             "Альтернативы: $city. Текущий список сохраняет исходные магазины, в том числе в других городах.",
                             "Баламалар: $city. Ағымдағы тізім бастапқы дүкендерді, соның ішінде басқа қалаларды сақтайды.", "Башка варианттар: $city. Учурдагы тизме баштапкы дүкөндөрдү, анын ичинде башка шаарлардагы дүкөндөрдү да сактайт."),
@@ -165,22 +225,31 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     item(key = "plans") {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             if (result.currencies.size > 1) sectionTabsWidget("basket-currency:$account",
-                                result.currencies.map { TabContent(it.currencyCode, it.currencyCode) }, selectedId = group.currencyCode, onSelected = { currency = it })
+                                result.currencies.map { TabContent(it.currencyCode, it.currencyCode) }, selectedId = group.currencyCode, onSelected = {
+                                    if (data.active && owner?.isCurrent() == true && currency != it) { data.select(); currency = it }
+                                })
                             sectionTabsWidget("basket-plan:$account", listOf(
                                 TabContent(MARKET_BASKET_CURRENT, authUiText("Current", "Сейчас", "Қазір", "Учурдагы")),
                                 TabContent(MARKET_BASKET_ONE_SHOP, authUiText("1 shop", "1 магазин", "1 дүкен", "1 дүкөн")),
                                 TabContent(MARKET_BASKET_TWO_SHOPS, authUiText("Up to 2", "До 2 магазинов", "2 дүкенге дейін", "2ге чейин")),
                                 TabContent(MARKET_BASKET_LOWEST_ITEMS, authUiText("Lower total", "Меньше сумма", "Төмен сома", "Төмөнүрөөк жалпы сумма"))),
-                                selectedId = kind, onSelected = { kind = it })
+                                selectedId = kind, onSelected = {
+                                    if (data.active && owner?.isCurrent() == true && kind != it) { data.select(); kind = it }
+                                })
                             BasketPlanSummary(group, plan)
                             if (plan.kind != MARKET_BASKET_CURRENT && plan.changedLines > 0) {
                                 actionButton(text = authUiText("Review this plan", "Проверить этот план", "Осы жоспарды тексеру", "Бул планды кароо"),
                                     iconPath = marketIconPath(141), iconRes = marketIconFallback(141),
                                     enabled = fresh && shopping.canChange && plan.complete,
                                     autoLoading = false, confirmationRequired = false, onClick = {
-                                        result.reviewedBasketCommand(group.currencyCode, plan.kind, newClientSideUuidString())?.let { command ->
-                                            review = FrozenBasketReview(result, command, signal, lastRead.value ?: TimeSource.Monotonic.markNow())
-                                        }
+                                        if (planIsCurrent(result, presentation) && shopping.canChange) {
+                                            val stamp = data.loadedStamp
+                                            val started = data.startedAt
+                                            val command = result.reviewedBasketCommand(group.currencyCode, plan.kind, newClientSideUuidString())
+                                            if (stamp != null && started != null && command != null) {
+                                                review = FrozenBasketReview(result, command, stamp, started)
+                                            }
+                                        } else requireFreshPlan()
                                     })
                                 if (!plan.complete) Text(authUiText("A whole-plan change needs every line in this currency. Missing lines are never removed to make it fit.",
                                     "Для применения плана нужны все строки в этой валюте. Недостающие товары не удаляются ради результата.",
@@ -192,8 +261,15 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     items(plan.choices, key = { "choice:${it.sourceOfferId}" }) { choice ->
                         val original = result.snapshot.lines.first { it.line.offerId == choice.sourceOfferId }.line
                         BasketPlanChoiceCard(original, choice, fresh, onCompare = {
-                            original.comparisonSelection(result.snapshot.revision)?.let { onCompare(it, city) }
-                        }, onVisitShop = onVisitShop)
+                            if (planIsCurrent(result, presentation) && shopping.canChange) {
+                                result.snapshot.reviewShoppingLine(original)?.let { lineReview ->
+                                    shopping.compareLine(lineReview)?.let { latestCompare(it, result.request.city) }
+                                }
+                            } else requireFreshPlan()
+                        }, onVisitShop = { shop ->
+                            if (planIsCurrent(result, presentation) && choice.quote.offer?.storefront == shop) latestVisitShop(shop)
+                            else requireFreshPlan()
+                        })
                     }
                     if (plan.missingOfferIds.isNotEmpty()) item(key = "missing") {
                         Column(Modifier.fillMaxWidth().background(stateValues.ErrorColor.copy(alpha = 0.05f)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -233,9 +309,9 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     else authUiText("Refresh needed · estimates only", "Нужно обновить · только расчёт", "Жаңарту қажет · тек есеп", "Жаңыртуу керек · болжолдуу суммалар гана"),
                     Modifier.padding(vertical = 10.dp), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
-                    enabled = !data.loading && !blocked, loading = data.loading, confirmationRequired = false, onClick = { requests.trySend(Unit) })
+                    enabled = !data.loading && !blocked, loading = data.loading, confirmationRequired = false, onClick = { queueRefresh() })
                 actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
-                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, confirmationRequired = false, onClick = onDismiss)
+                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, confirmationRequired = false, onClick = latestDismiss)
             }
         }
     }

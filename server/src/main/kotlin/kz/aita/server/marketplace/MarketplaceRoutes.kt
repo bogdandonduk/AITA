@@ -13,13 +13,14 @@ import java.sql.Connection
 
 private suspend inline fun <reified T> RoutingCall.marketResult(
     readOnly: Boolean = false,
+    transactionIsolation: Int = Connection.TRANSACTION_REPEATABLE_READ,
     noinline after: suspend (T) -> Unit = {},
     crossinline work: MarketplaceRepository.() -> T
 ) {
     response.header("Cache-Control", "private, no-store, max-age=0")
     try {
         val result = newSuspendedTransaction(aitaServerIoContext,
-            transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ, readOnly = readOnly) {
+            transactionIsolation = transactionIsolation, readOnly = readOnly) {
             maxAttempts = 3
             // Public visibility, stock projection and saved markers share one snapshot. A second
             // query must not accidentally mix a published row with a just-created private draft.
@@ -33,31 +34,77 @@ private suspend inline fun <reified T> RoutingCall.marketResult(
     catch (failure: MarketFailure) { genericResponseNoPayload(HttpStatusCode.fromValue(failure.status), eventMessage(failure.key)) }
 }
 
+// Search typing and periodic refresh need a different allowance from explicit basket planning.
+private val offerDetailReadGate = MarketBasketReadGate(requestsPerMinute = 60)
+private val shopDirectoryReadGate = MarketBasketReadGate(requestsPerMinute = 60)
+private val discoveryReadGate = MarketBasketReadGate(requestsPerMinute = 60)
+private val comparisonReadGate = MarketBasketReadGate()
 private val basketReadGate = MarketBasketReadGate()
 private val basketApplyGate = MarketBasketReadGate()
 private val shoppingCancelGate = MarketBasketReadGate()
+// History reads share an allowance, but must never starve Retry/Check result/Cancel.
+private val shoppingActivityReadGate = MarketBasketReadGate(requestsPerMinute = 60)
 
 internal fun Route.marketplaceRoutes() {
     authenticate("auth-jwt") {
         route("/market") {
             post("/discovery") {
                 val user = call.checkPrincipal() ?: return@post
-                val body = call.receiveAita<MarketDiscoveryRequest>()
-                call.marketResult(readOnly = true) { discover(user, body) }
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = discoveryReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.discovery_busy"))
+                    return@post
+                }
+                try {
+                    val body = call.receiveAita<MarketDiscoveryRequest>()
+                    call.marketResult(readOnly = true, transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        withDiscoveryReadBudget { discover(user, body) }
+                    }
+                } finally { discoveryReadGate.release(user) }
             }
             post("/shops/search") {
                 val user = call.checkPrincipal() ?: return@post
-                val body = call.receiveAita<MarketShopDirectoryRequest>()
-                call.marketResult(readOnly = true) {
-                    val db = TransactionManager.current().connection.connection as Connection
-                    db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
-                    MarketShopDirectoryRepository(db).search(user, body)
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = shopDirectoryReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.shops_busy"))
+                    return@post
                 }
+                try {
+                    val body = call.receiveAita<MarketShopDirectoryRequest>()
+                    call.marketResult(readOnly = true, transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        MarketShopDirectoryRepository(db).search(user, body)
+                    }
+                } finally { shopDirectoryReadGate.release(user) }
             }
             get("/offers") {
                 val user = call.checkPrincipal() ?: return@get
                 call.marketResult(readOnly = true) { browse(user, call.request.queryParameters["q"].orEmpty(), call.request.queryParameters["city"].orEmpty(),
                     call.request.queryParameters["after"], call.request.queryParameters["gtin"], call.request.queryParameters["store"]) }
+            }
+            get("/offers/{offerId}/detail") {
+                val user = call.checkPrincipal() ?: return@get
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = offerDetailReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.detail_busy"))
+                    return@get
+                }
+                try {
+                    call.marketResult(readOnly = true, transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        withOfferDetailReadBudget { offerDetail(user, call.parameters["offerId"].orEmpty()) }
+                    }
+                } finally { offerDetailReadGate.release(user) }
             }
             get("/offers/{offerId}") {
                 val user = call.checkPrincipal() ?: return@get
@@ -73,6 +120,24 @@ internal fun Route.marketplaceRoutes() {
                 call.marketResult(readOnly = true) {
                     MarketShoppingRepository(TransactionManager.current().connection.connection as Connection, this).comparison(user, body)
                 }
+            }
+            post("/compare/window") {
+                val user = call.checkPrincipal() ?: return@post
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = comparisonReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.comparison_window_busy"))
+                    return@post
+                }
+                try {
+                    val body = call.receiveAita<MarketComparisonWindowRequest>()
+                    call.marketResult(readOnly = true, transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        MarketShoppingRepository(db, this).comparisonWindow(user, body)
+                    }
+                } finally { comparisonReadGate.release(user) }
             }
             post("/shopping-list/result") {
                 val user = call.checkPrincipal() ?: return@post
@@ -106,29 +171,56 @@ internal fun Route.marketplaceRoutes() {
             }
             get("/shopping-list/activity/{commandId}") {
                 val user = call.checkPrincipal() ?: return@get
-                call.marketResult(readOnly = true) {
-                    val db = TransactionManager.current().connection.connection as Connection
-                    db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
-                    MarketShoppingRepository(db, this).activityDetail(user, call.parameters["commandId"].orEmpty())
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = shoppingActivityReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.activity_busy"))
+                    return@get
                 }
+                try {
+                    call.marketResult(readOnly = true) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        MarketShoppingRepository(db, this).activityDetail(user, call.parameters["commandId"].orEmpty())
+                    }
+                } finally { shoppingActivityReadGate.release(user) }
             }
             post("/shopping-list/activity/search") {
                 val user = call.checkPrincipal() ?: return@post
-                val body = call.receiveAita<MarketShoppingActivitySearchRequest>()
-                call.marketResult(readOnly = true) {
-                    val db = TransactionManager.current().connection.connection as Connection
-                    db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
-                    MarketShoppingRepository(db, this).activitySearch(user, body)
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = shoppingActivityReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.activity_busy"))
+                    return@post
                 }
+                try {
+                    val body = call.receiveAita<MarketShoppingActivitySearchRequest>()
+                    call.marketResult(readOnly = true) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        MarketShoppingRepository(db, this).activitySearch(user, body)
+                    }
+                } finally { shoppingActivityReadGate.release(user) }
             }
             post("/shopping-list/activity") {
                 val user = call.checkPrincipal() ?: return@post
-                val body = call.receiveAita<MarketShoppingActivityRequest>()
-                call.marketResult(readOnly = true) {
-                    val db = TransactionManager.current().connection.connection as Connection
-                    db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
-                    MarketShoppingRepository(db, this).activity(user, body)
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = shoppingActivityReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.activity_busy"))
+                    return@post
                 }
+                try {
+                    val body = call.receiveAita<MarketShoppingActivityRequest>()
+                    call.marketResult(readOnly = true) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        MarketShoppingRepository(db, this).activity(user, body)
+                    }
+                } finally { shoppingActivityReadGate.release(user) }
             }
             post("/shopping-list/plan") {
                 val user = call.checkPrincipal() ?: return@post
@@ -210,13 +302,19 @@ internal fun Route.marketplaceRoutes() {
             put("/saved") {
                 val user = call.checkPrincipal() ?: return@put
                 val body = call.receiveAita<MarketSavedUpdate>()
-                call.marketResult(after = { RealtimeServerBus.publish(entity="market/saved",userId=user.toString(),reason="saved_offers_changed") }) {
+                // A users-row lock alone does NOT refresh a repeatable-read snapshot. SSI
+                // makes overlapping count/check/write transactions retry as a whole.
+                call.marketResult(transactionIsolation = Connection.TRANSACTION_SERIALIZABLE,
+                    after = { RealtimeServerBus.publish(entity="market/saved",userId=user.toString(),reason="saved_offers_changed") }) {
                     updateSaved(user,body)
                 }
             }
             post("/saved/clear-unavailable") {
                 val user = call.checkPrincipal() ?: return@post
-                call.marketResult(after = { RealtimeServerBus.publish(entity="market/saved",userId=user.toString(),reason="saved_offers_changed") }) {
+                // A users-row lock alone does NOT refresh a repeatable-read snapshot. SSI
+                // makes overlapping count/check/write transactions retry as a whole.
+                call.marketResult(transactionIsolation = Connection.TRANSACTION_SERIALIZABLE,
+                    after = { RealtimeServerBus.publish(entity="market/saved",userId=user.toString(),reason="saved_offers_changed") }) {
                     clearUnavailableSaved(user)
                 }
             }

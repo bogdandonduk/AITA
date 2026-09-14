@@ -1,6 +1,8 @@
 package kz.aita
 
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 const val MARKET_SHOPS_PAGE_SIZE = 20
 const val MARKET_SHOPS_MAX_WINDOW = 200
@@ -37,10 +39,18 @@ fun MarketStorefront.isValidPublicMarketShop(): Boolean = marketDiscoveryId(stor
 
 fun MarketShopDirectoryResult.isValidShopDirectoryResult(account: String, wanted: MarketShopDirectoryRequest): Boolean {
     val normalized = wanted.normalizedShopDirectoryRequest() ?: return false
-    return protocolVersion == MARKET_SHOPS_PROTOCOL && accountId == account && request == normalized &&
+    return account.isNotBlank() && protocolVersion == MARKET_SHOPS_PROTOCOL && accountId == account && request == normalized &&
         checkedAtMillis > 0 && totalShops >= 0 && shops.size == minOf(totalShops, normalized.limit.toLong()).toInt() &&
         shops.map { it.storefront.storeId }.distinct().size == shops.size &&
-        shops.all { it.storefront.isValidPublicMarketShop() && it.publishedOffers >= 0 }
+        shops.all entries@{ entry ->
+            val shop = entry.storefront
+            if (!shop.isValidPublicMarketShop() || entry.publishedOffers < 0) return@entries false
+            // Match the route's literal AND-of-terms search. An echoed request is not evidence
+            // that the returned public rows actually belong to that city/name/address filter.
+            val searchable = "${shop.displayName} ${shop.publicAddress}"
+            (normalized.city.isEmpty() || shop.city.contains(normalized.city, ignoreCase = true)) &&
+                normalized.text.split(' ').filter { it.isNotEmpty() }.all { searchable.contains(it, ignoreCase = true) }
+        }
 }
 
 /** No account's result may cross a suspended ownership change. Errors keep the old UI window
@@ -49,14 +59,21 @@ fun MarketShopDirectoryResult.isValidShopDirectoryResult(account: String, wanted
 suspend fun readOwnedMarketShopDirectory(owner: MarketAccountScope, request: MarketShopDirectoryRequest,
     read: suspend (MarketShopDirectoryRequest) -> ResponseDataModel<MarketShopDirectoryResult>
 ): ResponseDataModel<MarketShopDirectoryResult> {
+    currentCoroutineContext().ensureActive()
     if (!owner.isCurrent()) return cloudSessionExpiredResponse()
     val normalized = request.normalizedShopDirectoryRequest()
         ?: return ResponseDataModel(eventMessage("market.shops_invalid"), null, true, 400)
     val response = read(normalized)
+    currentCoroutineContext().ensureActive()
     if (!owner.isCurrent()) return cloudSessionExpiredResponse()
+    if (response.transportFailure) return response.copy(payload = null, negative = true,
+        message = response.message ?: eventMessage("market.shops_failed"))
     if (response.httpStatusCode == 404) return response.copy(payload = null, negative = true, message = eventMessage("market.shops_upgrade"))
-    if (response.negative) return response.copy(payload = null)
-    if (response.payload?.isValidShopDirectoryResult(owner.accountId, normalized) != true)
+    if (response.negative) return response.copy(payload = null,
+        message = response.message ?: eventMessage("market.shops_failed"))
+    if (response.httpStatusCode != 200 || response.payload?.isValidShopDirectoryResult(owner.accountId, normalized) != true)
         return ResponseDataModel(eventMessage("market.shops_failed"), null, true, 502)
+    currentCoroutineContext().ensureActive()
+    if (!owner.isCurrent()) return cloudSessionExpiredResponse()
     return response
 }

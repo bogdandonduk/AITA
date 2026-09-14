@@ -24,7 +24,8 @@ import kotlinx.coroutines.isActive
 
 @Stable
 private class MarketComparisonData {
-    var page by mutableStateOf<MarketComparisonPage?>(null)
+    var page by mutableStateOf<MarketComparisonWindowResult?>(null)
+    var readRevision by mutableStateOf(-1L)
     var loading by mutableStateOf(true)
     var fresh by mutableStateOf(false)
     var error by mutableStateOf<List<LocalizedStringDataModel>?>(null)
@@ -66,18 +67,26 @@ internal fun AppConfiguration.MarketComparisonDialog(
             if (!owned.isCurrent()) break
             data.loading = true; data.fresh = false
             try {
-                val response = readMarketComparisonWindow(target, place, requestedPages) { loadMarketComparison(owned, it) }
+                val wanted = MarketComparisonWindowRequest(target, place, requestedPages * MARKET_COMPARISON_PAGE_CANDIDATES)
+                val startedRevision = MarketplaceSignals.revision.value
+                val response = loadMarketComparisonWindow(owned, wanted)
                 if (owned.isCurrent()) {
                     val value = response.payload
-                    if (!response.negative && value != null) { data.page = value; data.fresh = true; data.error = null }
+                    if (!response.negative && value != null) {
+                        val latestWanted = MarketComparisonWindowRequest(target, place, requestedPages * MARKET_COMPARISON_PAGE_CANDIDATES)
+                        val refreshQueued = requests.tryReceive().isSuccess
+                        if (!refreshQueued && value.matchesComparisonRead(latestWanted, startedRevision, MarketplaceSignals.revision.value)) {
+                            data.page = value; data.readRevision = startedRevision; data.fresh = true; data.error = null
+                        } else requests.trySend(Unit) // retain one trailing refresh; an older window is never labelled fresh
+                    }
                     else {
-                        data.error = response.message ?: eventMessage("market.comparison_refresh")
+                        data.error = response.message ?: eventMessage("market.comparison_window_refresh")
                         // Revoked publication / changed reference must not leave clickable ghost offers.
                         if (response.httpStatusCode in setOf(401, 403, 404, 409)) data.page = null
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (owned.isCurrent()) data.error = eventMessage("market.comparison_refresh") }
+            catch (_: Exception) { if (owned.isCurrent()) data.error = eventMessage("market.comparison_window_refresh") }
             finally { data.loading = false }
         }
     }
@@ -93,7 +102,9 @@ internal fun AppConfiguration.MarketComparisonDialog(
     }
     val page = data.page
     val selected = review
-    val comparisonReady = data.fresh && !data.loading && owner?.isCurrent() == true && !listChanged
+    val comparisonReady = data.fresh && !data.loading && owner?.isCurrent() == true && !listChanged &&
+        page?.matchesComparisonRead(MarketComparisonWindowRequest(target, place, pages * MARKET_COMPARISON_PAGE_CANDIDATES),
+            data.readRevision, remote) == true
     val reviewedCandidate = page?.matches?.firstOrNull { it.line.offerId == selected?.line?.offerId }
     val reviewUnchanged = selected != null && reviewedCandidate != null &&
         selected.line == reviewedCandidate.line && selected.status == reviewedCandidate.status &&
@@ -187,15 +198,15 @@ internal fun AppConfiguration.MarketComparisonDialog(
                 } else {
                     if (page == null && data.loading) item(key = "skeleton") { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5) }
                     else if (page != null && page.matches.isEmpty()) item(key = "no-matches") {
-                        Text(if (page.nextId == null) authUiText("No other matching published offers in this search.", "Других подходящих опубликованных предложений в этом поиске нет.", "Осы іздеуде басқа сәйкес жарияланған ұсыныстар жоқ.", "Бул издөөдө башка дал келген жарыяланган сунуштар жок.")
-                            else authUiText("No compatible offers on these pages yet. More candidates are available.", "На этих страницах пока нет совместимых предложений. Есть ещё кандидаты.", "Бұл беттерде сәйкес ұсыныстар әлі жоқ. Тағы үміткерлер бар.", "Бул беттерде шайкеш сунуштар азырынча жок. Дагы варианттар бар."),
+                        Text(if (!page.moreCandidates) authUiText("No other matching published offers in this search.", "Других подходящих опубликованных предложений в этом поиске нет.", "Осы іздеуде басқа сәйкес жарияланған ұсыныстар жоқ.", "Бул издөөдө башка дал келген жарыяланган сунуштар жок.")
+                            else eventMessage("market.comparison_window_empty_more").visibleLocalizedString(stateValues.appLanguage, ""),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.textSize)
                     }
                     items(page?.matches.orEmpty(), key = { it.line.offerId }) { candidate ->
                         MarketComparisonCard(candidate, page?.reference?.subtotalMinor, target, shopping, comparisonReady,
                             onReview = { review = candidate }, onVisitShop = onVisitShop)
                     }
-                    if (page?.nextId != null) item(key = "more") {
+                    if (page?.moreCandidates == true) item(key = "more") {
                         if (pages < MARKET_COMPARISON_MAX_PAGES) actionButton(text = authUiText("Search more offers", "Найти ещё предложения", "Тағы ұсыныстарды іздеу", "Дагы сунуштарды издөө"),
                             autoLoading = false, confirmationRequired = false, enabled = !data.loading, onClick = { pages++ })
                         else Text(authUiText("Search window reached: 400 candidates. Set a city to narrow the search. Unseen offers are not ranked.",
@@ -213,8 +224,9 @@ internal fun AppConfiguration.MarketComparisonDialog(
             }
             FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.fillMaxWidth()) {
-                    Text(if (!data.fresh) authUiText("Refresh needed", "Нужно обновить", "Жаңарту қажет", "Жаңыртуу керек")
-                        else authUiText("${page?.matches?.size ?: 0} matching offers loaded", "Загружено совпадений: ${page?.matches?.size ?: 0}", "${page?.matches?.size ?: 0} сәйкес ұсыныс жүктелді", "${page?.matches?.size ?: 0} дал келген сунуш жүктөлдү"),
+                    Text(if (!comparisonReady) authUiText("Refresh needed", "Нужно обновить", "Жаңарту қажет", "Жаңыртуу керек")
+                        else eventMessage("market.comparison_window_scope", "checked" to (page?.candidatesChecked ?: 0).toString(),
+                            "matches" to (page?.matches?.size ?: 0).toString()).visibleLocalizedString(stateValues.appLanguage, ""),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     page?.checkedAtMillis?.let { Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                 }
@@ -255,7 +267,7 @@ private fun AppConfiguration.MarketComparisonCard(row: MarketShoppingQuotedLine,
             autoLoading = false, confirmationRequired = false, onClick = onReview)
         else actionButton(text = if (inList) authUiText("In your list", "В вашем списке", "Сіздің тізіміңізде", "Тизмеңизде") else authUiText("Add this quantity to list", "Добавить это количество в список", "Осы санды тізімге қосу", "Бул санды тизмеге кошуу"),
             enabled = fresh && !inList && shopping.canChange, autoLoading = false, confirmationRequired = false,
-            onClick = { shopping.change(offer.id, selection.units, selection.basis) })
+            onClick = { shopping.add(offer.id, selection.units, selection.basis) })
         actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), enabled = fresh,
             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false,
             onClick = { onVisitShop(offer.storefront) })

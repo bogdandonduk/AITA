@@ -3,6 +3,7 @@ package kz.aita
 import kotlin.test.*
 
 class MarketDiscoveryPolicyTest {
+    private val account = "00000000-0000-0000-0000-000000000099"
     private fun id(n: Int) = "00000000-0000-0000-0000-${n.toString().padStart(12, '0')}"
     private fun category(n: Int, vararg parents: Int) = MarketCategory(id(n), listOf(LocalizedStringDataModel("en", "Category $n")), parents.map(::id))
     private val catalogue get() = MarketCategoryCatalogue("a".repeat(64), listOf(category(1), category(2, 1), category(3, 1, 2), category(4)))
@@ -10,7 +11,8 @@ class MarketDiscoveryPolicyTest {
         "Product", categoryIds = listOf(id(3)), saved = saved, checkedAtMillis = 100, sourceUpdatedAtMillis = 10)
     private fun result(request: MarketDiscoveryRequest = MarketDiscoveryRequest(MarketDiscoveryQuery())) = MarketDiscoveryResult(
         requireNotNull(request.query.normalizedDiscoveryQuery()), request.limit, MarketPage(listOf(offer(saved = request.query.savedOnly)), checkedAtMillis = 100),
-        1, 1, catalogue.version, catalogue.categories)
+        1, 1, catalogue.version, catalogue.categories, account,
+        offer().storefront.takeIf { request.query.storefrontId != null })
 
     @Test fun whitespaceIsCanonicalAcrossSearchCityAndLineBreaks() {
         val query = MarketDiscoveryQuery("  green\t tea\n\u2003bag\u00a0", "  Astana  ").normalizedDiscoveryQuery()
@@ -71,49 +73,49 @@ class MarketDiscoveryPolicyTest {
     }
     @Test fun firstResponseMustSupplyTaxonomy() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery())
-        assertNotNull(result().validatedDiscovery(request, null))
-        assertNull(result().copy(categories = null).validatedDiscovery(request, catalogue))
+        assertNotNull(result().validatedDiscovery(request, null, account))
+        assertNull(result().copy(categories = null).validatedDiscovery(request, catalogue, account))
     }
     @Test fun unchangedTaxonomyCanBeReusedButNotInvented() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery(), knownCategoryVersion = catalogue.version)
-        assertNotNull(result(request).copy(categories = null).validatedDiscovery(request, catalogue))
-        assertNull(result(request).copy(categories = null).validatedDiscovery(request, null))
-        assertNull(result(request).copy(categories = null, categoryVersion = "b".repeat(64)).validatedDiscovery(request, catalogue))
+        assertNotNull(result(request).copy(categories = null).validatedDiscovery(request, catalogue, account))
+        assertNull(result(request).copy(categories = null).validatedDiscovery(request, null, account))
+        assertNull(result(request).copy(categories = null, categoryVersion = "b".repeat(64)).validatedDiscovery(request, catalogue, account))
     }
     @Test fun changedTaxonomyReplacesKnownVersionExplicitly() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery(), knownCategoryVersion = "b".repeat(64))
-        assertEquals(catalogue.version, result(request).validatedDiscovery(request, null)?.catalogue?.version)
+        assertEquals(catalogue.version, result(request).validatedDiscovery(request, null, account)?.catalogue?.version)
     }
     @Test fun wrongAccountScopeFiltersOrWindowNeverPassValidation() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery(savedOnly = true, categoryId = id(1)))
         val valid = result(request)
-        assertNotNull(valid.validatedDiscovery(request, null))
-        assertNull(valid.copy(query = valid.query.copy(savedOnly = false)).validatedDiscovery(request, null))
-        assertNull(valid.copy(query = valid.query.copy(categoryId = null)).validatedDiscovery(request, null))
-        assertNull(valid.copy(limit = 80).validatedDiscovery(request, null))
+        assertNotNull(valid.validatedDiscovery(request, null, account))
+        assertNull(valid.copy(query = valid.query.copy(savedOnly = false)).validatedDiscovery(request, null, account))
+        assertNull(valid.copy(query = valid.query.copy(categoryId = null)).validatedDiscovery(request, null, account))
+        assertNull(valid.copy(limit = 80).validatedDiscovery(request, null, account))
     }
     @Test fun invalidStatisticsAndTruncatedSuccessAreRejected() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery()); val response = result()
-        assertNull(response.copy(totalOffers = -1).validatedDiscovery(request, null))
-        assertNull(response.copy(totalShops = 2).validatedDiscovery(request, null))
-        assertNull(response.copy(totalOffers = 2).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(nextId = id(10))).validatedDiscovery(request, null))
+        assertNull(response.copy(totalOffers = -1).validatedDiscovery(request, null, account))
+        assertNull(response.copy(totalShops = 2).validatedDiscovery(request, null, account))
+        assertNull(response.copy(totalOffers = 2).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(nextId = id(10))).validatedDiscovery(request, null, account))
     }
     @Test fun duplicateOffersAndPrivateShopRowsAreRejected() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery()); val response = result()
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer(), offer())), totalOffers = 2).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(storefront = offer().storefront.copy(published = false))))).validatedDiscovery(request, null))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer(), offer())), totalOffers = 2).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(storefront = offer().storefront.copy(published = false))))).validatedDiscovery(request, null, account))
     }
     @Test fun crossShopOrUnsaveRowsCannotMasqueradeAsFilteredResults() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery(storefrontId = id(20), savedOnly = true)); val response = result(request)
-        assertNotNull(response.validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer()))).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer(saved = true).copy(storefront = offer().storefront.copy(storeId = id(21)))))).validatedDiscovery(request, null))
+        assertNotNull(response.validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer()))).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer(saved = true).copy(storefront = offer().storefront.copy(storeId = id(21)))))).validatedDiscovery(request, null, account))
     }
     @Test fun unknownCategoryIdentifiersAndMalformedTaxonomyDoNotPublish() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery()); val response = result()
-        assertNull(response.copy(categories = catalogue.categories + category(1)).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(categoryIds = listOf(id(999)))))).validatedDiscovery(request, null))
+        assertNull(response.copy(categories = catalogue.categories + category(1)).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(categoryIds = listOf(id(999)))))).validatedDiscovery(request, null, account))
     }
     @Test fun filteredSavedMutationNeverInjectsTheRestOfTheSavedList() {
         val fence = MarketSavedReadFence()
@@ -141,28 +143,28 @@ class MarketDiscoveryPolicyTest {
     }
     @Test fun allPricesRemainEstimatesAndFilterDoesNotRequireKnownStock() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery()); val response = result()
-        assertNotNull(response.validatedDiscovery(request, null)) // unknown price/stock is a valid published offer
+        assertNotNull(response.validatedDiscovery(request, null, account)) // unknown price/stock is a valid published offer
     }
     @Test fun wholeWindowUsesTheLastDisplayedIdOnlyWhenMoreMatchesExist() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery())
         val offers = (10..49).map { offer(it) }
         val response = result().copy(totalOffers = 41, page = MarketPage(offers, offers.last().id, 100))
-        assertNotNull(response.validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(nextId = offers.first().id)).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(nextId = null)).validatedDiscovery(request, null))
-        assertNotNull(response.copy(totalOffers = 40, page = response.page.copy(nextId = null)).validatedDiscovery(request, null))
+        assertNotNull(response.validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(nextId = offers.first().id)).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(nextId = null)).validatedDiscovery(request, null, account))
+        assertNotNull(response.copy(totalOffers = 40, page = response.page.copy(nextId = null)).validatedDiscovery(request, null, account))
     }
     @Test fun selectedCategoryRequiresRealMembershipEvidenceEvenWithMatchingQueryEcho() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery(categoryId = id(1)))
         val response = result(request)
-        assertNotNull(response.validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(categoryIds = listOf(id(4)))))).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(categoryIds = emptyList())))).validatedDiscovery(request, null))
+        assertNotNull(response.validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(categoryIds = listOf(id(4)))))).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(categoryIds = emptyList())))).validatedDiscovery(request, null, account))
     }
     @Test fun knownAndUnknownPricesCannotBeMixedIntoMalformedEstimates() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery())
         val priced = offer().copy(priceMinor = 15000, currencyCode = "KZT", unitId = "piece", pricedAmount = 1.0)
-        fun checked(value: MarketOffer) = result().copy(page = result().page.copy(offers = listOf(value))).validatedDiscovery(request, null)
+        fun checked(value: MarketOffer) = result().copy(page = result().page.copy(offers = listOf(value))).validatedDiscovery(request, null, account)
         assertNotNull(checked(priced))
         assertNull(checked(priced.copy(priceMinor = -1)))
         assertNull(checked(priced.copy(priceMinor = 1_000_000_000_001)))
@@ -176,11 +178,11 @@ class MarketDiscoveryPolicyTest {
     @Test fun taxonomyAndOfferPayloadBoundsFailBeforeDisplay() {
         val request = MarketDiscoveryRequest(MarketDiscoveryQuery())
         val response = result()
-        assertNull(response.copy(categories = listOf(category(1).copy(name = emptyList()))).validatedDiscovery(request, null))
-        assertNull(response.copy(categories = listOf(category(1).copy(ancestorIds = List(65) { id(2) }))).validatedDiscovery(request, null))
-        assertNull(response.copy(categories = (1..MARKET_CATEGORY_MAX_COUNT + 1).map { category(it) }).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(title = "x".repeat(181))))).validatedDiscovery(request, null))
-        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(checkedAtMillis = 99)))).validatedDiscovery(request, null))
+        assertNull(response.copy(categories = listOf(category(1).copy(name = emptyList()))).validatedDiscovery(request, null, account))
+        assertNull(response.copy(categories = listOf(category(1).copy(ancestorIds = List(65) { id(2) }))).validatedDiscovery(request, null, account))
+        assertNull(response.copy(categories = (1..MARKET_CATEGORY_MAX_COUNT + 1).map { category(it) }).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(title = "x".repeat(181))))).validatedDiscovery(request, null, account))
+        assertNull(response.copy(page = response.page.copy(offers = listOf(offer().copy(checkedAtMillis = 99)))).validatedDiscovery(request, null, account))
     }
     @Test fun fullBookmarkReplyBoundsAreValidatedBeforeChangingReadOrdering() {
         val fence = MarketSavedReadFence(); val revision = fence.capture()

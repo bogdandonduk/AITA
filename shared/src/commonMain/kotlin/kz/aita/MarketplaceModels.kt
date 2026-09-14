@@ -50,7 +50,10 @@ const val MARKET_AVAILABILITY_CONFIRM = "confirm_with_store"
 
 @Serializable
 data class MarketPage(val offers: List<MarketOffer> = emptyList(), val nextId: String? = null,
-    val checkedAtMillis: Long = 0L, val unavailableSavedCount: Int = 0)
+    val checkedAtMillis: Long = 0L, val unavailableSavedCount: Int = 0,
+    // Mutation-only acknowledgements. Missing fields from an older server remain readable,
+    // but a discovery/saved page alone is not evidence that a write committed.
+    val savedMutation: MarketSavedUpdate? = null, val unavailableSavedCleared: Boolean = false)
 
 @Serializable
 data class MarketPublicationDashboard(val storefront: MarketStorefront, val listings: List<MarketListing> = emptyList())

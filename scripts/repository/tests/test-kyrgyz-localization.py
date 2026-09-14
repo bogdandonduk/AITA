@@ -24,7 +24,7 @@ contracts = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(contracts)
 Q = r'"(?:[^"\\]|\\.)*"'
 AUTH = re.compile(r'\bauthUiText\(\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(' + Q + r')\s*\)')
-EVENT = re.compile(r'\bEventMessageTemplate\(\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(?:' + Q + r'\s*,\s*)?ky\s*=\s*(' + Q + r')\s*\)')
+EVENT = re.compile(r'\bEventMessageTemplate\(\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(' + Q + r')\s*,\s*(?:' + Q + r'\s*,\s*)?ky\s*=\s*(' + Q + r')(?:\s*,\s*(?:tg|uz)\s*=\s*' + Q + r')*\s*\)')
 PARAMETERS = re.compile(r'\$\{[^}]*\}|\$[A-Za-z_]\w*|\{(?:[A-Za-z_]\w*|\d+)\}'
                         r'|%(?:\d+\$)?[-+0#]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[sSdDfFeEgGcCbBhHxXoOn]')
 LIVE_EVENTS = ("CoreEventMessages.kt", "ApplicationEventMessages.kt", "AuthenticationEventMessages.kt",
@@ -101,7 +101,12 @@ class KyrgyzLocalizationContractsTest(unittest.TestCase):
     def test_every_literal_inline_label_has_the_required_fourth_language(self):
         calls = list(auth_values())
         count = sum(len(re.findall(r'\bauthUiText\(\s*"', p.read_text(encoding="utf-8"))) for p in COMPOSE.glob("*.kt"))
-        self.assertGreaterEqual(count, 604)
+        # Two comparison labels moved from inline text to six-language event templates.
+        comparison = (COMPOSE / "MarketComparisonDialog.kt").read_text(encoding="utf-8")
+        migrated = sum(f'eventMessage("{key}"' in comparison for key in (
+            "market.comparison_window_empty_more", "market.comparison_window_scope"))
+        self.assertEqual(migrated, 2)
+        self.assertGreaterEqual(count + migrated, 604)
         self.assertEqual(count, len(calls))
         for filename, (en, ru, kk, ky) in calls:
             self.assertTrue(ky.strip(), (filename, en))
@@ -109,6 +114,12 @@ class KyrgyzLocalizationContractsTest(unittest.TestCase):
         self.assertIn("kk: String, ky: String", helper)
         self.assertIn('"ky" -> ky', helper)
         self.assertIn('effectiveAppLanguage(stateValues.appLanguage)', helper)
+
+    def test_event_parser_keeps_checking_kyrgyz_when_more_languages_are_added(self):
+        sample = 'EventMessageTemplate("key", "en", "ru", "kk", ky = "Кыргызча", tg = "Тоҷикӣ", uz = "O‘zbekcha")'
+        self.assertIsNotNone(EVENT.fullmatch(sample))
+        self.assertEqual("Кыргызча", kotlin_values(EVENT.fullmatch(sample))[-1])
+        self.assertIsNone(EVENT.fullmatch(sample.replace('ky = "Кыргызча", ', '')))
 
     def test_all_current_events_have_explicit_kyrgyz_templates(self):
         calls = list(event_values())

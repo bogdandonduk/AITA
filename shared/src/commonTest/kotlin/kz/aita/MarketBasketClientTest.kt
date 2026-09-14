@@ -3,6 +3,9 @@ package kz.aita
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
@@ -48,5 +51,51 @@ class MarketBasketClientTest {
     }
     @Test fun coroutineCancellationIsNotTurnedIntoAVisibleFailure()=runBlocking {
         assertFailsWith<CancellationException>{ readOwnedMarketBasket(Owner(),result.request){throw CancellationException("cancel")} }
+    }
+
+    @Test fun onlyHttp200CanPublishAPlausibleBasket() = runBlocking {
+        for (status in listOf(null, 0, 201, 202, 204, 304, 401, 409, 500, 503)) {
+            val reply = readOwnedMarketBasket(Owner(), result.request) { response().copy(httpStatusCode = status) }
+            assertTrue(reply.negative, "HTTP $status")
+            assertNull(reply.payload)
+            assertEquals(502, reply.httpStatusCode)
+        }
+    }
+    @Test fun transportFailureCannotPublishOrPretendTheEndpointIsMissing() = runBlocking {
+        for (status in listOf(200, 404, 500)) {
+            val reply = readOwnedMarketBasket(Owner(), result.request) {
+                response().copy(httpStatusCode = status, transportFailure = true)
+            }
+            assertTrue(reply.negative); assertNull(reply.payload); assertTrue(reply.transportFailure)
+            assertEquals(eventMessage("market.basket_refresh"), reply.message)
+        }
+    }
+    @Test fun cancelledCallerDoesNotEvenStartANonSuspendingAdapter() = runBlocking {
+        var calls = 0
+        val child = launch {
+            currentCoroutineContext().cancel()
+            readOwnedMarketBasket(Owner(), result.request) { calls++; response() }
+        }
+        child.join()
+        assertTrue(child.isCancelled); assertEquals(0, calls)
+    }
+    @Test fun adapterWhichReturnsAfterCancellationCannotPublish() = runBlocking {
+        var published = false
+        val child = launch {
+            readOwnedMarketBasket(Owner(), result.request) {
+                currentCoroutineContext().cancel()
+                response()
+            }
+            published = true
+        }
+        child.join()
+        assertTrue(child.isCancelled); assertFalse(published)
+    }
+    @Test fun missingSuccessPayloadAndUnexplainedErrorHaveUsefulFeedback() = runBlocking {
+        val missing = readOwnedMarketBasket(Owner(), result.request) { response().copy(payload = null) }
+        val error = readOwnedMarketBasket(Owner(), result.request) { response().copy(negative = true, httpStatusCode = 503) }
+        assertNull(missing.payload); assertTrue(missing.negative); assertNotNull(missing.message)
+        assertNull(error.payload); assertTrue(error.negative); assertNotNull(error.message)
+        assertEquals(503, error.httpStatusCode)
     }
 }

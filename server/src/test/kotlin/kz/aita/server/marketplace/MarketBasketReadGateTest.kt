@@ -35,4 +35,15 @@ class MarketBasketReadGateTest {
             assertEquals(4,jobs.count { it.get(5,java.util.concurrent.TimeUnit.SECONDS) })
         } finally { pool.shutdownNow() }
     }
+    @Test fun discoveryAllowanceDoesNotChangeTheDefaultBasketAllowance() {
+        val gate = MarketBasketReadGate(requestsPerMinute = 60); val user = UUID.randomUUID()
+        repeat(60) { assertTrue(gate.acquire(user, it.toLong()).allowed); gate.release(user) }
+        assertFalse(gate.acquire(user, 60).allowed)
+        assertTrue(gate.acquire(user, 60_000).allowed)
+    }
+    @Test fun invalidCapacityOrAllowanceIsRejected() {
+        assertFailsWith<IllegalArgumentException> { MarketBasketReadGate(0) }
+        assertFailsWith<IllegalArgumentException> { MarketBasketReadGate(requestsPerMinute = 0) }
+        assertFailsWith<IllegalArgumentException> { MarketBasketReadGate(requestsPerMinute = -1) }
+    }
 }

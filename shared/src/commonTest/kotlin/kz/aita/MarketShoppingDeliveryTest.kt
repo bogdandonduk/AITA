@@ -277,4 +277,76 @@ class MarketShoppingDeliveryTest {
         assertNotNull(memory.journal()?.pending)
     }
 
+    @Test fun newerDurableRevisionRejectsNewStaleCommandBeforePrepareOrSend() = runTest {
+        val memory = Memory(); val owner = Owner(); var sends = 0
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(2)) },
+            { _, request -> sends++; ok(outcome(request)) })
+        assertTrue(store.refresh(owner).fresh)
+        val before = memory.data.toMap()
+        val result = store.change(owner, command)
+        assertFalse(result.acknowledged); assertNull(result.pending); assertNotNull(result.error)
+        assertEquals(0, sends); assertEquals(before, memory.data)
+        assertEquals(2L, result.snapshot?.revision)
+    }
+    @Test fun senderWaiterCannotRebaseAfterEarlierWriteCommits() = runTest {
+        val memory = Memory(); val owner = Owner(); var sends = 0
+        val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(0)) }, { _, request ->
+            sends++; entered.complete(Unit); release.await(); ok(outcome(request))
+        })
+        val first = async { store.change(owner, command) }
+        entered.await()
+        val waiting = async { store.change(owner, command.copy(commandId = "waiting", offerId = "another")) }
+        release.complete(Unit)
+        assertTrue(first.await().acknowledged)
+        val rejected = waiting.await()
+        assertFalse(rejected.acknowledged); assertNull(rejected.pending); assertNotNull(rejected.error)
+        assertEquals(1, sends); assertNull(memory.journal()?.pending)
+        assertEquals(1L, memory.journal()?.snapshot?.revision)
+    }
+    @Test fun identicalPendingChangeStillReplaysAfterALaterSnapshotWasRead() = runTest {
+        val memory = Memory(); val owner = Owner(); val sent = mutableListOf<MarketShoppingCommand>()
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(3)) }, { _, request ->
+            sent += request
+            if (sent.size == 1) ResponseDataModel(null, null, true, 503)
+            else ok(outcome(request).copy(replayed = true, snapshot = snapshot(3)))
+        })
+        assertNotNull(store.change(owner, command).pending)
+        assertNotNull(store.refresh(owner).pending)
+        val result = store.change(owner, command)
+        assertTrue(result.acknowledged); assertTrue(result.accepted)
+        assertEquals(listOf(command, command), sent); assertNull(memory.journal()?.pending)
+        assertEquals(3L, memory.journal()?.snapshot?.revision)
+    }
+    @Test fun retryKeepsOriginalExpectedRevisionAfterAnotherDevicesEdit() = runTest {
+        val memory = Memory(); val owner = Owner(); val sent = mutableListOf<MarketShoppingCommand>()
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(5)) }, { _, request ->
+            sent += request
+            if (sent.size == 1) ResponseDataModel(null, null, true, 503)
+            else ok(MarketShoppingOutcome(request.commandId, false, errorKey = "market.shopping_changed", snapshot = snapshot(5)))
+        })
+        store.change(owner, command); store.refresh(owner)
+        val result = store.retry(owner)
+        assertTrue(result.acknowledged); assertFalse(result.accepted)
+        assertEquals(listOf(command, command), sent); assertNull(memory.journal()?.pending)
+    }
+    @Test fun sameKnownRevisionKeepsNewCommandIdentityAndPayload() = runTest {
+        val memory = Memory(); val owner = Owner(); var sent: MarketShoppingCommand? = null
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(snapshot(0)) }, { _, request ->
+            sent = request; ok(outcome(request))
+        })
+        store.refresh(owner)
+        assertTrue(store.change(owner, command).acknowledged)
+        assertEquals(command, sent)
+    }
+    @Test fun staleNewRemovalDoesNotCreateAnUnnecessaryRecoveryRecord() = runTest {
+        val memory = Memory(); val owner = Owner(); var sends = 0
+        val store = MarketShoppingDeliveryStore(memory::get, memory::put, { ok(outcome().snapshot.copy(revision = 2)) },
+            { _, request -> sends++; ok(outcome(request)) })
+        store.refresh(owner)
+        val result = store.change(owner, command.copy(expectedRevision = 1, units = 0, basis = null))
+        assertFalse(result.acknowledged); assertNull(result.pending); assertEquals(0, sends)
+        assertEquals(1, memory.journal()?.snapshot?.lines?.size)
+    }
+
 }

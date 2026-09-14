@@ -143,6 +143,23 @@ fun MarketBasketResult.isValidBasketResult(account: String, expected: MarketBask
         candidatesChecked > (allIds.size - fixedIds.size) * MARKET_BASKET_CANDIDATES_PER_LINE) return false
     val sourceGroups = snapshot.lines.groupBy { it.line.basis.currencyCode }
     if (currencies.map { it.currencyCode } != sourceGroups.keys.sorted()) return false
+    // A whole plan is read from one database snapshot. Reusing an offer or shop across tabs
+    // cannot change its public price/address/pickup note. Totals alone do not prove consistency.
+    val plans = currencies.flatMap { listOf(it.current, it.oneShop, it.twoShops, it.lowestItems) }
+    if (plans.any { it.choices.size > allIds.size }) return false
+    val publicOffers = snapshot.lines.mapNotNull { it.offer } + plans.flatMap { plan ->
+        plan.choices.mapNotNull { it.quote.offer }
+    }
+    val seenOffers = mutableMapOf<String, MarketOffer>()
+    val seenShops = mutableMapOf<String, MarketStorefront>()
+    for (offer in publicOffers) {
+        val previousOffer = seenOffers[offer.id]
+        val previousShop = seenShops[offer.storefront.storeId]
+        if ((previousOffer != null && previousOffer != offer) ||
+            (previousShop != null && previousShop != offer.storefront)) return false
+        seenOffers[offer.id] = offer
+        seenShops[offer.storefront.storeId] = offer.storefront
+    }
     return currencies.all groups@{ group ->
         val sources = sourceGroups.getValue(group.currencyCode).associateBy { it.line.offerId }
         if (group.eligibleShopCount !in 0..(allIds.size + candidatesChecked) ||

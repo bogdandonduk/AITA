@@ -103,7 +103,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
     var planning by remember(account, generation) { mutableStateOf(false) }
     var comparisonCity by remember(account, generation) { mutableStateOf("") }
     val activityNavigation = remember(account, generation) { MarketShoppingActivityNavigation() }
-    val groups = state.snapshot?.shoppingGroups().orEmpty()
+    var removal by remember(account, generation) { mutableStateOf<MarketShoppingLineReview?>(null) }
+    val displayed = state.snapshot
+    val groups = displayed?.shoppingGroups().orEmpty()
     AitaScreenColumn(
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1120.dp,
@@ -145,11 +147,17 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                         enabled = state.canChange, autoLoading = false, confirmationRequired = false,
                         onClick = { planning = true })
                 }
-                if (section == "list") items(state.snapshot?.lines.orEmpty(), key = { it.line.offerId }) { row ->
-                    ShoppingLineCard(row, state, onOpen = { openedId = row.line.offerId }, onCompare = {
-                        comparisonCity = ""
-                        state.snapshot?.revision?.let { comparison = row.line.comparisonSelection(it) }
-                    })
+                if (section == "list") {
+                    if (displayed != null) items(displayed.lines, key = { it.line.offerId }) { row ->
+                        val review = displayed.reviewShoppingLine(row.line)
+                        ShoppingLineCard(row, state, review, onOpen = { openedId = row.line.offerId }, onCompare = {
+                            comparisonCity = ""
+                            review?.let { comparison = state.compareLine(it) }
+                        }, onRemove = {
+                            // Keep this exact row/revision while the confirmation is open.
+                            removal = review
+                        })
+                    }
                 } else {
                     items(groups, key = { "${it.storeId}:${it.currencyCode}" }) { group ->
                         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
@@ -198,6 +206,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
             }
         }
     }
+    removal?.let { review ->
+        MarketShoppingRemoveDialog(review, state, onDismiss = { removal = null })
+    }
     openedId?.let { id -> MarketOfferDetailDialog(id, state, onDismiss = { openedId = null }, onVisitShop = { shop ->
         NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
         openedId = null
@@ -225,8 +236,10 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, state: MarketShoppingUiState, onOpen: () -> Unit, onCompare: () -> Unit) {
+private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, state: MarketShoppingUiState,
+    review: MarketShoppingLineReview?, onOpen: () -> Unit, onCompare: () -> Unit, onRemove: () -> Unit) {
     val line = row.line
+    val editable = state.canChange && review?.matches(state.snapshot) == true
     val unit = line.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл.", "бирдик"))
     val amount = line.basis.pricedAmount.toString().removeSuffix(".0")
     val status = when (row.status) {
@@ -248,21 +261,21 @@ private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, sta
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу") }, text = "−", iconContentDescription = authUiText("Decrease units", "Уменьшить количество", "Санды азайту", "Бирдиктерди азайтуу"),
-                enabled = state.canChange && line.units > 1, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
-                onClick = { state.change(line.offerId, line.units - 1, line.basis) })
+                enabled = editable && line.units > 1, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                onClick = { review?.let { state.changeLine(it, line.units - 1) } })
             Text(line.units.toString(), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
             actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү") }, text = "+", iconContentDescription = authUiText("Increase units", "Увеличить количество", "Санды көбейту", "Бирдиктерди көбөйтүү"),
-                enabled = state.canChange && line.units < MARKET_SHOPPING_MAX_UNITS, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
-                onClick = { state.change(line.offerId, line.units + 1, line.basis) })
+                enabled = editable && line.units < MARKET_SHOPPING_MAX_UNITS, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                onClick = { review?.let { state.changeLine(it, line.units + 1) } })
             }
             actionButton(text = "", iconPath = stateValues.drawablePathIconDelete,
                 iconContentDescription = authUiText("Remove from list", "Убрать из списка", "Тізімнен жою", "Тизмеден алып салуу"),
-                enabled = state.canChange, autoLoading = false, confirmationRequired = true,
-                onClick = { state.change(line.offerId, 0, null) })
+                enabled = editable, autoLoading = false, confirmationRequired = false,
+                onClick = onRemove)
         }
-        if (line.comparisonSelection(state.snapshot?.revision ?: 0L) != null) actionButton(
+        if (review != null && line.comparisonSelection(review.expectedRevision) != null) actionButton(
             text = authUiText("Compare other shops", "Сравнить другие магазины", "Басқа дүкендерді салыстыру", "Башка дүкөндөрдү салыштыруу"),
-            iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = !state.changing && state.pending == null,
+            iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = editable,
             autoLoading = false, confirmationRequired = false, onClick = onCompare)
         if (row.offer != null) actionButton(text = authUiText("View current offer", "Посмотреть предложение", "Ағымдағы ұсынысты көру", "Учурдагы сунушту көрүү"),
             autoLoading = false, confirmationRequired = false, onClick = onOpen)

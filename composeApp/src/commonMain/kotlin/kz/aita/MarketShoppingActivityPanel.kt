@@ -41,7 +41,15 @@ private fun AppConfiguration.activityStatus(entry: MarketShoppingActivityEntry):
 /** Kept above the Items/By shop/Activity branch. No custom objects enter Android saved state. */
 @Stable
 internal class MarketShoppingActivityNavigation {
-    var request by mutableStateOf(MarketShoppingActivitySearchRequest())
+    val reads = MarketShoppingActivityReadFence()
+    var selection by mutableStateOf(Any())
+        private set
+    private var selectedRequest by mutableStateOf(MarketShoppingActivitySearchRequest())
+    var request: MarketShoppingActivitySearchRequest
+        get() = selectedRequest
+        set(value) {
+            if (selectedRequest != value) { reads.invalidate(); selection = Any(); selectedRequest = value }
+        }
     var reference by mutableStateOf("")
     var referenceError by mutableStateOf(false)
     val scroll = LazyListState()
@@ -54,7 +62,11 @@ private class ShoppingActivityPageRead {
     var page by mutableStateOf<MarketShoppingActivitySearchPage?>(null)
     var loading by mutableStateOf(false)
     var error by mutableStateOf<List<LocalizedStringDataModel>?>(null)
+    var notice by mutableStateOf<List<LocalizedStringDataModel>?>(null)
     var loadedSignal by mutableStateOf(-1L)
+    var stamp by mutableStateOf<MarketShoppingActivityReadFence.Stamp?>(null)
+
+    fun retire() { stamp = null }
 }
 
 /** History is read-only, including an exact reference search. Finding an entry never retires the
@@ -70,27 +82,48 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
     val generation = currentAuthenticatedSessionGeneration()
     val owner = remember(account, generation) { captureMarketRequestScope() }
     val wanted = navigation.request
+    val selection = navigation.selection
     // A filter/page change gets an empty, independent result cell. Old rows are never relabelled
     // with new filters while their replacement loads. A disposed read cannot publish into it.
-    val data = remember(account, generation, wanted) { ShoppingActivityPageRead() }
+    val data = remember(account, generation, wanted, selection) { ShoppingActivityPageRead() }
     val requests = remember(data) { Channel<Unit>(Channel.CONFLATED) }
     var opened by remember(account, generation) { mutableStateOf<MarketShoppingActivityEntry?>(null) }
     val signal by MarketplaceSignals.revision.collectAsState()
-    val latestSignal by rememberUpdatedState(signal)
     val detailOpen by rememberUpdatedState(opened != null)
     val lastRead = remember(account, generation) { mutableStateOf<kotlin.time.TimeMark?>(null) }
     val scroll = navigation.scroll
+    fun controlsCurrent(): Boolean = data.active && owner?.isCurrent() == true &&
+        navigation.selection === selection && navigation.request == wanted
+    fun refreshPage() {
+        if (!controlsCurrent()) return
+        navigation.reads.invalidate()
+        data.retire()
+        requests.trySend(Unit)
+    }
+    fun canUsePage(displayed: MarketShoppingActivitySearchPage?): Boolean =
+        controlsCurrent() && displayed != null && data.page === displayed &&
+            navigation.reads.canUse(data.stamp, displayed, navigation.request,
+                MarketplaceSignals.revision.value, data.loading || data.error != null || opened != null)
+    fun stalePage() {
+        if (controlsCurrent()) {
+            data.notice = eventMessage("market.activity_page_changed")
+            if (opened == null) refreshPage()
+        }
+    }
     DisposableEffect(data) { onDispose { data.active = false; requests.close() } }
     LaunchedEffect(wanted) {
         if (navigation.positionedRequest != wanted) { scroll.scrollToItem(0); navigation.positionedRequest = wanted }
     }
     LaunchedEffect(data, signal, opened?.commandId) {
         // Do not jump someone reading older immutable records to a new head page on every event.
-        if (opened == null && (data.page == null || wanted.boundary == null)) requests.trySend(Unit)
+        if (opened == null && (data.page == null || wanted.boundary == null)) refreshPage()
     }
     LaunchedEffect(data) {
         val owned = owner
         if (owned == null) { data.error = eventMessage("market.shopping_denied"); return@LaunchedEffect }
+        if (wanted.normalizedActivitySearch() == null) {
+            data.error = eventMessage("market.activity_search_invalid"); return@LaunchedEffect
+        }
         for (ignored in requests) {
             delay(200)
             val wait = lastRead.value?.let { (2_000 - it.elapsedNow().inWholeMilliseconds).coerceAtLeast(0) } ?: 0
@@ -98,29 +131,35 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
             while (requests.tryReceive().isSuccess) { /* arrivals during I/O retain a trailing read */ }
             if (!data.active || !owned.isCurrent()) break
             if (detailOpen) continue
-            val atSignal = latestSignal
+            if (navigation.request != wanted) continue
+            val atSignal = MarketplaceSignals.revision.value
+            val stamp = navigation.reads.capture(wanted, atSignal)
+            fun stillOwnsRead() = data.active && owned.isCurrent() &&
+                navigation.selection === selection &&
+                navigation.reads.isCurrent(stamp, navigation.request, MarketplaceSignals.revision.value)
             lastRead.value = kotlin.time.TimeSource.Monotonic.markNow()
             data.loading = true
             try {
                 val response = loadMarketShoppingActivitySearch(owned, wanted)
                 if (!data.active || !owned.isCurrent()) break
+                if (!stillOwnsRead()) continue
                 val result = response.payload
                 if (!response.negative && result != null) {
-                    data.page = result; data.error = null; data.loadedSignal = atSignal
+                    data.page = result; data.error = null; data.notice = null; data.loadedSignal = atSignal; data.stamp = stamp
                 } else {
                     data.error = response.message ?: eventMessage("market.shopping_activity_failed")
-                    if (response.httpStatusCode in setOf(401, 403)) data.page = null
+                    if (!response.transportFailure && response.httpStatusCode in setOf(401, 403)) data.page = null
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (data.active && owned.isCurrent()) data.error = eventMessage("market.shopping_activity_failed") }
+            catch (_: Exception) { if (stillOwnsRead()) data.error = eventMessage("market.shopping_activity_failed") }
             finally { if (data.active) data.loading = false }
         }
     }
     LaunchedEffect(data) {
-        while (isActive) { delay(30_000); if (wanted.boundary == null && !detailOpen) requests.trySend(Unit) }
+        while (isActive) { delay(30_000); if (wanted.boundary == null && !detailOpen) refreshPage() }
     }
     val page = data.page
-    val canNavigate = page != null && !data.loading && data.error == null && owner?.isCurrent() == true
+    val canNavigate = canUsePage(page)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = scroll, contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -141,19 +180,23 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                             fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
                             enabled = navigation.reference.isNotBlank(), onClick = {
                                 val reference = normalizedMarketChangeReference(navigation.reference)
-                                navigation.referenceError = reference == null
-                                if (reference != null) {
+                                if (controlsCurrent()) navigation.referenceError = reference == null
+                                if (reference != null && controlsCurrent()) {
                                     navigation.reference = reference
                                     val next = MarketShoppingActivitySearchRequest(MarketShoppingActivityFilter(commandId = reference))
                                     navigation.request = next
-                                    if (wanted == next) requests.trySend(Unit)
+                                    if (wanted == next) refreshPage()
                                 }
                             })
                         if (wanted.filter != MarketShoppingActivityFilter() || navigation.reference.isNotEmpty())
                             actionButton(text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
                                 fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
-                                onClick = { navigation.reference = ""; navigation.referenceError = false
-                                    navigation.request = MarketShoppingActivitySearchRequest() })
+                                onClick = {
+                                    if (controlsCurrent()) {
+                                        navigation.reference = ""; navigation.referenceError = false
+                                        navigation.request = MarketShoppingActivitySearchRequest()
+                                    }
+                                })
                     }
                     if (wanted.filter.commandId == null) {
                         sectionTabsWidget("activity-result:$account", listOf(
@@ -164,7 +207,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                             TabContent(MARKET_ACTIVITY_RESULT_UNCHANGED, authUiText("No change", "Без изменений", "Өзгеріс жоқ", "Өзгөртүү жок"))),
                             selectedId = wanted.filter.result ?: "all", onSelected = {
                                 val current = navigation.request.filter
-                                if (current.commandId == null) navigation.request = MarketShoppingActivitySearchRequest(
+                                if (controlsCurrent() && current.commandId == null) navigation.request = MarketShoppingActivitySearchRequest(
                                     current.copy(result = it.takeUnless { key -> key == "all" }))
                             })
                         sectionTabsWidget("activity-kind:$account", listOf(
@@ -175,7 +218,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                             TabContent(MARKET_ACTIVITY_BASKET, authUiText("Basket", "Корзина", "Себет", "Себет"))),
                             selectedId = wanted.filter.kind ?: "all", onSelected = {
                                 val current = navigation.request.filter
-                                if (current.commandId == null) navigation.request = MarketShoppingActivitySearchRequest(
+                                if (controlsCurrent() && current.commandId == null) navigation.request = MarketShoppingActivitySearchRequest(
                                     current.copy(kind = it.takeUnless { key -> key == "all" }))
                             })
                     } else Text(authUiText("Exact reference search · type and result filters are cleared.",
@@ -193,7 +236,11 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
             data.error?.let { message -> item(key = "history-error") {
                 Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
             } }
-            if (page != null && page.entries.isEmpty()) item(key = "history-empty") {
+            data.notice?.let { message -> item(key = "history-notice") {
+                Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.PlaceholderTextColor,
+                    fontSize = stateValues.smallTextSize)
+            } }
+            if (canNavigate && page?.entries?.isEmpty() == true) item(key = "history-empty") {
                 Text(if (wanted.filter.commandId != null) authUiText("No recorded result for this reference in your account. This does not prove a pending request failed.",
                     "В вашем аккаунте нет записанного результата с этим номером. Это не доказывает отказ по ожидающей команде.",
                     "Аккаунтыңызда осы нөмірдің жазылған нәтижесі жоқ. Бұл күтілген пәрменнің орындалмағанын дәлелдемейді.", "Аккаунтуңузда бул шилтеме боюнча катталган натыйжа жок. Бул күтүүдөгү суроо-талап аткарылбай калганын далилдебейт.")
@@ -217,20 +264,30 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                         "${entry.changedLines} ауыстыру ұсынылды · ешқайсысы қолданылмады", "Дүкөн боюнча ${entry.changedLines} өзгөртүү сунушталды · эч бири колдонулган жок"),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     actionButton(text = authUiText("View result", "Посмотреть результат", "Нәтижені көру", "Натыйжаны көрүү"), fillMaxWidthIfTextPresent = false,
-                        confirmationRequired = false, autoLoading = false, onClick = { opened = entry })
+                        enabled = canNavigate, confirmationRequired = false, autoLoading = false, onClick = {
+                            if (canUsePage(page) && page?.entries?.contains(entry) == true) opened = entry
+                            else stalePage()
+                        })
                 }
             }
             item(key = "history-navigation") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (wanted.boundary != null) actionButton(text = authUiText("Latest", "Последние", "Соңғылары", "Акыркылар"),
                         enabled = !data.loading, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
-                        onClick = { navigation.request = MarketShoppingActivitySearchRequest(navigation.request.filter) })
+                        onClick = {
+                            if (controlsCurrent())
+                                navigation.request = MarketShoppingActivitySearchRequest(navigation.request.filter)
+                        })
                     page?.newerActivityRequest()?.let { next -> actionButton(text = authUiText("Newer", "Более новые", "Жаңарақ", "Жаңыраак"),
                         enabled = canNavigate, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
-                        onClick = { if (navigation.request == wanted) navigation.request = next }) }
+                        onClick = {
+                            if (canUsePage(page)) navigation.request = next else stalePage()
+                        }) }
                     page?.olderActivityRequest()?.let { next -> actionButton(text = authUiText("Older", "Более ранние", "Бұрынғы", "Эскирээк"),
                         enabled = canNavigate, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
-                        onClick = { if (navigation.request == wanted) navigation.request = next }) }
+                        onClick = {
+                            if (canUsePage(page)) navigation.request = next else stalePage()
+                        }) }
                 }
                 if (page != null && wanted.filter.commandId == null) Text(authUiText(
                     "${page.entries.size} changes on this page · older history remains available, 20 at a time.",
@@ -241,13 +298,13 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
         }
         FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(if (page != null && !data.loading && data.error == null && data.loadedSignal == signal)
+            Text(if (page != null && canNavigate && data.loadedSignal == signal)
                 authUiText("Updated", "Обновлено", "Жаңартылды", "Жаңыртылды") + " · " + receiptUiDateTime(page.checkedAtMillis)
             else authUiText("History · refresh needed", "История · требуется обновление", "Тарих · жаңарту қажет", "Тарых · жаңыртуу керек"),
                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             actionButton(text = authUiText("Refresh page", "Обновить страницу", "Бетті жаңарту", "Бетти жаңыртуу"), enabled = !data.loading,
                 loading = data.loading, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
-                onClick = { requests.trySend(Unit) })
+                onClick = { refreshPage() })
         }
     }
     opened?.let { entry -> MarketShoppingActivityDialog(entry, onDismiss = { opened = null }) }
@@ -259,11 +316,11 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
     val account = stateValues.userAccount?.id
     val generation = currentAuthenticatedSessionGeneration()
     val owner = remember(account, generation) { captureMarketRequestScope() }
-    var detail by remember(account, generation, entry.commandId) { mutableStateOf<MarketShoppingActivityEntry?>(null) }
-    var loading by remember(account, generation, entry.commandId) { mutableStateOf(false) }
-    var error by remember(account, generation, entry.commandId) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
-    var attempt by remember(account, generation, entry.commandId) { mutableStateOf(0) }
-    val detailLifetime = remember(account, generation, entry.commandId, attempt) { ShoppingActivityReadLifetime() }
+    var detail by remember(account, generation, entry) { mutableStateOf<MarketShoppingActivityEntry?>(null) }
+    var loading by remember(account, generation, entry) { mutableStateOf(false) }
+    var error by remember(account, generation, entry) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
+    var attempt by remember(account, generation, entry) { mutableStateOf(0) }
+    val detailLifetime = remember(account, generation, entry, attempt) { ShoppingActivityReadLifetime() }
     DisposableEffect(detailLifetime) { onDispose { detailLifetime.active = false } }
     LaunchedEffect(detailLifetime) {
         val owned = owner ?: return@LaunchedEffect
@@ -311,7 +368,11 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
                 error?.let { message -> item {
                     Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     actionButton(text = authUiText("Load details again", "Загрузить данные снова", "Деректерді қайта жүктеу", "Чоо-жайын кайра жүктөө"),
-                        enabled = !loading, autoLoading = false, confirmationRequired = false, onClick = { attempt++ })
+                        enabled = !loading, autoLoading = false, confirmationRequired = false, onClick = {
+                            if (detailLifetime.active && owner?.isCurrent() == true && !loading) {
+                                detailLifetime.active = false; loading = true; attempt++
+                            }
+                        })
                 } }
                 if (!entry.detailsRecorded) item {
                     Text(if (entry.accepted) authUiText("Older record: product and shop labels were not captured. Today's catalogue has not been substituted for past details.",

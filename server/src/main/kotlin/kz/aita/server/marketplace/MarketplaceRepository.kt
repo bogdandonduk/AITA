@@ -32,6 +32,25 @@ internal class MarketplaceRepository(private val db: Connection,
             throw failure
         } finally { basketReadStartedNanos = null }
     }
+    /** Reuse the bounded public-read machinery, but report the comparison's own recovery text. */
+    fun <T> withComparisonReadBudget(work: () -> T): T = try { withBasketReadBudget(work) }
+    catch (failure: MarketFailure) {
+        if (failure.key == "market.basket_busy") marketFail("market.comparison_window_busy", 503)
+        throw failure
+    }
+
+    fun <T> withDiscoveryReadBudget(work: () -> T): T = try { withBasketReadBudget(work) }
+    catch (failure: MarketFailure) {
+        if (failure.key == "market.basket_busy") marketFail("market.discovery_busy", 503)
+        throw failure
+    }
+
+    fun <T> withOfferDetailReadBudget(work: () -> T): T = try { withBasketReadBudget(work) }
+    catch (failure: MarketFailure) {
+        if (failure.key == "market.basket_busy") marketFail("market.detail_busy", 503)
+        throw failure
+    }
+
     private fun basketQueryTimeoutSeconds(): Int? {
         val started = basketReadStartedNanos ?: return null
         val remaining = 8_000_000_000L - (System.nanoTime() - started)
@@ -174,12 +193,13 @@ internal class MarketplaceRepository(private val db: Connection,
     fun discover(user: UUID, request: MarketDiscoveryRequest): MarketDiscoveryResult {
         if (!request.isValidDiscoveryRequest()) marketFail("market.discovery_invalid")
         val input = request.query.normalizedDiscoveryQuery() ?: marketFail("market.discovery_invalid")
+        val now = System.currentTimeMillis()
+        val shop = input.storefrontId?.let { publicShop(it, now) }
         val catalogue = discoveryCategories()
         val tree = MarketCategoryTree(catalogue.categories)
         val descendants = input.categoryId?.let { category ->
             tree.subtreeIds(category).takeIf { it.isNotEmpty() } ?: marketFail("market.category_changed", 409)
         }
-        val now = System.currentTimeMillis()
         val conditions = mutableListOf(publicPredicate)
         val args = mutableListOf<Any?>(now, now)
         // Terms are ANDed across public title/description. SQL wildcard characters are literal;
@@ -219,7 +239,8 @@ internal class MarketplaceRepository(private val db: Connection,
             user, now, now) { it.getLong(1).coerceAtMost(Int.MAX_VALUE.toLong()).toInt() }.single()
         return MarketDiscoveryResult(input, request.limit,
             MarketPage(offers, rows.lastOrNull()?.listing?.id?.takeIf { counts.first > rows.size }, now, unavailable),
-            counts.first, counts.second, catalogue.version, catalogue.categories.takeUnless { request.knownCategoryVersion == catalogue.version })
+            counts.first, counts.second, catalogue.version, catalogue.categories.takeUnless { request.knownCategoryVersion == catalogue.version },
+            accountId = user.toString(), storefront = shop)
     }
 
     private fun discoveryCategories(): MarketCategoryCatalogue {
@@ -259,6 +280,35 @@ internal class MarketplaceRepository(private val db: Connection,
         val quotes = quoteShopping(user, listOf(reference) + compatible, now)
         return MarketComparisonPage(selection, quotes.first(), quotes.drop(1),
             if (candidates.size > MARKET_COMPARISON_PAGE_CANDIDATES) scanned.last().listing.id else null, now, place)
+    }
+
+    /** One UUID-bounded candidate scan, then bounded quote batches, all on the caller's SAME
+     * read-only repeatable-read transaction and check instant. No independent cursor snapshots.
+     * Incompatible candidates still count toward the scan cap, so an empty window may expand.
+     */
+    fun compareWindow(user: UUID, request: MarketComparisonWindowRequest, reference: MarketShoppingLine,
+        now: Long): MarketComparisonWindowResult {
+        val input = request.normalizedComparisonWindowRequest() ?: marketFail("market.comparison_window_invalid")
+        val selection = input.selection
+        val conditions = mutableListOf(publicPredicate, "l.gtin=?", "l.id<>?", "l.store_id<>?")
+        val args = mutableListOf<Any?>(now, now, selection.basis.gtin, marketUuid(selection.offerId), marketUuid(reference.storeId))
+        if (input.city.isNotEmpty()) { conditions += "lower(f.city)=lower(?)"; args.add(input.city) }
+        args.add(input.candidateLimit + 1)
+        val candidates = candidates("SELECT l.* $publicJoins WHERE ${conditions.joinToString(" AND ")} ORDER BY l.id LIMIT ?", args)
+        val scanned = candidates.take(input.candidateLimit)
+        val original = quoteShopping(user, listOf(reference), now).single()
+        // quoteShopping projects price/stock once per bounded batch. Only compatible public
+        // quotes become rows; candidate labels come from that projection, never private stock.
+        val matches = scanned.map { candidate ->
+            MarketShoppingLine(candidate.listing.id, candidate.listing.storeId, candidate.listing.title,
+                "", selection.units, selection.basis)
+        }.chunked(MARKET_SHOPPING_MAX_LINES).flatMap { quoteShopping(user, it, now) }.mapNotNull { quote ->
+            val offer = quote.offer?.takeIf { it.matchesComparison(selection) } ?: return@mapNotNull null
+            quote.copy(line = quote.line.copy(title = offer.title, shopName = offer.storefront.displayName,
+                unitName = offer.unitName, updatedAtMillis = offer.sourceUpdatedAtMillis))
+        }.rankedComparison()
+        return MarketComparisonWindowResult(user.toString(), input, original, matches, scanned.size,
+            candidates.size > input.candidateLimit, now)
     }
 
     internal data class BasketCandidates(val choices: List<MarketBasketChoice>, val limitedSourceIds: List<String>, val checked: Int)
@@ -315,10 +365,15 @@ internal class MarketplaceRepository(private val db: Connection,
     fun offer(user: UUID, id: String): MarketOffer = offersByIds(user, listOf(marketUuid(id))).singleOrNull()
         ?: marketFail("market.unavailable", 404)
 
+    /** The same projection/visibility transaction as legacy details, now bound to its buyer.
+     * The envelope carries only public fields and that buyer's own saved marker.
+     */
+    fun offerDetail(user: UUID, id: String): MarketOfferDetailResult =
+        MarketOfferDetailResult(user.toString(), offer(user, id))
+
     /** A public shop page can remain empty. It never falls back to the private Stores model. */
-    fun publicShop(storeId: String): MarketStorefront {
+    fun publicShop(storeId: String, now: Long = System.currentTimeMillis()): MarketStorefront {
         val store = marketUuid(storeId)
-        val now = System.currentTimeMillis()
         return query("SELECT f.* ${MarketplacePublicVisibility.shopJoins} WHERE f.store_id=? AND ${MarketplacePublicVisibility.shopPredicate}",
             store, now, now, map = ::storefrontRow).singleOrNull() ?: marketFail("market.shop_unavailable", 404)
     }
@@ -369,13 +424,14 @@ internal class MarketplaceRepository(private val db: Connection,
     fun saved(user: UUID): MarketPage {
         val now = System.currentTimeMillis()
         val total = query("SELECT count(*) FROM buyer_saved_offers WHERE user_id=?", user) { it.getInt(1) }.single()
-        val rows = candidates("SELECT l.* $publicJoins JOIN buyer_saved_offers b ON b.listing_id=l.id WHERE $publicPredicate AND b.user_id=? ORDER BY b.created_at_millis DESC,l.id LIMIT 100",
+        val rows = candidates("SELECT l.* $publicJoins JOIN buyer_saved_offers b ON b.listing_id=l.id WHERE $publicPredicate AND b.user_id=? ORDER BY b.created_at_millis DESC,l.id LIMIT $MARKET_SAVED_MAX_OFFERS",
             listOf(now, now, user))
         return MarketPage(project(user, rows, now), checkedAtMillis = now, unavailableSavedCount = (total-rows.size).coerceAtLeast(0))
     }
     fun updateSaved(user: UUID, request: MarketSavedUpdate): MarketPage {
         val offer = marketUuid(request.offerId)
-        // Serialize an account's limit/check/insert, without taking any store/financial lock.
+        // The route uses SERIALIZABLE and retries the complete transaction. The user lock
+        // protects account deletion; on its own it cannot protect a count in an old snapshot.
         if (query("SELECT id FROM users WHERE id=? FOR UPDATE", user) { it.getString(1) }.isEmpty()) marketFail("market.owner",403)
         if (!request.saved) execute("DELETE FROM buyer_saved_offers WHERE user_id=? AND listing_id=?", user, offer)
         else {
@@ -384,17 +440,17 @@ internal class MarketplaceRepository(private val db: Connection,
                 val now = System.currentTimeMillis()
                 if (query("SELECT l.id $publicJoins WHERE $publicPredicate AND l.id=?", now, now, offer) { it.getString(1) }.isEmpty())
                     marketFail("market.unavailable",404)
-                if (query("SELECT count(*) FROM buyer_saved_offers WHERE user_id=?", user) { it.getInt(1) }.single() >= 100) marketFail("market.saved_limit",409)
+                if (query("SELECT count(*) FROM buyer_saved_offers WHERE user_id=?", user) { it.getInt(1) }.single() >= MARKET_SAVED_MAX_OFFERS) marketFail("market.saved_limit",409)
                 execute("INSERT INTO buyer_saved_offers(user_id,listing_id,created_at_millis) VALUES (?,?,?) ON CONFLICT DO NOTHING",user,offer,now)
             }
         }
-        return saved(user)
+        return saved(user).copy(savedMutation = MarketSavedUpdate(offer.toString(), request.saved))
     }
     fun clearUnavailableSaved(user: UUID): MarketPage {
-        query("SELECT id FROM users WHERE id=? FOR UPDATE",user) { it.getString(1) }
+        if (query("SELECT id FROM users WHERE id=? FOR UPDATE",user) { it.getString(1) }.isEmpty()) marketFail("market.shopping_denied", 403)
         val now=System.currentTimeMillis()
         execute("DELETE FROM buyer_saved_offers WHERE user_id=? AND listing_id NOT IN (SELECT l.id $publicJoins WHERE $publicPredicate)",user,now,now)
-        return saved(user)
+        return saved(user).copy(unavailableSavedCleared = true)
     }
 
     private fun items(ids: List<UUID>): List<GoodsItemDataModel> {
