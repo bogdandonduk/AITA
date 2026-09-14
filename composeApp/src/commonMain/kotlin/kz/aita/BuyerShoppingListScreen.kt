@@ -104,6 +104,8 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
     var comparisonCity by remember(account, generation) { mutableStateOf("") }
     val activityNavigation = remember(account, generation) { MarketShoppingActivityNavigation() }
     var removal by remember(account, generation) { mutableStateOf<MarketShoppingLineReview?>(null) }
+    var quantityEdit by remember(account, generation) { mutableStateOf<MarketShoppingLineReview?>(null) }
+    fun listDialogIsOpen(): Boolean = quantityEdit != null || removal != null || openedId != null || comparison != null || planning
     val displayed = state.snapshot
     val groups = displayed?.shoppingGroups().orEmpty()
     AitaScreenColumn(
@@ -145,17 +147,24 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                     actionButton(text = authUiText("Compare whole basket", "Сравнить всю корзину", "Бүкіл себетті салыстыру", "Бүт себетти салыштыруу"),
                         iconPath = marketIconPath(141), iconRes = marketIconFallback(141),
                         enabled = state.canChange, autoLoading = false, confirmationRequired = false,
-                        onClick = { planning = true })
+                        onClick = { if (!listDialogIsOpen() && state.canChange) planning = true })
                 }
                 if (section == "list") {
                     if (displayed != null) items(displayed.lines, key = { it.line.offerId }) { row ->
                         val review = displayed.reviewShoppingLine(row.line)
-                        ShoppingLineCard(row, state, review, onOpen = { openedId = row.line.offerId }, onCompare = {
-                            comparisonCity = ""
-                            review?.let { comparison = state.compareLine(it) }
+                        ShoppingLineCard(row, state, review, onOpen = {
+                            if (!listDialogIsOpen()) openedId = row.line.offerId
+                        }, onCompare = {
+                            if (!listDialogIsOpen()) {
+                                comparisonCity = ""
+                                review?.let { comparison = state.compareLine(it) }
+                            }
+                        }, onEditQuantity = {
+                            // Capture only a still-current row; never rebuild its review from a later revision.
+                            if (!listDialogIsOpen() && state.canChange && review?.matches(state.snapshot) == true) quantityEdit = review
                         }, onRemove = {
                             // Keep this exact row/revision while the confirmation is open.
-                            removal = review
+                            if (!listDialogIsOpen() && state.canChange && review?.matches(state.snapshot) == true) removal = review
                         })
                     }
                 } else {
@@ -206,6 +215,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
             }
         }
     }
+    quantityEdit?.let { review ->
+        MarketShoppingQuantityDialog(review, state, onDismiss = { quantityEdit = null })
+    }
     removal?.let { review ->
         MarketShoppingRemoveDialog(review, state, onDismiss = { removal = null })
     }
@@ -237,7 +249,8 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, state: MarketShoppingUiState,
-    review: MarketShoppingLineReview?, onOpen: () -> Unit, onCompare: () -> Unit, onRemove: () -> Unit) {
+    review: MarketShoppingLineReview?, onOpen: () -> Unit, onCompare: () -> Unit,
+    onEditQuantity: () -> Unit, onRemove: () -> Unit) {
     val line = row.line
     val editable = state.canChange && review?.matches(state.snapshot) == true
     val unit = line.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл.", "бирдик"))
@@ -268,6 +281,9 @@ private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, sta
                 enabled = editable && line.units < MARKET_SHOPPING_MAX_UNITS, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
                 onClick = { review?.let { state.changeLine(it, line.units + 1) } })
             }
+            actionButton(text = eventMessage("market.shopping_quantity_edit").visibleLocalizedString(stateValues.appLanguage, ""),
+                enabled = editable, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                onClick = onEditQuantity)
             actionButton(text = "", iconPath = stateValues.drawablePathIconDelete,
                 iconContentDescription = authUiText("Remove from list", "Убрать из списка", "Тізімнен жою", "Тизмеден алып салуу"),
                 enabled = editable, autoLoading = false, confirmationRequired = false,
