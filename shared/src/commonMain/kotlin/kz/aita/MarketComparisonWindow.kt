@@ -74,6 +74,14 @@ fun MarketComparisonWindowResult.isValidComparisonWindowResult(account: String, 
         matches.map { it.line.offerId }.distinct().size != matches.size || matches != matches.rankedComparison()) return false
     if (normalized.selection.shoppingRevision == null &&
         (reference.offer?.matchesComparison(normalized.selection) != true || reference.status == MARKET_QUOTE_UNAVAILABLE)) return false
+    // One read snapshot cannot assign different public pickup details to the same shop.
+    // Keep retained reference labels intact, but compare every current public storefront.
+    val shops = mutableMapOf<String, MarketStorefront>()
+    for (row in listOf(reference) + matches) {
+        val shop = row.offer?.storefront ?: continue
+        val previous = shops.put(shop.storeId, shop)
+        if (previous != null && previous != shop) return false
+    }
     return matches.all { row ->
         val public = row.offer ?: return@all false
         row.line.offerId != normalized.selection.offerId && row.line.storeId != reference.line.storeId &&

@@ -101,11 +101,11 @@ class KyrgyzLocalizationContractsTest(unittest.TestCase):
     def test_every_literal_inline_label_has_the_required_fourth_language(self):
         calls = list(auth_values())
         count = sum(len(re.findall(r'\bauthUiText\(\s*"', p.read_text(encoding="utf-8"))) for p in COMPOSE.glob("*.kt"))
-        # Two comparison labels moved from inline text to six-language event templates.
+        # Three comparison labels moved from inline text to six-language event templates.
         comparison = (COMPOSE / "MarketComparisonDialog.kt").read_text(encoding="utf-8")
         migrated = sum(f'eventMessage("{key}"' in comparison for key in (
-            "market.comparison_window_empty_more", "market.comparison_window_scope"))
-        self.assertEqual(migrated, 2)
+            "market.comparison_window_empty_more", "market.comparison_window_scope", "market.comparison_review_stale"))
+        self.assertEqual(migrated, 3)
         self.assertGreaterEqual(count + migrated, 604)
         self.assertEqual(count, len(calls))
         for filename, (en, ru, kk, ky) in calls:
