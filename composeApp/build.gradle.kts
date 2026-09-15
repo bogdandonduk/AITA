@@ -204,7 +204,7 @@ kotlin {
                 findByName(sourceSetName)?.dependsOn(iosMainSourceSet)
             }
             iosMainSourceSet.dependencies {
-                implementation(libs.kamel.fetcher.ktor)
+                // HTTP fetching is provided by kamel-image/core; iOS still needs its Darwin engine.
             }
 
             getByName("jvmTest").dependencies {

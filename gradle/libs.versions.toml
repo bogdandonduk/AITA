@@ -63,7 +63,6 @@ kamel-decoder-image-bitmap-resizing = { module = "media.kamel:kamel-decoder-imag
 kamel-decoder-image-vector = { module = "media.kamel:kamel-decoder-image-vector", version.ref = "kamelImage" }
 kamel-decoder-svg-batik = { module = "media.kamel:kamel-decoder-svg-batik", version.ref = "kamelImage" }
 kamel-decoder-svg-std = { module = "media.kamel:kamel-decoder-svg-std", version.ref = "kamelImage" }
-kamel-fetcher-ktor = { module = "media.kamel:kamel-fetcher-ktor", version.ref = "kamelImage" }
 kamel-fetcher-resources-android = { module = "media.kamel:kamel-fetcher-resources-android", version.ref = "kamelImage" }
 kamel-fetcher-resources-jvm = { module = "media.kamel:kamel-fetcher-resources-jvm", version.ref = "kamelImage" }
 kamel-image = { module = "media.kamel:kamel-image", version.ref = "kamelImage" }

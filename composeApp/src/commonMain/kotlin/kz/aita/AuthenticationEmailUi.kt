@@ -27,6 +27,7 @@ import kz.aita.auth.AitaSecurityEmailRequest
 import kz.aita.auth.aitaAuthCodeDigits
 import kz.aita.auth.aitaSecondFactorIsWellFormed
 import kz.aita.auth.canonicalAitaSecurityTarget
+import kz.aita.auth.loginSecondFactor
 import org.jetbrains.compose.resources.DrawableResource
 
 @Composable

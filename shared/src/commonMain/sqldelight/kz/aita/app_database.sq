@@ -42,12 +42,20 @@ DELETE FROM cart WHERE id = ?;
 selectKvLength:
 SELECT key, length(value) AS text_length FROM key_value WHERE key = ?;
 
+-- Resolve the numeric binds in their own SELECT. SQLDelight 2.1 otherwise
+-- infers nested substr bind arguments from the TEXT value, even inside CAST.
 selectKvSlice:
-SELECT key, substr(value, CAST(:sliceOffset AS INTEGER), CAST(:sliceLength AS INTEGER)) AS text_slice
-FROM key_value WHERE key = :cacheKey;
+WITH slice_bounds AS (
+  SELECT CAST(:sliceOffset AS INTEGER) AS start_at,
+         CAST(:sliceLength AS INTEGER) AS character_count
+)
+SELECT key, substr(value, slice_bounds.start_at, slice_bounds.character_count) AS text_slice
+FROM key_value CROSS JOIN slice_bounds WHERE key = :cacheKey;
 
+-- instr performs literal prefix matching (no LIKE/GLOB wildcard semantics).
+-- It also keeps these binds in a TEXT context instead of length's numeric one.
 deleteKvPrefixExcept:
 DELETE FROM key_value
-WHERE substr(key, 1, length(CAST(:prefix AS TEXT))) = :prefix
+WHERE instr(key, :prefix) = 1
   AND key != :manifestKey
-  AND (CAST(:keepPrefix AS TEXT) = '' OR substr(key, 1, length(CAST(:keepPrefix AS TEXT))) != :keepPrefix);
+  AND (:keepPrefix = '' OR instr(key, :keepPrefix) != 1);

@@ -12,7 +12,7 @@ actual fun renderAitaPdfDocument(document: AitaPdfDocument): ByteArray {
     fun font(style: AitaPdfStyle): UIFont = fonts.getOrPut(style) {
         if (style.bold) UIFont.boldSystemFontOfSize(style.size.toDouble()) else UIFont.systemFontOfSize(style.size.toDouble())
     }
-    fun text(value: String, style: AitaPdfStyle): NSAttributedString = NSAttributedString(
+    fun text(value: String, style: AitaPdfStyle): NSAttributedString = NSAttributedString.create(
         string = value,
         attributes = mapOf(NSFontAttributeName to font(style), NSForegroundColorAttributeName to UIColor.blackColor)
     )

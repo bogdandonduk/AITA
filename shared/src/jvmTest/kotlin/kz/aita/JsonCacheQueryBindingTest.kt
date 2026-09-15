@@ -72,4 +72,19 @@ class JsonCacheQueryBindingTest {
         assertNotNull(queries.selectKvByKey("cacheABCx:other").awaitAsOneOrNull())
         assertNull(queries.selectKvByKey(prefix + "old:1").awaitAsOneOrNull())
     }
+    @Test fun prefixCleanupOnlyMatchesTheBeginningAndPreservesUnicodeOwner() = testDb { database ->
+        val queries = database.app_databaseQueries
+        val prefix = "😀%_[owner]:"
+        val retained = listOf(prefix + "manifest", prefix + "new:0", "other:" + prefix + "old:0")
+        (retained + (prefix + "old:0")).forEach { queries.insertKv(it, "value") }
+        queries.deleteKvPrefixExcept(prefix = prefix, manifestKey = prefix + "manifest", keepPrefix = prefix + "new:")
+        retained.forEach { assertNotNull(queries.selectKvByKey(it).awaitAsOneOrNull(), it) }
+        assertNull(queries.selectKvByKey(prefix + "old:0").awaitAsOneOrNull())
+    }
+    @Test fun boundedSlicesDoNotReturnTheWholeValueAtZeroLengthOrPastEnd() = testDb { database ->
+        val queries = database.app_databaseQueries
+        queries.insertKv("bounded", "А😀Б")
+        assertEquals("", queries.selectKvSlice(sliceOffset = 1L, sliceLength = 0L, cacheKey = "bounded").awaitAsOneOrNull()?.text_slice)
+        assertEquals("", queries.selectKvSlice(sliceOffset = 4L, sliceLength = 32_768L, cacheKey = "bounded").awaitAsOneOrNull()?.text_slice)
+    }
 }
