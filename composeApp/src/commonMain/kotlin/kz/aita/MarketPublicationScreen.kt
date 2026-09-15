@@ -37,11 +37,12 @@ internal fun AppConfiguration.MarketPublicationScreen() {
     val account=stateValues.userAccount?.id
     val store=stateValues.activeStoreId
     val generation=currentAuthenticatedSessionGeneration()
+    val branchSelected = stateValues.stores.orEmpty().flattenStoresWithBranches().firstOrNull { it.id == store }?.parentStoreId != null
     val uiScope=rememberCoroutineScope()
     val host=NavigationScreenModel.Menu.ShopWindow
     val draftKey="market-editor:$account:$store"
     var draft by remember(account,store) { mutableStateOf(runCatching {
-        host.state.value[draftKey]?.takeIf { it.length<=20_000 }?.let { jsonBase.decodeFromString<MarketEditorDraft>(it) }
+        host.state.value[draftKey]?.takeIf { it.length<=100_000 }?.let { jsonBase.decodeFromString<MarketEditorDraft>(it) }
             ?.takeIf { candidate ->
                 candidate.storefront?.storeId.let { it==null || it==store } &&
                     candidate.listing?.storeId.let { it==null || it==store }
@@ -73,8 +74,8 @@ internal fun AppConfiguration.MarketPublicationScreen() {
             storefrontDirty=if(clearStore) false else draft.storefrontDirty,
             listingDirty=if(clearListing) false else draft.listingDirty))
     }
-    LaunchedEffect(account,store,generation,refresh) {
-        if(store==null) return@LaunchedEffect
+    LaunchedEffect(account,store,generation,refresh,branchSelected) {
+        if(store==null || branchSelected) return@LaunchedEffect
         val owner=captureMarketRequestScope(store) ?: return@LaunchedEffect
         loading=true
         val readRevision=publicationAckRevision
@@ -92,6 +93,16 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                 feedback=eventMessage("market.refresh_failed"); feedbackNegative=true
             }
         } finally { loading=false }
+    }
+    if (branchSelected) {
+        AitaScreenColumn(Modifier.fillMaxSize(), appBar = {
+            ScreenAppBarWidget(title = marketProductText("market.profile_tab"), iconPath = marketIconPath(148),
+                onBack = { uiScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+        }) {
+            Text(marketProductText("market.profile_parent_only"), Modifier.fillMaxWidth().padding(20.dp),
+                color = stateValues.TextColor, fontSize = stateValues.textSize)
+        }
+        return
     }
     val subscriptionAccess=rememberStoreSubscriptionAccess(store)
     if(!subscriptionAccess) { SubscriptionRequiredPane(); return }
@@ -121,7 +132,7 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                     "Жаңартулар бар. Дайын болғанда қайта жүктеңіз: жобаңыз өзгертілген жоқ.", "Жаңыртуулар бар. Даяр болгондо кайра жүктөңүз; долбооруңуздун үстүнөн жазылган жок."),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
             }
             if(dashboard==null) item("loading") {
-                if(loading) LoadingSkeleton(Modifier.fillMaxWidth(),rows=4)
+                if(loading) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Form,rows=4)
                 else actionButton(text=authUiText("Reload","Загрузить снова","Қайта жүктеу", "Кайра жүктөө"),autoLoading=false,confirmationRequired=false,onClick={ refresh++ })
             } else if(section=="storefront") {
                 val value=draft.storefront ?: dashboard!!.storefront
@@ -133,6 +144,9 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(publicAddress=it.take(400)),storefrontDirty=true)) } }
                 item("pickup") { MarketEditorField(value.pickupNote,authUiText("Pickup instructions","Условия самовывоза","Алып кету нұсқаулары", "Алып кетүү көрсөтмөлөрү"),"$draftKey:pickup",!saving,multiline=true) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(pickupNote=it.take(1000)),storefrontDirty=true)) } }
+                item("branches") { MarketPublishToggle(marketProductText("market.profile_branch_share"), value.shareBranchAvailability, !saving) {
+                    edit(draft.copy(storefront=(draft.storefront ?: value).copy(shareBranchAvailability=it), storefrontDirty=true))
+                } }
                 item("published") { MarketPublishToggle(authUiText("Visible in Buyer mode","Видно в режиме покупателя","Сатып алушы режимінде көрінеді", "Сатып алуучу режиминде көрүнөт"),value.published,!saving) {
                     edit(draft.copy(storefront=(draft.storefront ?: value).copy(published=it),storefrontDirty=true)) } }
                 item("save") { actionButton(text=authUiText("Save storefront","Сохранить витрину","Витринаны сақтау", "Витринаны сактоо"),iconPath=marketIconPath(142),iconRes=marketIconFallback(142),
@@ -174,12 +188,29 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                                 })
                         }
                     }
+                    item("productImport") {
+                        val source = stateValues.stock.orEmpty().firstOrNull { it.id == listing.goodsItemId }
+                        if (source != null) actionButton(text = marketProductText("market.profile_use_stock"), enabled = !saving,
+                            autoLoading = false, confirmationRequired = true, onClick = {
+                                val current = draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing
+                                val imported = source.marketListingDraft(store.orEmpty(), stateValues.appLanguage)
+                                edit(draft.copy(listing = current.copy(title = imported.title, description = imported.description,
+                                    gtin = imported.gtin, product = imported.product), listingDirty = true))
+                            })
+                    }
+                    item("productFields") {
+                        MarketProductFields(listing.product, "$draftKey:${listing.goodsItemId}:product", !saving) {
+                            val current = draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing
+                            edit(draft.copy(listing = current.copy(product = it), listingDirty = true))
+                        }
+                    }
+                    item("productReview") { Text(marketProductText("market.profile_review"), color=stateValues.PlaceholderTextColor, fontSize=stateValues.smallTextSize) }
                     item("listingVisible") { MarketPublishToggle(authUiText("Publish this product","Опубликовать этот товар","Осы тауарды жариялау", "Бул товарды жарыялоо"),listing.published,!saving) {
                         edit(draft.copy(listing=(draft.listing?.takeIf { it.goodsItemId == listing.goodsItemId } ?: listing).copy(published=it),listingDirty=true)) } }
-                    item("listingSave") { actionButton(text=authUiText("Save listing","Сохранить товар","Тауарды сақтау", "Жарыяны сактоо"),enabled=!saving && !loading,loading=saving,autoLoading=false,
+                    item("listingSave") { actionButton(text=authUiText("Save listing","Сохранить товар","Тауарды сақтау", "Жарыяны сактоо"),enabled=!saving && !loading && !listing.product.hasInvalidMarketProductInput(),loading=saving,autoLoading=false,
                         confirmationRequired=listing.published && dashboard!!.listings.none { it.id==listing.id && it.published },onClick={
                             val owner=captureMarketRequestScope(store)
-                            if(owner!=null && !saving && !loading) { val snapshot=listing; saving=true; uiScope.launch {
+                            if(owner!=null && !saving && !loading) { val snapshot=listing.copy(product=listing.product.normalizedMarketProduct()); saving=true; uiScope.launch {
                                 try {
                                     val result=saveMarketListing(owner,snapshot)
                                     if(owner.isCurrent()) {
@@ -194,15 +225,15 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                         }) }
                 }
                 items(dashboard!!.listings,key={ "listing:${it.id}" }) { listing ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
                         .border(stateValues.unfocusedBorderWidth,stateValues.PlaceholderTextColor.copy(alpha=0.3f),RoundedCornerShape(stateValues.cornerRadius)).padding(12.dp),
-                        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f)) {
+                        verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.fillMaxWidth()) {
                             Text(listing.title,color=stateValues.TextColor,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
                             Text(if(listing.published) authUiText("Published","Опубликован","Жарияланған", "Жарыяланган") else authUiText("Hidden","Скрыт","Жасырылған", "Жашырылган"),
                                 color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                         }
-                        actionButton(text=stateValues.stringEdit,fillMaxWidthIfTextPresent=false,enabled=!saving,autoLoading=false,confirmationRequired=draft.listingDirty,
+                        actionButton(text=stateValues.stringEdit,enabled=!saving,autoLoading=false,confirmationRequired=draft.listingDirty,
                             onClick={ edit(draft.copy(listing=listing,listingDirty=false)) })
                     }
                 }
@@ -221,8 +252,7 @@ internal fun AppConfiguration.MarketPublicationScreen() {
                 items(items,key={ it.id }) { item -> Text(item.name.visibleLocalizedString(stateValues.appLanguage,item.id),
                     Modifier.fillMaxWidth().clickable {
                         val existing=dashboard?.listings?.firstOrNull { it.goodsItemId==item.id }
-                        edit(draft.copy(listing=existing ?: MarketListing("",store.orEmpty(),item.id,item.name.visibleLocalizedString(stateValues.appLanguage,item.id),
-                            gtin=item.standardBarcodeValues().firstNotNullOfOrNull(::marketCanonicalGtin)),listingDirty=existing==null))
+                        edit(draft.copy(listing=existing ?: item.marketListingDraft(store.orEmpty(),stateValues.appLanguage),listingDirty=existing==null))
                         selectItem=false
                     }.padding(12.dp),color=stateValues.TextColor,fontSize=stateValues.textSize) }
             }
@@ -234,7 +264,7 @@ internal fun AppConfiguration.MarketPublicationScreen() {
 }
 
 @Composable
-private fun AppConfiguration.MarketEditorField(value: String, title: String, id: String, enabled: Boolean,
+internal fun AppConfiguration.MarketEditorField(value: String, title: String, id: String, enabled: Boolean,
     multiline: Boolean = false, onChanged: (String) -> Unit) {
     // Exactly one account/location-scoped journal owns text; no stale second field draft.
     genericTextField(modifier=Modifier.fillMaxWidth(),valueInitial=value,parentOwnsValue=true,identityKey=id,

@@ -15,7 +15,7 @@ class MarketShopDirectoryContractTest {
     private val shop = "00000000-0000-0000-0000-000000000002"
     private fun shopRow(count: Long = 0) = mapOf<String,Any?>("store_id" to shop,"display_name" to "Shop",
         "city" to "Astana","public_address" to "Door 4","pickup_note" to "Use the public entrance",
-        "is_published" to true,"revision" to 2L,"public_offer_count" to count)
+        "is_published" to true,"share_branch_availability" to true,"revision" to 2L,"public_offer_count" to count)
     private class Reads(val count: Long, val rows: List<Map<String,Any?>>) {
         val seen = mutableListOf<Pair<String,List<Any?>>>()
         val timeouts = mutableListOf<Int>()
@@ -48,7 +48,7 @@ class MarketShopDirectoryContractTest {
     }
     @Test fun publishedEmptyShopMapsOnlyExplicitPublicFields() {
         val f=Reads(1,listOf(shopRow()));val result=MarketShopDirectoryRepository(f.db).search(user,MarketShopDirectoryRequest())
-        assertEquals(0L,result.shops.single().publishedOffers);assertEquals(shop,result.shops.single().storefront.storeId)
+        assertTrue(result.shops.single().storefront.shareBranchAvailability);assertEquals(0L,result.shops.single().publishedOffers);assertEquals(shop,result.shops.single().storefront.storeId)
         assertTrue(result.isValidShopDirectoryResult(user.toString(),result.request))
         val sql=f.seen.last().first
         listOf("supply_price","owner_user","session_id","stock_batches","purchase","note FROM stock").forEach { assertFalse(sql.contains(it),it) }
@@ -71,7 +71,7 @@ class MarketShopDirectoryContractTest {
         val predicate=MarketplacePublicVisibility.shopPredicate.replace(Regex("\\s+")," ").trim()
         for((sql,_) in f.seen) {
             assertTrue(sql.contains(predicate));assertTrue(sql.contains("e.store_id=f.store_id"))
-            assertTrue(sql.contains("s.parent_store_id IS NULL OR p.is_active"))
+            assertTrue(sql.contains("s.parent_store_id IS NULL"))
             assertTrue(sql.contains("e.current_period_end_millis IS NULL AND NOT e.auto_renew"))
         }
     }

@@ -49,7 +49,7 @@ internal fun AppConfiguration.SubscriptionRequiredPane(modifier: Modifier = Modi
     val gate = rememberStoreSubscriptionGate(store)
     Column(modifier.fillMaxSize().padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (store != null && loading == store) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 3)
+        if (store != null && loading == store) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Subscription, rows = 1)
         else MessageText(Modifier.fillMaxWidth(), if (store == null)
             authUiText("Choose a location", "Выберите торговую точку", "Сауда нүктесін таңдаңыз", "Жайды тандаңыз")
             else eventMessage(if (gate == StoreSubscriptionGate.Checking) "subscription.verify" else "subscription.required")
@@ -155,7 +155,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
             }
             if (dashboard == null) {
                 item("loading") {
-                    if (loadingStore == storeId) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 4)
+                    if (loadingStore == storeId) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Subscription, rows = 1)
                     else {
                         MessageText(text = loadFailure.orEmpty().visibleLocalizedString(stateValues.appLanguage,
                             eventMessage("subscription.verify").visibleLocalizedString(stateValues.appLanguage, "")))

@@ -19,6 +19,10 @@ internal fun marketUuid(value: String): UUID = runCatching { UUID.fromString(val
 /** Same transaction as authorization/publication. No commits, providers, or private DTO responses. */
 internal class MarketplaceRepository(private val db: Connection,
     private val ownsStore: (UUID, UUID) -> Boolean) {
+    private var readsStock: (UUID, UUID) -> Boolean = ownsStore
+    constructor(db: Connection, ownsStore: (UUID, UUID) -> Boolean, readsStock: (UUID, UUID) -> Boolean) : this(db, ownsStore) {
+        this.readsStock = readsStock
+    }
     init { check(!db.autoCommit) }
     private var basketReadStartedNanos: Long? = null
 
@@ -72,6 +76,8 @@ internal class MarketplaceRepository(private val db: Connection,
         val subscriptions = SubscriptionRepository(db)
         subscriptions.lockLocation(store) ?: marketFail("market.unavailable", 404)
         if (!ownsStore(user, store)) marketFail("market.owner", 403)
+        if (query("SELECT parent_store_id FROM stores WHERE id=?", store) { it.getString(1) }.singleOrNull() != null)
+            marketFail("market.profile_parent_only", 403)
         if (!subscriptions.hasAccess(store, System.currentTimeMillis())) marketFail("subscription.required", 402)
     }
     private fun clean(value: String, max: Int, required: Boolean = false): String {
@@ -81,10 +87,11 @@ internal class MarketplaceRepository(private val db: Connection,
     }
     private fun storefrontRow(row: ResultSet) = MarketStorefront(
         row.getString("store_id"), row.getString("display_name"), row.getString("city"),
-        row.getString("public_address"), row.getString("pickup_note"), row.getBoolean("is_published"), row.getLong("revision"))
+        row.getString("public_address"), row.getString("pickup_note"), row.getBoolean("is_published"), row.getLong("revision"), row.getBoolean("share_branch_availability"))
     private fun listingRow(row: ResultSet) = MarketListing(
         row.getString("id"), row.getString("store_id"), row.getString("goods_item_id"), row.getString("title"),
-        row.getString("description"), row.getString("gtin"), row.getBoolean("is_published"), row.getLong("revision"))
+        row.getString("description"), row.getString("gtin"), row.getBoolean("is_published"), row.getLong("revision"),
+        jsonBase.decodeFromString<MarketProductDetails>(row.getString("product")).normalizedMarketProduct())
     private fun storefront(store: UUID): MarketStorefront = query("SELECT * FROM marketplace_storefronts WHERE store_id=?", store,
         map = ::storefrontRow).singleOrNull() ?: MarketStorefront(store.toString())
     private fun dashboardUnchecked(store: UUID) = MarketPublicationDashboard(storefront(store),
@@ -109,12 +116,13 @@ internal class MarketplaceRepository(private val db: Connection,
         if (input.revision != current.revision) marketFail("market.changed", 409)
         val now = System.currentTimeMillis()
         execute("""INSERT INTO marketplace_storefronts
-            (store_id,display_name,city,public_address,pickup_note,is_published,revision,updated_by,updated_at_millis)
-            VALUES (?,?,?,?,?,?,1,?,?) ON CONFLICT(store_id) DO UPDATE SET
+            (store_id,display_name,city,public_address,pickup_note,is_published,revision,updated_by,updated_at_millis,share_branch_availability)
+            VALUES (?,?,?,?,?,?,1,?,?,?) ON CONFLICT(store_id) DO UPDATE SET
             display_name=EXCLUDED.display_name,city=EXCLUDED.city,public_address=EXCLUDED.public_address,
             pickup_note=EXCLUDED.pickup_note,is_published=EXCLUDED.is_published,
+            share_branch_availability=EXCLUDED.share_branch_availability,
             revision=marketplace_storefronts.revision+1,updated_by=EXCLUDED.updated_by,updated_at_millis=EXCLUDED.updated_at_millis""",
-            store, input.displayName, input.city, input.publicAddress, input.pickupNote, input.published, user, now)
+            store, input.displayName, input.city, input.publicAddress, input.pickupNote, input.published, user, now, input.shareBranchAvailability)
         audit(user, session, store, null, "storefront", current.takeIf { it.revision > 0L }?.let { jsonBase.encodeToString(it) },
             jsonBase.encodeToString(storefront(store)), now)
         return dashboardUnchecked(store)
@@ -137,18 +145,21 @@ internal class MarketplaceRepository(private val db: Connection,
         if (!withdrawingExisting && gtin != null && gtin !in item?.standardBarcodeValues().orEmpty().mapNotNull(::marketCanonicalGtin)) marketFail()
         if (raw.id.isNotEmpty() && (previous == null || raw.id != previous.id)) marketFail("market.changed", 409)
         val input = raw.copy(id = previous?.id ?: UUID.randomUUID().toString(), title = clean(raw.title, 180, true),
-            description = clean(raw.description, 2000), gtin = gtin)
+            description = clean(raw.description, 2000), gtin = gtin,
+            product = (if (!request.replaceProduct && previous != null) previous.product else raw.product)
+                .also { if (!it.isValidMarketProduct()) marketFail("market.profile_invalid") })
         if (previous != null && input.copy(revision = previous.revision) == previous) return dashboardUnchecked(store)
         if (input.revision != (previous?.revision ?: 0L)) marketFail("market.changed", 409)
         if (previous == null && query("SELECT count(*) FROM marketplace_listings WHERE store_id=?", store) { it.getInt(1) }.single() >= 1000)
             marketFail("market.listing_limit", 409)
         val id = marketUuid(input.id); val now = System.currentTimeMillis()
         execute("""INSERT INTO marketplace_listings
-            (id,store_id,goods_item_id,title,description,gtin,is_published,revision,created_at_millis,updated_at_millis,updated_by)
-            VALUES (?,?,?,?,?,?,?,1,?,?,?) ON CONFLICT(store_id,goods_item_id) DO UPDATE SET
+            (id,store_id,goods_item_id,title,description,gtin,is_published,revision,created_at_millis,updated_at_millis,updated_by,product)
+            VALUES (?,?,?,?,?,?,?,1,?,?,?,?::jsonb) ON CONFLICT(store_id,goods_item_id) DO UPDATE SET
             title=EXCLUDED.title,description=EXCLUDED.description,gtin=EXCLUDED.gtin,is_published=EXCLUDED.is_published,
+            product=EXCLUDED.product,
             revision=marketplace_listings.revision+1,updated_at_millis=EXCLUDED.updated_at_millis,updated_by=EXCLUDED.updated_by""",
-            id, store, itemId, input.title, input.description, gtin, input.published, now, now, user)
+            id, store, itemId, input.title, input.description, gtin, input.published, now, now, user, jsonBase.encodeToString(input.product))
         val result = dashboardUnchecked(store)
         audit(user, session, store, id, "listing", previous?.let { jsonBase.encodeToString(it) },
             jsonBase.encodeToString(result.listings.first { it.id == input.id }), now)
@@ -368,8 +379,11 @@ internal class MarketplaceRepository(private val db: Connection,
     /** The same projection/visibility transaction as legacy details, now bound to its buyer.
      * The envelope carries only public fields and that buyer's own saved marker.
      */
-    fun offerDetail(user: UUID, id: String): MarketOfferDetailResult =
-        MarketOfferDetailResult(user.toString(), offer(user, id))
+    fun offerDetail(user: UUID, id: String): MarketOfferDetailResult {
+        val current = offer(user, id)
+        val availability = branchAvailability(current)
+        return MarketOfferDetailResult(user.toString(), current, availability.first, availability.second)
+    }
 
     /** A public shop page can remain empty. It never falls back to the private Stores model. */
     fun publicShop(storeId: String, now: Long = System.currentTimeMillis()): MarketStorefront {
@@ -453,12 +467,85 @@ internal class MarketplaceRepository(private val db: Connection,
         return saved(user).copy(unavailableSavedCleared = true)
     }
 
+    /** Inventory readers get only a parent publication index, never the seller's draft or audit. */
+    fun stockPublicationStatus(user: UUID, store: UUID): MarketStockPublicationStatus {
+        if (!readsStock(user, store)) marketFail("market.owner", 403)
+        val root = query("SELECT coalesce(parent_store_id,id) FROM stores WHERE id=? AND is_active", store) { it.getString(1) }
+            .singleOrNull() ?: marketFail("market.unavailable", 404)
+        val parent = marketUuid(root)
+        val now = System.currentTimeMillis()
+        val visible = query("SELECT f.store_id ${MarketplacePublicVisibility.shopJoins} WHERE f.store_id=? AND ${MarketplacePublicVisibility.shopPredicate}",
+            parent, now, now) { it.getString(1) }.isNotEmpty()
+        val entries = if (!visible) emptyList() else query("""SELECT l.goods_item_id,l.gtin,l.is_published,i.barcode_models,i.barcodes,i.measurement_unit_id
+            FROM marketplace_listings l JOIN stock_items i ON i.id=l.goods_item_id
+            WHERE l.store_id=? AND i.store_id=? AND i.is_active ORDER BY l.goods_item_id LIMIT 1000""", parent, parent) { row ->
+            val item = GoodsItemDataModel(id=row.getString("goods_item_id"),
+                barcodes=jsonBase.decodeFromString(row.getString("barcodes")), barcodeModels=jsonBase.decodeFromString(row.getString("barcode_models")))
+            val code = row.getString("gtin")?.takeIf { it in item.standardBarcodeValues().mapNotNull(::marketCanonicalGtin) }
+            MarketStockPublicationEntry(item.id,code,row.getString("measurement_unit_id"),row.getBoolean("is_published"))
+        }
+        return MarketStockPublicationStatus(user.toString(),store.toString(),root,visible,entries,now)
+    }
+
+    /** Parent opt-in only. Stock/price projection for the parent offer is never changed by this read. */
+    private fun branchAvailability(offer: MarketOffer): Pair<List<MarketBranchAvailability>, Boolean> {
+        if (!offer.storefront.shareBranchAvailability) return emptyList<MarketBranchAvailability>() to false
+        val parent = marketUuid(offer.storefront.storeId)
+        val itemId = query("SELECT goods_item_id FROM marketplace_listings WHERE id=? AND store_id=?", marketUuid(offer.id),parent) { it.getString(1) }
+            .singleOrNull() ?: return emptyList<MarketBranchAvailability>() to false
+        val item = items(listOf(marketUuid(itemId))).singleOrNull() ?: return emptyList<MarketBranchAvailability>() to false
+        val now = offer.checkedAtMillis
+        data class Branch(val id: String, val name: List<LocalizedStringDataModel>, val address: String)
+        val found = query("""SELECT s.id,s.name,s.address FROM stores s
+            JOIN store_subscription_states e ON e.store_id=s.id
+            WHERE s.parent_store_id=? AND s.is_active AND e.status='active'
+            AND coalesce(e.current_period_start_millis,e.started_at_millis)<=?
+            AND ((e.access_kind='lifetime' AND e.plan_id='internal_lifetime' AND e.current_period_end_millis IS NULL AND NOT e.auto_renew)
+                OR (e.access_kind IN ('paid','timed') AND e.current_period_end_millis>?))
+            ORDER BY s.id LIMIT ${MARKET_BRANCH_MAX_LOCATIONS + 1}""", parent,now,now) { row ->
+            Branch(row.getString("id"),jsonBase.decodeFromString<List<LocalizedStringDataModel>>(row.getString("name"))
+                .map { LocalizedStringDataModel(it.language.trim().take(12),it.value.trim().filter { char -> char.code >= 32 || char == '\n' || char == '\t' }.take(180)) }
+                .filter { it.language.isNotBlank() && it.value.isNotBlank() }.distinctBy { it.language }.take(12),row.getString("address").orEmpty().trim().filter { it.code >= 32 }.take(400))
+        }
+        val branches = found.take(MARKET_BRANCH_MAX_LOCATIONS).filter { it.name.isNotEmpty() && it.address.isNotBlank() }
+        if (branches.isEmpty()) return emptyList<MarketBranchAvailability>() to (found.size>MARKET_BRANCH_MAX_LOCATIONS)
+        val branchIds = branches.map { marketUuid(it.id) }
+        // Search by exact raw variants first; then recheck canonical STANDARD GTINs in Kotlin.
+        // Never reuse the private stock mirror's fuzzy name-based fallback for a public match.
+        // Only the still-valid reviewed public identity may link a separately owned branch item.
+        // A private stock barcode edit cannot silently relink a published product to another SKU.
+        val publicIdentity = item.copy(barcodes = offer.gtin?.let { listOf(it) }.orEmpty(), barcodeModels = emptyList())
+        val codes = publicIdentity.standardBarcodeValues().mapNotNull(::marketCanonicalGtin).flatMap { canonical ->
+            listOf(canonical,canonical.trimStart('0')) + listOf(8,12,13).filter { length -> canonical.take(14-length).all { it=='0' } }.map { canonical.takeLast(it) }
+        }.distinct()
+        val matching = if (codes.isEmpty()) emptyList() else query("""SELECT i.id,i.store_id,i.barcodes,i.barcode_models,i.measurement_unit_id
+            FROM stock_items i WHERE i.is_active AND i.store_id IN (${branchIds.joinToString(",") { "?" }})
+            AND i.measurement_unit_id=? AND
+            ((i.barcodes::jsonb ??| ?::text[]) OR EXISTS(SELECT 1 FROM jsonb_array_elements(i.barcode_models::jsonb) bc WHERE bc->>'value'=ANY(?::text[])))
+            ORDER BY i.id LIMIT 5001""", *(branchIds + listOf(item.measurementUnitId,codes.joinToString(",","{","}"),codes.joinToString(",","{","}"))).toTypedArray()) { row ->
+            GoodsItemDataModel(id=row.getString("id"),storeId=row.getString("store_id"),
+                barcodes=jsonBase.decodeFromString(row.getString("barcodes")),barcodeModels=jsonBase.decodeFromString(row.getString("barcode_models")),
+                measurementUnitId=row.getString("measurement_unit_id"))
+        }
+        if (matching.size>5000) return emptyList<MarketBranchAvailability>() to true
+        val matches = matching.filter { marketSameBranchProduct(publicIdentity,it) }
+        val byId = (matches+item).associateBy { it.id }
+        val available = batches(byId.keys.map(::marketUuid),branchIds,now).filter { batch ->
+            val candidate = byId[batch.goodsItemId]
+            candidate != null && (candidate.id==item.id || candidate.storeId==batch.storeId) && batch.isMarketSellableAt(batch.storeId,now) &&
+                batch.quantity.id==item.measurementUnitId
+        }.map { it.storeId }.toSet()
+        return branches.map { branch -> MarketBranchAvailability(branch.id,branch.name,branch.address,
+            if(branch.id in available) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,now) } to (found.size>MARKET_BRANCH_MAX_LOCATIONS)
+    }
+
     private fun items(ids: List<UUID>): List<GoodsItemDataModel> {
         if(ids.isEmpty()) return emptyList()
         // Select only fields needed by retail price calculation; no costs, notes, owner, or supplier data.
-        return query("""SELECT id,store_id,barcodes,barcode_models,sale_prices,promotions,active_shelf_batch_id,category_ids,updated_at_millis
+        return query("""SELECT id,store_id,barcodes,barcode_models,measurement_unit_id,sale_prices,promotions,active_shelf_batch_id,category_ids,updated_at_millis
             FROM stock_items WHERE is_active AND id IN (${ids.joinToString(",") { "?" }})""", *ids.toTypedArray()) { row ->
             GoodsItemDataModel(id=row.getString("id"),storeId=row.getString("store_id"),
+                measurementUnitId=row.getString("measurement_unit_id"),
                 barcodes=jsonBase.decodeFromString(row.getString("barcodes")), barcodeModels=jsonBase.decodeFromString(row.getString("barcode_models")),
                 salePrices=jsonBase.decodeFromString(row.getString("sale_prices")), promotions=jsonBase.decodeFromString(row.getString("promotions")),
                 activeShelfBatchId=row.getString("active_shelf_batch_id"), categoryIds=jsonBase.decodeFromString(row.getString("category_ids")),
@@ -528,7 +615,7 @@ internal class MarketplaceRepository(private val db: Connection,
                     .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) },
                 availability=if(batch!=null && minor!=null && batch.quantity.total >= total) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
                 checkedAtMillis=now,sourceUpdatedAtMillis=maxOf(candidate.sourceUpdated,item.updatedAtMillis,batch?.updatedAtMillis ?: 0L),
-                saved=listing.id in saved)
+                saved=listing.id in saved,product=listing.product)
         }
     }
 }

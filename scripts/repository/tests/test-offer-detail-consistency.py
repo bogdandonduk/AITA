@@ -44,7 +44,9 @@ class OfferDetailWiring(unittest.TestCase):
     def test_projection_uses_the_existing_public_offer_not_private_seller_data(self):
         source = (SERVER / 'MarketplaceRepository.kt').read_text()
         method = between(source, 'fun offerDetail(', '/** A public shop page')
-        self.assertIn('MarketOfferDetailResult(user.toString(), offer(user, id))', method)
+        self.assertIn('val current = offer(user, id)', method)
+        self.assertIn('branchAvailability(current)', method)
+        self.assertIn('MarketOfferDetailResult(user.toString(), current, availability.first, availability.second)', method)
         self.assertNotRegex(method, r'\b(INSERT INTO|DELETE FROM|UPDATE\s+\w+)')
         self.assertNotIn('dashboard', method)
         self.assertNotIn('ownsStore', method)

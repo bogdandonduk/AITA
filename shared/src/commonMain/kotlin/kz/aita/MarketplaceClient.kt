@@ -63,7 +63,7 @@ suspend fun saveMarketStorefront(scope: MarketRequestScope, value: MarketStorefr
 suspend fun saveMarketListing(scope: MarketRequestScope, value: MarketListing): ResponseDataModel<MarketPublicationDashboard> {
     if(!scope.isCurrent() || scope.storeId!=value.storeId) return cloudSessionExpiredResponse()
     return networkRequest(HttpMethod.Put,endpointUrl="market/seller/listing",headers=mapOf("store_id" to value.storeId),
-        body=MarketListingUpdate(value),expectedSessionGeneration=scope.generation)
+        body=MarketListingUpdate(value, replaceProduct=true),expectedSessionGeneration=scope.generation)
 }
 
 suspend fun loadMarketOffer(scope: MarketRequestScope, id: String): ResponseDataModel<MarketOffer> {

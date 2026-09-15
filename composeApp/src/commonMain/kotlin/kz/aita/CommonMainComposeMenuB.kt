@@ -6007,7 +6007,7 @@ fun AppConfiguration.NotificationsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (projection == null) {
-                item { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 4) }
+                item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Notification, rows = 4) }
             } else if (filtered.isEmpty()) {
                 item {
                     MessageText(

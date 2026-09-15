@@ -25,7 +25,7 @@ private suspend inline fun <reified T> RoutingCall.marketResult(
             // Public visibility, stock projection and saved markers share one snapshot. A second
             // query must not accidentally mix a published row with a just-created private draft.
             MarketplaceRepository(TransactionManager.current().connection.connection as Connection,
-                ::marketplaceStoreOwnerInsideTransaction).work()
+                ::marketplaceStoreOwnerInsideTransaction, ::marketplaceStockReaderInsideTransaction).work()
         }
         // Invalidation only AFTER commit; no private inventory identifiers in public events.
         after(result)
@@ -35,6 +35,7 @@ private suspend inline fun <reified T> RoutingCall.marketResult(
 }
 
 // Search typing and periodic refresh need a different allowance from explicit basket planning.
+private val stockPublicationReadGate = MarketBasketReadGate(requestsPerMinute = 60)
 private val offerDetailReadGate = MarketBasketReadGate(requestsPerMinute = 60)
 private val shopDirectoryReadGate = MarketBasketReadGate(requestsPerMinute = 60)
 private val discoveryReadGate = MarketBasketReadGate(requestsPerMinute = 60)
@@ -318,6 +319,23 @@ internal fun Route.marketplaceRoutes() {
                     clearUnavailableSaved(user)
                 }
             }
+            get("/seller/stock-status") {
+                val user = call.checkPrincipal() ?: return@get
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = stockPublicationReadGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.discovery_busy"))
+                    return@get
+                }
+                try {
+                    call.marketResult(readOnly = true) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'") }
+                        withDiscoveryReadBudget { stockPublicationStatus(user, marketUuid(call.request.headers["store_id"].orEmpty())) }
+                    }
+                } finally { stockPublicationReadGate.release(user) }
+            }
             get("/seller") {
                 val user = call.checkPrincipal() ?: return@get
                 call.marketResult { dashboard(user,marketUuid(call.request.headers["store_id"].orEmpty())) }
@@ -349,7 +367,9 @@ internal suspend fun publishMarketplaceStockChange(storeText: String?) {
         val published = newSuspendedTransaction(aitaServerIoContext) {
         val connection = TransactionManager.current().connection.connection as Connection
         connection.prepareStatement("""SELECT EXISTS(SELECT 1 FROM marketplace_storefronts f
-            JOIN stores s ON s.id=f.store_id WHERE f.is_published AND (f.store_id=? OR s.parent_store_id=?)
+            JOIN stores s ON s.id=f.store_id WHERE f.is_published AND s.parent_store_id IS NULL
+            AND (f.store_id=? OR (f.share_branch_availability AND EXISTS(
+                SELECT 1 FROM stores changed WHERE changed.id=? AND changed.parent_store_id=f.store_id)))
             AND EXISTS(SELECT 1 FROM marketplace_listings l WHERE l.store_id=f.store_id AND l.is_published))""").use { statement ->
             statement.setObject(1,store); statement.setObject(2,store)
             statement.executeQuery().use { rows -> rows.next(); rows.getBoolean(1) }

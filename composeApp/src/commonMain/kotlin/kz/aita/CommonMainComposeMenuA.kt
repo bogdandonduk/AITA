@@ -152,7 +152,7 @@ fun AppConfiguration.MessageText(
     if (text == localizedStringResource(1141, "Please wait…") && cleanSubText == null) {
         BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
             val compact = maxHeight < 100.dp
-            LoadingSkeleton(Modifier.fillMaxWidth().padding(if (compact) 8.dp else 16.dp), rows = if (compact) 1 else 3, compact = compact)
+            LoadingSkeleton(Modifier.fillMaxWidth().padding(if (compact) 8.dp else 16.dp), layout = LoadingLayout.Activity, rows = if (compact) 1 else 3, compact = compact)
         }
         return
     }
@@ -4330,7 +4330,7 @@ fun AppConfiguration.MenuOperationLogsScreen() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        if (selected.failure == null) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 4)
+                        if (selected.failure == null) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Activity, rows = 4)
                         else Text(
                             text = selected.failure?.extractLocalizedString(stateValues.appLanguage)
                                 ?: localizedStringResource(1141, "Please wait…"),

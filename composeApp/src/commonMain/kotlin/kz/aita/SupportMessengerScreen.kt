@@ -163,7 +163,7 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                         onClick={ composing=true; selected=null })
                 }
                 feedback?.let { SupportInlineError(it) }
-                if(loading) LoadingSkeleton(Modifier.fillMaxWidth(),rows=4)
+                if(loading && tickets.isEmpty()) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Conversation,rows=4)
                 else LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                     if(tickets.isEmpty()) item {
                         MessageText(Modifier.fillParentMaxWidth().padding(24.dp),authUiText("No conversations here yet","Здесь пока нет диалогов","Мұнда әзірге диалог жоқ", "Бул жерде маектер азырынча жок"))
@@ -352,7 +352,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         }
         feedback?.let { SupportInlineError(it) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if(loading) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp),rows=4)
+            if(loading && messages.isEmpty() && pending==null) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), layout = LoadingLayout.Message,rows=4)
             else if(ticketId==null && pending==null) Column(Modifier.align(Alignment.Center).padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally) {
                 Text(authUiText("Let’s work it out","Давайте разберёмся","Бірге шешейік", "Бирге чечели"),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
@@ -496,7 +496,7 @@ private fun AppConfiguration.SupportMetricsPane(modifier: Modifier,account: Stri
     Column(modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         error?.let { SupportInlineError(it) }
         val metrics=data
-        if(metrics==null && error==null) LoadingSkeleton(rows=4)
+        if(metrics==null && error==null) LoadingSkeleton(layout = LoadingLayout.Metrics, rows=4)
         else if(metrics!=null) {
             Text(authUiText("Team · last 30 days","Команда · последние 30 дней","Топ · соңғы 30 күн", "Команда · акыркы 30 күн"),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.accentTextSize)
             listOf(

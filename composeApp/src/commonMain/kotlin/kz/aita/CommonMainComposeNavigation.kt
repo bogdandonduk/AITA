@@ -398,6 +398,14 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             )
             add(
                 StockAddEditTabContent(
+                    id = "marketplace",
+                    title = marketProductText("market.profile_tab"),
+                    iconPath = marketIconPath(148),
+                    iconRes = marketIconFallback(148)
+                )
+            )
+            add(
+                StockAddEditTabContent(
                     id = "conditions",
                     title = localizedStringResource(609, "Conditions"),
                     iconPath = stateValues.drawablePathIconCheck,
@@ -553,6 +561,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         )
 
         when (visibleSelectedTabId) {
+            "marketplace" -> StockMarketplaceEditor(draft, existing?.imagePaths.orEmpty(), Modifier.weight(1f), onDraftChanged = { draft = it })
             "conditions" -> {
                 StockAddEditConditionsTab(
                     modifier = Modifier.weight(1f),

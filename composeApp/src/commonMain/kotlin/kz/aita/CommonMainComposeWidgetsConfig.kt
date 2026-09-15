@@ -386,6 +386,14 @@ internal fun localDrawableResourceForPath(
         "142_1" -> Res.drawable._142_1
         "143_0" -> Res.drawable._143_0
         "143_1" -> Res.drawable._143_1
+        "145_0" -> Res.drawable._145_0
+        "145_1" -> Res.drawable._145_1
+        "146_0" -> Res.drawable._146_0
+        "146_1" -> Res.drawable._146_1
+        "147_0" -> Res.drawable._147_0
+        "147_1" -> Res.drawable._147_1
+        "148_0" -> Res.drawable._148_0
+        "148_1" -> Res.drawable._148_1
         else -> fallbackRes
     }
 }
@@ -560,6 +568,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
     goodsItem: GoodsItemDataModel,
     batches: List<GoodsBatchDataModel>,
     index: Int,
+    enabled: Boolean,
     draggedBatchId: String?,
     dragTargetIndex: Int?,
     onDragStart: (String) -> Unit,
@@ -635,7 +644,8 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
                 },
                 cardShape
             )
-            .pointerInput(batch.id, batches.size, index) {
+            .pointerInput(enabled, batch.id, goodsItem.activeShelfBatchId, batches.map { it.id }, index) {
+                if (!enabled) return@pointerInput
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
                         dragOffsetPx = 0f
@@ -660,6 +670,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
                 )
             }
             .aitaClickable(
+                enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor)
             ) {
@@ -830,7 +841,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
     onDelete: ((GoodsItemDataModel) -> Unit)? = null,
     onEdit: ((GoodsItemDataModel) -> Unit)? = null,
     onAddBatch: ((GoodsItemDataModel) -> Unit)? = null,
-    onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null
+    onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null,
+    shelfActionsEnabled: Boolean = true
 ) {
     val language = stateValues.appLanguage
     val itemName = remember(goodsItem.name, language) {
@@ -987,6 +999,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    StockMarketplaceBadge(goodsItem)
 
                     if (goodsItem.isQuickItem) {
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1229,6 +1243,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                         goodsItem = goodsItem,
                         batches = shelfBatches,
                         index = batchIndex,
+                        enabled = shelfActionsEnabled && !selectionMode,
                         draggedBatchId = draggedBatchId,
                         dragTargetIndex = dragTargetIndex,
                         onDragStart = { id ->
@@ -1241,7 +1256,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                         onDragFinished = { from, to ->
                             draggedBatchId = null
                             dragTargetIndex = null
-                            if (from != to) {
+                            if (shelfActionsEnabled && !selectionMode && from != to) {
                                 reorderShelfBatches(
                                     goodsItem = goodsItem,
                                     batches = shelfBatches,
@@ -1273,7 +1288,7 @@ internal fun AppConfiguration.StockCardInfoLine(
     if (value == localizedStringResource(1141, "Please wait…")) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("$title:", color = textColor, fontSize = stateValues.textSize)
-            LoadingSkeleton(Modifier.weight(1f), rows = 1, compact = true)
+            LoadingSkeleton(Modifier.weight(1f), layout = LoadingLayout.InlineValue, rows = 1, compact = true)
         }
         return
     }
@@ -2547,9 +2562,12 @@ internal fun AppConfiguration.aitaFormTextField(
     placeholderContent: (@Composable () -> Unit)? = null,
     // Opt in for synchronous screen-owned filters: back navigation and clamps must replace the
     // accepted value even while focused. Existing form callers retain their prior behaviour.
-    parentOwnsValue: Boolean = false
+    parentOwnsValue: Boolean = false,
+    passwordRevealed: Boolean? = null,
+    onPasswordRevealedChange: ((Boolean) -> Unit)? = null
 ): GenericTextFieldContent {
-    var revealPassword by remember(identityKey) { mutableStateOf(false) }
+    var localRevealPassword by remember(identityKey) { mutableStateOf(false) }
+    val revealPassword = passwordRevealed ?: localRevealPassword
     val effectiveTextColor = if (enabled) stateValues.TextColor else stateValues.DisabledColor
 
     return genericTextField(
@@ -2578,7 +2596,7 @@ internal fun AppConfiguration.aitaFormTextField(
         },
         trailingIconExtraContentDescription = titleText,
         trailingIconExtraOnClick = if (password && enabled) {
-            { revealPassword = !revealPassword }
+            { onPasswordRevealedChange?.invoke(!revealPassword) ?: run { localRevealPassword = !revealPassword } }
         } else {
             null
         },
@@ -4399,6 +4417,10 @@ object AppConfiguration {
         vararg keys: Any
     ) {
 
+        LaunchedEffect(Unit) {
+            LiveCollectionWorkspace.start()
+            MarketStockPublicationWorkspace.start()
+        }
         var systemLocaleLanguage by remember { mutableStateOf(getSystemLocaleLanguage()) }
         androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
             systemLocaleLanguage = getSystemLocaleLanguage()
@@ -4820,8 +4842,8 @@ object AppConfiguration {
             private val _drawableResIconLog = remember { MutableStateFlow(Res.drawable._49_0) }
             override val drawableResIconLog: StateFlow<DrawableResource> = _drawableResIconLog.asStateFlow()
 
-            override val drawablePathIconPromos: String get() = appearanceResources.catalog.drawable(50L, appThemeId)
-            private val _drawableResIconPromos = remember { MutableStateFlow(Res.drawable._50_0) }
+            override val drawablePathIconPromos: String get() = appearanceResources.catalog.drawable(147L, appThemeId)
+            private val _drawableResIconPromos = remember { MutableStateFlow(Res.drawable._147_0) }
             override val drawableResIconPromos: StateFlow<DrawableResource> = _drawableResIconPromos.asStateFlow()
 
             override val drawablePathIconAnalytics: String get() = appearanceResources.catalog.drawable(21L, appThemeId)
@@ -5204,7 +5226,7 @@ object AppConfiguration {
 
                 _drawableResIconLog.emit(if (themeId == 1L) Res.drawable._49_1 else Res.drawable._49_0)
 
-                _drawableResIconPromos.emit(if (themeId == 1L) Res.drawable._50_1 else Res.drawable._50_0)
+                _drawableResIconPromos.emit(if (themeId == 1L) Res.drawable._147_1 else Res.drawable._147_0)
 
                 _drawableResIconAnalytics.emit(if (themeId == 1L) Res.drawable._21_1 else Res.drawable._21_0)
                 _drawableResIconAnalyticsReport.emit(if (themeId == 1L) Res.drawable._62_1 else Res.drawable._62_0)

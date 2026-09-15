@@ -3596,7 +3596,8 @@ data class StockAddEditDraft(
     val isQuickItem: Boolean = false,
     val note: String = "",
     val noteLocalized: List<LocalizedStringDataModel> = emptyList(),
-    val conditions: List<String> = emptyList()
+    val conditions: List<String> = emptyList(),
+    val marketplaceProfile: StockMarketplaceProfile? = null
 )
 
 /**
@@ -3653,7 +3654,8 @@ internal fun StockAddEditDraft.toPersistentDraftStateString(): String {
         note,
         jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), noteLocalized),
         jsonBase.encodeToString(ListSerializer(String.serializer()), conditions),
-        jsonBase.encodeToString(ListSerializer(String.serializer()), persistentBarcodeTypes)
+        jsonBase.encodeToString(ListSerializer(String.serializer()), persistentBarcodeTypes),
+        marketplaceProfile?.let { jsonBase.encodeToString(StockMarketplaceProfile.serializer(), it) }.orEmpty()
     ).joinToString(STOCK_ADD_EDIT_DRAFT_SEPARATOR) { it.cleanForStockAddEditDraftState() }
 }
 
@@ -3693,7 +3695,10 @@ internal fun String.toPersistentStockAddEditDraftOrNull(): StockAddEditDraft? {
             isQuickItem = values[13].toBooleanStrictOrNull() ?: false,
             note = values[14],
             noteLocalized = jsonBase.decodeFromString(ListSerializer(LocalizedStringDataModel.serializer()), values[15]),
-            conditions = jsonBase.decodeFromString(ListSerializer(String.serializer()), values[16])
+            conditions = jsonBase.decodeFromString(ListSerializer(String.serializer()), values[16]),
+            marketplaceProfile = values.getOrNull(18)?.takeIf { it.isNotBlank() }?.let {
+                jsonBase.decodeFromString(StockMarketplaceProfile.serializer(), it)
+            }
         )
     }.getOrNull()
 }
@@ -3731,7 +3736,8 @@ fun GoodsItemDataModel.toStockAddEditDraft(): StockAddEditDraft {
         noteLocalized = noteLocalized.ifEmpty {
             note?.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList()
         },
-        conditions = conditions
+        conditions = conditions,
+        marketplaceProfile = effectiveMarketplaceProfile()
     )
 }
 
@@ -3791,6 +3797,8 @@ fun StockAddEditDraft.toGoodsItem(
         promotions = promotions.sanitizedStockPromotions(),
         isQuickItem = isQuickItem,
         imagePaths = current?.imagePaths.orEmpty(),
+        marketplaceProfile = (marketplaceProfile ?: current?.marketplaceProfile ?: StockMarketplaceProfile())
+            .fromCurrentStock(name, description, current?.imagePaths.orEmpty()),
         activeShelfBatchId = current?.activeShelfBatchId,
         note = legacyNote,
         noteLocalized = cleanNoteLocalized,
@@ -3821,7 +3829,8 @@ fun StockAddEditDraft.isValidStockDraft(configuration: GlobalAppConfigurationDat
         )
     val hasWholesaleMinimum = parseStockQuantityInputText(wholesaleMinQuantityText, wholesaleMinimumUnit)?.let { it > 0.0 } == true
 
-    return hasName && hasBarcode && hasUnit && hasSalePrice && hasSupplyPrice && (!hasWholesalePrice || hasWholesaleMinimum)
+    return hasName && hasBarcode && hasUnit && hasSalePrice && hasSupplyPrice && (!hasWholesalePrice || hasWholesaleMinimum) &&
+        (marketplaceProfile?.product?.hasInvalidMarketProductInput() != true)
 }
 
 internal fun StockPromotionDataModel.visiblePromotionTitle(language: String, fallback: String): String =
@@ -5164,6 +5173,8 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
             title = localizedStringResource(252, "Info"),
             iconPath = stateValues.drawablePathIconEdit
         ),
+        StockAddEditTabContent(id = "marketplace", title = marketProductText("market.profile_tab"),
+            iconPath = marketIconPath(148), iconRes = marketIconFallback(148)),
         StockAddEditTabContent(
             id = "conditions",
             title = localizedStringResource(609, "Conditions"),
@@ -5206,6 +5217,7 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
                 .weight(1f)
 
             when (selectedTabId) {
+                "marketplace" -> StockMarketplaceEditor(draft, emptyList(), centeredFormModifier, onDraftChanged = { draft = it })
                 "promos" -> LazyColumn(modifier = centeredFormModifier.padding(stateValues.marginTextField)) {
                     item {
                         StockPromotionListEditor(

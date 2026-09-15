@@ -8,14 +8,20 @@ import kotlinx.serialization.Serializable
  * seller listing or a cached response for another account as an authoritative detail result.
  */
 @Serializable
-data class MarketOfferDetailResult(val accountId: String, val offer: MarketOffer)
+data class MarketOfferDetailResult(val accountId: String, val offer: MarketOffer,
+    val branchAvailability: List<MarketBranchAvailability> = emptyList(),
+    val branchAvailabilityTruncated: Boolean = false)
 
 fun MarketOfferDetailResult.isValidOfferDetailResult(account: String, requestedOfferId: String): Boolean {
     val id = marketDiscoveryId(requestedOfferId) ?: return false
     val value = offer
     return account.isNotBlank() && accountId == account && value.id == id &&
         value.storefront.isValidPublicMarketShop() && value.title.isNotBlank() && value.title.length <= 180 &&
-        value.description.length <= 2000 && value.checkedAtMillis > 0L && value.sourceUpdatedAtMillis >= 0L &&
+        value.description.length <= 2000 && value.product.isValidMarketProduct() &&
+        branchAvailability.size <= MARKET_BRANCH_MAX_LOCATIONS &&
+        branchAvailability.distinctBy { it.branchId }.size == branchAvailability.size &&
+        (value.storefront.shareBranchAvailability || (branchAvailability.isEmpty() && !branchAvailabilityTruncated)) &&
+        branchAvailability.all { it.isValidMarketBranch(value) } && value.checkedAtMillis > 0L && value.sourceUpdatedAtMillis >= 0L &&
         (value.gtin == null || marketCanonicalGtin(value.gtin) == value.gtin) &&
         value.categoryIds.size <= 16 && value.categoryIds.distinct().size == value.categoryIds.size &&
         value.hasValidDiscoveryPrice() &&

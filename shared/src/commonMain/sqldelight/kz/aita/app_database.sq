@@ -43,10 +43,11 @@ selectKvLength:
 SELECT key, length(value) AS text_length FROM key_value WHERE key = ?;
 
 selectKvSlice:
-SELECT key, substr(value, ?, ?) AS text_slice FROM key_value WHERE key = ?;
+SELECT key, substr(value, CAST(:sliceOffset AS INTEGER), CAST(:sliceLength AS INTEGER)) AS text_slice
+FROM key_value WHERE key = :cacheKey;
 
 deleteKvPrefixExcept:
 DELETE FROM key_value
-WHERE substr(key, 1, length(?)) = ?
-  AND key != ?
-  AND (? = '' OR substr(key, 1, length(?)) != ?);
+WHERE substr(key, 1, length(CAST(:prefix AS TEXT))) = :prefix
+  AND key != :manifestKey
+  AND (CAST(:keepPrefix AS TEXT) = '' OR substr(key, 1, length(CAST(:keepPrefix AS TEXT))) != :keepPrefix);

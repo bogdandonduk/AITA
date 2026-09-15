@@ -20226,6 +20226,7 @@ data class GoodsItemDataModel(
 
     val isQuickItem: Boolean = false,
     val imagePaths: List<String> = emptyList(),
+    val marketplaceProfile: StockMarketplaceProfile? = null,
 
     val activeShelfBatchId: String? = null,
 

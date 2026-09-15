@@ -123,7 +123,7 @@ fun MarketDiscoveryResult.validatedDiscovery(
         (query.city.isNotEmpty() && !query.city.equals(offer.storefront.city, ignoreCase = true)) ||
         offer.categoryIds.distinct().size != offer.categoryIds.size || offer.checkedAtMillis != page.checkedAtMillis || offer.title.isBlank() || offer.title.length > 180 ||
         offer.sourceUpdatedAtMillis < 0 || offer.categoryIds.size > 16 || offer.categoryIds.any { it !in knownIds } ||
-        (selectedIds != null && offer.categoryIds.none { it in selectedIds }) || !offer.hasValidDiscoveryPrice() ||
+        (selectedIds != null && offer.categoryIds.none { it in selectedIds }) || !offer.hasValidDiscoveryPrice() || !offer.product.isValidMarketProduct() ||
         (query.storefrontId != null && offer.storefront.storeId != query.storefrontId) || (query.savedOnly && !offer.saved) ||
         offer.availability !in setOf(MARKET_AVAILABILITY_RECORDED, MARKET_AVAILABILITY_CONFIRM) }) return null
     // A repeated shop identity must not display different pickup addresses/revisions on its cards.

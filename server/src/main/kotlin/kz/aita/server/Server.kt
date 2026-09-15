@@ -1919,6 +1919,7 @@ object StockItems: Table("stock_items") {
 
   val isQuickItem = bool("is_quick_item")
   val imagePaths = jsonb("image_paths", Json, ListSerializer(String.serializer()))
+  val marketplaceProfile = jsonb("marketplace_profile", jsonBase, StockMarketplaceProfile.serializer()).default(StockMarketplaceProfile())
 
   val activeShelfBatchId = uuid("active_shelf_batch_id").nullable()
 
@@ -4968,6 +4969,9 @@ private fun userHasSupplierAccessInsideTransaction(
 internal fun marketplaceStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean =
   isStoreOwnerInsideTransaction(userId, storeId)
 
+internal fun marketplaceStockReaderInsideTransaction(userId: UUID, storeId: UUID): Boolean =
+  userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false)
+
 private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return false
   return Stores
@@ -5401,6 +5405,8 @@ private fun stockItemChangedFieldsInsideTransaction(
     if (requestedGenericExpirationPeriod != previousRow[StockItems.genericExpirationPeriod]) add("expiration period")
     if (body.isQuickItem != previousRow[StockItems.isQuickItem]) add("quick item flag")
     if (body.imagePaths != previousRow[StockItems.imagePaths]) add("images")
+    if (body.marketplaceProfileForSave(previousRow[StockItems.marketplaceProfile]) !=
+        previousRow.toGoodsItemDataModel().effectiveMarketplaceProfile()) add("marketplace profile")
     if (requestedActiveShelfBatchId != existingActiveShelfBatchId) add("active shelf batch")
     if (sanitizedPromotions != previousRow[StockItems.promotions]) add("promotions")
     if (body.note != previousRow[StockItems.note]) add("note")
@@ -6606,6 +6612,8 @@ private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
 
     isQuickItem = this[StockItems.isQuickItem],
     imagePaths = this[StockItems.imagePaths],
+    marketplaceProfile = this[StockItems.marketplaceProfile].fromCurrentStock(
+      this[StockItems.name], this[StockItems.description], this[StockItems.imagePaths]),
 
     activeShelfBatchId = this[StockItems.activeShelfBatchId]?.toString(),
 
@@ -16077,6 +16085,7 @@ private fun cloneStockItemToStoreInsideTransaction(
     it[StockItems.genericExpirationPeriod] = sourceItemRow[StockItems.genericExpirationPeriod]
     it[StockItems.isQuickItem] = sourceItemRow[StockItems.isQuickItem]
     it[StockItems.imagePaths] = sourceItemRow[StockItems.imagePaths]
+    it[StockItems.marketplaceProfile] = sourceItemRow[StockItems.marketplaceProfile]
     it[StockItems.activeShelfBatchId] = null
     it[StockItems.promotions] = sourceItemRow[StockItems.promotions]
     it[StockItems.note] = sourceItemRow[StockItems.note]
@@ -19264,6 +19273,7 @@ fun Application.module() {
               return@newSuspendedTransaction null
 
             val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
+            val requestedMarketProfile = body.marketplaceProfileForSave()
             val now = System.currentTimeMillis()
             val id = UUID.randomUUID()
 
@@ -19290,6 +19300,7 @@ fun Application.module() {
 
               it[StockItems.isQuickItem] = body.isQuickItem
               it[StockItems.imagePaths] = body.imagePaths
+              it[StockItems.marketplaceProfile] = requestedMarketProfile
 
               it[StockItems.activeShelfBatchId] = body.activeShelfBatchId
                 ?.takeIf { value -> value.isNotBlank() }
@@ -19431,7 +19442,9 @@ fun Application.module() {
               sanitizedPromotions = sanitizedPromotions,
               body = body
             )
-            val requestedCoreMatchesExisting = cleanBarcodes.toSet() == goodsItemRow.stockBarcodeValues().toSet() &&
+            val requestedMarketProfile = body.marketplaceProfileForSave(goodsItemRow[StockItems.marketplaceProfile])
+            val requestedCoreMatchesExisting = requestedMarketProfile == goodsItemRow.toGoodsItemDataModel().effectiveMarketplaceProfile() &&
+               cleanBarcodes.toSet() == goodsItemRow.stockBarcodeValues().toSet() &&
                cleanBarcodeModels == goodsItemRow.stockBarcodeModels() &&
                body.name == goodsItemRow[StockItems.name] &&
                body.description == goodsItemRow[StockItems.description] &&
@@ -19484,6 +19497,7 @@ fun Application.module() {
 
               it[StockItems.isQuickItem] = body.isQuickItem
               it[StockItems.imagePaths] = body.imagePaths
+              it[StockItems.marketplaceProfile] = requestedMarketProfile
 
               it[StockItems.activeShelfBatchId] = body.activeShelfBatchId
                 ?.takeIf { value -> value.isNotBlank() }

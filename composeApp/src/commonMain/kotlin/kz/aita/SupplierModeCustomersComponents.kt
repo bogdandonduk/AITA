@@ -1258,7 +1258,7 @@ private fun AppConfiguration.SupplierCustomerRecentOrdersCard(
         iconRes = stateValues.drawableResIconAppModeSupplier.value
     ) {
         if (!partner.orderDetailsLoaded && partner.orderCount > 0) {
-            LoadingSkeleton(Modifier.fillMaxWidth(), rows = 2, compact = true)
+            LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.SupplierSummary, rows = 2, compact = true)
         } else if (partner.orders.isEmpty()) {
             Text(
                 text = localizedStringResource(2390, "No recent orders"),
@@ -1344,7 +1344,7 @@ private fun AppConfiguration.SupplierCustomerContractsCard(partner: SupplierPart
         iconRes = stateValues.drawableResIconSupplierContracts.value
     ) {
         if (!partner.contractDetailsLoaded && partner.hasContractRelationship) {
-            LoadingSkeleton(Modifier.fillMaxWidth(), rows = 2, compact = true)
+            LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.SupplierSummary, rows = 2, compact = true)
         } else if (visibleContracts.isEmpty()) {
             Text(
                 text = localizedStringResource(2384, "No contract yet"),
@@ -1404,7 +1404,7 @@ private fun AppConfiguration.SupplierCustomerOffersCard(partner: SupplierPartner
         iconRes = stateValues.drawableResIconSupplierCatalog.value
     ) {
         if (!partner.priceDetailsLoaded && partner.savedOfferCount > 0) {
-            LoadingSkeleton(Modifier.fillMaxWidth(), rows = 2, compact = true)
+            LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.SupplierSummary, rows = 2, compact = true)
         } else if (partner.prices.isEmpty()) {
             Text(
                 text = localizedStringResource(2391, "No saved offers yet"),

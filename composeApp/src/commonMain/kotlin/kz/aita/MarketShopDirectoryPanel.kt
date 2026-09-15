@@ -181,7 +181,7 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
                 data.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
             }
         }
-        if (result == null && data.loading) items(4) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 180.dp), rows = 4) }
+        if (result == null && data.loading) items(4) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 180.dp), layout = LoadingLayout.ShopCard, rows = 1) }
         else if (result?.shops.isNullOrEmpty()) item(key = "shops-empty", span = { GridItemSpan(maxLineSpan) }) {
             Text(if (data.error != null || result == null) authUiText("Connect to load published shops", "Подключитесь для загрузки магазинов", "Жарияланған дүкендерді жүктеу үшін қосылыңыз", "Жарыяланган дүкөндөрдү жүктөө үчүн туташыңыз")
                 else authUiText("No published shops match yet. Try another city or clear the filters.", "Опубликованных магазинов пока нет. Попробуйте другой город или сбросьте фильтры.", "Сәйкес жарияланған дүкендер әзірше жоқ. Басқа қаланы көріңіз немесе сүзгілерді тазалаңыз.", "Дал келген жарыяланган дүкөндөр азырынча жок. Башка шаарды тандаңыз же чыпкаларды тазалаңыз."),

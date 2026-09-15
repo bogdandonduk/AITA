@@ -281,7 +281,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                     MarketShoppingFeedback(shopping)
                 }
             }
-            if (data.page == null && data.loading) items(6) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 240.dp), rows = 4) }
+            if (data.page == null && data.loading) items(6) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 240.dp), layout = LoadingLayout.MarketplaceCard, rows = 1) }
             else if (rows.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     CpImage(Modifier.size(64.dp), url = marketIconPath(if (query.savedOnly) 140 else 139), fallbackRes = marketIconFallback(if (query.savedOnly) 140 else 139), contentDescription = null, tintColor = stateValues.AccentColor)
@@ -379,6 +379,7 @@ private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean
                 textColor = if (offer.saved) stateValues.AccentTextColor else stateValues.TextColor,
                 enabled = !saving, autoLoading = false, confirmationRequired = false, onClick = onSaved)
         }
+        MarketProductPhoto(offer.product.imageUrls.firstOrNull(), offer.title)
         Text(offer.title, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Text(marketPriceLabel(offer), color = changedValueColor(offer.priceMinor, "market:${offer.id}:${offer.currencyCode}:${stateValues.appLanguage}", stateValues.AccentColor),
             fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)

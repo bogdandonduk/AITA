@@ -10,7 +10,7 @@ internal suspend fun readLocalKvBounded(key: String, maxCharacters: Int): String
     val result = StringBuilder()
     var offset = 1L
     while (offset <= length) {
-        val part = appDatabase.app_databaseQueries.selectKvSlice(offset, 32_768L, key).awaitAsOneOrNull()?.text_slice ?: return null
+        val part = appDatabase.app_databaseQueries.selectKvSlice(sliceOffset = offset, sliceLength = 32_768L, cacheKey = key).awaitAsOneOrNull()?.text_slice ?: return null
         result.append(part)
         // UTF-16 may contain two chars per SQL character. Bound both to avoid malformed cache allocations.
         if (result.length.toLong() > maxCharacters.toLong() * 2L) return null
@@ -25,7 +25,7 @@ private val jsonTextCache = ChunkedTextCache(
     remove = ::deleteLocalKv,
     removePrefixExcept = { prefix, keep ->
         // Preserve the manifest as well as the new generation. Exact prefix matching avoids SQL LIKE wildcards.
-        appDatabase.app_databaseQueries.deleteKvPrefixExcept(prefix, prefix, prefix + "manifest", keep, keep, keep)
+        appDatabase.app_databaseQueries.deleteKvPrefixExcept(prefix = prefix, manifestKey = prefix + "manifest", keepPrefix = keep)
     }
 )
 

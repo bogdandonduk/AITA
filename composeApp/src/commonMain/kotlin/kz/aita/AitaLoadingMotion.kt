@@ -47,11 +47,19 @@ private fun rememberLoadingPhase(): Animatable<Float, androidx.compose.animation
     return phase
 }
 
-/** A single draw-only animation feeds all bars in this placeholder. No fake text or zero counts. */
+/** A placeholder is a layout contract. Requiring the kind keeps new screens from accidentally
+ * falling back to a generic avatar/list shape. All bars share one draw-only animation clock. */
+internal enum class LoadingLayout {
+    StockCard, MarketplaceCard, OfferDetail, ProductPhoto, ShopCard, ShoppingLine, Comparison,
+    Notification, Conversation, Message, Subscription, PaymentIntegration, SupplierSummary,
+    Form, InlineValue, Activity, Metrics
+}
+
 @Composable
 internal fun AitaLoadingSkeleton(
     modifier: Modifier = Modifier,
-    rows: Int = 3,
+    layout: LoadingLayout,
+    rows: Int = 1,
     compact: Boolean = false,
     color: Color = MaterialTheme.colorScheme.onSurface,
     label: String? = null
@@ -68,16 +76,54 @@ internal fun AitaLoadingSkeleton(
                 }
             })
     }
+    @Composable fun Line(fraction: Float = 1f, height: Int = 12) = Bar(Modifier.fillMaxWidth(fraction).height(height.dp))
+    @Composable fun Actions(count: Int = 1) {
+        repeat(count) { Line(1f, 40) }
+    }
+    @Composable fun Header(icon: Int, title: Float = .66f) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (icon > 0) Bar(Modifier.size(icon.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { Line(title, 16); Line(.4f, 10) }
+        }
+    }
+    @Composable fun ChipRow() {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) { Bar(Modifier.weight(1f).height(28.dp)) }
+        }
+    }
     Column(modifier.semantics(mergeDescendants = true) {
         progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
         if (label != null) contentDescription = label
-    }, verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 18.dp)) {
+    }, verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
         repeat(rows.coerceIn(1, 8)) { index ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (!compact) Bar(Modifier.size(42.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Bar(Modifier.fillMaxWidth(if (index % 2 == 0) 0.69f else 0.84f).height(if (compact) 10.dp else 14.dp))
-                    Bar(Modifier.fillMaxWidth(if (index % 2 == 0) 0.94f else 0.76f).height(10.dp))
+            val framed = layout in setOf(LoadingLayout.StockCard, LoadingLayout.MarketplaceCard, LoadingLayout.ShopCard,
+                LoadingLayout.Subscription, LoadingLayout.Comparison, LoadingLayout.ShoppingLine, LoadingLayout.PaymentIntegration)
+            Column(Modifier.fillMaxWidth().then(if (framed) Modifier.clip(RoundedCornerShape(16.dp))
+                .background(color.copy(alpha = .025f)).padding(14.dp) else Modifier),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)) {
+                when (layout) {
+                    LoadingLayout.ProductPhoto -> Bar(Modifier.fillMaxWidth().height(170.dp))
+                    LoadingLayout.StockCard -> { Header(0, .78f); Line(.56f, 10); Line(.8f, 10); ChipRow(); Line(.4f, 18); ChipRow() }
+                    LoadingLayout.MarketplaceCard -> { Line(1f, 170); Header(0, .83f); Line(.42f, 20); Line(.7f); Line(.82f, 10); Actions(2) }
+                    LoadingLayout.OfferDetail -> { Line(1f, 170); Line(.83f, 22); Line(.38f, 22); Line(); Line(.86f); Header(28); Line(); Actions(2) }
+                    LoadingLayout.ShopCard -> { Header(36); Line(.86f); Line(.64f); Actions() }
+                    LoadingLayout.ShoppingLine -> { Header(0, .78f); Line(.56f); ChipRow(); Line(.4f, 20); Actions() }
+                    LoadingLayout.Comparison -> { Header(28, .8f); Line(.68f); Line(.38f, 20); ChipRow(); Actions() }
+                    LoadingLayout.Notification -> { Header(22, .65f); Line(.96f); Line(.72f); Line(.32f, 9) }
+                    LoadingLayout.Conversation -> { Header(0, .72f); Line(.92f); Line(.57f, 10) }
+                    LoadingLayout.Message -> {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = if (index % 2 == 0) Arrangement.Start else Arrangement.End) {
+                            Column(Modifier.fillMaxWidth(.76f).clip(RoundedCornerShape(16.dp)).background(color.copy(alpha = .025f)).padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)) { Line(.45f, 10); Line(); Line(.78f); Line(.2f, 8) }
+                        }
+                    }
+                    LoadingLayout.Subscription -> { Header(42); Line(.42f, 26); Line(.9f); Line(.72f); ChipRow(); Actions() }
+                    LoadingLayout.PaymentIntegration -> { Header(32); Line(.78f); Line(.38f, 9); Line(1f, 40); Line(.38f, 9); Line(1f, 40); Actions() }
+                    LoadingLayout.SupplierSummary -> { Line(.7f, 15); Line(.52f, 10); ChipRow(); Line(.85f, 10) }
+                    LoadingLayout.Form -> { Line(.38f, 10); Line(1f, 40) }
+                    LoadingLayout.InlineValue -> { Line(.7f, 10); Line(.92f, 10) }
+                    LoadingLayout.Activity -> { Header(22, .72f); Line(.9f); Line(.36f, 9) }
+                    LoadingLayout.Metrics -> { ChipRow(); Line(.8f, 16); Line(.6f); Line(1f, 80) }
                 }
             }
         }
@@ -85,8 +131,8 @@ internal fun AitaLoadingSkeleton(
 }
 
 @Composable
-internal fun AppConfiguration.LoadingSkeleton(modifier: Modifier = Modifier, rows: Int = 3, compact: Boolean = false) =
-    AitaLoadingSkeleton(modifier, rows, compact, stateValues.TextColor,
+internal fun AppConfiguration.LoadingSkeleton(modifier: Modifier = Modifier, layout: LoadingLayout, rows: Int = 1, compact: Boolean = false) =
+    AitaLoadingSkeleton(modifier, layout, rows, compact, stateValues.TextColor,
         authUiText("Loading", "Загрузка", "Жүктелуде", "Жүктөлүүдө"))
 
 /** Actions keep their label/size; dots communicate pending work without pretending to be data. */

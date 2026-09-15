@@ -165,7 +165,7 @@ class CacheSqlQueries(unittest.TestCase):
         self.db.execute(query('insertKv'), ('stock', value))
         key, size = self.db.execute(query('selectKvLength'), ('stock',)).fetchone()
         self.assertEqual(size, len(value))
-        parts = [self.db.execute(query('selectKvSlice'), (start, 32_768, 'stock')).fetchone()[1] for start in range(1, size + 1, 32_768)]
+        parts = [self.db.execute(query('selectKvSlice'), {'sliceOffset': start, 'sliceLength': 32_768, 'cacheKey': 'stock'}).fetchone()[1] for start in range(1, size + 1, 32_768)]
         self.assertEqual(''.join(parts), value)
         self.assertTrue(all(len(part.encode('utf-8')) <= 4 * 32_768 for part in parts))
 
@@ -174,13 +174,13 @@ class CacheSqlQueries(unittest.TestCase):
         keys = [prefix + 'manifest', prefix + '1:0', prefix + '2:0', prefix + '2:1', prefix + '3:0', 'other']
         self.db.executemany(query('insertKv'), [(key, 'v') for key in keys])
         keep = prefix + '2:'
-        self.db.execute(query('deleteKvPrefixExcept'), (prefix, prefix, prefix + 'manifest', keep, keep, keep))
+        self.db.execute(query('deleteKvPrefixExcept'), {'prefix': prefix, 'manifestKey': prefix + 'manifest', 'keepPrefix': keep})
         self.assertEqual({row[0] for row in self.db.execute('SELECT key FROM key_value')}, {prefix + 'manifest', prefix + '2:0', prefix + '2:1', 'other'})
 
     def test_prefix_cleanup_treats_percent_underscore_as_literal(self):
         prefix = 'scope_1%:'
         self.db.executemany(query('insertKv'), [(prefix+'1:0','v'), ('scopeZ12:1:0','safe')])
-        self.db.execute(query('deleteKvPrefixExcept'), (prefix,prefix,prefix+'manifest','','',''))
+        self.db.execute(query('deleteKvPrefixExcept'), {'prefix': prefix, 'manifestKey': prefix + 'manifest', 'keepPrefix': ''})
         self.assertEqual(self.db.execute('SELECT key FROM key_value').fetchall(), [('scopeZ12:1:0',)])
 
     def test_nullable_legacy_value_is_not_an_authoritative_empty_json(self):

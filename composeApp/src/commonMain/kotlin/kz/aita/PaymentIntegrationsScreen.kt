@@ -102,7 +102,7 @@ internal fun PaymentIntegrationsWorkspace(
             }
 
             if (state.loading && state.balance == null && state.integrations.isEmpty() && state.capabilities.isEmpty()) {
-                item { AitaLoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 5) }
+                item { AitaLoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), layout = LoadingLayout.PaymentIntegration, rows = 5) }
                 return@LazyColumn
             }
 

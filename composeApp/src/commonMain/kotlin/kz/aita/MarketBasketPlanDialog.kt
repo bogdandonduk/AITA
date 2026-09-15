@@ -217,7 +217,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     }
                 }
-                if (result == null && (data.loading || data.error == null) && !blocked) item { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5) }
+                if (result == null && (data.loading || data.error == null) && !blocked) item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Comparison, rows = 5) }
                 if (result != null && group == null) item {
                     Text(authUiText("Add products to your list first", "Сначала добавьте товары в список", "Алдымен тізімге тауар қосыңыз", "Адегенде тизмеңизге товарларды кошуңуз"), color = stateValues.TextColor, fontSize = stateValues.textSize)
                 }

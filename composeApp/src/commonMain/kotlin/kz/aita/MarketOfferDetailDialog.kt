@@ -36,6 +36,8 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
     val generation = currentAuthenticatedSessionGeneration()
     val owner = remember(account, generation, offerId) { captureMarketRequestScope() }
     var offer by remember(account, generation, offerId) { mutableStateOf<MarketOffer?>(null) }
+    var branches by remember(account, generation, offerId) { mutableStateOf<List<MarketBranchAvailability>>(emptyList()) }
+    var branchesTruncated by remember(account, generation, offerId) { mutableStateOf(false) }
     var loading by remember(account, generation, offerId) { mutableStateOf(true) }
     var fresh by remember(account, generation, offerId) { mutableStateOf(false) }
     var unavailable by remember(account, generation, offerId) { mutableStateOf(false) }
@@ -74,14 +76,14 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                     } else {
                         val data = response.payload
                         if (!response.negative && data != null) {
-                            offer = data.offer; unavailable = false; error = null
+                            offer = data.offer; branches = data.branchAvailability; branchesTruncated = data.branchAvailabilityTruncated; unavailable = false; error = null
                             loadedStamp = stamp; receivedAt = TimeSource.Monotonic.markNow(); fresh = true
                         } else {
                             error = response.message ?: eventMessage("market.detail_failed")
                             // A missing new route is an upgrade problem, not a withdrawn offer.
                             if (!response.transportFailure && response.httpStatusCode == 404 &&
                                 response.message?.eventMessageReferenceOrNull()?.key == "market.unavailable") {
-                                offer = null; loadedStamp = null; receivedAt = null; unavailable = true
+                                offer = null; branches = emptyList(); branchesTruncated = false; loadedStamp = null; receivedAt = null; unavailable = true
                             }
                         }
                     }
@@ -102,17 +104,20 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
             .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             val current = offer
             val detailReady = detailIsCurrent(remote)
-            if (current == null && loading) LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5)
+            if (current == null && loading) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.OfferDetail, rows = 1)
             else if (current == null) Text(if (unavailable) authUiText("This offer is no longer available", "Предложение больше недоступно", "Ұсыныс енді қолжетімсіз", "Бул сунуш эми жеткиликсиз")
                 else authUiText("Connect to view this offer", "Подключитесь, чтобы открыть предложение", "Ұсынысты көру үшін қосылыңыз", "Бул сунушту көрүү үчүн туташыңыз"),
                 color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
             else {
+                MarketProductGallery(current.product, current.title)
                 SelectionContainer {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(current.title, color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
                         Text(marketPriceLabel(current), color = changedValueColor(current.priceMinor, "detail:$offerId:${current.currencyCode}", stateValues.AccentColor),
                             fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
                         if (current.description.isNotBlank()) Text(current.description, color = stateValues.TextColor, fontSize = stateValues.textSize)
+                        MarketProductFacts(current.product)
+                        MarketBranchAvailabilityContent(branches, branchesTruncated)
                         Text("${current.storefront.displayName}\n${current.storefront.city}\n${current.storefront.publicAddress}", color = stateValues.TextColor, fontSize = stateValues.textSize)
                         if (current.storefront.pickupNote.isNotBlank()) Text(current.storefront.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         Text(authUiText("Server inventory snapshot", "Снимок учётных остатков", "Есептегі қордың көрінісі", "Сервердеги товар калдыгынын учурундагы көрүнүшү") + ": " + receiptUiDateTime(current.checkedAtMillis),
@@ -147,10 +152,10 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
             }
             error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
             MarketShoppingFeedback(shopping)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                actionButton(modifier = Modifier.weight(1f), text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), autoLoading = false, enabled = !loading,
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                actionButton(modifier = Modifier.fillMaxWidth(), text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), autoLoading = false, enabled = !loading,
                     loading = loading, confirmationRequired = false, onClick = { requestRefresh() })
-                actionButton(modifier = Modifier.weight(1f), text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), autoLoading = false, confirmationRequired = false,
+                actionButton(modifier = Modifier.fillMaxWidth(), text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), autoLoading = false, confirmationRequired = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = onDismiss)
             }
         }

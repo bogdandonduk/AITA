@@ -11,7 +11,9 @@ data class MarketStorefront(
     val publicAddress: String = "",
     val pickupNote: String = "",
     val published: Boolean = false,
-    val revision: Long = 0L
+    val revision: Long = 0L,
+    // Explicit parent consent to publish branch business names/addresses with availability.
+    val shareBranchAvailability: Boolean = false
 )
 
 @Serializable
@@ -23,7 +25,8 @@ data class MarketListing(
     val description: String = "",
     val gtin: String? = null,
     val published: Boolean = false,
-    val revision: Long = 0L
+    val revision: Long = 0L,
+    val product: MarketProductDetails = MarketProductDetails()
 )
 
 @Serializable
@@ -42,7 +45,8 @@ data class MarketOffer(
     val availability: String = MARKET_AVAILABILITY_CONFIRM,
     val checkedAtMillis: Long,
     val sourceUpdatedAtMillis: Long,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    val product: MarketProductDetails = MarketProductDetails()
 )
 
 const val MARKET_AVAILABILITY_RECORDED = "recorded_in_stock"
@@ -62,7 +66,7 @@ data class MarketPublicationDashboard(val storefront: MarketStorefront, val list
 data class MarketStorefrontUpdate(val storefront: MarketStorefront)
 
 @Serializable
-data class MarketListingUpdate(val listing: MarketListing)
+data class MarketListingUpdate(val listing: MarketListing, val replaceProduct: Boolean = false)
 
 @Serializable
 data class MarketSavedUpdate(val offerId: String, val saved: Boolean)

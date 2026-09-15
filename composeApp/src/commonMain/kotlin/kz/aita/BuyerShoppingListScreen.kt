@@ -129,7 +129,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
             MarketShoppingActivityPanel(activityNavigation, Modifier.weight(1f).fillMaxWidth())
         } else {
             if (state.snapshot == null && state.loading) {
-                LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 5)
+                LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), layout = LoadingLayout.ShoppingLine, rows = 5)
                 Spacer(Modifier.weight(1f))
             } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -232,7 +232,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                         color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
                 }
             }
-            if (page == null && (data.loading || data.error == null)) item { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 4) }
+            if (page == null && (data.loading || data.error == null)) item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Activity, rows = 4) }
             data.error?.let { message -> item(key = "history-error") {
                 Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
             } }
@@ -364,7 +364,7 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
                 }
-                if (loading) item { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 3) }
+                if (loading) item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Activity, rows = 3) }
                 error?.let { message -> item {
                     Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     actionButton(text = authUiText("Load details again", "Загрузить данные снова", "Деректерді қайта жүктеу", "Чоо-жайын кайра жүктөө"),

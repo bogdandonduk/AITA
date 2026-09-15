@@ -283,7 +283,7 @@ internal fun AppConfiguration.MarketComparisonDialog(
                             })
                     }
                 } else {
-                    if (page == null && (data.loading || data.error == null)) item(key = "skeleton") { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 5) }
+                    if (page == null && (data.loading || data.error == null)) item(key = "skeleton") { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Comparison, rows = 5) }
                     else if (comparisonReady && page != null && page.matches.isEmpty()) item(key = "no-matches") {
                         Text(if (!page.moreCandidates) authUiText("No other matching published offers in this search.", "Других подходящих опубликованных предложений в этом поиске нет.", "Осы іздеуде басқа сәйкес жарияланған ұсыныстар жоқ.", "Бул издөөдө башка дал келген жарыяланган сунуштар жок.")
                             else eventMessage("market.comparison_window_empty_more").visibleLocalizedString(stateValues.appLanguage, ""),
