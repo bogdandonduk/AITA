@@ -5,7 +5,8 @@ internal data class StockWarehouseProjection(
     val search: StockWarehouseSearchResult,
     val defaultSortedItems: List<GoodsItemDataModel>,
     val unfilteredSortedItems: List<GoodsItemDataModel>,
-    val sortedItems: List<GoodsItemDataModel>
+    val sortedItems: List<GoodsItemDataModel>,
+    val metrics: StockWarehouseMetricsData
 )
 
 internal fun buildStockWarehouseProjection(
@@ -44,6 +45,7 @@ internal fun buildStockWarehouseProjection(
     } else defaultSorted
     return StockWarehouseProjection(
         search, defaultSorted, unfiltered,
-        stockWarehouseItemsForFilter(filterId, unfiltered, batchesByItem)
+        stockWarehouseItemsForFilter(filterId, unfiltered, batchesByItem),
+        stockWarehouseMetricsForUi(unfiltered, batchesByItem)
     )
 }

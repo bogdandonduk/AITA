@@ -2498,6 +2498,10 @@ fun AppConfiguration.MenuUserAccountScreen() {
                     stateHost = NavigationScreenModel.Menu.UserAccount,
                     stateKey = NavigationScreenModel.KEY_STATE_EMAIL
                 )
+                val accountEmailConfirmation = rememberContactEmailConfirmation(
+                    kz.aita.auth.AitaContactPurpose.ACCOUNT_CONTACT, stateValues.userAccount?.id.orEmpty(),
+                    listOf(emailTextFieldContent.value.text), listOf(stateValues.userAccount?.email.orEmpty()))
+                ContactEmailConfirmationContent(accountEmailConfirmation)
 
                 Spacer(modifier = Modifier.height(innerSpace))
 
@@ -2640,7 +2644,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
                         && (passwordTextFieldContent.value.text.isEmpty() || passwordTextFieldContent.isContentValid)
                         && (passwordTextFieldContent.value.text.isEmpty() || repeatedPasswordTextFieldContent!!.isContentValid)
                         && confirmationPasswordTextFieldContent.isContentValid
-                        && profileConfirmation.ready
+                        && profileConfirmation.ready && accountEmailConfirmation.ready
                     ) {
                         updateUser(
                             userAccountUpdate = UserAccountUpdateDataModel(
@@ -2666,7 +2670,8 @@ fun AppConfiguration.MenuUserAccountScreen() {
                                 password = confirmationPasswordTextFieldContent!!.value.text,
                                 newPassword = passwordTextFieldContent!!.takeIf { it.value.text.isNotEmpty() }?.value?.text,
                                 secondFactorCode = profileConfirmation.factor,
-                                emailProof = profileConfirmation.emailProof
+                                emailProof = profileConfirmation.emailProof,
+                                contactEmailProofs = accountEmailConfirmation.proofs
                             )
                         )
 
@@ -2678,7 +2683,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
                 actionButton(
                     text = stateValues.stringEdit,
-                    enabled = stateValues.latestNotification == null
+                    enabled = stateValues.latestNotification == null && accountEmailConfirmation.ready && profileConfirmation.ready
                 ) {
                     goAction.invoke()
                 }

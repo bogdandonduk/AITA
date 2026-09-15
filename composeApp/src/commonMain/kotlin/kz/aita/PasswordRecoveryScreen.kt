@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -19,6 +19,8 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
     onRepeatedPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit
 ) {
+    // One ephemeral eye state owns BOTH fields, just like the sign-up password pair.
+    var passwordsRevealed by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
         Text(
             text = authUiText(
@@ -41,6 +43,8 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             imeAction = ImeAction.Next,
             leadingIconPath = stateValues.drawablePathIconPassword,
             password = true,
+            passwordRevealed = passwordsRevealed,
+            onPasswordRevealedChange = { passwordsRevealed = it },
             sensitive = true
         )
         aitaFormTextField(
@@ -56,6 +60,8 @@ internal fun AppConfiguration.PasswordRecoveryNewPasswordContent(
             onImeAction = onSubmit,
             leadingIconPath = stateValues.drawablePathIconPassword,
             password = true,
+            passwordRevealed = passwordsRevealed,
+            onPasswordRevealedChange = { passwordsRevealed = it },
             sensitive = true
         )
         actionButton(

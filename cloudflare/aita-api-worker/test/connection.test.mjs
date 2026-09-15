@@ -118,3 +118,26 @@ test('error bodies never expose raw exceptions and HEAD remains bodyless', async
   const r = await gateway.fetch(req('/readyz', { method: 'HEAD' }), { AITA_ORIGIN: { fetch() { return fail('dns_error secret=private'); } } });
   assert.equal(await r.text(), ''); assert.equal(r.headers.get('x-aita-origin-error'), 'dns_error');
 }));
+test('public edge diagnostics are CORS readable without touching the private origin', async () => {
+  let called=0;
+  const response = await gateway.fetch(req('/_edge/health'), { AITA_ORIGIN: { fetch() { called++; throw Error('not reached'); } } });
+  assert.equal(response.status,200); assert.equal(response.headers.get('access-control-allow-origin'),'*');
+  const body = await response.json(); assert.equal(body.gateway,'aita-workers-vpc');
+  assert.equal(body.originBindingConfigured,true); assert.equal(called,0);
+});
+test('edge diagnostics have a bodyless preflight and reject mutation methods', async () => {
+  const preflight=await gateway.fetch(req('/_edge/health',{method:'OPTIONS'}),{});
+  assert.equal(preflight.status,204); assert.equal(await preflight.text(),'');
+  const bad=await gateway.fetch(req('/_edge/health',{method:'POST'}),{}); assert.equal(bad.status,405);
+  const head=await gateway.fetch(req('/_edge/health',{method:'HEAD'}),{}); assert.equal(await head.text(),'');
+});
+
+test('edge preflight accepts the exact no-cache diagnostic request headers', async () => {
+  const response=await gateway.fetch(req('/_edge/health',{method:'OPTIONS',headers:{
+    origin:'https://client.example', 'access-control-request-method':'GET',
+    'access-control-request-headers':'cache-control,pragma,x-aita-connection-probe'
+  }}),{});
+  const allowed=response.headers.get('access-control-allow-headers').toLowerCase().split(',').map(s=>s.trim());
+  for(const name of ['cache-control','pragma','x-aita-connection-probe']) assert.ok(allowed.includes(name));
+  assert.equal(response.headers.get('access-control-allow-origin'),'*');
+});

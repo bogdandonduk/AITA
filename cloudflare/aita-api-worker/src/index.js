@@ -8,7 +8,7 @@ const FAVICON_PATHS = new Set(["/favicon.svg", "/favicon.ico"]);
 const ROBOTS_PATH = "/robots.txt";
 const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
 const BOOTSTRAP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const GATEWAY_VERSION = "2026-09-11-connection-lifetime-v2";
+const GATEWAY_VERSION = "2026-09-15-inventory-continuity-v3";
 const CANONICAL_PUBLIC_ORIGIN = "https://aita-api.bogdan-donduk.workers.dev";
 
 // Only fixed health routes may be retried. In particular, NEVER replay a refresh token,
@@ -69,7 +69,7 @@ function bootstrapCorsHeaders(extra = {}) {
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET, HEAD, OPTIONS",
     "access-control-allow-headers":
-      "Accept, Content-Type, X-AITA-Installation-Id, X-AITA-Device-Name, " +
+      "Accept, Content-Type, Cache-Control, Pragma, X-AITA-Connection-Probe, X-AITA-Installation-Id, X-AITA-Device-Name, " +
       "X-AITA-Device-Platform, X-AITA-Device-Os, X-AITA-App-Name, " +
       "X-AITA-App-Version, X-AITA-Device-Locale",
     "access-control-max-age": "86400",
@@ -293,6 +293,10 @@ export default {
     const requestUrl = new URL(request.url);
 
     if (requestUrl.pathname === EDGE_HEALTH_PATH) {
+      if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        return bootstrapJsonResponse({ error: "method_not_allowed" }, 405, true);
+      }
+      if (method === "OPTIONS") return new Response(null, { status: 204, headers: bootstrapCorsHeaders() });
       return jsonResponse(
         {
           status: "ok",
@@ -303,7 +307,7 @@ export default {
         },
         200,
         method !== "HEAD",
-        { "x-aita-gateway": "AITA" },
+        { ...bootstrapCorsHeaders(), "x-aita-gateway": "AITA" },
       );
     }
 

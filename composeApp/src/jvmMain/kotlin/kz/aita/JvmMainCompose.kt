@@ -1100,6 +1100,8 @@ object DesktopVoiceInputJvmBridge {
      * Plug a local engine such as Vosk/Whisper here and return the recognized text for the requested locale.
      */
     var recognizeOnce: (suspend (localeLanguage: String) -> String?)? = null
+    /** A multilingual engine returns its own detected language, never a guessed UI language. */
+    var recognizeAutomaticallyOnce: (suspend () -> VoiceRecognitionResult?)? = null
 }
 
 private fun desktopPermissionSettingsCommands(kind: PlatformPermissionKind): List<Array<String>> =
@@ -1150,44 +1152,48 @@ private suspend fun openDesktopPermissionSettings(kind: PlatformPermissionKind):
     }
 
 fun installDesktopVoiceInputJvm() {
-    isPlatformVoiceInputAvailable = { DesktopVoiceInputJvmBridge.recognizeOnce != null }
-
-    getVoiceInputPermissionState = {
-        if (DesktopVoiceInputJvmBridge.recognizeOnce == null) PlatformPermissionState.Unavailable else PlatformPermissionState.Granted
+    var generation = 0L
+    var finishActiveSession: (() -> Unit)? = null
+    fun available() = DesktopVoiceInputJvmBridge.recognizeAutomaticallyOnce != null || DesktopVoiceInputJvmBridge.recognizeOnce != null
+    isPlatformVoiceInputAvailable = ::available
+    getVoiceInputPermissionState = { if (available()) PlatformPermissionState.Granted else PlatformPermissionState.Unavailable }
+    stopPlatformVoiceInput = {
+        generation++
+        val finished = finishActiveSession
+        finishActiveSession = null
+        finished?.invoke()
     }
-
-    stopPlatformVoiceInput = { }
     startPlatformVoiceInput = start@{ texts, callbacks ->
-        val recognizer = DesktopVoiceInputJvmBridge.recognizeOnce
-        if (recognizer == null) {
-            callbacks.onError(
-                "Desktop voice input engine is not configured for ${desktopPlatformDisplayName()}."
-            )
-            callbacks.onFinished()
-            return@start
-        }
-
-        callbacks.onAmplitude(0.30f)
-        val languageCandidates = (listOf(texts.primaryLanguageTag) + texts.languageTags + Locale.getDefault().toLanguageTag())
-            .map { it.substringBefore('-').trim().lowercase(Locale.ROOT) }
-            .filter { it.isNotBlank() && it != "main" && it != "system" }
-            .distinct()
-            .ifEmpty { listOf(Locale.getDefault().language) }
-        val result = withContext(Dispatchers.IO) {
-            languageCandidates.firstNotNullOfOrNull { language ->
-                runCatching { recognizer(language) }
-                    .getOrNull()
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { recognizedText -> language to recognizedText }
+        stopPlatformVoiceInput?.invoke()
+        val ticket = ++generation
+        finishActiveSession = callbacks.onFinished
+        try {
+            val automatic = DesktopVoiceInputJvmBridge.recognizeAutomaticallyOnce
+            val legacy = DesktopVoiceInputJvmBridge.recognizeOnce
+            if (automatic == null && legacy == null) {
+                callbacks.onError("Desktop voice input engine is not configured for ${desktopPlatformDisplayName()}.")
+                return@start
+            }
+            callbacks.onAmplitude(0.30f)
+            callbacks.onLanguageMode(if (automatic != null) VoiceLanguageMode.AutomaticRequested else VoiceLanguageMode.DeviceDefault)
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    if (automatic != null) automatic()
+                    else legacy?.invoke(if (texts.automaticLanguageDetection) Locale.getDefault().language else texts.primaryLanguageTag)
+                        ?.let { VoiceRecognitionResult(it) }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
+            }
+            if (ticket != generation) return@start
+            normalizedDetectedLanguage(result?.detectedLanguage)?.let(callbacks.onDetectedLanguage)
+            if (!result?.text.isNullOrBlank()) callbacks.onFinalText(result!!.text) else callbacks.onError("Nothing was recognized")
+        } finally {
+            if (ticket == generation) {
+                val finished = finishActiveSession
+                finishActiveSession = null
+                finished?.invoke()
             }
         }
-        if (result != null) {
-            callbacks.onDetectedLanguage(result.first)
-            callbacks.onFinalText(result.second)
-        } else {
-            callbacks.onError("Nothing was recognized")
-        }
-        callbacks.onFinished()
     }
 }
 

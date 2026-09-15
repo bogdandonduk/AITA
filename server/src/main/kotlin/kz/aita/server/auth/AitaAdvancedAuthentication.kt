@@ -321,7 +321,9 @@ internal class AitaAdvancedAuthService(
         authenticatorLoginPolicyEnabled = config.securityConfigured,
         authenticatorCodeLoginEnabled = config.advancedReady,
         authenticatorEmailRecoveryEnabled = config.emailReady,
-        emailSecondFactorEnabled = config.emailReady
+        emailSecondFactorEnabled = config.emailReady,
+        contactEmailVerificationEnabled = config.emailReady,
+        registrationEmailVerificationRequired = true
     )
 
     suspend fun passwordLogin(request: AitaPasswordLoginRequestDataModel, meta: Map<String, String>): AitaAuthFlowDataModel? {
@@ -420,7 +422,7 @@ internal class AitaAdvancedAuthService(
             it[AuthOneTimeChallenges.createdAtMillis] = now
             it[AuthOneTimeChallenges.updatedAtMillis] = now
         }
-        if (userId != null && destination != null) {
+        if (destination != null && (userId != null || purpose == AUTH_PURPOSE_CONTACT)) {
             val workId = UUID.randomUUID()
             val copy = aitaAuthEmailCopy(purpose, locale, code, ((deadlineMillis - now + 59_999L) / 60_000L).coerceAtLeast(1L))
             val json = aitaResendEmailRequestJson(config.fromEmail, destination, copy.subject, copy.html, config.replyTo, copy.text, copy.inlineImages)
@@ -1621,17 +1623,8 @@ internal class AitaAdvancedAuthService(
             normalizeAitaPhoneAlias(account.phoneNumber) != normalizeAitaStoredMainPhone(user[Users.phoneNumber], user[Users.countryLocale]) ||
             account.isActive != user[Users.isActive] || !request.newPassword.isNullOrBlank()
         if (!changesProtectedValues) return true
-        val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq user[Users.id] }.singleOrNull()
-        val requestedEmail = normalizeAitaEmail(account.email)
-        if (profile?.get(AuthSecurityProfiles.emailRequiredForLogin) == true && requestedEmail != normalizeAitaEmail(user[Users.email])) {
-            // Email is now a required factor. Do not replace its destination with an unverified
-            // typo and strand the owner. Verify the new address as the extra email first.
-            val verified = requestedEmail?.let { address -> AuthLoginEmails.selectAll().where {
-                (AuthLoginEmails.userId eq user[Users.id]) and (AuthLoginEmails.emailNormalized eq address) and
-                    (AuthLoginEmails.isPrimary eq false) and AuthLoginEmails.verifiedAtMillis.isNotNull()
-            }.singleOrNull() } != null
-            if (!verified) throw AitaAuthContactConflictException(AuthContactConflict.MAIN_EMAIL_VERIFICATION)
-        }
+        // The profile route has already locked and validated an exact new-address contact receipt.
+        // Existing password and enrolled-factor checks below still authorize the account change.
         return verifyEmailAliasCredentialsInside(user, request.password, request.secondFactorCode, System.currentTimeMillis(),
             request.emailProof, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(account.phoneNumber, account.email, account.isActive))
     }
@@ -1678,6 +1671,249 @@ internal class AitaAdvancedAuthService(
             }
         }
         return codes
+    }
+
+    /** Separate enrollment delivery from anonymous sign-in lookup (which must stay neutral). */
+    private fun requireContactDelivery() {
+        try { requireEmailDelivery() }
+        catch (_: AitaAuthUnavailableException) { throw AitaContactDeliveryUnavailableException() }
+    }
+
+    internal fun lockContactActorInside(actor: UUID) {
+        val user = lockSecurityUserInside(actor)
+        if (user == null || !user[Users.isActive]) throw AitaContactVerificationRequiredException()
+    }
+
+    private fun contactScope(actor: UUID?, target: AitaContactTarget, address: String): String =
+        crypto.hmac("contact-scope", listOf(AitaContactChannel.EMAIL.name, actor?.toString().orEmpty(), target.purpose.name,
+            target.entityId, target.parentId, address).joinToString("\n"))
+
+    private fun contactAuthorizationValidInside(binding: ResultRow): Boolean {
+        val actor = binding[AuthContactVerifications.actorUserId]
+        if (!contactTargetIsAuthorizedInside(actor, binding.contactTarget())) return false
+        if (actor == null) return binding[AuthContactVerifications.authorizationHash] == null
+        val user = Users.selectAll().where { Users.id eq actor }.singleOrNull() ?: return false
+        return crypto.constantTimeEquals(binding[AuthContactVerifications.authorizationHash].orEmpty(), loginAuthorizationInside(user))
+    }
+
+    suspend fun requestContactCode(actor: UUID?, request: AitaContactCodeRequest, ip: String): AitaAuthFlowDataModel? {
+        requireContactDelivery()
+        if (request.channel != AitaContactChannel.EMAIL) return null // SMS is deliberately not implemented.
+        val target = canonicalAitaContactTarget(request.target) ?: return null
+        val address = normalizeAitaEmail(request.address) ?: return null
+        if ((target.purpose == AitaContactPurpose.REGISTRATION) != (actor == null)) return null
+        return issueContactCode(actor, target, address, request.locale, ip, null)
+    }
+
+    private suspend fun issueContactCode(actor: UUID?, target: AitaContactTarget, address: String,
+        locale: String, ip: String, previousFlowId: UUID?): AitaAuthFlowDataModel? {
+        val requestedAt = System.currentTimeMillis()
+        // Destination quota is shared across ALL contact purposes, actors and draft identifiers.
+        val emailHash = crypto.hmac("contact-destination", address)
+        val ipHash = crypto.hmac("ip", ip)
+        requireActionBudget("contact:request:ip:$ipHash", 120, requestedAt)
+        val scopeHash = contactScope(actor, target, address)
+        return newSuspendedTransaction(Dispatchers.IO) {
+            val user = actor?.let(::lockSecurityUserInside)
+            if (actor != null && user == null) return@newSuspendedTransaction null
+            if (!contactTargetIsAuthorizedInside(actor, target)) return@newSuspendedTransaction null
+            lockEmailBucketsInside(emailHash, ipHash, actor)
+            val now = System.currentTimeMillis()
+            val binding = if (previousFlowId != null) AuthContactVerifications.selectAll()
+                .where { AuthContactVerifications.challengePublicId eq previousFlowId }.singleOrNull()
+            else AuthContactVerifications.selectAll().where { AuthContactVerifications.scopeHash eq scopeHash }
+                .orderBy(AuthContactVerifications.createdAtMillis to SortOrder.DESC).limit(1).singleOrNull()
+            if (previousFlowId != null && (binding == null || binding[AuthContactVerifications.scopeHash] != scopeHash ||
+                !contactAuthorizationValidInside(binding))) return@newSuspendedTransaction null
+            val old = binding?.let { b -> AuthOneTimeChallenges.selectAll()
+                .where { AuthOneTimeChallenges.publicId eq b[AuthContactVerifications.challengePublicId] }.forUpdate().singleOrNull() }
+            if (previousFlowId != null && (old == null || old[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_CONTACT ||
+                old[AuthOneTimeChallenges.consumedAtMillis] != null || old[AuthOneTimeChallenges.verifiedAtMillis] != null ||
+                old[AuthOneTimeChallenges.expiresAtMillis] <= now)) return@newSuspendedTransaction null
+            if (old != null && old[AuthOneTimeChallenges.consumedAtMillis] == null &&
+                old[AuthOneTimeChallenges.verifiedAtMillis] == null && old[AuthOneTimeChallenges.expiresAtMillis] > now &&
+                old[AuthOneTimeChallenges.attempts] < old[AuthOneTimeChallenges.maxAttempts] &&
+                old[AuthOneTimeChallenges.resendAfterMillis] > now && binding != null && contactAuthorizationValidInside(binding)) {
+                return@newSuspendedTransaction emailFlow(old, now).copy(maskedDestination = maskEmail(address))
+            }
+            checkEmailQuotaInside(emailHash, ipHash, now)
+            if (actor != null) {
+                val hourly = AuthContactVerifications.select(AuthContactVerifications.createdAtMillis).where {
+                    (AuthContactVerifications.actorUserId eq actor) and (AuthContactVerifications.createdAtMillis greaterEq now - 3_600_000L)
+                }.orderBy(AuthContactVerifications.createdAtMillis to SortOrder.DESC).limit(30).toList()
+                if (hourly.size >= 30) throw AitaAuthRateLimitedException(
+                    ((hourly.last()[AuthContactVerifications.createdAtMillis] + 3_600_000L - now) / 1000L + 1L).coerceAtLeast(1L))
+            }
+            if (old != null && old[AuthOneTimeChallenges.consumedAtMillis] == null) {
+                AuthOneTimeChallenges.update({ AuthOneTimeChallenges.id eq old[AuthOneTimeChallenges.id] }) {
+                    it[consumedAtMillis] = now; it[updatedAtMillis] = now
+                }
+            }
+            val deadline = if (previousFlowId == null) now + config.codeTtlMillis else requireNotNull(old)[AuthOneTimeChallenges.expiresAtMillis]
+            val flow = createEmailChallengeInside(actor, address, AUTH_PURPOSE_CONTACT, locale, emailHash, ipHash, now, deadline)
+            AuthContactVerifications.insert {
+                it[challengePublicId] = UUID.fromString(flow.flowId); it[actorUserId] = actor
+                it[channel] = AitaContactChannel.EMAIL.name; it[contactPurpose] = target.purpose.name
+                it[entityId] = target.entityId; it[parentId] = target.parentId; it[AuthContactVerifications.address] = address
+                it[AuthContactVerifications.scopeHash] = scopeHash
+                it[authorizationHash] = user?.let(::loginAuthorizationInside); it[createdAtMillis] = now
+            }
+            flow.copy(maskedDestination = maskEmail(address))
+        }
+    }
+
+    suspend fun resendContactCode(actor: UUID?, request: AitaEmailCodeResendRequestDataModel, ip: String): AitaAuthFlowDataModel? {
+        requireContactDelivery()
+        val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
+        val snapshot = newSuspendedTransaction(Dispatchers.IO) {
+            val row = AuthContactVerifications.selectAll().where { AuthContactVerifications.challengePublicId eq publicId }.singleOrNull()
+                ?: return@newSuspendedTransaction null
+            if (row[AuthContactVerifications.actorUserId] != actor) return@newSuspendedTransaction null
+            row.contactTarget() to row[AuthContactVerifications.address]
+        } ?: return null
+        return issueContactCode(actor, snapshot.first, snapshot.second, request.locale, ip, publicId)
+    }
+
+    suspend fun verifyContactCode(actor: UUID?, request: AitaEmailCodeVerifyRequestDataModel, ip: String): AitaContactVerificationResult? {
+        config.requireSecurityConfigured()
+        val publicId = runCatching { UUID.fromString(request.flowId) }.getOrNull() ?: return null
+        val code = normalizeAitaOneTimeCode(request.code) ?: return null
+        val requestedAt = System.currentTimeMillis()
+        requireActionBudget("contact:verify:ip:${crypto.hmac("ip", ip)}", 120, requestedAt)
+        return newSuspendedTransaction(Dispatchers.IO) {
+            actor?.let { if (lockSecurityUserInside(it) == null) return@newSuspendedTransaction null }
+            val row = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq publicId }.forUpdate().singleOrNull()
+                ?: return@newSuspendedTransaction null
+            if (row[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_CONTACT || row[AuthOneTimeChallenges.userId] != actor) return@newSuspendedTransaction null
+            val binding = AuthContactVerifications.selectAll().where { AuthContactVerifications.challengePublicId eq publicId }.forUpdate().singleOrNull()
+                ?: return@newSuspendedTransaction null
+            if (binding[AuthContactVerifications.actorUserId] != actor || !contactAuthorizationValidInside(binding)) return@newSuspendedTransaction null
+            val now = System.currentTimeMillis() // Do not validate against a timestamp from before lock waits.
+            val deadline = if (row[AuthOneTimeChallenges.verifiedAtMillis] != null) binding[AuthContactVerifications.receiptExpiresAtMillis] ?: 0L
+                else row[AuthOneTimeChallenges.expiresAtMillis]
+            if (row[AuthOneTimeChallenges.consumedAtMillis] != null || deadline <= now ||
+                row[AuthOneTimeChallenges.attempts] >= row[AuthOneTimeChallenges.maxAttempts]) return@newSuspendedTransaction null
+            if (!crypto.constantTimeEquals(row[AuthOneTimeChallenges.codeHash], crypto.hmac("code:$publicId", code))) {
+                // Return normally so failed attempts COMMIT; throwing would roll the counter back.
+                AuthOneTimeChallenges.update({ AuthOneTimeChallenges.id eq row[AuthOneTimeChallenges.id] }) {
+                    it[attempts] = row[AuthOneTimeChallenges.attempts] + 1; it[updatedAtMillis] = now
+                }
+                return@newSuspendedTransaction null
+            }
+            val oldReceipt = binding[AuthContactVerifications.receiptCiphertext]
+            val receipt = oldReceipt?.let { crypto.decrypt("contact-receipt:$publicId", it) } ?: crypto.randomToken()
+            val expires = binding[AuthContactVerifications.receiptExpiresAtMillis] ?: (now + config.resetTtlMillis)
+            if (oldReceipt == null) {
+                AuthContactVerifications.update({ AuthContactVerifications.challengePublicId eq publicId }) {
+                    it[receiptHash] = crypto.hmac("contact-proof:$publicId", receipt)
+                    it[receiptCiphertext] = crypto.encrypt("contact-receipt:$publicId", receipt)
+                    it[receiptExpiresAtMillis] = expires
+                }
+                AuthOneTimeChallenges.update({ AuthOneTimeChallenges.id eq row[AuthOneTimeChallenges.id] }) {
+                    it[verifiedAtMillis] = now; it[updatedAtMillis] = now
+                }
+                auditInside(actor, "CONTACT_EMAIL_VERIFIED", row[AuthOneTimeChallenges.identifierHash], row[AuthOneTimeChallenges.requestIpHash], now)
+            }
+            // Retries with the same code recover the SAME proof without extending its lifetime.
+            AitaContactVerificationResult(AitaVerifiedContactProof(publicId.toString(), receipt), binding.contactTarget(),
+                binding[AuthContactVerifications.address], expiresAtMillis = expires, serverTimeMillis = now)
+        }
+    }
+
+    /** The caller's mutation transaction owns these locks until save/rollback. No code is accepted here. */
+    internal fun requireContactProofsInside(actor: UUID?, target: AitaContactTarget, proposed: List<String>, previous: List<String>,
+        proofs: List<AitaVerifiedContactProof>): List<UUID> {
+        val needed = aitaContactEmailsRequiringProof(proposed, previous) ?: throw BadRequestException("Invalid contact email")
+        if (needed.isEmpty()) return emptyList()
+        config.requireSecurityConfigured()
+        val canonicalTarget = canonicalAitaContactTarget(target) ?: throw AitaContactVerificationRequiredException()
+        if (!contactTargetIsAuthorizedInside(actor, canonicalTarget)) throw AitaContactVerificationRequiredException()
+        if (proofs.size != needed.size || proofs.size > 10 || proofs.map { it.flowId }.distinct().size != proofs.size)
+            throw AitaContactVerificationRequiredException()
+        var earliestExpiry = Long.MAX_VALUE
+        val matched = mutableSetOf<String>()
+        val ids = mutableListOf<UUID>()
+        for (proof in proofs.sortedBy { it.flowId }) {
+            val publicId = runCatching { UUID.fromString(proof.flowId) }.getOrNull() ?: throw AitaContactVerificationRequiredException()
+            if (proof.receipt.length !in 40..128) throw AitaContactVerificationRequiredException()
+            val row = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq publicId }.forUpdate().singleOrNull()
+                ?: throw AitaContactVerificationRequiredException()
+            val binding = AuthContactVerifications.selectAll().where { AuthContactVerifications.challengePublicId eq publicId }.forUpdate().singleOrNull()
+                ?: throw AitaContactVerificationRequiredException()
+            val now = System.currentTimeMillis()
+            earliestExpiry = minOf(earliestExpiry, binding[AuthContactVerifications.receiptExpiresAtMillis] ?: 0L)
+            val address = binding[AuthContactVerifications.address]
+            if (address !in needed || !matched.add(address) || row[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_CONTACT ||
+                row[AuthOneTimeChallenges.userId] != actor || row[AuthOneTimeChallenges.verifiedAtMillis] == null ||
+                !aitaContactProofMatches(canonicalTarget, binding.contactTarget(), actor?.toString(), binding[AuthContactVerifications.actorUserId]?.toString(),
+                    address, address, AitaContactChannel.valueOf(binding[AuthContactVerifications.channel]), now,
+                    binding[AuthContactVerifications.receiptExpiresAtMillis] ?: 0L, row[AuthOneTimeChallenges.consumedAtMillis]) ||
+                !contactAuthorizationValidInside(binding) ||
+                !crypto.constantTimeEquals(binding[AuthContactVerifications.receiptHash].orEmpty(), crypto.hmac("contact-proof:$publicId", proof.receipt)))
+                throw AitaContactVerificationRequiredException()
+            ids += publicId
+        }
+        if (matched.size != needed.size || System.currentTimeMillis() >= earliestExpiry) throw AitaContactVerificationRequiredException()
+        return ids
+    }
+
+    /** Consume only AFTER every proof/permission passes, in the SAME transaction as the actual write. */
+    internal fun consumeContactProofsInside(publicIds: List<UUID>, appliedEntityId: UUID) {
+        val now = System.currentTimeMillis()
+        for (publicId in publicIds) {
+            AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId eq publicId }) {
+                it[consumedAtMillis] = now; it[updatedAtMillis] = now
+            }
+            // Erase the recoverable receipt on consumption; the HMAC remains only as audit material.
+            AuthContactVerifications.update({ AuthContactVerifications.challengePublicId eq publicId }) {
+                it[receiptCiphertext] = ""
+                it[AuthContactVerifications.appliedEntityId] = appliedEntityId
+                it[appliedAtMillis] = now
+            }
+        }
+    }
+
+    internal fun markPrimaryEmailVerifiedInside(userId: UUID, email: String) {
+        val now = System.currentTimeMillis()
+        ensureProfileInside(userId, now)
+        AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq userId }) {
+            it[emailVerifiedAtMillis] = now; it[updatedAtMillis] = now
+        }
+        AuthLoginEmails.update({ (AuthLoginEmails.userId eq userId) and (AuthLoginEmails.emailNormalized eq email) }) {
+            it[verifiedAtMillis] = now
+        }
+    }
+
+    internal fun enqueueOldEmailChangeNoticeInside(userId: UUID, oldEmail: String, locale: String) {
+        val destination = normalizeAitaEmail(oldEmail) ?: return
+        val now = System.currentTimeMillis()
+        val flow = createEmailChallengeInside(userId, destination, AUTH_PURPOSE_CONTACT_NOTICE, locale,
+            crypto.hmac("contact-change-notice", userId.toString()), crypto.hmac("ip", "internal-notice"), now, now + 86_400_000L)
+        AuthContactChangeNotices.insert {
+            it[challengePublicId] = UUID.fromString(flow.flowId); it[AuthContactChangeNotices.userId] = userId
+            it[address] = destination; it[createdAtMillis] = now
+        }
+        auditInside(userId, "ACCOUNT_EMAIL_CHANGED_CONFIRMED", null, null, now)
+    }
+
+    private fun contactDeliveryDestinationInside(challenge: ResultRow): String? {
+        val binding = AuthContactVerifications.selectAll().where {
+            AuthContactVerifications.challengePublicId eq challenge[AuthOneTimeChallenges.publicId]
+        }.singleOrNull() ?: return null
+        if (binding[AuthContactVerifications.channel] != AitaContactChannel.EMAIL.name ||
+            binding[AuthContactVerifications.actorUserId] != challenge[AuthOneTimeChallenges.userId] ||
+            !contactAuthorizationValidInside(binding)) return null
+        val address = binding[AuthContactVerifications.address]
+        return address.takeIf { crypto.constantTimeEquals(challenge[AuthOneTimeChallenges.deliveryEmailHash].orEmpty(), crypto.hmac("delivery-email", it)) }
+    }
+
+    private fun contactNoticeDestinationInside(challenge: ResultRow): String? {
+        val notice = AuthContactChangeNotices.selectAll().where {
+            AuthContactChangeNotices.challengePublicId eq challenge[AuthOneTimeChallenges.publicId]
+        }.singleOrNull() ?: return null
+        if (notice[AuthContactChangeNotices.userId] != challenge[AuthOneTimeChallenges.userId]) return null
+        val address = notice[AuthContactChangeNotices.address]
+        return address.takeIf { crypto.constantTimeEquals(challenge[AuthOneTimeChallenges.deliveryEmailHash].orEmpty(), crypto.hmac("delivery-email", it)) }
     }
 
     private fun ensureProfileInside(userId: UUID, now: Long) {
@@ -1798,16 +2034,22 @@ internal class AitaAdvancedAuthService(
                 val challenge = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.id eq work[AuthEmailOutbox.challengeId] }.singleOrNull()
                     ?: return@newSuspendedTransaction DeliveryWork(cancellation = "CHALLENGE_REMOVED")
                 val userId = challenge[AuthOneTimeChallenges.userId]
-                    ?: return@newSuspendedTransaction DeliveryWork(cancellation = "CHALLENGE_UNAVAILABLE")
-                val user = Users.selectAll().where { Users.id eq userId }.singleOrNull()
-                    ?: return@newSuspendedTransaction DeliveryWork(cancellation = "ACCOUNT_UNAVAILABLE")
+                val user = userId?.let { id -> Users.selectAll().where { Users.id eq id }.singleOrNull() }
+                val contactPurpose = challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_CONTACT
+                val contactNotice = challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_CONTACT_NOTICE
+                if (!contactPurpose && user == null)
+                    return@newSuspendedTransaction DeliveryWork(cancellation = "ACCOUNT_UNAVAILABLE")
+                val destination = when {
+                    contactPurpose -> contactDeliveryDestinationInside(challenge)
+                    contactNotice -> contactNoticeDestinationInside(challenge)
+                    else -> challengeDestinationInside(challenge, requireNotNull(user))
+                } ?: return@newSuspendedTransaction DeliveryWork(cancellation = "RECIPIENT_CHANGED_OR_UNVERIFIED")
                 if (!authEmailCanBeDelivered(System.currentTimeMillis(), challenge[AuthOneTimeChallenges.expiresAtMillis],
-                        challenge[AuthOneTimeChallenges.consumedAtMillis], challenge[AuthOneTimeChallenges.verifiedAtMillis], user[Users.isActive]))
+                        challenge[AuthOneTimeChallenges.consumedAtMillis], challenge[AuthOneTimeChallenges.verifiedAtMillis],
+                        contactNotice || (if (contactPurpose) true else user?.get(Users.isActive) == true)))
                     return@newSuspendedTransaction DeliveryWork(cancellation = "CODE_EXPIRED_OR_REPLACED")
                 if (challenge[AuthOneTimeChallenges.purpose] == AUTH_PURPOSE_RECOVERY && !config.passwordRecoveryEnabled)
                     return@newSuspendedTransaction DeliveryWork(cancellation = "RECOVERY_DISABLED")
-                val destination = challengeDestinationInside(challenge, user)
-                    ?: return@newSuspendedTransaction DeliveryWork(cancellation = "RECIPIENT_CHANGED_OR_UNVERIFIED")
 
                 val encrypted = work[AuthEmailOutbox.payloadCiphertext]
                 val json = if (!encrypted.isNullOrBlank()) {
@@ -1961,7 +2203,7 @@ internal class AitaAdvancedAuthService(
 
 private val AdvancedAuthServiceKey = AttributeKey<AitaAdvancedAuthService>("AITA.AdvancedAuthentication.Service")
 
-private fun advancedAuthService(tokenService: TokenService, application: Application): AitaAdvancedAuthService =
+internal fun advancedAuthService(tokenService: TokenService, application: Application): AitaAdvancedAuthService =
     synchronized(application) {
         application.attributes.getOrNull(AdvancedAuthServiceKey) ?: run {
             val config = AdvancedAuthConfig.load(
@@ -2022,6 +2264,9 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
     route("/auth") {
         intercept(ApplicationCallPipeline.Plugins) {
             call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+        }
+        route("/registration/email") {
+            installContactVerificationActions(service, registration = true)
         }
         get("/capabilities") {
             call.genericResponse(HttpStatusCode.OK, service.capabilities())
@@ -2160,6 +2405,9 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
 
         authenticate("auth-jwt") {
             route("/security") {
+                route("/contact-verification") {
+                    installContactVerificationActions(service, registration = false)
+                }
                 post("/email-proof/request") {
                     val userId = call.checkPrincipal() ?: return@post
                     val result = service.requestSecurityEmail(userId, call.receiveAita<AitaSecurityEmailRequest>(), call.authClientIp())
@@ -2278,5 +2526,32 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                 }
             }
         }
+    }
+}
+
+/** Anonymous enrollment endpoints can NEVER request or verify an authenticated contact purpose. */
+private fun Route.installContactVerificationActions(service: AitaAdvancedAuthService, registration: Boolean) {
+    post("/request") {
+        val actor: UUID? = if (registration) null else (call.checkPrincipal() ?: return@post)
+        val request = call.receiveAita<AitaContactCodeRequest>()
+        if ((request.target.purpose == AitaContactPurpose.REGISTRATION) != registration || request.channel != AitaContactChannel.EMAIL) {
+            call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("contact.invalid_request"))
+            return@post
+        }
+        val result = service.requestContactCode(actor, request, call.authClientIp())
+        if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("contact.invalid_request"))
+        else call.genericResponse(HttpStatusCode.Accepted, result)
+    }
+    post("/resend") {
+        val actor: UUID? = if (registration) null else (call.checkPrincipal() ?: return@post)
+        val result = service.resendContactCode(actor, call.receiveAita<AitaEmailCodeResendRequestDataModel>(), call.authClientIp())
+        if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("contact.restart"))
+        else call.genericResponse(HttpStatusCode.Accepted, result)
+    }
+    post("/verify") {
+        val actor: UUID? = if (registration) null else (call.checkPrincipal() ?: return@post)
+        val result = service.verifyContactCode(actor, call.receiveAita<AitaEmailCodeVerifyRequestDataModel>(), call.authClientIp())
+        if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("contact.code_invalid"))
+        else call.genericResponse(HttpStatusCode.OK, result)
     }
 }

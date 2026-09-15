@@ -10,6 +10,11 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
     val tg = emailLanguage == "tg"
     val ky = emailLanguage == "ky"
     val uz = emailLanguage == "uz"
+    if (purpose == AUTH_PURPOSE_CONTACT_NOTICE) {
+        val title = requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("contact.notice_title"), emailLanguage))
+        val detail = requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("contact.notice_detail"), emailLanguage))
+        return AuthEmailCopy("AITA · $title", aitaAuthEmailLayout(title, detail, null, "", "AITA", emailLanguage), "AITA · $title\n\n$detail")
+    }
     if (purpose == "TOTP_RESET_NOTICE") {
         val title = when { ru -> "Аутентификатор удалён"; kk -> "Аутентификатор жойылды"; tg -> "Аутентификатор нест карда шуд"; ky -> "Аутентификатор өчүрүлдү"; uz -> "Autentifikator oʻchirildi"; else -> "Authenticator removed" }
         val detail = when {
@@ -23,6 +28,7 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
         return AuthEmailCopy("AITA · $title", aitaAuthEmailLayout(title, detail, null, "", "AITA", emailLanguage), "AITA · $title\n\n$detail")
     }
     val title = when (purpose) {
+        AUTH_PURPOSE_CONTACT -> requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("contact.title"), emailLanguage))
         "LOGIN_EMAIL_FACTOR" -> when { ru -> "Подтвердите вход"; kk -> "Кіруді растаңыз"; tg -> "Воридшавии худро тасдиқ кунед"; ky -> "Кирүүңүздү ырастаңыз"; uz -> "Kirishni tasdiqlang"; else -> "Confirm your sign-in" }
         "SECURITY_EMAIL_PROOF" -> when { ru -> "Подтвердите изменение"; kk -> "Өзгерісті растаңыз"; tg -> "Тағйири амниятиро тасдиқ кунед"; ky -> "Коопсуздук өзгөртүүсүн ырастаңыз"; uz -> "Xavfsizlik oʻzgarishini tasdiqlang"; else -> "Confirm a security change" }
         "TOTP_RECOVERY" -> when { ru -> "Сброс аутентификатора"; kk -> "Аутентификаторды қалпына келтіру"; tg -> "Аз нав танзим кардани аутентификатор"; ky -> "Аутентификаторду баштапкы абалга келтирүү"; uz -> "Autentifikatorni qayta sozlash"; else -> "Reset your authenticator" }
@@ -31,7 +37,9 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
         "PHONE_ALIAS" -> when { ru -> "Подтвердите номер для входа"; kk -> "Кіру нөмірін растаңыз"; tg -> "Рақами воридшавиро тасдиқ кунед"; ky -> "Кирүү үчүн номериңизди ырастаңыз"; uz -> "Kirish uchun raqamingizni tasdiqlang"; else -> "Confirm your sign-in number" }
         else -> when { ru -> "Ваш код входа"; kk -> "Кіру кодыңыз"; tg -> "Коди воридшавии шумо"; ky -> "Кирүү кодуңуз"; uz -> "Kirish kodingiz"; else -> "Your sign-in code" }
     }
-    val instruction = if (purpose == "TOTP_RECOVERY") when {
+    val instruction = if (purpose == AUTH_PURPOSE_CONTACT) {
+        requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("contact.email_instruction"), emailLanguage))
+    } else if (purpose == "TOTP_RECOVERY") when {
         ru -> "Этот код удалит аутентификатор и резервные коды, а также завершит все сеансы входа. Введите его только если вы запросили сброс в AITA."
         kk -> "Бұл код аутентификатор мен резервтік кодтарды жойып, барлық кіру сеанстарын аяқтайды. Оны AITA қолданбасында қалпына келтіруді өзіңіз сұратсаңыз ғана енгізіңіз."
         tg -> "Ин код аутентификатор ва кодҳои барқарорсозиро нест карда, ҳамаи сеансҳои воридшавиро анҷом медиҳад. Онро танҳо дар сурате ворид кунед, ки азнавтанзимкуниро дар AITA худатон дархост карда бошед."

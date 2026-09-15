@@ -54,7 +54,8 @@ data class VoiceInputPermissionRequestText(
     val listeningTitle: String,
     val listeningSubtitle: String,
     val languageTags: List<String> = emptyList(),
-    val primaryLanguageTag: String = ""
+    val primaryLanguageTag: String = "",
+    val automaticLanguageDetection: Boolean = true
 )
 
 data class VoiceInputCallbacks(
@@ -64,7 +65,8 @@ data class VoiceInputCallbacks(
     val onDetectedLanguage: (String) -> Unit = {},
     val onDenied: () -> Unit = {},
     val onError: (String) -> Unit = {},
-    val onFinished: () -> Unit = {}
+    val onFinished: () -> Unit = {},
+    val onLanguageMode: (VoiceLanguageMode) -> Unit = {}
 )
 
 enum class PlatformPermissionKind {
@@ -467,12 +469,12 @@ internal fun AppConfiguration.sortActionIconFallback(): DrawableResource =
 @Composable
 internal fun AppConfiguration.nextPageIconPath(): String {
     val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
-    return stateValues.drawables.orEmpty().extractPath(90L, normalizedThemeId)
-        ?: "svg/90_${normalizedThemeId}.svg"
+    return stateValues.drawables.orEmpty().extractPath(146L, normalizedThemeId)
+        ?: "svg/146_${normalizedThemeId}.svg"
 }
 
 internal fun AppConfiguration.nextPageIconFallback(): DrawableResource =
-    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._90_1 else Res.drawable._90_0
+    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._146_1 else Res.drawable._146_0
 
 internal fun StateHost?.autoFocusScopeKey(): String = this?.toString() ?: "global"
 

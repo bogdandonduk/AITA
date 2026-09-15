@@ -215,15 +215,7 @@ internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, p
             settings = null; error = ""; factor = ""; revision++
         }
     }
-    val requestedEmail = target.split('\n').getOrNull(1)?.let(::normalizeAitaEmail)
-    if (current.emailRequiredForLogin && requestedEmail != normalizeAitaEmail(current.email) &&
-        current.additionalLoginEmails.none { normalizeAitaEmail(it) == requestedEmail }) {
-        Text(authUiText("First verify this address as your extra email in Sign-in & security.",
-            "Сначала подтвердите этот адрес как дополнительный email в разделе «Вход и безопасность».",
-            "Алдымен бұл мекенжайды «Кіру және қауіпсіздік» бөлімінде қосымша email ретінде растаңыз.", "Адегенде бул даректи «Кирүү жана коопсуздук» бөлүмүндө кошумча электрондук почтаңыз катары ырастатыңыз."),
-            color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-        return ProfileSecurityConfirmation(false)
-    }
+    // New-address ownership is confirmed in the profile form, separately from this current-account factor.
     if (current.authenticatorEnabled) AuthenticatorCodeEntryField(factor, false, { factor = it }, {}, "profile-security-factor")
     val needsEmail = current.emailRequiredForLogin && !current.authenticatorEnabled
     val proof = if (needsEmail) SecurityEmailProofInput(AitaSecurityEmailRequest(AitaSecurityEmailAction.PROFILE, target, password,

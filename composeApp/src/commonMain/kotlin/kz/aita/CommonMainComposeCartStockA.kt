@@ -2633,53 +2633,16 @@ fun AppConfiguration.StockWarehouseScreenContent(
             } else {
                 val activeStoreId = stateValues.activeStoreId
                 val stockBatches = stateValues.stockBatches.orEmpty()
+                val liveCollections by LiveCollectionWorkspace.stock.collectAsState()
+                val collections = liveCollections?.takeIf { it.owner == inventoryViewScopeKey() }
                 val stockPayloadAlreadyScopedForTransaction = stockItemsOverride != null && transactionTypeIndex != null
                 val showWarehouseInfoTile = searchQuery == null && transactionTypeIndex == null
                 val selectedSortMode = sortMode ?: "name"
-                val needsWarehouseQuantityMap = showWarehouseInfoTile || selectedSortMode == "quantity"
-                val warehouseBatchesByItem = remember(stockBatches, needsWarehouseQuantityMap) {
-                    if (needsWarehouseQuantityMap) stockWarehouseBatchesByItemForUi(stockBatches) else emptyMap()
-                }
-                val warehouseQuantityByItem = remember(warehouseBatchesByItem, needsWarehouseQuantityMap) {
-                    if (needsWarehouseQuantityMap) warehouseBatchesByItem.mapValues { (_, batches) -> batches.sumOf { it.quantity.total } } else emptyMap()
-                }
-                val needsDisplayBatchesByItem = showBatches || disableIfOutOfStock || onPrintLabel != null
-                val stockPayloadItemIdsForBatchDisplay = remember(stockPayload, stockItemsOverride) {
-                    if (stockItemsOverride == null) emptySet()
-                    else stockPayload.map { it.id }.filter { it.isNotBlank() }.toSet()
-                }
-                val displayBatchesByItem = remember(stockBatches, transactionTypeIndex, activeStoreId, needsDisplayBatchesByItem, stockPayloadItemIdsForBatchDisplay) {
-                    if (!needsDisplayBatchesByItem) {
-                        emptyMap()
-                    } else {
-                        stockBatches
-                            .asSequence()
-                            .filter { batch ->
-                                (stockPayloadItemIdsForBatchDisplay.isEmpty() || batch.goodsItemId in stockPayloadItemIdsForBatchDisplay) &&
-                                        batch.isActive && (
-                                        transactionTypeIndex == null ||
-                                                (batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId) && batch.isSelectableActiveStockBatch())
-                                        )
-                            }
-                            .groupBy { it.goodsItemId }
-                    }
-                }
-                val sellableItemIdsForActiveStore = remember(stockBatches, activeStoreId, stockPayloadAlreadyScopedForTransaction) {
-                    if (stockPayloadAlreadyScopedForTransaction || activeStoreId.isNullOrBlank()) {
-                        emptySet()
-                    } else {
-                        stockBatches
-                            .asSequence()
-                            .filter { batch ->
-                                batch.isActive &&
-                                        batch.isSelectableActiveStockBatch() &&
-                                        batchBelongsToInventoryStoreForUi(batch.storeId, activeStoreId)
-                            }
-                            .map { it.goodsItemId }
-                            .filter { it.isNotBlank() }
-                            .toSet()
-                    }
-                }
+                val warehouseBatchesByItem = collections?.warehouseBatchesByItem.orEmpty()
+                val warehouseQuantityByItem = collections?.quantityByItem.orEmpty()
+                val displayBatchesByItem = if (transactionTypeIndex == null) collections?.activeBatchesByItem.orEmpty()
+                    else collections?.saleBatchesByItem.orEmpty()
+                val sellableItemIdsForActiveStore = collections?.saleBatchesByItem?.keys.orEmpty()
 
                 var lSearchQuery: String by rememberSaveable {
                     mutableStateOf("")
@@ -2781,24 +2744,33 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     language, warehouseQuantityByItem, warehouseBatchesByItem, selectedWarehouseFilterId,
                     showWarehouseInfoTile, fallbackOrderIds, activeStoreId
                 ) { Any() }
-                // Keep the previous layout while sorting this same store, rather than flashing a
-                // full-screen spinner for every keystroke or stock update. Never retain across owners.
+                val useWarmWarehouse = showWarehouseInfoTile && stockItemsOverride == null && onFilter == null && preferredOrderIds.isEmpty()
+                val warmWarehouse by LiveCollectionWorkspace.warehouse.collectAsState()
+                val requestedSelection = WarehouseSelection(appliedSearchQuery, selectedSortMode, sortAscending,
+                    if (showWarehouseInfoTile) selectedWarehouseFilterId else STOCK_WAREHOUSE_FILTER_TOTAL, fallbackOrderIds)
+                LaunchedEffect(useWarmWarehouse, requestedSelection) {
+                    if (useWarmWarehouse) LiveCollectionWorkspace.selectWarehouse(requestedSelection)
+                }
+                // Retain the previous row layout while a same-owner worker prepares a new projection.
                 val projectionState = remember(activeStoreId, stateValues.userAccount?.id) {
                     mutableStateOf<Pair<Any, StockWarehouseProjection>?>(null)
                 }
-                LaunchedEffect(projectionRequest) {
-                    val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                        buildStockWarehouseProjection(
-                            baseItems, appliedSearchQuery, preferredOrderIds, selectedSortMode,
-                            sortAscending, language, warehouseQuantityByItem, warehouseBatchesByItem,
-                            if (showWarehouseInfoTile) selectedWarehouseFilterId else STOCK_WAREHOUSE_FILTER_TOTAL,
-                            fallbackOrderIds
-                        )
+                LaunchedEffect(projectionRequest, useWarmWarehouse) {
+                    if (!useWarmWarehouse) {
+                        val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                            buildStockWarehouseProjection(baseItems, appliedSearchQuery, preferredOrderIds, selectedSortMode,
+                                sortAscending, language, warehouseQuantityByItem, warehouseBatchesByItem,
+                                requestedSelection.filter, fallbackOrderIds)
+                        }
+                        projectionState.value = projectionRequest to result
                     }
-                    projectionState.value = projectionRequest to result
                 }
-                val projection = projectionState.value?.second
-                val projectionCurrent = projectionState.value?.first === projectionRequest
+                val warm = warmWarehouse?.takeIf { it.owner == inventoryViewScopeKey() }
+                val projection = if (useWarmWarehouse) warm?.projection else projectionState.value?.second
+                val collectionsCurrent = collections?.stock === state.payload && collections?.batches === stateValues.stockBatches
+                val projectionCurrent = collectionsCurrent && if (useWarmWarehouse)
+                    warm != null && warm.selection == requestedSelection && warm.language == language && warm.stock === state.payload && warm.batches === stateValues.stockBatches
+                    else projectionState.value?.first === projectionRequest
                 if (projection == null) {
                     InventoryLoadFeedback(
                         modifier = modifier.fillMaxSize(),
@@ -2906,10 +2878,13 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     }
                 }
 
-                var page by rememberSaveable(appliedSearchQuery, selectedSortMode, sortAscending, selectedWarehouseFilterId, sortedItems.size) {
+                var page by rememberSaveable(appliedSearchQuery, selectedSortMode, sortAscending, selectedWarehouseFilterId) {
                     mutableStateOf(0)
                 }
                 val pageSize = stateValues.globalAppConfiguration.pagingDefaultPageSize.coerceIn(20, 100)
+                LaunchedEffect(sortedItems.size, pageSize) {
+                    page = page.coerceIn(0, (sortedItems.size.totalClientPages(pageSize) - 1).coerceAtLeast(0))
+                }
                 val visibleItems = remember(sortedItems, page, pageSize) { sortedItems.clientPaged(page, pageSize) }
 
                 Column(
@@ -2918,17 +2893,15 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 ) {
                     val failedLoad = stockLoadStatus.takeIf { it.failure != null || it.cacheWriteFailed }
                         ?: batchesLoadStatus.takeIf { it.failure != null || it.cacheWriteFailed }
-                    if (failedLoad != null) {
+                    if (failedLoad != null || stateValues.cloudTransportStatus == CLOUD_TRANSPORT_STATUS_UNAVAILABLE) {
                         InventoryLoadFeedback(
                             modifier = Modifier.fillMaxWidth(),
-                            status = failedLoad,
+                            status = failedLoad ?: stockLoadStatus,
                             compact = true
                         )
                     }
                     if (showWarehouseInfoTile) {
-                        val overviewMetrics = remember(unfilteredSortedItems, warehouseBatchesByItem) {
-                            stockWarehouseMetricsForUi(unfilteredSortedItems, warehouseBatchesByItem)
-                        }
+                        val overviewMetrics = projection.metrics
                         StockWarehouseInfoTile(
                             modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp),
                             metrics = overviewMetrics,
@@ -3032,16 +3005,17 @@ fun AppConfiguration.StockWarehouseScreenContent(
                                 }
                                 val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
 
-                                val canOperateThisStoreInventory = projectionCurrent && (
-                                    activeStoreId.isNullOrBlank() || sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || item.id in sellableItemIdsForActiveStore
-                                )
+                                val belongsToVisibleInventory = activeStoreId.isNullOrBlank() ||
+                                    sameInventoryStoreGroupForUi(activeStoreId, item.storeId) || item.id in sellableItemIdsForActiveStore
+                                val canOperateThisStoreInventory = projectionCurrent && belongsToVisibleInventory
 
                                 GoodsItemInStockWidget(
                                     modifier = Modifier
                                         .alpha(if (trulyOutOfStock) 0.5f else 1f),
                                     goodsItem = item,
                                     batches = itemBatches,
-                                    showBatches = showBatches && canOperateThisStoreInventory,
+                                    showBatches = showBatches && belongsToVisibleInventory,
+                                    shelfActionsEnabled = canOperateThisStoreInventory,
                                     transactionTypeIndex = transactionTypeIndex,
                                     selectionMode = selectionMode,
                                     selected = item.id in selectedStockItemIds,
@@ -4904,13 +4878,18 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
+                val supplierEmailConfirmation = rememberContactEmailConfirmation(
+                    kz.aita.auth.AitaContactPurpose.SUPPLIER_CONTACT, "", listOf(supplierEmail))
+                ContactEmailConfirmationContent(supplierEmailConfirmation, enabled = !isSaving)
+
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(631, "Save supplier"),
                     iconPath = stateValues.drawablePathIconCheck,
-                    enabled = supplierName.isNotBlank() && !isSaving,
+                    enabled = supplierName.isNotBlank() && !isSaving && supplierEmailConfirmation.ready,
                     confirmationRequired = false,
                     onClick = {
+                        if (isSaving || !supplierEmailConfirmation.ready) return@actionButton
                         val phoneLocal = supplierPhoneTextFieldContent.value.text.trim()
                         val phoneNumber = if (phoneLocal.isBlank()) {
                             ""
@@ -4940,6 +4919,8 @@ internal fun AppConfiguration.QuickSupplierAddBottomSheet(
                             name = listOf(LocalizedStringDataModel("main", supplierName.trim())),
                             phoneNumbers = listOf(phoneNumber).filter { it.isNotBlank() },
                             emails = listOfNotNull(cleanEmail),
+                            contactVerificationId = supplierEmailConfirmation.draftId,
+                            contactEmailProofs = supplierEmailConfirmation.proofs,
                             addedAt = getCurrentTimeMillis(),
                             isActive = true
                         ).normalizedSupplierProfileFields()
@@ -5193,6 +5174,12 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
             id = "prices",
             title = localizedStringResource(253, "Generic prices"),
             iconPath = stateValues.drawablePathIconFinances
+        ),
+        StockAddEditTabContent(
+            id = "promos", title = localizedStringResource(920, "Promos"),
+            iconPath = stateValues.drawablePathIconPromos,
+            iconRes = stateValues.drawableResIconPromos.value,
+            count = draft.promotions.size
         )
     )
 
@@ -5219,6 +5206,16 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
                 .weight(1f)
 
             when (selectedTabId) {
+                "promos" -> LazyColumn(modifier = centeredFormModifier.padding(stateValues.marginTextField)) {
+                    item {
+                        StockPromotionListEditor(
+                            promotions = draft.promotions,
+                            onPromotionsChanged = { draft = draft.copy(promotions = it.sanitizedStockPromotions()) },
+                            quantityUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.find { it.id == draft.measurementUnitId }
+                        )
+                        Spacer(Modifier.height(24.dp))
+                    }
+                }
                 "conditions" -> StockAddEditConditionsTab(
                     modifier = centeredFormModifier,
                     draft = draft,
@@ -6240,21 +6237,8 @@ internal fun GoodsBatchDataModel.toDraft(
     )
 }
 
-internal fun List<GoodsBatchDataModel>.sortedForShelf(goodsItem: GoodsItemDataModel): List<GoodsBatchDataModel> {
-    return filter {
-        it.goodsItemId == goodsItem.id &&
-                it.isActive &&
-                it.status != StockBatchStatusDataModel.Deleted
-    }.sortedWith(
-        compareBy<GoodsBatchDataModel> {
-            if (it.id == goodsItem.activeShelfBatchId) 0 else 1
-        }.thenBy {
-            it.shelfPriority
-        }.thenBy {
-            it.expirationDateMillis ?: Long.MAX_VALUE
-        }
-    )
-}
+internal fun List<GoodsBatchDataModel>.sortedForShelf(goodsItem: GoodsItemDataModel): List<GoodsBatchDataModel> =
+    shelfOrderedBatches(goodsItem, this)
 
 internal fun AppConfiguration.reorderShelfBatches(
     goodsItem: GoodsItemDataModel,
@@ -6271,26 +6255,13 @@ internal fun AppConfiguration.reorderShelfBatches(
     val moved = current.removeAt(fromIndex)
     current.add(toIndex, moved)
 
-    val updated = current.mapIndexed { index, batch ->
-        batch.copy(
-            shelfPriority = index,
-            shelfPosition = (index + 1).toString()
-        )
-    }
-
-    updateGoodsBatches(updated) {
-        if (it is DataState.Success) {
-            updated.firstOrNull()?.let { firstBatch ->
-                if (firstBatch.id != goodsItem.activeShelfBatchId) {
-                    setActiveShelfBatch(
-                        batch = firstBatch,
-                        storeId = storeId,
-                        previousActiveShelfBatchId = goodsItem.activeShelfBatchId
-                    )
-                }
-            }
-        }
-    }
+    saveShelfOrder(ShelfOrderRequest(
+        storeId = storeId,
+        goodsItemId = goodsItem.id,
+        expectedBatchIds = batches.sortedForShelf(goodsItem).map { it.id },
+        expectedActiveBatchId = goodsItem.activeShelfBatchId,
+        orderedBatchIds = current.map { it.id }
+    ))
 }
 
 internal fun AppConfiguration.moveShelfBatch(

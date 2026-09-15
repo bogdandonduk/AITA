@@ -13,7 +13,8 @@ data class InventoryLoadStatus(
     val source: InventoryLoadSource = InventoryLoadSource.None,
     val failure: List<LocalizedStringDataModel>? = null,
     val accessDenied: Boolean = false,
-    val cacheWriteFailed: Boolean = false
+    val cacheWriteFailed: Boolean = false,
+    val cacheChecked: Boolean = false
 )
 
 enum class InventoryLoadSource { None, Cache, Cloud, Local }
@@ -127,3 +128,8 @@ internal fun canHydrateInventory(hasPayload: Boolean, ownerIsCurrent: Boolean): 
 fun inventoryCachedWhileOfflineMessage(): List<LocalizedStringDataModel> = eventMessage("message.offline_showing_saved_stock")
 
 fun inventoryCacheWriteFailureMessage(): List<LocalizedStringDataModel> = eventMessage("message.stock_is_visible_but_could_not_be_saved_on_this_device")
+
+/** Opaque runtime-only owner key for retained presentation indexes; never used as authorization. */
+fun inventoryViewScopeKey(): String? = inventoryOwners.current.takeIf(::inventoryOwnerIsCurrent)?.let {
+    "${it.accountId}:${it.storeId}:${it.sessionGeneration}:${it.epoch}"
+}

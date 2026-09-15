@@ -124,55 +124,10 @@ private fun installAndroidSoftKeyboardHider(context: Context) {
 
 private var activeAndroidSpeechRecognizer: SpeechRecognizer? = null
 
-private const val ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_DETECTION = "android.speech.extra.ENABLE_LANGUAGE_DETECTION"
-private const val ANDROID_SPEECH_EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES = "android.speech.extra.LANGUAGE_DETECTION_ALLOWED_LANGUAGES"
-private const val ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_SWITCH = "android.speech.extra.ENABLE_LANGUAGE_SWITCH"
-private const val ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES = "android.speech.extra.LANGUAGE_SWITCH_ALLOWED_LANGUAGES"
-private const val ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS = "android.speech.extra.LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS"
-private const val ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_MAX_SWITCHES = "android.speech.extra.LANGUAGE_SWITCH_MAX_SWITCHES"
-private const val ANDROID_SPEECH_LANGUAGE_SWITCH_BALANCED = "balanced"
-private const val ANDROID_SPEECH_EXTRA_DETECTED_LANGUAGE = "android.speech.extra.DETECTED_LANGUAGE"
-private const val ANDROID_SPEECH_EXTRA_LANGUAGE = "android.speech.extra.LANGUAGE"
-private const val ANDROID_SPEECH_EXTRA_LANGUAGE_TAG = "android.speech.extra.LANGUAGE_TAG"
-
-private fun androidSpeechLocaleTag(languageOrTag: String): String {
-    val clean = languageOrTag.trim().replace('_', '-').takeIf { it.isNotBlank() } ?: return Locale.getDefault().toLanguageTag()
-    val lower = clean.lowercase(Locale.ROOT)
-    return when (lower) {
-        "ru", "ru-ru" -> "ru-RU"
-        "kk", "kk-kz", "kz", "kz-kz" -> "kk-KZ"
-        "en", "en-us" -> "en-US"
-        "en-gb" -> "en-GB"
-        "main", "system" -> Locale.getDefault().toLanguageTag()
-        else -> clean
-    }
-}
-
-private fun androidSpeechLocaleTags(texts: VoiceInputPermissionRequestText): List<String> {
-    val candidates = (listOf(texts.primaryLanguageTag) + texts.languageTags + appLanguageState.value + Locale.getDefault().toLanguageTag() + listOf("ru-RU", "kk-KZ", "en-US"))
-        .map(::androidSpeechLocaleTag)
-        .filter { it.isNotBlank() }
-        .distinctBy { it.lowercase(Locale.ROOT) }
-    return candidates.ifEmpty { listOf(Locale.getDefault().toLanguageTag()) }
-}
-
-private fun Bundle?.detectedAndroidSpeechLanguageTag(): String = this?.let { bundle ->
-    listOf(
-        bundle.getString(ANDROID_SPEECH_EXTRA_DETECTED_LANGUAGE),
-        bundle.getString(ANDROID_SPEECH_EXTRA_LANGUAGE_TAG),
-        bundle.getString(ANDROID_SPEECH_EXTRA_LANGUAGE)
-    ).firstOrNull { !it.isNullOrBlank() }.orEmpty()
-}.orEmpty()
-
-private fun androidSpeechShouldTryNextLanguage(error: Int): Boolean = when (error) {
-    SpeechRecognizer.ERROR_NO_MATCH,
-    SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
-    12,
-    13,
-    14,
-    15 -> true
-    else -> false
-}
+// All recognizer lifecycle operations and callbacks are serialized on Android's main thread.
+private var androidVoiceSession = 0L
+private fun Bundle?.detectedAndroidSpeechLanguageTag(): String? =
+    if (Build.VERSION.SDK_INT >= 34) normalizedDetectedLanguage(this?.getString(SpeechRecognizer.DETECTED_LANGUAGE)) else null
 
 private fun androidSpeechErrorMessage(error: Int): String = when (error) {
     SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
@@ -221,166 +176,133 @@ private fun Context.openAndroidApplicationSettingsResult(): ReceiptPlatformActio
 }
 
 private fun installAndroidVoiceInput(context: Context) {
-    isPlatformVoiceInputAvailable = {
-        MainActivity.getOrNull()?.let { SpeechRecognizer.isRecognitionAvailable(it) } == true
-    }
-
+    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    var finishActiveSession: (() -> Unit)? = null
+    isPlatformVoiceInputAvailable = { MainActivity.getOrNull()?.let { SpeechRecognizer.isRecognitionAvailable(it) } == true }
     getVoiceInputPermissionState = {
         val activity = MainActivity.getOrNull()
         when {
-            activity == null -> PlatformPermissionState.Unavailable
-            !SpeechRecognizer.isRecognitionAvailable(activity) -> PlatformPermissionState.Unavailable
+            activity == null || !SpeechRecognizer.isRecognitionAvailable(activity) -> PlatformPermissionState.Unavailable
             else -> activity.permissionState(Manifest.permission.RECORD_AUDIO)
         }
     }
-
     stopPlatformVoiceInput = {
-        runCatching { activeAndroidSpeechRecognizer?.stopListening() }
-        runCatching { activeAndroidSpeechRecognizer?.cancel() }
-        runCatching { activeAndroidSpeechRecognizer?.destroy() }
+        // Invalidate permission, support-check and recognition callbacks before destroying their receiver.
+        androidVoiceSession++
+        val previousFinished = finishActiveSession
+        finishActiveSession = null
+        previousFinished?.invoke()
+        val previous = activeAndroidSpeechRecognizer
         activeAndroidSpeechRecognizer = null
+        handler.post { runCatching { previous?.cancel() }; runCatching { previous?.destroy() } }
     }
-
     startPlatformVoiceInput = start@{ texts, callbacks ->
         val activity = MainActivity.getOrNull()
-        if (activity == null) {
-            callbacks.onError(texts.deniedSubtitle)
-            callbacks.onFinished()
-            return@start
+        if (activity == null || !SpeechRecognizer.isRecognitionAvailable(activity)) {
+            callbacks.onError(texts.deniedSubtitle); callbacks.onFinished(); return@start
         }
-
-        if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
-            callbacks.onError("Voice recognition is not available on this Android device")
-            callbacks.onFinished()
-            return@start
+        stopPlatformVoiceInput?.invoke()
+        val session = ++androidVoiceSession
+        finishActiveSession = callbacks.onFinished
+        fun current() = session == androidVoiceSession
+        fun finishCallbacks() {
+            if (!current()) return
+            val finished = finishActiveSession
+            finishActiveSession = null
+            finished?.invoke()
         }
-
-        val languageTags = androidSpeechLocaleTags(texts)
-        val languageAttempts: List<String?> = (languageTags + listOf<String?>(null))
-            .distinctBy { it?.lowercase(Locale.ROOT) ?: "auto" }
-
-        fun beginListening(attemptIndex: Int = 0) {
+        fun beginListening() {
             activity.runOnUiThread {
-                runCatching { activeAndroidSpeechRecognizer?.destroy() }
-                val recognizer = SpeechRecognizer.createSpeechRecognizer(activity)
+                if (!current()) return@runOnUiThread
+                val recognizer = runCatching { SpeechRecognizer.createSpeechRecognizer(activity) }.getOrElse {
+                    callbacks.onError(it.message ?: texts.deniedSubtitle); finishCallbacks(); return@runOnUiThread
+                }
                 activeAndroidSpeechRecognizer = recognizer
-                val currentLanguageTag = languageAttempts.getOrNull(attemptIndex)
-
-                fun finishAndDestroy() {
+                var finished = false
+                var started = false
+                fun owns() = current() && !finished && activeAndroidSpeechRecognizer === recognizer
+                fun finish() {
+                    if (!owns()) return
+                    finished = true
+                    activeAndroidSpeechRecognizer = null
                     runCatching { recognizer.destroy() }
-                    if (activeAndroidSpeechRecognizer === recognizer) activeAndroidSpeechRecognizer = null
+                    finishCallbacks()
                 }
-
-                fun tryNextLanguageFor(error: Int): Boolean {
-                    val nextIndex = attemptIndex + 1
-                    if (androidSpeechShouldTryNextLanguage(error) && nextIndex < languageAttempts.size) {
-                        finishAndDestroy()
-                        beginListening(nextIndex)
-                        return true
-                    }
-                    return false
-                }
-
                 recognizer.setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        callbacks.onAmplitude(0.20f)
-                        val detectedLanguage = params.detectedAndroidSpeechLanguageTag()
-                        when {
-                            detectedLanguage.isNotBlank() -> callbacks.onDetectedLanguage(detectedLanguage)
-                            !currentLanguageTag.isNullOrBlank() -> callbacks.onDetectedLanguage(currentLanguageTag)
-                        }
-                    }
-
-                    override fun onBeginningOfSpeech() {
-                        callbacks.onAmplitude(0.40f)
-                    }
-
-                    override fun onRmsChanged(rmsdB: Float) {
-                        callbacks.onAmplitude(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
-                    }
-
+                    override fun onReadyForSpeech(params: Bundle?) { if (owns()) callbacks.onAmplitude(0.20f) }
+                    override fun onBeginningOfSpeech() { if (owns()) callbacks.onAmplitude(0.40f) }
+                    override fun onRmsChanged(rmsdB: Float) { if (owns()) callbacks.onAmplitude(((rmsdB + 2f) / 12f).coerceIn(0f, 1f)) }
                     override fun onBufferReceived(buffer: ByteArray?) = Unit
-                    override fun onEndOfSpeech() {
-                        callbacks.onAmplitude(0.12f)
-                    }
-
+                    override fun onEndOfSpeech() { if (owns()) callbacks.onAmplitude(0.12f) }
                     override fun onError(error: Int) {
-                        if (tryNextLanguageFor(error)) return
-                        callbacks.onError(androidSpeechErrorMessage(error))
-                        callbacks.onFinished()
-                        finishAndDestroy()
+                        if (!owns()) return
+                        callbacks.onError(androidSpeechErrorMessage(error)); finish()
                     }
-
                     override fun onResults(results: Bundle?) {
-                        results.detectedAndroidSpeechLanguageTag().takeIf { it.isNotBlank() }?.let(callbacks.onDetectedLanguage)
-                        val text = results
-                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            ?.firstOrNull()
-                            .orEmpty()
-                        if (text.isNotBlank()) callbacks.onFinalText(text)
-                        callbacks.onFinished()
-                        finishAndDestroy()
+                        if (!owns()) return
+                        results.detectedAndroidSpeechLanguageTag()?.let(callbacks.onDetectedLanguage)
+                        results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                            ?.takeIf { it.isNotBlank() }?.let(callbacks.onFinalText)
+                        finish()
                     }
-
                     override fun onPartialResults(partialResults: Bundle?) {
-                        partialResults.detectedAndroidSpeechLanguageTag().takeIf { it.isNotBlank() }?.let(callbacks.onDetectedLanguage)
-                        val text = partialResults
-                            ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            ?.firstOrNull()
-                            .orEmpty()
-                        if (text.isNotBlank()) callbacks.onPartialText(text)
+                        if (!owns()) return
+                        partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                            ?.takeIf { it.isNotBlank() }?.let(callbacks.onPartialText)
                     }
-
+                    override fun onLanguageDetection(results: Bundle) {
+                        if (owns()) results.detectedAndroidSpeechLanguageTag()?.let(callbacks.onDetectedLanguage)
+                    }
                     override fun onEvent(eventType: Int, params: Bundle?) = Unit
                 })
-
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    currentLanguageTag?.let { putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }
+                    // Automatic mode never sets EXTRA_LANGUAGE to the app's UI locale.
+                    if (!texts.automaticLanguageDetection && texts.primaryLanguageTag.isNotBlank())
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, texts.primaryLanguageTag)
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
                     putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.packageName)
                     putExtra(RecognizerIntent.EXTRA_PROMPT, texts.listeningTitle)
-                    if (Build.VERSION.SDK_INT >= 34 && languageTags.size > 1) {
-                        putExtra(ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_DETECTION, true)
-                        putStringArrayListExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, ArrayList(languageTags))
-                        putExtra(ANDROID_SPEECH_EXTRA_ENABLE_LANGUAGE_SWITCH, ANDROID_SPEECH_LANGUAGE_SWITCH_BALANCED)
-                        putStringArrayListExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, ArrayList(languageTags))
-                        putExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_INITIAL_ACTIVE_DURATION_TIME_MILLIS, 3500)
-                        putExtra(ANDROID_SPEECH_EXTRA_LANGUAGE_SWITCH_MAX_SWITCHES, languageTags.size.coerceAtLeast(1))
+                }
+                fun startWithModels(installed: List<String>?) {
+                    if (!owns() || started) return
+                    started = true
+                    val plan = voiceLanguagePlan(Build.VERSION.SDK_INT, texts.automaticLanguageDetection, installed)
+                    if (Build.VERSION.SDK_INT >= 34 && plan.detect) {
+                        intent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                        if (plan.switch) {
+                            intent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_BALANCED)
+                            plan.installedLanguages?.let {
+                                intent.putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, ArrayList(it))
+                            }
+                        }
+                        // No detection allow-list or short initial switching window: speech can change language throughout.
+                    }
+                    callbacks.onLanguageMode(plan.mode)
+                    runCatching { recognizer.startListening(intent) }.onFailure {
+                        if (owns()) { callbacks.onError(it.message ?: texts.deniedSubtitle); finish() }
                     }
                 }
-
-                runCatching { recognizer.startListening(intent) }
-                    .onFailure { throwable ->
-                        if (!tryNextLanguageFor(12)) {
-                            callbacks.onError(throwable.message ?: "Could not start voice input")
-                            callbacks.onFinished()
-                            finishAndDestroy()
-                        }
-                    }
+                if (Build.VERSION.SDK_INT >= 34 && texts.automaticLanguageDetection) {
+                    // Older/custom recognition services may not implement this API. Do not hang the microphone UI.
+                    handler.postDelayed({ startWithModels(null) }, 1_500L)
+                    runCatching {
+                        recognizer.checkRecognitionSupport(intent, activity.mainExecutor, object : android.speech.RecognitionSupportCallback {
+                            override fun onSupportResult(support: android.speech.RecognitionSupport) = startWithModels(support.installedOnDeviceLanguages)
+                            override fun onError(error: Int) = startWithModels(null)
+                        })
+                    }.onFailure { startWithModels(null) }
+                } else startWithModels(null)
             }
         }
-
-        val alreadyGranted = ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (alreadyGranted) {
-            beginListening()
-            return@start
-        }
-
-        activity.requestPermissions(
+        if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) beginListening()
+        else activity.requestPermissions(
             permissions = arrayOf(Manifest.permission.RECORD_AUDIO),
-            deniedRationaleTitle = texts.deniedTitle,
-            deniedRationaleSubtitle = texts.deniedSubtitle,
-            dontAskAgainDeniedRationaleTitle = texts.settingsTitle,
-            dontAskAgainDeniedRationaleSubtitle = texts.settingsSubtitle,
-            force = false,
-            permissionGrantedResultAction = { beginListening() },
-            permissionDeniedResultAction = {
-                callbacks.onDenied()
-                callbacks.onFinished()
-            }
+            deniedRationaleTitle = texts.deniedTitle, deniedRationaleSubtitle = texts.deniedSubtitle,
+            dontAskAgainDeniedRationaleTitle = texts.settingsTitle, dontAskAgainDeniedRationaleSubtitle = texts.settingsSubtitle,
+            force = false, permissionGrantedResultAction = { if (current()) beginListening() },
+            permissionDeniedResultAction = { if (current()) { callbacks.onDenied(); finishCallbacks() } }
         )
     }
 }

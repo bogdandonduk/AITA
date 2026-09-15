@@ -53,7 +53,9 @@ data class AitaAuthCapabilitiesDataModel(
     val authenticatorLoginPolicyEnabled: Boolean = false,
     val authenticatorCodeLoginEnabled: Boolean = false,
     val authenticatorEmailRecoveryEnabled: Boolean = false,
-    val emailSecondFactorEnabled: Boolean = false
+    val emailSecondFactorEnabled: Boolean = false,
+    val contactEmailVerificationEnabled: Boolean = false,
+    val registrationEmailVerificationRequired: Boolean = false
 )
 
 @Serializable

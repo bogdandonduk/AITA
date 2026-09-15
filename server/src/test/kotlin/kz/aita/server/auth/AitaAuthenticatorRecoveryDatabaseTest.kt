@@ -120,7 +120,8 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                         "V94__authenticated_phone_login_alias_challenges.sql", "V95__authentication_email_delivery_snapshots.sql",
                         "V96__verified_additional_login_emails.sql", "V97__authenticator_login_requirement.sql",
                         "V98__authenticator_sign_in_and_email_recovery.sql",
-                        "V99__email_second_factor_and_single_extra_email.sql").forEach { name ->
+                        "V99__email_second_factor_and_single_extra_email.sql",
+                        "V111__scoped_contact_email_confirmation.sql").forEach { name ->
                         val sql = requireNotNull(javaClass.getResourceAsStream("/db/migration/$name")).bufferedReader().use { it.readText() }
                         exec(sql)
                     }
@@ -433,23 +434,234 @@ class AitaAuthenticatorRecoveryDatabaseTest {
     @Test fun emailFactorDoesNotAllowAnUnverifiedMainEmailReplacement() = fixture {
         val id = user(); emailPolicy(id)
         val request = profileRequest(id, "typo@example.test")
-        assertEquals(AuthContactConflict.MAIN_EMAIL_VERIFICATION, assertFailsWith<AitaAuthContactConflictException> {
-            sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), request) }
-        }.conflict)
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(id, AitaContactTarget(AitaContactPurpose.ACCOUNT_CONTACT, id.toString()),
+                listOf(request.account.email), listOf(mainEmail), emptyList()) }
+        }
         assertEquals(mainEmail, service.settings(id).email)
     }
 
     @Test fun verifiedExtraCanBecomeMainAfterCurrentMainEmailConfirmation() = fixture {
         val id = user(); emailPolicy(id); addExtra(id)
         val confirmed = proof(id, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(mainPhone, extraEmail, true))
+        val target = AitaContactTarget(AitaContactPurpose.ACCOUNT_CONTACT, id.toString())
+        val flow = assertNotNull(service.requestContactCode(id, AitaContactCodeRequest(target, extraEmail), device.getValue("ip")))
+        val receipt = assertNotNull(service.verifyContactCode(id, AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), device.getValue("ip")))
         sql {
+            service.lockContactActorInside(id)
+            val ids = service.requireContactProofsInside(id, target, listOf(extraEmail), listOf(mainEmail), listOf(receipt.proof))
             assertTrue(service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), profileRequest(id, extraEmail, confirmed)))
             Users.update({ Users.id eq id }) { it[email] = extraEmail }
+            service.consumeContactProofsInside(ids, id)
+            service.markPrimaryEmailVerifiedInside(id, extraEmail)
         }
         val settings = service.settings(id)
         assertEquals(extraEmail, settings.email)
         assertTrue(settings.emailRequiredForLogin)
         assertTrue(settings.additionalLoginEmails.isEmpty())
+    }
+
+
+    private fun registrationTarget() = aitaContactDraftTarget(AitaContactPurpose.REGISTRATION, "", UUID.randomUUID().toString())
+
+    @Test fun registrationQueuesAnAnonymousContactWithoutCreatingAnAccountOrLoginSession() = fixture {
+        val target = registrationTarget()
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(target, extraEmail), "192.0.2.40"))
+        assertEquals(AitaAuthNextStep.EMAIL_CODE, flow.nextStep)
+        assertNull(flow.tokenPair)
+        assertEquals(extraEmail, email(flow.flowId)["to"]!!.jsonArray.single().jsonPrimitive.content)
+        sql {
+            assertEquals(0L, Users.selectAll().count())
+            assertEquals(0L, RefreshSessions.selectAll().count())
+            assertNull(AuthContactVerifications.selectAll().single()[AuthContactVerifications.actorUserId])
+        }
+    }
+
+    @Test fun contactCodeVerificationRetriesRecoverTheSameReceiptAndDeadline() = fixture {
+        val target = registrationTarget()
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(target, extraEmail), "192.0.2.41"))
+        val request = AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId))
+        val first = assertNotNull(service.verifyContactCode(null, request, "192.0.2.41"))
+        val second = assertNotNull(service.verifyContactCode(null, request, "192.0.2.41"))
+        assertEquals(first.proof, second.proof)
+        assertEquals(first.expiresAtMillis, second.expiresAtMillis)
+        sql {
+            val row = AuthContactVerifications.selectAll().single()
+            assertNotEquals(first.proof.receipt, row[AuthContactVerifications.receiptHash])
+            assertFalse(row[AuthContactVerifications.receiptCiphertext].orEmpty().contains(first.proof.receipt))
+            assertEquals(listOf(UUID.fromString(flow.flowId)), service.requireContactProofsInside(null, target,
+                listOf(extraEmail), emptyList(), listOf(first.proof)))
+        }
+    }
+
+    @Test fun contactWrongAttemptsCommitAndEventuallyExhaustTheChallenge() = fixture {
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(registrationTarget(), extraEmail), "192.0.2.42"))
+        val correct = code(flow.flowId)
+        val wrong = if (correct == "000000") "111111" else "000000"
+        repeat(config.maxAttempts) { attempt ->
+            assertNull(service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(flow.flowId, wrong), "192.0.2.42"))
+            assertEquals(attempt + 1, sql { AuthOneTimeChallenges.selectAll().single()[AuthOneTimeChallenges.attempts] })
+        }
+        assertNull(service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(flow.flowId, correct), "192.0.2.42"))
+    }
+
+    @Test fun contactResendKeepsOriginalExpiryAndClosesOriginalCode() = fixture {
+        val target = registrationTarget()
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(target, extraEmail), "192.0.2.43"))
+        val correct = code(flow.flowId)
+        // A lost initial response is safe to retry during the same cooldown.
+        assertEquals(flow.flowId, service.requestContactCode(null, AitaContactCodeRequest(target, extraEmail), "192.0.2.43")?.flowId)
+        sql { AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId eq UUID.fromString(flow.flowId) }) { it[resendAfterMillis] = 1L } }
+        val replacement = assertNotNull(service.resendContactCode(null, AitaEmailCodeResendRequestDataModel(flow.flowId), "192.0.2.43"))
+        assertNotEquals(flow.flowId, replacement.flowId)
+        assertEquals(flow.expiresAtMillis, replacement.expiresAtMillis)
+        assertNull(service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(flow.flowId, correct), "192.0.2.43"))
+        assertNotNull(service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(replacement.flowId, code(replacement.flowId)), "192.0.2.43"))
+    }
+
+    @Test fun contactProofCannotCrossPurposeDraftAddressOrActor() = fixture {
+        val owner = user()
+        val other = user(phone = "+77771234568", mail = "other@example.test")
+        val target = aitaContactDraftTarget(AitaContactPurpose.SUPPLIER_CONTACT, "", UUID.randomUUID().toString())
+        val flow = assertNotNull(service.requestContactCode(owner, AitaContactCodeRequest(target, extraEmail), "192.0.2.44"))
+        val request = AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId))
+        assertNull(service.verifyContactCode(other, request, "192.0.2.44"))
+        assertNull(service.verifyContactCode(null, request, "192.0.2.44"))
+        val receipt = assertNotNull(service.verifyContactCode(owner, request, "192.0.2.44")).proof
+        for (changed in listOf(target.copy(purpose = AitaContactPurpose.STORE_CONTACT),
+            target.copy(entityId = "new:${UUID.randomUUID()}"))) {
+            assertFailsWith<AitaContactVerificationRequiredException> {
+                sql { service.requireContactProofsInside(owner, changed, listOf(extraEmail), emptyList(), listOf(receipt)) }
+            }
+        }
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(other, target, listOf(extraEmail), emptyList(), listOf(receipt)) }
+        }
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(owner, target, listOf("wrong@example.test"), emptyList(), listOf(receipt)) }
+        }
+    }
+
+    @Test fun phoneChannelAndAuthenticatedRegistrationAreRejectedWithoutOutboxWrites() = fixture {
+        val owner = user()
+        assertNull(service.requestContactCode(null, AitaContactCodeRequest(registrationTarget(), extraEmail, AitaContactChannel.PHONE), "192.0.2.45"))
+        assertNull(service.requestContactCode(owner, AitaContactCodeRequest(registrationTarget(), extraEmail), "192.0.2.45"))
+        assertEquals(0L, sql { AuthEmailOutbox.selectAll().count() })
+    }
+
+    @Test fun anotherAccountCannotRequestProofForYourAccountTarget() = fixture {
+        val owner = user()
+        val other = user(phone = "+77771234568", mail = "other@example.test")
+        assertNull(service.requestContactCode(other, AitaContactCodeRequest(AitaContactTarget(AitaContactPurpose.ACCOUNT_CONTACT,
+            owner.toString()), extraEmail), "192.0.2.46"))
+    }
+
+    @Test fun contactPasswordRevisionChangeClosesConfirmedReceipts() = fixture {
+        val owner = user()
+        val target = AitaContactTarget(AitaContactPurpose.ACCOUNT_CONTACT, owner.toString())
+        val flow = assertNotNull(service.requestContactCode(owner, AitaContactCodeRequest(target, extraEmail), "192.0.2.47"))
+        val receipt = assertNotNull(service.verifyContactCode(owner,
+            AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), "192.0.2.47")).proof
+        sql { Users.update({ Users.id eq owner }) { it[passwordHash] = Pw.hash("A-new-strong-password-42!".toCharArray()) } }
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(owner, target, listOf(extraEmail), listOf(mainEmail), listOf(receipt)) }
+        }
+    }
+
+    @Test fun contactReceiptExpiryIsCheckedAtSaveEvenAfterCodeWasAccepted() = fixture {
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(registrationTarget(), extraEmail), "192.0.2.48"))
+        val result = assertNotNull(service.verifyContactCode(null,
+            AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), "192.0.2.48"))
+        sql { AuthContactVerifications.update({ AuthContactVerifications.challengePublicId eq UUID.fromString(flow.flowId) }) { it[receiptExpiresAtMillis] = 1L } }
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(null, result.target, listOf(extraEmail), emptyList(), listOf(result.proof)) }
+        }
+    }
+
+    @Test fun contactConsumptionAndActualMutationRollBackTogetherAndCannotReplayAfterCommit() = fixture {
+        val owner = user()
+        val target = AitaContactTarget(AitaContactPurpose.ACCOUNT_CONTACT, owner.toString())
+        val flow = assertNotNull(service.requestContactCode(owner, AitaContactCodeRequest(target, extraEmail), "192.0.2.49"))
+        val receipt = assertNotNull(service.verifyContactCode(owner,
+            AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), "192.0.2.49")).proof
+        fun applyThen(fail: Boolean) = sql {
+            service.lockContactActorInside(owner)
+            val ids = service.requireContactProofsInside(owner, target, listOf(extraEmail), listOf(mainEmail), listOf(receipt))
+            Users.update({ Users.id eq owner }) { it[firstName] = "Saved" }
+            service.consumeContactProofsInside(ids, owner)
+            if (fail) error("deliberate transaction rollback")
+        }
+        assertFailsWith<IllegalStateException> { applyThen(true) }
+        sql {
+            assertEquals("Test", Users.selectAll().single()[Users.firstName])
+            assertNull(AuthOneTimeChallenges.selectAll().single()[AuthOneTimeChallenges.consumedAtMillis])
+        }
+        applyThen(false)
+        assertFailsWith<AitaContactVerificationRequiredException> { applyThen(false) }
+        sql {
+            assertEquals(owner, AuthContactVerifications.selectAll().single()[AuthContactVerifications.appliedEntityId])
+            assertEquals("", AuthContactVerifications.selectAll().single()[AuthContactVerifications.receiptCiphertext])
+        }
+    }
+
+    @Test fun concurrentContactConsumersHaveExactlyOneWinner() = fixture {
+        val owner = user()
+        val target = AitaContactTarget(AitaContactPurpose.ACCOUNT_CONTACT, owner.toString())
+        val flow = assertNotNull(service.requestContactCode(owner, AitaContactCodeRequest(target, extraEmail), "192.0.2.50"))
+        val receipt = assertNotNull(service.verifyContactCode(owner,
+            AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), "192.0.2.50")).proof
+        val start = CompletableDeferred<Unit>()
+        val winners = coroutineScope {
+            val jobs = List(2) { async(Dispatchers.IO) {
+                start.await()
+                try {
+                    sql {
+                        service.lockContactActorInside(owner)
+                        val ids = service.requireContactProofsInside(owner, target, listOf(extraEmail), listOf(mainEmail), listOf(receipt))
+                        service.consumeContactProofsInside(ids, owner)
+                    }
+                    true
+                } catch (_: AitaContactVerificationRequiredException) { false }
+            } }
+            start.complete(Unit)
+            withTimeout(15_000L) { jobs.awaitAll() }
+        }
+        assertEquals(1, winners.count { it })
+    }
+
+    @Test fun destinationQuotaCannotBeBypassedByCreatingMoreDrafts() = fixture {
+        repeat(5) { n -> assertNotNull(service.requestContactCode(null,
+            AitaContactCodeRequest(registrationTarget(), extraEmail), "192.0.2.${60 + n}")) }
+        assertFailsWith<AitaAuthRateLimitedException> {
+            service.requestContactCode(null, AitaContactCodeRequest(registrationTarget(), extraEmail), "192.0.2.70")
+        }
+    }
+
+    @Test fun unchangedBusinessContactsAreNotRetrospectivelyMarkedVerified() = fixture {
+        val owner = user()
+        val target = aitaContactDraftTarget(AitaContactPurpose.SUPPLIER_CONTACT, "", UUID.randomUUID().toString())
+        sql {
+            assertTrue(service.requireContactProofsInside(owner, target, listOf(mainEmail), listOf(mainEmail), emptyList()).isEmpty())
+            assertEquals(0L, AuthContactVerifications.selectAll().count())
+        }
+    }
+
+    @Test fun oldEmailNotificationRetainsOldRecipientAndHasNoCodeAfterThePrimaryEmailChanges() = fixture {
+        val owner = user()
+        sql {
+            Users.update({ Users.id eq owner }) { it[email] = extraEmail }
+            service.markPrimaryEmailVerifiedInside(owner, extraEmail)
+            service.enqueueOldEmailChangeNoticeInside(owner, mainEmail, "en")
+        }
+        val flowId = sql { AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.purpose eq AUTH_PURPOSE_CONTACT_NOTICE }
+            .single()[AuthOneTimeChallenges.publicId].toString() }
+        val copy = email(flowId)
+        assertEquals(mainEmail, copy["to"]!!.jsonArray.single().jsonPrimitive.content)
+        assertFalse(Regex("(?<![0-9])[0-9]{6}(?![0-9])").containsMatchIn(copy["text"]!!.jsonPrimitive.content))
+        sql {
+            assertNotNull(AuthSecurityProfiles.selectAll().single()[AuthSecurityProfiles.emailVerifiedAtMillis])
+            assertNotNull(AuthLoginEmails.selectAll().where { AuthLoginEmails.emailNormalized eq extraEmail }.single()[AuthLoginEmails.verifiedAtMillis])
+        }
     }
 
     private fun profileRequest(id: UUID, email: String, proof: AitaSecurityEmailProof? = null) = kz.aita.UserAccountUpdateDataModel(

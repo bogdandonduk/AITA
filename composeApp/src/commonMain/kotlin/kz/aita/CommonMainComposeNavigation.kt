@@ -418,6 +418,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                     id = "promos",
                     title = localizedStringResource(920, "Promos"),
                     iconPath = stateValues.drawablePathIconPromos,
+                    iconRes = stateValues.drawableResIconPromos.value,
                     count = draft.promotions.size
                 )
             )

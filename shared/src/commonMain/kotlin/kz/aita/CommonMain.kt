@@ -7672,7 +7672,7 @@ val drawablePathIconGoodsCategoriesState = MutableStateFlow("svg/18_0.svg")
 val drawablePathIconStoresState = MutableStateFlow("svg/19_0.svg")
 val drawablePathIconTransactionHistoryState = MutableStateFlow("svg/20_0.svg")
 val drawablePathIconLogState = MutableStateFlow("svg/49_0.svg")
-val drawablePathIconPromosState = MutableStateFlow("svg/50_0.svg")
+val drawablePathIconPromosState = MutableStateFlow("svg/147_0.svg")
 val drawablePathIconAnalyticsState = MutableStateFlow("svg/21_0.svg")
 val drawablePathIconAnalyticsReportState = MutableStateFlow("svg/62_0.svg")
 val drawablePathIconLabelPrinterState = MutableStateFlow("svg/63_0.svg")
@@ -9790,7 +9790,7 @@ suspend fun updateDrawables(
             drawablePath(49L)
         )
         drawablePathIconPromosState.emit(
-            drawablePath(50L)
+            drawablePath(147L)
         )
         drawablePathIconAnalyticsState.emit(
             drawablePath(21L)
@@ -11311,6 +11311,7 @@ private suspend fun probeReachableAitaServerUrl(
 
     for (resolvedServerUrl in serverUrlCandidates.distinct()) {
         val requestUrl = networkTargetUrl(resolvedServerUrl, endpointUrl)
+        val probeStarted = getCurrentTimeMillis()
         try {
             logNetworkAttempt("TRY ${HttpMethod.Get.value} $requestUrl probe=$reason")
             val response = probeHttpClient.request(requestUrl) {
@@ -11332,6 +11333,8 @@ private suspend fun probeReachableAitaServerUrl(
             }
             val rawBody = response.bodyAsText()
             val aitaServerResponse = response.isAitaServerResponse(rawBody)
+            recordConnectionProbe(probeStarted, resolvedServerUrl, response.status.value, aitaServerResponse,
+                originError = !response.headers["x-aita-origin-error"].isNullOrBlank())
             logNetworkAttempt(
                 "RESULT ${HttpMethod.Get.value} $requestUrl HTTP ${response.status.value} " +
                     "aita=$aitaServerResponse probe=$reason"
@@ -11365,6 +11368,7 @@ private suspend fun probeReachableAitaServerUrl(
             }
         } catch (throwable: Throwable) {
             ensureConnectionOwnerActive(throwable)
+            recordConnectionProbe(probeStarted, resolvedServerUrl, null, false, failureSummary = networkFailureSummary(throwable))
             logNetworkAttempt(
                 "FAILED ${HttpMethod.Get.value} $requestUrl probe=$reason ${networkFailureSummary(throwable)}"
             )
@@ -11944,7 +11948,7 @@ private fun storeScopedCacheKey(name: String, storeId: String): String = "$name:
 
 private suspend inline fun <reified T> putJsonCache(key: String, value: T) {
     try {
-        putLocalKv(CACHE_PREFIX + key, jsonBase.encodeToString(value))
+        writeJsonCacheText(CACHE_PREFIX + key, jsonBase.encodeToString(value))
     } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
     }
@@ -11952,7 +11956,7 @@ private suspend inline fun <reified T> putJsonCache(key: String, value: T) {
 
 private suspend inline fun <reified T> getJsonCache(key: String): T? {
     return try {
-        getLocalKv(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
+        readJsonCacheText(CACHE_PREFIX + key)?.let { jsonBase.decodeFromString<T>(it) }
     } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
         null
@@ -11961,7 +11965,7 @@ private suspend inline fun <reified T> getJsonCache(key: String): T? {
 
 private suspend fun deleteJsonCache(key: String) {
     try {
-        deleteLocalKv(CACHE_PREFIX + key)
+        deleteJsonCacheText(CACHE_PREFIX + key)
     } catch (throwable: Throwable) {
         if (throwable is CancellationException) throw throwable
     }
@@ -11996,7 +12000,7 @@ private suspend fun persistPendingSessionCleanups(items: List<PendingSessionClea
         .takeLast(MAX_PENDING_SESSION_CLEANUPS)
 
     if (cleaned.isEmpty()) {
-        putLocalKv(CACHE_PREFIX + CACHE_PENDING_SESSION_CLEANUPS, null)
+        deleteJsonCache(CACHE_PENDING_SESSION_CLEANUPS)
     } else {
         putJsonCache(CACHE_PENDING_SESSION_CLEANUPS, cleaned)
     }
@@ -12056,7 +12060,7 @@ private suspend fun persistPendingWorkshiftEnds(items: List<PendingWorkshiftEndD
         .takeLast(MAX_PENDING_WORKSHIFT_ENDS)
 
     if (cleaned.isEmpty()) {
-        putLocalKv(CACHE_PREFIX + CACHE_PENDING_WORKSHIFT_ENDS, null)
+        deleteJsonCache(CACHE_PENDING_WORKSHIFT_ENDS)
     } else {
         putJsonCache(CACHE_PENDING_WORKSHIFT_ENDS, cleaned)
     }
@@ -12610,11 +12614,11 @@ private suspend fun applyLocalNetworkSnapshot(snapshot: LocalNetworkSnapshotData
         if (!inventoryOwnerIsCurrent(owner) || !currentStoreHasSubscriptionAccess(snapshot.storeId)) return
         stock?.let {
             stockState.emit(DataState.Success(it, message))
-            stockLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local)
+            stockLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local, cacheChecked = true)
         }
         batches?.let {
             stockBatchesState.emit(DataState.Success(it, message))
-            stockBatchesLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local)
+            stockBatchesLoadStatusState.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Local, cacheChecked = true)
         }
         transactionsState.emit(DataState.Success(snapshot.transactions, message))
         snapshot.transactions.forEach(::reconcileLatestReceiptIdentity)
@@ -13573,9 +13577,9 @@ private suspend inline fun <reified T> persistInventoryCacheLocked(
     payload: List<T>,
     cloudVerified: Boolean = false
 ): Boolean = try {
-    withTimeoutOrNull(5_000L) {
+    withTimeoutOrNull(30_000L) {
         val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
-        putLocalKv(key, jsonBase.encodeToString(payload))
+        writeJsonCacheText(key, jsonBase.encodeToString(payload))
         // Cache/local writes must never grant permission. Only an accepted cloud read clears this marker.
         if (cloudVerified) deleteLocalKv(key + ":access-denied")
         getLocalKv(key + ":access-denied") != "1"
@@ -13600,9 +13604,9 @@ private suspend fun denyCachedInventoryLocked(owner: InventoryOwner, failure: Li
         try {
             val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
             // Marker first: even an interrupted deletion must not make the old cache eligible again.
-            val saved = withTimeoutOrNull(5_000L) {
+            val saved = withTimeoutOrNull(30_000L) {
                 putLocalKv(key + ":access-denied", "1")
-                deleteLocalKv(key)
+                deleteJsonCacheText(key)
                 true
             } ?: false
             if (!saved) logCloudConnectionDiagnostic("Inventory revocation cache write timed out; memory remains denied")
@@ -13628,7 +13632,7 @@ private suspend inline fun <reified T> hydrateInventoryResource(
     // Disk I/O must not hold the ownership lock: logout/store switching can cancel this hydration.
     val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
     val cached = try {
-        withTimeoutOrNull(5_000L) {
+        withTimeoutOrNull(30_000L) {
             val denied = getLocalKv(key + ":access-denied") == "1"
             denied to if (denied) null else getJsonCache<List<T>>(inventoryCacheKey(name, owner))
         }
@@ -13636,12 +13640,13 @@ private suspend inline fun <reified T> hydrateInventoryResource(
         ensureConnectionOwnerActive(failure)
         logCloudConnectionDiagnostic("Inventory cache read failed; cloud loading remains available")
         null
-    } ?: return
-    val payload = cached.second?.let { filter(it) }
+    }
+    val payload = cached?.second?.let { filter(it) }
     inventoryStateMutex.withLock {
         if (inventoryAccessRevision != accessAtStart ||
             !canHydrateInventory(state.payloadValue != null || status.value.accessDenied, inventoryOwnerIsCurrent(owner))) return
-        if (cached.first) {
+        status.value = status.value.copy(cacheChecked = true)
+        if (cached?.first == true) {
             status.value = status.value.copy(accessDenied = true, failure = inventoryLoadFailureMessage())
         } else if (payload != null) {
             state.emit(DataState.Success(payload, cacheMessage()))
@@ -13652,8 +13657,10 @@ private suspend inline fun <reified T> hydrateInventoryResource(
 
 private suspend fun loadCachedInventory(storeId: String, owner: InventoryOwner = inventoryOwners.current) {
     if (owner.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
-    hydrateInventoryResource("stock", owner, stockState, stockLoadStatusState, ::filterRecentlyDeletedStockItems)
-    hydrateInventoryResource("stock_batches", owner, stockBatchesState, stockBatchesLoadStatusState, ::filterRecentlyDeletedStockBatches)
+    coroutineScope {
+        launch { hydrateInventoryResource("stock", owner, stockState, stockLoadStatusState, ::filterRecentlyDeletedStockItems) }
+        launch { hydrateInventoryResource("stock_batches", owner, stockBatchesState, stockBatchesLoadStatusState, ::filterRecentlyDeletedStockBatches) }
+    }
 }
 
 /** Includes null owners so logout also cancels an in-progress cache hydration. */
@@ -13773,8 +13780,16 @@ private suspend fun loadCachedApplicationData() {
         getJsonCache<List<SupplierDataModel>>(CACHE_SUPPLIERS)?.let {
             suppliersState.emit(DataState.Success(it, cacheMessage()))
         }
-        getJsonCache<List<NotificationDataModel>>(CACHE_NOTIFICATIONS)?.let {
-            notificationsState.emit(DataState.Success(it, cacheMessage()))
+        val notificationOwner = userAccountState.payloadValue?.id
+        val notificationGeneration = currentAuthenticatedSessionGeneration()
+        getJsonCache<List<NotificationDataModel>>(CACHE_NOTIFICATIONS)?.let { cached ->
+            notificationHistoryMutex.withLock {
+                if (userAccountState.payloadValue?.id == notificationOwner && authenticatedSessionGenerationIsCurrent(notificationGeneration)) {
+                    val live = notificationsState.payloadValue.orEmpty()
+                    val merged = mergeNotificationSnapshot(emptyList(), live, cached.filter { it.userId == null || it.userId == notificationOwner })
+                    notificationsState.emit(DataState.Success(merged, cacheMessage()))
+                }
+            }
         }
         getJsonCache<List<SecuritySessionDataModel>>(CACHE_SECURITY_SESSIONS)?.let {
             securitySessionsState.emit(DataState.Success(it, cacheMessage()))
@@ -14274,7 +14289,7 @@ private suspend fun scheduleRealtimeRefresh(
 
 // Independent unauthenticated transport: health cannot queue behind bearer refresh or a
 // half-open business/WebSocket request on the application's long-lived client.
-private val cloudHealthHttpClient: HttpClient by lazy {
+internal val cloudHealthHttpClient: HttpClient by lazy {
     HttpClient(getHttpClientEngine()) {
         expectSuccess = false
         install(HttpTimeout) {
@@ -16031,15 +16046,14 @@ private fun List<NotificationDataModel>.dedupeRecentNotificationHistory(): List<
 
 private suspend fun appendNotificationLocally(notification: NotificationDataModel) {
     if (notification.isLocalOnlyNotification()) return
-    val old = notificationsState.payloadValue.orEmpty()
-    notificationsState.emit(
-        DataState.Success(
+    notificationHistoryMutex.withLock {
+        if (notification.userId != null && notification.userId != userAccountState.payloadValue?.id) return@withLock
+        val old = notificationsState.payloadValue.orEmpty()
+        notificationsState.emit(DataState.Success(
             (listOf(notification) + old.filterNot { it.isLocalOnlyNotification() })
-                .distinctBy { it.id }
-                .dedupeRecentNotificationHistory()
-                .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
-        )
-    )
+                .distinctBy { it.id }.dedupeRecentNotificationHistory().take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
+        ))
+    }
 }
 
 private suspend fun removeActiveInAppNotification(notificationId: String) {
@@ -16311,32 +16325,29 @@ fun dismissInAppNotification(notificationId: String, markAsRead: Boolean = true)
 }
 
 private suspend fun saveNotificationToServerNow(notification: NotificationDataModel) {
-    if (notification.message.isBlank()) return
-    if (notification.isLocalOnlyNotification()) return
-    if (getStoredUserAuthTokens?.invoke() == null) return
-    if (userAccountState.payloadValue == null) return
-    if (!currentCloudSessionIsReadyForBackgroundSync()) return
-
+    if (notification.message.isBlank() || notification.isLocalOnlyNotification()) return
+    val generation = currentAuthenticatedSessionGeneration()
+    val account = userAccountState.payloadValue?.id ?: return
+    if (notification.userId != null && notification.userId != account) return
+    if (getStoredUserAuthTokens?.invoke() == null || !currentCloudSessionIsReadyForBackgroundSync()) return
     saveNotificationMutex.withLock {
+        if (!authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != account) return@withLock
         val response = networkRequest<NotificationDataModel, NotificationDataModel>(
-            method = HttpMethod.Post,
-            endpointUrl = "notifications/add",
-            body = notification
+            method = HttpMethod.Post, endpointUrl = "notifications/add", body = notification,
+            expectedSessionGeneration = generation
         )
-
-        if (!response.negative && response.payload != null) {
-            val saved = response.payload.copy(isSavedOnServer = true)
-            val old = notificationsState.payloadValue.orEmpty()
-            notificationsState.emit(
-                DataState.Success(
+        notificationHistoryMutex.withLock history@{
+            if (!authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != account) return@history
+            if (!response.negative && response.payload != null) {
+                val old = notificationsState.payloadValue.orEmpty()
+                val local = old.firstOrNull { it.id == notification.id }
+                val saved = response.payload.copy(isSavedOnServer = true,
+                    readAtMillis = local?.readAtMillis ?: response.payload.readAtMillis)
+                notificationsState.emit(DataState.Success(
                     (listOf(saved) + old.filter { it.id != notification.id && it.id != saved.id && !it.isLocalOnlyNotification() })
-                        .distinctBy { it.id }
-                        .dedupeRecentNotificationHistory()
-                        .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
-                )
-            )
-        } else if (response.transportFailure) {
-            // Leave the local copy with isSavedOnServer=false. It will be retried after reconnect.
+                        .distinctBy { it.id }.dedupeRecentNotificationHistory().take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
+                ))
+            }
         }
     }
 }
@@ -16379,8 +16390,7 @@ fun getNotifications() {
             if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             if (getStoredUserAuthTokens?.invoke() == null) return@withLock
 
-            val localPending = notificationsState.payloadValue.orEmpty()
-                .filter { !it.isSavedOnServer && !it.isLocalOnlyNotification() }
+            val before = notificationHistoryMutex.withLock { notificationsState.payloadValue.orEmpty() }
 
             val response = networkRequest<List<NotificationDataModel>, Unit>(
                 method = HttpMethod.Get,
@@ -16389,7 +16399,9 @@ fun getNotifications() {
             )
             if (!authenticatedSessionGenerationIsCurrent(generation)) return@withLock
 
-            if (!response.negative) {
+            if (!response.negative && response.payload != null) {
+                notificationHistoryMutex.withLock history@{
+                if (!authenticatedSessionGenerationIsCurrent(generation)) return@history
                 val serverNotifications = response.payload.orEmpty().filterNot { it.isLocalOnlyNotification() }
                 val currentNotifications = notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() }
                 val previousIds = currentNotifications.map { it.id }.toSet()
@@ -16422,21 +16434,20 @@ fun getNotifications() {
                     serverNotificationPopupIds.retainAll(visibleServerIds)
                 }
 
-                val merged = (localPending + serverNotifications)
-                    .distinctBy { it.id }
+                val merged = mergeNotificationSnapshot(before, currentNotifications, serverNotifications)
                     .dedupeRecentNotificationHistory()
                     .take(LOCAL_NOTIFICATION_HISTORY_LIMIT)
                 notificationsState.emit(DataState.Success(merged, response.message))
+                // Re-send local offline read marks without replacing the visible list with the response.
+                val remoteById = serverNotifications.associateBy { it.id }
+                val pendingReadIds = merged.filter { local -> local.readAtMillis != null &&
+                    remoteById[local.id]?.let { it.readAtMillis == null && it.createdAtMillis == local.createdAtMillis } == true
+                }.map { it.id }
+                if (pendingReadIds.isNotEmpty()) markNotificationsRead(pendingReadIds)
+                }
                 syncPendingNotificationsToServer()
-            } else if (response.transportFailure) {
-                // Keep local notification history available offline.
-                notificationsState.emit(
-                    DataState.Success(
-                        notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() },
-                        response.message
-                    )
-                )
             }
+            // A failed refresh does not replace the last usable list or toggle it through Empty.
         }
     }
 }
@@ -16452,63 +16463,42 @@ fun saveNotificationToServer(notification: NotificationDataModel) {
     }
 }
 
-fun markNotificationRead(notificationId: String) {
+fun markNotificationRead(notificationId: String) = markNotificationsRead(listOf(notificationId))
+
+fun markAllNotificationsRead() = markNotificationsRead(
+    notificationsState.payloadValue.orEmpty().filter { it.readAtMillis == null }.map { it.id }
+)
+
+fun markNotificationsRead(notificationIds: List<String>) {
+    val ids = notificationIds.filter { it.isNotBlank() }.toSet()
+    if (ids.isEmpty()) return
+    val generation = currentAuthenticatedSessionGeneration()
+    val account = userAccountState.payloadValue?.id ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
         markNotificationReadMutex.withLock {
-            val local = notificationsState.payloadValue.orEmpty()
-            val target = local.firstOrNull { it.id == notificationId }
-            removeActiveInAppNotification(notificationId)
-            if (target == null) return@withLock
-
-            val now = getCurrentTimeMillis()
-            notificationsState.emit(
-                DataState.Success(local.map { if (it.id == notificationId) it.copy(readAtMillis = now) else it })
-            )
-
-            if (!target.isSavedOnServer) return@withLock
-
-            val response = networkRequest<List<NotificationDataModel>, List<String>>(
-                method = HttpMethod.Put,
-                endpointUrl = "notifications/read",
-                body = listOf(notificationId)
-            )
-
-            if (!response.negative && response.payload != null) {
-                notificationsState.emit(DataState.Success(response.payload.filterNot { it.isLocalOnlyNotification() }))
+            if (!authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != account) return@withLock
+            val savedIds = notificationHistoryMutex.withLock {
+                val local = notificationsState.payloadValue.orEmpty()
+                val now = getCurrentTimeMillis()
+                notificationsState.emit(DataState.Success(local.map {
+                    if (it.id in ids && it.readAtMillis == null) it.copy(readAtMillis = now) else it
+                }))
+                local.filter { it.id in ids && it.isSavedOnServer }.map { it.id }
             }
-        }
-    }
-}
-
-fun markAllNotificationsRead() {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val unreadNotifications = notificationsState.payloadValue.orEmpty()
-            .filter { it.readAtMillis == null }
-
-        if (unreadNotifications.isEmpty()) return@launch
-
-        val ids = unreadNotifications.map { it.id }
-        val savedIds = unreadNotifications
-            .filter { it.isSavedOnServer }
-            .map { it.id }
-
-        val now = getCurrentTimeMillis()
-        notificationsState.emit(
-            DataState.Success(
-                notificationsState.payloadValue.orEmpty().map { if (it.id in ids) it.copy(readAtMillis = now) else it }
+            ids.forEach { removeActiveInAppNotification(it) }
+            if (savedIds.isEmpty()) return@withLock
+            val response = networkRequest<List<NotificationDataModel>, List<String>>(
+                method = HttpMethod.Put, endpointUrl = "notifications/read", body = savedIds,
+                expectedSessionGeneration = generation
             )
-        )
-
-        if (savedIds.isEmpty()) return@launch
-
-        val response = networkRequest<List<NotificationDataModel>, List<String>>(
-            method = HttpMethod.Put,
-            endpointUrl = "notifications/read",
-            body = savedIds
-        )
-
-        if (!response.negative && response.payload != null) {
-            notificationsState.emit(DataState.Success(response.payload.filterNot { it.isLocalOnlyNotification() }))
+            notificationHistoryMutex.withLock history@{
+                if (!authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != account) return@history
+                if (!response.negative && response.payload != null) {
+                    notificationsState.emit(DataState.Success(applyNotificationReadAcknowledgement(
+                        notificationsState.payloadValue.orEmpty(), savedIds.toSet(), response.payload
+                    )))
+                }
+            }
         }
     }
 }
@@ -17089,7 +17079,7 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
     cashRegisterEventsState.emit(DataState.Empty())
     cashRegisterExtractionsState.emit(DataState.Empty())
 
-    notificationsState.emit(DataState.Empty())
+    notificationHistoryMutex.withLock { notificationsState.emit(DataState.Empty()) }
     notificationPopupMutex.withLock {
         notificationPopupJobs.values.forEach { it.cancel() }
         notificationPopupJobs.clear()
@@ -18030,15 +18020,22 @@ fun getStores() {
 }
 
 fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
+    val requestGeneration = currentAuthenticatedSessionGeneration()
+    val requestOwner = userAccountState.payloadValue?.id ?: return
+    fun requestStillCurrent(): Boolean = authenticatedSessionGenerationIsCurrent(requestGeneration) &&
+        userAccountState.payloadValue?.id == requestOwner
     GlobalScope.launch(Dispatchers.ourIo) {
         addStoreMutex.withLock {
+            if (!requestStillCurrent()) return@withLock
             val response = networkRequest<StoreDataModel, StoreDataModel>(
                 HttpMethod.Post,
                 endpointUrl = globalAppConfigurationState.payloadValue.addStoresPath.first,
-                body = store
+                body = store,
+                expectedSessionGeneration = requestGeneration
             )
 
-            if (response.negative) {
+            if (!requestStillCurrent()) return@withLock
+            if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
 
                 onCompleted?.invoke(DataState.Empty())
@@ -18047,29 +18044,36 @@ fun addStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) ->
 
                 storesState.emit(
                     DataState.Success(
-                        storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
+                        storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!.withoutContactVerification())
                     )
                 )
 
                 getStores()
 
-                onCompleted?.invoke(DataState.Success(response.payload!!))
+                onCompleted?.invoke(DataState.Success(response.payload!!.withoutContactVerification()))
             }
         }
     }
 }
 
 fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>) -> Unit)?) {
+    val requestGeneration = currentAuthenticatedSessionGeneration()
+    val requestOwner = userAccountState.payloadValue?.id ?: return
+    fun requestStillCurrent(): Boolean = authenticatedSessionGenerationIsCurrent(requestGeneration) &&
+        userAccountState.payloadValue?.id == requestOwner
     GlobalScope.launch(Dispatchers.ourIo) {
         updateStoreMutex.withLock {
+            if (!requestStillCurrent()) return@withLock
             val response = networkRequest<StoreDataModel, StoreDataModel>(
                 HttpMethod.Put,
                 endpointUrl = globalAppConfigurationState.payloadValue.updateStoresPath.first,
                 headers = mapOf("store_id" to store.id),
-                body = store
+                body = store,
+                expectedSessionGeneration = requestGeneration
             )
 
-            if (response.negative) {
+            if (!requestStillCurrent()) return@withLock
+            if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
 
                 onCompleted?.invoke(DataState.Empty())
@@ -18078,12 +18082,12 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
 
                 storesState.emit(
                     DataState.Success(
-                        storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!)
+                        storesState.payloadValue.orEmpty().upsertStoreOrBranch(response.payload!!.withoutContactVerification())
                     )
                 )
                 getStores()
 
-                onCompleted?.invoke(DataState.Success(response.payload!!))
+                onCompleted?.invoke(DataState.Success(response.payload!!.withoutContactVerification()))
             }
         }
     }
@@ -18185,7 +18189,7 @@ fun addSupplier(
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
-                val savedSupplier = response.payload!!
+                val savedSupplier = response.payload!!.withoutContactVerification()
                 suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(savedSupplier), response.message))
                 // Profile mutations already publish the authoritative profile locally. A first-profile
                 // focus change is reconciled by SupplierIdentityFocus and owns the one scoped workspace
@@ -18217,7 +18221,7 @@ fun updateSupplier(
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
-                val savedSupplier = response.payload!!
+                val savedSupplier = response.payload!!.withoutContactVerification()
                 suppliersState.emit(DataState.Success(suppliersState.payloadValue.orEmpty().upsertById(savedSupplier), response.message))
                 // Profile mutations already publish the authoritative profile locally. A first-profile
                 // focus change is reconciled by SupplierIdentityFocus and owns the one scoped workspace
@@ -18432,7 +18436,7 @@ private inline fun <reified T> readInventoryResource(
                         val saved = persistInventoryCacheLocked(name, owner, cleanPayload, cloudVerified = true)
                         if (!inventoryOwnerIsCurrent(owner) || state.payloadValue !== atStart.second) return@withLock
                         state.emit(DataState.Success(cleanPayload, response.message))
-                        status.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Cloud, cacheWriteFailed = !saved)
+                        status.value = InventoryLoadStatus(owner.storeId, source = InventoryLoadSource.Cloud, cacheWriteFailed = !saved, cacheChecked = true)
                     }
                     else -> {
                         // 401, timeout and transport failures never erase same-owner data or become a false empty success.
@@ -19408,60 +19412,45 @@ fun CashRegisterEventDataModel.toExtractionEntry(): CashRegisterExtractionEntryD
     )
 }
 
-private val setActiveShelfBatchMutex = Mutex()
-
 fun setActiveShelfBatch(
     batch: GoodsBatchDataModel,
     storeId: String,
     onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)? = null,
     previousActiveShelfBatchId: String? = null
 ) {
-    val knownPreviousActiveShelfBatchId = previousActiveShelfBatchId
-        ?: stockState.payloadValue?.firstOrNull { it.id == batch.goodsItemId }?.activeShelfBatchId
-
-    if (knownPreviousActiveShelfBatchId == batch.id) {
-        stockState.payloadValue?.firstOrNull { it.id == batch.goodsItemId }?.let { currentItem ->
-            onCompleted?.invoke(DataState.Success(currentItem))
-        } ?: onCompleted?.invoke(DataState.Empty())
-        return
-    }
-
+    val owner = inventoryOwners.current
+    if (owner.storeId != storeId || batch.storeId != storeId || !inventoryOwnerIsCurrent(owner)) return
     GlobalScope.launch(Dispatchers.ourIo) {
-        setActiveShelfBatchMutex.withLock {
+        shelfOrderSaveMutex.withLock {
+            if (!inventoryOwnerIsCurrent(owner)) return@withLock
+            val visible = stockState.payloadValue?.firstOrNull { it.id == batch.goodsItemId }
+            val previous = visible?.activeShelfBatchId ?: previousActiveShelfBatchId
+            if (visible != null && previous == batch.id) {
+                withContext(Dispatchers.Main) { if (inventoryOwnerIsCurrent(owner)) onCompleted?.invoke(DataState.Success(visible)) }
+                return@withLock
+            }
             val response = networkRequest<GoodsItemDataModel, GoodsBatchDataModel>(
-                method = HttpMethod.Post,
-                endpointUrl = "stockBatches/setActiveShelfBatch",
-                body = batch,
-                headers = mapOf("store_id" to storeId)
+                method = HttpMethod.Post, endpointUrl = "stockBatches/setActiveShelfBatch", body = batch,
+                headers = mapOf("store_id" to storeId), expectedSessionGeneration = owner.sessionGeneration
             )
-
-            if (response.negative || response.payload == null) {
+            if (!inventoryOwnerIsCurrent(owner)) return@withLock
+            val item = response.payload
+            if (response.negative || item == null || item.id != batch.goodsItemId || item.storeId != storeId || item.activeShelfBatchId != batch.id) {
                 postInAppNotification(response.message, NotificationType.Negative)
-                onCompleted?.invoke(DataState.Empty())
+                withContext(Dispatchers.Main) { if (inventoryOwnerIsCurrent(owner)) onCompleted?.invoke(DataState.Empty(response.message)) }
             } else {
-                val isGenuineShelfChange = response.message.orEmpty().isNotEmpty() &&
-                    knownPreviousActiveShelfBatchId != response.payload.activeShelfBatchId
-
-                if (isGenuineShelfChange)
-                    postInAppNotification(response.message, NotificationType.Positive)
-
-                stockState.emit(
-                    DataState.Success(
-                        mutableListOf<GoodsItemDataModel>().also { newList ->
-                            stockState.payloadValue?.let { newList.addAll(it) }
-
-                            val index = newList.indexOfFirst { it.id == response.payload.id }
-
-                            if (index != -1)
-                                newList[index] = response.payload
-                            else
-                                newList.add(response.payload)
-                        },
-                        response.message
-                    )
-                )
-
-                onCompleted?.invoke(DataState.Success(response.payload, response.message))
+                val published = inventoryStateMutex.withLock publish@ {
+                    if (!inventoryOwnerIsCurrent(owner)) return@publish false
+                    stockState.emit(DataState.Success(stockState.payloadValue.orEmpty().map {
+                        if (it.id == item.id && it.updatedAtMillis <= item.updatedAtMillis) item else it
+                    }, response.message))
+                    true
+                }
+                if (published && inventoryOwnerIsCurrent(owner)) {
+                    val isGenuineShelfChange = response.message.orEmpty().isNotEmpty() && previous != item.activeShelfBatchId
+                    if (isGenuineShelfChange) postInAppNotification(response.message, NotificationType.Positive)
+                    withContext(Dispatchers.Main) { if (inventoryOwnerIsCurrent(owner)) onCompleted?.invoke(DataState.Success(item, response.message)) }
+                }
             }
         }
     }
@@ -20880,7 +20869,9 @@ data class StoreDataModel(
     val emails: List<String>,
     val countryLocales: List<String>,
     val createdAt: Long,
-    val branches: List<StoreDataModel> = emptyList()
+    val branches: List<StoreDataModel> = emptyList(),
+    val contactVerificationId: String = "",
+    val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList()
 ): Searchable {
 
     override val exactSearchOperands: List<String>
@@ -21104,7 +21095,9 @@ data class SupplierDataModel(
     val phoneNumbers: List<String>? = null,
     val emails: List<String>? = null,
     val addedAt: Long = 0L,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val contactVerificationId: String = "",
+    val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList()
 ) {
     fun isMineForUser(userId: String?): Boolean = !userId.isNullOrBlank() && userIds.contains(userId)
     fun isGenericSupplier(): Boolean = userIds.isEmpty()
@@ -22053,7 +22046,8 @@ class UserAccountUpdateDataModel(
     val password: String,
     val newPassword: String?,
     val secondFactorCode: String = "",
-    val emailProof: kz.aita.auth.AitaSecurityEmailProof? = null
+    val emailProof: kz.aita.auth.AitaSecurityEmailProof? = null,
+    val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList()
 )
 
 @kotlinx.serialization.Serializable
@@ -22071,7 +22065,9 @@ data class UserAuthSignUpDataModel(
     val lastName: String,
     val countryLocale: String,
     val password: String,
-    val deviceInfo: ClientDeviceInfoDataModel? = null
+    val deviceInfo: ClientDeviceInfoDataModel? = null,
+    val contactVerificationId: String = "",
+    val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList()
 )
 
 @kotlinx.serialization.Serializable

@@ -3639,6 +3639,10 @@ private fun prewarmSharedRuntimeSerializers() {
   touch("UserAccountUpdateDataModel") { UserAccountUpdateDataModel.serializer() }
   touch("UserAuthLogInDataModel") { UserAuthLogInDataModel.serializer() }
   touch("UserAuthSignUpDataModel") { UserAuthSignUpDataModel.serializer() }
+  touch("AitaContactCodeRequest") { kz.aita.auth.AitaContactCodeRequest.serializer() }
+  touch("AitaContactTarget") { kz.aita.auth.AitaContactTarget.serializer() }
+  touch("AitaVerifiedContactProof") { kz.aita.auth.AitaVerifiedContactProof.serializer() }
+  touch("AitaContactVerificationResult") { kz.aita.auth.AitaContactVerificationResult.serializer() }
   touch("UserPreferencesDataModel") { UserPreferencesDataModel.serializer() }
   touch("WorkerEmploymentDecisionRequestDataModel") { WorkerEmploymentDecisionRequestDataModel.serializer() }
   touch("WorkerEmploymentRequestCreateDataModel") { WorkerEmploymentRequestCreateDataModel.serializer() }
@@ -6654,6 +6658,38 @@ private fun decodeSupplierStringList(value: String?): List<String> {
     ?.takeIf { it.isNotBlank() }
     ?.let { raw -> runCatching { jsonBase.decodeFromString<List<String>>(raw) }.getOrNull() }
     .orEmpty()
+}
+
+
+/** Contact proof is not permission to edit an entity. Recheck permissions at request, verify and save. */
+internal fun contactTargetIsAuthorizedInside(userId: UUID?, target: kz.aita.auth.AitaContactTarget): Boolean {
+  val normalized = kz.aita.auth.canonicalAitaContactTarget(target) ?: return false
+  if (normalized.purpose == kz.aita.auth.AitaContactPurpose.REGISTRATION) return userId == null
+  if (userId == null || Users.selectAll().where { Users.id eq userId }.singleOrNull()?.get(Users.isActive) != true) return false
+  val isNew = normalized.entityId.startsWith("new:")
+  return when (normalized.purpose) {
+    kz.aita.auth.AitaContactPurpose.REGISTRATION -> false
+    kz.aita.auth.AitaContactPurpose.ACCOUNT_CONTACT -> normalized.entityId == userId.toString()
+    kz.aita.auth.AitaContactPurpose.STORE_CONTACT -> {
+      val id = if (isNew) normalized.parentId.takeIf { it.isNotEmpty() }?.let(UUID::fromString)
+        else UUID.fromString(normalized.entityId)
+      if (id == null) true else {
+        val store = Stores.selectAll().where { Stores.id eq id }.singleOrNull()
+        if (store == null || !store[Stores.isActive]) false else {
+          val parent = store[Stores.parentStoreId]
+          if (isNew && parent != null) false else if (isNew || parent != null) {
+            val ownerId = parent ?: id
+            userCanUseStoreActionInsideTransaction(userId, ownerId, STORE_PERMISSION_BRANCHES_MANAGE, requireWorkshift = false) ||
+              userCanUseStoreActionInsideTransaction(userId, ownerId, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false)
+          } else userCanUseStoreActionInsideTransaction(userId, id, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false)
+        }
+      }
+    }
+    kz.aita.auth.AitaContactPurpose.SUPPLIER_CONTACT -> if (isNew) true else {
+      val row = Suppliers.selectAll().where { Suppliers.id eq UUID.fromString(normalized.entityId) }.singleOrNull()
+      row?.toSupplierDataModel()?.let { it.isActive && it.userIds.contains(userId.toString()) } == true
+    }
+  }
 }
 
 private fun ResultRow.toSupplierDataModel(): SupplierDataModel {
@@ -17626,6 +17662,8 @@ fun Application.module() {
     allowHeader(HttpHeaders.Authorization)
     allowHeader(HttpHeaders.ContentType)
     allowHeader(HttpHeaders.Accept)
+    allowHeader(HttpHeaders.CacheControl)
+    allowHeader(HttpHeaders.Pragma)
     allowHeader("store_id")
     allowHeader("store-id")
     allowHeader("worker_job_password")
@@ -17668,6 +17706,14 @@ fun Application.module() {
     exception<SubscriptionFailure> { call, cause ->
       if (cause.httpStatus == 429) call.response.headers.append(HttpHeaders.RetryAfter, "60")
       call.safeGenericResponseNoPayload(HttpStatusCode.fromValue(cause.httpStatus), eventMessage(cause.key))
+    }
+
+    exception<AitaContactDeliveryUnavailableException> { call, _ ->
+      call.safeGenericResponseNoPayload(HttpStatusCode.ServiceUnavailable, eventMessage("contact.delivery_unavailable"))
+    }
+
+    exception<AitaContactVerificationRequiredException> { call, _ ->
+      call.safeGenericResponseNoPayload(HttpStatusCode(428, "Precondition Required"), eventMessage("contact.confirm_required"))
     }
 
     exception<AitaAuthContactConflictException> { call, cause ->
@@ -18227,7 +18273,10 @@ fun Application.module() {
           val phoneNumber = kz.aita.auth.normalizeAitaPhoneAlias(body.phoneNumber)?.removePrefix("+")
             ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest,
               message = eventMessage("message.invalid_phone_number"))
-          val email = body.email.trim().lowercase()
+          val email = kz.aita.auth.normalizeAitaEmail(body.email)
+            ?: return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("contact.invalid_email"))
+          val contactAuth = advancedAuthService(tokenService, call.application)
+          val contactTarget = kz.aita.auth.aitaContactDraftTarget(kz.aita.auth.AitaContactPurpose.REGISTRATION, "", body.contactVerificationId)
           val cleanPassword = body.password.trim()
 
           if (!cleanPassword.checkAsPassword()) {
@@ -18235,6 +18284,11 @@ fun Application.module() {
               HttpStatusCode.BadRequest,
               message = passwordRequirementMessage()
             )
+          }
+
+          // Even legacy /signUp cannot create an account or disclose identity conflicts before proof.
+          newSuspendedTransaction(aitaServerIoContext) {
+            contactAuth.requireContactProofsInside(null, contactTarget, listOf(email), emptyList(), body.contactEmailProofs)
           }
 
           val conflictResult = newSuspendedTransaction(aitaServerIoContext) {
@@ -18301,6 +18355,7 @@ fun Application.module() {
                   lateUniqueConflictResult = 2
                   return@newSuspendedTransaction false
                 }
+                val emailProofIds = contactAuth.requireContactProofsInside(null, contactTarget, listOf(email), emptyList(), body.contactEmailProofs)
                 Users.insert {
                   it[Users.id] = id
                   it[Users.publicId] = generateUniqueUserPublicIdInsideTransaction()
@@ -18319,6 +18374,8 @@ fun Application.module() {
                   it[Users.isActive] = true
                 }
 
+                contactAuth.consumeContactProofsInside(emailProofIds, id)
+                contactAuth.markPrimaryEmailVerifiedInside(id, email)
                 false
               }
             } catch (exception: ExposedSQLException) {
@@ -18372,7 +18429,8 @@ fun Application.module() {
             message = getResponse("3").message
           )
         } catch (throwable: Throwable) {
-          if (throwable is kotlinx.coroutines.CancellationException) throw throwable
+          if (throwable is kotlinx.coroutines.CancellationException || throwable is AitaContactVerificationRequiredException ||
+              throwable is AitaAuthUnavailableException || throwable is AitaContactDeliveryUnavailableException) throw throwable
           call.safeGenericResponseNoPayload(
             status = HttpStatusCode.InternalServerError,
             message = getResponse("3").message,
@@ -20567,6 +20625,70 @@ fun Application.module() {
           } ?: call.respondAitaUnauthorized()
         }
 
+        post("/reorderShelf") {
+          val userId = call.checkPrincipal() ?: return@post
+          val body = call.receiveAita<ShelfOrderRequest>()
+          val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
+          val itemId = runCatching { UUID.fromString(body.goodsItemId) }.getOrNull()
+          if (storeId == null || itemId == null || body.orderedBatchIds.size > 10_000 || body.expectedBatchIds.size > 10_000) {
+            call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("inventory.shelf_retry"))
+            return@post
+          }
+          var failureStatus = HttpStatusCode.Forbidden
+          var failureMessage = eventMessage("inventory.shelf_retry")
+          val result = newSuspendedTransaction(aitaServerIoContext) {
+            if (!call.matchesInventoryContextStoreIdInsideTransaction(userId, storeId) ||
+                !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF, requireWorkshift = true))
+              return@newSuspendedTransaction null
+            // Same inventory lock as checkout: a drag can neither resurrect stock nor overwrite a concurrent sale.
+            lockStockInventoryInsideTransaction(listOf(storeId))
+            val itemRow = StockItems.selectAll().where {
+              (StockItems.id eq itemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true)
+            }.singleOrNull() ?: return@newSuspendedTransaction null
+            val item = itemRow.toGoodsItemDataModel()
+            val rows = StockBatchesV2.selectAll().where {
+              (StockBatchesV2.goodsItemId eq itemId) and (StockBatchesV2.storeId eq storeId) and
+                  (StockBatchesV2.isActive eq true)
+            }.map { it.toGoodsBatchDataModel() }
+            val current = shelfOrderedBatches(item, rows)
+            when (evaluateShelfOrder(body, item, current)) {
+              ShelfOrderDecision.Invalid -> { failureStatus = HttpStatusCode.BadRequest; return@newSuspendedTransaction null }
+              ShelfOrderDecision.Stale -> { failureStatus = HttpStatusCode.Conflict; failureMessage = eventMessage("inventory.shelf_stale"); return@newSuspendedTransaction null }
+              ShelfOrderDecision.Unchanged -> return@newSuspendedTransaction ShelfOrderResult(item, current, false)
+              ShelfOrderDecision.Apply -> Unit
+            }
+            val now = System.currentTimeMillis()
+            val byId = current.associateBy { it.id }
+            val updated = body.orderedBatchIds.mapIndexed { index, id ->
+              val batch = requireNotNull(byId[id])
+              StockBatchesV2.update({ (StockBatchesV2.id eq UUID.fromString(id)) and (StockBatchesV2.storeId eq storeId) }) {
+                it[StockBatchesV2.shelfPriority] = index
+                it[StockBatchesV2.shelfPosition] = (index + 1).toString()
+                it[StockBatchesV2.updatedAtMillis] = now
+              }
+              batch.copy(shelfPriority = index, shelfPosition = (index + 1).toString(), updatedAtMillis = now)
+            }
+            StockItems.update({ (StockItems.id eq itemId) and (StockItems.storeId eq storeId) }) {
+              it[StockItems.activeShelfBatchId] = UUID.fromString(body.orderedBatchIds.first())
+              it[StockItems.updatedAtMillis] = now
+            }
+            insertOperationLogInsideTransaction(
+              actorUserId = userId, storeId = storeId, action = OPERATION_LOG_ACTION_UPDATED,
+              entityType = OPERATION_LOG_ENTITY_STOCK_ITEM, entityId = body.goodsItemId,
+              title = eventMessage("message.active_shelf_batch_changed", "itemName" to itemRow.stockItemOperationLogName(body.goodsItemId)),
+              details = stockItemChangeDetails(listOf("active shelf batch", "shelf order")),
+              metadata = mapOf("changed_fields" to "active_shelf_batch,shelf_order", "goods_item_id" to body.goodsItemId), now = now
+            )
+            ShelfOrderResult(item.copy(activeShelfBatchId = body.orderedBatchIds.first(), updatedAtMillis = now), updated, true)
+          }
+          if (result == null) {
+            call.genericResponseNoPayload(failureStatus, failureMessage)
+          } else {
+            if (result.changed) publishStockRealtimeBundle(body.storeId, "stock_shelf_reordered")
+            call.genericResponse(HttpStatusCode.OK, payload = result, message = if (result.changed) eventMessage("inventory.shelf_saved") else null)
+          }
+        }
+
         post("/setActiveShelfBatch") {
           val userId = call.checkPrincipal() ?: return@post
           val body = call.receiveAita<GoodsBatchDataModel>()
@@ -21053,7 +21175,10 @@ fun Application.module() {
 
           if (noUser) return@post call.respondAitaUnauthorized()
 
-          val submittedBody = call.receiveAita<StoreDataModel>()
+          val rawBody = call.receiveAita<StoreDataModel>()
+          val normalizedEmails = kz.aita.auth.canonicalAitaContactEmails(rawBody.emails)
+            ?: throw BadRequestException("Invalid contact email")
+          val submittedBody = rawBody.copy(emails = normalizedEmails)
 
           if (!validateStoreAddress(submittedBody)) {
             return@post call.genericResponseNoPayload(
@@ -21123,10 +21248,15 @@ fun Application.module() {
               instant = Instant.now()
 
               newSuspendedTransaction(aitaServerIoContext) {
+                val contactAuth = advancedAuthService(tokenService, call.application)
+                contactAuth.lockContactActorInside(userId)
                 val publicId = generateUniqueStorePublicIdInsideTransaction()
                 val parentOwnerUserIds = parentStoreIdForBranch?.let { parentId ->
                   Stores.select(Stores.ownerUserIds).where { Stores.id eq parentId }.singleOrNull()?.get(Stores.ownerUserIds)
                 }
+                val contactProofIds = contactAuth.requireContactProofsInside(userId,
+                  kz.aita.auth.aitaContactDraftTarget(kz.aita.auth.AitaContactPurpose.STORE_CONTACT, "", body.contactVerificationId,
+                    parentStoreIdForBranch?.toString().orEmpty()), body.emails, emptyList(), body.contactEmailProofs)
                 Stores.insert {
                   it[Stores.id] = id
                   it[Stores.publicId] = publicId
@@ -21166,6 +21296,7 @@ fun Application.module() {
                     }
 
                 }
+                contactAuth.consumeContactProofsInside(contactProofIds, requireNotNull(id))
               }
 
               false
@@ -21187,7 +21318,7 @@ fun Application.module() {
             }
             call.genericResponse(
               HttpStatusCode.Created,
-              payload = body.copy(id = createdStoreId.toString(), publicId = publicId, createdAt = instant.toEpochMilli(), parentStoreId = parentStoreIdForBranch?.toString()),
+              payload = body.copy(id = createdStoreId.toString(), publicId = publicId, createdAt = instant.toEpochMilli(), parentStoreId = parentStoreIdForBranch?.toString()).withoutContactVerification(),
               message = getResponse("10").message
             )
           } ?: call.genericResponseNoPayload(
@@ -21199,7 +21330,10 @@ fun Application.module() {
         put("/update") {
           val userId = call.checkPrincipal() ?: return@put
 
-          val submittedBody = call.receiveAita<StoreDataModel>()
+          val rawBody = call.receiveAita<StoreDataModel>()
+          val normalizedEmails = kz.aita.auth.canonicalAitaContactEmails(rawBody.emails)
+            ?: throw BadRequestException("Invalid contact email")
+          val submittedBody = rawBody.copy(emails = normalizedEmails)
 
           if (!validateStoreAddress(submittedBody)) {
             return@put call.genericResponseNoPayload(
@@ -21273,14 +21407,13 @@ fun Application.module() {
           }
 
           val updated = newSuspendedTransaction(aitaServerIoContext) {
-
+            val contactAuth = advancedAuthService(tokenService, call.application)
+            contactAuth.lockContactActorInside(userId)
             val id = runCatching { UUID.fromString(body.id) }.getOrNull() ?: return@newSuspendedTransaction 2
 
-            val currentParentStoreId = Stores
-              .select(Stores.parentStoreId)
-              .where { Stores.id eq id }
-              .singleOrNull()
-              ?.get(Stores.parentStoreId)
+            val currentStore = Stores.selectAll().where { Stores.id eq id }.forUpdate().singleOrNull()
+              ?: return@newSuspendedTransaction 2
+            val currentParentStoreId = currentStore[Stores.parentStoreId]
 
             val canUpdateStore = if (currentParentStoreId == null) {
               userCanUseStoreActionInsideTransaction(userId, id, STORE_PERMISSION_STORE_MANAGE, requireWorkshift = false)
@@ -21292,6 +21425,9 @@ fun Application.module() {
             if (!canUpdateStore)
               return@newSuspendedTransaction 1
 
+            val contactProofIds = contactAuth.requireContactProofsInside(userId,
+              kz.aita.auth.AitaContactTarget(kz.aita.auth.AitaContactPurpose.STORE_CONTACT, id.toString()),
+              body.emails, currentStore[Stores.emails], body.contactEmailProofs)
             Stores.update({ Stores.id eq id }) {
               it[Stores.storeTypeIds] = body.storeTypeIds
               it[Stores.name] = body.name
@@ -21307,17 +21443,17 @@ fun Application.module() {
               it[Stores.countryLocales] = body.countryLocales
               it[Stores.updatedAt] = Instant.now()
             }.run {
-              if (this > 0)
+              if (this > 0) {
+                contactAuth.consumeContactProofsInside(contactProofIds, id)
                 0
-              else
-                1
+              } else 1
             }
           }
 
           return@put when (updated) {
             0 -> call.genericResponse(
               HttpStatusCode.OK,
-              payload = body,
+              payload = body.withoutContactVerification(),
               getResponse("11").message
             )
 
@@ -21425,6 +21561,8 @@ fun Application.module() {
           }
 
           val inserted = newSuspendedTransaction(aitaServerIoContext) {
+            val contactAuth = advancedAuthService(tokenService, call.application)
+            contactAuth.lockContactActorInside(userId)
             if (Users.select(Users.id).where { Users.id eq userId }.empty())
               return@newSuspendedTransaction null
 
@@ -21432,6 +21570,9 @@ fun Application.module() {
             val id = UUID.randomUUID()
             lockSupplierProfileInsideTransaction(id)
 
+            val contactProofIds = contactAuth.requireContactProofsInside(userId,
+              kz.aita.auth.aitaContactDraftTarget(kz.aita.auth.AitaContactPurpose.SUPPLIER_CONTACT, "", body.contactVerificationId),
+              cleaned.emails.orEmpty(), emptyList(), body.contactEmailProofs)
             Suppliers.insert {
               it[Suppliers.id] = id
               it[Suppliers.userIds] = jsonBase.encodeToString(cleaned.userIds)
@@ -21443,6 +21584,7 @@ fun Application.module() {
               it[Suppliers.isActive] = true
             }
 
+            contactAuth.consumeContactProofsInside(contactProofIds, id)
             Suppliers.selectAll().where { Suppliers.id eq id }.single().toSupplierDataModel()
           }
 
@@ -21472,6 +21614,8 @@ fun Application.module() {
           var failureMessage = eventMessage("message.you_cannot_edit_this_supplier_profile")
           var profileChanged = false
           val updated = newSuspendedTransaction(aitaServerIoContext) {
+            val contactAuth = advancedAuthService(tokenService, call.application)
+            contactAuth.lockContactActorInside(userId)
             lockSupplierProfileInsideTransaction(supplierId)
             val row = Suppliers.selectAll().where { Suppliers.id eq supplierId }.singleOrNull()
             if (row == null) {
@@ -21500,6 +21644,9 @@ fun Application.module() {
                 existing.emails.orEmpty() != cleaned.emails.orEmpty() ||
                 !existing.isActive
 
+            val contactProofIds = contactAuth.requireContactProofsInside(userId,
+              kz.aita.auth.AitaContactTarget(kz.aita.auth.AitaContactPurpose.SUPPLIER_CONTACT, supplierId.toString()),
+              cleaned.emails.orEmpty(), existing.emails.orEmpty(), body.contactEmailProofs)
             if (profileChanged) {
               Suppliers.update({ Suppliers.id eq supplierId }) {
                 it[Suppliers.userIds] = jsonBase.encodeToString(cleaned.userIds)
@@ -21512,6 +21659,7 @@ fun Application.module() {
               }
             }
 
+            contactAuth.consumeContactProofsInside(contactProofIds, supplierId)
             Suppliers.selectAll().where { Suppliers.id eq supplierId }.single().toSupplierDataModel()
           }
 
@@ -23203,7 +23351,8 @@ fun Application.module() {
           val phoneNumber = kz.aita.auth.normalizeAitaPhoneAlias(newAccount.phoneNumber)?.removePrefix("+")
             ?: return@put call.genericResponseNoPayload(HttpStatusCode.BadRequest,
               message = eventMessage("message.invalid_phone_number"))
-          val email = newAccount.email.trim().lowercase()
+          val email = kz.aita.auth.normalizeAitaEmail(newAccount.email)
+            ?: return@put call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("contact.invalid_email"))
           val firstName = newAccount.firstName.trim()
           val lastName = newAccount.lastName.trim()
           val countryLocale = newAccount.countryLocale.trim().lowercase()
@@ -23237,6 +23386,11 @@ fun Application.module() {
               return@newSuspendedTransaction "phone_number_clash"
             else if (emailClash)
               return@newSuspendedTransaction "email_clash"
+
+            val contactAuth = advancedAuthService(tokenService, call.application)
+            val contactProofIds = contactAuth.requireContactProofsInside(uuid,
+              kz.aita.auth.AitaContactTarget(kz.aita.auth.AitaContactPurpose.ACCOUNT_CONTACT, uuid.toString()),
+              listOf(email), listOf(existingUser[Users.email]), body.contactEmailProofs)
 
             if (!verifyAdvancedAuthProfileChangeInside(existingUser, body, tokenService, call.application))
               return@newSuspendedTransaction "security_confirmation"
@@ -23273,6 +23427,12 @@ fun Application.module() {
               }
             }
 
+            if (contactProofIds.isNotEmpty()) {
+              contactAuth.consumeContactProofsInside(contactProofIds, uuid)
+              // The primary-email trigger clears the old verification flag. Stamp the NEW address only now.
+              contactAuth.markPrimaryEmailVerifiedInside(uuid, email)
+              contactAuth.enqueueOldEmailChangeNoticeInside(uuid, existingUser[Users.email], appLanguage)
+            }
             "ok"
           }
 

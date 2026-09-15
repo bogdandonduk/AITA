@@ -37,3 +37,16 @@ DELETE FROM cart WHERE id = ? AND transactionTypeIndex = ? AND clientId = ?;
 deleteById:
 DELETE FROM cart WHERE id = ?;
 
+
+-- Small projections let old multi-megabyte caches be read without exceeding Android CursorWindow.
+selectKvLength:
+SELECT key, length(value) AS text_length FROM key_value WHERE key = ?;
+
+selectKvSlice:
+SELECT key, substr(value, ?, ?) AS text_slice FROM key_value WHERE key = ?;
+
+deleteKvPrefixExcept:
+DELETE FROM key_value
+WHERE substr(key, 1, length(?)) = ?
+  AND key != ?
+  AND (? = '' OR substr(key, 1, length(?)) != ?);

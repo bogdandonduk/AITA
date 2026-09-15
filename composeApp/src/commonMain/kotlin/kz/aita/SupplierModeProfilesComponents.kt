@@ -282,6 +282,11 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
         stateKey = phoneStateKey
     )
 
+    val supplierEmailConfirmation = rememberContactEmailConfirmation(
+        kz.aita.auth.AitaContactPurpose.SUPPLIER_CONTACT, editedSupplier?.id.orEmpty(),
+        mergeSupplierProfilePrimaryEmail(editedSupplier?.emails, normalizeSupplierProfileEmail(supplierEmail)).orEmpty(),
+        editedSupplier?.emails.orEmpty())
+
     val cancelEditor = {
         if (!isSaving) {
             operationGate.invalidate()
@@ -293,7 +298,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
     }
 
     val saveProfile = saveProfile@{
-        if (isSaving) return@saveProfile
+        if (isSaving || !supplierEmailConfirmation.ready) return@saveProfile
         val cleanName = supplierName.trim()
         if (cleanName.isBlank()) {
             postInAppNotification(
@@ -338,6 +343,8 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
             name = mergeSupplierProfilePrimaryName(editedSupplier?.name.orEmpty(), cleanName),
             phoneNumbers = mergeSupplierProfilePrimaryPhone(editedSupplier?.phoneNumbers, phoneNumber),
             emails = mergeSupplierProfilePrimaryEmail(editedSupplier?.emails, cleanEmail),
+            contactVerificationId = supplierEmailConfirmation.draftId,
+            contactEmailProofs = supplierEmailConfirmation.proofs,
             addedAt = editedSupplier?.addedAt ?: getCurrentTimeMillis(),
             isActive = true
         )
@@ -412,6 +419,8 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
             }
         )
 
+        ContactEmailConfirmationContent(supplierEmailConfirmation, enabled = !isSaving)
+
         if (editedSupplier != null && (editedSupplier.phoneNumbers.orEmpty().size > 1 || editedSupplier.emails.orEmpty().size > 1)) {
             androidx.compose.material3.Text(
                 text = localizedStringResource(2507, "Additional existing contacts are preserved when the primary contact changes."),
@@ -436,7 +445,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
                     text = if (isSaving) localizedStringResource(2508, "Saving profile…") else localizedStringResource(631, "Save supplier"),
                     iconPath = stateValues.drawablePathIconCheck,
                     iconRes = stateValues.drawableResIconCheck.value,
-                    enabled = !isSaving && supplierName.isNotBlank(),
+                    enabled = !isSaving && supplierName.isNotBlank() && supplierEmailConfirmation.ready,
                     confirmationRequired = false,
                     onClick = saveProfile
                 )
@@ -457,7 +466,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
                     text = if (isSaving) localizedStringResource(2508, "Saving profile…") else localizedStringResource(631, "Save supplier"),
                     iconPath = stateValues.drawablePathIconCheck,
                     iconRes = stateValues.drawableResIconCheck.value,
-                    enabled = !isSaving && supplierName.isNotBlank(),
+                    enabled = !isSaving && supplierName.isNotBlank() && supplierEmailConfirmation.ready,
                     confirmationRequired = false,
                     onClick = saveProfile
                 )

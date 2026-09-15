@@ -433,6 +433,12 @@ fun AppConfiguration.UserAuthSignUpScreen(
     // AITA normally restores form drafts, but restoring an abandoned registration after relaunch
     // would expose phone/email/password data on a shared device.
     val transientSignUpState = remember { object : StateHost() {} }
+    var pendingRegistration by remember { mutableStateOf<UserAuthSignUpDataModel?>(null) }
+    val pending = pendingRegistration
+    if (pending != null) {
+        RegistrationEmailConfirmationScreen(pending) { pendingRegistration = null }
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -557,7 +563,7 @@ fun AppConfiguration.UserAuthSignUpScreen(
             val signingUp = stateValues.signUpInProgress
 
             actionButton(
-                text = stateValues.stringSignUp,
+                text = contactText("registration_continue"),
                 enabled = !signingUp,
                 loading = signingUp,
                 loadingText = stateValues.stringSigningUp,
@@ -583,7 +589,7 @@ fun AppConfiguration.UserAuthSignUpScreen(
                         .countryByPhoneSelection(phoneNumberTextFieldContent.selectedSecondaryId)
                         ?: stateValues.globalAppConfiguration.countries.first()
 
-                    signUpUser(
+                    pendingRegistration = (
                         UserAuthSignUpDataModel(
                             phoneNumber = selectedPhoneCountry.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim(),
                             email = emailTextFieldContent.value.text.trim(),

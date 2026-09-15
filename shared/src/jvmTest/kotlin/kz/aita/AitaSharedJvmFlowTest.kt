@@ -164,7 +164,7 @@ class AitaSharedJvmFlowTest {
         environment.stock = (1..150).map { aitaTestGoodsItem(id = "cached-$it") }
         getStock(AITA_FLOW_SOURCE_STORE_ID)
         waitUntilAitaFlowCondition { stockLoadStatusState.value.source == InventoryLoadSource.Cloud }
-        val raw = getLocalKv("cache_json:" + inventoryCacheKey("stock", owner))
+        val raw = readJsonCacheText("cache_json:" + inventoryCacheKey("stock", owner))
         assertNotNull(raw)
         assertEquals(environment.stock, jsonBase.decodeFromString<List<GoodsItemDataModel>>(raw))
         assertEquals(environment.stock, stockState.payloadValue)

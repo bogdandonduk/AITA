@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -4736,6 +4737,12 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                 )
 
                 StoreEmailQuickFillButtons(emailTextFieldContent, emailQuickFillButtons)
+                val storeEmailConfirmation = rememberContactEmailConfirmation(
+                    kz.aita.auth.AitaContactPurpose.STORE_CONTACT, editedStore?.id.orEmpty(),
+                    listOf(emailTextFieldContent.value.text), editedStore?.emails.orEmpty(),
+                    parentId = if (editedStore == null && isBranchEditor) parentStore?.id.orEmpty() else "")
+                var storeSaveInProgress by remember(editedStore?.id, parentStore?.id) { mutableStateOf(false) }
+                ContactEmailConfirmationContent(storeEmailConfirmation, enabled = !storeSaveInProgress)
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
@@ -4837,6 +4844,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             legalId = legalIdTextFieldContent.value.text.trim(),
                             phoneNumbers = listOf(selectedCountry.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()),
                             emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
+                            contactVerificationId = storeEmailConfirmation.draftId,
+                            contactEmailProofs = storeEmailConfirmation.proofs,
                             countryLocales = listOf(selectedCountry.locale),
                             createdAt = editedStore?.createdAt ?: 0L,
                             branches = editedStore?.branches.orEmpty()
@@ -4847,7 +4856,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                     actionButton(
                         text = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
-                        enabled = stateValues.latestNotification == null
+                        enabled = stateValues.latestNotification == null && storeEmailConfirmation.ready && !storeSaveInProgress,
+                        loading = storeSaveInProgress, autoLoading = false
                     ) {
                         softKeyboardController?.hide()
                         addressTextFieldContent.checkContentValidity()
@@ -4869,20 +4879,27 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                         }
                         addressPickerContent.state.clearValidation()
 
-                        if (addressTextFieldContent.isContentValid && phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid && legalIdTextFieldContent.isContentValid) {
+                        if (!storeSaveInProgress && storeEmailConfirmation.ready && addressTextFieldContent.isContentValid && phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid && legalIdTextFieldContent.isContentValid) {
+                            storeSaveInProgress = true
                             val body = buildStoreModel(verifiedLocation)
                             if (editedStore != null) {
-                                updateStore(body) {
+                                updateStore(body) { result ->
                                     coroutineScope.launch {
-                                        Navigation.Menu.pop()
-                                        clearStoreEditorState()
+                                        storeSaveInProgress = false
+                                        if (result is DataState.Success) {
+                                            Navigation.Menu.pop()
+                                            clearStoreEditorState()
+                                        }
                                     }
                                 }
                             } else {
-                                addStore(body) {
+                                addStore(body) { result ->
                                     coroutineScope.launch {
-                                        Navigation.Menu.pop()
-                                        clearStoreEditorState()
+                                        storeSaveInProgress = false
+                                        if (result is DataState.Success) {
+                                            Navigation.Menu.pop()
+                                            clearStoreEditorState()
+                                        }
                                     }
                                 }
                             }
@@ -4916,6 +4933,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             legalId = "",
                             phoneNumbers = listOf(selectedCountry.phoneNumberCode.lowercase() + phoneNumberTextFieldContent.value.text.trim().lowercase()),
                             emails = listOf(emailTextFieldContent.value.text.trim().lowercase()),
+                            contactVerificationId = storeEmailConfirmation.draftId,
+                            contactEmailProofs = storeEmailConfirmation.proofs,
                             countryLocales = listOf(selectedCountry.locale),
                             createdAt = editedStore?.createdAt ?: 0L,
                             branches = emptyList()
@@ -4926,7 +4945,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                     actionButton(
                         text = if (editedStore != null) localizedStringResource(534, "Edit branch") else localizedStringResource(533, "Add branch"),
-                        enabled = stateValues.latestNotification == null
+                        enabled = stateValues.latestNotification == null && storeEmailConfirmation.ready && !storeSaveInProgress,
+                        loading = storeSaveInProgress, autoLoading = false
                     ) {
                         softKeyboardController?.hide()
                         addressTextFieldContent.checkContentValidity()
@@ -4947,20 +4967,27 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                         }
                         addressPickerContent.state.clearValidation()
 
-                        if (addressTextFieldContent.isContentValid && phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid) {
+                        if (!storeSaveInProgress && storeEmailConfirmation.ready && addressTextFieldContent.isContentValid && phoneNumberTextFieldContent.isContentValid && emailTextFieldContent.isContentValid) {
+                            storeSaveInProgress = true
                             val body = buildBranchModel(verifiedLocation)
                             if (editedStore != null) {
-                                updateStore(body) {
+                                updateStore(body) { result ->
                                     coroutineScope.launch {
-                                        Navigation.Menu.pop()
-                                        clearStoreEditorState()
+                                        storeSaveInProgress = false
+                                        if (result is DataState.Success) {
+                                            Navigation.Menu.pop()
+                                            clearStoreEditorState()
+                                        }
                                     }
                                 }
                             } else {
-                                addStore(body) {
+                                addStore(body) { result ->
                                     coroutineScope.launch {
-                                        Navigation.Menu.pop()
-                                        clearStoreEditorState()
+                                        storeSaveInProgress = false
+                                        if (result is DataState.Success) {
+                                            Navigation.Menu.pop()
+                                            clearStoreEditorState()
+                                        }
                                     }
                                 }
                             }
@@ -5893,48 +5920,32 @@ internal fun AppConfiguration.NotificationPopupCard(
 fun AppConfiguration.NotificationsScreen(
     onBack: (() -> Unit)? = null
 ) {
-    val deviceState by deviceFileNotifications.collectAsState()
-    val deviceHistory = deviceState.entries.filter { it.owner.isCurrent() }.map { it.notification }
-    val notifications = (deviceHistory + stateValues.notifications.orEmpty()).distinctBy { it.id }
     var search by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf("all") }
-
+    val prepared by LiveCollectionWorkspace.notifications.collectAsState()
+    val projection = prepared?.takeIf { it.account == stateValues.userAccount?.id && it.generation == currentAuthenticatedSessionGeneration() }
+    val searchedNotifications = projection?.searched.orEmpty()
+    val filtered = projection?.visible.orEmpty()
+    val notificationListState = rememberPersistentLazyListState(NavigationScreenModel.Notifications, "notifications_scroll")
+    LaunchedEffect(search, selectedCategory) {
+        LiveCollectionWorkspace.selectNotifications(NotificationSelection(search, selectedCategory))
+    }
     LaunchedEffect(stateValues.userAccount?.id) {
         if (stateValues.userAccount != null) getNotifications()
     }
-
-    val searchedNotifications = notifications
-        .filter { notification ->
-            val q = search.trim()
-            q.isBlank() || listOf(
-                notification.message,
-                localizedNotificationMessage(notification),
-                localizedNotificationTitle(notification),
-                notification.category,
-                notificationTypeLabel(notification.type),
-                localizedNotificationSource(notification.source),
-                notification.metadata.values.joinToString(" "),
-                notification.createdAtMillis.toString()
-            ).any { it.contains(q, ignoreCase = true) }
-        }
-
-    val filtered = searchedNotifications
-        .filter { notification ->
-            when (selectedCategory) {
-                "positive" -> notification.type == NotificationType.Positive
-                "negative" -> notification.type == NotificationType.Negative
-                "neutral" -> notification.type == NotificationType.Neutral
-                "unread" -> notification.readAtMillis == null
-                else -> true
-            }
-        }
-        .sortedByDescending { it.createdAtMillis }
-
-    LaunchedEffect(filtered.map { it.id to it.readAtMillis }) {
-        if (filtered.any { it.readAtMillis == null }) {
-            delay(700)
-            markAllNotificationsRead()
-            markDeviceFileNotificationsRead()
+    LaunchedEffect(notificationListState, selectedCategory, stateValues.userAccount?.id) {
+        // Never auto-remove rows from the Unread tab. Elsewhere mark only rows actually seen.
+        if (selectedCategory != "unread") {
+            snapshotFlow { notificationListState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String } }
+                .collectLatest { visibleIds ->
+                    delay(700)
+                    val current = LiveCollectionWorkspace.notifications.value
+                    if (current != null && current.selection.category == selectedCategory && current.account == stateValues.userAccount?.id) {
+                        val unread = current.visible.filter { it.id in visibleIds && it.readAtMillis == null }
+                        markNotificationsRead(unread.filterNot(::isDeviceFileNotification).map { it.id })
+                        unread.filter(::isDeviceFileNotification).forEach { markDeviceFileNotificationsRead(it.id) }
+                    }
+                }
         }
     }
 
@@ -5987,6 +5998,7 @@ fun AppConfiguration.NotificationsScreen(
         }
 
         LazyColumn(
+            state = notificationListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
@@ -5994,7 +6006,9 @@ fun AppConfiguration.NotificationsScreen(
                 .padding(horizontal = stateValues.marginTextField),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (filtered.isEmpty()) {
+            if (projection == null) {
+                item { LoadingSkeleton(Modifier.fillMaxWidth(), rows = 4) }
+            } else if (filtered.isEmpty()) {
                 item {
                     MessageText(
                         modifier = Modifier
