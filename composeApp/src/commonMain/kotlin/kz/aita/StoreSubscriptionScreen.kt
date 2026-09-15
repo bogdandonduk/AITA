@@ -11,9 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -49,7 +46,7 @@ internal fun AppConfiguration.SubscriptionRequiredPane(modifier: Modifier = Modi
     val gate = rememberStoreSubscriptionGate(store)
     Column(modifier.fillMaxSize().padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (store != null && loading == store) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Subscription, rows = 1)
+        if (store != null && loading == store) LoadingSkeleton(layout = LoadingLayout.Subscription, modifier = Modifier.fillMaxWidth(), rows = 3)
         else MessageText(Modifier.fillMaxWidth(), if (store == null)
             authUiText("Choose a location", "Выберите торговую точку", "Сауда нүктесін таңдаңыз", "Жайды тандаңыз")
             else eventMessage(if (gate == StoreSubscriptionGate.Checking) "subscription.verify" else "subscription.required")
@@ -67,13 +64,11 @@ internal fun AppConfiguration.SubscriptionRequiredPane(modifier: Modifier = Modi
 }
 
 @Composable
-private fun AppConfiguration.SubscriptionSurface(lifetime: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    val aqua = if (stateValues.BackgroundColor.luminance() > 0.5f) Color(0xFF007D8B) else Color(0xFF63E0ED)
-    val edge = if (lifetime) aqua else stateValues.AccentColor
-    Column(Modifier.fillMaxWidth().foregroundTactileShadow(stateValues.cornerRadius, elevated = lifetime)
+private fun AppConfiguration.SubscriptionSurface(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
         .clip(RoundedCornerShape(stateValues.cornerRadius))
-        .background(if (lifetime) lerp(stateValues.BackgroundColor, aqua, 0.09f) else stateValues.BackgroundColor)
-        .border(stateValues.unfocusedBorderWidth, edge.copy(alpha = 0.65f), RoundedCornerShape(stateValues.cornerRadius))
+        .background(stateValues.BackgroundColor)
+        .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor.copy(alpha = 0.65f), RoundedCornerShape(stateValues.cornerRadius))
         .padding(stateValues.marginTextFieldGroup), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
 }
 
@@ -155,7 +150,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
             }
             if (dashboard == null) {
                 item("loading") {
-                    if (loadingStore == storeId) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Subscription, rows = 1)
+                    if (loadingStore == storeId) LoadingSkeleton(layout = LoadingLayout.Subscription, modifier = Modifier.fillMaxWidth(), rows = 4)
                     else {
                         MessageText(text = loadFailure.orEmpty().visibleLocalizedString(stateValues.appLanguage,
                             eventMessage("subscription.verify").visibleLocalizedString(stateValues.appLanguage, "")))
@@ -188,9 +183,9 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                     val current = dashboard.subscription
                     val lifetime = hasAccess && current.accessKind == SUBSCRIPTION_ACCESS_LIFETIME
                     val plan = dashboard.plans.firstOrNull { it.id == current.planId }
-                    SubscriptionSurface(lifetime) {
-                        Text(if (lifetime) authUiText("Lifetime access", "Бессрочный доступ", "Мерзімсіз қолжетімділік", "Мөөнөтсүз мүмкүнчүлүк")
-                            else plan?.name?.visibleLocalizedString(stateValues.appLanguage, "Basic") ?: "Basic",
+                    if (lifetime) LifetimeSubscriptionCard()
+                    else SubscriptionSurface {
+                        Text(plan?.name?.visibleLocalizedString(stateValues.appLanguage, "Basic") ?: "Basic",
                             color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
                         Text(if (hasAccess) localizedStringResource(812, "active") else
                             authUiText("Not active for this location", "Для этой точки не активна", "Бұл нүктеде белсенді емес", "Бул жай үчүн активдүү эмес"),
@@ -199,9 +194,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                             "Доступ действует только для этой точки. У каждого филиала своя подписка.",
                             "Қолжетімділік тек осы нүктеге арналған. Әр филиалға бөлек жазылым қажет.", "Мүмкүнчүлүк ушул жайга гана таандык. Филиалдар өзүнчө жазылат."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        if (lifetime) Text(authUiText("Unlocked by promo code · no renewal charges", "Активирован промокодом · без списаний за продление", "Промокодпен қосылған · ұзарту төлемі жоқ", "Промокод менен ачылды · узартуу акысы алынбайт"),
-                            color = if (stateValues.BackgroundColor.luminance() > 0.5f) Color(0xFF007D8B) else Color(0xFF63E0ED), fontSize = stateValues.textSize)
-                        else current.currentPeriodEndMillis?.let { end ->
+                        current.currentPeriodEndMillis?.let { end ->
                             Text(authUiText("Access until", "Доступ до", "Қолжетімділік мерзімі", "Мүмкүнчүлүк аяктайт") + ": " + securitySessionDateTimeText(end),
                                 color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
                         }

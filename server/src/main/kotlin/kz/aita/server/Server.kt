@@ -1153,7 +1153,8 @@ fun ResultRow.toSecuritySessionHistoryDataModel(): SecuritySessionHistoryDataMod
     sessionId = this[SecuritySessionEvents.sessionId]?.toString(),
     eventType = this[SecuritySessionEvents.eventType],
     title = this[SecuritySessionEvents.title],
-    details = this[SecuritySessionEvents.details],
+    // Keep raw audit details in the database, not in user-facing history payloads.
+    details = emptyList(),
     deviceName = this[SecuritySessionEvents.deviceName],
     platformName = this[SecuritySessionEvents.platformName],
     osName = this[SecuritySessionEvents.osName],
@@ -1161,7 +1162,7 @@ fun ResultRow.toSecuritySessionHistoryDataModel(): SecuritySessionHistoryDataMod
     appVersion = this[SecuritySessionEvents.appVersion],
     ipAddress = this[SecuritySessionEvents.ipAddress],
     createdAtMillis = this[SecuritySessionEvents.createdAtMillis],
-    metadata = this[SecuritySessionEvents.metadata]
+    metadata = securitySessionDisplayMetadata(this[SecuritySessionEvents.metadata])
   )
 }
 

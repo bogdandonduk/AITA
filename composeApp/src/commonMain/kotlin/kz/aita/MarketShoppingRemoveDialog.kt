@@ -31,6 +31,7 @@ internal fun AppConfiguration.MarketShoppingRemoveDialog(
     val unit = line.unitName.visibleLocalizedString(stateValues.appLanguage, line.basis.unitId)
     val amount = line.basis.pricedAmount.toString().removeSuffix(".0")
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.fillMaxWidth().aitaWidthCap(560.dp).padding(12.dp).heightIn(max = 560.dp)
             .aitaDialogEntrance().clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.BackgroundColor)

@@ -49,10 +49,10 @@ private fun rememberLoadingPhase(): Animatable<Float, androidx.compose.animation
 
 /** A placeholder is a layout contract. Requiring the kind keeps new screens from accidentally
  * falling back to a generic avatar/list shape. All bars share one draw-only animation clock. */
-internal enum class LoadingLayout {
+enum class LoadingLayout {
     StockCard, MarketplaceCard, OfferDetail, ProductPhoto, ShopCard, ShoppingLine, Comparison,
     Notification, Conversation, Message, Subscription, PaymentIntegration, SupplierSummary,
-    Form, InlineValue, Activity, Metrics
+    Form, InlineValue, Activity, Metrics, SupplierCustomer, SupplierContract, SupplierOrder, SupplierDispatch
 }
 
 @Composable
@@ -120,6 +120,10 @@ internal fun AitaLoadingSkeleton(
                     LoadingLayout.Subscription -> { Header(42); Line(.42f, 26); Line(.9f); Line(.72f); ChipRow(); Actions() }
                     LoadingLayout.PaymentIntegration -> { Header(32); Line(.78f); Line(.38f, 9); Line(1f, 40); Line(.38f, 9); Line(1f, 40); Actions() }
                     LoadingLayout.SupplierSummary -> { Line(.7f, 15); Line(.52f, 10); ChipRow(); Line(.85f, 10) }
+                    LoadingLayout.SupplierCustomer -> { Header(0, .78f); Line(.68f); Line(.52f); ChipRow(); Actions() }
+                    LoadingLayout.SupplierContract -> { Header(0, .78f); Line(.75f); ChipRow(); Line(.7f, 10); Actions() }
+                    LoadingLayout.SupplierOrder -> { Header(0, .78f); Line(.48f); ChipRow(); Line(.83f); Actions() }
+                    LoadingLayout.SupplierDispatch -> { Header(0, .78f); Line(.85f); Line(.62f); ChipRow(); Actions() }
                     LoadingLayout.Form -> { Line(.38f, 10); Line(1f, 40) }
                     LoadingLayout.InlineValue -> { Line(.7f, 10); Line(.92f, 10) }
                     LoadingLayout.Activity -> { Header(22, .72f); Line(.9f); Line(.36f, 9) }

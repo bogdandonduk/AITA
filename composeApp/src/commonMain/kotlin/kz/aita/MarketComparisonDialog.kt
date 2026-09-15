@@ -178,6 +178,7 @@ internal fun AppConfiguration.MarketComparisonDialog(
     val displayedReady = if (frozen == null) comparisonReady else reviewUnchanged
 
     Dialog(onDismissRequest = ::closeComparison, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.fillMaxWidth().aitaWidthCap(920.dp).fillMaxHeight(0.92f).padding(12.dp)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor),
             horizontalAlignment = Alignment.CenterHorizontally) {
@@ -220,11 +221,11 @@ internal fun AppConfiguration.MarketComparisonDialog(
                                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Compare fewer units", "Сравнить меньшее количество", "Аз санды салыстыру", "Азыраак бирдикти салыштыруу") },
-                                        text = "−", fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
+                                        text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("−", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу"),autoLoading = false, confirmationRequired = false,
                                         enabled = units > 1 && !blocked && !draftPending(),
                                         onClick = { if (units == target.units && !draftPending()) applyQuantity(units - 1) })
                                     actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Compare more units", "Сравнить большее количество", "Көп санды салыстыру", "Көбүрөөк бирдикти салыштыруу") },
-                                        text = "+", fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
+                                        text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("+", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү"),autoLoading = false, confirmationRequired = false,
                                         enabled = units < MARKET_SHOPPING_MAX_UNITS && !blocked && !draftPending(),
                                         onClick = { if (units == target.units && !draftPending()) applyQuantity(units + 1) })
                                 }
@@ -283,7 +284,7 @@ internal fun AppConfiguration.MarketComparisonDialog(
                             })
                     }
                 } else {
-                    if (page == null && (data.loading || data.error == null)) item(key = "skeleton") { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Comparison, rows = 5) }
+                    if (page == null && (data.loading || data.error == null)) item(key = "skeleton") { LoadingSkeleton(layout = LoadingLayout.Comparison, modifier = Modifier.fillMaxWidth(), rows = 5) }
                     else if (comparisonReady && page != null && page.matches.isEmpty()) item(key = "no-matches") {
                         Text(if (!page.moreCandidates) authUiText("No other matching published offers in this search.", "Других подходящих опубликованных предложений в этом поиске нет.", "Осы іздеуде басқа сәйкес жарияланған ұсыныстар жоқ.", "Бул издөөдө башка дал келген жарыяланган сунуштар жок.")
                             else eventMessage("market.comparison_window_empty_more").visibleLocalizedString(stateValues.appLanguage, ""),
@@ -332,7 +333,10 @@ internal fun AppConfiguration.MarketComparisonDialog(
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 }
             }
-            FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Column(Modifier.fillMaxWidth()) {
                     Text(if (!displayedReady) authUiText("Refresh needed", "Нужно обновить", "Жаңарту қажет", "Жаңыртуу керек")
                         else eventMessage("market.comparison_window_scope", "checked" to (page?.candidatesChecked ?: 0).toString(),
@@ -340,14 +344,13 @@ internal fun AppConfiguration.MarketComparisonDialog(
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     page?.checkedAtMillis?.let { Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
                 }
-                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"),autoLoading = false,
                     enabled = !data.loading && !blocked, loading = data.loading, confirmationRequired = false, onClick = {
                         if (data.active && owner?.isCurrent() == true && !shoppingBlocked()) {
                             review = null; submittedId = null; queueRefresh()
                         }
                     })
-                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), fillMaxWidthIfTextPresent = false,
-                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false, onClick = ::closeComparison)
+                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"),                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false, onClick = ::closeComparison)
             }
         }
     }

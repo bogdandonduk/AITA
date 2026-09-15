@@ -29,6 +29,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -81,8 +82,7 @@ internal fun AppConfiguration.PagingControls(
         verticalAlignment = Alignment.CenterVertically
     ) {
         actionButton(
-            fillMaxWidthIfTextPresent = false,
-            text = localizedStringResource(577, "Previous"),
+            text = "", iconContentDescription = localizedStringResource(577, "Previous"),
             enabled = page > 0,
             iconPath = stateValues.drawablePathIconBackArrow,
             confirmationRequired = false,
@@ -98,8 +98,7 @@ internal fun AppConfiguration.PagingControls(
             overflow = TextOverflow.Ellipsis
         )
         actionButton(
-            fillMaxWidthIfTextPresent = false,
-            text = localizedStringResource(579, "Next"),
+            text = "", iconContentDescription = localizedStringResource(579, "Next"),
             enabled = page + 1 < totalPages,
             iconPath = nextPageIconPath(),
             iconRes = nextPageIconFallback(),
@@ -780,12 +779,6 @@ internal fun closeQuickStockAddSheet() {
 }
 
 internal var activeTransactionBarcodeHandler: ((String) -> Boolean)? = null
-internal var activeTransactionBarcodeFocusRequester: FocusRequester? = null
-internal var activeTransactionBarcodeFocusAction: (() -> Unit)? = null
-
-internal fun requestTransactionBarcodeFocus() {
-    activeTransactionBarcodeFocusAction?.invoke() ?: activeTransactionBarcodeFocusRequester?.requestFocus()
-}
 
 internal fun String.transactionBarcodeCandidate(): String? {
     val compact = trim()
@@ -1141,7 +1134,8 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
 internal fun AppConfiguration.TransactionBarcodeHidInput(
     transactionTypeIndex: Int,
     clientId: Int,
-    currentCart: List<GoodsItemInCartDataModel>
+    currentCart: List<GoodsItemInCartDataModel>,
+    captureEnabled: Boolean
 ) {
     val focusRequester = remember { FocusRequester() }
     val softKeyboardController = LocalSoftwareKeyboardController.current
@@ -1171,59 +1165,52 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
     }
     var buffer by rememberSaveable(transactionTypeIndex, clientId) { mutableStateOf("") }
 
-    val barcodeHandler: (String) -> Boolean = remember(
-        transactionTypeIndex,
-        clientId,
-        currentCart,
-        stateValues.stock,
-        stateValues.stockBatches,
-        stateValues.globalAppConfiguration,
-        stateValues.appLanguage
-    ) {
+    val latestCart by rememberUpdatedState(currentCart)
+    val latestCaptureEnabled by rememberUpdatedState(captureEnabled)
+    val barcodeHandler: (String) -> Boolean = remember(transactionTypeIndex, clientId) {
         { input ->
-            tryHandleTransactionBarcodeInput(
+            latestCaptureEnabled && !transactionBarcodeModalOpen() && tryHandleTransactionBarcodeInput(
                 rawInput = input,
                 transactionTypeIndex = transactionTypeIndex,
                 clientId = clientId,
-                currentCart = currentCart
+                currentCart = latestCart
             )
         }
     }
-
-    SideEffect {
+    DisposableEffect(barcodeHandler) {
         activeTransactionBarcodeHandler = barcodeHandler
-        activeTransactionBarcodeFocusRequester = focusRequester
-        activeTransactionBarcodeFocusAction = requestFocusWithoutSoftKeyboard
-    }
-
-    DisposableEffect(transactionTypeIndex, clientId, barcodeHandler, focusRequester) {
         onDispose {
             if (activeTransactionBarcodeHandler === barcodeHandler) activeTransactionBarcodeHandler = null
-            if (activeTransactionBarcodeFocusRequester == focusRequester) {
-                activeTransactionBarcodeFocusRequester = null
-                activeTransactionBarcodeFocusAction = null
-            }
         }
     }
 
     BasicTextField(
         value = buffer,
+        enabled = captureEnabled,
         onValueChange = { raw ->
-            val candidate = if (buffer.isNotBlank() && raw.startsWith(buffer) && raw.length > buffer.length) {
-                raw.removePrefix(buffer)
-            } else {
-                raw
-            }.takeLast(32)
+            val candidate = transactionHidBuffer(raw)
 
-            buffer = if (barcodeHandler(candidate)) "" else candidate
+            // Keep a scanner terminator for completion detection; never store it in the buffer.
+            buffer = if (barcodeHandler(raw)) "" else candidate
         },
         modifier = Modifier
             .size(1.dp)
             .alpha(0f)
             .focusRequester(focusRequester)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.Tab)) {
+                    val consumed = barcodeHandler("$buffer\n")
+                    if (consumed) buffer = ""
+                    consumed
+                } else false
+            }
             .onFocusChanged { focusState ->
                 if (focusState.isFocused) {
                     hideSoftKeyboardIfNeeded()
+                } else {
+                    buffer = ""
+                    requestTransactionBarcodeFocus()
                 }
             },
         singleLine = true,
@@ -1233,10 +1220,13 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
         )
     )
 
-    LaunchedEffect(transactionTypeIndex, clientId, suppressSoftKeyboard) {
-        delay(300)
-        requestFocusWithoutSoftKeyboard()
-    }
+    LaunchedEffect(captureEnabled) { if (!captureEnabled) buffer = "" }
+    TransactionBarcodeFocusEffect(
+        contextKey = "$transactionTypeIndex:$clientId:${stateValues.activeStoreId}",
+        captureEnabled = captureEnabled,
+        preferSearch = prefersVisibleTransactionSearch(stateValues.isNarrowScreen),
+        requestHidFocus = requestFocusWithoutSoftKeyboard
+    )
 }
 
 @Composable
@@ -1733,17 +1723,17 @@ fun AppConfiguration.TransactionSelectionScreen(
             isFocusedInitial = false,
             autoFocus = false,
             updateIsFocusedAction = { focusState ->
-                if (!focusState.isFocused) {
-                    coroutineScope.launch {
-                        delay(120)
-                        onBarcodeCaptureFocusRequested?.invoke()
-                    }
-                }
+                if (!focusState.isFocused) onBarcodeCaptureFocusRequested?.invoke()
             },
             forceRefocus = false,
             modifier = Modifier.padding(stateValues.marginTextField),
             barcodeCamScanner = true,
             captureTransactionBarcodeInput = true
+        )
+
+        TransactionSearchFocusTarget(
+            requester = searchTextFieldContent.focusRequester,
+            enabled = prefersVisibleTransactionSearch(stateValues.isNarrowScreen)
         )
 
         val scopeRowContent = tabRowWidget(
@@ -1773,6 +1763,7 @@ fun AppConfiguration.TransactionSelectionScreen(
                     currentCart = goodsInCart
                 )
             }
+            onBarcodeCaptureFocusRequested?.invoke()
         }
 
         val addToCartFromSearchAction: (GoodsItemDataModel, String) -> Unit = { goodsItem, query ->
@@ -2027,8 +2018,8 @@ fun AppConfiguration.TransactionScreen() {
                 )
 
                 actionButton(
-                    text = stateValues.stringSelectInMenu,
-                    fillMaxWidthIfTextPresent = false
+                    autoLoading = false,
+                    text = stateValues.stringSelectInMenu
                 ) {
                     coroutineScope.launch {
                         Navigation.Menu.go(NavigationScreenModel.Menu.Stores)
@@ -2098,12 +2089,6 @@ fun AppConfiguration.TransactionScreen() {
                     )
                 }
             }
-
-            TransactionBarcodeHidInput(
-                transactionTypeIndex = transactionTypeIndex,
-                clientId = clientId,
-                currentCart = goodsInCart
-            )
 
             val quickAddRequest by quickStockAddSheetRequestState.collectAsState()
             val scopedQuickAddRequest = quickAddRequest?.takeIf { request ->
@@ -2389,6 +2374,18 @@ fun AppConfiguration.TransactionScreen() {
             val rightTransactionPaneModel =
                 navigationScreensRight.lastOrNull() as? NavigationScreenModel.Transaction
                     ?: NavigationScreenModel.Transaction.Cart
+
+            // The selection pane can remain visible beside payment: do not scan into that cart.
+            val visiblePaneModels = if (stateValues.isNarrowScreen) listOf(leftTransactionPaneModel)
+                else listOf(leftTransactionPaneModel, rightTransactionPaneModel)
+            TransactionBarcodeHidInput(
+                transactionTypeIndex = transactionTypeIndex,
+                clientId = clientId,
+                currentCart = goodsInCart,
+                captureEnabled = visiblePaneModels.all {
+                    it is NavigationScreenModel.Transaction.Selection || it is NavigationScreenModel.Transaction.Cart
+                }
+            )
 
             fun paneMotionTarget(stack: List<NavigationScreenModel>) = AitaSceneMotionTarget(
                 family = "transaction:$transactionTypeIndex",
@@ -4374,19 +4371,19 @@ internal fun AppConfiguration.CartQuantityBottomSheet(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringCancel,
                     enabledColor = stateValues.PlaceholderTextColor,
                     onClick = onDismiss
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringConfirm,
                     enabled = amountValid,
                     enabledColor = stateValues.AccentColor,
@@ -4747,19 +4744,19 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringCancel,
                     enabledColor = stateValues.PlaceholderTextColor,
                     onClick = onDismiss
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringConfirm,
                     enabled = amountText.isNotBlank() && enteredAmount >= 0.0,
                     enabledColor = stateValues.AccentColor,
@@ -4973,6 +4970,7 @@ internal fun AppConfiguration.DebtReceiptDialog(
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
+        TransactionBarcodeModalGuard()
         LazyColumn(
             modifier = Modifier
                 .aitaDialogEntrance()
@@ -5118,17 +5116,20 @@ internal fun AppConfiguration.DebtorPaymentCard(
         }
 
         Spacer(modifier = Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(326, "Edit / pay debt"),
                 iconPath = stateValues.drawablePathIconEdit,
                 onClick = onClick
             )
             onDelete?.let {
                 actionButton(
+                    autoLoading = false,
                     text = stateValues.stringDelete,
-                    fillMaxWidthIfTextPresent = false,
                     enabledColor = stateValues.ErrorColor,
                     iconPath = stateValues.drawablePathIconDelete,
                     onClick = it

@@ -79,7 +79,7 @@ internal fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashb
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = item.barcodeSnapshots.take(3).joinToString(" • ").ifBlank { item.goodsItemId.take(8) },
+                    text = item.barcodeSnapshots.take(3).joinToString(" • ").ifBlank { stateValues.stringNoName },
                     color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize,
                     maxLines = 2,
@@ -203,12 +203,12 @@ internal fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashb
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1724, "Open factory-linked orders"),
                     iconPath = stateValues.drawablePathIconAppModeSupplier,
                     iconRes = stateValues.drawableResIconAppModeSupplier.value,
@@ -222,7 +222,7 @@ internal fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashb
                     }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1725, "Copy factory brief"),
                     iconPath = stateValues.drawablePathIconClipboard,
                     iconRes = stateValues.drawableResIconClipboard.value,
@@ -239,7 +239,7 @@ internal fun AppConfiguration.SupplierManufacturerBridgeCard(item: SupplierDashb
 internal fun AppConfiguration.supplierBackorderTitle(item: SupplierDashboardBackorderDataModel): String =
     item.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.barcodeSnapshots.firstOrNull().orEmpty() }
-        .ifBlank { item.goodsItemId.take(8) }
+        .ifBlank { stateValues.stringNoName }
 
 internal fun AppConfiguration.supplierBackorderActionTitle(action: String): String = when (action) {
     "negotiate" -> localizedStringResource(1801, "Store negotiation")
@@ -559,7 +559,7 @@ internal fun AppConfiguration.supplierBackorderRecoveryAuditTitle(lane: String):
 internal fun AppConfiguration.supplierRecoveryWaveTopTitle(wave: SupplierDashboardRecoveryWaveDataModel): String =
     wave.topGoodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { wave.topGoodsItemNameSnapshot.visibleLocalizedString("main", "") }
-        .ifBlank { wave.topGoodsItemId.take(8) }
+        .ifBlank { stateValues.stringNoName }
         .ifBlank { localizedStringResource(1663, "No promised date") }
 
 internal fun AppConfiguration.supplierRecoveryWaveNote(wave: SupplierDashboardRecoveryWaveDataModel): String = buildString {
@@ -612,7 +612,7 @@ internal fun AppConfiguration.supplierBackorderWaveNote(item: SupplierDashboardB
 internal fun AppConfiguration.supplierRecoveryDeskTopTitle(desk: SupplierDashboardRecoveryDeskDataModel): String =
     desk.topGoodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { desk.topGoodsItemNameSnapshot.visibleLocalizedString("main", "") }
-        .ifBlank { desk.topGoodsItemId.take(8) }
+        .ifBlank { stateValues.stringNoName }
         .ifBlank { localizedStringResource(1663, "No promised date") }
 
 internal fun AppConfiguration.supplierBackorderAgingNote(item: SupplierDashboardBackorderDataModel): String = buildString {
@@ -2294,7 +2294,7 @@ internal fun AppConfiguration.SupplierBackorderWatchCardIntroContent(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = item.barcodeSnapshots.take(3).joinToString(" • ").ifBlank { item.goodsItemId.take(8) },
+                text = item.barcodeSnapshots.take(3).joinToString(" • ").ifBlank { stateValues.stringNoName },
                 color = stateValues.PlaceholderTextColor,
                 fontSize = stateValues.smallTextSize,
                 maxLines = 2,

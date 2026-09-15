@@ -120,7 +120,6 @@ internal fun AppConfiguration.SupplierOrdersWorkspaceHeader(
 
             actionButton(
                 modifier = Modifier.size(40.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = stateValues.drawablePathIconSuppliers,
                 iconRes = stateValues.drawableResIconSuppliers.value,
@@ -131,7 +130,6 @@ internal fun AppConfiguration.SupplierOrdersWorkspaceHeader(
             )
             actionButton(
                 modifier = Modifier.size(40.dp),
-                fillMaxWidthIfTextPresent = false,
                 enabled = !refreshCoolingDown,
                 loading = refreshCoolingDown,
                 autoLoading = false,
@@ -510,7 +508,6 @@ internal fun AppConfiguration.SupplierOrdersFilterPanel(
             )
             actionButton(
                 modifier = Modifier.size(40.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = stateValues.drawablePathIconSettings,
                 iconRes = stateValues.drawableResIconSettings.value,
@@ -557,12 +554,12 @@ internal fun AppConfiguration.SupplierOrdersFilterPanel(
 @Composable
 internal fun AppConfiguration.SupplierOrdersWorkflowLinks() {
     if (stateValues.isNarrowScreen) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1338, "Catalog"),
                 textSize = stateValues.smallTextSize,
                 iconPath = stateValues.drawablePathIconSupplierCatalog,
@@ -572,7 +569,7 @@ internal fun AppConfiguration.SupplierOrdersWorkflowLinks() {
                 onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main) } }
             )
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1556, "Dispatch"),
                 textSize = stateValues.smallTextSize,
                 iconPath = stateValues.drawablePathIconSupplierDispatch,
@@ -583,12 +580,12 @@ internal fun AppConfiguration.SupplierOrdersWorkflowLinks() {
             )
         }
     } else {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1338, "Catalog"),
                 iconPath = stateValues.drawablePathIconSupplierCatalog,
                 iconRes = stateValues.drawableResIconSupplierCatalog.value,
@@ -597,7 +594,7 @@ internal fun AppConfiguration.SupplierOrdersWorkflowLinks() {
                 onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main) } }
             )
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1556, "Dispatch"),
                 iconPath = stateValues.drawablePathIconSupplierDispatch,
                 iconRes = stateValues.drawableResIconSupplierDispatch.value,
@@ -606,7 +603,7 @@ internal fun AppConfiguration.SupplierOrdersWorkflowLinks() {
                 onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Dispatch.Main) } }
             )
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1340, "Insights"),
                 iconPath = stateValues.drawablePathIconSupplierDemandRadar,
                 iconRes = stateValues.drawableResIconSupplierDemandRadar.value,

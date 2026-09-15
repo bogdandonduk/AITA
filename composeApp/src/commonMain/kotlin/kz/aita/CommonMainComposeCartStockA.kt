@@ -1278,15 +1278,15 @@ fun AppConfiguration.TransactionCartScreen() {
                 else -> null
             }
 
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
@@ -1311,8 +1311,8 @@ fun AppConfiguration.TransactionCartScreen() {
                 }
 
                 actionButton(
-                    modifier = Modifier.widthIn(min = 120.dp, max = 180.dp),
-                    fillMaxWidthIfTextPresent = false,
+                    autoLoading = false,
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringPayment,
                     enabled = stateValues.latestNotification == null && invalidPromotionRestrictions.isEmpty() && invalidWholesaleCartItems.isEmpty() && firstUncheckedCondition == null,
                     onDisabledClick = {
@@ -2557,7 +2557,6 @@ internal fun AppConfiguration.StockWarehouseInfoTile(
                 iconRes = stateValues.drawableResIconCheck.value,
                 iconContentDescription = localizedStringResource(1324, "Select all"),
                 enabled = selectedCount < totalSelectableCount,
-                fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = onSelectAll
             )
@@ -2568,7 +2567,6 @@ internal fun AppConfiguration.StockWarehouseInfoTile(
                     iconRes = stateValues.drawableResIconPrintTag.value,
                     iconContentDescription = localizedStringResource(1288, "Print item label"),
                     enabled = selectedCount > 0,
-                    fillMaxWidthIfTextPresent = false,
                     confirmationRequired = false,
                     onClick = printSelected
                 )
@@ -2578,7 +2576,6 @@ internal fun AppConfiguration.StockWarehouseInfoTile(
                 iconPath = stateValues.drawablePathIconCancel,
                 iconRes = stateValues.drawableResIconCancel.value,
                 iconContentDescription = localizedStringResource(1328, "Clear selection"),
-                fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = onClearSelection
             )
@@ -3077,8 +3074,8 @@ fun AppConfiguration.StockScreen() {
                 )
 
                 actionButton(
-                    text = stateValues.stringSelectInMenu,
-                    fillMaxWidthIfTextPresent = false
+                    autoLoading = false,
+                    text = stateValues.stringSelectInMenu
                 ) {
                     coroutineScope.launch {
                         Navigation.Menu.go(NavigationScreenModel.Menu.Stores)
@@ -4183,11 +4180,11 @@ internal fun AppConfiguration.StockPromotionListEditor(
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
         actionButton(
+            autoLoading = false,
             text = localizedStringResource(921, "Add promo"),
             iconPath = stateValues.drawablePathIconPromos,
             iconRes = stateValues.drawableResIconPromos.value,
             confirmationRequired = false,
-            fillMaxWidthIfTextPresent = false,
             onClick = { onPromotionsChanged(promotions + defaultStockPromotion(stateValues.appLanguage)) }
         )
     }
@@ -4324,6 +4321,7 @@ internal fun AppConfiguration.AitaBottomSheet(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        TransactionBarcodeModalGuard()
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -4335,7 +4333,8 @@ internal fun AppConfiguration.AitaBottomSheet(
             Column(
                 modifier = Modifier
                     .aitaBottomSheetEntrance()
-                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth()
                     .heightIn(min = stateValues.screenHeight * 0.38f, max = (stateValues.screenHeight * 0.92f - bottomNavReserve).coerceAtLeast(stateValues.screenHeight * 0.50f))
                     .foregroundTactileShadow(stateValues.cornerRadius, elevated = true)
                     .clip(
@@ -4691,19 +4690,19 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                             fontSize = stateValues.accentTextSize,
                             fontWeight = FontWeight.Bold
                         )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(barcodeOptions, key = { it }) { barcode ->
+                            barcodeOptions.forEach { barcode ->
                                 actionButton(
+                                    autoLoading = false,
                                     text = barcode.take(24),
                                     enabledColor = if (barcode == selectedBarcode) stateValues.AccentColor else stateValues.BackgroundColor,
                                     textColor = if (barcode == selectedBarcode) stateValues.AccentTextColor else stateValues.TextColor,
                                     iconPath = if (barcode == selectedBarcode) stateValues.drawablePathIconCheck else stateValues.drawablePathIconBarcodeType,
                                     iconRes = if (barcode == selectedBarcode) stateValues.drawableResIconCheck.value else stateValues.drawableResIconBarcodeType.value,
                                     iconTintColor = if (barcode == selectedBarcode) stateValues.AccentTextColor else stateValues.TextColor,
-                                    fillMaxWidthIfTextPresent = false,
                                     confirmationRequired = false,
                                     onClick = { selectedBarcode = barcode }
                                 )
@@ -4722,11 +4721,11 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                             fontSize = stateValues.accentTextSize,
                             fontWeight = FontWeight.Bold
                         )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = 2.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(sortedBatches, key = { it.id }) { batch ->
+                            sortedBatches.forEach { batch ->
                                 val isSelected = batch.id == selectedBatchId
                                 val batchInfo = buildList {
                                     add(batch.quantity.quantityText(stateValues.appLanguage))
@@ -4736,13 +4735,13 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                                     batch.shelfPosition?.takeIf { it.isNotBlank() }?.let { add(it) }
                                 }.joinToString(" • ")
                                 actionButton(
+                                    autoLoading = false,
                                     text = batchInfo.take(40).ifBlank { batch.id.take(10) },
                                     enabledColor = if (isSelected) stateValues.AccentColor else stateValues.BackgroundColor,
                                     textColor = if (isSelected) stateValues.AccentTextColor else stateValues.TextColor,
                                     iconPath = if (isSelected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconStock,
                                     iconRes = if (isSelected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconStock.value,
                                     iconTintColor = if (isSelected) stateValues.AccentTextColor else stateValues.TextColor,
-                                    fillMaxWidthIfTextPresent = false,
                                     confirmationRequired = false,
                                     onClick = { selectedBatchId = batch.id }
                                 )
@@ -4766,9 +4765,8 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         fontWeight = FontWeight.Bold
                     )
                     actionButton(
-                        text = "−",
+                        text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("−", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу"),
                         enabled = copies > 1,
-                        fillMaxWidthIfTextPresent = false,
                         confirmationRequired = false,
                         onClick = { copies = (copies - 1).coerceAtLeast(1) }
                     )
@@ -4781,9 +4779,8 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         modifier = Modifier.widthIn(min = 36.dp)
                     )
                     actionButton(
-                        text = "+",
+                        text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("+", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү"),
                         enabled = copies < 99,
-                        fillMaxWidthIfTextPresent = false,
                         confirmationRequired = false,
                         onClick = { copies = (copies + 1).coerceAtMost(99) }
                     )
@@ -5073,7 +5070,7 @@ internal fun AppConfiguration.TransactionSupplySupplierBanner(
     val supplierText = supplier?.visibleSupplierName(stateValues.appLanguage)
         ?: localizedStringResource(638, "No supplier selected")
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
             .padding(horizontal = 8.dp, vertical = 2.dp)
@@ -5091,8 +5088,8 @@ internal fun AppConfiguration.TransactionSupplySupplierBanner(
                 onClick = onSelectSupplier
             )
             .padding(horizontal = 6.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         CpImage(
             modifier = Modifier.size(22.dp),
@@ -5102,7 +5099,7 @@ internal fun AppConfiguration.TransactionSupplySupplierBanner(
             tintColor = if (selectedSupplierId != null) stateValues.AccentColor else stateValues.TextColor
         )
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = localizedStringResource(639, "Supplier for supply"),
                 color = stateValues.PlaceholderTextColor,
@@ -5120,10 +5117,10 @@ internal fun AppConfiguration.TransactionSupplySupplierBanner(
         }
 
         actionButton(
+            autoLoading = false,
             text = stateValues.stringSelect,
             iconPath = stateValues.drawablePathIconCheck,
             confirmationRequired = false,
-            fillMaxWidthIfTextPresent = false,
             onClick = onSelectSupplier
         )
     }
@@ -5173,8 +5170,6 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
             title = localizedStringResource(252, "Info"),
             iconPath = stateValues.drawablePathIconEdit
         ),
-        StockAddEditTabContent(id = "marketplace", title = marketProductText("market.profile_tab"),
-            iconPath = marketIconPath(148), iconRes = marketIconFallback(148)),
         StockAddEditTabContent(
             id = "conditions",
             title = localizedStringResource(609, "Conditions"),
@@ -5186,6 +5181,8 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
             title = localizedStringResource(253, "Generic prices"),
             iconPath = stateValues.drawablePathIconFinances
         ),
+        StockAddEditTabContent(id = "marketplace", title = marketProductText("market.profile_tab"),
+            iconPath = marketIconPath(148), iconRes = marketIconFallback(148)),
         StockAddEditTabContent(
             id = "promos", title = localizedStringResource(920, "Promos"),
             iconPath = stateValues.drawablePathIconPromos,
@@ -5217,7 +5214,9 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
                 .weight(1f)
 
             when (selectedTabId) {
-                "marketplace" -> StockMarketplaceEditor(draft, emptyList(), centeredFormModifier, onDraftChanged = { draft = it })
+                "marketplace" -> LazyColumn(modifier = centeredFormModifier.padding(16.dp)) {
+                    item { StockMarketplaceEditor(draft, emptyList(), Modifier.fillMaxWidth(), onDraftChanged = { draft = it }) }
+                }
                 "promos" -> LazyColumn(modifier = centeredFormModifier.padding(stateValues.marginTextField)) {
                     item {
                         StockPromotionListEditor(
@@ -5614,12 +5613,12 @@ internal fun AppConfiguration.StockConditionListEditor(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1018, "Manual"),
                     iconPath = manualConditionIconPath,
                     iconRes = manualConditionIconRes,
@@ -5630,7 +5629,7 @@ internal fun AppConfiguration.StockConditionListEditor(
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1012, "Buyer age"),
                     iconPath = buyerAgeConditionIconPath,
                     iconRes = buyerAgeConditionIconRes,
@@ -5641,12 +5640,12 @@ internal fun AppConfiguration.StockConditionListEditor(
                 )
             }
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1013, "Time"),
                     iconPath = timeConditionIconPath,
                     iconRes = timeConditionIconRes,
@@ -5657,7 +5656,7 @@ internal fun AppConfiguration.StockConditionListEditor(
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1499, "Margin"),
                     iconPath = marginConditionIconPath,
                     iconRes = marginConditionIconRes,
@@ -6078,7 +6077,6 @@ internal fun AppConfiguration.StockDatePartsEditor(
                 iconPath = stateValues.drawablePathIconCancel,
                 iconContentDescription = stateValues.stringClear,
                 enabledColor = stateValues.DisabledColor,
-                fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = { onDateChanged("") }
             )

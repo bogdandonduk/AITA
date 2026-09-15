@@ -105,7 +105,6 @@ internal fun AppConfiguration.SupplierDispatchFilterPanel(
             )
             actionButton(
                 modifier = Modifier.size(40.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = stateValues.drawablePathIconSettings,
                 iconRes = stateValues.drawableResIconSettings.value,
@@ -149,7 +148,6 @@ internal fun AppConfiguration.SupplierDispatchFilterPanel(
             if (hasNonDefaultFilter) {
                 actionButton(
                     modifier = Modifier.size(40.dp),
-                    fillMaxWidthIfTextPresent = false,
                     text = "",
                     iconPath = stateValues.drawablePathIconCancel,
                     iconRes = stateValues.drawableResIconCancel.value,
@@ -248,35 +246,35 @@ internal fun AppConfiguration.SupplierDispatchWorkflowLinks() {
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 WorkflowButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(254, "Orders"),
                     iconPath = stateValues.drawablePathIconAppModeSupplier,
                     iconRes = stateValues.drawableResIconAppModeSupplier.value
                 ) { Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main) }
                 WorkflowButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1453, "Partner stores"),
                     iconPath = stateValues.drawablePathIconSupplierPartners,
                     iconRes = stateValues.drawableResIconSupplierPartners.value
                 ) { Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main) }
             }
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 WorkflowButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(2398, "All agreements"),
                     iconPath = stateValues.drawablePathIconSupplierContracts,
                     iconRes = stateValues.drawableResIconSupplierContracts.value
                 ) { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) }
                 WorkflowButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1338, "Catalog"),
                     iconPath = stateValues.drawablePathIconSupplierCatalog,
                     iconRes = stateValues.drawableResIconSupplierCatalog.value
@@ -949,12 +947,12 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                     ) {
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(1568, "Open run orders"),
                             iconPath = stateValues.drawablePathIconAppModeSupplier,
                             iconRes = stateValues.drawableResIconAppModeSupplier.value,
@@ -964,7 +962,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                             onClick = ::openOrders
                         )
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(2463, "Open partner store"),
                             iconPath = stateValues.drawablePathIconSupplierPartners,
                             iconRes = stateValues.drawableResIconSupplierPartners.value,
@@ -974,12 +972,12 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                             onClick = ::openPartner
                         )
                     }
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                     ) {
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(2464, "Open agreements"),
                             iconPath = stateValues.drawablePathIconSupplierContracts,
                             iconRes = stateValues.drawableResIconSupplierContracts.value,
@@ -989,7 +987,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                             onClick = ::openContracts
                         )
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(2465, "Open catalogue"),
                             iconPath = stateValues.drawablePathIconSupplierCatalog,
                             iconRes = stateValues.drawableResIconSupplierCatalog.value,
@@ -1016,12 +1014,12 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                             )
                         }
                     )
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                     ) {
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(1570, "Mark packed"),
                             enabled = run.contractSafetyReady && run.packableOrderIds.isNotEmpty() && !anyMutation,
                             loading = mutatingPacked,
@@ -1041,7 +1039,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                             onClick = onMarkPacked
                         )
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(1571, "Start delivery"),
                             enabled = run.contractSafetyReady && run.dispatchableOrderIds.isNotEmpty() && !anyMutation,
                             loading = mutatingDelivery,

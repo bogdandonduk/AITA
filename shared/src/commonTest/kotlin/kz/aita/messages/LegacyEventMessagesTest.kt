@@ -32,6 +32,21 @@ class LegacyEventMessagesTest {
         val reference = assertNotNull(legacyEventMessageReference("Batch updated: Sale {value} Shop"))
         assertEquals("Партия обновлена: Sale {value} Shop", EventMessages.render(reference, "ru"))
     }
+    @Test fun multilineFactsKeepEveryLineBreakAcrossLegacyRecognition() {
+        listOf("\n", "\r", "\r\n", "\u0085", "\u2028", "\u2029").forEach { separator ->
+            val fact = "Tea${separator}Shelf {value} [.*] 🌿"
+            val reference = assertNotNull(legacyEventMessageReference("Batch updated: $fact"))
+            assertEquals("Партия обновлена: $fact", EventMessages.render(reference, "ru"))
+        }
+    }
+    @Test fun legacyCaptureDoesNotEvaluateBracesOrRegexInUserFacts() {
+        val fact = "{children} \\E.* [en] \\Q 🌿"
+        val reference = assertNotNull(legacyEventMessageReference("Batch updated: $fact"))
+        assertEquals("Партия обновлена: $fact", EventMessages.render(reference, "ru"))
+    }
+    @Test fun legacyRecognitionStillRequiresTheWholeTemplate() {
+        assertNull(legacyEventMessageReference("Unrelated note\nBatch updated: Tea"))
+    }
     @Test fun explicitIdentityWinsOverObsoleteFallbackWording() {
         val ref = EventMessageReference("message.stock_item_added")
         assertEquals(ref, listOf(LocalizedStringDataModel("en", "obsolete", ref)).eventMessageReferenceOrNull())

@@ -398,14 +398,6 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             )
             add(
                 StockAddEditTabContent(
-                    id = "marketplace",
-                    title = marketProductText("market.profile_tab"),
-                    iconPath = marketIconPath(148),
-                    iconRes = marketIconFallback(148)
-                )
-            )
-            add(
-                StockAddEditTabContent(
                     id = "conditions",
                     title = localizedStringResource(609, "Conditions"),
                     iconPath = stateValues.drawablePathIconCheck,
@@ -420,6 +412,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 )
             )
         }
+        if (canEditCoreStockItem) add(StockAddEditTabContent(
+            id = "marketplace", title = marketProductText("market.profile_tab"),
+            iconPath = marketIconPath(148), iconRes = marketIconFallback(148)))
         if (canManageStockPromotions) {
             add(
                 StockAddEditTabContent(
@@ -561,7 +556,9 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         )
 
         when (visibleSelectedTabId) {
-            "marketplace" -> StockMarketplaceEditor(draft, existing?.imagePaths.orEmpty(), Modifier.weight(1f), onDraftChanged = { draft = it })
+            "marketplace" -> LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(16.dp)) {
+                item { StockMarketplaceEditor(draft, existing?.imagePaths.orEmpty(), Modifier.fillMaxWidth(), onDraftChanged = { draft = it }) }
+            }
             "conditions" -> {
                 StockAddEditConditionsTab(
                     modifier = Modifier.weight(1f),
@@ -679,7 +676,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 
             actionButton(
                 modifier = Modifier
-                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f)
+                    .fillMaxWidth()
                     .padding(8.dp),
                 text = stateValues.stringConfirm,
                 loading = isSavingStockItem,
@@ -1746,9 +1743,9 @@ fun AppConfiguration.BarcodeListEditor(
         }
 
         actionButton(
+            autoLoading = false,
             text = stateValues.stringAddBarcode,
-            iconPath = stateValues.drawablePathIconAdd,
-            fillMaxWidthIfTextPresent = false
+            iconPath = stateValues.drawablePathIconAdd
         ) {
             val nextIndex = currentBarcodes.size
             val nextBarcodes = currentBarcodes + ""
@@ -1940,7 +1937,10 @@ fun AppConfiguration.SimpleDialogWidget(
             fontSize = stateValues.titleTextSize
         )
 
-        Row {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             actionButton(text = positiveAction.first, onClick = positiveAction.second)
             actionButton(text = negativeAction.first, onClick = negativeAction.second)
         }
@@ -2249,7 +2249,6 @@ fun AppConfiguration.ScreenAppBarWidget(
                         text = "",
                         iconPath = it.first,
                         iconRes = it.second,
-                        fillMaxWidthIfTextPresent = false,
                         autoLoading = false,
                         onClick = it.third
                     )
@@ -2292,8 +2291,8 @@ fun AppConfiguration.BarcodeCameraScannerFallbackPane(
         )
         Spacer(modifier = Modifier.height(stateValues.marginTextField / 2))
         actionButton(
+            autoLoading = false,
             text = localizedStringResource(989, "Close scanner"),
-            fillMaxWidthIfTextPresent = false,
             onClick = onClose
         )
     }

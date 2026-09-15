@@ -363,7 +363,7 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                                 item(key = "loading") {
                                     MessageText(
                                         modifier = Modifier.fillMaxWidth(),
-                                        text = localizedStringResource(1141, "Please wait…")
+                                        loadingLayout = LoadingLayout.SupplierCustomer, text = localizedStringResource(1141, "Please wait…")
                                     )
                                 }
                             }

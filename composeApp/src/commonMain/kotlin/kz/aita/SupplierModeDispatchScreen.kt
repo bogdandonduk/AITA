@@ -379,7 +379,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                             item(key = "dispatch-loading") {
                                 MessageText(
                                     modifier = Modifier.fillMaxWidth(),
-                                    text = localizedStringResource(1141, "Please wait…")
+                                    loadingLayout = LoadingLayout.SupplierDispatch, text = localizedStringResource(1141, "Please wait…")
                                 )
                             }
                         }

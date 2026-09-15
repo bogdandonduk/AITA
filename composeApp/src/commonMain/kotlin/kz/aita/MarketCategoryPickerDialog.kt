@@ -45,6 +45,7 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
     }
     val validChoice = chosen == null || chosen in tree.byId
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.padding(16.dp).fillMaxWidth().aitaWidthCap(720.dp).heightIn(max = stateValues.screenHeight * 0.88f)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -60,14 +61,17 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Find a category", "Найти категорию", "Санатты табу", "Категория табуу"),
                             identityKey = "market-category-search", sensitive = true, autoFocus = false, parentOwnsValue = true)
-                        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             actionButton(text = authUiText("All categories", "Все категории", "Барлық санаттар", "Бардык категориялар"), autoLoading = false, confirmationRequired = false,
-                                fillMaxWidthIfTextPresent = false, enabledColor = if (chosen == null) stateValues.AccentColor else stateValues.BackgroundColor,
+enabledColor = if (chosen == null) stateValues.AccentColor else stateValues.BackgroundColor,
                                 textColor = if (chosen == null) stateValues.AccentTextColor else stateValues.TextColor, onClick = { chosen = null; search = "" })
                             if (path.size > 4) Text("…", Modifier.padding(8.dp), color = stateValues.PlaceholderTextColor)
                             path.takeLast(4).forEach { category ->
                                 actionButton(text = name(category).substringAfterLast(" / "), autoLoading = false, confirmationRequired = false,
-                                    fillMaxWidthIfTextPresent = false, enabledColor = if (category.id == chosen) stateValues.AccentColor else stateValues.BackgroundColor,
+enabledColor = if (category.id == chosen) stateValues.AccentColor else stateValues.BackgroundColor,
                                     textColor = if (category.id == chosen) stateValues.AccentTextColor else stateValues.TextColor,
                                     onClick = { chosen = category.id; search = "" })
                             }
@@ -98,11 +102,13 @@ internal fun AppConfiguration.MarketCategoryPickerDialog(
                     }
                 }
             }
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 actionButton(text = authUiText("Apply category", "Применить категорию", "Санатты қолдану", "Категорияны колдонуу"), enabled = validChoice,
-                    fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false, onClick = { onSelected(chosen) })
-                actionButton(text = authUiText("Cancel", "Отмена", "Бас тарту", "Жокко чыгаруу"), fillMaxWidthIfTextPresent = false,
-                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false, onClick = onDismiss)
+autoLoading = false, confirmationRequired = false, onClick = { onSelected(chosen) })
+                actionButton(text = authUiText("Cancel", "Отмена", "Бас тарту", "Жокко чыгаруу"),                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false, onClick = onDismiss)
             }
         }
     }

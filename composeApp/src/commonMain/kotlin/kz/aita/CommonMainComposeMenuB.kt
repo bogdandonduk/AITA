@@ -180,11 +180,12 @@ internal fun AppConfiguration.SecuritySessionHistoryCard(event: SecuritySessionH
     val device = event.deviceName
         .ifBlank { event.platformName }
         .ifBlank { localizedStringResource(230, "Unknown device") }
-    val details = event.details.visibleLocalizedString(stateValues.appLanguage, "")
-    val metadataText = event.metadata
-        .filterValues { it.isNotBlank() }
-        .entries
-        .joinToString(" • ") { "${it.key}: ${it.value}" }
+    val displayMetadata = securitySessionDisplayMetadata(event.metadata)
+    val deviceDetails = listOf(
+        event.platformName,
+        event.osName,
+        event.appVersion.takeIf { it.isNotBlank() }?.let { "AITA $it" }.orEmpty()
+    ).filter { it.isNotBlank() }.distinct().joinToString(" • ")
 
     Column(
         modifier = Modifier
@@ -230,11 +231,9 @@ internal fun AppConfiguration.SecuritySessionHistoryCard(event: SecuritySessionH
         Spacer(modifier = Modifier.height(10.dp))
         SecuritySessionInfoLine(localizedStringResource(1124, "Event time"), securitySessionDateTimeText(event.createdAtMillis))
         SecuritySessionInfoLine(localizedStringResource(1126, "Device"), device)
-        SecuritySessionInfoLine(localizedStringResource(235, "Language"), event.metadata["localeLanguage"].orEmpty())
+        SecuritySessionInfoLine(localizedStringResource(235, "Language"), displayMetadata["localeLanguage"].orEmpty())
         SecuritySessionInfoLine("IP", event.ipAddress)
-        SecuritySessionInfoLine(localizedStringResource(1128, "Session ID"), event.sessionId?.take(8).orEmpty())
-        SecuritySessionInfoLine(localizedStringResource(1127, "Details"), details)
-        SecuritySessionInfoLine(localizedStringResource(1137, "Related data"), metadataText)
+        SecuritySessionInfoLine(localizedStringResource(1127, "Details"), deviceDetails)
     }
 }
 
@@ -355,12 +354,12 @@ fun AppConfiguration.MenuSecurityScreen() {
                 }
 
                 item {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(237, "Refresh"),
                             iconPath = stateValues.drawablePathIconSearch,
                             onClick = {
@@ -369,7 +368,7 @@ fun AppConfiguration.MenuSecurityScreen() {
                         )
                         if (selectedSecurityTab == "sessions") {
                             actionButton(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                                 text = localizedStringResource(238, "Revoke others"),
                                 iconPath = stateValues.drawablePathIconDelete,
                                 enabled = sessions.any { !it.current },
@@ -636,13 +635,13 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 )
                             }
                         } else {
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                                horizontalAlignment = Alignment.Start
                             ) {
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = refreshButtonText,
                                     iconPath = stateValues.drawablePathIconRefresh,
                                     iconRes = stateValues.drawableResIconRefresh.value,
@@ -653,7 +652,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                                     onClick = { refreshReceiptPrinters(showNotification = true) }
                                 )
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = testReceiptButtonText,
                                     loading = printingReceipt,
                                     iconPath = stateValues.drawablePathIconReceipt,
@@ -665,7 +664,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                                     onClick = ::sendTestReceipt
                                 )
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(1265, "Clear receipt printer"),
                                     iconPath = stateValues.drawablePathIconCancel,
                                     iconRes = stateValues.drawableResIconCancel.value,
@@ -796,13 +795,13 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 )
                             }
                         } else {
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                                horizontalAlignment = Alignment.Start
                             ) {
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = refreshButtonText,
                                     iconPath = stateValues.drawablePathIconRefresh,
                                     iconRes = stateValues.drawableResIconRefresh.value,
@@ -811,7 +810,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                                     onClick = { refreshLabelPrinters(showNotification = true) }
                                 )
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(1282, "Send test label"),
                                     iconPath = stateValues.drawablePathIconLabelPrinter,
                                     iconRes = stateValues.drawableResIconLabelPrinter.value,
@@ -839,7 +838,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                                     }
                                 )
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(1286, "Clear label printer"),
                                     iconPath = stateValues.drawablePathIconCancel,
                                     iconRes = stateValues.drawableResIconCancel.value,
@@ -987,7 +986,7 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
     enabled: Boolean = true,
     onSelect: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(stateValues.cornerRadius))
@@ -998,8 +997,8 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
                 RoundedCornerShape(stateValues.cornerRadius)
             )
             .padding(stateValues.marginTextField),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
         CpImage(
             modifier = Modifier.size(24.dp),
@@ -1009,7 +1008,7 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
             tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor
         )
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = printer.name.ifBlank { printer.id },
                 color = stateValues.TextColor,
@@ -1030,12 +1029,12 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
         }
 
         actionButton(
+            autoLoading = false,
             text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1257, "Use this printer"),
             iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconDevices,
             iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconDevices.value,
             enabled = enabled && !selected,
             confirmationRequired = false,
-            fillMaxWidthIfTextPresent = false,
             onClick = onSelect
         )
     }
@@ -1048,7 +1047,7 @@ internal fun AppConfiguration.StickyLabelPrinterCard(
     selected: Boolean,
     onSelect: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(stateValues.cornerRadius))
@@ -1059,8 +1058,8 @@ internal fun AppConfiguration.StickyLabelPrinterCard(
                 RoundedCornerShape(stateValues.cornerRadius)
             )
             .padding(stateValues.marginTextField),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
         CpImage(
             modifier = Modifier.size(24.dp),
@@ -1070,7 +1069,7 @@ internal fun AppConfiguration.StickyLabelPrinterCard(
             tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor
         )
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = printer.name.ifBlank { printer.id },
                 color = stateValues.TextColor,
@@ -1091,12 +1090,12 @@ internal fun AppConfiguration.StickyLabelPrinterCard(
         }
 
         actionButton(
+            autoLoading = false,
             text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1303, "Use this label printer"),
             iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconLabelPrinter,
             iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconLabelPrinter.value,
             enabled = !selected,
             confirmationRequired = false,
-            fillMaxWidthIfTextPresent = false,
             onClick = onSelect
         )
     }
@@ -1376,6 +1375,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
 
         pendingDeleteId?.let { debtorId ->
             Dialog(onDismissRequest = { pendingDeleteId = null }) {
+                TransactionBarcodeModalGuard()
                 Column(
                     modifier = Modifier
                         .aitaDialogEntrance()
@@ -1387,9 +1387,12 @@ fun AppConfiguration.MenuDebtorsScreen() {
                 ) {
                     Text(localizedStringResource(381, "Delete debtor?"), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        actionButton(modifier = Modifier.weight(1f), text = stateValues.stringCancel, enabledColor = stateValues.DisabledColor) { pendingDeleteId = null }
-                        actionButton(modifier = Modifier.weight(1f), text = stateValues.stringDelete, enabledColor = stateValues.ErrorColor) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringCancel, enabledColor = stateValues.DisabledColor) { pendingDeleteId = null }
+                        actionButton(modifier = Modifier.fillMaxWidth(), text = stateValues.stringDelete, enabledColor = stateValues.ErrorColor) {
                             storeId?.let { deleteDebtor(it, debtorId) }
                             pendingDeleteId = null
                         }
@@ -1697,9 +1700,12 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
                     TransactionNumpad { token -> paymentAmountText = paymentInputAppend(paymentAmountText, token) }
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(350, "Pay partial"),
                             iconPath = stateValues.drawablePathIconFinances,
                             enabled = amountToPay > 0.0,
@@ -1712,7 +1718,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                             }
                         )
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(351, "Pay full"),
                             iconPath = stateValues.drawablePathIconCheck,
                             enabled = debtor.debtAmount > 0.0,
@@ -2579,13 +2585,13 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                horizontalAlignment = Alignment.Start
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1243, "Save report PDF"),
                     iconPath = stateValues.drawablePathIconReceipt,
                     iconRes = stateValues.drawableResIconReceipt.value,
@@ -2596,7 +2602,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     onClick = { export("pdf") }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1244, "Share report PDF"),
                     iconPath = stateValues.drawablePathIconShare,
                     iconRes = stateValues.drawableResIconShare.value,
@@ -2607,7 +2613,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     onClick = { export("share") }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1245, "Print report"),
                     iconPath = stateValues.drawablePathIconDevices,
                     iconRes = stateValues.drawableResIconDevices.value,
@@ -3660,13 +3666,13 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
                             text = localizedStringResource(438, "You do not have permission to extract cash from this register")
                         )
                     } else {
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                            verticalAlignment = Alignment.Top
+                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                            horizontalAlignment = Alignment.Start
                         ) {
                             SimpleTextInput(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                                 value = extractionAmountText,
                                 placeholder = localizedStringResource(439, "Amount to extract"),
                                 keyboardType = KeyboardType.Decimal,
@@ -3678,7 +3684,7 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
                             )
 
                             actionButton(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                                 enabled = !extractingCash && extractionAmount > 0.0 && extractionAmount <= currentAmount + 0.01,
                                 loading = extractingCash,
                                 autoLoading = false,
@@ -6007,7 +6013,7 @@ fun AppConfiguration.NotificationsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (projection == null) {
-                item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Notification, rows = 4) }
+                item { LoadingSkeleton(layout = LoadingLayout.Notification, modifier = Modifier.fillMaxWidth(), rows = 4) }
             } else if (filtered.isEmpty()) {
                 item {
                     MessageText(

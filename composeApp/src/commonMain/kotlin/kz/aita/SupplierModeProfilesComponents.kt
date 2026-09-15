@@ -191,13 +191,13 @@ internal fun AppConfiguration.SupplierProfileWorkspaceCard(
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 if (showFocusAction) {
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = if (item.selected) localizedStringResource(2501, "Working profile") else localizedStringResource(2500, "Work as this profile"),
                         iconPath = stateValues.drawablePathIconAppModeSupplier,
                         iconRes = stateValues.drawableResIconAppModeSupplier.value,
@@ -207,7 +207,7 @@ internal fun AppConfiguration.SupplierProfileWorkspaceCard(
                     )
                 }
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(2502, "Edit profile"),
                     iconPath = stateValues.drawablePathIconEdit,
                     iconRes = stateValues.drawableResIconEdit.value,
@@ -216,7 +216,7 @@ internal fun AppConfiguration.SupplierProfileWorkspaceCard(
                     onClick = onEdit
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = if (isDeleting) localizedStringResource(2518, "Deleting profile…") else localizedStringResource(2503, "Delete profile"),
                     iconPath = stateValues.drawablePathIconDelete,
                     iconRes = stateValues.drawableResIconDelete.value,
@@ -451,9 +451,12 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
                 )
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringCancel,
                     iconPath = stateValues.drawablePathIconCancel,
                     iconRes = stateValues.drawableResIconCancel.value,
@@ -462,7 +465,7 @@ internal fun AppConfiguration.SupplierProfileEditorContent(
                     onClick = cancelEditor
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = if (isSaving) localizedStringResource(2508, "Saving profile…") else localizedStringResource(631, "Save supplier"),
                     iconPath = stateValues.drawablePathIconCheck,
                     iconRes = stateValues.drawableResIconCheck.value,

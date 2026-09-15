@@ -471,12 +471,12 @@ internal fun AppConfiguration.SupplierOrderLineResponseEditor(
             }
 
             if (priceBookPrice != null) {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                 ) {
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(1695, "Use price book"),
                         iconPath = stateValues.drawablePathIconSupplierCatalog,
                         iconRes = stateValues.drawableResIconSupplierCatalog.value,
@@ -486,7 +486,7 @@ internal fun AppConfiguration.SupplierOrderLineResponseEditor(
                         }
                     )
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(1613, "Use request"),
                         iconPath = stateValues.drawablePathIconCheck,
                         confirmationRequired = false,
@@ -503,9 +503,9 @@ internal fun AppConfiguration.SupplierOrderLineResponseEditor(
                 }
             } else {
                 actionButton(
+                    autoLoading = false,
                     text = localizedStringResource(1613, "Use request"),
                     iconPath = stateValues.drawablePathIconCheck,
-                    fillMaxWidthIfTextPresent = false,
                     confirmationRequired = false,
                     onClick = {
                         onDraftChanged(
@@ -520,11 +520,11 @@ internal fun AppConfiguration.SupplierOrderLineResponseEditor(
             }
 
             actionButton(
+                autoLoading = false,
                 text = localizedStringResource(1758, "Decline line"),
                 iconPath = stateValues.drawablePathIconCancel,
                 iconRes = stateValues.drawableResIconCancel.value,
                 enabledColor = stateValues.ErrorColor,
-                fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = {
                     onDraftChanged(
@@ -1008,19 +1008,19 @@ internal fun AppConfiguration.SupplierOrderDeskCard(
                 onValueChange = { commentText = it }
             )
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1361, "Save response"),
                     iconPath = stateValues.drawablePathIconCheck,
                     confirmationRequired = false,
                     onClick = { saveSupplierResponse(selectedStatus) }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1362, "Confirm"),
                     enabled = draftReadyToConfirm,
                     iconPath = stateValues.drawablePathIconTransactionSupply,
@@ -1030,12 +1030,12 @@ internal fun AppConfiguration.SupplierOrderDeskCard(
                 )
             }
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1363, "Packed"),
                     enabled = order.status == SupplierOrderStatusDataModel.Confirmed && draftReadyToConfirm,
                     iconPath = stateValues.drawablePathIconStock,
@@ -1044,7 +1044,7 @@ internal fun AppConfiguration.SupplierOrderDeskCard(
                     onClick = { saveSupplierResponse(SupplierOrderStatusDataModel.Packed) }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1364, "In delivery"),
                     enabled = order.status == SupplierOrderStatusDataModel.Packed,
                     iconPath = stateValues.drawablePathIconStores,
@@ -1054,12 +1054,12 @@ internal fun AppConfiguration.SupplierOrderDeskCard(
                 )
             }
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1614, "Mark issue"),
                     iconPath = stateValues.drawablePathIconResponse,
                     enabledColor = stateValues.BorderlineBadColor,
@@ -1067,7 +1067,7 @@ internal fun AppConfiguration.SupplierOrderDeskCard(
                     onClick = { saveSupplierResponse(SupplierOrderStatusDataModel.IssueReported) }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(975, "Cancelled"),
                     iconPath = stateValues.drawablePathIconCancel,
                     enabledColor = stateValues.ErrorColor,
@@ -1104,7 +1104,7 @@ internal fun AppConfiguration.buildSupplierProfileIdentityRows(
     val dashboardRowsById = dashboard?.supplierProfiles.orEmpty().mapNotNull { profile ->
         val normalizedId = normalizeSupplierProfileIdentityId(profile.supplierId) ?: return@mapNotNull null
         val title = profile.name.visibleLocalizedString(stateValues.appLanguage, "")
-            .ifBlank { profile.supplierId.take(8) }
+            .ifBlank { stateValues.stringNoName }
         val contact = (profile.phoneNumbers.asDisplayPhoneNumbers() + profile.emails)
             .filter { it.isNotBlank() }
             .distinct()
@@ -1364,12 +1364,12 @@ internal fun AppConfiguration.SupplierProfileIdentityCard(
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = if (hasProfiles) localizedStringResource(2495, "Manage profiles") else localizedStringResource(1624, "Create supplier profile"),
                     iconPath = stateValues.drawablePathIconSuppliers,
                     iconRes = stateValues.drawableResIconSuppliers.value,
@@ -1387,7 +1387,7 @@ internal fun AppConfiguration.SupplierProfileIdentityCard(
                     }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1636, "Refresh supplier desk"),
                     iconPath = stateValues.drawablePathIconResponse,
                     iconRes = stateValues.drawableResIconResponse.value,
@@ -1529,7 +1529,7 @@ internal fun AppConfiguration.buildSupplierDemandRadarItems(
             SupplierDemandRadarUiModel(
                 goodsItemId = goodsItemId,
                 title = title,
-                subtitle = stores.take(3).joinToString(" • ").ifBlank { goodsItemId.take(8) },
+                subtitle = stores.take(3).joinToString(" • ").ifBlank { stateValues.stringNoName },
                 totalQuantityText = totalQuantityText,
                 storesCount = stores.size,
                 openOrderCount = openOrders,
@@ -1718,7 +1718,7 @@ internal fun AppConfiguration.buildSupplierTermsGuardItems(
                 .distinct()
                 .take(4)
             val fallbackGoodsTitles = contract.priceTerms
-                .map { term -> term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, term.goodsItemId.take(8)) }
+                .map { term -> term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, stateValues.stringNoName) }
                 .filter { it.isNotBlank() }
                 .distinct()
                 .take(4)
@@ -1742,7 +1742,7 @@ internal fun AppConfiguration.buildSupplierTermsGuardItems(
                 .take(3)
                 .joinToString(" • ") { term ->
                     listOfNotNull(
-                        term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, term.goodsItemId.take(8)),
+                        term.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, stateValues.stringNoName),
                         term.supplyPrice.supplierDeskMoneyText(),
                         term.minOrderQuantity?.quantityText(stateValues.appLanguage)
                     ).filter { it.isNotBlank() }.joinToString(" ")
@@ -1930,12 +1930,12 @@ internal fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiM
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1594, "Open contract board"),
                     iconPath = stateValues.drawablePathIconSupplierContracts,
                     iconRes = stateValues.drawableResIconSupplierContracts.value,
@@ -1944,7 +1944,7 @@ internal fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiM
                     onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) } }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1595, "Open affected orders"),
                     iconPath = stateValues.drawablePathIconAppModeSupplier,
                     iconRes = stateValues.drawableResIconAppModeSupplier.value,
@@ -1958,7 +1958,7 @@ internal fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiM
                     }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1596, "Copy terms brief"),
                     iconPath = stateValues.drawablePathIconClipboard,
                     iconRes = stateValues.drawableResIconClipboard.value,
@@ -1975,7 +1975,7 @@ internal fun AppConfiguration.SupplierTermsGuardCard(item: SupplierTermsGuardUiM
 internal fun AppConfiguration.supplierManufacturerBridgeTitle(item: SupplierDashboardManufacturerBridgeDataModel): String =
     item.goodsItemNameSnapshot.visibleLocalizedString(stateValues.appLanguage, "")
         .ifBlank { item.barcodeSnapshots.firstOrNull().orEmpty() }
-        .ifBlank { item.goodsItemId.take(8) }
+        .ifBlank { stateValues.stringNoName }
 
 internal fun AppConfiguration.supplierManufacturerBridgeQuantityText(
     total: Double,

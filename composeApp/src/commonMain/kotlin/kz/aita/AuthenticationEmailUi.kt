@@ -14,10 +14,19 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kz.aita.auth.*
+import kz.aita.auth.AitaAdvancedAuthenticationClient
 import kz.aita.auth.AitaAuthFlowDataModel
 import kz.aita.auth.AitaAuthenticationSettingsDataModel
+import kz.aita.auth.AitaEmailDestination
+import kz.aita.auth.AitaEmailDestinationOption
+import kz.aita.auth.AitaLoginPolicyRequest
+import kz.aita.auth.AitaLoginSecondFactor
+import kz.aita.auth.AitaSecurityEmailAction
+import kz.aita.auth.AitaSecurityEmailProof
+import kz.aita.auth.AitaSecurityEmailRequest
 import kz.aita.auth.aitaAuthCodeDigits
+import kz.aita.auth.aitaSecondFactorIsWellFormed
+import kz.aita.auth.canonicalAitaSecurityTarget
 import org.jetbrains.compose.resources.DrawableResource
 
 @Composable
@@ -154,8 +163,12 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
         val proof = if (needsEmail) SecurityEmailProofInput(AitaSecurityEmailRequest(AitaSecurityEmailAction.LOGIN_POLICY,
             chosen.name, password, settings.securityRevision, stateValues.appLanguage), !busy) else null
         if (error.isNotBlank()) Text(error, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            actionButton(modifier = Modifier.weight(1f), text = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау", "Өзгөртүүнү ырастоо"),
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            actionButton(modifier = Modifier.fillMaxWidth(), text = authUiText("Confirm change", "Подтвердить изменение", "Өзгерісті растау", "Өзгөртүүнү ырастоо"),
                 enabled = !busy && password.isNotBlank() && (!settings.authenticatorEnabled || aitaSecondFactorIsWellFormed(factor)) && (!needsEmail || proof != null),
                 loading = busy, autoLoading = false) {
                 val request = AitaLoginPolicyRequest(chosen, password, factor, settings.securityRevision, proof)

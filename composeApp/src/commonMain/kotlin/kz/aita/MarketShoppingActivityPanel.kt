@@ -175,9 +175,12 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                         identityKey = "activity-reference:$account:$generation", autoFocus = false, parentOwnsValue = true)
                     if (navigation.referenceError) Text(eventMessage("market.activity_reference_invalid")
                         .visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         actionButton(text = authUiText("Find reference", "Найти по номеру", "Нөмір бойынша табу", "Шилтемени табуу"),
-                            fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
+autoLoading = false, confirmationRequired = false,
                             enabled = navigation.reference.isNotBlank(), onClick = {
                                 val reference = normalizedMarketChangeReference(navigation.reference)
                                 if (controlsCurrent()) navigation.referenceError = reference == null
@@ -190,7 +193,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                             })
                         if (wanted.filter != MarketShoppingActivityFilter() || navigation.reference.isNotEmpty())
                             actionButton(text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
-                                fillMaxWidthIfTextPresent = false, autoLoading = false, confirmationRequired = false,
+autoLoading = false, confirmationRequired = false,
                                 onClick = {
                                     if (controlsCurrent()) {
                                         navigation.reference = ""; navigation.referenceError = false
@@ -232,7 +235,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                         color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
                 }
             }
-            if (page == null && (data.loading || data.error == null)) item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Activity, rows = 4) }
+            if (page == null && (data.loading || data.error == null)) item { LoadingSkeleton(layout = LoadingLayout.Activity, modifier = Modifier.fillMaxWidth(), rows = 4) }
             data.error?.let { message -> item(key = "history-error") {
                 Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
             } }
@@ -263,7 +266,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                         "Предлагалось замен: ${entry.changedLines} · ни одна не применена",
                         "${entry.changedLines} ауыстыру ұсынылды · ешқайсысы қолданылмады", "Дүкөн боюнча ${entry.changedLines} өзгөртүү сунушталды · эч бири колдонулган жок"),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                    actionButton(text = authUiText("View result", "Посмотреть результат", "Нәтижені көру", "Натыйжаны көрүү"), fillMaxWidthIfTextPresent = false,
+                    actionButton(text = authUiText("View result", "Посмотреть результат", "Нәтижені көру", "Натыйжаны көрүү"),
                         enabled = canNavigate, confirmationRequired = false, autoLoading = false, onClick = {
                             if (canUsePage(page) && page?.entries?.contains(entry) == true) opened = entry
                             else stalePage()
@@ -271,20 +274,23 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                 }
             }
             item(key = "history-navigation") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     if (wanted.boundary != null) actionButton(text = authUiText("Latest", "Последние", "Соңғылары", "Акыркылар"),
-                        enabled = !data.loading, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                        enabled = !data.loading, autoLoading = false, confirmationRequired = false,
                         onClick = {
                             if (controlsCurrent())
                                 navigation.request = MarketShoppingActivitySearchRequest(navigation.request.filter)
                         })
                     page?.newerActivityRequest()?.let { next -> actionButton(text = authUiText("Newer", "Более новые", "Жаңарақ", "Жаңыраак"),
-                        enabled = canNavigate, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                        enabled = canNavigate, autoLoading = false, confirmationRequired = false,
                         onClick = {
                             if (canUsePage(page)) navigation.request = next else stalePage()
                         }) }
                     page?.olderActivityRequest()?.let { next -> actionButton(text = authUiText("Older", "Более ранние", "Бұрынғы", "Эскирээк"),
-                        enabled = canNavigate, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                        enabled = canNavigate, autoLoading = false, confirmationRequired = false,
                         onClick = {
                             if (canUsePage(page)) navigation.request = next else stalePage()
                         }) }
@@ -296,14 +302,16 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             }
         }
-        FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text(if (page != null && canNavigate && data.loadedSignal == signal)
                 authUiText("Updated", "Обновлено", "Жаңартылды", "Жаңыртылды") + " · " + receiptUiDateTime(page.checkedAtMillis)
             else authUiText("History · refresh needed", "История · требуется обновление", "Тарих · жаңарту қажет", "Тарых · жаңыртуу керек"),
                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             actionButton(text = authUiText("Refresh page", "Обновить страницу", "Бетті жаңарту", "Бетти жаңыртуу"), enabled = !data.loading,
-                loading = data.loading, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                loading = data.loading, autoLoading = false, confirmationRequired = false,
                 onClick = { refreshPage() })
         }
     }
@@ -338,6 +346,7 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
     }
     val scroll = rememberLazyListState()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.fillMaxWidth().aitaWidthCap(900.dp).fillMaxHeight(0.90f).padding(12.dp)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)) {
             Text(activityKind(entry), Modifier.padding(16.dp), color = stateValues.TextColor,
@@ -364,7 +373,7 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
                 }
-                if (loading) item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Activity, rows = 3) }
+                if (loading && detail == null) item { LoadingSkeleton(layout = LoadingLayout.Activity, modifier = Modifier.fillMaxWidth(), rows = 3) }
                 error?.let { message -> item {
                     Text(message.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     actionButton(text = authUiText("Load details again", "Загрузить данные снова", "Деректерді қайта жүктеу", "Чоо-жайын кайра жүктөө"),

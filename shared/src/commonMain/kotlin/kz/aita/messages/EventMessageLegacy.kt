@@ -26,12 +26,14 @@ private object LegacyEventMessageIndex {
                 val expression = buildString {
                     matches.forEach { match ->
                         append(Regex.escape(text.substring(previous, match.range.first)))
-                        append("(.*?)")
+                        // Unlike platform-specific DOT_MATCHES_ALL, this capture works in
+                        // common code and keeps newlines/Unicode separators as literal data.
+                        append("([\\s\\S]*?)")
                         previous = match.range.last + 1
                     }
                     append(Regex.escape(text.substring(previous)))
                 }
-                add(Pattern(definition.key, Regex(expression, RegexOption.DOT_MATCHES_ALL), matches.map { it.groupValues[1] }))
+                add(Pattern(definition.key, Regex(expression), matches.map { it.groupValues[1] }))
             }
         }
     }

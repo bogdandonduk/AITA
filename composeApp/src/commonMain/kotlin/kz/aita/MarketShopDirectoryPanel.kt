@@ -176,12 +176,12 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
                     "Әр карточка — жарияланған нақты дүкен. Сандар ұсыныстарды көрсетеді, қор, жұмыс уақыты не резерв емес. Тауар мен санатты «Тауарлар» қойындысынан іздеңіз.", "Ар бир карточка — жарыяланган чыныгы дүкөн. Сандар товар калдыгын, иш убактысын же резервди эмес, жарыяланган сунуштарды көрсөтөт. Товар же категория издөө үчүн «Товарлар» бөлүмүн колдонуңуз."),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 if (navigation.text.isNotEmpty() || navigation.city.isNotEmpty()) actionButton(
-                    text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"), fillMaxWidthIfTextPresent = false,
+                    text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
                     autoLoading = false, confirmationRequired = false, onClick = { setSearch(text = "", city = "") })
                 data.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage, ""), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
             }
         }
-        if (result == null && data.loading) items(4) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 180.dp), layout = LoadingLayout.ShopCard, rows = 1) }
+        if (result == null && data.loading) items(4) { LoadingSkeleton(layout = LoadingLayout.ShopCard, modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp), rows = 1) }
         else if (result?.shops.isNullOrEmpty()) item(key = "shops-empty", span = { GridItemSpan(maxLineSpan) }) {
             Text(if (data.error != null || result == null) authUiText("Connect to load published shops", "Подключитесь для загрузки магазинов", "Жарияланған дүкендерді жүктеу үшін қосылыңыз", "Жарыяланган дүкөндөрдү жүктөө үчүн туташыңыз")
                 else authUiText("No published shops match yet. Try another city or clear the filters.", "Опубликованных магазинов пока нет. Попробуйте другой город или сбросьте фильтры.", "Сәйкес жарияланған дүкендер әзірше жоқ. Басқа қаланы көріңіз немесе сүзгілерді тазалаңыз.", "Дал келген жарыяланган дүкөндөр азырынча жок. Башка шаарды тандаңыз же чыпкаларды тазалаңыз."),
@@ -221,13 +221,16 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
                         else authUiText("Shops · refresh needed", "Магазины · требуется обновление", "Дүкендер · жаңарту қажет", "Дүкөндөр · жаңыртуу керек")
                 }, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 result?.let { Text(receiptUiDateTime(it.checkedAtMillis), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), enabled = !data.loading && !inputPending,
-                        loading = data.loading, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                        loading = data.loading, autoLoading = false, confirmationRequired = false,
                         onClick = { queueRefresh() })
                     if (result != null && result.totalShops > result.shops.size && wanted.limit < MARKET_SHOPS_MAX_WINDOW)
                         actionButton(text = authUiText("More shops", "Ещё магазины", "Тағы дүкендер", "Дагы дүкөндөр"), enabled = fresh,
-                            autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                            autoLoading = false, confirmationRequired = false,
                             onClick = { expandWindow() })
                 }
                 if (result != null && result.totalShops > MARKET_SHOPS_MAX_WINDOW && wanted.limit == MARKET_SHOPS_MAX_WINDOW)

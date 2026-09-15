@@ -38,6 +38,7 @@ internal fun AppConfiguration.MarketShoppingQuantityDialog(
     val amount = line.basis.pricedAmount.toString().removeSuffix(".0")
     val entered = editor.enteredUnits
     Dialog(onDismissRequest = editor::dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.fillMaxWidth().aitaWidthCap(560.dp).imePadding().padding(12.dp).heightIn(max = 620.dp)
             .aitaDialogEntrance().clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(stateValues.BackgroundColor)

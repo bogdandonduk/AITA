@@ -297,7 +297,6 @@ internal fun AppConfiguration.SupplierCustomersFilterPanel(
             )
             actionButton(
                 modifier = Modifier.size(40.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = stateValues.drawablePathIconSettings,
                 iconRes = stateValues.drawableResIconSettings.value,
@@ -341,7 +340,6 @@ internal fun AppConfiguration.SupplierCustomersFilterPanel(
             if (hasNonDefaultFilter) {
                 actionButton(
                     modifier = Modifier.size(40.dp),
-                    fillMaxWidthIfTextPresent = false,
                     text = "",
                     iconPath = stateValues.drawablePathIconCancel,
                     iconRes = stateValues.drawableResIconCancel.value,
@@ -448,13 +446,13 @@ internal fun AppConfiguration.SupplierCustomersWorkflowLinks() {
             ContractsButton(Modifier.fillMaxWidth())
         }
     } else {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            OrdersButton(Modifier.weight(1f))
-            CatalogButton(Modifier.weight(1f))
-            ContractsButton(Modifier.weight(1f))
+            OrdersButton(Modifier.fillMaxWidth())
+            CatalogButton(Modifier.fillMaxWidth())
+            ContractsButton(Modifier.fillMaxWidth())
         }
     }
 }
@@ -1038,9 +1036,6 @@ private fun AppConfiguration.SupplierCustomerOverviewCard(partner: SupplierPartn
             }
         }
 
-        partner.publicId.takeIf { it.isNotBlank() }?.let {
-            StockCardInfoLine("ID", it, stateValues.TextColor)
-        }
         partner.address.takeIf { it.isNotBlank() }?.let {
             StockCardInfoLine(localizedStringResource(147, "Address"), it, stateValues.TextColor)
         }
@@ -1132,13 +1127,13 @@ private fun AppConfiguration.SupplierCustomerActionGrid(
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actions.chunked(2).forEach { rowActions ->
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                 ) {
                     rowActions.forEach { action ->
                         actionButton(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             text = action.text,
                             iconPath = action.iconPath,
                             iconRes = action.iconRes,
@@ -1147,7 +1142,7 @@ private fun AppConfiguration.SupplierCustomerActionGrid(
                             onClick = action.onClick
                         )
                     }
-                    if (rowActions.size == 1) Spacer(Modifier.weight(1f))
+                    if (rowActions.size == 1) Spacer(Modifier.height(8.dp))
                 }
             }
         }
@@ -1257,8 +1252,8 @@ private fun AppConfiguration.SupplierCustomerRecentOrdersCard(
         iconPath = stateValues.drawablePathIconAppModeSupplier,
         iconRes = stateValues.drawableResIconAppModeSupplier.value
     ) {
-        if (!partner.orderDetailsLoaded && partner.orderCount > 0) {
-            LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.SupplierSummary, rows = 2, compact = true)
+        if (!partner.orderDetailsLoaded && partner.orderCount > 0 && partner.orders.isEmpty()) {
+            LoadingSkeleton(layout = LoadingLayout.SupplierOrder, modifier = Modifier.fillMaxWidth(), rows = 2)
         } else if (partner.orders.isEmpty()) {
             Text(
                 text = localizedStringResource(2390, "No recent orders"),
@@ -1343,8 +1338,8 @@ private fun AppConfiguration.SupplierCustomerContractsCard(partner: SupplierPart
         iconPath = stateValues.drawablePathIconSupplierContracts,
         iconRes = stateValues.drawableResIconSupplierContracts.value
     ) {
-        if (!partner.contractDetailsLoaded && partner.hasContractRelationship) {
-            LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.SupplierSummary, rows = 2, compact = true)
+        if (!partner.contractDetailsLoaded && partner.hasContractRelationship && visibleContracts.isEmpty()) {
+            LoadingSkeleton(layout = LoadingLayout.SupplierContract, modifier = Modifier.fillMaxWidth(), rows = 2)
         } else if (visibleContracts.isEmpty()) {
             Text(
                 text = localizedStringResource(2384, "No contract yet"),
@@ -1403,8 +1398,8 @@ private fun AppConfiguration.SupplierCustomerOffersCard(partner: SupplierPartner
         iconPath = stateValues.drawablePathIconSupplierCatalog,
         iconRes = stateValues.drawableResIconSupplierCatalog.value
     ) {
-        if (!partner.priceDetailsLoaded && partner.savedOfferCount > 0) {
-            LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.SupplierSummary, rows = 2, compact = true)
+        if (!partner.priceDetailsLoaded && partner.savedOfferCount > 0 && partner.prices.isEmpty()) {
+            LoadingSkeleton(layout = LoadingLayout.ShoppingLine, modifier = Modifier.fillMaxWidth(), rows = 2)
         } else if (partner.prices.isEmpty()) {
             Text(
                 text = localizedStringResource(2391, "No saved offers yet"),

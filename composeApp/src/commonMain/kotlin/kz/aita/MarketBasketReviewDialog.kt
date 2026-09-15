@@ -54,6 +54,7 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
     val shown = change.lines.filter { (it.sourceOfferId != it.targetOfferId) == (tab == "changes") }
     val untouchedCurrencyLines = result.snapshot.lines.count { it.line.basis.currencyCode != change.currencyCode }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.fillMaxWidth().aitaWidthCap(960.dp).fillMaxHeight(0.92f).padding(12.dp)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
@@ -126,8 +127,10 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
                     }
                 }
             }
-            FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if (!ownPending) actionButton(text = authUiText("Apply ${change.changedLines} shop changes", "Применить ${change.changedLines} замен", "${change.changedLines} ауыстыруды қолдану", "Дүкөн боюнча ${change.changedLines} өзгөртүүнү колдонуу"),
                     enabled = canConfirm, loading = shopping.changing, autoLoading = false,
                     confirmationRequired = false, onClick = {
@@ -140,11 +143,9 @@ internal fun AppConfiguration.MarketBasketReviewDialog(
                         }
                     })
                 actionButton(text = authUiText("Back to plans", "Назад к планам", "Жоспарларға қайту", "Тарифтерге кайтуу"),
-                    enabled = !shopping.changing && !shopping.checking && !shopping.cancelling && shopping.pending == null, fillMaxWidthIfTextPresent = false,
-                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
+                    enabled = !shopping.changing && !shopping.checking && !shopping.cancelling && shopping.pending == null,                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
                     autoLoading = false, confirmationRequired = false, onClick = onBack)
-                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), fillMaxWidthIfTextPresent = false,
-                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
+                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"),                    enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
                     autoLoading = false, confirmationRequired = false, onClick = onDismiss)
             }
         }

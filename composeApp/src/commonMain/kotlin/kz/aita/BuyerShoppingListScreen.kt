@@ -62,13 +62,16 @@ internal fun AppConfiguration.MarketShoppingRecoveryControls(state: MarketShoppi
             SelectionContainer { Text(frozen.command.commandId, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
             if (frozen != pending) Text(eventMessage("market.shopping_recovery_changed").visibleLocalizedString(stateValues.appLanguage, ""),
                 color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 actionButton(text = authUiText("Confirm cancellation", "Подтвердить отмену", "Бас тартуды растау", "Жокко чыгарууну ырастоо"),
                     enabled = !busy && state.active && frozen == pending, loading = state.cancelling,
-                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    autoLoading = false, confirmationRequired = false,
                     onClick = { state.cancelPending(frozen.command); reviewed = null })
                 actionButton(text = authUiText("Keep pending", "Оставить ожидающим", "Күтілуде қалдыру", "Күтүүдө калтыруу"),
-                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    autoLoading = false, confirmationRequired = false,
                     enabled = !busy, onClick = { reviewed = null })
             }
         } else {
@@ -76,16 +79,19 @@ internal fun AppConfiguration.MarketShoppingRecoveryControls(state: MarketShoppi
                 "Проверка читает результат. Повтор продолжает отмену, не исходное изменение. Закрытие сохраняет восстановление.",
                 "Тексеру нәтижені оқиды. Қайталау бастапқы өзгерісті емес, бас тартуды жалғастырады. Жапқанда қалпына келтіру сақталады.", "«Текшерүү» натыйжаны окуйт. «Кайталоо» баштапкы түзөтүүнү эмес, жокко чыгарууну улантат. Жабылганда калыбына келтирүү маалыматы сакталат."),
                 color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 actionButton(text = authUiText("Check result", "Проверить результат", "Нәтижені тексеру", "Натыйжаны текшерүү"),
-                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    autoLoading = false, confirmationRequired = false,
                     enabled = !busy && state.active, loading = state.checking, onClick = { state.checkResult() })
                 actionButton(text = if (cancelling) authUiText("Retry cancellation", "Повторить отмену", "Бас тартуды қайталау", "Жокко чыгарууну кайталоо")
                     else authUiText("Retry same change", "Повторить ту же команду", "Сол өзгерісті қайталау", "Ошол эле өзгөртүүнү кайталоо"),
-                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    autoLoading = false, confirmationRequired = false,
                     enabled = !busy && state.active, loading = state.changing, onClick = { state.retry() })
                 if (!cancelling) actionButton(text = authUiText("Cancel pending change", "Отменить ожидающее изменение", "Күтілудегі өзгерістен бас тарту", "Күтүүдөгү өзгөртүүнү жокко чыгаруу"),
-                    autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                    autoLoading = false, confirmationRequired = false,
                     enabled = !busy && state.active, onClick = { reviewed = pending })
             }
         }
@@ -129,7 +135,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
             MarketShoppingActivityPanel(activityNavigation, Modifier.weight(1f).fillMaxWidth())
         } else {
             if (state.snapshot == null && state.loading) {
-                LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), layout = LoadingLayout.ShoppingLine, rows = 5)
+                LoadingSkeleton(layout = LoadingLayout.ShoppingLine, modifier = Modifier.fillMaxWidth().padding(16.dp), rows = 5)
                 Spacer(Modifier.weight(1f))
             } else LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -200,8 +206,12 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(Modifier.fillMaxWidth()) {
                     Text(if (state.fresh) authUiText("Server estimate", "Расчёт сервера", "Сервер есебі", "Сервердин болжолдуу суммасы")
                         else if (state.snapshot == null) authUiText("Waiting for your list", "Ожидаем список", "Тізім күтілуде", "Тизмеңизди күтүүдө")
                         else authUiText("Saved estimate · refresh needed", "Сохранённый расчёт · обновите", "Сақталған есеп · жаңартыңыз", "Сакталган болжолдуу сумма · жаңыртуу керек"),
@@ -210,7 +220,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                         Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
                 }
-                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"),autoLoading = false,
                     enabled = !state.loading, loading = state.loading, confirmationRequired = false, onClick = { state.refresh(userInitiated = true) })
             }
         }
@@ -271,18 +281,21 @@ private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, sta
             color = changedValueColor(row.subtotalMinor, "shopping-line:${line.offerId}", stateValues.AccentColor),
             fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
         Text(status, color = if (row.status == MARKET_QUOTE_ESTIMATED) stateValues.PlaceholderTextColor else stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу") }, text = "−", iconContentDescription = authUiText("Decrease units", "Уменьшить количество", "Санды азайту", "Бирдиктерди азайтуу"),
-                enabled = editable && line.units > 1, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+            actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу") }, text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("−", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Decrease units", "Уменьшить количество", "Санды азайту", "Бирдиктерди азайтуу"),
+                enabled = editable && line.units > 1, autoLoading = false, confirmationRequired = false,
                 onClick = { review?.let { state.changeLine(it, line.units - 1) } })
             Text(line.units.toString(), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-            actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү") }, text = "+", iconContentDescription = authUiText("Increase units", "Увеличить количество", "Санды көбейту", "Бирдиктерди көбөйтүү"),
-                enabled = editable && line.units < MARKET_SHOPPING_MAX_UNITS, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+            actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү") }, text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("+", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Increase units", "Увеличить количество", "Санды көбейту", "Бирдиктерди көбөйтүү"),
+                enabled = editable && line.units < MARKET_SHOPPING_MAX_UNITS, autoLoading = false, confirmationRequired = false,
                 onClick = { review?.let { state.changeLine(it, line.units + 1) } })
             }
             actionButton(text = eventMessage("market.shopping_quantity_edit").visibleLocalizedString(stateValues.appLanguage, ""),
-                enabled = editable, autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                enabled = editable, autoLoading = false, confirmationRequired = false,
                 onClick = onEditQuantity)
             actionButton(text = "", iconPath = stateValues.drawablePathIconDelete,
                 iconContentDescription = authUiText("Remove from list", "Убрать из списка", "Тізімнен жою", "Тизмеден алып салуу"),

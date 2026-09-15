@@ -533,7 +533,7 @@ internal fun AppConfiguration.buildSupplierCatalogItems(
                 }
                 .ifBlank { dashboardPartner?.storePublicIdSnapshot.orEmpty() }
                 .ifBlank { dashboardPartner?.storeAddressTextSnapshot.orEmpty() }
-                .ifBlank { storeId.take(8) }
+                .ifBlank { stateValues.stringNoName }
             val storePublicId = preferredRelationOrder?.storePublicIdSnapshot
                 .orEmpty()
                 .ifBlank { dashboardPartner?.storePublicIdSnapshot.orEmpty() }
@@ -546,7 +546,7 @@ internal fun AppConfiguration.buildSupplierCatalogItems(
                         ?.visibleSupplierName(stateValues.appLanguage)
                         .orEmpty()
                 }
-                .ifBlank { supplierId.take(8) }
+                .ifBlank { stateValues.stringNoName }
             val quantityTemplate = relationLatestFacet?.quantityForCatalog()
                 ?: existingPrice?.minOrderQuantity
                 ?: existingPrice?.packageQuantity

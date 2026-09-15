@@ -657,9 +657,9 @@ fun AppConfiguration.StockBatchEditor(
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
                     actionButton(
+                        autoLoading = false,
                         text = "${localizedStringResource(305, "Use predicted expiration")}: $predicted",
-                        iconPath = stateValues.drawablePathIconStock,
-                        fillMaxWidthIfTextPresent = false
+                        iconPath = stateValues.drawablePathIconStock
                     ) {
                         draft = draft.copy(expirationDateText = predicted)
                     }
@@ -702,14 +702,14 @@ fun AppConfiguration.StockBatchEditor(
             }
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = stateValues.stringCancel,
                 enabledColor = stateValues.DisabledColor,
                 onClick = onCancel
@@ -720,12 +720,12 @@ fun AppConfiguration.StockBatchEditor(
                     text = error,
                     color = stateValues.ErrorColor,
                     fontSize = stateValues.smallTextSize,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = stateValues.stringConfirm,
                 enabled = !isSavingBatch &&
                         parseStockQuantityInputText(draft.quantityText, selectedQuantityUnit)?.let { it > 0.0 } == true &&
@@ -1129,7 +1129,6 @@ internal fun AppConfiguration.StockLocationAvailabilityCard(
                     onMoveBatch?.let { moveBatch ->
                         actionButton(
                             text = "",
-                            fillMaxWidthIfTextPresent = false,
                             iconPath = stockMoveIconPath,
                             iconRes = stockBatchMovementIconFallback(),
                             iconContentDescription = localizedStringResource(1209, "Move this batch"),
@@ -1325,12 +1324,12 @@ internal fun AppConfiguration.StockBatchMoveDialog(
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
         }
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = stateValues.stringCancel,
                 iconPath = stateValues.drawablePathIconCancel,
                 iconRes = stateValues.drawableResIconCancel.value,
@@ -1341,7 +1340,7 @@ internal fun AppConfiguration.StockBatchMoveDialog(
             )
 
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = if (willRequireReceivingAcceptance) localizedStringResource(1210, "Send en route") else localizedStringResource(549, "Move"),
                 enabled = canMove && !moving,
                 iconPath = stockMoveIconPath,
@@ -1623,12 +1622,12 @@ internal fun AppConfiguration.IncomingStockBatchTransferCard(
         } else if (!canDecide) {
             MessageText(text = localizedStringResource(665, "You do not have permission for this action"))
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1194, "Decline"),
                     iconPath = stateValues.drawablePathIconCancel,
                     enabled = !deciding,
@@ -1648,7 +1647,7 @@ internal fun AppConfiguration.IncomingStockBatchTransferCard(
                     }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1195, "Accept"),
                     iconPath = stateValues.drawablePathIconCheck,
                     enabled = !deciding,
@@ -2257,9 +2256,9 @@ fun AppConfiguration.StockSupplierPricesPage(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             goodsItem.supplyPrices
                                 .filter { it.price.isNotBlank() }
@@ -2267,7 +2266,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 .take(4)
                                 .forEach { price ->
                                     actionButton(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         text = "${price.price} ${price.currency}",
                                         textSize = stateValues.smallTextSize,
                                         iconPath = stateValues.drawablePathIconFinances,
@@ -3526,7 +3525,6 @@ internal fun AppConfiguration.GlobalGoodsSuggestionCard(
         actionButton(
             text = localizedStringResource(1170, "Use template"),
             iconPath = globalGoodsIconPath(),
-            fillMaxWidthIfTextPresent = true,
             confirmationRequired = false,
             onClick = onApply
         )
@@ -3615,7 +3613,7 @@ internal fun AppConfiguration.GlobalGoodsSuggestionsPanel(
         if (loading) {
             MessageText(
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                text = localizedStringResource(1141, "Please wait…"),
+                loadingLayout = LoadingLayout.StockCard, text = localizedStringResource(1141, "Please wait…"),
                 textSize = stateValues.textSize,
                 textColor = stateValues.PlaceholderTextColor
             )
@@ -3756,10 +3754,10 @@ internal fun AppConfiguration.GlobalGoodsPickerItemCard(
             )
             .padding(10.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             CpImage(
                 modifier = Modifier.size(30.dp),
@@ -3769,7 +3767,7 @@ internal fun AppConfiguration.GlobalGoodsPickerItemCard(
                 tintColor = stateValues.AccentColor
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = name,
                     color = stateValues.TextColor,
@@ -3788,9 +3786,9 @@ internal fun AppConfiguration.GlobalGoodsPickerItemCard(
             }
 
             actionButton(
+                autoLoading = false,
                 text = localizedStringResource(1170, "Use template"),
                 iconPath = globalGoodsIconPath(),
-                fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = onApply
             )
@@ -3907,10 +3905,10 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
             )
             .padding(10.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             CpImage(
                 modifier = Modifier.size(30.dp),
@@ -3920,7 +3918,7 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
                 tintColor = if (barcodeMatched) stateValues.AccentColor else stateValues.TextColor
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = name,
                     color = stateValues.TextColor,
@@ -3943,9 +3941,9 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
             }
 
             actionButton(
+                autoLoading = false,
                 text = localizedStringResource(1218, "Use parent item"),
                 iconPath = parentStoreStockIconPath(),
-                fillMaxWidthIfTextPresent = false,
                 confirmationRequired = false,
                 onClick = onApply
             )
@@ -4124,7 +4122,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                 displayItems.isEmpty() && (loading || pageWaitingForServer) -> item {
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = localizedStringResource(1141, "Please wait…"),
+                        loadingLayout = LoadingLayout.StockCard, text = localizedStringResource(1141, "Please wait…"),
                         textSize = stateValues.textSize,
                         textColor = stateValues.PlaceholderTextColor
                     )
@@ -4378,7 +4376,7 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
                 displayItems.isEmpty() && (loading || pageWaitingForServer) -> item {
                     MessageText(
                         modifier = Modifier.fillParentMaxSize().fillMaxWidth(),
-                        text = localizedStringResource(1141, "Please wait…"),
+                        loadingLayout = LoadingLayout.StockCard, text = localizedStringResource(1141, "Please wait…"),
                         textSize = stateValues.textSize,
                         textColor = stateValues.PlaceholderTextColor
                     )
@@ -5016,12 +5014,12 @@ internal fun AppConfiguration.SupplierOrderCard(
         if (!order.status.isSupplierOrderClosed()) {
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(979, "Receive full quantity"),
                     iconPath = stateValues.drawablePathIconTransactionSupply,
                     confirmationRequired = true,
@@ -5029,7 +5027,7 @@ internal fun AppConfiguration.SupplierOrderCard(
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(965, "Cancel order"),
                     iconPath = stateValues.drawablePathIconCancel,
                     enabledColor = stateValues.ErrorColor,
@@ -5577,12 +5575,12 @@ internal fun AppConfiguration.SupplierActionQueueItem(action: SupplierDashboardA
                 }
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = primaryActionTitle,
                     iconPath = if (action.actionType == "contract") stateValues.drawablePathIconSupplierContracts else stateValues.drawablePathIconAppModeSupplier,
                     iconRes = if (action.actionType == "contract") stateValues.drawableResIconSupplierContracts.value else stateValues.drawableResIconAppModeSupplier.value,
@@ -5592,7 +5590,7 @@ internal fun AppConfiguration.SupplierActionQueueItem(action: SupplierDashboardA
                 )
                 quickStatus?.let { status ->
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = supplierDashboardQuickActionLabel(status),
                         enabled = action.orderId.isNotBlank(),
                         iconPath = quickActionIcon?.first,
@@ -5733,12 +5731,12 @@ internal fun AppConfiguration.SupplierReadinessBoardCard(
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1693, "Open answer gaps"),
                     iconPath = stateValues.drawablePathIconResponse,
                     iconRes = stateValues.drawableResIconResponse.value,
@@ -5746,7 +5744,7 @@ internal fun AppConfiguration.SupplierReadinessBoardCard(
                     onClick = onOpenAnswerGaps
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1694, "Open pack queue"),
                     iconPath = stateValues.drawablePathIconStock,
                     iconRes = stateValues.drawableResIconStock.value,

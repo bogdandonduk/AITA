@@ -107,8 +107,12 @@ internal fun AppConfiguration.AdditionalLoginEmailsEditor(
                 val proof = if (needsEmail) SecurityEmailProofInput(AitaSecurityEmailRequest(
                     if (removeEmail == null) AitaSecurityEmailAction.ADD_EMAIL else AitaSecurityEmailAction.REMOVE_EMAIL,
                     normalizeAitaEmail(removeEmail ?: email).orEmpty(), password, settings.securityRevision, stateValues.appLanguage), !busy) else null
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    actionButton(modifier = Modifier.weight(1f), autoLoading = false, loading = busy,
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    actionButton(modifier = Modifier.fillMaxWidth(), autoLoading = false, loading = busy,
                         text = if (removeEmail == null) authUiText("Get code", "Получить код", "Код алу", "Код алуу") else authUiText("Remove extra email", "Удалить дополнительный email", "Қосымша email жою", "Кошумча электрондук почтаны алып салуу"),
                         enabledColor = if (removeEmail == null) stateValues.AccentColor else stateValues.ErrorColor,
                         enabled = !busy && password.isNotBlank() && (!settings.authenticatorEnabled || aitaSecondFactorIsWellFormed(factor)) &&

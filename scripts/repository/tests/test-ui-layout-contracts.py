@@ -55,9 +55,11 @@ class UiLayoutContractsTest(unittest.TestCase):
         button = function("CommonMainComposeWidgetsConfig.kt", "AppConfiguration.actionButton")
         sizing = button[button.index("Row(\n        modifier = modifier"):]
         sizing = sizing[:sizing.index("if (fillMaxHeight)")]
-        self.assertLess(sizing.index("if (!textPresent || !fillMaxWidthIfTextPresent)"), sizing.index("aitaWidthCap"))
+        self.assertIn("if (!textPresent)", sizing)
+        self.assertNotIn("fillMaxWidthIfTextPresent", button)
         compact, normal = sizing.split("else", 1)
-        self.assertIn("aitaWidthCap().wrapContentWidth()", compact)
+        self.assertIn("wrapContentWidth()", compact)
+        self.assertNotIn("aitaWidthCap", compact)
         self.assertIn("fillMaxWidth()", normal)
         self.assertNotIn("aitaWidthCap", normal)
         self.assertIn("horizontalArrangement = Arrangement.Center", button)

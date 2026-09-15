@@ -505,12 +505,12 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
                                     }
                                 }
                             } else {
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                                 ) {
                                     actionButton(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         text = localizedStringResource(1494, "Create contract"),
                                         iconPath = stateValues.drawablePathIconSupplierContracts,
                                         iconRes = stateValues.drawableResIconSupplierContracts.value,
@@ -534,7 +534,7 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
                                     )
                                     if (actorSide == SUPPLIER_CONTRACT_SIDE_STORE) {
                                         actionButton(
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.fillMaxWidth(),
                                             text = localizedStringResource(237, "Refresh"),
                                             iconPath = stateValues.drawablePathIconRefresh,
                                             iconRes = stateValues.drawableResIconRefresh.value,
@@ -582,7 +582,7 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
                                 item(key = "supplier-contract-loading") {
                                     MessageText(
                                         modifier = Modifier.fillMaxWidth(),
-                                        text = localizedStringResource(1141, "Please wait…")
+                                        loadingLayout = LoadingLayout.SupplierContract, text = localizedStringResource(1141, "Please wait…")
                                     )
                                 }
                             }

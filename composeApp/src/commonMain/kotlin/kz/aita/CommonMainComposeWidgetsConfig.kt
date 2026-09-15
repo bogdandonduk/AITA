@@ -386,12 +386,14 @@ internal fun localDrawableResourceForPath(
         "142_1" -> Res.drawable._142_1
         "143_0" -> Res.drawable._143_0
         "143_1" -> Res.drawable._143_1
-        "145_0" -> Res.drawable._145_0
-        "145_1" -> Res.drawable._145_1
+        "144_0" -> Res.drawable._144_0
+        "144_1" -> Res.drawable._144_1
         "146_0" -> Res.drawable._146_0
         "146_1" -> Res.drawable._146_1
         "147_0" -> Res.drawable._147_0
         "147_1" -> Res.drawable._147_1
+        "145_0" -> Res.drawable._145_0
+        "145_1" -> Res.drawable._145_1
         "148_0" -> Res.drawable._148_0
         "148_1" -> Res.drawable._148_1
         else -> fallbackRes
@@ -1001,7 +1003,6 @@ fun AppConfiguration.GoodsItemInStockWidget(
                     )
 
                     StockMarketplaceBadge(goodsItem)
-
                     if (goodsItem.isQuickItem) {
                         Spacer(modifier = Modifier.width(8.dp))
 
@@ -1288,7 +1289,7 @@ internal fun AppConfiguration.StockCardInfoLine(
     if (value == localizedStringResource(1141, "Please wait…")) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("$title:", color = textColor, fontSize = stateValues.textSize)
-            LoadingSkeleton(Modifier.weight(1f), layout = LoadingLayout.InlineValue, rows = 1, compact = true)
+            LoadingSkeleton(Modifier.weight(1f), layout = LoadingLayout.InlineValue, rows = 1)
         }
         return
     }
@@ -1450,14 +1451,14 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
             }
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(138, "Batches")
             ) {
                 coroutineScope.launch {
@@ -1469,7 +1470,7 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
             }
 
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(203, "Supplier prices")
             ) {
                 coroutineScope.launch {
@@ -1481,7 +1482,7 @@ fun AppConfiguration.StockGoodsItemDetailsScreen() {
             }
 
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1288, "Print item label"),
                 iconPath = stateValues.drawablePathIconLabelPrinter,
                 iconRes = stateValues.drawableResIconLabelPrinter.value,
@@ -1628,6 +1629,7 @@ fun AppConfiguration.genericTextField(
         mutableStateOf(emptyMap())
     }
 
+    val editorFocusGuard = rememberTransactionEditorFocusGuard()
     val stateValue = state?.get(stateKey)
     val persistentTextDraftKey = if (!parentOwnsValue && persistTextDraft && shouldPersistUiTextDraft(keyboardType, stateKey)) {
         persistentUiDraftKey(stateHost, stateKey)
@@ -1776,7 +1778,7 @@ fun AppConfiguration.genericTextField(
         if (!isFocused && textFieldValue.selection != meta.selection) {
             textFieldValue = textFieldValue.copy(selection = meta.selection)
         }
-        if (!isFocused && meta.focused && platformAllowsAutomaticTextFieldFocus() && enabled && !readOnly) {
+        if (!captureTransactionBarcodeInput && !isFocused && meta.focused && platformAllowsAutomaticTextFieldFocus() && enabled && !readOnly) {
             val focusKey = listOf(textFieldMetaStateKey.orEmpty(), encoded, textFieldValue.text).joinToString("|")
             if (focusKey != restoredPersistentFocusKey) {
                 restoredPersistentFocusKey = focusKey
@@ -1803,6 +1805,16 @@ fun AppConfiguration.genericTextField(
     var voiceLevel by remember(textFieldIdentityKey) {
         mutableStateOf(0f)
     }
+
+    var voiceLanguageStatus by remember(textFieldIdentityKey) { mutableStateOf("") }
+
+    DisposableEffect(textFieldIdentityKey) {
+        onDispose {
+            if (isVoiceListening) stopPlatformVoiceInput?.invoke()
+            isVoiceListening = false
+        }
+    }
+
 
     var voiceStatusText by remember(textFieldIdentityKey) {
         mutableStateOf("")
@@ -1874,11 +1886,19 @@ fun AppConfiguration.genericTextField(
         isVoiceListening = true
         voiceLevel = 0.18f
         voiceStatusText = localizedStringResource(1007, "Listening…")
+        voiceLanguageStatus = ""
 
         coroutineScope.launch {
             starter(
                 voicePermissionRequestText,
                 VoiceInputCallbacks(
+                    onLanguageMode = { mode ->
+                        voiceLanguageStatus = eventMessage(when (mode) {
+                            VoiceLanguageMode.AutomaticRequested -> "voice.auto_requested"
+                            VoiceLanguageMode.DetectionOnly -> "voice.detection_only"
+                            VoiceLanguageMode.DeviceDefault -> "voice.device_default"
+                        }).extractLocalizedString(stateValues.appLanguage).orEmpty()
+                    },
                     onPartialText = { partial ->
                         if (partial.isNotBlank()) {
                             voiceStatusText = partial
@@ -1895,10 +1915,7 @@ fun AppConfiguration.genericTextField(
                         voiceLevel = level.coerceIn(0f, 1f)
                     },
                     onDetectedLanguage = { languageTag ->
-                        val displayName = voiceInputLanguageDisplayName(languageTag)
-                        if (displayName.isNotBlank()) {
-                            voiceStatusText = "${localizedStringResource(1057, "Detected language")}: $displayName"
-                        }
+                        voiceLanguageStatus = localizedStringResource(1057, "Detected language") + ": " + languageTag
                     },
                     onDenied = {
                         isVoiceListening = false
@@ -1991,7 +2008,7 @@ fun AppConfiguration.genericTextField(
     }
 
     Column(
-        modifier = modifier.aitaWidthCap(720.dp)
+        modifier = modifier.fillMaxWidth()
     ) {
         val titleTextPresent = titleText.isNotEmpty() && titleText.isNotBlank()
 
@@ -2143,6 +2160,8 @@ fun AppConfiguration.genericTextField(
                     .focusRequester(focusRequester)
                     .onFocusChanged {
                         isFocused = it.isFocused
+                        // A manual editor always wins over the checkout scanner's restore request.
+                        editorFocusGuard(it.isFocused && !captureTransactionBarcodeInput)
                         savePersistentTextFieldMeta(textFieldValue, it.isFocused)
 
                         updateIsFocusedAction?.invoke(it)
@@ -2427,6 +2446,11 @@ fun AppConfiguration.genericTextField(
                     )
                 }
 
+                if (voiceLanguageStatus.isNotBlank()) {
+                    Text(text = voiceLanguageStatus, color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize, textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 4.dp))
+                }
                 if (voiceStatusText.isNotBlank()) {
                     Text(
                         modifier = Modifier.padding(top = 3.dp),
@@ -3254,7 +3278,7 @@ fun AppConfiguration.domainSelectionTextField(
     } catch (_: Throwable) {
         ""
     },
-    selectedSecondaryInitial: String? = secondaryDomains?.first()?.id,
+    selectedSecondaryInitial: String? = secondaryDomains?.firstOrNull()?.id,
     selectionEnabled: Boolean = true,
     selectionSecondaryEnabled: Boolean = true,
     displayFullDomain: Boolean = false,
@@ -3381,7 +3405,7 @@ fun AppConfiguration.domainSelectionTextField(
     }
 
     var selectedSecondary by remember(domainFieldIdentityKey, secondaryDomainIdsKey) {
-        mutableStateOf(secondaryDomains?.find { it.id.equals(selectedSecondaryId, true) } ?: secondaryDomains?.first())
+        mutableStateOf(secondaryDomains?.find { it.id.equals(selectedSecondaryId, true) } ?: secondaryDomains?.firstOrNull())
     }
 
     LaunchedEffect(selectedSecondaryId) {
@@ -3550,7 +3574,7 @@ fun AppConfiguration.domainSelectionTextField(
                 }
             }
 
-            textFieldContent = genericTextField(
+            val renderedTextFieldContent = genericTextField(
                 enabled = enabled,
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -3613,8 +3637,10 @@ fun AppConfiguration.domainSelectionTextField(
                 }
             )
 
-            LaunchedEffect(textFieldContent.isFocused) {
-                isFocused = textFieldContent.isFocused
+            // Capture the stable field result, not the mutable nullable outer holder.
+            textFieldContent = renderedTextFieldContent
+            LaunchedEffect(renderedTextFieldContent.isFocused) {
+                isFocused = renderedTextFieldContent.isFocused
             }
 
             Spacer(
@@ -3717,14 +3743,15 @@ fun AppConfiguration.domainSelectionTextField(
         }
     }
 
+    val renderedContent = checkNotNull(textFieldContent)
     return DomainSelectionTextFieldContent(
-        value = textFieldContent!!.value,
-        isFocused = textFieldContent.isFocused,
+        value = renderedContent.value,
+        isFocused = renderedContent.isFocused,
         selectedId = selectedId,
         selectedSecondaryId = selectedSecondaryId,
-        isContentValid = textFieldContent.isContentValid,
-        onContentValidityCheck = textFieldContent.onContentValidityCheck,
-        onReplaceText = textFieldContent.onReplaceText,
+        isContentValid = renderedContent.isContentValid,
+        onContentValidityCheck = renderedContent.onContentValidityCheck,
+        onReplaceText = renderedContent.onReplaceText,
         onSelectedSecondaryIdChange = { nextSelectedSecondaryId ->
             if (lockedSecondaryDomainId == null) {
                 val cleanId = nextSelectedSecondaryId?.takeIf { candidate ->
@@ -4417,10 +4444,6 @@ object AppConfiguration {
         vararg keys: Any
     ) {
 
-        LaunchedEffect(Unit) {
-            LiveCollectionWorkspace.start()
-            MarketStockPublicationWorkspace.start()
-        }
         var systemLocaleLanguage by remember { mutableStateOf(getSystemLocaleLanguage()) }
         androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
             systemLocaleLanguage = getSystemLocaleLanguage()
@@ -5407,6 +5430,8 @@ object AppConfiguration {
                 }
 
                 LaunchedEffect(Unit) {
+                    LiveCollectionWorkspace.start()
+    MarketStockPublicationWorkspace.start()
                     val resourceStrings = withContext(Dispatchers.Default) { loadResourceStrings() }
                     val resourceDimensions = withContext(Dispatchers.Default) { loadResourceDimensions() }
                     val resourceColors = withContext(Dispatchers.Default) { loadResourceColors() }
@@ -5852,7 +5877,6 @@ fun AppConfiguration.AppLanguageSettingsItemWidget(
 fun AppConfiguration.actionButton(
     modifier: Modifier = Modifier,
     fillMaxHeight: Boolean = false,
-    fillMaxWidthIfTextPresent: Boolean = true,
 
     enabled: Boolean = true,
     loading: Boolean = false,
@@ -5924,7 +5948,7 @@ fun AppConfiguration.actionButton(
     }
 
     fun startAutoLoadingPulse() {
-        if (!autoLoading || text.isBlank() || !fillMaxWidthIfTextPresent) return
+        if (!autoLoading || text.isBlank()) return
         val startedAt = activeNetworkOperationsState.value
         val generation = ++autoLoadingGeneration
         autoLoadingActive = true
@@ -6004,9 +6028,9 @@ fun AppConfiguration.actionButton(
     Row(
         modifier = modifier
             .run {
-                if (!textPresent || !fillMaxWidthIfTextPresent)
-                    // Compact/icon-only actions keep their existing bounded clickable surface.
-                    aitaWidthCap().wrapContentWidth()
+                if (!textPresent)
+                    // Toolbars and steppers are icon-only. Named actions always fill their lane.
+                    wrapContentWidth()
                 else
                     // A form/card owns its width; a normal action must not impose a second cap.
                     fillMaxWidth()
@@ -6105,12 +6129,7 @@ fun AppConfiguration.actionButton(
 
         if (textPresent) {
             Column(
-                modifier = Modifier.run {
-                    if (!fillMaxWidthIfTextPresent)
-                        wrapContentWidth()
-                    else
-                        weight(1f)
-                },
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

@@ -163,7 +163,7 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                         onClick={ composing=true; selected=null })
                 }
                 feedback?.let { SupportInlineError(it) }
-                if(loading && tickets.isEmpty()) LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Conversation,rows=4)
+                if(loading && tickets.isEmpty()) LoadingSkeleton(layout = LoadingLayout.Conversation, modifier = Modifier.fillMaxWidth(), rows =4)
                 else LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                     if(tickets.isEmpty()) item {
                         MessageText(Modifier.fillParentMaxWidth().padding(24.dp),authUiText("No conversations here yet","Здесь пока нет диалогов","Мұнда әзірге диалог жоқ", "Бул жерде маектер азырынча жок"))
@@ -328,9 +328,13 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         }
     }
     Column(modifier.imePadding()) {
-        Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            actionButton(text=authUiText("Chats","Чаты","Чаттар", "Чаттар"),fillMaxWidthIfTextPresent=false,autoLoading=false,onClick=onBack)
-            Column(Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(10.dp),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            actionButton(text=authUiText("Chats","Чаты","Чаттар", "Чаттар"),autoLoading=false,onClick=onBack)
+            Column(Modifier.fillMaxWidth()) {
                 Text(ticket?.subject ?: authUiText("New conversation","Новый диалог","Жаңа диалог", "Жаңы маек"),color=stateValues.TextColor,
                     fontSize=stateValues.textSize,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
                 ticket?.let { Text(if(it.status=="closed") authUiText("Closed","Закрыт","Жабық", "Жабык")
@@ -342,17 +346,20 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
             val mine=current.assignedAgentUserId==account
             val manager=CompanyCapability.SUPPORT_MANAGE in capabilities
             val canResolve=!agent || (current.userId!=account && CompanyCapability.SUPPORT_RESOLVE in capabilities && (mine || manager))
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal=12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if(agent && !mine && current.status!="closed" && CompanyCapability.SUPPORT_CLAIM in capabilities && current.userId!=account)
-                    actionButton(text=authUiText("Take conversation","Взять в работу","Жұмысқа алу", "Маекти өзүңүзгө алуу"),fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,loading=acting,onClick={ act("claim") })
-                if(agent && mine && CompanyCapability.SUPPORT_CLAIM in capabilities) actionButton(text=authUiText("Release","Освободить","Босату", "Бошотуу"),fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,onClick={ act("release") })
+                    actionButton(text=authUiText("Take conversation","Взять в работу","Жұмысқа алу", "Маекти өзүңүзгө алуу"),autoLoading=false,enabled=!acting,loading=acting,onClick={ act("claim") })
+                if(agent && mine && CompanyCapability.SUPPORT_CLAIM in capabilities) actionButton(text=authUiText("Release","Освободить","Босату", "Бошотуу"),autoLoading=false,enabled=!acting,onClick={ act("release") })
                 if(canResolve) actionButton(text=if(current.status=="closed") authUiText("Reopen","Открыть снова","Қайта ашу", "Кайра ачуу") else authUiText("Resolve","Решено","Шешілді", "Чечүү"),
-                    fillMaxWidthIfTextPresent=false,autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",onClick={ act(if(current.status=="closed") "reopen" else "close") })
+autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",onClick={ act(if(current.status=="closed") "reopen" else "close") })
             }
         }
         feedback?.let { SupportInlineError(it) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if(loading && messages.isEmpty() && pending==null) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), layout = LoadingLayout.Message,rows=4)
+            if(loading && messages.isEmpty() && pending == null) LoadingSkeleton(layout = LoadingLayout.Message, modifier = Modifier.fillMaxWidth().padding(16.dp), rows =4)
             else if(ticketId==null && pending==null) Column(Modifier.align(Alignment.Center).padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally) {
                 Text(authUiText("Let’s work it out","Давайте разберёмся","Бірге шешейік", "Бирге чечели"),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
@@ -398,7 +405,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                 } }
             }
             if(hasNew) Box(Modifier.align(Alignment.BottomCenter).padding(10.dp)) {
-                actionButton(text=authUiText("New messages ↓","Новые сообщения ↓","Жаңа хабарламалар ↓", "Жаңы билдирүүлөр ↓"),fillMaxWidthIfTextPresent=false,autoLoading=false,
+                actionButton(text=authUiText("New messages ↓","Новые сообщения ↓","Жаңа хабарламалар ↓", "Жаңы билдирүүлөр ↓"),autoLoading=false,
                     onClick={ hasNew=false; scope.launch { list.animateScrollToItem(0) } })
             }
         }
@@ -485,18 +492,18 @@ private fun AppConfiguration.SupportConversationBubble(message: SupportMessageDa
 
 @Composable
 private fun AppConfiguration.SupportMetricsPane(modifier: Modifier,account: String) {
-    var data by remember { mutableStateOf<SupportTeamMetrics?>(null) }
+    var data by remember(account) { mutableStateOf<SupportTeamMetrics?>(null) }
     var error by remember { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     val signals by SupportWorkspaceSignals.revision.collectAsState()
     LaunchedEffect(account,signals) {
         val generation=currentAuthenticatedSessionGeneration()
         val result=networkRequest<SupportTeamMetrics,Unit>(HttpMethod.Get,endpointUrl="support/agent/metrics",expectedSessionGeneration=generation)
-        if(authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id==account) { data=result.payload; error=result.message.takeIf { result.negative } }
+        if(authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id==account) { if (!result.negative && result.payload != null) data=result.payload; error=result.message.takeIf { result.negative } }
     }
     Column(modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         error?.let { SupportInlineError(it) }
         val metrics=data
-        if(metrics==null && error==null) LoadingSkeleton(layout = LoadingLayout.Metrics, rows=4)
+        if(metrics==null && error==null) LoadingSkeleton(layout = LoadingLayout.Metrics, rows =1)
         else if(metrics!=null) {
             Text(authUiText("Team · last 30 days","Команда · последние 30 дней","Топ · соңғы 30 күн", "Команда · акыркы 30 күн"),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.accentTextSize)
             listOf(

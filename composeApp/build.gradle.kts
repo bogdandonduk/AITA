@@ -207,6 +207,10 @@ kotlin {
                 implementation(libs.kamel.fetcher.ktor)
             }
 
+            getByName("jvmTest").dependencies {
+                implementation(kotlin("test-junit"))
+            }
+
             getByName("jvmMain").dependencies {
                 implementation(libs.java.keyring)
                 implementation(libs.kamel.decoder.svg.batik)
@@ -240,16 +244,20 @@ if (!aitaWebOnlyBuild) {
                 excludes += "/META-INF/{AL2.0,LGPL2.1}"
             }
         }
-        val aitaReleaseSigningConfig = if (aitaAndroidSigningConfigured) {
-            signingConfigs.create("aitaRelease") {
-                storeFile = project.file(aitaAndroidKeystorePath)
-                storePassword = aitaAndroidKeystorePassword
-                keyAlias = aitaAndroidKeyAlias
-                keyPassword = aitaAndroidKeyPassword
+        // Use the Android DSL's concrete container element type, not the generic
+        // Kotlin DSL create<T> overload during Gradle sync and script compilation.
+        val aitaReleaseSigningConfig: com.android.build.api.dsl.ApkSigningConfig? =
+            if (aitaAndroidSigningConfigured) {
+                val releaseSigning: com.android.build.api.dsl.ApkSigningConfig =
+                    signingConfigs.maybeCreate("aitaRelease")
+                releaseSigning.storeFile = project.file(aitaAndroidKeystorePath)
+                releaseSigning.storePassword = aitaAndroidKeystorePassword
+                releaseSigning.keyAlias = aitaAndroidKeyAlias
+                releaseSigning.keyPassword = aitaAndroidKeyPassword
+                releaseSigning
+            } else {
+                null
             }
-        } else {
-            null
-        }
 
         buildTypes {
             getByName("release") {

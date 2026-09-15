@@ -112,13 +112,13 @@ internal fun AppConfiguration.SupplierCatalogWorkflowLinks() {
             ContractsButton(Modifier.fillMaxWidth())
         }
     } else {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            OrdersButton(Modifier.weight(1f))
-            CustomersButton(Modifier.weight(1f))
-            ContractsButton(Modifier.weight(1f))
+            OrdersButton(Modifier.fillMaxWidth())
+            CustomersButton(Modifier.fillMaxWidth())
+            ContractsButton(Modifier.fillMaxWidth())
         }
     }
 }
@@ -191,7 +191,6 @@ internal fun AppConfiguration.SupplierCatalogFilterPanel(
             )
             actionButton(
                 modifier = Modifier.size(40.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = stateValues.drawablePathIconSettings,
                 iconRes = stateValues.drawableResIconSettings.value,
@@ -235,7 +234,6 @@ internal fun AppConfiguration.SupplierCatalogFilterPanel(
             if (hasNonDefaultFilter) {
                 actionButton(
                     modifier = Modifier.size(40.dp),
-                    fillMaxWidthIfTextPresent = false,
                     text = "",
                     iconPath = stateValues.drawablePathIconCancel,
                     iconRes = stateValues.drawableResIconCancel.value,
@@ -768,7 +766,6 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
             }
             actionButton(
                 modifier = Modifier.size(38.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = stateValues.drawablePathIconSupplierPartners,
                 iconRes = stateValues.drawableResIconSupplierPartners.value,
@@ -790,7 +787,6 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
             )
             actionButton(
                 modifier = Modifier.size(38.dp),
-                fillMaxWidthIfTextPresent = false,
                 text = "",
                 iconPath = if (expanded) {
                     stateValues.drawablePathIconExpandLess
@@ -1201,12 +1197,12 @@ internal fun AppConfiguration.SupplierCatalogProductDetail(
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(2333, "Open store orders"),
                     iconPath = stateValues.drawablePathIconAppModeSupplier,
                     iconRes = stateValues.drawableResIconAppModeSupplier.value,
@@ -1223,7 +1219,7 @@ internal fun AppConfiguration.SupplierCatalogProductDetail(
                     }
                 )
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(2334, "Copy product brief"),
                     iconPath = stateValues.drawablePathIconClipboard,
                     iconRes = stateValues.drawableResIconClipboard.value,

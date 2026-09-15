@@ -237,7 +237,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                         }
                         actionButton(text = if (savedOnly) authUiText("Back to saved", "К сохранённому", "Сақталғандарға оралу", "Сакталгандарга кайтуу")
                             else if (browseSection == "shops") authUiText("Back to shops", "К магазинам", "Дүкендерге оралу", "Дүкөндөргө кайтуу")
-                            else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу", "Маркетке кайтуу"), fillMaxWidthIfTextPresent = false,
+                            else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу", "Маркетке кайтуу"),
                             autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
                     }
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -253,18 +253,18 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                                 authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес", "Шаар · милдеттүү эмес"), identityKey = "market-city:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
                         }
                     }
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         actionButton(text = selectedCategory?.name?.visibleLocalizedString(stateValues.appLanguage, "")?.substringAfterLast(" / ")
                             ?: if (categoryId == null) authUiText("All categories", "Все категории", "Барлық санаттар", "Бардык категориялар")
                                 else authUiText("Selected category", "Выбранная категория", "Таңдалған санат", "Тандалган категория"),
                             iconPath = marketIconPath(18), iconRes = marketIconFallback(18), autoLoading = false, confirmationRequired = false,
-                            fillMaxWidthIfTextPresent = false, enabled = catalogue != null, onClick = { choosingCategory = true })
+                             enabled = catalogue != null, onClick = { choosingCategory = true })
                         if (categoryId != null) actionButton(text = authUiText("Clear category", "Сбросить категорию", "Санатты алып тастау", "Категорияны тазалоо"),
-                            autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                            autoLoading = false, confirmationRequired = false,
                             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
                             onClick = { categoryId = null; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null })
                         if (search.isNotEmpty() || city.isNotEmpty() || categoryId != null) actionButton(text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
-                            autoLoading = false, confirmationRequired = false, fillMaxWidthIfTextPresent = false,
+                            autoLoading = false, confirmationRequired = false,
                             enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = ::clearFilters)
                     }
                     sectionTabsWidget("market-sort:$account:$savedOnly", listOf(
@@ -334,9 +334,9 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                     })
             }
         }
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.Start) {
             val counts = data.result
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.fillMaxWidth()) {
                 Text(when {
                     inputPending -> authUiText("Searching…", "Поиск…", "Іздеу…", "Изделүүдө…")
                     data.loading -> authUiText("Updating matches…", "Обновляем результаты…", "Нәтижелер жаңартылуда…", "Дал келүүлөр жаңыртылууда…")
@@ -347,7 +347,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                 }, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 data.page?.checkedAtMillis?.let { Text(receiptUiDateTime(it), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize) }
             }
-            actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false,
+            actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"),
                 autoLoading = false, enabled = !data.loading && !inputPending, loading = data.loading, confirmationRequired = false, onClick = {
                     data.fresh = false; data.countsFresh = false; requests.trySend(Unit)
                 })

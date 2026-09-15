@@ -178,6 +178,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
     val fresh = planIsCurrent(currentSignal = signal)
 
     Dialog(onDismissRequest = latestDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        TransactionBarcodeModalGuard()
         Column(Modifier.fillMaxWidth().aitaWidthCap(960.dp).fillMaxHeight(0.92f).padding(12.dp)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
@@ -198,7 +199,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                             identityKey = "basket-city:$account", autoFocus = false, parentOwnsValue = true)
                         val normalizedCity = MarketBasketRequest(0, cityDraft).normalizedBasketRequest()?.city
                         if (cityDraft != city) actionButton(text = authUiText("Apply city", "Применить город", "Қаланы қолдану", "Шаарды колдонуу"),
-                            enabled = normalizedCity != null && !blocked, fillMaxWidthIfTextPresent = false, autoLoading = false,
+                            enabled = normalizedCity != null && !blocked,autoLoading = false,
                             confirmationRequired = false, onClick = {
                                 if (data.active && owner?.isCurrent() == true && !shoppingBlocked()) {
                                     // The draft may have changed since the Apply button was rendered.
@@ -217,7 +218,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     }
                 }
-                if (result == null && (data.loading || data.error == null) && !blocked) item { LoadingSkeleton(Modifier.fillMaxWidth(), layout = LoadingLayout.Comparison, rows = 5) }
+                if (result == null && (data.loading || data.error == null) && !blocked) item { LoadingSkeleton(layout = LoadingLayout.Comparison, modifier = Modifier.fillMaxWidth(), rows = 5) }
                 if (result != null && group == null) item {
                     Text(authUiText("Add products to your list first", "Сначала добавьте товары в список", "Алдымен тізімге тауар қосыңыз", "Адегенде тизмеңизге товарларды кошуңуз"), color = stateValues.TextColor, fontSize = stateValues.textSize)
                 }
@@ -304,13 +305,16 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     }
                 }
             }
-            FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Text(if (fresh) authUiText("Checked", "Проверено", "Тексерілді", "Текшерилди") + " · " + receiptUiDateTime(result?.snapshot?.checkedAtMillis ?: 0L)
                     else authUiText("Refresh needed · estimates only", "Нужно обновить · только расчёт", "Жаңарту қажет · тек есеп", "Жаңыртуу керек · болжолдуу суммалар гана"),
                     Modifier.padding(vertical = 10.dp), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"),autoLoading = false,
                     enabled = !data.loading && !blocked, loading = data.loading, confirmationRequired = false, onClick = { queueRefresh() })
-                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"), fillMaxWidthIfTextPresent = false, autoLoading = false,
+                actionButton(text = authUiText("Close", "Закрыть", "Жабу", "Жабуу"),autoLoading = false,
                     enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, confirmationRequired = false, onClick = latestDismiss)
             }
         }

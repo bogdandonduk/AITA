@@ -518,11 +518,20 @@ internal class MarketplaceRepository(private val db: Connection,
         val codes = publicIdentity.standardBarcodeValues().mapNotNull(::marketCanonicalGtin).flatMap { canonical ->
             listOf(canonical,canonical.trimStart('0')) + listOf(8,12,13).filter { length -> canonical.take(14-length).all { it=='0' } }.map { canonical.takeLast(it) }
         }.distinct()
-        val matching = if (codes.isEmpty()) emptyList() else query("""SELECT i.id,i.store_id,i.barcodes,i.barcode_models,i.measurement_unit_id
+        val barcodeArray = codes.joinToString(",", "{", "}")
+        // JDBC binds UUID store keys and text parameters in one ordered collection. Avoid
+        // reifying an inferred UUID/String intersection type when creating the vararg array.
+        val matchArguments = buildList<Any?> {
+            addAll(branchIds)
+            add(item.measurementUnitId)
+            add(barcodeArray)
+            add(barcodeArray)
+        }
+        val matching: List<GoodsItemDataModel> = if (codes.isEmpty()) emptyList() else query("""SELECT i.id,i.store_id,i.barcodes,i.barcode_models,i.measurement_unit_id
             FROM stock_items i WHERE i.is_active AND i.store_id IN (${branchIds.joinToString(",") { "?" }})
             AND i.measurement_unit_id=? AND
             ((i.barcodes::jsonb ??| ?::text[]) OR EXISTS(SELECT 1 FROM jsonb_array_elements(i.barcode_models::jsonb) bc WHERE bc->>'value'=ANY(?::text[])))
-            ORDER BY i.id LIMIT 5001""", *(branchIds + listOf(item.measurementUnitId,codes.joinToString(",","{","}"),codes.joinToString(",","{","}"))).toTypedArray()) { row ->
+            ORDER BY i.id LIMIT 5001""", *matchArguments.toTypedArray()) { row ->
             GoodsItemDataModel(id=row.getString("id"),storeId=row.getString("store_id"),
                 barcodes=jsonBase.decodeFromString(row.getString("barcodes")),barcodeModels=jsonBase.decodeFromString(row.getString("barcode_models")),
                 measurementUnitId=row.getString("measurement_unit_id"))

@@ -70,8 +70,12 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
             leadingIconPath = stateValues.drawablePathIconEmail,
             onTransformValue = { aitaAuthCodeDigits(it).take(6) }
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            actionButton(modifier = Modifier.weight(1f), text = confirmText,
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            actionButton(modifier = Modifier.fillMaxWidth(), text = confirmText,
                 enabled = !busy && !countdown.expired && value.length == 6 && !flow?.flowId.isNullOrBlank(),
                 loading = busy, autoLoading = false, onClick = onSubmit)
             trailingAction?.invoke()

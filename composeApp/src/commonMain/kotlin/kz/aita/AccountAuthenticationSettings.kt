@@ -640,10 +640,14 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                 onPasswordChange = { currentPassword = it },
                                 onSecondFactorChange = { secondFactor = it }
                             )
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.Start
+                            ) {
                             actionButton(
                                 autoLoading = false,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                                 text = authUiText("Get code", "Получить код", "Код алу", "Код алуу"),
                                 enabled = !loading && currentPassword.isNotBlank() &&
                                     (settings?.authenticatorEnabled != true || secondFactor.isNotBlank()) &&

@@ -415,7 +415,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                         item(key = "supplier-orders-loading") {
                             MessageText(
                                 modifier = Modifier.fillMaxWidth(),
-                                text = localizedStringResource(1141, "Please wait…")
+                                loadingLayout = LoadingLayout.SupplierOrder, text = localizedStringResource(1141, "Please wait…")
                             )
                         }
                     } else if (activeOrders.isEmpty()) {
@@ -434,12 +434,12 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                         }
                     } else if (expandedOrder != null) {
                         item(key = "supplier-order-back-${expandedOrder.id}") {
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                             ) {
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(254, "Orders"),
                                     iconPath = stateValues.drawablePathIconBackArrow,
                                     iconRes = stateValues.drawableResIconBackArrow.value,
@@ -449,7 +449,6 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                                 )
                                 actionButton(
                                     modifier = Modifier.size(48.dp),
-                                    fillMaxWidthIfTextPresent = false,
                                     text = "",
                                     iconPath = stateValues.drawablePathIconSupplierPartners,
                                     iconRes = stateValues.drawableResIconSupplierPartners.value,

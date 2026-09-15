@@ -45,7 +45,7 @@ class OfferDetailWiring(unittest.TestCase):
         source = (SERVER / 'MarketplaceRepository.kt').read_text()
         method = between(source, 'fun offerDetail(', '/** A public shop page')
         self.assertIn('val current = offer(user, id)', method)
-        self.assertIn('branchAvailability(current)', method)
+        self.assertIn('val availability = branchAvailability(current)', method)
         self.assertIn('MarketOfferDetailResult(user.toString(), current, availability.first, availability.second)', method)
         self.assertNotRegex(method, r'\b(INSERT INTO|DELETE FROM|UPDATE\s+\w+)')
         self.assertNotIn('dashboard', method)

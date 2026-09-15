@@ -1082,18 +1082,18 @@ internal fun AppConfiguration.SupplierBackorderWideFirstActionRow(
     item: SupplierDashboardBackorderDataModel,
     actions: List<SupplierBackorderCopyActionModel>
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
         SupplierBackorderOpenOrdersActionButton(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             item = item,
             textSize = stateValues.smallTextSize
         )
         actions.forEach { action ->
             SupplierBackorderCopyActionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 action = action,
                 textSize = stateValues.smallTextSize
             )
@@ -1125,13 +1125,13 @@ internal fun AppConfiguration.SupplierBackorderCopyActionRow(
     actions: List<SupplierBackorderCopyActionModel>,
     textSize: TextUnit
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
         actions.forEach { action ->
             SupplierBackorderCopyActionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 action = action,
                 textSize = textSize
             )
@@ -2047,12 +2047,12 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                                 )
                             }
                         } else {
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                             ) {
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(1549, "Confirm waiting orders"),
                                     iconPath = stateValues.drawablePathIconAppModeSupplier,
                                     iconRes = stateValues.drawableResIconAppModeSupplier.value,
@@ -2065,7 +2065,7 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                                     }
                                 )
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(1547, "Review contracts"),
                                     iconPath = stateValues.drawablePathIconSupplierContracts,
                                     iconRes = stateValues.drawableResIconSupplierContracts.value,
@@ -2073,7 +2073,7 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                                     onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) } }
                                 )
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     text = localizedStringResource(1453, "Partner stores"),
                                     iconPath = stateValues.drawablePathIconSupplierPartners,
                                     iconRes = stateValues.drawableResIconSupplierPartners.value,

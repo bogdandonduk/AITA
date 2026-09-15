@@ -62,6 +62,7 @@ fun AppConfiguration.ModalDialogWidget(
     Dialog(
         onDismissRequest = onDismiss,
     ) {
+        TransactionBarcodeModalGuard()
         Column(
             modifier = Modifier
                 .aitaDialogEntrance()
@@ -146,13 +147,18 @@ fun AppConfiguration.MessageText(
     textColor: Color = stateValues.TextColor,
     textSize: TextUnit = stateValues.accentTextSize,
     subTextColor: Color = textColor,
-    subTextSize: TextUnit = stateValues.textSize
+    subTextSize: TextUnit = stateValues.textSize,
+    loadingLayout: LoadingLayout? = null
 ) {
     val cleanSubText = subText?.takeIf { it.isNotBlank() }
     if (text == localizedStringResource(1141, "Please wait…") && cleanSubText == null) {
-        BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-            val compact = maxHeight < 100.dp
-            LoadingSkeleton(Modifier.fillMaxWidth().padding(if (compact) 8.dp else 16.dp), layout = LoadingLayout.Activity, rows = if (compact) 1 else 3, compact = compact)
+        Box(modifier, contentAlignment = Alignment.Center) {
+            if (loadingLayout != null) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), layout = loadingLayout)
+            else Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AitaBusyIndicator(Modifier.size(24.dp), stateValues.AccentColor)
+                Text(text, color = textColor, fontSize = textSize)
+            }
         }
         return
     }
@@ -469,6 +475,7 @@ internal fun AppConfiguration.WorkerDecisionNoteDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        TransactionBarcodeModalGuard()
         Column(
             modifier = Modifier
                 .aitaDialogEntrance()
@@ -514,12 +521,12 @@ internal fun AppConfiguration.WorkerDecisionNoteDialog(
                 onValueChange = { note = it.take(240) }
             )
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = stateValues.stringCancel,
                     iconPath = stateValues.drawablePathIconCancel,
                     enabledColor = stateValues.DisabledColor,
@@ -528,7 +535,7 @@ internal fun AppConfiguration.WorkerDecisionNoteDialog(
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = positiveButtonText,
                     iconPath = positiveIconPath,
                     enabledColor = positiveColor,
@@ -862,16 +869,16 @@ internal fun AppConfiguration.WorkerRoleTemplateManager(
         if (templates.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 templates.forEach { template ->
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(stateValues.cornerRadius))
                             .background(stateValues.BackgroundColor)
                             .padding(stateValues.marginTextField),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = workerRoleLabel(template.id, templates),
                                 color = stateValues.TextColor,
@@ -930,19 +937,19 @@ internal fun AppConfiguration.WorkerRoleTemplateManager(
             onValueChange = { descriptionText = it.take(180) }
         )
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = workerRoleLabel(WORKER_ROLE_STANDARD),
                 iconPath = stateValues.drawablePathIconPerson,
                 confirmationRequired = false,
                 onClick = { permissionsText = defaultAssignablePermissionsForWorkerRole(WORKER_ROLE_STANDARD, assignablePermissions, templates).joinToString("|") }
             )
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = workerRoleLabel(WORKER_ROLE_ADMIN),
                 iconPath = stateValues.drawablePathIconSecurity,
                 confirmationRequired = false,
@@ -956,12 +963,12 @@ internal fun AppConfiguration.WorkerRoleTemplateManager(
             onChanged = { permissionsText = it.distinct().joinToString("|") }
         )
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = stateValues.stringCancel,
                 iconPath = stateValues.drawablePathIconCancel,
                 enabledColor = stateValues.DisabledColor,
@@ -969,7 +976,7 @@ internal fun AppConfiguration.WorkerRoleTemplateManager(
                 onClick = { resetEditor() }
             )
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(471, "Save"),
                 enabled = nameText.isNotBlank() && permissions.isNotEmpty(),
                 iconPath = stateValues.drawablePathIconCheck,
@@ -1176,12 +1183,12 @@ internal fun AppConfiguration.WorkerRequestCard(
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1434, "Send job offer"),
                 iconPath = stateValues.drawablePathIconCheck,
                 confirmationRequired = false,
@@ -1189,7 +1196,7 @@ internal fun AppConfiguration.WorkerRequestCard(
             )
 
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 enabledColor = stateValues.ErrorColor,
                 text = localizedStringResource(469, "Decline"),
                 iconPath = stateValues.drawablePathIconCancel,
@@ -1284,12 +1291,12 @@ internal fun AppConfiguration.WorkerRemovalRequestCard(
             )
         }
 
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1228, "Confirm removal"),
                 enabledColor = stateValues.ErrorColor,
                 iconPath = stateValues.drawablePathIconCancel,
@@ -1297,7 +1304,7 @@ internal fun AppConfiguration.WorkerRemovalRequestCard(
                 onClick = { decisionDialog = "confirm" }
             )
             actionButton(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(1229, "Keep my access"),
                 iconPath = stateValues.drawablePathIconCheck,
                 confirmationRequired = false,
@@ -1810,13 +1817,13 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                                verticalAlignment = Alignment.Top
+                                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+                                horizontalAlignment = Alignment.Start
                             ) {
                                 SimpleTextInput(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     value = storeIdText,
                                     placeholder = localizedStringResource(657, "Enter store or branch public ID"),
                                     leadingIconPath = stateValues.drawablePathIconStores,
@@ -1826,7 +1833,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                                 )
 
                                 actionButton(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.fillMaxWidth(),
                                     enabled = storeIdText.isNotBlank(),
                                     text = localizedStringResource(477, "Send request"),
                                     iconPath = stateValues.drawablePathIconCheck,
@@ -1994,19 +2001,19 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                                    Row(
+                                    Column(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                                     ) {
                                         actionButton(
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.fillMaxWidth(),
                                             text = localizedStringResource(1443, "Accept job offer"),
                                             iconPath = stateValues.drawablePathIconCheck,
                                             confirmationRequired = false,
                                             onClick = { decisionDialog = "accept" }
                                         )
                                         actionButton(
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.fillMaxWidth(),
                                             text = localizedStringResource(1444, "Decline job offer"),
                                             enabledColor = stateValues.ErrorColor,
                                             iconPath = stateValues.drawablePathIconCancel,
@@ -3077,6 +3084,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
     val weekDays = listOf(411L, 412L, 413L, 414L, 415L, 416L, 417L)
 
     Dialog(onDismissRequest = onDismiss) {
+        TransactionBarcodeModalGuard()
         Column(
             modifier = Modifier
                 .aitaDialogEntrance()
@@ -3109,8 +3117,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 actionButton(
-                    fillMaxWidthIfTextPresent = false,
-                    text = "‹",
+                    text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("‹", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = localizedStringResource(577, "Previous"),
                     iconPath = null,
                     confirmationRequired = false,
                     onClick = {
@@ -3149,8 +3156,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
                 }
 
                 actionButton(
-                    fillMaxWidthIfTextPresent = false,
-                    text = "›",
+                    text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("›", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = localizedStringResource(579, "Next"),
                     iconPath = null,
                     confirmationRequired = false,
                     onClick = {
@@ -3203,16 +3209,14 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
                         )
 
                         actionButton(
-                            fillMaxWidthIfTextPresent = false,
-                            text = "‹",
+                            text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("‹", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = localizedStringResource(577, "Previous"),
                             iconPath = null,
                             confirmationRequired = false,
                             onClick = { yearPickerStart = (yearPickerStart - 12).coerceAtLeast(1970) }
                         )
 
                         actionButton(
-                            fillMaxWidthIfTextPresent = false,
-                            text = "›",
+                            text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("›", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = localizedStringResource(579, "Next"),
                             iconPath = null,
                             confirmationRequired = false,
                             onClick = { yearPickerStart = (yearPickerStart + 12).coerceAtMost(2489) }
@@ -3319,12 +3323,12 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     enabledColor = stateValues.DisabledColor,
                     text = stateValues.stringCancel,
                     confirmationRequired = false,
@@ -3332,7 +3336,7 @@ internal fun AppConfiguration.TransactionHistoryCalendarDialog(
                 )
 
                 actionButton(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(260, "Today"),
                     confirmationRequired = false,
                     onClick = {
@@ -3690,12 +3694,12 @@ fun AppConfiguration.MenuTransactionHistoryScreen() {
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
                 ) {
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(409, "Refresh history"),
                         iconPath = stateValues.drawablePathIconTransactionHistory,
                         confirmationRequired = false,
@@ -3703,7 +3707,7 @@ fun AppConfiguration.MenuTransactionHistoryScreen() {
                     )
 
                     actionButton(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         enabledColor = stateValues.DisabledColor,
                         text = localizedStringResource(390, "Clear period"),
                         iconPath = stateValues.drawablePathIconCancel,
@@ -3950,7 +3954,7 @@ internal fun SupplierDataModel.visibleSupplierName(language: String): String {
         "ky" -> "Жеткирүүчү"
         else -> "Supplier"
     }
-    return name.visibleLocalizedString(language, id.ifBlank { fallback })
+    return name.visibleLocalizedString(language, fallback)
 }
 
 @Composable
@@ -4054,9 +4058,6 @@ internal fun AppConfiguration.SupplierCard(
             StockCardInfoLine(localizedStringResource(621, "Supplier email"), it.joinToString(", "), stateValues.TextColor)
         }
 
-        if (supplier.id.isNotBlank()) {
-            StockCardInfoLine("ID", supplier.id, stateValues.TextColor)
-        }
     }
 }
 
@@ -5290,16 +5291,16 @@ internal fun AppConfiguration.NoActiveWorkshiftMenuTile() {
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
-                NoActiveWorkshiftMenuTileText(modifier = Modifier.weight(1f))
+                NoActiveWorkshiftMenuTileText(modifier = Modifier.fillMaxWidth())
                 actionButton(
-                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp),
+                    autoLoading = false,
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1091, "Start shift"),
-                    fillMaxWidthIfTextPresent = false,
                     iconPath = stateValues.drawablePathIconWorkers,
                     confirmationRequired = false,
                     onClick = { showWorkshiftStartDialog() }
@@ -5365,16 +5366,16 @@ internal fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMo
                 )
             }
         } else {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
-                ActiveWorkshiftMenuTileText(workshift = workshift, modifier = Modifier.weight(1f))
+                ActiveWorkshiftMenuTileText(workshift = workshift, modifier = Modifier.fillMaxWidth())
                 actionButton(
-                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp),
+                    autoLoading = false,
+                    modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(650, "End workshift"),
-                    fillMaxWidthIfTextPresent = false,
                     iconPath = stateValues.drawablePathIconCancel,
                     enabledColor = stateValues.ErrorColor,
                     confirmationRequired = true,
@@ -6079,14 +6080,18 @@ internal fun AppConfiguration.PaymentIntentCard(intent: TopUpPaymentIntentDataMo
             .padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(intent.amount.money(intent.currencyCode), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
                 Text(intent.providerId + " · " + intent.status, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             }
             if (intent.status != PAYMENT_STATUS_PAID) {
                 actionButton(
-                    fillMaxWidthIfTextPresent = false,
+                    autoLoading = false,
                     text = localizedStringResource(594, "Confirm test payment"),
                     iconPath = stateValues.drawablePathIconCheck,
                     confirmationRequired = true,

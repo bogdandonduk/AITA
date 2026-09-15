@@ -592,7 +592,7 @@ internal fun AppConfiguration.buildSupplierPartnerItems(
                             ?.visibleLocalizedString(stateValues.appLanguage, "")
                             .orEmpty()
                     }
-                    .ifBlank { supplierId.take(8) }
+                    .ifBlank { stateValues.stringNoName }
             }.distinct()
 
             val orderBundles = groupOrders.associateWith { order ->

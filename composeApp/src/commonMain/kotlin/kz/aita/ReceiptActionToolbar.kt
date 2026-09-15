@@ -37,7 +37,6 @@ internal fun AppConfiguration.ReceiptActionToolbar(
                     actionButton(
                         modifier = Modifier.size(44.dp),
                         text = "",
-                        fillMaxWidthIfTextPresent = false,
                         iconPath = "svg/${action.family}_${if (dark) 1 else 0}.svg",
                         iconRes = action.res,
                         iconContentDescription = action.label,

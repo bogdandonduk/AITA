@@ -66,7 +66,7 @@ internal fun buildSupplierOrderPromiseBuckets(
                 .map { line ->
                     line.goodsItemNameSnapshot.firstOrNull { it.value.isNotBlank() }?.value
                         ?: line.goodsItemBarcodeSnapshots.firstOrNull { it.isNotBlank() }
-                        ?: line.goodsItemId.take(8)
+                        ?: ""
                 }
                 .filter { it.isNotBlank() }
                 .joinToString(" • ")
