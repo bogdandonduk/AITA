@@ -1,0 +1,78 @@
+package kz.aita
+
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+
+/** Independently outlined, start-aligned tabs. Short selectors wrap; long selectors scroll. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun AppConfiguration.AitaTabChips(
+    tabs: List<TabContent>, selectedId: String, enabled: Boolean, scrollable: Boolean,
+    cornerRadius: Dp, textSize: TextUnit, selectedContainerColor: Color, unselectedContainerColor: Color,
+    selectedTextColor: Color, unselectedTextColor: Color, onSelected: (TabContent) -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+        val chipMaximum = minOf(360.dp, (maxWidth - 8.dp).coerceAtLeast(48.dp))
+        @Composable fun Chip(tab: TabContent) {
+            val selected = tab.id == selectedId
+            val container by animateColorAsState(if (selected) selectedContainerColor else unselectedContainerColor)
+            val ink by animateColorAsState(if (selected) selectedTextColor else unselectedTextColor)
+            val shape = RoundedCornerShape(cornerRadius)
+            Row(
+                Modifier.widthIn(min = minOf(64.dp, chipMaximum), max = chipMaximum).heightIn(min = 48.dp).padding(2.dp)
+                    .foregroundTactileShadow(cornerRadius, elevated = selected)
+                    .clip(shape).background(if (!selected && container == Color.Transparent) stateValues.BackgroundColor else container)
+                    .border(if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+                        if (selected) selectedContainerColor else stateValues.PlaceholderTextColor.copy(alpha = .65f), shape)
+                    .alpha(if (enabled) 1f else .55f)
+                    .selectable(selected = selected, enabled = enabled, role = Role.Tab,
+                        interactionSource = remember { MutableInteractionSource() }, indication = ripple(color = ink),
+                        onClick = { onSelected(tab) })
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                CpImage(Modifier.size(19.dp), url = marketIconPath(tab.icon.family), fallbackRes = tabIconResource(tab.icon),
+                    contentDescription = null, tintColor = ink)
+                Text(tab.text, color = ink, fontSize = textSize, fontWeight = FontWeight.Bold,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (scrollable) {
+            val state = rememberLazyListState()
+            LaunchedEffect(selectedId, tabs.map { it.id }) {
+                val index = tabs.indexOfFirst { it.id == selectedId }
+                if (index >= 0 && state.layoutInfo.visibleItemsInfo.none { it.index == index }) state.scrollToItem(index)
+            }
+            LazyRow(Modifier.fillMaxWidth().selectableGroup(), state = state,
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start), contentPadding = PaddingValues(vertical = 4.dp)) {
+                items(tabs, key = { it.id }) { Chip(it) }
+            }
+        } else FlowRow(Modifier.fillMaxWidth().selectableGroup().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.Start), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            tabs.forEach { tab -> key(tab.id) { Chip(tab) } }
+        }
+    }
+}
