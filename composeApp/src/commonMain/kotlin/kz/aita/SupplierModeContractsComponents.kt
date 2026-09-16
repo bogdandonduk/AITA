@@ -1216,7 +1216,7 @@ internal fun AppConfiguration.SupplierContractDetail(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
+                .align(Alignment.Start)
                 .padding(vertical = stateValues.marginTextField / 2),
         )
 
@@ -1269,7 +1269,7 @@ internal fun AppConfiguration.SupplierContractDetail(
                     }
                 }
             } else {
-                MessageText(text = stateValues.stringListEmpty)
+                MessageText(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), text = stateValues.stringListEmpty)
             }
         }
 

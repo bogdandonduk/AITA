@@ -193,7 +193,9 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
             )
         }
     ) {
+        val emptySpaceListState = androidx.compose.foundation.lazy.rememberLazyListState()
         LazyColumn(
+            state = emptySpaceListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -202,7 +204,7 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(
                 top = stateValues.marginTextField,
-                bottom = stateValues.screenHeight / 5
+                bottom = stateValues.marginTextField
             )
         ) {
             if (!hasSupplierProfile) {
@@ -292,9 +294,9 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
 
                     when {
                         catalogItems.isEmpty() -> {
-                            item {
+                            item(key = "supplier-catalog-empty") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-catalog-empty"),
                                     text = localizedStringResource(1418, "No catalog items yet"),
                                     subText = localizedStringResource(
                                         1419,
@@ -306,9 +308,9 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
                         }
 
                         filteredItems.isEmpty() -> {
-                            item {
+                            item(key = "supplier-catalog-filtered-empty") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-catalog-filtered-empty"),
                                     text = localizedStringResource(
                                         1420,
                                         "No catalog items match this filter"

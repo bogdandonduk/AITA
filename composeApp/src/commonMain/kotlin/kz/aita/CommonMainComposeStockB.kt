@@ -1414,7 +1414,7 @@ internal fun AppConfiguration.StockBranchAvailabilitySection(
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
         if (locations.isEmpty()) {
-            MessageText(text = stateValues.stringListEmpty)
+            MessageText(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), text = stateValues.stringListEmpty)
         } else {
             currentLocation?.let {
                 StockLocationAvailabilityCard(

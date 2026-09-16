@@ -290,19 +290,20 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
                 TabContent("readiness", authUiText("Readiness", "Готовность", "Дайындық", "Даярдык"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
+        val emptySpaceListState = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Identity.Main, "sections:$section")
         LazyColumn(
-            state = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Identity.Main, "sections:$section"),
+            state = emptySpaceListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
                 .padding(stateValues.marginTextField),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+            contentPadding = PaddingValues(bottom = stateValues.marginTextField)
         ) {
             item {
                 Column(
@@ -329,7 +330,7 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
 
             if (section == "readiness") {
                 if (items.isEmpty()) {
-                    item { MessageText(Modifier.fillMaxWidth(), localizedStringResource(2514, "No supplier profiles yet. Create the identity stores will order from.")) }
+                    item(key = "supplier-profiles-readiness-empty") { MessageText(Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-profiles-readiness-empty"), localizedStringResource(2514, "No supplier profiles yet. Create the identity stores will order from.")) }
                 } else {
                     item {
                         SupplierWorkspaceReadinessCard(
@@ -342,10 +343,10 @@ internal fun AppConfiguration.SupplierProfilesScreen() {
 
             if (section == "profiles") {
                 if (items.isEmpty()) {
-                    item {
+                    item(key = "supplier-profiles-empty") {
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                            modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-profiles-empty"),
+                            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField, Alignment.CenterVertically)
                         ) {
                             MessageText(
                                 modifier = Modifier.fillMaxWidth(),

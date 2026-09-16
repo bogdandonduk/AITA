@@ -2177,7 +2177,7 @@ internal fun AppConfiguration.SupplierBackorderWatchCard(item: SupplierDashboard
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
+                .align(Alignment.Start)
                 .padding(vertical = stateValues.marginTextField / 2),
         )
 

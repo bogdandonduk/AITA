@@ -5973,13 +5973,10 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
                                 Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                                TransactionPlainTextField(
-                                    title = stateValues.stringPhoneNumber,
+                                DebtorPhoneInput(
                                     value = newDebtorPhone,
-                                    placeholder = stateValues.stringPhoneNumber,
-                                    leadingIconPath = stateValues.drawablePathIconPerson,
-                                    keyboardType = KeyboardType.Phone,
-                                    onValueChange = { paymentDraftEdited = true; newDebtorPhone = it.filter { ch -> ch.isDigit() || ch == '+' } }
+                                    identityKey = "payment-debtor-phone:${stateValues.userAccount?.id}:${stateValues.activeStoreId}:${context.transactionTypeIndex}:${context.clientId}",
+                                    onValueChange = { paymentDraftEdited = true; newDebtorPhone = it }
                                 )
 
                                 Spacer(modifier = Modifier.height(stateValues.marginTextField))

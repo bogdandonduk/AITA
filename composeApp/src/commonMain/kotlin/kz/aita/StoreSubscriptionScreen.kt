@@ -84,6 +84,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
     val dashboard = (dashboardState as? DataState.Success<SubscriptionDashboardDataModel>)?.payload
         ?.takeIf { it.subscription.storeId == storeId }
     val subscription = dashboard?.subscription
+    val lifetimeOnly = hasAccess && subscription?.accessKind == SUBSCRIPTION_ACCESS_LIFETIME
     val scope = rememberCoroutineScope()
     // Drafts/commands live ABOVE tab branches. Promo secrets are not saved in Android instance state.
     var promo by remember(accountId, storeId) { mutableStateOf("") }
@@ -123,28 +124,25 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
         Modifier.fillMaxSize(),
         appBar = {
             ScreenAppBarWidget(title = stateValues.stringSubscription, iconPath = stateValues.drawablePathIconSubscription,
-                onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+                onBack = if (Navigation.Menu.isVeryFirstScreen(stateValues.isNarrowScreen)) null
+                    else { { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } } })
         }
     ) {
         if (storeId == null) {
             SubscriptionRequiredPane(Modifier.weight(1f))
             return@AitaScreenColumn
         }
-        val store = stateValues.stores.orEmpty().flattenStoresWithBranches().firstOrNull { it.id == storeId }
-        Text(store?.name?.visibleLocalizedString(stateValues.appLanguage, storeId) ?: storeId,
-            Modifier.align(Alignment.CenterHorizontally).padding(stateValues.marginTextField),
-            color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-        val tabs = listOf(TabContent("current", localizedStringResource(587, "Current subscription")),
+        val tabs = listOf(TabContent("current", localizedStringResource(587, "Current subscription"), icon = AitaTabIcon.Security),
             TabContent("plans", authUiText("Plans", "Тарифы", "Тарифтер", "Тарифтер"))) +
             if (dashboard?.canManage == true) listOf(TabContent("charges", localizedStringResource(589, "Subscription charges"))) else emptyList()
-        val section = sectionTabsWidget(stateKey = "location-subscription:$accountId:$storeId", tabs = tabs,
+        val section = if (lifetimeOnly) "current" else sectionTabsWidget(stateKey = "location-subscription:$accountId:$storeId", tabs = tabs,
             modifier = Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField))
         LazyColumn(state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.StoreSubscriptionPlans, "$storeId:$section"),
             modifier = Modifier.weight(1f).fillMaxWidth().aitaWidthCap(760.dp)
                 .align(Alignment.CenterHorizontally).aitaPaneEntrance(section).padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
-            if (feedback != null) item("feedback") {
+            if (feedback != null && (!lifetimeOnly || feedbackNegative)) item("feedback") {
                 Text(feedback.orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
                     color = if (feedbackNegative) stateValues.ErrorColor else stateValues.OkayColor, fontSize = stateValues.smallTextSize)
             }
@@ -159,7 +157,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                     }
                 }
             } else {
-                if (pendingId != null) item("pending-command") {
+                if (pendingId != null && !lifetimeOnly) item("pending-command") {
                     SubscriptionSurface {
                         Text(eventMessage("subscription.result_unknown").visibleLocalizedString(stateValues.appLanguage, ""),
                             color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
@@ -220,7 +218,7 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                             onClick = { launchAction { refreshStoreSubscriptionNow(storeId) } })
                     }
                 }
-                if (section == "plans") {
+                if (!lifetimeOnly && section == "plans") {
                     val plan = dashboard.plans.firstOrNull { it.id == SUBSCRIPTION_BASIC_PLAN && !it.hidden }
                     if (plan == null) item("no-regional-price") { MessageText(text = eventMessage("subscription.price_unavailable").visibleLocalizedString(stateValues.appLanguage, "")) }
                     else item("basic-offer") {
@@ -283,8 +281,8 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                         }
                     }
                 }
-                if (section == "charges" && dashboard.canManage) {
-                    if (dashboard.charges.isEmpty()) item("no-charges") { MessageText(text = stateValues.stringListEmpty) }
+                if (!lifetimeOnly && section == "charges" && dashboard.canManage) {
+                    if (dashboard.charges.isEmpty()) item("no-charges") { MessageText(Modifier.fillParentMaxSize(), text = stateValues.stringListEmpty) }
                     items(dashboard.charges, key = { it.id }) { charge ->
                         FinanceLedgerCard(title = if (charge.planId == SUBSCRIPTION_LIFETIME_PLAN) authUiText("Lifetime access", "Бессрочный доступ", "Мерзімсіз қолжетімділік", "Мөөнөтсүз мүмкүнчүлүк") else "Basic",
                             subtitle = if (charge.status == "promo_grant") authUiText("Promo code activated", "Активировано промокодом", "Промокодпен қосылған", "Промокод иштетилди") else when (charge.status) {

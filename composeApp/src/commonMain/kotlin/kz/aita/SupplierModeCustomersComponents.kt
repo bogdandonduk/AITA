@@ -771,7 +771,7 @@ internal fun AppConfiguration.SupplierPartnerDetail(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
+                .align(Alignment.Start)
                 .padding(vertical = stateValues.marginTextField / 2),
         )
 

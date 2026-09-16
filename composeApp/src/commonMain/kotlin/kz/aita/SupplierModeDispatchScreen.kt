@@ -278,7 +278,9 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                 stableKey = { it.key },
             )
         }
+        val emptySpaceListState = androidx.compose.foundation.lazy.rememberLazyListState()
         LazyColumn(
+            state = emptySpaceListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.80f)
@@ -287,7 +289,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(
                 top = stateValues.marginTextField,
-                bottom = stateValues.screenHeight / 5
+                bottom = stateValues.marginTextField
             )
         ) {
             if (!hasSupplierProfile) {
@@ -387,7 +389,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                         runs.isEmpty() -> {
                             item(key = "dispatch-empty") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "dispatch-empty"),
                                     text = localizedStringResource(2448, "No delivery work yet"),
                                     subText = localizedStringResource(
                                         2449,
@@ -401,7 +403,7 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                         filteredRuns.isEmpty() -> {
                             item(key = "dispatch-filtered-empty") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "dispatch-filtered-empty"),
                                     text = localizedStringResource(2459, "No delivery run matches these filters")
                                 )
                             }

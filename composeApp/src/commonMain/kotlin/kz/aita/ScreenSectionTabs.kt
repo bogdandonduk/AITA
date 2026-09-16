@@ -28,7 +28,7 @@ internal fun AppConfiguration.sectionTabsWidget(
     tabRowWidget(
         modifier = modifier,
         tabs = tabs.map { tab ->
-            TabContent(tab.id, tab.text) { id ->
+            TabContent(tab.id, tab.text, icon = tab.icon) { id ->
                 rememberedId = id
                 onSelected?.invoke(id)
                 tab.onClick?.invoke(id)

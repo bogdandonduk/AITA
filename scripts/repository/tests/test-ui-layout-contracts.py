@@ -83,38 +83,47 @@ class UiLayoutContractsTest(unittest.TestCase):
         self.assertIn("key = { model -> model.route }", listing)
         self.assertIn("contentDescription = model.name", listing)
 
-    def test_menu_order_in_every_declared_list(self):
+    def test_menu_lists_keep_normal_account_and_mode_entries(self):
         lists = source("CommonMainComposeMenuA.kt") + source("CommonMainComposeNavigation.kt")
-        expected = r"NavigationScreenModel\.Menu\.UserAccount,\s*NavigationScreenModel\.Menu\.AppMode,\s*NavigationScreenModel\.Menu\.Work,"
+        expected = r"NavigationScreenModel\.Menu\.UserAccount,\s*NavigationScreenModel\.Menu\.AppMode,"
         self.assertEqual(3, len(re.findall(expected, lists)))
+        self.assertNotRegex(lists, r"NavigationScreenModel\.Menu\.Work(?:\s|,|->)")
 
-    def test_work_is_wired_in_all_three_menu_dispatchers(self):
+    def test_workers_is_wired_in_all_three_menu_dispatchers(self):
         menu = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuScreen")
-        self.assertEqual(3, len(re.findall(r"is NavigationScreenModel\.Menu\.Work ->\s*\{\s*MenuWorkScreen\(\)", menu)))
+        self.assertEqual(3, len(re.findall(r"is NavigationScreenModel\.Menu\.Workers ->\s*\{\s*MenuWorkersScreen\(\)", menu)))
+        self.assertFalse((KOTLIN / "MenuWorkScreen.kt").exists())
 
-    def test_worker_identity_was_moved_not_duplicated(self):
+    def test_worker_identity_lives_only_in_my_work(self):
         account = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuUserAccountScreen")
-        work = source("MenuWorkScreen.kt")
+        identity = source("WorkerIdentityCard.kt")
+        workers = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuWorkersScreen")
         for text in ("Your public worker ID", "Use this ID when a store owner invites you as a worker", "visibleWorkerInviteId()"):
             self.assertNotIn(text, account)
-            self.assertIn(text, work)
-        self.assertIn("ClipboardCopyButton(textToCopy = account.visibleWorkerInviteId())", work)
-        self.assertIn("if (account == null)", work)
-        self.assertIn("rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Work)", work)
+            self.assertIn(text, identity)
+        self.assertIn("ClipboardCopyButton(textToCopy = account.visibleWorkerInviteId())", identity)
+        self.assertIn("val account = stateValues.userAccount ?: return", identity)
+        self.assertRegex(workers, r'if \(selectedTab.id == "my_work"\) \{\s*WorkerIdentityCard')
+        self.assertEqual(1, workers.count("WorkerIdentityCard("))
 
-    def test_personal_work_does_not_change_worker_authorization(self):
+    def test_personal_identity_does_not_unlock_management(self):
         menu = source("CommonMainComposeMenuA.kt")
         start = menu.index("internal fun menuDestinationRequiresStoreSubscription")
         end = menu.index("internal fun AppConfiguration.canOpenMenuDestination", start)
-        self.assertNotRegex(menu[start:end], r"NavigationScreenModel\.Menu\.Work(?:\s|,|->)")
-        self.assertIn("NavigationScreenModel.Menu.Workers -> activeOwnerFallback || currentUserCanViewWorkers(activeStoreId)", menu)
-        self.assertNotIn("getStoreWorkers(", source("MenuWorkScreen.kt"))
+        self.assertNotIn("NavigationScreenModel.Menu.Workers,", menu[start:end])
+        self.assertIn("NavigationScreenModel.Menu.Workers -> true", menu)
+        workers = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuWorkersScreen")
+        self.assertIn("storeAccess && activeStoreId != null && currentUserCanViewWorkers(activeStoreId)", workers)
+        self.assertIn("storeAccess && activeStoreId != null && currentUserCanInviteWorkers(activeStoreId)", workers)
+        self.assertIn("if (canViewStoreWorkers && activeStoreId != null) getStoreWorkers(activeStoreId)", workers)
+        self.assertNotIn("getStoreWorkers(", source("WorkerIdentityCard.kt"))
 
-    def test_work_route_is_registered_for_persistence(self):
+    def test_legacy_work_route_is_an_alias_not_another_screen(self):
         nav = source("CommonMainComposeNavigation.kt")
-        self.assertEqual(1, nav.count('Menu("MenuWorkNavigationScreenModelRoute")'))
+        self.assertNotIn('Menu("MenuWorkNavigationScreenModelRoute")', nav)
+        self.assertIn('if (route == "MenuWorkNavigationScreenModelRoute") NavigationScreenModel.Menu.Workers', nav)
         registry = nav.split("internal fun persistentAppNavigationScreens()", 1)[1].split("internal fun persistentAppRouteToScreen", 1)[0]
-        self.assertEqual(1, len(re.findall(r"NavigationScreenModel\.Menu\.Work,", registry)))
+        self.assertEqual(1, registry.count("NavigationScreenModel.Menu.Workers,"))
 
     def test_new_label_is_mirrored_and_available_offline(self):
         paths = [ROOT / "server/assets/values/strings.json",
@@ -138,9 +147,9 @@ class UiLayoutContractsTest(unittest.TestCase):
         offline = {language: json.loads('"' + text + '"') for language, text in pairs}
         self.assertEqual(values, offline)
 
-    def test_work_reuses_the_existing_android_compatible_worker_icon(self):
-        work = source("MenuWorkScreen.kt")
-        self.assertIn("iconRes = stateValues.drawableResIconWorkers.value", work)
+    def test_worker_identity_reuses_the_existing_android_compatible_worker_icon(self):
+        work = source("WorkerIdentityCard.kt")
+        self.assertIn("fallbackRes = stateValues.drawableResIconWorkers.value", work)
         for variant in (0, 1):
             svg = ROOT / f"composeApp/src/commonMain/composeResources/drawable/22_{variant}.svg"
             vector = ROOT / f"composeApp/src/androidMain/res/drawable/ic_aita_22_{variant}.xml"

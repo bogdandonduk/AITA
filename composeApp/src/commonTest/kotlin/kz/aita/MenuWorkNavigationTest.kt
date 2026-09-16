@@ -7,12 +7,13 @@ import kotlin.test.assertTrue
 
 class MenuWorkNavigationTest {
     @Test
-    fun everyModePlacesAppModeImmediatelyAfterAccountAndIncludesPersonalWork() {
+    fun everyModeKeepsAccountAndAppModeAndOneWorkersDestination() {
         listOf(APP_MODE_STORE, APP_MODE_SUPPLIER, APP_MODE_BUYER, APP_MODE_MANUFACTURER).forEach { mode ->
             val destinations = menuDestinationsForAppMode(mode)
             assertEquals(NavigationScreenModel.Menu.UserAccount, destinations.first(), "Mode $mode")
             assertEquals(NavigationScreenModel.Menu.AppMode, destinations[1], "Mode $mode")
-            assertEquals(NavigationScreenModel.Menu.Work, destinations[2], "Mode $mode")
+            assertEquals(1, destinations.count { it == NavigationScreenModel.Menu.Workers }, "Mode $mode")
+            assertFalse(destinations.any { it.route == "MenuWorkNavigationScreenModelRoute" })
             assertEquals(destinations.size, destinations.map { it.route }.distinct().size, "Mode $mode")
         }
     }
@@ -24,26 +25,27 @@ class MenuWorkNavigationTest {
 
     @Test
     fun personalWorkDoesNotUnlockStoreWorkerManagement() {
-        assertFalse(menuDestinationRequiresStoreSubscription(NavigationScreenModel.Menu.Work))
-        assertFalse(NavigationScreenModel.Menu.Work.isTemporarilyHiddenFromUi())
-        assertTrue(menuDestinationRequiresStoreSubscription(NavigationScreenModel.Menu.Workers))
+        assertFalse(menuDestinationRequiresStoreSubscription(NavigationScreenModel.Menu.Workers))
+        assertFalse(NavigationScreenModel.Menu.Workers.isTemporarilyHiddenFromUi())
+        assertFalse(menuDestinationRequiresStoreSubscription(NavigationScreenModel.Menu.Workers))
         assertTrue(menuDestinationRequiresStoreSubscription(NavigationScreenModel.Menu.AddEditWorker))
     }
 
     @Test
     fun workRouteHasExactlyOnePersistentOwner() {
-        val work = NavigationScreenModel.Menu.Work
+        val work = NavigationScreenModel.Menu.Workers
         assertEquals(work, persistentAppRouteToScreen(work.route))
         assertEquals(1, persistentAppNavigationScreens().count { it.route == work.route })
-        assertTrue(work.route != NavigationScreenModel.Menu.Workers.route)
+        assertEquals(work, persistentAppRouteToScreen("MenuWorkNavigationScreenModelRoute"))
+        assertEquals(0, persistentAppNavigationScreens().count { it.route == "MenuWorkNavigationScreenModelRoute" })
         assertTrue(work.route != NavigationScreenModel.Menu.UserAccount.route)
     }
 
     @Test
     fun narrowWorkRestoreKeepsMenuAsBackDestination() {
         assertEquals(
-            listOf(NavigationScreenModel.Menu.List, NavigationScreenModel.Menu.Work),
-            listOf(NavigationScreenModel.Menu.List.route, NavigationScreenModel.Menu.Work.route)
+            listOf(NavigationScreenModel.Menu.List, NavigationScreenModel.Menu.Workers),
+            listOf(NavigationScreenModel.Menu.List.route, "MenuWorkNavigationScreenModelRoute")
                 .toPersistentMenuStack(NavigationScreenModel.Menu.List)
         )
     }
@@ -51,8 +53,8 @@ class MenuWorkNavigationTest {
     @Test
     fun wideWorkRestoreKeepsAccountAsBackDestination() {
         assertEquals(
-            listOf(NavigationScreenModel.Menu.UserAccount, NavigationScreenModel.Menu.Work),
-            listOf(NavigationScreenModel.Menu.Work.route)
+            listOf(NavigationScreenModel.Menu.UserAccount, NavigationScreenModel.Menu.Workers),
+            listOf("MenuWorkNavigationScreenModelRoute")
                 .toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount)
         )
     }
@@ -60,8 +62,8 @@ class MenuWorkNavigationTest {
     @Test
     fun unknownPersistedRouteDoesNotHideTheLastValidWorkScreen() {
         assertEquals(
-            listOf(NavigationScreenModel.Menu.List, NavigationScreenModel.Menu.Work),
-            listOf(NavigationScreenModel.Menu.Work.route, "unavailable-future-route")
+            listOf(NavigationScreenModel.Menu.List, NavigationScreenModel.Menu.Workers),
+            listOf(NavigationScreenModel.Menu.Workers.route, "unavailable-future-route")
                 .toPersistentMenuStack(NavigationScreenModel.Menu.List)
         )
     }

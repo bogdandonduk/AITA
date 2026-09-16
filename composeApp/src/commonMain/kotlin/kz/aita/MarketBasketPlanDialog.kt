@@ -226,11 +226,11 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
                     item(key = "plans") {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             if (result.currencies.size > 1) sectionTabsWidget("basket-currency:$account",
-                                result.currencies.map { TabContent(it.currencyCode, it.currencyCode) }, selectedId = group.currencyCode, onSelected = {
+                                result.currencies.map { TabContent(it.currencyCode, it.currencyCode, icon = AitaTabIcon.Money) }, selectedId = group.currencyCode, onSelected = {
                                     if (data.active && owner?.isCurrent() == true && currency != it) { data.select(); currency = it }
                                 })
                             sectionTabsWidget("basket-plan:$account", listOf(
-                                TabContent(MARKET_BASKET_CURRENT, authUiText("Current", "Сейчас", "Қазір", "Учурдагы")),
+                                TabContent(MARKET_BASKET_CURRENT, authUiText("Current", "Сейчас", "Қазір", "Учурдагы"), icon = AitaTabIcon.Basket),
                                 TabContent(MARKET_BASKET_ONE_SHOP, authUiText("1 shop", "1 магазин", "1 дүкен", "1 дүкөн")),
                                 TabContent(MARKET_BASKET_TWO_SHOPS, authUiText("Up to 2", "До 2 магазинов", "2 дүкенге дейін", "2ге чейин")),
                                 TabContent(MARKET_BASKET_LOWEST_ITEMS, authUiText("Lower total", "Меньше сумма", "Төмен сома", "Төмөнүрөөк жалпы сумма"))),

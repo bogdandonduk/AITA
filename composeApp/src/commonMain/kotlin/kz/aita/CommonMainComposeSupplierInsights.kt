@@ -1369,7 +1369,7 @@ internal fun AppConfiguration.SupplierInsightsBackorderWatchSummaryCard(
                     supplierBackorderNow = supplierBackorderNow
                 )
             } else {
-                MessageText(text = stateValues.stringListEmpty)
+                MessageText(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), text = stateValues.stringListEmpty)
             }
         }
         summaries.firstOrNull { it.id == section }?.let { summary ->
@@ -1463,21 +1463,21 @@ internal fun AppConfiguration.SupplierInsightsRecoveryDeskCompactPanel(
             if (recoveryDeskChecklistText.isNotBlank()) {
                 SupplierBackorderBoundedText(recoveryDeskChecklistText, stateValues.TextColor, maxLines = 5)
             } else {
-                MessageText(text = stateValues.stringListEmpty)
+                MessageText(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), text = stateValues.stringListEmpty)
             }
         }
         if (section == "script") {
             if (recoveryDeskScriptText.isNotBlank()) {
                 SupplierBackorderBoundedText(recoveryDeskScriptText, stateValues.PlaceholderTextColor, maxLines = 4)
             } else {
-                MessageText(text = stateValues.stringListEmpty)
+                MessageText(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), text = stateValues.stringListEmpty)
             }
         }
         if (section == "waves") {
             if (recoveryWaves.isNotEmpty()) {
                 SupplierInsightsRecoveryWaveMiniBoard(recoveryWaves)
             } else {
-                MessageText(text = stateValues.stringListEmpty)
+                MessageText(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), text = stateValues.stringListEmpty)
             }
         }
         if (section == "overview") {
@@ -1810,8 +1810,8 @@ internal fun AppConfiguration.SupplierInsightsScreen() {
                 TabContent("demand", localizedStringResource(1353, "Demand radar"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.74f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -2371,7 +2371,7 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 

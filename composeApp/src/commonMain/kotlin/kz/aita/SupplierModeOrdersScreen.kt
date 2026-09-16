@@ -262,15 +262,16 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                 TabContent("promises", authUiText("Delivery promises", "Сроки доставки", "Жеткізу мерзімдері", "Жеткирүү убадалары"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
             selectedId = supplierOrderNavigationState[SUPPLIER_WORKSPACE_SECTION_STATE_KEY] ?: "orders",
             onSelected = { NavigationScreenModel.Supplier.Orders.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to it) },
         )
 
+        val emptySpaceListState = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Orders.Main, "sections:${focusedSupplierId.orEmpty()}:$section")
         LazyColumn(
-            state = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Orders.Main, "sections:${focusedSupplierId.orEmpty()}:$section"),
+            state = emptySpaceListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -279,7 +280,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(
                 top = stateValues.marginTextField,
-                bottom = stateValues.screenHeight / 5
+                bottom = stateValues.marginTextField
             )
         ) {
             if (!hasSupplierProfile) {
@@ -334,7 +335,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
 
                 if (section == "readiness") {
                     if (supplierReadiness == null) {
-                        item { MessageText(Modifier.fillMaxWidth(), authUiText("No readiness data yet", "Данные о готовности пока не загружены", "Дайындық деректері әлі жүктелмеген", "Даярдык боюнча маалымат азырынча жок")) }
+                        item(key = "supplier-orders-readiness-empty") { MessageText(Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-orders-readiness-empty"), authUiText("No readiness data yet", "Данные о готовности пока не загружены", "Дайындық деректері әлі жүктелмеген", "Даярдык боюнча маалымат азырынча жок")) }
                     }
                     supplierReadiness?.let { readiness ->
                         item(key = "supplier-order-readiness-board") {
@@ -359,7 +360,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                     }
                 }
 
-                if (section == "readiness") {
+                if (section == "readiness" && supplierReadiness != null) {
                     item {
                         SupplierOrdersWorkflowLinks()
                     }
@@ -367,7 +368,7 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
 
                 if (section == "promises") {
                     if (deliveryPromiseBuckets.isEmpty()) {
-                        item { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                        item(key = "supplier-orders-promises-empty") { MessageText(Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-orders-promises-empty"), stateValues.stringListEmpty) }
                     } else {
                         item(key = "supplier-order-promise-radar") {
                             SupplierDeliveryPromiseRadarCard(
@@ -421,14 +422,14 @@ internal fun AppConfiguration.SupplierOrdersInboxScreen() {
                     } else if (activeOrders.isEmpty()) {
                         item(key = "supplier-orders-empty") {
                             MessageText(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-orders-empty"),
                                 text = localizedStringResource(1379, "No store orders have reached this supplier profile yet. When stores send supply requests, they will appear here.")
                             )
                         }
                     } else if (filteredOrders.isEmpty()) {
-                        item {
+                        item(key = "supplier-orders-filtered-empty") {
                             MessageText(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-orders-filtered-empty"),
                                 text = localizedStringResource(1380, "No orders match this filter")
                             )
                         }

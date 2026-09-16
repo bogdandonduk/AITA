@@ -1691,6 +1691,9 @@ internal fun AppConfiguration.WorkerMembershipCard(
 @Composable
 fun AppConfiguration.MenuWorkersScreen() {
     val activeStoreId = stateValues.activeStoreId
+    val storeAccess = rememberStoreSubscriptionAccess(activeStoreId)
+    val canViewStoreWorkers = storeAccess && activeStoreId != null && currentUserCanViewWorkers(activeStoreId)
+    val canManageStoreRequests = storeAccess && activeStoreId != null && currentUserCanInviteWorkers(activeStoreId)
     val myMembershipsPayload by myWorkerMembershipsState.payload.collectAsState()
     val myRequestsPayload by myWorkerRequestsState.payload.collectAsState()
     val incomingRequestsPayload by incomingWorkerRequestsState.payload.collectAsState()
@@ -1717,18 +1720,18 @@ fun AppConfiguration.MenuWorkersScreen() {
         .count { !it.isWorkerRemovalRequest() && it.status == WORKER_REQUEST_STATUS_INVITED } +
         myRequestsPayload.orEmpty().count { it.isPendingWorkerRemovalRequest() }
     val myResponsesCount = myRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() } +
-        incomingRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
+        (if (canManageStoreRequests) incomingRequestsPayload.orEmpty().count { it.isEmploymentResponse() || it.isWorkerRemovalResponse() } else 0)
     val storeWorkersCount = storeWorkersPayload.orEmpty().size
     val incomingEmploymentRequestsCount = incomingRequestsPayload.orEmpty()
         .count { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
 
-    LaunchedEffect(activeStoreId) {
+    LaunchedEffect(stateValues.userAccount?.id, activeStoreId, canViewStoreWorkers, canManageStoreRequests) {
         getMyWorkerMemberships()
         getMyWorkerRequests()
-        activeStoreId?.let { storeId ->
-            getStoreWorkers(storeId)
-            getIncomingWorkerRequests(storeId)
-            getStoreWorkerRoleTemplates(storeId)
+        if (canViewStoreWorkers && activeStoreId != null) getStoreWorkers(activeStoreId)
+        if (canManageStoreRequests && activeStoreId != null) {
+            getIncomingWorkerRequests(activeStoreId)
+            getStoreWorkerRoleTemplates(activeStoreId)
         }
     }
 
@@ -1748,16 +1751,15 @@ fun AppConfiguration.MenuWorkersScreen() {
     ) {
         val selectedTab = tabRowWidget(
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(stateValues.marginTextField),
             tabs = listOf(
                 TabContent("my_work", tabLabelWithCount(localizedStringResource(472, "My work"), myMembershipsCount + myPendingEmploymentRequestsCount)),
                 TabContent("invites", tabLabelWithCount(localizedStringResource(651, "Invites"), myInvitesCount)),
-                TabContent("responses", tabLabelWithCount(localizedStringResource(1092, "Responses"), myResponsesCount)),
-                TabContent("store_workers", tabLabelWithCount(localizedStringResource(473, "Store workers"), storeWorkersCount)),
-                TabContent("requests", tabLabelWithCount(localizedStringResource(474, "Requests"), incomingEmploymentRequestsCount))
-            )
+                TabContent("responses", tabLabelWithCount(localizedStringResource(1092, "Responses"), myResponsesCount))
+            ) + (if (canViewStoreWorkers) listOf(TabContent("store_workers", tabLabelWithCount(localizedStringResource(473, "Store workers"), storeWorkersCount))) else emptyList()) +
+                (if (canManageStoreRequests) listOf(TabContent("requests", tabLabelWithCount(localizedStringResource(474, "Requests"), incomingEmploymentRequestsCount))) else emptyList())
         )
 
         val sectionTabs = when (selectedTab.id) {
@@ -1771,9 +1773,8 @@ fun AppConfiguration.MenuWorkersScreen() {
                 TabContent("removals", localizedStringResource(1225, "Removal requests"))
             )
             "responses" -> listOf(
-                TabContent("mine", localizedStringResource(1104, "My response history")),
-                TabContent("store", localizedStringResource(1105, "Store response history"))
-            )
+                TabContent("mine", localizedStringResource(1104, "My response history"))
+            ) + if (canManageStoreRequests) listOf(TabContent("store", localizedStringResource(1105, "Store response history"))) else emptyList()
             "store_workers" -> buildList {
                 add(TabContent("workers", localizedStringResource(473, "Store workers")))
                 if (activeStoreId != null && currentUserCanInviteWorkers(activeStoreId)) {
@@ -1789,10 +1790,15 @@ fun AppConfiguration.MenuWorkersScreen() {
             stateKey = "workers:${stateValues.userAccount?.id.orEmpty()}:${activeStoreId.orEmpty()}:${selectedTab.id}",
             tabs = sectionTabs,
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField)
         )
+
+        if (selectedTab.id == "my_work") {
+            WorkerIdentityCard(Modifier.fillMaxWidth().aitaWidthCap(960.dp)
+                .align(Alignment.CenterHorizontally).padding(stateValues.marginTextField))
+        }
 
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, "${selectedTab.id}_$section"),
@@ -1801,7 +1807,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
                 .align(Alignment.CenterHorizontally)
                 .padding(horizontal = stateValues.marginTextField),
-            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5),
+            contentPadding = PaddingValues(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             when (selectedTab.id) {
@@ -1857,7 +1863,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                     when (section) {
                         "requests" -> {
                             if (requests.isEmpty()) {
-                                item(key = "MenuWorkersScreen:$section:1") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(1117, "No pending employment requests")) }
+                                item(key = "MenuWorkersScreen:$section:1") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(1117, "No pending employment requests")) }
                             } else {
                                 items(requests, key = { it.id }) { request ->
                                     Column(
@@ -1901,7 +1907,7 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                         "managed" -> {
                             if (memberships.isEmpty()) {
-                                item(key = "MenuWorkersScreen:$section:2") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(479, "You are not employed in other stores yet")) }
+                                item(key = "MenuWorkersScreen:$section:2") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(479, "You are not employed in other stores yet")) }
                             } else {
                                 items(memberships, key = { it.id }) { worker ->
                                     WorkerMembershipCard(worker = worker, editable = false, showSelfPasswordEditor = true)
@@ -1921,7 +1927,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         .distinctBy { it.id }
 
                     if ((section == "invitations" && invitations.isEmpty()) || (section == "removals" && removalRequests.isEmpty())) {
-                        item(key = "MenuWorkersScreen:$section:3") { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringListEmpty) }
+                        item(key = "MenuWorkersScreen:$section:3") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringListEmpty) }
                     } else {
                         if (section == "invitations" && invitations.isNotEmpty()) {
                             item(key = "MenuWorkersScreen:$section:4") {
@@ -2093,9 +2099,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                         }
 
                         if (activeStoreId == null) {
-                            item(key = "MenuWorkersScreen:$section:10") { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
+                            item(key = "MenuWorkersScreen:$section:10") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
                         } else if (!currentUserCanDecideWorkerRequests(activeStoreId)) {
-                            item(key = "MenuWorkersScreen:$section:11") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
+                            item(key = "MenuWorkersScreen:$section:11") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
                         } else {
                             val storeResponses = incomingRequestsPayload.orEmpty()
                                 .filter { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
@@ -2128,9 +2134,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                     }
 
                     if (activeStoreId == null) {
-                        item(key = "MenuWorkersScreen:$section:14") { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
+                        item(key = "MenuWorkersScreen:$section:14") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
                     } else if (!currentUserCanViewWorkers(activeStoreId)) {
-                        item(key = "MenuWorkersScreen:$section:15") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(483, "You do not have permission to view workers in this store")) }
+                        item(key = "MenuWorkersScreen:$section:15") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(483, "You do not have permission to view workers in this store")) }
                     } else {
                         val roleTemplates = roleTemplatesPayload.orEmpty()
 
@@ -2306,7 +2312,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         if (section == "workers") {
                             val workers = storeWorkersPayload.orEmpty()
                             if (workers.isEmpty()) {
-                                item(key = "MenuWorkersScreen:$section:18") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(484, "No workers in this store yet")) }
+                                item(key = "MenuWorkersScreen:$section:18") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(484, "No workers in this store yet")) }
                             } else {
                                 val editable = currentUserCanEditWorkerPermissions(activeStoreId)
                                 val removable = currentUserCanRemoveWorkers(activeStoreId)
@@ -2343,13 +2349,13 @@ fun AppConfiguration.MenuWorkersScreen() {
                     }
 
                     if (activeStoreId == null) {
-                        item(key = "MenuWorkersScreen:$section:20") { MessageText(modifier = Modifier.fillMaxWidth(), text = stateValues.stringNoActiveStore) }
+                        item(key = "MenuWorkersScreen:$section:20") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
                     } else if (!currentUserCanDecideWorkerRequests(activeStoreId)) {
-                        item(key = "MenuWorkersScreen:$section:21") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
+                        item(key = "MenuWorkersScreen:$section:21") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
                     } else {
                         val pendingRequests = incomingRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
                         if (pendingRequests.isEmpty()) {
-                            item(key = "MenuWorkersScreen:$section:22") { MessageText(modifier = Modifier.fillMaxWidth(), text = localizedStringResource(487, "No incoming employment requests")) }
+                            item(key = "MenuWorkersScreen:$section:22") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(487, "No incoming employment requests")) }
                         } else {
                             items(pendingRequests, key = { it.id }) { request ->
                                 WorkerRequestCard(storeId = activeStoreId, request = request)
@@ -4616,22 +4622,23 @@ fun AppConfiguration.MenuStoresScreen() {
         var storeTabId by rememberSaveable { mutableStateOf("owned") }
         var storeSearchQuery by rememberSaveable { mutableStateOf("") }
 
+        val storesListState = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Stores, storeTabId)
         LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Stores, storeTabId),
+            state = storesListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.7f)
                 .padding(horizontal = stateValues.marginTextField),
-            contentPadding = PaddingValues(top = 8.dp, bottom = stateValues.screenHeight / 4),
+            contentPadding = PaddingValues(vertical = stateValues.marginTextField),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
             when (storesStateValue) {
                 is DataState.Success -> {
                     if (storesStateValue.payload.isEmpty()) {
-                        item {
+                        item(key = "stores-empty-3") {
                             MessageText(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().remainingListSpace(storesListState, "stores-empty-3"),
                                 stateValues.stringListEmpty
                             )
                         }
@@ -4678,16 +4685,16 @@ fun AppConfiguration.MenuStoresScreen() {
                         }
 
                         if (searchedItems.isEmpty()) {
-                            item {
+                            item(key = "stores-empty-2") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(storesListState, "stores-empty-2"),
                                     stateValues.stringNoMatches
                                 )
                             }
                         } else if (filteredTopLevelStores.isEmpty()) {
-                            item {
+                            item(key = "stores-empty-1") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(storesListState, "stores-empty-1"),
                                     if (selectedTabId == "managed") localizedStringResource(479, "You are not employed in other stores yet") else stateValues.stringListEmpty
                                 )
                             }
@@ -4790,9 +4797,9 @@ fun AppConfiguration.MenuStoresScreen() {
                 }
 
                 is DataState.Empty -> {
-                    item {
+                    item(key = "stores-empty-0") {
                         MessageText(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().remainingListSpace(storesListState, "stores-empty-0"),
                             stateValues.stringListEmpty
                         )
                     }
@@ -4829,9 +4836,6 @@ fun AppConfiguration.MenuScreen() {
                     }
                     is NavigationScreenModel.Menu.UserAccount -> {
                         MenuUserAccountScreen()
-                    }
-                    is NavigationScreenModel.Menu.Work -> {
-                        MenuWorkScreen()
                     }
                     is NavigationScreenModel.Menu.Notifications -> {
                         NotificationsScreen(
@@ -4936,9 +4940,6 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.UserAccount -> {
                             MenuUserAccountScreen()
                         }
-                        is NavigationScreenModel.Menu.Work -> {
-                            MenuWorkScreen()
-                        }
                         is NavigationScreenModel.Menu.Notifications -> {
                             NotificationsScreen(
                                 onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
@@ -5036,9 +5037,6 @@ fun AppConfiguration.MenuScreen() {
                         }
                         is NavigationScreenModel.Menu.UserAccount -> {
                             MenuUserAccountScreen()
-                        }
-                        is NavigationScreenModel.Menu.Work -> {
-                            MenuWorkScreen()
                         }
                         is NavigationScreenModel.Menu.Notifications -> {
                             NotificationsScreen(
@@ -5153,7 +5151,7 @@ internal fun menuDestinationRequiresStoreSubscription(model: NavigationScreenMod
     NavigationScreenModel.Menu.TransactionHistory,
     NavigationScreenModel.Menu.TransactionHistoryReceiptPreview,
     NavigationScreenModel.Menu.OperationLogs, NavigationScreenModel.Menu.Analytics,
-    NavigationScreenModel.Menu.Workers, NavigationScreenModel.Menu.AddEditWorker,
+    NavigationScreenModel.Menu.AddEditWorker,
     NavigationScreenModel.Menu.Suppliers, NavigationScreenModel.Menu.AddEditSupplier,
     NavigationScreenModel.Menu.Debtors, NavigationScreenModel.Menu.CloseDebt,
     NavigationScreenModel.Menu.GoodsCategories, NavigationScreenModel.Menu.AddEditGoodsCategory,
@@ -5170,7 +5168,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
         NavigationScreenModel.Menu.TransactionHistory -> activeOwnerFallback || currentUserCanViewTransactionHistory(activeStoreId)
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
-        NavigationScreenModel.Menu.Workers -> activeOwnerFallback || currentUserCanViewWorkers(activeStoreId)
+        NavigationScreenModel.Menu.Workers -> true // Personal employment remains available without a store subscription.
         NavigationScreenModel.Menu.ShopWindow -> currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.Stores -> true
         NavigationScreenModel.Menu.Suppliers -> activeOwnerFallback || currentUserCanViewSuppliers(activeStoreId) || currentUserCanViewSupplierOrders(activeStoreId) || currentUserCanManageSupplierOrders(activeStoreId) || currentUserCanReceiveSupplierOrders(activeStoreId)
@@ -5189,7 +5187,7 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
     APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
         NavigationScreenModel.Menu.AppMode,
-        NavigationScreenModel.Menu.Work,
+        NavigationScreenModel.Menu.Workers,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.Finances,
         NavigationScreenModel.Menu.Security,
@@ -5201,7 +5199,7 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
     APP_MODE_BUYER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
         NavigationScreenModel.Menu.AppMode,
-        NavigationScreenModel.Menu.Work,
+        NavigationScreenModel.Menu.Workers,
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.Finances,
         NavigationScreenModel.Menu.Security,
@@ -5883,8 +5881,8 @@ fun AppConfiguration.MenuFinancesScreen() {
                 TabContent("history", localizedStringResource(585, "Balance history"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -5896,7 +5894,7 @@ fun AppConfiguration.MenuFinancesScreen() {
                 .align(Alignment.CenterHorizontally)
                 .padding(stateValues.marginTextField),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-            contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
+            contentPadding = PaddingValues(vertical = stateValues.marginTextField)
         ) {
             val wallet = (walletState as? DataState.Success<UserWalletDataModel>)?.payload
             val dashboard = (financeState as? DataState.Success<UserFinanceDashboardDataModel>)?.payload
@@ -5984,7 +5982,7 @@ fun AppConfiguration.MenuFinancesScreen() {
 
             if (section == "invoices") {
                 if (intents.isEmpty()) {
-                    item(key = "MenuFinancesScreen:$section:2") { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                    item(key = "MenuFinancesScreen:$section:2") { MessageText(Modifier.fillParentMaxSize(), stateValues.stringListEmpty) }
                 } else {
                     item(key = "MenuFinancesScreen:$section:3") {
                         Text(
@@ -6015,7 +6013,7 @@ fun AppConfiguration.MenuFinancesScreen() {
                 }
 
                 if (ledger.isEmpty()) {
-                    item(key = "MenuFinancesScreen:$section:6") { MessageText(Modifier.fillMaxWidth(), localizedStringResource(586, "No balance operations yet")) }
+                    item(key = "MenuFinancesScreen:$section:6") { MessageText(Modifier.fillParentMaxSize(), localizedStringResource(586, "No balance operations yet")) }
                 } else {
                     val visibleLedgerPage = boundedSectionPage(ledgerPage, ledger.size, pageSize)
                     val pagedLedger = ledger.clientPaged(visibleLedgerPage, pageSize)

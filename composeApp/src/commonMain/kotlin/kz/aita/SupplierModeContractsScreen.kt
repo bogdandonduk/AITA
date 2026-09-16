@@ -329,7 +329,9 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
             }
         }
     ) {
+        val emptySpaceListState = androidx.compose.foundation.lazy.rememberLazyListState()
         LazyColumn(
+            state = emptySpaceListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -338,7 +340,7 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(
                 top = stateValues.marginTextField,
-                bottom = stateValues.screenHeight / 5
+                bottom = stateValues.marginTextField
             )
         ) {
             if (!showAppBar && closeFocusedContent != null) {
@@ -590,7 +592,7 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
                             workspaceItems.isEmpty() -> {
                                 item(key = "supplier-contract-empty") {
                                     MessageText(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-contract-empty"),
                                         text = localizedStringResource(1511, "No contracts yet"),
                                         subText = localizedStringResource(
                                             2439,
@@ -604,7 +606,7 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
                             visibleItems.isEmpty() -> {
                                 item(key = "supplier-contract-filtered-empty") {
                                     MessageText(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-contract-filtered-empty"),
                                         text = localizedStringResource(2440, "No agreement matches these filters")
                                     )
                                 }

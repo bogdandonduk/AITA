@@ -546,8 +546,8 @@ fun AppConfiguration.MenuDevicesScreen() {
                 TabContent("system", localizedStringResource(616, "Open system devices"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -1530,7 +1530,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                         SimpleTextInput(Modifier.fillMaxWidth(), idNumber, localizedStringResource(293, "ID number"), keyboardType = KeyboardType.Number, leadingIconPath = stateValues.drawablePathIconPerson, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_id_number") { idNumber = it.filter { c -> c.isDigit() }.take(32) }
                     }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                    SimpleTextInput(Modifier.fillMaxWidth(), phone, stateValues.stringPhoneNumber, keyboardType = KeyboardType.Phone, leadingIconPath = stateValues.drawablePathIconPerson, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_phone") { phone = it }
+                    DebtorPhoneInput(value = phone, identityKey = "edit-debtor-phone:${stateValues.userAccount?.id}:${debtor.id}") { phone = it }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
                     SimpleTextInput(Modifier.fillMaxWidth(), email, stateValues.stringEmail, keyboardType = KeyboardType.Email, leadingIconPath = stateValues.drawablePathIconEmail, stateHost = NavigationScreenModel.Menu.CloseDebt, stateKey = "menu_close_debt_${debtor.id}_email") { email = it }
                     Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -1663,7 +1663,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
                     }
                     Text(localizedStringResource(377, "Payment history"), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-                    if (debtor.paymentHistory.isEmpty()) MessageText(text = localizedStringResource(349, "No payment records yet"))
+                    if (debtor.paymentHistory.isEmpty()) MessageText(Modifier.fillMaxWidth().heightIn(min = 160.dp), text = localizedStringResource(349, "No payment records yet"))
                     debtor.paymentHistory.sortedByDescending { it.timeMillis }.forEach { record ->
                         DebtorInfoLine(receiptUiDateTime(record.timeMillis), "${moneyInputFromDouble(record.amount)} ${record.currency} • ${record.paymentKind}", accent = true)
                         DebtorInfoLine(localizedStringResource(378, "Before / after"), "${moneyInputFromDouble(record.debtBefore)} → ${moneyInputFromDouble(record.debtAfter)}")
@@ -2765,7 +2765,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         val selectedTabContent = tabRowWidget(
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .fillMaxWidth()
                 .padding(stateValues.marginTextField),
             tabs = listOf(
                 TabContent(MenuAnalyticsTab.Sales.id, stateValues.stringSale),
@@ -2790,10 +2790,10 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         tabRowWidget(
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .fillMaxWidth()
                 .padding(horizontal = stateValues.marginTextField),
             tabs = periodOptions.map { option ->
-                TabContent(option.first, option.second) { selectedPeriodId ->
+                TabContent(option.first, option.second, icon = AitaTabIcon.Calendar) { selectedPeriodId ->
                     periodPresetId = selectedPeriodId
                     if (selectedPeriodId != "custom") {
                         val range = transactionHistoryPresetDates(selectedPeriodId)
@@ -2857,7 +2857,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         tabRowWidget(
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .fillMaxWidth()
                 .padding(horizontal = stateValues.marginTextField),
             tabs = analyticsScopeOptions.map { option ->
                 TabContent(option.first, option.second) { selectedScopeId ->
@@ -3159,8 +3159,8 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
                 add(TabContent("history", localizedStringResource(257, "History")))
             },
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -3348,8 +3348,8 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
                 TabContent("slow_moving", localizedStringResource(682, "Slow-moving inventory"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -3397,7 +3397,7 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
 
             if (section == "slow_moving") {
                 if (dashboard?.slowMovingItems.isNullOrEmpty()) {
-                    item(key = "MenuAnalyticsStockScreen:$section:2") { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                    item(key = "MenuAnalyticsStockScreen:$section:2") { MessageText(Modifier.fillParentMaxSize(), stateValues.stringListEmpty) }
                 }
                 dashboard?.slowMovingItems?.takeIf { it.isNotEmpty() }?.let { items ->
                     item(key = "MenuAnalyticsStockScreen:$section:3") {
@@ -3437,8 +3437,8 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
                 TabContent("rankings", localizedStringResource(703, "Top performers"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -3510,8 +3510,8 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
                 TabContent("performance", localizedStringResource(702, "Performance"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -3591,8 +3591,8 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
                 TabContent("history", localizedStringResource(257, "History"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
 
@@ -3907,10 +3907,10 @@ internal fun AppConfiguration.AnalyticsPeriodSelector(
 
     tabRowWidget(
         modifier = Modifier
-            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+            .fillMaxWidth()
             .padding(horizontal = stateValues.marginTextField),
         tabs = presets.map { (preset, title) ->
-            TabContent(preset.id, title) { selectedPresetId ->
+            TabContent(preset.id, title, icon = AitaTabIcon.Calendar) { selectedPresetId ->
                 onSelected(selectedPresetId)
             }
         },

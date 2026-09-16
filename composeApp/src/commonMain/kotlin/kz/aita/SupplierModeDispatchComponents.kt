@@ -636,7 +636,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
+                .align(Alignment.Start)
                 .padding(vertical = stateValues.marginTextField / 2),
         )
 

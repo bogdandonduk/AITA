@@ -213,15 +213,16 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                 TabContent("health", authUiText("Portfolio health", "Состояние партнёров", "Серіктестердің жағдайы", "Өнөктөштөрдүн жалпы абалы"))
             ),
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
-                .align(Alignment.CenterHorizontally)
+                .fillMaxWidth()
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
             selectedId = navigationState[SUPPLIER_WORKSPACE_SECTION_STATE_KEY] ?: "partners",
             onSelected = { NavigationScreenModel.Supplier.Customers.Main.setStateNow(SUPPLIER_WORKSPACE_SECTION_STATE_KEY to it) },
         ) else "partners"
 
+        val emptySpaceListState = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Customers.Main, "sections:${focusedSupplierId.orEmpty()}:${selectedPartnerKey.orEmpty()}:$section")
         LazyColumn(
-            state = rememberPersistentLazyListState(NavigationScreenModel.Supplier.Customers.Main, "sections:${focusedSupplierId.orEmpty()}:${selectedPartnerKey.orEmpty()}:$section"),
+            state = emptySpaceListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f)
@@ -230,7 +231,7 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             contentPadding = PaddingValues(
                 top = stateValues.marginTextField,
-                bottom = stateValues.screenHeight / 5
+                bottom = stateValues.marginTextField
             )
         ) {
             if (!hasSupplierProfile) {
@@ -282,7 +283,7 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
 
                     if (section == "health") {
                         if (partnerItems.isEmpty()) {
-                            item { MessageText(Modifier.fillMaxWidth(), stateValues.stringListEmpty) }
+                            item(key = "supplier-customers-health-empty") { MessageText(Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "supplier-customers-health-empty"), stateValues.stringListEmpty) }
                         } else {
                             item(key = "partner-portfolio-health") {
                                 SupplierPartnerPortfolioHealthCard(
@@ -371,7 +372,7 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                             partnerItems.isEmpty() -> {
                                 item(key = "empty") {
                                     MessageText(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "empty"),
                                         text = localizedStringResource(2388, "No store partners yet"),
                                         subText = localizedStringResource(
                                             2389,
@@ -385,7 +386,7 @@ internal fun AppConfiguration.SupplierCustomersScreen() {
                             filteredPartners.isEmpty() -> {
                                 item(key = "filtered-empty") {
                                     MessageText(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().remainingListSpace(emptySpaceListState, "filtered-empty"),
                                         text = localizedStringResource(
                                             2387,
                                             "No partner matches these filters"

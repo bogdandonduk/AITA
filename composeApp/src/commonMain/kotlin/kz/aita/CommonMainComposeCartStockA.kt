@@ -1579,82 +1579,24 @@ fun AppConfiguration.tabRowWidget(
     enabled: Boolean = true,
     scrollable: Boolean = tabs.size > 4,
 ): TabRowContent {
-    val tabsKey = remember(tabs) { tabs.joinToString(separator = "|") { it.id } }
-    val savedSelectedIdState = rememberSaveable(tabsKey, selectedIndexInitial) { mutableStateOf(selectedIndexInitial) }
-    val transientSelectedIdState = remember(tabsKey, selectedIndexInitial) { mutableStateOf(selectedIndexInitial) }
-    val selectedIdState = if (persistSelection) savedSelectedIdState else transientSelectedIdState
-    var selectedId by selectedIdState
-
-    LaunchedEffect(selectedIndexInitial, tabsKey) {
-        if (tabs.any { it.id == selectedIndexInitial } && selectedId != selectedIndexInitial) {
-            selectedId = selectedIndexInitial
-        }
+    val ids = tabs.map { it.id }
+    val savedState = rememberSaveable { mutableStateOf(selectedIndexInitial) }
+    val transientState = remember { mutableStateOf(selectedIndexInitial) }
+    val selection = if (persistSelection) savedState else transientState
+    val selectedId = resolveScreenSectionId(selection.value, ids, selectedIndexInitial)
+    LaunchedEffect(selectedIndexInitial) {
+        if (selectedIndexInitial in ids) selection.value = selectedIndexInitial
     }
-
-    LaunchedEffect(tabsKey) {
-        if (tabs.none { it.id == selectedId }) {
-            selectedId = selectedIndexInitial
-        }
-    }
-
     if (tabs.isNotEmpty()) {
-        Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-            titleText.takeIf { it.isNotEmpty() && it.isNotBlank() }?.apply {
-                Text(
-                    text = this,
-                    modifier = Modifier,
-                    style = TextStyle(
-                        color = titleTextColor,
-                        fontSize = titleTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-
-            val tabScrollState = rememberScrollState()
-            BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val scrollableTabs = scrollable || maxWidth > 600.dp
-                Row(
-                    modifier = Modifier.padding(2.dp)
-                        .foregroundTactileShadow(cornerRadius, elevated = false)
-                        .clip(RoundedCornerShape(cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .run { if (scrollableTabs) horizontalScroll(tabScrollState) else fillMaxWidth() }
-                ) {
-                    tabs.forEach { tab ->
-                        val isSelected = tab.id == selectedId
-                        val tabItemModifier = if (scrollableTabs) Modifier.widthIn(min = 96.dp, max = 240.dp)
-                            else Modifier.weight(1f)
-                        val containerColor by animateColorAsState(
-                            targetValue = if (isSelected) selectedContainerColor else unselectedContainerColor)
-                        val textColor by animateColorAsState(
-                            targetValue = if (isSelected) selectedTextColor else unselectedTextColor)
-                        Box(
-                            modifier = tabItemModifier.background(containerColor).aitaClickable(
-                                enabled = enabled,
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(color = textColor)
-                            ) {
-                                selectedId = tab.id
-                                tab.onClick?.invoke(tab.id)
-                            },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = tab.text,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                fontSize = textSize, color = textColor,
-                                fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
-                                style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
-                                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
+        Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+            if (titleText.isNotBlank()) Text(titleText, color = titleTextColor, fontSize = titleTextSize, fontWeight = FontWeight.Bold)
+            AitaTabChips(tabs, selectedId, enabled, scrollable, cornerRadius, textSize,
+                selectedContainerColor, unselectedContainerColor, selectedTextColor, unselectedTextColor) { tab ->
+                selection.value = tab.id
+                tab.onClick?.invoke(tab.id)
             }
         }
     }
-
     return TabRowContent(selectedId)
 }
 
@@ -1665,6 +1607,7 @@ data class TabRowContent(
 class TabContent(
     val id: String,
     val text: String,
+    val icon: AitaTabIcon = aitaTabIconForId(id),
     val onClick: ((String) -> Unit)? = null
 )
 

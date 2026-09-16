@@ -166,7 +166,7 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                 if(loading && tickets.isEmpty()) LoadingSkeleton(layout = LoadingLayout.Conversation, modifier = Modifier.fillMaxWidth(), rows =4)
                 else LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                     if(tickets.isEmpty()) item {
-                        MessageText(Modifier.fillParentMaxWidth().padding(24.dp),authUiText("No conversations here yet","Здесь пока нет диалогов","Мұнда әзірге диалог жоқ", "Бул жерде маектер азырынча жок"))
+                        MessageText(Modifier.fillParentMaxSize().padding(24.dp),authUiText("No conversations here yet","Здесь пока нет диалогов","Мұнда әзірге диалог жоқ", "Бул жерде маектер азырынча жок"))
                     }
                     items(tickets,key={ it.id }) { ticket ->
                         val unread=if(agent) ticket.unreadForAgentCount else ticket.unreadForUserCount

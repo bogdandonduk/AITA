@@ -2989,16 +2989,6 @@ sealed class NavigationScreenModel(
             const val KEY_STATE_CONFIRMATION_PASSWORD: String = "keyState_confirmationPassword"
         }
 
-        /** Personal identity, not the permission-gated store Workers management screen. */
-        data object Work: Menu("MenuWorkNavigationScreenModelRoute") {
-            override val iconPath: String
-                get() = AppConfiguration.stateValues.drawablePathIconWorkers
-            override val name: String
-                get() = with(AppConfiguration) { localizedStringResource(2658, "Work") }
-            override val iconRes: DrawableResource
-                get() = AppConfiguration.stateValues.drawableResIconWorkers.value
-        }
-
         data object Notifications: Menu("MenuNotificationsNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconTransactionHistory
@@ -3299,7 +3289,6 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.Main,
     NavigationScreenModel.Menu.List,
     NavigationScreenModel.Menu.UserAccount,
-    NavigationScreenModel.Menu.Work,
     NavigationScreenModel.Menu.Notifications,
     NavigationScreenModel.Menu.Finances,
     NavigationScreenModel.Menu.AppMode,
@@ -3345,7 +3334,8 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
 )
 
 internal fun persistentAppRouteToScreen(route: String): NavigationScreenModel? =
-    persistentAppNavigationScreens().firstOrNull { it.route == route }
+    if (route == "MenuWorkNavigationScreenModelRoute") NavigationScreenModel.Menu.Workers
+    else persistentAppNavigationScreens().firstOrNull { it.route == route }
 
 internal fun NavigationScreenModel.toPersistentAppRoute(): String = route
 
@@ -3581,14 +3571,12 @@ object Navigation {
     }
 
     suspend fun showSubscriptionRecovery() {
-        // Replace both saved menu panes, not the customer's carts/editor state hosts.
+        // Recover above the normal menu roots. A back action must lead somewhere real.
         Menu.clearLeft()
+        Menu.clearRight()
         val recovery = if (activeStoreIdState.value.isNullOrBlank()) NavigationScreenModel.Menu.Stores
             else NavigationScreenModel.Menu.StoreSubscriptionPlans
-        if (AppConfiguration.stateValues.isNarrowScreen) {
-            Menu.clearRight()
-            Menu.goLeft(recovery)
-        } else Menu.clearRight(recovery)
+        Menu.go(recovery, isNarrowScreen = AppConfiguration.stateValues.isNarrowScreen)
         _Main.emit(listOf(NavigationScreenModel.Menu.Main))
     }
 
@@ -6254,8 +6242,7 @@ object Navigation {
         val listScreens = listOf(
             NavigationScreenModel.Menu.UserAccount,
             NavigationScreenModel.Menu.AppMode,
-            NavigationScreenModel.Menu.Work,
-            NavigationScreenModel.Menu.Notifications,
+                    NavigationScreenModel.Menu.Notifications,
             NavigationScreenModel.Menu.Finances,
             NavigationScreenModel.Menu.StoreSubscription,
             NavigationScreenModel.Menu.ShopWindow,
@@ -6344,7 +6331,7 @@ object Navigation {
                     _Left
                         .value.toMutableList()
                         .apply {
-                            if (remove)
+                            if (remove && size > 1)
                                 removeAt(lastIndex)
 
                             add(model)
@@ -6367,10 +6354,7 @@ object Navigation {
             )
 
             navigateAfterwards?.run {
-                while (_Left.value.size == oldSize)
-                    delay(30)
-
-                delay(300)
+                if (_Left.value.size < oldSize) delay(300)
 
                 goLeft(this@run)
             }
@@ -6379,7 +6363,7 @@ object Navigation {
         suspend fun clearLeft(model: NavigationScreenModel.Menu = NavigationScreenModel.Menu.List) {
             val visibleModel = model.takeUnless { it.isTemporarilyHiddenFromUi() }
                 ?: NavigationScreenModel.Menu.List
-            _Left.emit(listOf(visibleModel))
+            _Left.emit(normalizeMenuStack(listOf(visibleModel), NavigationScreenModel.Menu.List))
         }
 
         suspend fun goRight(
@@ -6393,7 +6377,7 @@ object Navigation {
                     _Right
                         .value.toMutableList()
                         .apply {
-                            if (remove)
+                            if (remove && size > 1)
                                 removeAt(lastIndex)
 
                             add(model)
@@ -6413,53 +6397,22 @@ object Navigation {
             )
 
             navigateAfterwards?.run {
-                while (_Right.value.size == oldSize)
-                    delay(30)
+                if (_Right.value.size < oldSize) delay(300)
 
-                delay(300)
-
-                goLeft(this@run)
+                goRight(this@run)
             }
         }
 
         suspend fun clearRight(model: NavigationScreenModel.Menu = NavigationScreenModel.Menu.UserAccount) {
             val visibleModel = model.takeUnless { it.isTemporarilyHiddenFromUi() }
                 ?: NavigationScreenModel.Menu.UserAccount
-            _Right.emit(listOf(visibleModel))
+            _Right.emit(normalizeMenuStack(listOf(visibleModel), NavigationScreenModel.Menu.UserAccount))
         }
 
         suspend fun init(isNarrowScreen: Boolean) {
-            Menu.run {
-                if (isNarrowScreen) {
-                    if (Right.value.size > 1) {
-                        _Left.emit(
-                            mutableListOf<NavigationScreenModel.Menu>().apply {
-                                add(NavigationScreenModel.Menu.List)
-                                addAll(
-                                    Right.value
-                                        .drop(1)
-                                        .filterNot { it.isTemporarilyHiddenFromUi() }
-                                )
-                            }
-                        )
-                    }
-                    clearRight()
-                } else {
-                    if (_Left.value.size > 1) {
-                        _Right.emit(
-                            mutableListOf<NavigationScreenModel.Menu>().apply {
-                                add(NavigationScreenModel.Menu.UserAccount)
-                                addAll(
-                                    _Left.value
-                                        .drop(1)
-                                        .filterNot { it.isTemporarilyHiddenFromUi() }
-                                )
-                            }
-                        )
-                    }
-                    clearLeft()
-                }
-            }
+            val adapted = adaptMenuStacks(Left.value, Right.value, isNarrowScreen)
+            _Left.emit(adapted.first)
+            _Right.emit(adapted.second)
         }
     }
 
