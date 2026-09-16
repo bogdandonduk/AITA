@@ -5348,6 +5348,7 @@ internal fun List<NotificationDataModel>.compactForPopupDisplay(): List<Notifica
 
 @Composable
 fun AppConfiguration.MainScreen() {
+    AppUpdateEffects()
     val subscriptionGate = rememberStoreSubscriptionGate()
     val subscriptionAccess = subscriptionGate == StoreSubscriptionGate.Active
     val accountForSubscription = stateValues.userAccount?.id
@@ -5647,15 +5648,14 @@ fun AppConfiguration.MainScreen() {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CpImage(
-                            modifier = Modifier
-                                .requiredSize(bottomNavigationIconSize)
-                                .aitaSelectionMotion(selected = isSelected, selectedScale = 1.11f),
-                            url = model.iconPath,
-                            fallbackRes = model.iconRes,
-                            contentDescription = model.name,
-                            tintColor = iconTintColor
-                        )
+                        Box(Modifier.requiredSize(bottomNavigationIconSize)) {
+                            CpImage(
+                                modifier = Modifier.fillMaxSize().aitaSelectionMotion(selected = isSelected, selectedScale = 1.11f),
+                                url = model.iconPath, fallbackRes = model.iconRes,
+                                contentDescription = model.name, tintColor = iconTintColor
+                            )
+                            if (model == NavigationScreenModel.Menu.Main) MenuUpdateMarker(Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-3).dp))
+                        }
 
                         Text(
                             text = model.name,

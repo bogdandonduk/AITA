@@ -7,6 +7,15 @@ on:
         description: Numeric release version (MAJOR.MINOR.PATCH)
         required: true
         default: "1.0.0"
+      build:
+        description: Positive, increasing build number shared by every artifact in this release
+        required: true
+        default: "1"
+      channel:
+        description: Client release channel (tags always use release)
+        type: choice
+        options: [release, test]
+        default: release
   push:
     tags:
       - "v*"
@@ -24,6 +33,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 75
 
+    env:
+      AITA_UPDATE_PUBLIC_KEY: ${{ vars.AITA_UPDATE_PUBLIC_KEY }}
+      AITA_UPDATE_FEED_BASE: ${{ vars.AITA_UPDATE_FEED_BASE }}
+      AITA_RELEASE_REVISION: ${{ github.sha }}
+      AITA_RELEASE_DISTRIBUTION: direct
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -41,6 +55,9 @@ jobs:
         shell: pwsh
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          INPUT_BUILD: ${{ inputs.build }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          TAG_BUILD: ${{ vars.AITA_RELEASE_BUILD }}
           AITA_REF_TYPE: ${{ github.ref_type }}
           AITA_REF_NAME: ${{ github.ref_name }}
         run: |
@@ -51,8 +68,24 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
             throw "Version must use numeric MAJOR.MINOR.PATCH form, for example 1.0.0. Received: $version"
           }
+          $build = "$env:INPUT_BUILD".Trim()
+          $channel = "$env:INPUT_CHANNEL".Trim()
+          if ($env:AITA_REF_TYPE -eq "tag") {
+            $build = "$env:TAG_BUILD".Trim()
+            $channel = "release"
+          }
+          if ($build -notmatch '^[1-9][0-9]{0,9}$' -or [long]$build -gt 2100000000) {
+            throw "Set a positive increasing release build number; tag builds use the AITA_RELEASE_BUILD repository variable."
+          }
+          if ($channel -notin @("release", "test")) { throw "Unknown client release channel." }
+          if ([string]::IsNullOrWhiteSpace($env:AITA_UPDATE_PUBLIC_KEY) -or [string]::IsNullOrWhiteSpace($env:AITA_UPDATE_FEED_BASE)) {
+            throw "Set repository variables AITA_UPDATE_PUBLIC_KEY and AITA_UPDATE_FEED_BASE before building updater-enabled releases."
+          }
           "AITA_RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "AITA Windows release version: $version"
+          "AITA_RELEASE_BUILD=$build" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "AITA_RELEASE_CHANNEL=$channel" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "AITA_RELEASE_BUILT_AT=$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "AITA Windows release: $version ($build), $channel"
 
       - name: Put WiX Toolset 3 on PATH
         shell: pwsh
@@ -108,6 +141,7 @@ jobs:
           if (-not $exe) { throw "Compose did not produce an EXE installer." }
           $msi | Copy-Item -Destination $releaseDir
           $exe | Copy-Item -Destination $releaseDir
+          Copy-Item "shared/build/generated/aitaClientBuild/client-build.json" -Destination $releaseDir
 
           $appRoot = "composeApp/build/compose/binaries/main/app"
           $appDir = Get-ChildItem $appRoot -Directory -ErrorAction SilentlyContinue | Select-Object -First 1

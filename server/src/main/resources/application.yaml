@@ -57,3 +57,8 @@ flyway:
   runOnStart: ${?AITA_FLYWAY_RUN_ON_START}
   cleanDisabled: ${?AITA_FLYWAY_CLEAN_DISABLED}
   repairOnValidateFailure: ${?AITA_FLYWAY_REPAIR_ON_VALIDATE_FAILURE}
+
+# Public, signed metadata and immutable installers; only the offline release publisher writes here.
+clientUpdates:
+  directory: ${?AITA_CLIENT_RELEASES_DIR}
+  publicKey: ${?AITA_UPDATE_PUBLIC_KEY}

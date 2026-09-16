@@ -46,6 +46,59 @@ sqldelight {
     appDatabase.generateAsync.set(true)
 }
 
+
+fun aitaClientBuildValue(property: String, environment: String, fallback: String = ""): String =
+    providers.gradleProperty(property).orElse(providers.environmentVariable(environment)).orElse(fallback).get().trim()
+val clientBuildValues = linkedMapOf(
+    "version" to aitaClientBuildValue("aita.release.version", "AITA_RELEASE_VERSION", "1.0.0"),
+    "build" to aitaClientBuildValue("aita.release.build", "AITA_RELEASE_BUILD", aitaClientBuildValue("aita.android.versionCode", "AITA_ANDROID_VERSION_CODE", "1")),
+    "channel" to aitaClientBuildValue("aita.release.channel", "AITA_RELEASE_CHANNEL", "release"),
+    "revision" to aitaClientBuildValue("aita.release.revision", "AITA_RELEASE_REVISION", runCatching {
+        providers.exec { workingDir(rootProject.projectDir); commandLine("git", "rev-parse", "--short=12", "HEAD"); isIgnoreExitValue = true }.standardOutput.asText.get().trim().takeIf { Regex("[0-9a-f]{7,40}").matches(it) } ?: "development"
+    }.getOrDefault("development")),
+    "builtAt" to aitaClientBuildValue("aita.release.builtAt", "AITA_RELEASE_BUILT_AT", "development"),
+    "distribution" to aitaClientBuildValue("aita.release.distribution", "AITA_RELEASE_DISTRIBUTION", "direct"),
+    "feed" to aitaClientBuildValue("aita.update.feedBase", "AITA_UPDATE_FEED_BASE", "https://aita-api.bogdan-donduk.workers.dev/client-updates"),
+    "publicKey" to aitaClientBuildValue("aita.update.publicKey", "AITA_UPDATE_PUBLIC_KEY"),
+    "kotlin" to libs.versions.kotlin.get(),
+    "compose" to libs.versions.composeMultiplatform.get()
+)
+require(clientBuildValues.getValue("channel") in setOf("release", "test")) { "AITA release channel must be release or test" }
+require(clientBuildValues.getValue("distribution") in setOf("direct", "store")) { "AITA distribution must be direct or store" }
+require(clientBuildValues.getValue("build").toLongOrNull()?.let { it in 1L..2_100_000_000L } == true) { "AITA release build must be a positive increasing integer" }
+require(Regex("[0-9]{1,5}\\.[0-9]{1,5}\\.[0-9]{1,5}").matches(clientBuildValues.getValue("version"))) { "Invalid release version" }
+require(clientBuildValues.getValue("publicKey").isEmpty() || Regex("[A-Za-z0-9+/=]{300,2048}").matches(clientBuildValues.getValue("publicKey"))) { "AITA update public key must be base64 DER SubjectPublicKeyInfo, never a private key" }
+val generateAitaClientBuildInfo by tasks.registering {
+    inputs.properties(clientBuildValues)
+    val generated = layout.buildDirectory.dir("generated/aitaClientBuild")
+    outputs.dir(generated)
+    doLast {
+        fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$").replace("\n", "\\n").replace("\r", "\\r") + "\""
+        val out = generated.get().asFile.resolve("kotlin/kz/aita/updates/GeneratedClientBuild.kt")
+        out.parentFile.mkdirs()
+        fun jsonQuote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"")
+            .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t") + "\""
+        generated.get().asFile.resolve("client-build.json").writeText(clientBuildValues.entries.joinToString(",\n", "{\n", "\n}\n") { (k,v) -> jsonQuote(k) + ":" + jsonQuote(v) })
+        out.writeText("""
+            package kz.aita.updates
+            object GeneratedClientBuild {
+                val identity = ClientBuildIdentity(
+                    version = ${quote(clientBuildValues.getValue("version"))},
+                    build = ${clientBuildValues.getValue("build")}L,
+                    channel = ReleaseChannel.${clientBuildValues.getValue("channel").uppercase()},
+                    revision = ${quote(clientBuildValues.getValue("revision"))},
+                    builtAt = ${quote(clientBuildValues.getValue("builtAt"))},
+                    distribution = ${quote(clientBuildValues.getValue("distribution"))},
+                    kotlinVersion = ${quote(clientBuildValues.getValue("kotlin"))},
+                    composeVersion = ${quote(clientBuildValues.getValue("compose"))}
+                )
+                const val feedBase = ${quote(clientBuildValues.getValue("feed"))}
+                const val publicKey = ${quote(clientBuildValues.getValue("publicKey"))}
+            }
+        """.trimIndent() + "\n")
+    }
+}
+
 kotlin {
     if (!aitaWebOnlyBuild) {
         jvmToolchain(21)
@@ -97,6 +150,8 @@ kotlin {
         all {
             languageSettings.optIn("kotlin.time.ExperimentalTime")
         }
+
+        getByName("commonMain").kotlin.srcDir(generateAitaClientBuildInfo.map { it.outputs.files.singleFile.resolve("kotlin") })
 
         commonMain.dependencies {
             implementation("io.ktor:ktor-client-logging:${property("ktor.version")}")

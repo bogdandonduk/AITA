@@ -4834,6 +4834,8 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.AppMode -> {
                         MenuAppModeScreen()
                     }
+                    is NavigationScreenModel.Menu.ClientUpdate -> { ClientUpdatesScreen() }
+                    is NavigationScreenModel.Menu.About -> { AboutScreen() }
                     is NavigationScreenModel.Menu.UserAccount -> {
                         MenuUserAccountScreen()
                     }
@@ -4937,6 +4939,8 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppMode -> {
                             MenuAppModeScreen()
                         }
+                        is NavigationScreenModel.Menu.ClientUpdate -> { ClientUpdatesScreen() }
+                        is NavigationScreenModel.Menu.About -> { AboutScreen() }
                         is NavigationScreenModel.Menu.UserAccount -> {
                             MenuUserAccountScreen()
                         }
@@ -5035,6 +5039,8 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppMode -> {
                             MenuAppModeScreen()
                         }
+                        is NavigationScreenModel.Menu.ClientUpdate -> { ClientUpdatesScreen() }
+                        is NavigationScreenModel.Menu.About -> { AboutScreen() }
                         is NavigationScreenModel.Menu.UserAccount -> {
                             MenuUserAccountScreen()
                         }
@@ -5194,7 +5200,9 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
-        NavigationScreenModel.Menu.AppScale
+        NavigationScreenModel.Menu.AppScale,
+        NavigationScreenModel.Menu.ClientUpdate,
+        NavigationScreenModel.Menu.About
     )
     APP_MODE_BUYER -> listOf(
         NavigationScreenModel.Menu.UserAccount,
@@ -5206,7 +5214,9 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
-        NavigationScreenModel.Menu.AppScale
+        NavigationScreenModel.Menu.AppScale,
+        NavigationScreenModel.Menu.ClientUpdate,
+        NavigationScreenModel.Menu.About
     )
     else -> Navigation.Menu.listScreens
 }
@@ -5728,6 +5738,7 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
 
 @Composable
 fun AppConfiguration.MenuListScreen() {
+    val clientUpdate by AppUpdateWorkspace.state.collectAsState()
     val subscriptionAccess = rememberStoreSubscriptionAccess()
     AitaScreenColumn(
         modifier = Modifier
@@ -5755,7 +5766,7 @@ fun AppConfiguration.MenuListScreen() {
                 .weight(1f)
         ) {
             items(
-                items = filteredMenuDestinations(),
+                items = filteredMenuDestinations().filter { it != NavigationScreenModel.Menu.ClientUpdate || clientUpdate.hasUpdate },
                 key = { model -> model.route }
             ) { model ->
                 Row(

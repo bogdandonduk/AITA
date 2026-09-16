@@ -2979,6 +2979,18 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.drawableResIconMenu.value
         }
 
+        data object ClientUpdate: Menu("MenuClientUpdateNavigationScreenModelRoute") {
+            override val iconPath get() = with(AppConfiguration) { updateIconPath() }
+            override val iconRes get() = with(AppConfiguration) { updateIconResource() }
+            override val name get() = with(AppConfiguration) { updateText("available") }
+        }
+
+        data object About: Menu("MenuAboutNavigationScreenModelRoute") {
+            override val iconPath get() = with(AppConfiguration) { updateIconPath(about = true) }
+            override val iconRes get() = with(AppConfiguration) { updateIconResource(about = true) }
+            override val name get() = with(AppConfiguration) { updateText("about") }
+        }
+
         data object UserAccount: Menu("MenuUserAccountNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconUserAccount
@@ -3289,6 +3301,8 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.Main,
     NavigationScreenModel.Menu.List,
     NavigationScreenModel.Menu.UserAccount,
+    NavigationScreenModel.Menu.ClientUpdate,
+    NavigationScreenModel.Menu.About,
     NavigationScreenModel.Menu.Notifications,
     NavigationScreenModel.Menu.Finances,
     NavigationScreenModel.Menu.AppMode,
@@ -3410,7 +3424,8 @@ internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreen
  * When disabled, indirect callers must not reopen the selector either.
  */
 internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
-    this == NavigationScreenModel.Menu.AppMode && !APP_MODE_SELECTION_PUBLICLY_ENABLED
+    (this == NavigationScreenModel.Menu.AppMode && !APP_MODE_SELECTION_PUBLICLY_ENABLED) ||
+        (this == NavigationScreenModel.Menu.ClientUpdate && AppUpdateWorkspace.state.value.let { it.initialized && !it.hasUpdate })
 
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
     val restoredCurrent = orEmpty()
@@ -6258,7 +6273,9 @@ object Navigation {
             NavigationScreenModel.Menu.Support,
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,
-            NavigationScreenModel.Menu.AppScale
+            NavigationScreenModel.Menu.AppScale,
+            NavigationScreenModel.Menu.ClientUpdate,
+            NavigationScreenModel.Menu.About
         )
 
         private val _Left =
@@ -6282,6 +6299,14 @@ object Navigation {
             MutableStateFlow<List<NavigationScreenModel.Menu>>(listOf(NavigationScreenModel.Menu.UserAccount))
         val Right =
             _Right.asStateFlow()
+
+        internal suspend fun removeUnavailableUpdateDestination() {
+            if (!AppUpdateWorkspace.state.value.initialized || AppUpdateWorkspace.state.value.hasUpdate) return
+            val left = normalizeMenuStack(_Left.value.filterNot { it == NavigationScreenModel.Menu.ClientUpdate }, NavigationScreenModel.Menu.List)
+            val right = normalizeMenuStack(_Right.value.filterNot { it == NavigationScreenModel.Menu.ClientUpdate }, NavigationScreenModel.Menu.UserAccount)
+            if (left != _Left.value) _Left.emit(left)
+            if (right != _Right.value) _Right.emit(right)
+        }
 
         internal fun persistentSnapshot(): PersistedSplitNavigationStackDataModel =
             PersistedSplitNavigationStackDataModel(

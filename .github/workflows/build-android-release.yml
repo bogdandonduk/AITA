@@ -11,6 +11,16 @@ on:
         description: Positive, always-increasing Android version code
         required: true
         default: "1"
+      channel:
+        description: Client release channel
+        type: choice
+        options: [release, test]
+        default: release
+      distribution:
+        description: Direct APK updater or store-managed updates
+        type: choice
+        options: [direct, store]
+        default: direct
 permissions:
   contents: read
 
@@ -24,6 +34,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
+    env:
+      AITA_RELEASE_CHANNEL: ${{ inputs.channel }}
+      AITA_RELEASE_DISTRIBUTION: ${{ inputs.distribution }}
+      AITA_UPDATE_PUBLIC_KEY: ${{ vars.AITA_UPDATE_PUBLIC_KEY }}
+      AITA_UPDATE_FEED_BASE: ${{ vars.AITA_UPDATE_FEED_BASE }}
+      AITA_RELEASE_REVISION: ${{ github.sha }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -54,7 +70,13 @@ jobs:
             echo "Android version code must be a positive integer." >&2
             exit 1
           }
+          [[ -n "$AITA_UPDATE_PUBLIC_KEY" && -n "$AITA_UPDATE_FEED_BASE" ]] || {
+            echo "Set repository variables AITA_UPDATE_PUBLIC_KEY and AITA_UPDATE_FEED_BASE before building updater-enabled releases." >&2
+            exit 1
+          }
           {
+            echo "AITA_RELEASE_BUILD=$version_code"
+            echo "AITA_RELEASE_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "AITA_RELEASE_VERSION=$version_name"
             echo "AITA_ANDROID_VERSION_NAME=$version_name"
             echo "AITA_ANDROID_VERSION_CODE=$version_code"
@@ -130,6 +152,7 @@ jobs:
           mkdir -p "$release_dir"
           cp "$apk" "$release_dir/AITA-$AITA_ANDROID_VERSION_NAME-android-release.apk"
           cp "$aab" "$release_dir/AITA-$AITA_ANDROID_VERSION_NAME-android-release.aab"
+          cp shared/build/generated/aitaClientBuild/client-build.json "$release_dir/client-build.json"
           if [[ -f composeApp/build/outputs/mapping/release/mapping.txt ]]; then
             cp composeApp/build/outputs/mapping/release/mapping.txt "$release_dir/mapping.txt"
           fi

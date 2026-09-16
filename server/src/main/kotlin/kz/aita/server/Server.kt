@@ -2,6 +2,8 @@
 
 package kz.aita.server
 
+import kz.aita.server.updates.installClientUpdateRoutes
+
 import kz.aita.server.marketplace.marketplaceRoutes
 import kz.aita.server.marketplace.publishMarketplaceStockChange
 import kz.aita.server.support.companySupportRoutes
@@ -18015,6 +18017,7 @@ fun Application.module() {
   val tokenService = TokenService(jwtConfig())
 
   routing {
+        installClientUpdateRoutes(this@module.environment.config)
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
         installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope, this@module)

@@ -50,12 +50,20 @@ val aitaAndroidVersionName = aitaBuildValue("aita.android.versionName", "AITA_AN
     .get()
     .trim()
 val aitaAndroidVersionCode = aitaBuildValue("aita.android.versionCode", "AITA_ANDROID_VERSION_CODE")
-    .orElse("1")
+    .orElse(aitaBuildValue("aita.release.build", "AITA_RELEASE_BUILD").orElse("1"))
     .get()
     .trim()
     .toIntOrNull()
     ?.takeIf { it in 1..2_100_000_000 }
     ?: error("AITA Android versionCode must be an integer from 1 to 2100000000")
+
+require(aitaAndroidVersionName == aitaReleaseVersion) {
+    "Android versionName must equal AITA_RELEASE_VERSION so update identity matches the installed package"
+}
+val explicitClientBuild = aitaBuildValue("aita.release.build", "AITA_RELEASE_BUILD").orNull
+require(explicitClientBuild == null || explicitClientBuild.trim().toIntOrNull() == aitaAndroidVersionCode) {
+    "Android versionCode and AITA_RELEASE_BUILD must agree"
+}
 
 val aitaAndroidKeystorePath = aitaBuildValue("aita.android.keystorePath", "AITA_ANDROID_KEYSTORE_PATH")
     .orNull
@@ -150,6 +158,10 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
+        if (!aitaWebOnlyBuild) {
+            getByName("jvmMain").kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
+            getByName("androidMain").kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
+        }
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)
@@ -228,7 +240,23 @@ if (!aitaWebOnlyBuild) {
         add("debugImplementation", compose.uiTooling)
     }
 
+    // tools:node is parsed before manifest placeholder substitution. Generate a complete
+    // manifest from the canonical template instead of using an invalid dynamic tools enum.
+    val generateAitaAndroidManifest by tasks.registering {
+        val template = layout.projectDirectory.file("src/androidMain/AndroidManifest.xml")
+        val output = layout.buildDirectory.file("generated/aitaManifest/AndroidManifest.xml")
+        val distribution = aitaBuildValue("aita.release.distribution", "AITA_RELEASE_DISTRIBUTION").orElse("direct")
+        inputs.file(template); inputs.property("distribution", distribution); outputs.file(output)
+        doLast {
+            require(distribution.get() in setOf("direct", "store"))
+            val permission = if (distribution.get() == "direct")
+                "<uses-permission android:name=\"android.permission.REQUEST_INSTALL_PACKAGES\" />" else ""
+            output.get().asFile.apply { parentFile.mkdirs(); writeText(template.asFile.readText().replace("<!-- AITA_DIRECT_INSTALL_PERMISSION -->", permission)) }
+        }
+    }
+    tasks.matching { it.name.startsWith("process") && it.name.endsWith("MainManifest") }.configureEach { dependsOn(generateAitaAndroidManifest) }
     extensions.configure<ApplicationExtension> {
+        sourceSets.getByName("main").manifest.srcFile(generateAitaAndroidManifest.map { it.outputs.files.singleFile })
         namespace = "kz.aita"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -305,7 +333,7 @@ if (!aitaWebOnlyBuild) {
             mainClass = "kz.aita.JvmMainComposeKt"
 
             nativeDistributions {
-                targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Dmg)
+                targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Dmg, TargetFormat.Pkg)
                 modules(
                     "java.sql",
                     "java.logging",
