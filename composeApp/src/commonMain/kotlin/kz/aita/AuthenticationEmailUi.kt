@@ -127,37 +127,19 @@ internal fun AppConfiguration.SecurityEmailProofInput(
 
 @Composable
 internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSettingsDataModel,
-    initiallyRequired: Boolean, emailAvailable: Boolean, onUpdated: (AitaAuthenticationSettingsDataModel) -> Unit, onClose: () -> Unit) {
+    selectedMethod: AitaLoginSecondFactor, onUpdated: (AitaAuthenticationSettingsDataModel) -> Unit,
+    onClose: () -> Unit, onBusyChanged: (Boolean) -> Unit = {}) {
     val owner = stateValues.userAccount?.id
     val generation = currentAuthenticatedSessionGeneration()
-    var required by remember { mutableStateOf(initiallyRequired) }
-    var method by remember { mutableStateOf(if (settings.loginSecondFactor != AitaLoginSecondFactor.NONE) settings.loginSecondFactor
-        else if (settings.authenticatorEnabled) AitaLoginSecondFactor.AUTHENTICATOR else AitaLoginSecondFactor.EMAIL) }
     var password by remember { mutableStateOf("") }
     var factor by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    val chosen = if (required) method else AitaLoginSecondFactor.NONE
+    val chosen = selectedMethod
+    LaunchedEffect(busy) { onBusyChanged(busy) }
+    DisposableEffect(Unit) { onDispose { onBusyChanged(false) } }
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету", "Кирүүдө 2FA талап кылуу"),
-                Modifier.weight(1f), color = stateValues.TextColor, fontSize = stateValues.textSize)
-            Switch(checked = required, onCheckedChange = { required = it }, enabled = !busy,
-                colors = SwitchDefaults.colors(checkedTrackColor = stateValues.AccentColor))
-        }
-        if (required) {
-            val choices = listOfNotNull(AitaLoginSecondFactor.AUTHENTICATOR.takeIf { settings.authenticatorEnabled }, AitaLoginSecondFactor.EMAIL.takeIf { emailAvailable || settings.emailRequiredForLogin })
-            choices.forEach { choice ->
-                Row(Modifier.fillMaxWidth().selectable(selected = method == choice, enabled = !busy,
-                    role = Role.RadioButton, onClick = { method = choice }), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = method == choice, onClick = null, enabled = !busy,
-                        colors = RadioButtonDefaults.colors(selectedColor = stateValues.AccentColor, unselectedColor = stateValues.PlaceholderTextColor))
-                    Text(if (choice == AitaLoginSecondFactor.EMAIL) authUiText("Email code", "Код из письма", "Email коды", "Электрондук почтадагы код")
-                        else authUiText("Authenticator", "Аутентификатор", "Аутентификатор", "Аутентификатор"), color = stateValues.TextColor, fontSize = stateValues.textSize)
-                }
-            }
-        }
         SensitiveAuthConfirmationFields(enabled = !busy, currentPassword = password, secondFactor = factor,
             secondFactorRequired = settings.authenticatorEnabled, onPasswordChange = { password = it }, onSecondFactorChange = { factor = it })
         val needsEmail = chosen == AitaLoginSecondFactor.EMAIL || (!settings.authenticatorEnabled && settings.emailRequiredForLogin)

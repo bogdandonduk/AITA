@@ -11,14 +11,15 @@ internal fun parseAppearanceColor(value: String): Color {
 
 /** No chosen locale/theme/scale is captured in this object, so delayed resource loads cannot replay one. */
 internal class UiAppearanceResources(val catalog: AppearanceCatalog) {
-    private val palettes = listOf(0L, 1L).associateWith { theme ->
-        val dark = theme == 1L
+    private val palettes = SUPPORTED_APP_THEME_IDS.associateWith { theme ->
+        val dark = isDarkAppTheme(theme)
         val defaults = listOf("#ffffba24", if (dark) "#ff111111" else "#ffffffff",
             if (dark) "#ffffffff" else "#ff000000", "#ffffffff",
             if (dark) "#aaffffff" else "#aa000000", "#ffa7a7a7", "#ffff0000",
             if (dark) "#ffffffff" else "#ff000000", "#ff6bb522", "#ffffa500")
-        defaults.mapIndexed { id, fallback ->
-            runCatching { parseAppearanceColor(catalog.color(id.toLong(), theme) ?: fallback) }.getOrElse { parseAppearanceColor(fallback) }
+        defaults.mapIndexed { id, default ->
+            val fallback=tintedAppThemeColor(id.toLong(),theme) ?: default
+            runCatching {parseAppearanceColor(catalog.color(id.toLong(),theme) ?: fallback)}.getOrElse {parseAppearanceColor(fallback)}
         }
     }
     fun color(id: Int, theme: Long): Color = palettes.getValue(normalizeAppThemePreference(theme))[id]

@@ -39,7 +39,7 @@ import kz.aita.help.*
 internal fun AppConfiguration.tutorialText(key:String,vararg args:Pair<String,String>) =
     eventMessage("help.$key",*args).extractLocalizedString(stateValues.appLanguage).orEmpty()
 internal fun AppConfiguration.tutorialIconPath()=uiAppearanceResourcesState.value.catalog.drawable(212L,stateValues.appThemeId)
-internal fun AppConfiguration.tutorialIconResource()=if(normalizeAppThemePreference(stateValues.appThemeId)==1L) Res.drawable._212_1 else Res.drawable._212_0
+internal fun AppConfiguration.tutorialIconResource()=if(isDarkAppTheme(stateValues.appThemeId)) Res.drawable._212_1 else Res.drawable._212_0
 private fun HelpCategory.tabIcon()=when(this) {
     HelpCategory.START->AitaTabIcon.Checklist; HelpCategory.ACCOUNT->AitaTabIcon.Security
     HelpCategory.STOCK->AitaTabIcon.Stock; HelpCategory.SALES->AitaTabIcon.CashRegister
@@ -80,11 +80,8 @@ private data class HelpSearchResult(val tutorials:List<HelpTutorial> = emptyList
         }
         val selected=book?.tutorials?.firstOrNull { it.id==fromFaq && mode in it.modes }
         Column(modifier.widthIn(max=940.dp).fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                Text(tutorialText("mode.${mode.slug}"),color=stateValues.AccentColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold)
-                if(!faq && book!=null) Text(tutorialText("count","count" to book.tutorials.size.toString()),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-                if(state.remoteUnavailable) Text(tutorialText("offline"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-            }
+            if(state.remoteUnavailable) Text(tutorialText("offline"),modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp),
+                color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
             if(selected!=null) {
                 actionButton(modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),text=tutorialText("back_faq"),
                     autoLoading=false,confirmationRequired=false,onClick={fromFaq=null})
@@ -108,9 +105,6 @@ private data class HelpSearchResult(val tutorials:List<HelpTutorial> = emptyList
                     } else items(results.tutorials,key={it.id}) { entry -> TutorialCard(entry) }
                 }
             }
-            actionButton(modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp),text=tutorialText("refresh"),
-                autoLoading=false,loading=state.refreshing,enabled=!state.refreshing,confirmationRequired=false,
-                onClick={TutorialWorkspace.load(mode,force=true)})
         }
     }
 }

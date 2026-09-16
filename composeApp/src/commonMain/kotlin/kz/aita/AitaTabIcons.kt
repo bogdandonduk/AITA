@@ -134,7 +134,7 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
 }
 
 internal fun AppConfiguration.tabIconResource(icon: AitaTabIcon): DrawableResource {
-    val dark = normalizeAppThemePreference(stateValues.appThemeId) == 1L
+    val dark = isDarkAppTheme(stateValues.appThemeId)
     return when(icon) {
         AitaTabIcon.All -> if (dark) Res.drawable._149_1 else Res.drawable._149_0
         AitaTabIcon.Quick -> if (dark) Res.drawable._150_1 else Res.drawable._150_0

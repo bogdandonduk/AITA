@@ -3348,22 +3348,22 @@ internal fun AppConfiguration.rememberLatestStockAddEditCategorySelection(rootCa
 
 
 internal fun AppConfiguration.globalGoodsIconPath(): String =
-    if (stateValues.appThemeId == 1L) "svg/56_1.svg" else "svg/56_0.svg"
+    if (isDarkAppTheme(stateValues.appThemeId)) "svg/56_1.svg" else "svg/56_0.svg"
 
 internal fun AppConfiguration.globalGoodsIconFallback(): DrawableResource =
-    if (stateValues.appThemeId == 1L) Res.drawable._56_1 else Res.drawable._56_0
+    if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._56_1 else Res.drawable._56_0
 
 internal fun AppConfiguration.undoTemplateIconPath(): String =
-    if (stateValues.appThemeId == 1L) "svg/58_1.svg" else "svg/58_0.svg"
+    if (isDarkAppTheme(stateValues.appThemeId)) "svg/58_1.svg" else "svg/58_0.svg"
 
 internal fun AppConfiguration.undoTemplateIconFallback(): DrawableResource =
-    if (stateValues.appThemeId == 1L) Res.drawable._58_1 else Res.drawable._58_0
+    if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._58_1 else Res.drawable._58_0
 
 internal fun AppConfiguration.parentStoreStockIconPath(): String =
-    if (stateValues.appThemeId == 1L) "svg/60_1.svg" else "svg/60_0.svg"
+    if (isDarkAppTheme(stateValues.appThemeId)) "svg/60_1.svg" else "svg/60_0.svg"
 
 internal fun AppConfiguration.parentStoreStockIconFallback(): DrawableResource =
-    if (stateValues.appThemeId == 1L) Res.drawable._60_1 else Res.drawable._60_0
+    if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._60_1 else Res.drawable._60_0
 
 
 internal fun AppConfiguration.stockBatchStatusText(status: StockBatchStatusDataModel): String = when (status) {

@@ -32,7 +32,7 @@ internal fun AppConfiguration.updateText(key: String, vararg arguments: Pair<Str
     eventMessage("updates.$key", *arguments).extractLocalizedString(stateValues.appLanguage).orEmpty()
 internal fun AppConfiguration.updateIconPath(about: Boolean = false) = uiAppearanceResourcesState.value.catalog.drawable(if(about) 211L else 210L,stateValues.appThemeId)
 internal fun AppConfiguration.updateIconResource(about: Boolean = false): DrawableResource {
-    val dark = normalizeAppThemePreference(stateValues.appThemeId) == 1L
+    val dark = isDarkAppTheme(stateValues.appThemeId)
     return if(about) { if(dark) Res.drawable._211_1 else Res.drawable._211_0 }
         else if(dark) Res.drawable._210_1 else Res.drawable._210_0
 }
@@ -42,13 +42,17 @@ internal fun AppConfiguration.AppUpdateEffects() {
     val current by AppUpdateWorkspace.state.collectAsState()
     val focused = LocalWindowInfo.current.isWindowFocused
     val transport by cloudTransportStatusState.collectAsState()
+    val account=stateValues.userAccount?.id
+    val generation=currentAuthenticatedSessionGeneration()
+    LaunchedEffect(account,generation) {supportConversationBooks.forOwner(account,generation)}
     LaunchedEffect(Unit) {
         launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { AppUpdateWorkspace.notifications.collect { version ->
             postInAppNotification(eventMessage("updates.notification","version" to version),NotificationType.Positive,transient = true)
         } }
         AppUpdateWorkspace.start()
+        TutorialWorkspace.start()
     }
-    LaunchedEffect(focused, transport) { if(focused) AppUpdateWorkspace.checkNow() }
+    LaunchedEffect(focused, transport) { if(focused) { AppUpdateWorkspace.checkNow(); TutorialWorkspace.refreshObserved() } }
     LaunchedEffect(current.initialized,current.hasUpdate) {
         if(current.initialized && !current.hasUpdate) {
             Navigation.awaitAppNavigationRestore()
@@ -192,9 +196,6 @@ internal fun AppConfiguration.AboutScreen() {
             InformationRow(updateText("built_at"),build.builtAt.takeUnless { it=="development" } ?: updateText("development"))
             InformationRow("Kotlin / Compose Multiplatform","${build.kotlinVersion} / ${build.composeVersion}")
         }
-        if(current.hasUpdate) actionButton(text=updateText("available"),iconPath=updateIconPath(),iconRes=updateIconResource(),
-            autoLoading=false,confirmationRequired=false) { coroutineScope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.ClientUpdate) } }
-        UpdateCheckFooter(current)
         actionButton(text=updateText("support"),iconPath=stateValues.drawablePathIconSupport,autoLoading=false,confirmationRequired=false) {
             coroutineScope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.Support) }
         }

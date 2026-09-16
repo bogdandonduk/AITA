@@ -2,6 +2,9 @@
 @file:OptIn(ExperimentalTime::class, ExperimentalFoundationApi::class)
 package kz.aita
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
@@ -1274,7 +1277,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
                         TabContent("amount", localizedStringResource(581, "Amount")) { sortId = it }
                     ),
                     selectedIndexInitial = sortId,
-                    textSize = stateValues.smallTextSize
+                    compact = true, textSize = stateValues.smallTextSize
                 )
 
                 tabRowWidget(
@@ -1284,7 +1287,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
                         TabContent("desc", localizedStringResource(516, "Descending")) { sortAscending = false }
                     ),
                     selectedIndexInitial = if (sortAscending) "asc" else "desc",
-                    textSize = stateValues.smallTextSize
+                    compact = true, textSize = stateValues.smallTextSize
                 )
             }
         }
@@ -1784,7 +1787,7 @@ fun AppConfiguration.MenuAppThemeScreen() {
                     if (stateValues.isNarrowScreen) 1f else 0.6f
                 )
         ) {
-            items(stateValues.globalAppConfiguration.themes) { theme ->
+            items(availableAppThemes(stateValues.globalAppConfiguration.themes)) { theme ->
                 AppThemeSettingsItemWidget(
                     id = theme.id,
                     name = theme.name.extractLocalizedString(stateValues.appLanguage) ?: theme.id.toString(),
@@ -1917,255 +1920,54 @@ internal fun AppConfiguration.availableAppModeOptions(currentModeId: Int): List<
     appModeOptions().filter { option -> appModeIsAvailableInCurrentRelease(option.modeId, currentModeId) }
 
 @Composable
-internal fun AppConfiguration.AppModeFeatureChip(
-    text: String,
-    selected: Boolean
-) {
-    Text(
-        text = text,
-        color = if (selected) stateValues.AccentTextColor else stateValues.TextColor,
-        fontSize = stateValues.smallTextSize,
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(if (selected) stateValues.AccentColor else stateValues.DisabledColor.copy(alpha = 0.20f))
-            .border(
-                stateValues.unfocusedBorderWidth,
-                if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
-                RoundedCornerShape(stateValues.cornerRadius)
-            )
-            .padding(horizontal = 9.dp, vertical = 5.dp)
-    )
-}
-
-@Composable
 internal fun AppConfiguration.AppModeSelectionCard(
-    option: AppModeOptionUiModel,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    option: AppModeOptionUiModel, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .run { if (selected) this else foregroundTactileShadow(stateValues.cornerRadius, elevated = false) }
-            .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(if (selected) stateValues.AccentColor.copy(alpha = 0.10f) else stateValues.BackgroundColor)
-            .border(
-                if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
-                if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor,
-                RoundedCornerShape(stateValues.cornerRadius)
-            )
-            .aitaClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = if (selected) stateValues.AccentColor else stateValues.TextColor)
-            ) { onClick() }
-            .padding(stateValues.marginTextFieldGroup),
-        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+    Row(modifier
+        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
+        .clip(RoundedCornerShape(stateValues.cornerRadius))
+        .background(if (selected) stateValues.AccentColor.copy(alpha = .12f) else stateValues.BackgroundColor)
+        .border(if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
+            if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = .55f),
+            RoundedCornerShape(stateValues.cornerRadius))
+        .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+        .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(58.dp)
-                    .clip(RoundedCornerShape(stateValues.cornerRadius))
-                    .background(if (selected) stateValues.AccentColor.copy(alpha = 0.16f) else stateValues.DisabledColor.copy(alpha = 0.18f))
-                    .border(
-                        stateValues.unfocusedBorderWidth,
-                        if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = 0.55f),
-                        RoundedCornerShape(stateValues.cornerRadius)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                CpImage(
-                    modifier = Modifier.size(40.dp),
-                    url = option.iconPath,
-                    fallbackRes = option.iconRes,
-                    contentDescription = option.title,
-                    tintColor = null
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = option.title,
-                    color = if (selected) stateValues.AccentColor else stateValues.TextColor,
-                    fontSize = stateValues.accentTextSize,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = option.subtitle,
-                    color = stateValues.PlaceholderTextColor,
-                    fontSize = stateValues.smallTextSize,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (selected) {
-                CpImage(
-                    modifier = Modifier.size(22.dp),
-                    url = stateValues.drawablePathIconCheck,
-                    fallbackRes = stateValues.drawableResIconCheck.value,
-                    contentDescription = localizedStringResource(1396, "Selected"),
-                    tintColor = stateValues.AccentColor
-                )
-            }
-        }
-
-        Text(
-            text = option.promise,
-            color = stateValues.TextColor,
-            fontSize = stateValues.textSize,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            option.features.take(2).forEach { chip ->
-                AppModeFeatureChip(text = chip, selected = selected)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            option.features.drop(2).take(2).forEach { chip ->
-                AppModeFeatureChip(text = chip, selected = selected)
-            }
-        }
+        CpImage(Modifier.size(36.dp), url = option.iconPath, fallbackRes = option.iconRes,
+            contentDescription = null, tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor)
+        Text(accountPresentationText(when(option.modeId) {
+            APP_MODE_STORE -> "store"; APP_MODE_BUYER -> "marketplace"; else -> "supplier"
+        }), Modifier.weight(1f), color = if(selected) stateValues.AccentColor else stateValues.TextColor,
+            fontSize = stateValues.accentTextSize, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 fun AppConfiguration.MenuAppModeScreen() {
     val options = availableAppModeOptions(stateValues.appModeId)
-
-    fun selectAppMode(modeId: Int) {
-        if (stateValues.appModeId == modeId) return
-        setAppMode(modeId)
-        coroutineScope.launch {
-            Navigation.Menu.clearLeft()
-            Navigation.Menu.clearRight()
-            Navigation.goMain(defaultMainScreenForAppMode(modeId))
-        }
-    }
-
-    AitaScreenColumn(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        appBar = {
-            ScreenAppBarWidget(
-                title = stateValues.stringAppMode,
-                iconPath = stateValues.drawablePathIconSwitch,
-                iconRes = stateValues.drawableResIconSwitch.value,
-                onBack = {
-                    coroutineScope.launch {
-                        Navigation.Menu.pop(stateValues.isNarrowScreen)
-                    }
-                }
-            )
-        }
-    ) {
-        LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppMode),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.78f),
-            contentPadding = PaddingValues(
-                start = stateValues.marginTextField,
-                end = stateValues.marginTextField,
-                top = stateValues.marginTextField,
-                bottom = stateValues.screenHeight / 6
-            ),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.AccentColor.copy(alpha = 0.10f))
-                        .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                        .padding(stateValues.marginTextFieldGroup),
-                    verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CpImage(
-                        modifier = Modifier.size(58.dp),
-                        url = options.firstOrNull { it.modeId == stateValues.appModeId }?.iconPath ?: stateValues.drawablePathIconSwitch,
-                        fallbackRes = options.firstOrNull { it.modeId == stateValues.appModeId }?.iconRes ?: stateValues.drawableResIconSwitch.value,
-                        contentDescription = stateValues.stringAppMode,
-                        tintColor = null
-                    )
-                    Text(
-                        text = localizedStringResource(1397, "Choose how AITA behaves today"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.titleTextSize,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            item {
-                if (stateValues.isNarrowScreen) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                    ) {
-                        options.forEach { option ->
-                            AppModeSelectionCard(
-                                option = option,
-                                selected = stateValues.appModeId == option.modeId,
-                                modifier = Modifier.fillMaxWidth(),
-                                onClick = { selectAppMode(option.modeId) }
-                            )
-                        }
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                    ) {
-                        options.chunked(2).forEach { rowOptions ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-                            ) {
-                                rowOptions.forEach { option ->
-                                    AppModeSelectionCard(
-                                        option = option,
-                                        selected = stateValues.appModeId == option.modeId,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { selectAppMode(option.modeId) }
-                                    )
-                                }
-                                if (rowOptions.size == 1) Spacer(modifier = Modifier.weight(1f))
-                            }
+    AitaScreenColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, appBar = {
+        ScreenAppBarWidget(title = stateValues.stringAppMode, iconPath = stateValues.drawablePathIconSwitch,
+            iconRes = stateValues.drawableResIconSwitch.value,
+            onBack = if(Navigation.Menu.isVeryFirstScreen(stateValues.isNarrowScreen)) null else {
+                { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } }
+            })
+    }) {
+        LazyColumn(state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AppMode),
+            modifier = Modifier.weight(1f).widthIn(max = 640.dp).fillMaxWidth(),
+            contentPadding = PaddingValues(stateValues.marginTextField),
+            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+            items(options, key = { it.modeId }) { option ->
+                AppModeSelectionCard(option, stateValues.appModeId == option.modeId, Modifier.fillMaxWidth()) {
+                    if (stateValues.appModeId != option.modeId) {
+                        setAppMode(option.modeId)
+                        coroutineScope.launch {
+                            Navigation.Menu.clearLeft(); Navigation.Menu.clearRight()
+                            Navigation.goMain(defaultMainScreenForAppMode(option.modeId))
                         }
                     }
                 }
             }
-
-            if (stateValues.appModeId == APP_MODE_SUPPLIER || stateValues.appModeId == APP_MODE_MANUFACTURER) {
-                item(key = "app-mode-supplier-workspace-overview") {
-                    SupplierWorkspaceMenuTile()
-                }
-            }
-
         }
     }
 }

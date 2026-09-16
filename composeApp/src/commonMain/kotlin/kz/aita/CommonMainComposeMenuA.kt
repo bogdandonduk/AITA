@@ -1800,8 +1800,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                 .align(Alignment.CenterHorizontally).padding(stateValues.marginTextField))
         }
 
+        val workerListState = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, "${selectedTab.id}_$section")
         LazyColumn(
-            state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, "${selectedTab.id}_$section"),
+            state = workerListState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
@@ -1814,12 +1815,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                 "my_work" -> {
                     if (section == "apply") {
                         item(key = "MenuWorkersScreen:$section:0") {
-                            Text(
-                                text = localizedStringResource(475, "Request employment in a store"),
-                                color = stateValues.TextColor,
-                                fontSize = stateValues.titleTextSize,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Text(text = localizedStringResource(475, "Request employment in a store"), color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
 
                             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -1863,7 +1861,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                     when (section) {
                         "requests" -> {
                             if (requests.isEmpty()) {
-                                item(key = "MenuWorkersScreen:$section:1") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(1117, "No pending employment requests")) }
+                                item(key = "MenuWorkersScreen:$section:1") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:1"), text = localizedStringResource(1117, "No pending employment requests")) }
                             } else {
                                 items(requests, key = { it.id }) { request ->
                                     Column(
@@ -1907,7 +1905,7 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                         "managed" -> {
                             if (memberships.isEmpty()) {
-                                item(key = "MenuWorkersScreen:$section:2") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(479, "You are not employed in other stores yet")) }
+                                item(key = "MenuWorkersScreen:$section:2") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:2"), text = localizedStringResource(479, "You are not employed in other stores yet")) }
                             } else {
                                 items(memberships, key = { it.id }) { worker ->
                                     WorkerMembershipCard(worker = worker, editable = false, showSelfPasswordEditor = true)
@@ -1927,16 +1925,13 @@ fun AppConfiguration.MenuWorkersScreen() {
                         .distinctBy { it.id }
 
                     if ((section == "invitations" && invitations.isEmpty()) || (section == "removals" && removalRequests.isEmpty())) {
-                        item(key = "MenuWorkersScreen:$section:3") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringListEmpty) }
+                        item(key = "MenuWorkersScreen:$section:3") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:3"), text = stateValues.stringListEmpty) }
                     } else {
                         if (section == "invitations" && invitations.isNotEmpty()) {
                             item(key = "MenuWorkersScreen:$section:4") {
-                                Text(
-                                    text = localizedStringResource(652, "Incoming invites from stores"),
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.titleTextSize,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text(text = localizedStringResource(652, "Incoming invites from stores"), color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                             }
 
                             items(invitations, key = { it.id }) { request ->
@@ -2033,13 +2028,9 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                         if (section == "removals" && removalRequests.isNotEmpty()) {
                             item(key = "MenuWorkersScreen:$section:5") {
-                                Text(
-                                    text = localizedStringResource(1225, "Removal requests"),
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.titleTextSize,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                )
+                                Text(text = localizedStringResource(1225, "Removal requests"), color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                             }
 
                             items(removalRequests, key = { "removal_${it.id}" }) { request ->
@@ -2051,12 +2042,9 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                 "responses" -> {
                     item(key = "MenuWorkersScreen:$section:6") {
-                        Text(
-                            text = localizedStringResource(1238, "Worker responses"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = localizedStringResource(1238, "Worker responses"), color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                     }
 
                     if (section == "mine") {
@@ -2065,18 +2053,15 @@ fun AppConfiguration.MenuWorkersScreen() {
                             .distinctBy { it.id }
 
                         item(key = "MenuWorkersScreen:$section:7") {
-                            Text(
-                                text = localizedStringResource(1104, "My response history"),
-                                color = stateValues.TextColor,
-                                fontSize = stateValues.accentTextSize,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Text(text = localizedStringResource(1104, "My response history"), color = stateValues.TextColor,
+                                fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         }
 
                         if (myResponses.isEmpty()) {
                             item(key = "MenuWorkersScreen:$section:8") {
                                 MessageText(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:8"),
                                     text = localizedStringResource(1094, "No employment responses yet")
                                 )
                             }
@@ -2089,19 +2074,15 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                     if (section == "store") {
                         item(key = "MenuWorkersScreen:$section:9") {
-                            Text(
-                                text = localizedStringResource(1105, "Store response history"),
-                                color = stateValues.TextColor,
-                                fontSize = stateValues.accentTextSize,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = stateValues.marginTextFieldGroup)
-                            )
+                            Text(text = localizedStringResource(1105, "Store response history"), color = stateValues.TextColor,
+                                fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         }
 
                         if (activeStoreId == null) {
-                            item(key = "MenuWorkersScreen:$section:10") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
+                            item(key = "MenuWorkersScreen:$section:10") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:10"), text = stateValues.stringNoActiveStore) }
                         } else if (!currentUserCanDecideWorkerRequests(activeStoreId)) {
-                            item(key = "MenuWorkersScreen:$section:11") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
+                            item(key = "MenuWorkersScreen:$section:11") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:11"), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
                         } else {
                             val storeResponses = incomingRequestsPayload.orEmpty()
                                 .filter { it.isEmploymentResponse() || it.isWorkerRemovalResponse() }
@@ -2110,7 +2091,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                             if (storeResponses.isEmpty()) {
                                 item(key = "MenuWorkersScreen:$section:12") {
                                     MessageText(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:12"),
                                         text = localizedStringResource(1094, "No employment responses yet")
                                     )
                                 }
@@ -2125,18 +2106,15 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                 "store_workers" -> {
                     item(key = "MenuWorkersScreen:$section:13") {
-                        Text(
-                            text = localizedStringResource(473, "Store workers"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = localizedStringResource(473, "Store workers"), color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                     }
 
                     if (activeStoreId == null) {
-                        item(key = "MenuWorkersScreen:$section:14") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
+                        item(key = "MenuWorkersScreen:$section:14") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:14"), text = stateValues.stringNoActiveStore) }
                     } else if (!currentUserCanViewWorkers(activeStoreId)) {
-                        item(key = "MenuWorkersScreen:$section:15") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(483, "You do not have permission to view workers in this store")) }
+                        item(key = "MenuWorkersScreen:$section:15") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:15"), text = localizedStringResource(483, "You do not have permission to view workers in this store")) }
                     } else {
                         val roleTemplates = roleTemplatesPayload.orEmpty()
 
@@ -2170,12 +2148,9 @@ fun AppConfiguration.MenuWorkersScreen() {
                                             .background(stateValues.BackgroundColor)
                                             .padding(stateValues.marginTextFieldGroup)
                                     ) {
-                                        Text(
-                                            text = localizedStringResource(505, "Invite worker"),
-                                            color = stateValues.TextColor,
-                                            fontSize = stateValues.accentTextSize,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        Text(text = localizedStringResource(505, "Invite worker"), color = stateValues.TextColor,
+                                fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
 
                                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -2312,7 +2287,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                         if (section == "workers") {
                             val workers = storeWorkersPayload.orEmpty()
                             if (workers.isEmpty()) {
-                                item(key = "MenuWorkersScreen:$section:18") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(484, "No workers in this store yet")) }
+                                item(key = "MenuWorkersScreen:$section:18") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:18"), text = localizedStringResource(484, "No workers in this store yet")) }
                             } else {
                                 val editable = currentUserCanEditWorkerPermissions(activeStoreId)
                                 val removable = currentUserCanRemoveWorkers(activeStoreId)
@@ -2340,22 +2315,19 @@ fun AppConfiguration.MenuWorkersScreen() {
 
                 else -> {
                     item(key = "MenuWorkersScreen:$section:19") {
-                        Text(
-                            text = localizedStringResource(658, "Requests to this store or branch"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.titleTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = localizedStringResource(658, "Requests to this store or branch"), color = stateValues.TextColor,
+                                fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                     }
 
                     if (activeStoreId == null) {
-                        item(key = "MenuWorkersScreen:$section:20") { MessageText(modifier = Modifier.fillParentMaxSize(), text = stateValues.stringNoActiveStore) }
+                        item(key = "MenuWorkersScreen:$section:20") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:20"), text = stateValues.stringNoActiveStore) }
                     } else if (!currentUserCanDecideWorkerRequests(activeStoreId)) {
-                        item(key = "MenuWorkersScreen:$section:21") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
+                        item(key = "MenuWorkersScreen:$section:21") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:21"), text = localizedStringResource(486, "Only store owners and permitted worker managers can accept employment requests")) }
                     } else {
                         val pendingRequests = incomingRequestsPayload.orEmpty().filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
                         if (pendingRequests.isEmpty()) {
-                            item(key = "MenuWorkersScreen:$section:22") { MessageText(modifier = Modifier.fillParentMaxSize(), text = localizedStringResource(487, "No incoming employment requests")) }
+                            item(key = "MenuWorkersScreen:$section:22") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:22"), text = localizedStringResource(487, "No incoming employment requests")) }
                         } else {
                             items(pendingRequests, key = { it.id }) { request ->
                                 WorkerRequestCard(storeId = activeStoreId, request = request)
@@ -2488,6 +2460,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.72f)
                 .padding(horizontal = stateValues.marginTextField, vertical = 24.dp)
         ) {
+            item(key = "account-profile-photo") { UserProfilePhotoCard() }
             item {
                 val outerSpace = 16.dp
                 val innerSpace = 8.dp
@@ -4458,7 +4431,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
                         TabContent("added", localizedStringResource(514, "Time added")) { sortId = it }
                     ),
                     selectedIndexInitial = sortId,
-                    textSize = stateValues.smallTextSize
+                    compact = true, textSize = stateValues.smallTextSize
                 )
 
                 tabRowWidget(
@@ -4468,7 +4441,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
                         TabContent("desc", localizedStringResource(516, "Descending")) { sortAscending = false }
                     ),
                     selectedIndexInitial = if (sortAscending) "asc" else "desc",
-                    textSize = stateValues.smallTextSize
+                    compact = true, textSize = stateValues.smallTextSize
                 )
             }
         }

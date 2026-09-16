@@ -78,6 +78,9 @@ class MenuTabsRefinementTest(unittest.TestCase):
             self.assertIn("remainingListSpace(emptySpaceListState",(KOTLIN/file).read_text(),file)
         workers=(KOTLIN/"CommonMainComposeMenuA.kt").read_text().split("fun AppConfiguration.MenuWorkersScreen()",1)[1].split("\n@Composable",1)[0]
         self.assertLess(workers.index("WorkerIdentityCard("),workers.index("LazyColumn("))
-        self.assertIn("Modifier.fillParentMaxSize()",workers)
+        self.assertNotIn("Modifier.fillParentMaxSize()",workers)
+        self.assertIn("remainingListSpace(workerListState",workers)
+        for key in (8,12):
+            self.assertIn(f'remainingListSpace(workerListState, "MenuWorkersScreen:$section:{key}")',workers)
 
 if __name__=="__main__": unittest.main(verbosity=2)

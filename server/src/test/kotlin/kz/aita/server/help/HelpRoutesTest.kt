@@ -18,7 +18,7 @@ import kotlin.test.*
 class HelpRoutesTest {
     private fun temporary(test:(Path)->Unit) { val root=Files.createTempDirectory("aita-help-test-").toRealPath();try {test(root)}finally {root.toFile().deleteRecursively()} }
     @Test fun bundledBookIsValidAndHasSubstantialModeSpecificCoverage()=runBlocking {
-        val all=HelpCatalogStore().catalogue();assertTrue(validHelpCatalogue(all));assertEquals(98,all.tutorials.size)
+        val all=HelpCatalogStore().catalogue();assertTrue(validHelpCatalogue(all));assertTrue(all.tutorials.size>=100)
         assertTrue(all.forMode(HelpMode.STORE).tutorials.size>=60)
         assertTrue(all.forMode(HelpMode.BUYER).tutorials.size>=30)
         assertTrue(all.forMode(HelpMode.SUPPLIER).tutorials.size>=30)
@@ -55,5 +55,42 @@ class HelpRoutesTest {
     }
     @Test fun newDatabaseRowsUseBuyerDefault() {
         assertEquals(DEFAULT_NEW_ACCOUNT_APP_MODE,Users.appModeId.defaultValueFun?.invoke())
+    }
+    @Test fun validatedPublicationAnnouncesOnceAndBadFilesNeverAnnounce()=temporary {root->
+        runBlocking {
+            val original=HelpCatalogStore().catalogue();val file=root.resolve("tutorials.json")
+            fun publish(book:HelpCatalogue) {Files.writeString(file,helpJson.encodeToString(HelpCatalogue.serializer(),book))}
+            publish(original)
+            var notices=0
+            val watcher=HelpChangeAnnouncer(HelpCatalogStore(file)) {notices++}
+            watcher.check();assertEquals(0,notices)
+            publish(original.copy(revision=original.revision+1));watcher.check();assertEquals(1,notices)
+            watcher.check();assertEquals(1,notices)
+            Files.writeString(file,"{}");assertFailsWith<IllegalArgumentException> {watcher.check()}
+            assertEquals(1,notices)
+            publish(original.copy(revision=original.revision+2));watcher.check();assertEquals(2,notices)
+        }
+    }
+    @Test fun failedAnnouncementIsRetriedAndLowerRevisionNeverPublished()=temporary {root->
+        runBlocking {
+            val original=HelpCatalogStore().catalogue();val file=root.resolve("tutorials.json")
+            fun publish(book:HelpCatalogue) {Files.writeString(file,helpJson.encodeToString(HelpCatalogue.serializer(),book))}
+            publish(original);var fail=true;var notices=0
+            val watcher=HelpChangeAnnouncer(HelpCatalogStore(file)) {if(fail)error("test failure");notices++}
+            watcher.check();publish(original.copy(revision=original.revision+1))
+            assertFailsWith<IllegalStateException> {watcher.check()}
+            fail=false;watcher.check();assertEquals(1,notices)
+            publish(original);assertFailsWith<IllegalArgumentException> {watcher.check()};assertEquals(1,notices)
+        }
+    }
+    @Test fun firstValidPublicationAfterMissingFileNotifiesWaitingClients()=temporary {root->
+        runBlocking {
+            val original=HelpCatalogStore().catalogue();val file=root.resolve("tutorials.json");var notices=0
+            val watcher=HelpChangeAnnouncer(HelpCatalogStore(file)) {notices++}
+            assertFailsWith<IllegalArgumentException> {watcher.check()}
+            Files.writeString(file,helpJson.encodeToString(HelpCatalogue.serializer(),original))
+            watcher.check();assertEquals(1,notices)
+            watcher.check();assertEquals(1,notices)
+        }
     }
 }

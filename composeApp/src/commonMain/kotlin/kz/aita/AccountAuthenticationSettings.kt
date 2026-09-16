@@ -1,5 +1,8 @@
 package kz.aita
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,7 +54,8 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
     var setup by remember { mutableStateOf<AitaTotpSetupDataModel?>(null) }
     var setupCode by remember { mutableStateOf("") }
     var setupRequireForLogin by remember { mutableStateOf(true) }
-    var requestedLoginRequirement by remember { mutableStateOf(true) }
+    var requestedLoginMethod by remember { mutableStateOf<AitaLoginSecondFactor?>(null) }
+    var disableLoginDialog by remember { mutableStateOf(false) }
     var currentPassword by remember { mutableStateOf("") }
     var secondFactor by remember { mutableStateOf("") }
     var phoneAlias by remember { mutableStateOf("") }
@@ -203,7 +207,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value,
                 !loading && editor == AccountAuthEditor.NONE, ::load)
             if (collapsible) {
-                QuietAction(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; clearSensitive() } }) {
+                QuietAction(onClick = { expanded = !expanded; if (!expanded) { editor = AccountAuthEditor.NONE; requestedLoginMethod = null; clearSensitive() } }) {
                     Text(if (expanded) authUiText("Close", "Закрыть", "Жабу", "Жабуу") else authUiText("Manage", "Управлять", "Басқару", "Башкаруу"))
                 }
             }
@@ -225,10 +229,10 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                     AuthSettingsInfoRow(authUiText("Main email", "Основной email", "Негізгі email", "Негизги электрондук почта"), current.email)
                     AuthSettingsInfoRow(
                         authUiText("Extra phone number", "Дополнительный номер телефона", "Қосымша телефон нөмірі", "Кошумча телефон номери"),
-                        current.phoneLoginAlias ?: authUiText("Not configured", "Не настроен", "Бапталмаған", "Жөндөлгөн эмес")
+                        current.phoneLoginAlias?.takeIf(String::isNotBlank) ?: accountPresentationText("not_added")
                     )
                     AuthSettingsInfoRow(authUiText("Extra email", "Дополнительный email", "Қосымша email", "Кошумча электрондук почта"),
-                        current.additionalLoginEmails.joinToString("\n").ifBlank { authUiText("Not configured", "Не настроен", "Бапталмаған", "Жөндөлгөн эмес") })
+                        current.additionalLoginEmails.joinToString("\n").ifBlank { accountPresentationText("not_added") })
                     AuthSettingsInfoRow(
                         authUiText("Authenticator", "Аутентификатор", "Аутентификатор", "Аутентификатор"),
                         if (current.authenticatorEnabled) authUiText("Connected", "Подключён", "Қосылған", "Туташкан") else authUiText("Off", "Выключен", "Өшірулі", "Өчүк"),
@@ -240,15 +244,36 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             current.recoveryCodesRemaining.toString()
                         )
                     }
-                    if (editor == AccountAuthEditor.NONE && (capabilities?.emailSecondFactorEnabled == true || capabilities?.authenticatorLoginPolicyEnabled == true)) {
-                        Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            AuthenticatorLoginRequirementToggle(current.loginSecondFactor != AitaLoginSecondFactor.NONE, !loading) { required ->
-                                clearSensitive(); requestedLoginRequirement = required; editor = AccountAuthEditor.TOTP_POLICY
-                            }
-                            if (current.loginSecondFactor != AitaLoginSecondFactor.NONE) AuthQuietAction(
-                                if (current.loginSecondFactor == AitaLoginSecondFactor.EMAIL) authUiText("Email code", "Код из письма", "Email коды", "Электрондук почтадагы код")
-                                else authUiText("Authenticator", "Аутентификатор", "Аутентификатор", "Аутентификатор"), !loading) {
-                                clearSensitive(); requestedLoginRequirement = true; editor = AccountAuthEditor.TOTP_POLICY
+                    TwoFactorMethodDropdown(
+                        selected = requestedLoginMethod ?: current.loginSecondFactor,
+                        enabled = !loading,
+                        emailAvailable = capabilities?.emailSecondFactorEnabled == true,
+                        authenticatorAvailable = authAvailability.authenticator == AitaAuthFeatureAvailability.AVAILABLE
+                    ) { method ->
+                        clearSensitive(); requestedLoginMethod = method
+                        when (factorSelectionAction(method, current.loginSecondFactor, current.authenticatorEnabled)) {
+                            FactorSelectionAction.NONE -> { requestedLoginMethod = null; editor = AccountAuthEditor.NONE }
+                            FactorSelectionAction.CONFIRM_DISABLE -> { editor = AccountAuthEditor.NONE; disableLoginDialog = true }
+                            FactorSelectionAction.ENROLL -> { setupRequireForLogin = true; editor = AccountAuthEditor.TOTP_ENABLE }
+                            FactorSelectionAction.POLICY -> editor = AccountAuthEditor.TOTP_POLICY
+                        }
+                    }
+                    if(disableLoginDialog) {
+                        androidx.compose.ui.window.Dialog(onDismissRequest = {
+                            if(!loading){disableLoginDialog=false;requestedLoginMethod=null}
+                        }) {
+                            Column(Modifier.fillMaxWidth().heightIn(max=640.dp).verticalScroll(rememberScrollState())
+                                .background(stateValues.BackgroundColor,RoundedCornerShape(stateValues.cornerRadius))
+                                .border(stateValues.unfocusedBorderWidth,stateValues.PlaceholderTextColor,RoundedCornerShape(stateValues.cornerRadius))
+                                .padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                                Text(accountPresentationText("disable_confirm"),color=stateValues.TextColor,
+                                    fontWeight=FontWeight.Bold,fontSize=stateValues.textSize,textAlign=TextAlign.Center)
+                                key(current.securityRevision) {
+                                    LoginPolicyEditor(current,AitaLoginSecondFactor.NONE,
+                                        onUpdated={settings=it;clearSensitive();requestedLoginMethod=null;disableLoginDialog=false},
+                                        onClose={clearSensitive();requestedLoginMethod=null;disableLoginDialog=false},
+                                        onBusyChanged={loading=it})
+                                }
                             }
                         }
                     }
@@ -285,6 +310,8 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                             if (settings?.authenticatorEnabled == true) {
                                 editor = AccountAuthEditor.TOTP_DISABLE
                             } else {
+                                requestedLoginMethod = AitaLoginSecondFactor.AUTHENTICATOR
+                                setupRequireForLogin = true
                                 editor = AccountAuthEditor.TOTP_ENABLE
                             }
                         }
@@ -339,7 +366,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                     AccountAuthEditor.EMAIL -> settings?.let { current ->
                         AdditionalLoginEmailsEditor(current,
                             onUpdated = { settings = it },
-                            onClose = { editor = AccountAuthEditor.NONE; clearSensitive() })
+                            onClose = { editor = AccountAuthEditor.NONE; requestedLoginMethod = null; clearSensitive() })
                     }
 
                     AccountAuthEditor.TOTP_RECOVERY -> AuthenticatorRecoveryEditor(
@@ -398,7 +425,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                 } ?: run { error = authResponseText(response) }
                             }
                         }
-                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) {
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; requestedLoginMethod = null; clearSensitive() }) {
                             Text(stateValues.stringCancel)
                         }
                     }
@@ -500,9 +527,9 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                 }
                             }
                         }
-                        if (capabilities?.authenticatorLoginPolicyEnabled == true) {
-                            AuthenticatorLoginRequirementToggle(setupRequireForLogin, !loading) { setupRequireForLogin = it }
-                        }
+                        // Choosing Authenticator enrolls it for sign-in; there is no competing on/off toggle.
+                        Text(accountPresentationText("two_factor") + ": " + accountPresentationText("authenticator"),
+                            color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
                         aitaFormTextField(
                             modifier = Modifier.fillMaxWidth(),
                             value = setupCode,
@@ -537,18 +564,22 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                                     )
                                     info = authUiText("Authenticator enabled. Save the recovery codes now.", "Аутентификатор включён. Сохраните резервные коды сейчас.", "Аутентификатор қосылды. Қалпына келтіру кодтарын қазір сақтаңыз.", "Аутентификатор күйгүзүлдү. Калыбына келтирүү коддорун азыр сактап алыңыз.")
                                     editor = AccountAuthEditor.NONE
+                                    requestedLoginMethod = null
                                     setup = null
                                     setupCode = ""
                                 } ?: run { error = authResponseText(response) }
                             }
                         }
-                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; requestedLoginMethod = null; clearSensitive() }) { Text(stateValues.stringCancel) }
                     }
 
                     AccountAuthEditor.TOTP_POLICY -> settings?.let { current ->
-                        LoginPolicyEditor(current, requestedLoginRequirement, emailAvailable = capabilities?.emailSecondFactorEnabled == true,
-                            onUpdated = { settings = it; clearSensitive(); editor = AccountAuthEditor.NONE },
-                            onClose = { clearSensitive(); editor = AccountAuthEditor.NONE })
+                        key(current.securityRevision, requestedLoginMethod) {
+                            LoginPolicyEditor(current, requestedLoginMethod ?: current.loginSecondFactor,
+                                onUpdated = { settings = it; clearSensitive(); requestedLoginMethod = null; editor = AccountAuthEditor.NONE },
+                                onClose = { clearSensitive(); requestedLoginMethod = null; editor = AccountAuthEditor.NONE },
+                                onBusyChanged = { loading = it })
+                        }
                     }
 
                     AccountAuthEditor.TOTP_DISABLE, AccountAuthEditor.RECOVERY_CODES -> {
@@ -597,7 +628,7 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                         AuthQuietAction(authUiText("Lost authenticator?", "Нет доступа к аутентификатору?", "Аутентификаторға қолжетімділік жоқ па?", "Аутентификаторду жоготтуңузбу?"), !loading) {
                             clearSensitive(); editor = AccountAuthEditor.TOTP_RECOVERY
                         }
-                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; clearSensitive() }) { Text(stateValues.stringCancel) }
+                        QuietAction(onClick = { editor = AccountAuthEditor.NONE; requestedLoginMethod = null; clearSensitive() }) { Text(stateValues.stringCancel) }
                     }
 
                     AccountAuthEditor.PHONE -> {
@@ -807,28 +838,5 @@ private fun AppConfiguration.RecoveryCodesPanel(codes: List<String>) {
         SelectionContainer {
             Text(codes.joinToString("\n"), color = stateValues.TextColor, fontWeight = FontWeight.SemiBold)
         }
-    }
-}
-
-@Composable
-private fun AppConfiguration.AuthenticatorLoginRequirementToggle(
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету", "Кирүүдө 2FA талап кылуу"),
-                color = stateValues.TextColor, fontSize = stateValues.textSize)
-
-        }
-        val label = authUiText("Require 2FA at sign-in", "Требовать 2FA при входе", "Кіру кезінде 2FA талап ету", "Кирүүдө 2FA талап кылуу")
-        Switch(modifier = Modifier.semantics { contentDescription = label },
-            checked = checked, onCheckedChange = onCheckedChange, enabled = enabled,
-            colors = SwitchDefaults.colors(checkedTrackColor = stateValues.AccentColor,
-                checkedThumbColor = stateValues.BackgroundColor,
-                uncheckedThumbColor = stateValues.PlaceholderTextColor,
-                uncheckedTrackColor = stateValues.PlaceholderTextColor.copy(alpha = 0.15f)))
     }
 }

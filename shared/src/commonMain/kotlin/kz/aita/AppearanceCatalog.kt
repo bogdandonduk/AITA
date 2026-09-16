@@ -13,8 +13,8 @@ class AppearanceCatalog private constructor(
     }
     fun dimension(id: Long, mode: Long, fallback: Float): Float = dimensions[normalizeAppSizeModePreference(mode)]?.get(id) ?: fallback
     fun color(id: Long, theme: Long): String? = colors[normalizeAppThemePreference(theme)]?.get(id)
-    fun drawable(id: Long, theme: Long): String = drawables[normalizeAppThemePreference(theme)]?.get(id)
-        ?: "svg/${id}_${normalizeAppThemePreference(theme)}.svg"
+    fun drawable(id: Long, theme: Long): String = drawables[appDrawableThemeId(theme)]?.get(id)
+        ?: "svg/${id}_${appDrawableThemeId(theme)}.svg"
 
     companion object {
         fun build(
@@ -50,7 +50,7 @@ class AppearanceCatalog private constructor(
             }
             val primaryColors = firstById(colors) { it.id }
             val fallbackColors = firstById(bundledColors) { it.id }
-            val indexedColors = listOf(0L, 1L).associateWith { theme ->
+            val indexedColors = SUPPORTED_APP_THEME_IDS.associateWith { theme ->
                 (primaryColors.keys + fallbackColors.keys).mapNotNull { id ->
                     (primaryColors[id]?.extractColor(id, theme) ?: fallbackColors[id]?.extractColor(id, theme))?.let { id to it }
                 }.toMap()

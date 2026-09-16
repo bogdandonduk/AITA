@@ -88,12 +88,13 @@ class CheckoutPremiumLayoutTest(unittest.TestCase):
         for required in ('Brush.linearGradient', 'cyan', '144L', 'tintColor = null'):
             self.assertIn(required, card)
 
-    def test_underglow_has_draw_phase_animation_and_reserved_space(self):
+    def test_lifetime_card_has_no_external_bottom_glow(self):
+        # Response 031 explicitly removes the old under-car ellipse and reserved external space.
         text = (UI / 'LifetimeSubscriptionCard.kt').read_text()
-        for token in ('LocalWindowInfo.current.isWindowFocused', 'Canvas(Modifier.matchParentSize())',
-                      'val alpha = glow.value', '.padding(bottom = 36.dp)', 'RepeatMode.Reverse'):
+        for token in ('drawOval(', 'Canvas(Modifier.matchParentSize())', '.padding(bottom = 36.dp)', 'rememberInfiniteTransition'):
+            self.assertNotIn(token, text)
+        for token in ('Brush.linearGradient', '144L', 'ice', 'cyan'):
             self.assertIn(token, text)
-        self.assertLess(text.index('.padding(bottom = 36.dp)'), text.index('.clip(shape)'))
 
     def test_history_filters_server_and_old_cached_client_records(self):
         client = body('CommonMainComposeMenuB.kt', 'AppConfiguration.SecuritySessionHistoryCard')

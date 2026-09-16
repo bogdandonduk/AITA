@@ -35,6 +35,11 @@ REQUIRED_FILES = (
     "composeApp/src/commonMain/kotlin/kz/aita/AuthenticationEmailUi.kt",
     "composeApp/src/commonMain/kotlin/kz/aita/ContactEmailConfirmation.kt",
     "server/src/main/kotlin/kz/aita/server/marketplace/MarketplaceRepository.kt",
+    "shared/src/commonMain/kotlin/kz/aita/ProfilePhoto.kt",
+    "composeApp/src/commonMain/kotlin/kz/aita/UserProfilePhoto.kt",
+    "composeApp/src/commonMain/kotlin/kz/aita/AccountPresentation.kt",
+    "composeApp/src/commonMain/kotlin/kz/aita/TwoFactorMethodDropdown.kt",
+    "server/src/main/kotlin/kz/aita/server/profile/ProfilePhotoRoutes.kt",
 )
 COMPILE_TASKS = (
     ":shared:compileCommonMainKotlinMetadata",
@@ -325,6 +330,10 @@ REQUIRED_SHARED_CLASSES = (
     "kz/aita/auth/AitaAuthNextStep.class",
     "kz/aita/auth/AdvancedAuthenticationModelsKt.class",
     "kz/aita/AppDatabase.class",
+    "kz/aita/ConnectionRetryWakeupKt.class",
+    "kz/aita/CommonMainKt$forgetReachableServerUrlCandidate$1.class",
+    "kz/aita/ProfilePhotoSnapshot.class",
+    "kz/aita/ProfilePhotoSnapshot$$serializer.class",
 )
 GENERATED_QUERY_PARAMETERS = {
     "selectKvSlice": {"sliceOffset": "Long", "sliceLength": "Long", "cacheKey": "String"},

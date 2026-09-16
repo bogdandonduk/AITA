@@ -21,6 +21,14 @@
         {
           "themeId": 1,
           "valueHex": "ff000000"
+        },
+        {
+          "themeId": 2,
+          "valueHex": "ff241c36"
+        },
+        {
+          "themeId": 3,
+          "valueHex": "ff17212b"
         }
       ]
     },
@@ -33,6 +41,14 @@
         },
         {
           "themeId": 1,
+          "valueHex": "ffffffff"
+        },
+        {
+          "themeId": 2,
+          "valueHex": "ffffffff"
+        },
+        {
+          "themeId": 3,
           "valueHex": "ffffffff"
         }
       ]
@@ -56,6 +72,14 @@
         {
           "themeId": 1,
           "valueHex": "66ffffff"
+        },
+        {
+          "themeId": 2,
+          "valueHex": "b3ded4ee"
+        },
+        {
+          "themeId": 3,
+          "valueHex": "b3d6e3ef"
         }
       ]
     },
@@ -95,6 +119,14 @@
         {
           "themeId": 1,
           "valueHex": "aaffffff"
+        },
+        {
+          "themeId": 2,
+          "valueHex": "ccffffff"
+        },
+        {
+          "themeId": 3,
+          "valueHex": "ccffffff"
         }
       ]
     },

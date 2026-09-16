@@ -78,7 +78,7 @@ private fun AppConfiguration.AddressSuggestionRow(
     ) {
         CpImage(
             modifier = Modifier.size(28.dp),
-            url = "svg/135_${normalizeAppThemePreference(stateValues.appThemeId)}.svg",
+            url = "svg/135_${appDrawableThemeId(stateValues.appThemeId)}.svg",
             fallbackRes = null,
             contentDescription = suggestion.title
         )
@@ -134,7 +134,7 @@ private fun AppConfiguration.VerifiedAddressCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             CpImage(
                 modifier = Modifier.size(34.dp),
-                url = "svg/135_${normalizeAppThemePreference(stateValues.appThemeId)}.svg",
+                url = "svg/135_${appDrawableThemeId(stateValues.appThemeId)}.svg",
                 fallbackRes = null,
                 contentDescription = localizedStringResource(2300, "Verified address")
             )
@@ -190,7 +190,7 @@ private fun AppConfiguration.VerifiedAddressCard(
             actionButton(
                 modifier = Modifier.fillMaxWidth(),
                 text = localizedStringResource(2302, "Open on map"),
-                iconPath = "svg/135_${normalizeAppThemePreference(stateValues.appThemeId)}.svg",
+                iconPath = "svg/135_${appDrawableThemeId(stateValues.appThemeId)}.svg",
                 confirmationRequired = false,
                 onClick = { onOpenMap(preview.openMapUrl) }
             )
@@ -234,7 +234,7 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
             ?: initialAddress,
         stateHost = NavigationScreenModel.Menu.AddEditStore,
         stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ADDRESS,
-        leadingIconPath = "svg/135_${normalizeAppThemePreference(stateValues.appThemeId)}.svg",
+        leadingIconPath = "svg/135_${appDrawableThemeId(stateValues.appThemeId)}.svg",
         contentInvalidText = localizedStringResource(2305, "Select an address from suggestions"),
         onContentValidityCheck = { raw -> state.locationForSave(raw, stateValues.appLanguage) != null },
         trailingIcon = trailingContent,
@@ -325,7 +325,7 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
             val response = requestStoreAddressMapPreview(
                 location = location,
                 language = stateValues.appLanguage,
-                darkTheme = normalizeAppThemePreference(stateValues.appThemeId) == 1L
+                darkTheme = isDarkAppTheme(stateValues.appThemeId)
             )
             if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreview = response.payload
             if (aitaLatestAddressOwner1.owns(aitaLatestAddressTicket1)) state.mapPreviewFailed = response.negative || response.payload == null

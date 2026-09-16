@@ -4,13 +4,10 @@ package kz.aita
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
@@ -52,28 +49,132 @@ fun AppConfiguration.MenuSupportScreen() {
             delay(1000); ticks++
         }
     }
-    key(account) {
-        var selected by remember { mutableStateOf("chat") }
-        val canAgent=companyCanOpenSupport(employment,account)
-        val tab=selected.takeUnless { it=="agent" && !canAgent } ?: "chat"
-        LaunchedEffect(canAgent) { if(!canAgent && selected=="agent") selected="chat" }
-        AitaScreenColumn(
-            Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,
-            appBar = {
-                ScreenAppBarWidget(title=localizedStringResource(813,"Support"),iconPath=stateValues.drawablePathIconSupport,
-                    onBack={ coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+    val sessionGeneration = currentAuthenticatedSessionGeneration()
+    key(account, sessionGeneration) {
+        val book = remember(account,sessionGeneration) {supportConversationBooks.forOwner(account,sessionGeneration)}
+        var selected by book::selected
+        val conversations = book.conversations
+        val screenScope = rememberCoroutineScope()
+        var tabsError by remember { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
+        var confirming by remember { mutableStateOf<String?>(null) }
+        val canAgent = companyCanOpenSupport(employment, account)
+        val capabilities = employment?.capabilities.orEmpty()
+        fun owned() = userAccountState.payloadValue?.id == account && authenticatedSessionGenerationIsCurrent(sessionGeneration)
+        fun openConversation(agent: Boolean, ticket: SupportTicketDataModel?) {
+            val id = supportConversationTabId(agent, ticket?.id)
+            if (conversations.none { it.key == id }) {
+                if (conversations.size >= 16) { tabsError = eventMessage("support.tabs.limit"); return }
+                conversations.add(SupportConversationTab(agent, ticket?.id, SupportConversationMemory(ticket)))
             }
-        ) {
-            tabRowWidget(Modifier.widthIn(max=960.dp).fillMaxWidth().padding(horizontal=stateValues.marginTextField,vertical=4.dp),
+            selected = id; tabsError = null
+        }
+        fun closeConversation(tab: SupportConversationTab) {
+            val memory = tab.memory
+            if (account == null || memory.sending || memory.acting || memory.closing) return
+            memory.closing = true
+            screenScope.launch {
+                try {
+                    if (supportDraftNeedsSaving(memory.draftLoaded,memory.edited)) SupportDelivery.saveDraft(account, tab.agent, tab.ticketId, memory.draft, memory.draftRevision)
+                    if (!owned()) return@launch
+                    conversations.remove(tab)
+                    if (selected == tab.key) selected = if (tab.agent && canAgent) "agent" else "chat"
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { if (owned()) tabsError = eventMessage("support.save_failed") }
+                finally { memory.closing = false }
+            }
+        }
+        fun resolveConversation(tab: SupportConversationTab) {
+            if (account == null || !owned() || !supportTabCanResolve(tab.memory.ticket, account, tab.agent, capabilities)) return
+            val memory = tab.memory
+            val ticket = memory.ticket ?: return
+            if (memory.acting || memory.sending) return
+            memory.acting = true
+            screenScope.launch {
+                try {
+                    val result = networkRequest<SupportTicketDataModel,SupportAgentActionRequest>(HttpMethod.Post,
+                        endpointUrl="support/workspace/action", query=mapOf("agent" to tab.agent),
+                        body=SupportAgentActionRequest(ticket.id,"close",ticket.revision),expectedSessionGeneration=sessionGeneration)
+                    if (!owned()) return@launch
+                    val confirmed = result.payload
+                    if (!result.negative && confirmed?.id == ticket.id && confirmed.status == "closed" && confirmed.revision > ticket.revision) {
+                        memory.ticket = newestSupportTabTicket(memory.ticket,confirmed,ticket.id); memory.feedback = null; SupportWorkspaceSignals.changed()
+                    } else {
+                        memory.feedback = result.message ?: eventMessage("support.tabs.resolve_failed")
+                        memory.refresh++
+                    }
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { if (owned()) { memory.feedback = eventMessage("support.tabs.resolve_failed"); memory.refresh++ } }
+                finally { memory.acting = false }
+            }
+        }
+        LaunchedEffect(canAgent) {
+            if (!canAgent) {
+                val removed = conversations.filter { it.agent }
+                // Losing employment is not permission to retain an agent conversation onscreen.
+                conversations.removeAll(removed.toSet())
+                if (selected == "agent" || removed.any { it.key == selected }) selected = "chat"
+            }
+        }
+        val tab = selected.takeIf { it in listOf("faq","chat") || (it == "agent" && canAgent) || conversations.any { c -> c.key == it } } ?: "chat"
+        AitaScreenColumn(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,appBar={
+            ScreenAppBarWidget(title=localizedStringResource(813,"Support"),iconPath=stateValues.drawablePathIconSupport,
+                onBack={coroutineScope.launch{Navigation.Menu.pop(stateValues.isNarrowScreen)}})
+        }) {
+            tabRowWidget(Modifier.widthIn(max=1080.dp).fillMaxWidth().padding(horizontal=stateValues.marginTextField,vertical=4.dp),
                 tabs=buildList {
-                    add(TabContent("faq",localizedStringResource(814,"FAQ")) { selected=it })
-                    add(TabContent("chat",authUiText("Chats","Чаты","Чаттар", "Чаттар")) { selected=it })
-                    if(canAgent) add(TabContent("agent",authUiText("Agent","Специалист","Маман", "Агент")) { selected=it })
-                },selectedIndexInitial=tab)
-            if(tab=="faq") SupportHelpPane(Modifier.weight(1f))
-            else if(account==null) MessageText(text=authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз", "Колдоого кайрылуу үчүн кириңиз"))
-            else key(account,tab) {
-                SupportInboxPane(account,tab=="agent",employment?.capabilities.orEmpty(),Modifier.weight(1f))
+                    add(TabContent("faq",localizedStringResource(814,"FAQ")){selected=it})
+                    add(TabContent("chat",authUiText("Chats","Чаты","Чаттар","Чаттар")){selected=it})
+                    if(canAgent) add(TabContent("agent",authUiText("Agent","Специалист","Маман","Агент")){selected=it})
+                    conversations.forEach { conversation ->
+                        val memory=conversation.memory
+                        val title=memory.ticket?.subject ?: eventMessage("support.tabs.new").extractLocalizedString(stateValues.appLanguage).orEmpty()
+                        add(TabContent(conversation.key,title,AitaTabIcon.Chat,actions=buildList {
+                            if(conversation.ticketId!=null) add(AitaTabAction("resolve",
+                                eventMessage(if(memory.ticket?.status=="closed") "support.tabs.resolved" else "support.tabs.resolve").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                                AitaTabIcon.Check,enabled=account!=null && supportTabCanResolve(memory.ticket,account,conversation.agent,capabilities) && !memory.acting && !memory.sending && !memory.closing) {
+                                    selected=conversation.key; confirming=conversation.key
+                                })
+                            add(AitaTabAction("close",eventMessage("support.tabs.close").extractLocalizedString(stateValues.appLanguage).orEmpty(),AitaTabIcon.Cancel,
+                                enabled=!memory.acting && !memory.sending && !memory.closing){closeConversation(conversation)})
+                        }){selected=it})
+                    }
+                },selectedIndexInitial=tab,persistSelection=false)
+            tabsError?.let { SupportInlineError(it) }
+            when {
+                tab=="faq" -> SupportHelpPane(Modifier.weight(1f))
+                account==null -> MessageText(Modifier.weight(1f).fillMaxWidth(),authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз","Колдоого кайрылуу үчүн кириңиз"))
+                tab=="chat" || tab=="agent" -> key(account,tab) {
+                    SupportInboxPane(account,tab=="agent",capabilities,Modifier.weight(1f),
+                        onOpen={openConversation(tab=="agent",it)},onNew={openConversation(false,null)})
+                }
+                else -> conversations.firstOrNull { it.key==tab }?.let { conversation ->
+                    key(conversation.key) {
+                        SupportConversationPane(account,conversation.agent,conversation.ticketId,capabilities,
+                            Modifier.weight(1f).widthIn(max=1080.dp).fillMaxWidth(),conversation.memory,
+                            onCreated={ created ->
+                                val index=conversations.indexOf(conversation)
+                                if(index>=0 && owned()) {
+                                    val next=conversation.copy(ticketId=created)
+                                    val existing=conversations.firstOrNull{it.key==next.key}
+                                    if(existing==null) conversations[index]=next else conversations.removeAt(index)
+                                    if(selected==conversation.key)selected=next.key
+                                }
+                            })
+                    }
+                }
+            }
+        }
+        conversations.firstOrNull{it.key==confirming}?.let { conversation ->
+            androidx.compose.ui.window.Dialog(onDismissRequest={confirming=null}) {
+                Column(Modifier.widthIn(max=520.dp).fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
+                    .background(stateValues.BackgroundColor).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Text(eventMessage("support.tabs.confirm").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                        color=stateValues.TextColor,fontSize=stateValues.textSize)
+                    actionButton(text=eventMessage("support.tabs.resolve").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                        autoLoading=false,confirmationRequired=false,enabled=!conversation.memory.acting && !conversation.memory.sending,
+                        onClick={confirming=null;resolveConversation(conversation)})
+                    actionButton(text=stateValues.stringCancel,autoLoading=false,confirmationRequired=false,onClick={confirming=null})
+                }
             }
         }
     }
@@ -86,7 +187,8 @@ private fun AppConfiguration.SupportHelpPane(modifier: Modifier) {
 }
 
 @Composable
-private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,capabilities: Set<String>,modifier: Modifier) {
+private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,capabilities: Set<String>,modifier: Modifier,
+    onOpen: (SupportTicketDataModel)->Unit, onNew: ()->Unit) {
     var tickets by remember { mutableStateOf<List<SupportTicketDataModel>>(emptyList()) }
     var page by remember { mutableStateOf<SupportTicketPage?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -96,14 +198,11 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
     var pageEpoch by remember { mutableStateOf(0) }
     var feedback by remember { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     var filter by remember { mutableStateOf(if(agent) "open" else "all") }
-    var selected by remember { mutableStateOf<String?>(null) }
-    var composing by remember { mutableStateOf(false) }
     var metrics by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
     val signals by SupportWorkspaceSignals.revision.collectAsState()
     val window=LocalWindowInfo.current
     val scope=rememberCoroutineScope()
-    val split=stateValues.screenWidth>=840.dp
     LaunchedEffect(account,agent,filter,signals,refresh) {
         if(agent && !CompanyEmployment.has(CompanyCapability.SUPPORT_QUEUE)) return@LaunchedEffect
         val generation=currentAuthenticatedSessionGeneration()
@@ -143,15 +242,13 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
             SupportMetricsPane(Modifier.weight(1f),account); return@Column
         }
         Row(Modifier.weight(1f).fillMaxWidth()) {
-            if(split || (selected==null && !composing)) Column(
-                if(split) Modifier.width(300.dp).fillMaxHeight() else Modifier.fillMaxSize()
-            ) {
+            Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
                     Text(if(agent) authUiText("Support inbox","Обращения","Өтініштер", "Колдоонун кирген маектери") else authUiText("Your conversations","Ваши диалоги","Сіздің диалогтарыңыз", "Маектериңиз"),
                         Modifier.weight(1f),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.textSize)
                     if(!agent) actionButton(text="",iconPath=stateValues.drawablePathIconAdd,
                         iconContentDescription=authUiText("New conversation","Новый диалог","Жаңа диалог", "Жаңы маек"),autoLoading=false,
-                        onClick={ composing=true; selected=null })
+                        onClick=onNew)
                 }
                 feedback?.let { SupportInlineError(it) }
                 if(loading && tickets.isEmpty()) LoadingSkeleton(layout = LoadingLayout.Conversation, modifier = Modifier.fillMaxWidth(), rows =4)
@@ -162,8 +259,8 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                     items(tickets,key={ it.id }) { ticket ->
                         val unread=if(agent) ticket.unreadForAgentCount else ticket.unreadForUserCount
                         Column(Modifier.fillMaxWidth().padding(horizontal=6.dp).clip(RoundedCornerShape(stateValues.cornerRadius))
-                            .background(if(selected==ticket.id) stateValues.AccentColor.copy(alpha=0.1f) else Color.Transparent)
-                            .clickable { selected=ticket.id; composing=false }.padding(12.dp)) {
+                            .background(Color.Transparent)
+                            .clickable { onOpen(ticket) }.padding(12.dp)) {
                             Row(verticalAlignment=Alignment.CenterVertically) {
                                 Text(ticket.subject,Modifier.weight(1f),color=stateValues.TextColor,fontWeight=FontWeight.Bold,
                                     fontSize=stateValues.textSize,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -200,15 +297,7 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                     }
                 }
             }
-            if(split) Box(Modifier.width(1.dp).fillMaxHeight().background(stateValues.PlaceholderTextColor.copy(alpha=0.15f)))
-            if(selected!=null || composing) key(account,agent,selected,composing) {
-                SupportConversationPane(account,agent,selected,capabilities,
-                    if(split) Modifier.weight(1f).fillMaxHeight() else Modifier.fillMaxSize(),
-                    onBack={ selected=null; composing=false },onCreated={ selected=it; composing=false; refresh++ })
-            } else if(split) Box(Modifier.weight(1f).fillMaxHeight(),contentAlignment=Alignment.Center) {
-                MessageText(Modifier.padding(32.dp),authUiText("Choose a conversation","Выберите диалог","Диалогты таңдаңыз", "Маекти тандаңыз"),
-                    authUiText("Messages stay together, from the first question to the solution.","От первого вопроса до решения — всё в одном диалоге.","Алғашқы сұрақтан шешімге дейін — барлығы бір диалогта.", "Алгачкы суроодон чечимге чейин билдирүүлөр бир жерде сакталат."))
-            }
+
         }
     }
 }
@@ -221,27 +310,13 @@ private fun AppConfiguration.SupportInlineError(message: List<LocalizedStringDat
 
 @Composable
 private fun AppConfiguration.SupportConversationPane(account: String,agent: Boolean,ticketId: String?,capabilities: Set<String>,
-    modifier: Modifier,onBack: ()->Unit,onCreated: (String)->Unit) {
-    var ticket by remember { mutableStateOf<SupportTicketDataModel?>(null) }
-    var messages by remember { mutableStateOf<List<SupportMessageDataModel>>(emptyList()) }
-    var before by remember { mutableStateOf<Long?>(null) }
-    var loading by remember { mutableStateOf(ticketId!=null) }
-    var loadingMore by remember { mutableStateOf(false) }
-    var refresh by remember { mutableStateOf(0) }
-    var feedback by remember { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
-    var draft by remember { mutableStateOf("") }
-    var draftRevision by remember { mutableStateOf(newClientSideUuidString()) }
-    var draftLoaded by remember { mutableStateOf(false) }
-    var edited by remember { mutableStateOf(false) }
-    var pending by remember { mutableStateOf<PendingSupportMessage?>(null) }
-    var sending by remember { mutableStateOf(false) }
-    var acting by remember { mutableStateOf(false) }
-    var category by remember { mutableStateOf("general") }
-    var hasNew by remember { mutableStateOf(false) }
-    val list=rememberLazyListState()
+    modifier: Modifier,memory: SupportConversationMemory,onCreated: (String)->Unit) {
+    with(memory) {
     val signals by SupportWorkspaceSignals.revision.collectAsState()
     val scope=rememberCoroutineScope()
     val window=LocalWindowInfo.current
+    val ownerGeneration=remember(account,agent,ticketId) {currentAuthenticatedSessionGeneration()}
+    fun owned()=userAccountState.payloadValue?.id==account && authenticatedSessionGenerationIsCurrent(ownerGeneration)
     val latestMessages by rememberUpdatedState(messages)
     val latestTicket by rememberUpdatedState(ticket)
     LaunchedEffect(account,agent,ticketId) {
@@ -253,8 +328,20 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         catch(_: Exception) { feedback=eventMessage("support.save_failed") }
         finally { draftLoaded=true }
     }
+    DisposableEffect(memory, ticketId) {
+        onDispose {
+            if(supportDraftNeedsSaving(draftLoaded,edited)) {
+                val text=draft; val revision=draftRevision
+                coroutineScope.launch {
+                    try { SupportDelivery.saveDraft(account,agent,ticketId,text,revision) }
+                    catch(cancel:CancellationException){throw cancel}
+                    catch(_:Exception){postInAppNotification(eventMessage("support.save_failed"),NotificationType.Neutral,transient=true)}
+                }
+            }
+        }
+    }
     LaunchedEffect(draftRevision,draftLoaded) {
-        if(draftLoaded) {
+        if(supportDraftNeedsSaving(draftLoaded,edited)) {
             delay(400)
             try { SupportDelivery.saveDraft(account,agent,ticketId,draft,draftRevision) }
             catch(cancelled: CancellationException) { throw cancelled }
@@ -262,26 +349,29 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         }
     }
     LaunchedEffect(ticketId,signals,refresh) {
-        if(ticketId==null) return@LaunchedEffect
-        val generation=currentAuthenticatedSessionGeneration()
+        if(ticketId==null || !owned()) return@LaunchedEffect
+        if(messages.isEmpty())loading=true
+        val generation=ownerGeneration
         val wasNearEnd=list.firstVisibleItemIndex<=1
         try {
             val result=networkRequest<SupportMessagePage,Unit>(HttpMethod.Get,endpointUrl="support/workspace/messages",
                 query=mapOf("ticket_id" to ticketId,"agent" to agent),expectedSessionGeneration=generation)
             val data=result.payload
             if(userAccountState.payloadValue?.id!=account || !authenticatedSessionGenerationIsCurrent(generation)) return@LaunchedEffect
-            if(!result.negative && data?.ticket?.id==ticketId) {
+            if(!result.negative && data != null && data.ticket.id==ticketId) {
                 val newLast=data.messages.lastOrNull()?.sequence ?: 0
                 val oldLast=messages.lastOrNull()?.sequence ?: 0
-                ticket=data.ticket
-                messages=(data.messages+messages).distinctBy { it.id }.sortedBy { it.sequence }
+                ticket=newestSupportTabTicket(ticket,data.ticket,ticketId)
+                messages=(data.messages.filter {it.ticketId==ticketId}+messages).distinctBy { it.id }.sortedBy { it.sequence }
                 if(before==null && messages.size<=100) before=data.nextBeforeSequence
                 if(newLast>oldLast) { if(wasNearEnd) list.scrollToItem(0) else hasNew=true }
             } else { feedback=result.message; if(agent && result.httpStatusCode==403) CompanyEmployment.clear() }
-        } finally { loading=false }
+        } catch(cancel:CancellationException){throw cancel}
+        catch(_:Exception){feedback=eventMessage("support.send_unknown")}
+        finally { loading=false }
     }
     LaunchedEffect(window.isWindowFocused,ticketId) {
-        while(isActive && ticketId!=null && window.isWindowFocused) { delay(15_000); refresh++ }
+        while(isActive && owned() && ticketId!=null && window.isWindowFocused) { delay(15_000); refresh++ }
     }
     // A read receipt means a message was visible in this focused dialogue, not merely fetched.
     LaunchedEffect(ticketId,window.isWindowFocused,ticket?.assignedAgentUserId) {
@@ -293,29 +383,37 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         }.collectLatest { cursor ->
             if(cursor>lastMarked && (!agent || latestTicket?.assignedAgentUserId==account)) {
                 delay(450)
-                val generation=currentAuthenticatedSessionGeneration()
-                val result=networkRequest<Pair<SupportTicketDataModel,Boolean>,SupportReadCursorRequest>(HttpMethod.Post,
-                    endpointUrl="support/workspace/read",query=mapOf("agent" to agent),body=SupportReadCursorRequest(ticketId,cursor),
-                    expectedSessionGeneration=generation)
-                if(!result.negative && authenticatedSessionGenerationIsCurrent(generation)) lastMarked=cursor
+                if(!owned())return@collectLatest
+                val generation=ownerGeneration
+                try {
+                    val result=networkRequest<Pair<SupportTicketDataModel,Boolean>,SupportReadCursorRequest>(HttpMethod.Post,
+                        endpointUrl="support/workspace/read",query=mapOf("agent" to agent),body=SupportReadCursorRequest(ticketId,cursor),
+                        expectedSessionGeneration=generation)
+                    if(!result.negative && owned())lastMarked=cursor
+                } catch(cancel:CancellationException){throw cancel}
+                catch(_:Exception){ /* A failed receipt is not a successfully read acknowledgement. */ }
             }
         }
     }
     fun act(action: String) {
         val current=ticket ?: return
-        if(acting) return
+        if(acting || !owned()) return
         acting=true
         scope.launch {
             try {
-                val generation=currentAuthenticatedSessionGeneration()
+                if(!owned())return@launch
+                val generation=ownerGeneration
                 val result=networkRequest<SupportTicketDataModel,SupportAgentActionRequest>(HttpMethod.Post,endpointUrl="support/workspace/action",
                     query=mapOf("agent" to agent),body=SupportAgentActionRequest(current.id,action,current.revision),expectedSessionGeneration=generation)
                 if(userAccountState.payloadValue?.id==account && authenticatedSessionGenerationIsCurrent(generation)) {
                     val data=result.payload
-                    if(!result.negative && data!=null) { ticket=data; feedback=null; SupportWorkspaceSignals.changed() }
-                    else { feedback=result.message; refresh++ }
+                    if(!result.negative && data?.id==current.id && data.revision>current.revision) {
+                        ticket=newestSupportTabTicket(ticket,data,current.id); feedback=null; SupportWorkspaceSignals.changed()
+                    } else { feedback=result.message ?: eventMessage("support.tabs.resolve_failed"); refresh++ }
                 }
-            } finally { acting=false }
+            } catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){feedback=eventMessage("support.tabs.resolve_failed");refresh++}
+            finally { acting=false }
         }
     }
     Column(modifier.imePadding()) {
@@ -324,7 +422,6 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            actionButton(text=authUiText("Chats","Чаты","Чаттар", "Чаттар"),autoLoading=false,onClick=onBack)
             Column(Modifier.fillMaxWidth()) {
                 Text(ticket?.subject ?: authUiText("New conversation","Новый диалог","Жаңа диалог", "Жаңы маек"),color=stateValues.TextColor,
                     fontSize=stateValues.textSize,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
@@ -344,8 +441,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                 if(agent && !mine && current.status!="closed" && CompanyCapability.SUPPORT_CLAIM in capabilities && current.userId!=account)
                     actionButton(text=authUiText("Take conversation","Взять в работу","Жұмысқа алу", "Маекти өзүңүзгө алуу"),autoLoading=false,enabled=!acting,loading=acting,onClick={ act("claim") })
                 if(agent && mine && CompanyCapability.SUPPORT_CLAIM in capabilities) actionButton(text=authUiText("Release","Освободить","Босату", "Бошотуу"),autoLoading=false,enabled=!acting,onClick={ act("release") })
-                if(canResolve) actionButton(text=if(current.status=="closed") authUiText("Reopen","Открыть снова","Қайта ашу", "Кайра ачуу") else authUiText("Resolve","Решено","Шешілді", "Чечүү"),
-autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",onClick={ act(if(current.status=="closed") "reopen" else "close") })
+                if(canResolve && current.status=="closed") AuthQuietAction(authUiText("Reopen","Открыть снова","Қайта ашу","Кайра ачуу"),!acting) { act("reopen") }
             }
         }
         feedback?.let { SupportInlineError(it) }
@@ -379,18 +475,25 @@ autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",
                 }
                 before?.let { cursor -> item(key="older") {
                     actionButton(text=authUiText("Earlier messages","Более ранние сообщения","Бұрынғы хабарламалар", "Мурунку билдирүүлөр"),autoLoading=false,loading=loadingMore,enabled=!loadingMore,onClick={
+                        if(!owned())return@actionButton
                         loadingMore=true
                         scope.launch {
                             try {
-                                val generation=currentAuthenticatedSessionGeneration()
+                                if(!owned())return@launch
+                                val generation=ownerGeneration
                                 val result=networkRequest<SupportMessagePage,Unit>(HttpMethod.Get,endpointUrl="support/workspace/messages",
                                     query=mapOf("ticket_id" to ticketId,"agent" to agent,"before_sequence" to cursor),expectedSessionGeneration=generation)
                                 val data=result.payload
                                 if(userAccountState.payloadValue?.id==account && authenticatedSessionGenerationIsCurrent(generation)) {
-                                    if(!result.negative && data!=null) { messages=(messages+data.messages).distinctBy { it.id }.sortedBy { it.sequence }; before=data.nextBeforeSequence }
+                                    if(!result.negative && data != null && data.ticket.id==ticketId) {
+                                        messages=(messages+data.messages.filter {it.ticketId==ticketId}).distinctBy { it.id }.sortedBy { it.sequence }
+                                        before=data.nextBeforeSequence
+                                    }
                                     else feedback=result.message
                                 }
-                            } finally { loadingMore=false }
+                            } catch(cancel:CancellationException){throw cancel}
+                            catch(_:Exception){if(owned())feedback=eventMessage("support.send_unknown")}
+                            finally { loadingMore=false }
                         }
                     })
                 } }
@@ -414,7 +517,7 @@ autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",
             genericTextField(modifier=Modifier.weight(1f).heightIn(max=160.dp),valueInitial=draft,
                 placeholderText=localizedStringResource(824,"Type your message"),singleLine=false,autoFocus=false,
                 wide=true,adaptiveMultiline=true,showClearButton=true,parentOwnsValue=true,
-                retainTextAcrossRecreation=false,persistTextDraft=false,identityKey="support:$account:$agent:$ticketId",
+                retainTextAcrossRecreation=false,persistTextDraft=false,enabled=!closing,identityKey="support:$account:$agent:$ticketId",
                 onValueChange={ value,applyChange ->
                     val limited=value.take(4000).let { if(it.lastOrNull()?.isHighSurrogate()==true) it.dropLast(1) else it }
                     if(limited!=draft) { edited=true; draft=limited; draftRevision=newClientSideUuidString() }
@@ -422,17 +525,18 @@ autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",
                 })
             actionButton(text="",iconPath=supportSendIconPath(),iconRes=supportSendIconFallback(),autoLoading=false,confirmationRequired=false,
                 iconContentDescription=if(pending!=null) authUiText("Retry saved message","Повторить сохранённое сообщение","Сақталған хабарламаны қайталау", "Сакталган билдирүүнү кайра жөнөтүү") else localizedStringResource(825,"Send"),
-                enabled=canSend && draftLoaded && !sending && (pending!=null || (draft.isNotBlank() && '\u0000' !in draft)),loading=sending,onClick={
-                    if(sending) return@actionButton
+                enabled=canSend && draftLoaded && !sending && !closing && !acting && (pending!=null || (draft.isNotBlank() && '\u0000' !in draft)),loading=sending,onClick={
+                    if(sending || closing || acting || !owned()) return@actionButton
                     val command=pending ?: PendingSupportMessage(account,newClientSideUuidString(),ticketId,agent,draft.trim(),category,
                         stateValues.activeStoreId.takeIf { !agent },stateValues.appLanguage,draftRevision)
-                    val sendGeneration=currentAuthenticatedSessionGeneration()
+                    val sendGeneration=ownerGeneration
                     val draftAtClick=draft; val revisionAtClick=draftRevision
                     sending=true; feedback=null; pending=command
                     scope.launch {
                         try {
                             SupportDelivery.saveDraft(account,agent,ticketId,draftAtClick,revisionAtClick)
-                            val result=SupportDelivery.send(command)
+                            if(!owned())return@launch
+                            val result=SupportDelivery.send(command,sendGeneration)
                             if(userAccountState.payloadValue?.id!=account || !authenticatedSessionGenerationIsCurrent(sendGeneration)) return@launch
                             pending=SupportDelivery.pending(account,agent,ticketId)
                             feedback=result.error
@@ -455,6 +559,8 @@ autoLoading=false,enabled=!acting,confirmationRequired=current.status!="closed",
         if(pending!=null && !sending) Text(authUiText("Send retries the saved message. Your newer draft is kept separately.","Кнопка повторит сохранённое сообщение. Новый черновик остаётся отдельно.","Батырма сақталған хабарламаны қайталайды. Жаңа мәтін бөлек сақталады.", "«Жөнөтүү» сакталган билдирүүнү кайра жөнөтөт. Жаңы долбооруңуз өзүнчө сакталат."),
             Modifier.padding(horizontal=14.dp,vertical=4.dp),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
     }
+}
+
 }
 
 @Composable

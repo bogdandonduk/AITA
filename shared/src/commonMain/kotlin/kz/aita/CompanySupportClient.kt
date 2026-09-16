@@ -100,8 +100,11 @@ object SupportDelivery {
         if(next!=record) putLocalKv(key(account, agent, ticket), jsonBase.encodeToString(next))
     }
 
-    suspend fun send(command: PendingSupportMessage): SupportDeliveryResult = sender.withLock {
-        val generation = currentAuthenticatedSessionGeneration()
+    suspend fun send(command: PendingSupportMessage,
+        expectedSessionGeneration: Long = currentAuthenticatedSessionGeneration()): SupportDeliveryResult = sender.withLock {
+        // Capture before waiting on the sender mutex. A queued action from a previous
+        // sign-in must not borrow the same account's newly established session.
+        val generation = expectedSessionGeneration
         fun owned() = userAccountState.payloadValue?.id == command.accountId &&
             authenticatedSessionGenerationIsCurrent(generation)
         if (!owned()) return@withLock SupportDeliveryResult(null, null, eventMessage("support.denied"))

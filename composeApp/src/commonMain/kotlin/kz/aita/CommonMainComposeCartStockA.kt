@@ -1577,7 +1577,8 @@ fun AppConfiguration.tabRowWidget(
     titleTextSize: TextUnit = stateValues.accentTextSize,
     titleTextColor: Color = stateValues.TextColor,
     enabled: Boolean = true,
-    scrollable: Boolean = tabs.size > 4,
+    scrollable: Boolean = true,
+    compact: Boolean = false,
 ): TabRowContent {
     val ids = tabs.map { it.id }
     val savedState = rememberSaveable { mutableStateOf(selectedIndexInitial) }
@@ -1591,7 +1592,7 @@ fun AppConfiguration.tabRowWidget(
         Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
             if (titleText.isNotBlank()) Text(titleText, color = titleTextColor, fontSize = titleTextSize, fontWeight = FontWeight.Bold)
             AitaTabChips(tabs, selectedId, enabled, scrollable, cornerRadius, textSize,
-                selectedContainerColor, unselectedContainerColor, selectedTextColor, unselectedTextColor) { tab ->
+                selectedContainerColor, unselectedContainerColor, selectedTextColor, unselectedTextColor, compact) { tab ->
                 selection.value = tab.id
                 tab.onClick?.invoke(tab.id)
             }
@@ -1608,8 +1609,12 @@ class TabContent(
     val id: String,
     val text: String,
     val icon: AitaTabIcon = aitaTabIconForId(id),
+    val actions: List<AitaTabAction> = emptyList(),
     val onClick: ((String) -> Unit)? = null
 )
+
+data class AitaTabAction(val id: String, val label: String, val icon: AitaTabIcon,
+    val enabled: Boolean = true, val onClick: () -> Unit)
 
 internal fun tabLabelWithCount(label: String, count: Int): String =
     "${label.trim()} (${count.coerceAtLeast(0)})"
@@ -1963,7 +1968,7 @@ fun AppConfiguration.StockWarehouseScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     tabs = sortTabs,
                     selectedIndexInitial = sortMode.takeIf { mode -> sortTabs.any { it.id == mode } } ?: "name",
-                    textSize = stateValues.smallTextSize
+                    compact = true, textSize = stateValues.smallTextSize
                 )
 
                 tabRowWidget(
@@ -1973,7 +1978,7 @@ fun AppConfiguration.StockWarehouseScreen() {
                         TabContent("desc", localizedStringResource(516, "Descending")) { sortAscending = false }
                     ),
                     selectedIndexInitial = if (sortAscending) "asc" else "desc",
-                    textSize = stateValues.smallTextSize
+                    compact = true, textSize = stateValues.smallTextSize
                 )
             }
         }
@@ -5466,7 +5471,7 @@ internal fun AppConfiguration.StockConditionListEditor(
     var conditions by remember {
         mutableStateOf(values.map { it.toStockConditionDataModel().normalizedStockCondition() }.filter { visibleStockConditionText(it).isNotBlank() || it.kind != STOCK_CONDITION_KIND_CUSTOM_TEXT })
     }
-    val darkConditionIcons = stateValues.appThemeId == 1L
+    val darkConditionIcons = isDarkAppTheme(stateValues.appThemeId)
     val manualConditionIconPath = if (darkConditionIcons) "svg/131_1.svg" else "svg/131_0.svg"
     val manualConditionIconRes = if (darkConditionIcons) Res.drawable._131_1 else Res.drawable._131_0
     val buyerAgeConditionIconPath = if (darkConditionIcons) "svg/132_1.svg" else "svg/132_0.svg"

@@ -4,6 +4,11 @@ import io.ktor.http.*
 import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import io.ktor.server.application.*
+import kz.aita.server.RealtimeServerBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
@@ -22,12 +27,12 @@ internal class HelpCatalogStore(private val configured: Path? = null, private va
     }) {
     private val mutex=Mutex()
     private var cached: HelpCatalogue?=null
-    private var fileStamp: Pair<Long,Long>?=null
+    private var fileStamp: Pair<java.nio.file.attribute.FileTime,Long>?=null
     suspend fun catalogue(): HelpCatalogue = withContext(Dispatchers.IO) { mutex.withLock {
         val file=configured?.toAbsolutePath()?.normalize()
         val stamp=file?.let { require(Files.isRegularFile(it,LinkOption.NOFOLLOW_LINKS) && it.toRealPath()==it)
             require(Files.size(it) in 1..HELP_CATALOGUE_MAX_BYTES.toLong())
-            Files.getLastModifiedTime(it).toMillis() to Files.size(it) }
+            Files.getLastModifiedTime(it) to Files.size(it) }
         if(cached!=null && stamp==fileStamp) return@withLock requireNotNull(cached)
         val bytes=if(file==null) bundled() else Files.newInputStream(file).use { it.readNBytes(HELP_CATALOGUE_MAX_BYTES+1) }
         require(bytes.size<=HELP_CATALOGUE_MAX_BYTES)
@@ -74,6 +79,30 @@ internal fun Route.installHelpRoutes(store: HelpCatalogStore) {
         }
     }
 }
-fun Route.installHelpRoutes(config: ApplicationConfig) = installHelpRoutes(HelpCatalogStore(
-    config.propertyOrNull("help.catalogFile")?.getString()?.takeIf(String::isNotBlank)?.let(Path::of),
-    config.propertyOrNull("help.screenshotDirectory")?.getString()?.takeIf(String::isNotBlank)?.let(Path::of)))
+/** The same validated store serves HTTP and drives realtime invalidations after atomic publication. */
+internal class HelpChangeAnnouncer(private val store:HelpCatalogStore,private val announce:suspend ()->Unit) {
+    private var previous:HelpCatalogue?=null
+    private var attempted=false
+    suspend fun check() {
+        val recoveringInitialRead=attempted && previous==null
+        attempted=true
+        val current=store.catalogue()
+        if(recoveringInitialRead || (previous!=null && previous!=current))announce()
+        previous=current
+    }
+}
+fun Route.installHelpRoutes(config: ApplicationConfig) {
+    val store=HelpCatalogStore(
+        config.propertyOrNull("help.catalogFile")?.getString()?.takeIf(String::isNotBlank)?.let(Path::of),
+        config.propertyOrNull("help.screenshotDirectory")?.getString()?.takeIf(String::isNotBlank)?.let(Path::of))
+    installHelpRoutes(store)
+    application.launch(Dispatchers.IO) {
+        val watcher=HelpChangeAnnouncer(store){RealtimeServerBus.publish(entity="help/tutorials")}
+        while(isActive) {
+            try {watcher.check()}
+            catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
+            catch(_:Exception){ /* Invalid/incomplete file publications are not announced. Last client book stays intact. */ }
+            delay(2000L)
+        }
+    }
+}

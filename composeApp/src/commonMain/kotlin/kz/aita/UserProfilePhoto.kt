@@ -1,0 +1,156 @@
+package kz.aita
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.jetbrains.compose.resources.decodeToImageBitmap
+
+internal data class ProfilePhotoPick(val bytes:ByteArray?=null,val error:String?=null)
+@Composable internal expect fun rememberProfilePhotoPicker(title:String,onResult:(ProfilePhotoPick)->Unit):()->Unit
+internal data class PhotoEditorState(val saved:ProfilePhotoSnapshot?=null,val preview:String?=null,val busy:Boolean=false,
+    val error:String?=null,val notice:String?=null)
+internal interface PhotoEditorBackend {
+    suspend fun load():ResponseDataModel<ProfilePhotoSnapshot>
+    suspend fun preview(bytes:ByteArray):ResponseDataModel<ProfilePhotoPreview>
+    suspend fun change(value:ProfilePhotoChange):ResponseDataModel<ProfilePhotoSnapshot>
+}
+/** Screen-owned operations; every acknowledgement belongs to the exact account/session that opened it. */
+internal class PhotoEditor(private val owner:String,private val current:()->Boolean,
+    private val scope:CoroutineScope,private val backend:PhotoEditorBackend) {
+    private val mutable=MutableStateFlow(PhotoEditorState())
+    val state=mutable.asStateFlow()
+    private fun error(response:ResponseDataModel<*>)=when(response.httpStatusCode) {
+        404,405,501,503->"unavailable";409->"conflict";413->"size";400,422->"format";429->"busy";else->"network"
+    }
+    private fun run(block:suspend ()->Unit) {
+        if(!current() || mutable.value.busy)return
+        mutable.value=mutable.value.copy(busy=true,error=null,notice=null)
+        scope.launch {
+            try {withTimeout(60_000) {block()}}
+            catch(_:TimeoutCancellationException){if(current())mutable.value=mutable.value.copy(error="network")}
+            catch(cancel:CancellationException){throw cancel}
+            catch(_:Exception){if(current())mutable.value=mutable.value.copy(error="network")}
+            finally {if(current())mutable.value=mutable.value.copy(busy=false)}
+        }
+    }
+    fun load()=run {
+        val response=backend.load(); if(!current())return@run
+        val photo=response.payload
+        mutable.value=if(!response.negative && photo!=null && validProfilePhotoSnapshot(photo,owner))
+            mutable.value.copy(saved=photo,preview=null) else mutable.value.copy(error=error(response))
+    }
+    fun select(pick:ProfilePhotoPick) {
+        if(!current() || mutable.value.busy)return
+        if(pick.error!=null){mutable.value=mutable.value.copy(error=pick.error);return}
+        val bytes=pick.bytes ?: return
+        if(bytes.size !in 1..PROFILE_PHOTO_MAX_INPUT_BYTES){mutable.value=mutable.value.copy(error="size");return}
+        if(mutable.value.saved==null)return
+        run {
+            val response=backend.preview(bytes);if(!current())return@run
+            val value=response.payload?.jpegBase64
+            mutable.value=if(!response.negative && profilePhotoJpegBytes(value)!=null)
+                mutable.value.copy(preview=value) else mutable.value.copy(error=error(response))
+        }
+    }
+    fun discard(){if(current() && !mutable.value.busy)mutable.value=mutable.value.copy(preview=null,error=null,notice=null)}
+    fun save(remove:Boolean=false) {
+        val before=mutable.value;val saved=before.saved ?: return
+        if(!remove && before.preview==null)return
+        val request=ProfilePhotoChange(saved.revision,if(remove)null else before.preview)
+        run {
+            val response=backend.change(request);if(!current())return@run
+            val result=response.payload
+            if(result!=null && validProfilePhotoSnapshot(result,owner) && result.revision>=saved.revision &&
+                (if(response.negative) response.httpStatusCode==409 else profilePhotoAcknowledges(request,result,owner))) {
+                // A conflict must be reviewed afresh; never turn its new revision into an automatic overwrite.
+                mutable.value=mutable.value.copy(saved=result,preview=null,
+                    error=if(response.negative)"conflict" else null,notice=if(response.negative)null else if(remove)"removed" else "saved")
+            } else mutable.value=mutable.value.copy(error=error(response))
+        }
+    }
+}
+
+@Composable internal fun AppConfiguration.UserProfilePhotoCard() {
+    val owner=stateValues.userAccount?.id ?: return
+    val generation=currentAuthenticatedSessionGeneration()
+    key(owner,generation) {
+        val scope=rememberCoroutineScope()
+        val editor=remember {PhotoEditor(owner,{
+            authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id==owner
+        },scope,object:PhotoEditorBackend {
+            override suspend fun load()=ProfilePhotoClient.load(generation)
+            override suspend fun preview(bytes:ByteArray)=ProfilePhotoClient.preview(bytes,generation)
+            override suspend fun change(value:ProfilePhotoChange)=ProfilePhotoClient.save(value,generation)
+        })}
+        val state by editor.state.collectAsState()
+        val photoRevision by ProfilePhotoSignals.revision.collectAsState()
+        var observedPhotoRevision by remember {mutableStateOf(photoRevision)}
+        LaunchedEffect(editor){editor.load()}
+        LaunchedEffect(photoRevision,state.preview,state.busy) {
+            // Keep a reviewed local edit tied to its original revision; otherwise a push
+            // could silently upgrade its CAS revision and overwrite another device's photo.
+            if(shouldRefreshProfilePhoto(photoRevision,observedPhotoRevision,state.preview!=null,state.busy)) {
+                observedPhotoRevision=photoRevision;editor.load()
+            }
+        }
+        val pick=rememberProfilePhotoPicker(accountPresentationText("photo.choose"),editor::select)
+        val picture=state.preview ?: state.saved?.jpegBase64
+        val bitmap by produceState<ImageBitmap?>(null,picture) {
+            value=null
+            value=withContext(Dispatchers.Default) {runCatching {profilePhotoJpegBytes(picture)?.decodeToImageBitmap()}.getOrNull()}
+        }
+        Column(Modifier.fillMaxWidth().padding(bottom=20.dp).clip(RoundedCornerShape(stateValues.cornerRadius))
+            .background(stateValues.BackgroundColor)
+            .border(stateValues.unfocusedBorderWidth,stateValues.PlaceholderTextColor.copy(alpha=.45f),RoundedCornerShape(stateValues.cornerRadius))
+            .padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(accountPresentationText("photo.title"),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
+            Box(Modifier.size(112.dp).clip(CircleShape).background(stateValues.AccentColor.copy(alpha=.10f))
+                .border(2.dp,stateValues.AccentColor.copy(alpha=.6f),CircleShape),contentAlignment=Alignment.Center) {
+                val decoded=bitmap
+                if(decoded!=null)Image(decoded,accountPresentationText("photo.title"),Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                else CpImage(Modifier.size(52.dp),url=stateValues.drawablePathIconPerson,fallbackRes=stateValues.drawableResIconPerson.value,
+                    contentDescription=accountPresentationText("photo.title"),tintColor=stateValues.PlaceholderTextColor)
+                if(state.busy)CircularProgressIndicator(Modifier.size(100.dp),color=stateValues.AccentColor)
+            }
+            Text(accountPresentationText(if(state.preview!=null)"photo.preview" else "photo.help"),
+                color=if(state.preview!=null)stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth())
+            Text(accountPresentationText("photo.private"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
+            state.error?.let {code->Text(accountPresentationText("photo.error.${code.takeIf {it in setOf("size","format","conflict","busy","unavailable")} ?: "network"}"),
+                color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)}
+            state.notice?.let {Text(accountPresentationText("photo.$it"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)}
+            if(state.saved!=null) {
+                actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText(if(state.saved?.jpegBase64==null)"photo.choose" else "photo.change"),
+                    iconPath=stateValues.drawablePathIconPerson,enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick=pick)
+                if(state.preview!=null) {
+                    actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.save"),
+                        iconPath=stateValues.drawablePathIconCheck,enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick={editor.save()})
+                    actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.discard"),
+                        enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick=editor::discard)
+                } else if(state.saved?.jpegBase64!=null) {
+                    actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.remove"),
+                        enabled=!state.busy,autoLoading=false,confirmationRequired=true,onClick={editor.save(remove=true)})
+                }
+            }
+            if(state.error!=null || state.saved==null)actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.retry"),
+                iconPath=stateValues.drawablePathIconRefresh,enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick=editor::load)
+        }
+    }
+}

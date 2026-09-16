@@ -2,6 +2,8 @@
 
 package kz.aita.server
 
+import kz.aita.server.profile.installProfilePhotoRoutes
+
 import kz.aita.server.updates.installClientUpdateRoutes
 import kz.aita.server.help.installHelpRoutes
 
@@ -18022,6 +18024,7 @@ fun Application.module() {
   routing {
         installClientUpdateRoutes(this@module.environment.config)
         installHelpRoutes(this@module.environment.config)
+        installProfilePhotoRoutes()
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
         installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope, this@module)

@@ -4,11 +4,11 @@ import aita.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 
 internal fun AppConfiguration.marketIconPath(id: Int): String {
-    val theme = normalizeAppThemePreference(stateValues.appThemeId)
+    val theme = appDrawableThemeId(stateValues.appThemeId)
     return stateValues.drawables.orEmpty().extractPath(id.toLong(), theme) ?: "svg/${id}_${theme}.svg"
 }
 internal fun AppConfiguration.marketIconFallback(id: Int): DrawableResource {
-    val dark = normalizeAppThemePreference(stateValues.appThemeId) == 1L
+    val dark = isDarkAppTheme(stateValues.appThemeId)
     return when(id) {
         18 -> if(dark) Res.drawable._18_1 else Res.drawable._18_0
         140 -> if(dark) Res.drawable._140_1 else Res.drawable._140_0

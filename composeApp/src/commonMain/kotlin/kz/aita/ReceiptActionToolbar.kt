@@ -18,7 +18,7 @@ internal fun AppConfiguration.ReceiptActionToolbar(
     onAction: (String, String) -> Unit,
     onFinish: (() -> Unit)? = null
 ) {
-    val dark = stateValues.appThemeId == 1L
+    val dark = isDarkAppTheme(stateValues.appThemeId)
     data class Action(val id: String, val label: String, val success: String, val family: Int, val res: DrawableResource)
     val actions = listOf(
         Action("pdf", stateValues.stringPdf, stateValues.stringReceiptPdfSaved, 126, if (dark) Res.drawable._126_1 else Res.drawable._126_0),

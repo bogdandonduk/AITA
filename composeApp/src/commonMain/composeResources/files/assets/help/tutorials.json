@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 1,
+  "revision": 3,
   "tutorials": [
     {
       "id": "account.register",
@@ -280,6 +280,118 @@
       "caution": {}
     },
     {
+      "id": "account.profile-photo",
+      "modes": [
+        "STORE",
+        "BUYER",
+        "SUPPLIER",
+        "MANUFACTURER"
+      ],
+      "category": "ACCOUNT",
+      "title": {
+        "en": "Add, change or remove your profile picture",
+        "ru": "Добавить, изменить или удалить фото профиля"
+      },
+      "introduction": {
+        "en": "The picture belongs to your personal account. It is not a store logo or a public marketplace product image.",
+        "ru": "Фото относится к вашему личному аккаунту. Это не логотип магазина и не публичное изображение товара."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Menu → User account and find Profile picture. Wait for the saved picture or empty profile to load, then tap Choose picture or Change picture.",
+            "ru": "Откройте Меню → Аккаунт и найдите блок «Фото профиля». Дождитесь загрузки сохранённого фото или пустого профиля и нажмите «Выбрать фото» либо «Изменить фото»."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Select one JPEG or PNG up to 8 MB in the system picker. On iOS use a picture saved in Files. A connection to the updated AITA server is required to prepare the preview.",
+            "ru": "Выберите в системном окне один JPEG или PNG размером до 8 МБ. На iOS используйте изображение из приложения «Файлы». Для подготовки предпросмотра нужно подключение к обновлённому серверу AITA."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Check the square centre-cropped preview. Choosing a file has not saved it to your profile. Tap Save picture to confirm or Discard to keep the previously saved picture.",
+            "ru": "Проверьте квадратный предпросмотр с обрезкой по центру. Выбор файла ещё не сохраняет фото в профиле. Нажмите «Сохранить фото» для подтверждения или «Отменить», чтобы оставить прежнее фото."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "After the success message, reopen User account to check the result. Use Remove picture and confirm to delete it. If a conflict is reported, review the latest saved picture before making another change.",
+            "ru": "После сообщения об успехе снова откройте аккаунт и проверьте результат. Для удаления нажмите «Удалить фото» и подтвердите действие. При конфликте сначала проверьте последнее сохранённое фото, затем вносите новое изменение."
+          },
+          "screenshots": []
+        }
+      ],
+      "caution": {
+        "en": "Only you can read this picture through the current account-photo service. AITA stores a normalized small JPEG, not your original file or its metadata. A timeout is not proof that a save failed: reload and check before changing it again.",
+        "ru": "Текущий сервис фото аккаунта выдаёт снимок только владельцу. AITA хранит уменьшенный JPEG, а не исходный файл и его метаданные. Истечение ожидания не доказывает, что сохранение не произошло: перезагрузите фото и проверьте результат перед новым изменением."
+      }
+    },
+    {
+      "id": "account.two-factor",
+      "modes": [
+        "STORE",
+        "BUYER",
+        "SUPPLIER",
+        "MANUFACTURER"
+      ],
+      "category": "ACCOUNT",
+      "title": {
+        "en": "Choose your two-factor authentication method",
+        "ru": "Выбрать способ двухфакторной аутентификации"
+      },
+      "introduction": {
+        "en": "Choose None, Email or Authenticator without confusing a selection with a saved security change.",
+        "ru": "Выбирайте «Нет», «Email» или «Аутентификатор», не путая выбор в списке с сохранением настройки безопасности."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Menu → Sign in and security and locate the Two-factor authentication dropdown. Its current value is the saved sign-in requirement.",
+            "ru": "Откройте Меню → Вход и безопасность и найдите список «Двухфакторная аутентификация». Его текущее значение показывает сохранённое требование при входе."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Choose Email to show the password and email-code controls, or Authenticator to configure or confirm the authenticator. Complete the current security proof requested below the list.",
+            "ru": "Выберите «Email», чтобы открыть поля пароля и кода из письма, или «Аутентификатор», чтобы настроить либо подтвердить его. Под списком пройдите проверку действующим способом защиты."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Choosing None leaves no normal inline form. If protection was previously required, a separate confirmation dialog asks for your password and current protection before disabling the sign-in requirement. Cancel leaves the saved requirement unchanged.",
+            "ru": "При выборе «Нет» обычная встроенная форма не отображается. Если защита ранее была обязательной, отдельное окно запросит пароль и действующий способ защиты для отключения требования при входе. Отмена оставит сохранённое требование без изменений."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Wait for server confirmation and check the selected method again. SMS is not available in this selector yet. Keep your mailbox, authenticator and recovery codes secure.",
+            "ru": "Дождитесь подтверждения сервера и ещё раз проверьте выбранный способ. SMS пока нет среди вариантов. Защитите почту, аутентификатор и резервные коды."
+          },
+          "screenshots": []
+        }
+      ],
+      "caution": {
+        "en": "Changing this sign-in requirement does not automatically disconnect an enrolled authenticator. Security-sensitive changes may still need it. Never send passwords or one-time codes to support.",
+        "ru": "Изменение требования при входе не отключает подключённый аутентификатор автоматически. Он всё ещё может требоваться для важных изменений безопасности. Никогда не отправляйте поддержке пароли и одноразовые коды."
+      }
+    },
+    {
       "id": "account.authenticator",
       "modes": [
         "STORE",
@@ -300,8 +412,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Sign in and security and choose authenticator setup.",
-            "ru": "Откройте Меню → Вход и безопасность и настройку аутентификатора."
+            "en": "Open Menu → Sign in and security. In Two-factor authentication, choose Authenticator. Confirm the current password and any existing security proof to start setup.",
+            "ru": "Откройте Меню → Вход и безопасность. В списке «Двухфакторная аутентификация» выберите «Аутентификатор». Для начала настройки подтвердите текущий пароль и действующую защиту, если она запрошена."
           },
           "screenshots": []
         },
@@ -324,8 +436,8 @@
         {
           "id": "step-4",
           "text": {
-            "en": "Review whether an authenticator is required at every sign-in. Confirm any changed policy using your existing protection.",
-            "ru": "Проверьте, обязателен ли аутентификатор при каждом входе. Изменение этого правила подтвердите действующим способом защиты."
+            "en": "After confirmation, Authenticator becomes the sign-in method. To stop requiring it at sign-in while keeping it connected, select None or Email in Two-factor authentication and complete the protected confirmation.",
+            "ru": "После подтверждения аутентификатор станет способом дополнительной проверки при входе. Чтобы не требовать его при входе, но сохранить подключение, выберите «Нет» или «Email» в списке двухфакторной аутентификации и пройдите защищённое подтверждение."
           },
           "screenshots": []
         }
@@ -579,8 +691,8 @@
         {
           "id": "step-2",
           "text": {
-            "en": "Open Theme to select the desired appearance.",
-            "ru": "В разделе темы выберите нужное оформление."
+            "en": "Open Theme and choose Light, Dark, Purple or Blue. Purple and Blue use deep-colored backgrounds, white text and the same gold accent.",
+            "ru": "Откройте «Тема» и выберите светлую, тёмную, фиолетовую или синюю. В фиолетовой и синей темах используются глубокий цвет фона, белый текст и прежний золотой акцент."
           },
           "screenshots": []
         },
@@ -685,8 +797,8 @@
         {
           "id": "step-2",
           "text": {
-            "en": "Open Chats and start a new conversation or continue the existing conversation about the same issue.",
-            "ru": "В чатах создайте обращение или продолжите существующий диалог о той же проблеме."
+            "en": "Open Chats to see your conversation list. Select a conversation or start a new one: it opens in its own tab while Chats stays the inbox.",
+            "ru": "Откройте «Чаты», чтобы увидеть список диалогов. Выберите диалог или начните новый: он откроется в отдельной вкладке, а «Чаты» останутся списком."
           },
           "screenshots": []
         },
@@ -701,8 +813,8 @@
         {
           "id": "step-4",
           "text": {
-            "en": "Send only relevant, redacted screenshots when attachment is available. Check for a reply in the same conversation.",
-            "ru": "Если доступно вложение, отправляйте только нужные скриншоты со скрытыми личными данными. Ответ проверяйте в том же диалоге."
+            "en": "Switch between the open conversation tabs. The cross closes a tab and keeps its draft; it does not resolve the ticket. Use the checkmark and confirm only when the issue is solved. Return to Chats to reopen a conversation.",
+            "ru": "Переключайтесь между вкладками диалогов. Крестик закрывает вкладку и сохраняет черновик, но не завершает обращение. Нажмите галочку и подтвердите только после решения вопроса. Чтобы снова открыть диалог, вернитесь в «Чаты»."
           },
           "screenshots": []
         }
@@ -786,8 +898,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Finish and save the current work. Open Menu → Update available, or About → Check for updates.",
-            "ru": "Завершите и сохраните текущую работу. Откройте Меню → Доступно обновление либо О приложении → Проверить обновления."
+            "en": "Finish and save the current work. When a compatible update is available, open Menu → Update available. About is only for build and project information; it is not the update screen.",
+            "ru": "Завершите и сохраните текущую работу. Когда доступно совместимое обновление, откройте Меню → Доступно обновление. Раздел «О приложении» содержит сведения о сборке и проекте, а не управление обновлением."
           },
           "screenshots": []
         },
@@ -866,8 +978,8 @@
         {
           "id": "step-4",
           "text": {
-            "en": "Use Check for updates or Support from this page when needed.",
-            "ru": "При необходимости здесь же откройте проверку обновлений или поддержку."
+            "en": "Open Support from this page when needed. Updates have their own temporary menu item, Update available, which appears only when a newer compatible build is known.",
+            "ru": "При необходимости откройте поддержку с этой страницы. Для обновлений есть отдельный временный пункт меню «Доступно обновление», который появляется, когда обнаружена новая совместимая сборка."
           },
           "screenshots": []
         }
@@ -6333,14 +6445,14 @@
         "uz": "Autentifikatorni saqlab, har kirishda ishlatmasam boʻladimi?"
       },
       "answer": {
-        "en": "Yes. Keep the authenticator connected and turn off Require 2FA at sign-in, or select Email code as the required method. Protecting security changes still requires your password and current protection. Enabling email verification also confirms the main mailbox. Email is less independent than an authenticator, especially when it is also used to reset your password.",
-        "ru": "Да. Оставьте аутентификатор подключённым и выключите «Требовать 2FA при входе» либо выберите код из письма. Для изменений безопасности нужны пароль и текущая защита. Включение email-проверки также подтверждает основной почтовый ящик. Email менее независим, чем аутентификатор, особенно если используется для восстановления пароля.",
-        "kk": "Иә. Аутентификаторды қосулы қалдырып, «Кіру кезінде 2FA талап ету» параметрін өшіріңіз немесе email кодын таңдаңыз. Қауіпсіздік өзгерістері құпия сөз бен ағымдағы қорғанысты талап етеді. Email тексеруін қосқанда негізгі пошта да расталады. Email, әсіресе құпия сөзді қалпына келтіруге қолданылса, аутентификаторға қарағанда тәуелсіздігі төмен.",
-        "tg": "Бале. Аутентификаторро пайваст нигоҳ доред ва Талаби 2FA ҳангоми воридшавиро хомӯш кунед, ё Коди почтаи электрониро ҳамчун усули ҳатмӣ интихоб кунед. Барои ҳифзи тағйироти амниятӣ гузарвожа ва муҳофизати ҷорӣ ҳамоно заруранд. Фаъол кардани тасдиқи почта инчунин қуттии почтаи асосиро тасдиқ мекунад. Почтаи электронӣ нисбат ба аутентификатор омили камтар мустақил аст, махсусан агар барои барқарор кардани гузарвожа ҳам истифода шавад.",
-        "ky": "Ооба. Аутентификаторду туташкан бойдон калтырып, «Кирүүдө 2FA талап кылуу» жөндөөсүн өчүрүңүз же милдеттүү ыкма катары «Электрондук почтадагы кодду» тандаңыз. Коопсуздук өзгөртүүлөрүн коргоо үчүн сырсөзүңүз жана учурдагы коргоо ыкмасы дагы эле талап кылынат. Электрондук почта аркылуу текшерүүнү күйгүзүү негизги почта кутусун да ырастайт. Айрыкча сырсөздү баштапкы абалга келтирүүгө да колдонулганда, электрондук почта аутентификаторго караганда көз карандысыздыгы азыраак фактор болот.",
-        "uz": "Ha. Autentifikatorni ulangan holda qoldirib, Kirishda 2FA talab qilishni oʻchiring yoki talab qilinadigan usul sifatida Elektron pochta kodini tanlang. Xavfsizlik oʻzgarishlarini himoyalash baribir parolingiz va amaldagi himoyani talab qiladi. Elektron pochta tekshiruvini yoqish asosiy pochta qutisini ham tasdiqlaydi. Elektron pochta autentifikatorga qaraganda kamroq mustaqil omildir, ayniqsa u parolni tiklash uchun ham ishlatilsa."
+        "en": "Yes. In Sign in and security → Two-factor authentication, choose None or Email and confirm with your password and current protection. The authenticator stays connected unless you explicitly disable it. Enabling Email confirms the main mailbox. Changing the dropdown alone does not save a new requirement.",
+        "ru": "Да. В разделе «Вход и безопасность» в списке «Двухфакторная аутентификация» выберите «Нет» или «Email» и подтвердите изменение паролем и действующим способом защиты. Аутентификатор останется подключённым, пока вы отдельно не отключите его. При включении Email подтверждается основная почта. Один только выбор в списке не сохраняет новое требование.",
+        "kk": "Иә. «Кіру және қауіпсіздік» бөліміндегі «Екі факторлы аутентификация» тізімінен «Жоқ» немесе «Email» таңдап, құпия сөз бен қолданыстағы қорғаныс арқылы растаңыз. Аутентификаторды бөлек өшірмесеңіз, ол қосулы қалады. Email қосылғанда негізгі пошта расталады. Тізімнен таңдау өздігінен жаңа талапты сақтамайды.",
+        "ky": "Ооба. «Кирүү жана коопсуздук» бөлүмүндөгү «Эки факторлуу аутентификация» тизмесинен «Жок» же «Email» тандап, сырсөз жана учурдагы коргоо менен ырастаңыз. Аутентификаторду өзүнчө өчүрмөйүнчө, ал туташкан бойдон калат. Email күйгүзүлгөндө негизги почта ырасталат. Тизмеден тандоо эле жаңы талапты сактабайт.",
+        "tg": "Бале. Дар «Воридшавӣ ва амният» аз рӯйхати «Аутентификатсияи дуомилагӣ» «Ҳеҷ» ё «Email»-ро интихоб намуда, бо гузарвожа ва муҳофизати ҷорӣ тасдиқ кунед. Аутентификатор то хомӯшкунии алоҳида пайваст мемонад. Ҳангоми фаъол кардани Email почтаи асосӣ тасдиқ мешавад. Танҳо интихоби рӯйхат талаби навро захира намекунад.",
+        "uz": "Ha. «Kirish va xavfsizlik» bo‘limidagi «Ikki bosqichli autentifikatsiya» ro‘yxatidan «Yo‘q» yoki «Email»ni tanlab, parol va amaldagi himoya bilan tasdiqlang. Autentifikatorni alohida o‘chirmaguningizcha u ulangan holda qoladi. Email yoqilganda asosiy pochta tasdiqlanadi. Faqat ro‘yxatdan tanlash yangi talabni saqlamaydi."
       },
-      "tutorialId": "account.authenticator"
+      "tutorialId": "account.two-factor"
     },
     {
       "id": "faq.existing-2622",
@@ -6764,6 +6876,25 @@
         "uz": "Yoʻq. Server qismini joylashtirish serverni yangilaydi; Android va kompyuter mijozlari alohida yigʻilib, oʻrnatilishi kerak. Tuzatish haqida xabar berilganda mijoz versiyasi va serverga joylashtirilgan kommitni tekshiring. Eski oʻrnatilgan ilovada eski interfeys va qurilma kodi qoladi."
       },
       "tutorialId": "settings.updates"
+    },
+    {
+      "id": "faq.profile-photo",
+      "modes": [
+        "STORE",
+        "BUYER",
+        "SUPPLIER",
+        "MANUFACTURER"
+      ],
+      "category": "ACCOUNT",
+      "question": {
+        "en": "Why did choosing a profile picture not save it?",
+        "ru": "Почему выбор фото профиля не сохранил его?"
+      },
+      "answer": {
+        "en": "Choosing a JPEG/PNG only prepares a centre-cropped preview. Check it and tap Save picture. The server must support profile pictures and be reachable. If saving times out, keep the preview and retry the same save, or reload to check the actual stored result. The picture is private to your account.",
+        "ru": "Выбор JPEG/PNG только подготавливает предпросмотр с обрезкой по центру. Проверьте его и нажмите «Сохранить фото». Сервер должен поддерживать фото профиля и быть доступен. При истечении ожидания сохраните предпросмотр и повторите то же сохранение либо перезагрузите фото, чтобы проверить фактический результат. Снимок доступен только вашему аккаунту."
+      },
+      "tutorialId": "account.profile-photo"
     }
   ]
 }

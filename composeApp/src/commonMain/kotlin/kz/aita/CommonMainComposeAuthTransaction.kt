@@ -306,30 +306,7 @@ internal fun AppConfiguration.AuthPreferencesChooser(
         }
     }
 
-    val themes = stateValues.globalAppConfiguration.themes.ifEmpty {
-        listOf(
-            AppThemeDataModel(
-                id = 0L,
-                name = listOf(
-                    LocalizedStringDataModel("main", "Light"),
-                    LocalizedStringDataModel("en", "Light"),
-                    LocalizedStringDataModel("ru", "Светлая"),
-                    LocalizedStringDataModel("kk", "Жарық"),
-                    LocalizedStringDataModel("ky", "Жарык")
-                )
-            ),
-            AppThemeDataModel(
-                id = 1L,
-                name = listOf(
-                    LocalizedStringDataModel("main", "Dark"),
-                    LocalizedStringDataModel("en", "Dark"),
-                    LocalizedStringDataModel("ru", "Темная"),
-                    LocalizedStringDataModel("kk", "Қараңғы"),
-                    LocalizedStringDataModel("ky", "Караңгы")
-                )
-            )
-        )
-    }.sortedBy { it.id }
+    val themes = availableAppThemes(stateValues.globalAppConfiguration.themes)
 
     val sizeModeChoices = listOf(
         0L to localizedStringResource(911, "Default"),
@@ -387,7 +364,7 @@ internal fun AppConfiguration.AuthPreferencesChooser(
             ) {
                 themes.forEach { theme ->
                     val selected = stateValues.appThemeId == theme.id
-                    val darkThemeChoice = theme.id == 1L
+                    val darkThemeChoice = isDarkAppTheme(theme.id)
                     AuthTinyChoiceChip(
                         selected = selected,
                         label = theme.name.visibleLocalizedString(stateValues.appLanguage, theme.id.toString()),
@@ -3014,7 +2991,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
     val draftCreatedAt = remember(stateValues.userAccount?.id, stateValues.activeStoreId, context.transactionTypeIndex, context.clientId) {
         getCurrentTimeMillis()
     }
-    val darkActionIcons = stateValues.appThemeId == 1L
+    val darkActionIcons = isDarkAppTheme(stateValues.appThemeId)
     val completeReceiptIconPath = if (darkActionIcons) "svg/125_1.svg" else "svg/125_0.svg"
     val completeReceiptIconRes = if (darkActionIcons) Res.drawable._125_1 else Res.drawable._125_0
 

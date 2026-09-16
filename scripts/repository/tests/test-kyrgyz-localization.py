@@ -106,7 +106,28 @@ class KyrgyzLocalizationContractsTest(unittest.TestCase):
         migrated = sum(f'eventMessage("{key}"' in comparison for key in (
             "market.comparison_window_empty_more", "market.comparison_window_scope", "market.comparison_review_stale"))
         self.assertEqual(migrated, 3)
-        self.assertGreaterEqual(count + migrated, 604)
+        # The new method dropdown replaces three deliberately removed inline switch labels.
+        # Guard the replacement itself as well as the remaining translations, rather than
+        # forcing obsolete visible UI text to remain just to satisfy a historical count.
+        security = (COMPOSE / "AccountAuthenticationSettings.kt").read_text(encoding="utf-8")
+        self.assertNotIn("AuthenticatorLoginRequirementToggle(", security)
+        self.assertIn("TwoFactorMethodDropdown(", security)
+        # The tabbed support reader removes two redundant welcome lines and the
+        # full-width Chats/Resolve controls. Its inline tab actions use six-language
+        # templates instead. Check those replacements before crediting removed calls.
+        support = (COMPOSE / "SupportMessengerScreen.kt").read_text(encoding="utf-8")
+        self.assertNotIn('authUiText("Choose a conversation"', support)
+        self.assertNotIn('authUiText("Messages stay together,', support)
+        self.assertNotIn('actionButton(text=authUiText("Chats"', support)
+        self.assertNotIn('else authUiText("Resolve"', support)
+        account_messages = (SHARED / "messages/AccountPresentationMessages.kt").read_text(encoding="utf-8")
+        templates = {kotlin_values(match)[0]: kotlin_values(match) for match in EVENT.finditer(account_messages)}
+        for action in ("close", "resolve"):
+            self.assertIn(f'"support.tabs.{action}"', support)
+            key = f"support.tabs.{action}"
+            self.assertIn(key, templates)
+            self.assertTrue(templates[key][-1].strip())
+        self.assertGreaterEqual(count + migrated + 3 + 4, 604)
         self.assertEqual(count, len(calls))
         for filename, (en, ru, kk, ky) in calls:
             self.assertTrue(ky.strip(), (filename, en))

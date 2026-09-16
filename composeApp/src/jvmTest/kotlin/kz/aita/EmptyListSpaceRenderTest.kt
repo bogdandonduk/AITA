@@ -64,4 +64,27 @@ class EmptyListSpaceRenderTest {
     @Test fun centersUnderScrollableHeader() = verifyCenter(400, 800, 120)
     @Test fun centersAtHighDensity() = verifyCenter(800, 1600, 120, density = 2f)
     @Test fun recentersAfterViewportResize() = verifyCenter(500, 900, 150, resizedHeight = 620)
+    @Test fun centersEmploymentResponseBelowBothTitleAndSubtitle() = onUiThread {
+        var bounds: Rect? = null
+        val scene = ImageComposeScene(440, 760, Density(1f)) {
+            val list = rememberLazyListState()
+            LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item("title") { Box(Modifier.fillMaxWidth().height(44.dp)) }
+                item("subtitle") { Box(Modifier.fillMaxWidth().height(30.dp)) }
+                item("responses") {
+                    Box(Modifier.fillMaxWidth().remainingListSpace(list, "responses"), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(24.dp).onGloballyPositioned { bounds = it.boundsInRoot() })
+                    }
+                }
+            }
+        }
+        try {
+            repeat(16) { scene.render(it * 16_000_000L).close() }
+            val result = assertNotNull(bounds)
+            assertEquals(220f, result.center.x, 1f)
+            // Two headers and two inter-item gaps occupy 94 px; padding balances at both ends.
+            assertEquals((760f + 94f) / 2f, result.center.y, 1.5f)
+        } finally { scene.close() }
+    }
 }
