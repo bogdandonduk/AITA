@@ -2979,6 +2979,12 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.drawableResIconMenu.value
         }
 
+        data object Tutorials: Menu("MenuTutorialsNavigationScreenModelRoute") {
+            override val iconPath get() = with(AppConfiguration) { tutorialIconPath() }
+            override val iconRes get() = with(AppConfiguration) { tutorialIconResource() }
+            override val name get() = with(AppConfiguration) { tutorialText("title") }
+        }
+
         data object ClientUpdate: Menu("MenuClientUpdateNavigationScreenModelRoute") {
             override val iconPath get() = with(AppConfiguration) { updateIconPath() }
             override val iconRes get() = with(AppConfiguration) { updateIconResource() }
@@ -3301,6 +3307,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.Main,
     NavigationScreenModel.Menu.List,
     NavigationScreenModel.Menu.UserAccount,
+    NavigationScreenModel.Menu.Tutorials,
     NavigationScreenModel.Menu.ClientUpdate,
     NavigationScreenModel.Menu.About,
     NavigationScreenModel.Menu.Notifications,
@@ -6274,6 +6281,7 @@ object Navigation {
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,
             NavigationScreenModel.Menu.AppScale,
+            NavigationScreenModel.Menu.Tutorials,
             NavigationScreenModel.Menu.ClientUpdate,
             NavigationScreenModel.Menu.About
         )

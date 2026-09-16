@@ -3,6 +3,7 @@
 package kz.aita.server
 
 import kz.aita.server.updates.installClientUpdateRoutes
+import kz.aita.server.help.installHelpRoutes
 
 import kz.aita.server.marketplace.marketplaceRoutes
 import kz.aita.server.marketplace.publishMarketplaceStockChange
@@ -1483,6 +1484,7 @@ private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
     appLanguage = this[Users.appLanguage],
     appThemeId = this[Users.appThemeId],
     appSizeModeId = this[Users.appSizeModeId],
+    appModeId = this[Users.appModeId],
     createdAt = this[Users.createdAt].toEpochMilli(),
     isActive = this[Users.isActive]
   )
@@ -1588,6 +1590,7 @@ object Users: Table("users") {
   val appLanguage = varchar("app_language", 16).default(DEFAULT_APP_LANGUAGE)
   val appThemeId = long("app_theme_id").default(DEFAULT_APP_THEME_ID)
   val appSizeModeId = long("app_size_mode_id").default(DEFAULT_APP_SIZE_MODE_ID)
+  val appModeId = integer("app_mode_id").nullable().default(DEFAULT_NEW_ACCOUNT_APP_MODE)
   val passwordHash = varchar("password_hash", 100) // BCrypt ~60 chars, give some headroom
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
   val isActive = bool("is_active").default(true)
@@ -18018,6 +18021,7 @@ fun Application.module() {
 
   routing {
         installClientUpdateRoutes(this@module.environment.config)
+        installHelpRoutes(this@module.environment.config)
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
         installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope, this@module)
@@ -18382,6 +18386,7 @@ fun Application.module() {
                   it[Users.appLanguage] = DEFAULT_APP_LANGUAGE
                   it[Users.appThemeId] = DEFAULT_APP_THEME_ID
                   it[Users.appSizeModeId] = DEFAULT_APP_SIZE_MODE_ID
+                  it[Users.appModeId] = DEFAULT_NEW_ACCOUNT_APP_MODE
                   it[Users.passwordHash] = hash
                   it[Users.createdAt] = instant
                   it[Users.isActive] = true
@@ -23311,6 +23316,21 @@ fun Application.module() {
             HttpStatusCode.OK,
             user
           )
+        }
+
+        // Separate from appearance/profile saves so an old client cannot erase a mode choice.
+        put("/app-mode") {
+          val uuid = call.checkPrincipal() ?: return@put
+          val body = call.receiveAita<UserAppModePreferenceDataModel>()
+          if (!isSelectableAppMode(body.appModeId)) {
+            call.respond(HttpStatusCode.BadRequest)
+            return@put
+          }
+          val found = newSuspendedTransaction(aitaServerIoContext) {
+            Users.update({ Users.id eq uuid }) { it[Users.appModeId] = body.appModeId } > 0
+          }
+          if (!found) return@put call.respondAitaUnauthorized()
+          call.genericResponse(HttpStatusCode.OK, UserAppModePreferenceResult(uuid.toString(), body.appModeId))
         }
 
         put("/preferences/update") {

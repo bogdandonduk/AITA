@@ -7037,7 +7037,7 @@ private fun normalizeAppModePreference(modeId: Int?): Int {
     }
 }
 
-val appModeState = MutableStateFlow(APP_MODE_STORE)
+val appModeState = MutableStateFlow(DEFAULT_NEW_ACCOUNT_APP_MODE)
 
 private val appInitializationStartedState = MutableStateFlow(false)
 
@@ -8491,16 +8491,7 @@ fun init() {
 
     GlobalScope.launch(Dispatchers.ourIo) { AppPreferences.hydrate() }
 
-    GlobalScope.launch {
-        observeLocalKv(KEY_APP_MODE)
-            .collect { stored ->
-                stored?.let { raw ->
-                    val normalized = normalizeAppModePreference(raw.toIntOrNull())
-                    appModeState.emit(normalized)
-                    if (raw != normalized.toString()) putLocalKv(KEY_APP_MODE, normalized.toString())
-                }
-            }
-    }
+    // Mode is restored with its account; a legacy device-global key is never a live command bus.
 
     GlobalScope.launch(Dispatchers.ourIo) { observeActiveInventoryData() }
 
@@ -8751,10 +8742,7 @@ fun setAppSizeMode(sizeModeId: Long, syncServer: Boolean = true) =
 
 fun setAppMode(modeId: Int) {
     val safeModeId = normalizeAppModePreference(modeId)
-    appModeState.value = safeModeId
-    GlobalScope.launch(Dispatchers.ourIo) {
-        putLocalKv(KEY_APP_MODE, safeModeId.toString())
-    }
+    AccountAppModes.select(safeModeId)
 }
 
 fun updateGlobalAppConfiguration(
@@ -13773,6 +13761,7 @@ private suspend fun loadCachedApplicationData() {
         getJsonCache<UserAccountDataModel>(CACHE_USER)?.let {
             userAccountState.emit(DataState.Success(it, cacheMessage()))
             ActiveStores.acceptAccount(it)
+            AccountAppModes.acceptAccount(it, authoritative = false)
         }
         getJsonCache<List<StoreDataModel>>(CACHE_STORES)?.let {
             storesState.emit(DataState.Success(it, cacheMessage()))
@@ -14499,6 +14488,7 @@ private fun launchCloudConnectionReconciliation(
                 syncLocalNetworkOperationsToCloudNow()
             }
             runCloudConnectionReconciliationStep("active_store") { ActiveStores.retryPending() }
+            runCloudConnectionReconciliationStep("app_mode") { AccountAppModes.retryPending() }
             runCloudConnectionReconciliationStep("entities") {
                 scheduleRealtimeRefresh(
                     reason = reason,
@@ -14674,7 +14664,7 @@ fun startCloudConnectionHealthMonitor() {
 
                     if (serverAvailable) {
                         unavailableRound = 0
-                        if (hasLocalAccount) ActiveStores.retryPending()
+                        if (hasLocalAccount) { ActiveStores.retryPending(); AccountAppModes.retryPending() }
                         // A network-change hint must survive a failed first probe. Refresh the old
                         // network's socket once, after AITA is reachable on the replacement network.
                         if (pendingNetworkRestart) {
@@ -17233,6 +17223,7 @@ internal suspend fun refreshUserAccountNow(
             if (authenticatedSessionGenerationIsCurrent(sessionGeneration) && userAccountState.payloadValue == null) {
                 userAccountState.emit(DataState.Success(this))
                 ActiveStores.acceptAccount(this, applyServerActiveStore)
+                AccountAppModes.acceptAccount(this, authoritative = false)
                 activeStoreIdState.value?.let { loadCachedInventory(it) }
             }
         }
@@ -17255,11 +17246,12 @@ internal suspend fun refreshUserAccountNow(
     }
 
     clearTransientOrNeutralInAppNotifications()
-    val account = ActiveStores.mergeAccount(payload)
+    val account = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(payload))
     userAccountState.emit(DataState.Success(account, response.message))
     ActiveStores.acceptAccount(payload, applyServerActiveStore)
+    AccountAppModes.acceptAccount(payload, authoritative = true)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
-    val currentAccount = ActiveStores.mergeAccount(account)
+    val currentAccount = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(account))
     setStoredUserAccountDataModel?.invoke(currentAccount)
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
@@ -22038,7 +22030,8 @@ data class UserAccountDataModel(
     val appThemeId: Long = DEFAULT_APP_THEME_ID,
     val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID,
     val createdAt: Long,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val appModeId: Int? = null
 )
 
 @kotlinx.serialization.Serializable

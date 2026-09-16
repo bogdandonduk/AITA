@@ -4834,6 +4834,7 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.AppMode -> {
                         MenuAppModeScreen()
                     }
+                    is NavigationScreenModel.Menu.Tutorials -> { TutorialsScreen() }
                     is NavigationScreenModel.Menu.ClientUpdate -> { ClientUpdatesScreen() }
                     is NavigationScreenModel.Menu.About -> { AboutScreen() }
                     is NavigationScreenModel.Menu.UserAccount -> {
@@ -4939,6 +4940,7 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppMode -> {
                             MenuAppModeScreen()
                         }
+                        is NavigationScreenModel.Menu.Tutorials -> { TutorialsScreen() }
                         is NavigationScreenModel.Menu.ClientUpdate -> { ClientUpdatesScreen() }
                         is NavigationScreenModel.Menu.About -> { AboutScreen() }
                         is NavigationScreenModel.Menu.UserAccount -> {
@@ -5039,6 +5041,7 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppMode -> {
                             MenuAppModeScreen()
                         }
+                        is NavigationScreenModel.Menu.Tutorials -> { TutorialsScreen() }
                         is NavigationScreenModel.Menu.ClientUpdate -> { ClientUpdatesScreen() }
                         is NavigationScreenModel.Menu.About -> { AboutScreen() }
                         is NavigationScreenModel.Menu.UserAccount -> {
@@ -5197,6 +5200,7 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.Finances,
         NavigationScreenModel.Menu.Security,
+        NavigationScreenModel.Menu.Tutorials,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
@@ -5211,6 +5215,7 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.Notifications,
         NavigationScreenModel.Menu.Finances,
         NavigationScreenModel.Menu.Security,
+        NavigationScreenModel.Menu.Tutorials,
         NavigationScreenModel.Menu.Support,
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,

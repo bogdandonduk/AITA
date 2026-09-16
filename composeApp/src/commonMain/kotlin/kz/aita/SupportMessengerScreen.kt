@@ -70,8 +70,8 @@ fun AppConfiguration.MenuSupportScreen() {
                     add(TabContent("chat",authUiText("Chats","Чаты","Чаттар", "Чаттар")) { selected=it })
                     if(canAgent) add(TabContent("agent",authUiText("Agent","Специалист","Маман", "Агент")) { selected=it })
                 },selectedIndexInitial=tab)
-            if(account==null) MessageText(text=authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз", "Колдоого кайрылуу үчүн кириңиз"))
-            else if(tab=="faq") SupportHelpPane(Modifier.weight(1f))
+            if(tab=="faq") SupportHelpPane(Modifier.weight(1f))
+            else if(account==null) MessageText(text=authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз", "Колдоого кайрылуу үчүн кириңиз"))
             else key(account,tab) {
                 SupportInboxPane(account,tab=="agent",employment?.capabilities.orEmpty(),Modifier.weight(1f))
             }
@@ -81,17 +81,8 @@ fun AppConfiguration.MenuSupportScreen() {
 
 @Composable
 private fun AppConfiguration.SupportHelpPane(modifier: Modifier) {
-    var search by remember { mutableStateOf("") }
-    val entries=supportFaqEntries().filter { entry -> search.isBlank() ||
-        localizedStringResource(entry.questionId,entry.questionFallback).contains(search,true) ||
-        localizedStringResource(entry.answerId,entry.answerFallback).contains(search,true) }
-    Column(modifier.widthIn(max=900.dp).fillMaxWidth()) {
-        SimpleTextInput(Modifier.fillMaxWidth(),search,localizedStringResource(816,"Search FAQ"),autoFocus=false,
-            leadingIconPath=stateValues.drawablePathIconSearch,onValueChange={ search=it })
-        LazyColumn(Modifier.fillMaxSize().padding(stateValues.marginTextField),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            items(entries,key={ it.questionId }) { SupportFaqCard(it) }
-        }
-    }
+    HelpBookPane(modifier, faq = true)
+
 }
 
 @Composable
