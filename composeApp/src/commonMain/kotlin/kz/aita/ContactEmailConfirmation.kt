@@ -174,7 +174,7 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            val theme = normalizeAppThemePreference(stateValues.appThemeId)
+            val theme = appDrawableThemeId(stateValues.appThemeId)
             CpImage(Modifier.size(36.dp), url = stateValues.drawables.orEmpty().extractPath(145L, theme) ?: "svg/145_${theme}.svg",
                 fallbackRes = if (theme == 1L) Res.drawable._145_1 else Res.drawable._145_0,
                 contentDescription = contactText("title"), tintColor = null)

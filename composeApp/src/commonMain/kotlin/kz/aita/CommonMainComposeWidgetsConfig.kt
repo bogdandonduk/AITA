@@ -5198,7 +5198,7 @@ object AppConfiguration {
 
 
             override suspend fun updateDrawableResources() {
-                val themeId = appThemeIdState.value
+                val themeId = appDrawableThemeId(appThemeIdState.value)
                 _drawableResAITALogo.emit(if (themeId == 1L) Res.drawable._0_1 else Res.drawable._0_0)
 
                 _drawableResIconPassword.emit(if (themeId == 1L) Res.drawable._1_1 else Res.drawable._1_0)
@@ -5741,7 +5741,7 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
 ) {
     Row(
         modifier = Modifier
-            .height(42.dp)
+            .heightIn(min = 52.dp)
             .fillMaxWidth()
             .aitaClickable(
                 interactionSource = remember {
@@ -5755,8 +5755,8 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        val themeIconPath = if (id == 1L) stateValues.drawablePathIconThemeDark else stateValues.drawablePathIconThemeLight
-        val themeIconRes = if (id == 1L) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value
+        val themeIconPath = if (isDarkAppTheme(id)) stateValues.drawablePathIconThemeDark else stateValues.drawablePathIconThemeLight
+        val themeIconRes = if (isDarkAppTheme(id)) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             CpImage(

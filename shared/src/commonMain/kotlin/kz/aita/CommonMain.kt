@@ -133,7 +133,7 @@ fun normalizeAppLanguagePreference(language: String?): String {
 }
 
 fun normalizeAppThemePreference(themeId: Long?): Long {
-    return if (themeId == 1L) 1L else DEFAULT_APP_THEME_ID
+    return themeId?.takeIf { it in SUPPORTED_APP_THEME_IDS } ?: DEFAULT_APP_THEME_ID
 }
 
 fun normalizeAppSizeModePreference(sizeModeId: Long?): Long {
@@ -7355,44 +7355,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                 "png/flag_kz.png"
             )
         ),
-        themes = listOf(
-            AppThemeDataModel(
-                0,
-                listOf(
-                    LocalizedStringDataModel(
-                        "en",
-                        "Light"
-                    ),
-                    LocalizedStringDataModel(
-                        "ru",
-                        "Светлая"
-                    ),
-                    LocalizedStringDataModel(
-                        "kk",
-                        "Жарық"
-                    ),
-                    LocalizedStringDataModel("ky", "Жарык")
-                )
-            ),
-            AppThemeDataModel(
-                1,
-                listOf(
-                    LocalizedStringDataModel(
-                        "en",
-                        "Dark"
-                    ),
-                    LocalizedStringDataModel(
-                        "ru",
-                        "Темная"
-                    ),
-                    LocalizedStringDataModel(
-                        "kk",
-                        "Қараңғы"
-                    ),
-                    LocalizedStringDataModel("ky", "Караңгы")
-                )
-            )
-        ),
+        themes = availableAppThemes(emptyList()),
         goodsItemsQuantityUnits = listOf(
             QuantityDataModel(
                 id = "0",
@@ -8302,24 +8265,24 @@ fun List<StylizedDimensionGroupDataModel>.extractValue(id: Long, sizeModeId: Lon
 }
 
 fun List<StylizedColorGroupDataModel>.extractColor(id: Long, themeId: Long): String? {
-    val normalizedThemeId = normalizeAppThemePreference(themeId)
+    val normalized = normalizeAppThemePreference(themeId)
     val values = find { it.id == id }?.values
-
-    return values?.firstOrNull { it.themeId == normalizedThemeId }?.valueHex
+    return values?.firstOrNull { it.themeId == normalized }?.valueHex
+        ?: tintedAppThemeColor(id, normalized)
         ?: values?.firstOrNull { it.themeId == -1L }?.valueHex
+        ?: values?.firstOrNull { it.themeId == appDrawableThemeId(normalized) }?.valueHex
         ?: values?.firstOrNull { it.themeId == DEFAULT_APP_THEME_ID }?.valueHex
         ?: values?.firstOrNull()?.valueHex
 }
 
 fun List<StylizedDrawablePathsGroupDataModel>.extractPath(id: Long, themeId: Long): String? {
-    val normalizedThemeId = normalizeAppThemePreference(themeId)
+    val variant = appDrawableThemeId(themeId)
     val values = find { it.id == id }?.values
-
-    return values?.firstOrNull { it.themeId == normalizedThemeId }?.path
+    return values?.firstOrNull { it.themeId == variant }?.path
         ?: values?.firstOrNull { it.themeId == -1L }?.path
         ?: values?.firstOrNull { it.themeId == DEFAULT_APP_THEME_ID }?.path
         ?: values?.firstOrNull()?.path
-        ?: if (id in 0L..200L) "svg/${id}_${normalizedThemeId}.svg" else null
+        ?: if (id in 0L..212L) "svg/${id}_${variant}.svg" else null
 }
 
 fun getFullDrawableRemoteResourceUrl(path: String): String {
@@ -9698,7 +9661,7 @@ suspend fun updateDrawables(
     withContext(Dispatchers.Default) {
         val themeId = appThemeIdState.value
         fun drawablePath(id: Long): String {
-            val normalizedThemeId = if (themeId == 1L) 1L else 0L
+            val normalizedThemeId = appDrawableThemeId(themeId)
             return drawables.extractPath(id, themeId)
                 ?: drawables.extractPath(id, normalizedThemeId)
                 ?: resourceDrawables.extractPath(id, themeId)
@@ -10983,6 +10946,7 @@ internal fun cloudEndpointRequiresAuthentication(endpointUrl: String): Boolean {
         endpoint.startsWith("auth/") -> false
         endpoint.startsWith("config/") -> false
         endpoint.startsWith("res/") -> false
+        endpoint in setOf("help/tutorials/store", "help/tutorials/buyer", "help/tutorials/supplier", "help/tutorials/manufacturer") -> false
         endpoint.startsWith(".well-known/") -> false
         endpoint == "healthz" || endpoint == "readyz" -> false
         else -> true
@@ -14057,6 +14021,8 @@ private fun realtimeUpdateRequiresBroadRefresh(entity: String, reason: String): 
         reason == "websocket_connected"
 
 private suspend fun refreshEverythingFromServerAfterRealtimeUpdate() {
+    PublicContentSignals.changed()
+    ProfilePhotoSignals.changed()
     AnalyticsWorkspace.refreshServerTotalsIfNeeded()
     lastRealtimeBroadRefreshAtMillis = getCurrentTimeMillis()
 
@@ -14216,6 +14182,14 @@ private suspend fun scheduleRealtimeRefresh(
     force: Boolean = false
 ) {
     val cleanEntity = cleanRealtimeEntity(entity)
+    if (cleanEntity == "users/profile-photo") {
+        ProfilePhotoSignals.changed()
+        return // Private invalidation already audience-filtered by the server socket.
+    }
+    if (cleanEntity == "help" || cleanEntity.startsWith("help/")) {
+        PublicContentSignals.changed()
+        return // No stock, finance or operation-log refresh is needed for a public handbook change.
+    }
     val cleanReason = cleanRealtimeReason(reason)
     val now = getCurrentTimeMillis()
     val generation = currentAuthenticatedSessionGeneration()

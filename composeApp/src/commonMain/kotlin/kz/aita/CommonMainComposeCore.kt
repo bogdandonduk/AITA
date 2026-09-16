@@ -448,33 +448,33 @@ internal fun platformAllowsAutomaticTextFieldFocus(): Boolean {
 
 @Composable
 internal fun AppConfiguration.stockBatchMovementIconPath(): String {
-    val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
+    val normalizedThemeId = appDrawableThemeId(stateValues.appThemeId)
     return stateValues.drawables.orEmpty().extractPath(59L, normalizedThemeId)
         ?: "svg/59_${normalizedThemeId}.svg"
 }
 
 internal fun AppConfiguration.stockBatchMovementIconFallback(): DrawableResource =
-    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._59_1 else Res.drawable._59_0
+    if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._59_1 else Res.drawable._59_0
 
 @Composable
 internal fun AppConfiguration.sortActionIconPath(): String {
-    val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
+    val normalizedThemeId = appDrawableThemeId(stateValues.appThemeId)
     return stateValues.drawables.orEmpty().extractPath(61L, normalizedThemeId)
         ?: "svg/61_${normalizedThemeId}.svg"
 }
 
 internal fun AppConfiguration.sortActionIconFallback(): DrawableResource =
-    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._61_1 else Res.drawable._61_0
+    if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._61_1 else Res.drawable._61_0
 
 @Composable
 internal fun AppConfiguration.nextPageIconPath(): String {
-    val normalizedThemeId = normalizeAppThemePreference(stateValues.appThemeId)
+    val normalizedThemeId = appDrawableThemeId(stateValues.appThemeId)
     return stateValues.drawables.orEmpty().extractPath(146L, normalizedThemeId)
         ?: "svg/146_${normalizedThemeId}.svg"
 }
 
 internal fun AppConfiguration.nextPageIconFallback(): DrawableResource =
-    if (normalizeAppThemePreference(stateValues.appThemeId) == 1L) Res.drawable._146_1 else Res.drawable._146_0
+    if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._146_1 else Res.drawable._146_0
 
 internal fun StateHost?.autoFocusScopeKey(): String = this?.toString() ?: "global"
 
