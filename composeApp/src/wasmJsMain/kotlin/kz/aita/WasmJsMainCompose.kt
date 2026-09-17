@@ -85,6 +85,7 @@ fun main() {
     MainScope().launch {
         try {
             initializeBrowserDatabase()
+            init()
             document.getElementById("aita-startup")?.remove()
             ComposeViewport(document.body!!) {
                 AppConfiguration({ MainScreen() })
