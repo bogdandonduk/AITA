@@ -310,7 +310,8 @@ internal fun AppConfiguration.AuthPreferencesChooser(
 
     val sizeModeChoices = listOf(
         0L to localizedStringResource(911, "Default"),
-        1L to localizedStringResource(912, "Big")
+        1L to localizedStringResource(912, "Big"),
+        2L to storePeopleText("large")
     )
 
     if (languages.isEmpty() && themes.isEmpty() && sizeModeChoices.isEmpty()) return

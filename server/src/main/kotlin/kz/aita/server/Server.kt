@@ -2,6 +2,7 @@
 
 package kz.aita.server
 
+import kz.aita.server.profile.installStorePeopleRoutes
 import kz.aita.server.profile.installProfilePhotoRoutes
 
 import kz.aita.server.updates.installClientUpdateRoutes
@@ -173,7 +174,8 @@ private fun ResultRow.toTransactionDataModel(): TransactionDataModel = Transacti
   cardPaymentOptionId = this[Transactions.cardPaymentOptionId],
   debtor = this[Transactions.debtor]?.let { raw -> jsonBase.decodeFromString<DebtorDataModel>(raw) },
   timeMillis = this[Transactions.timeMillis],
-  clientOperationId = this[Transactions.clientOperationId].orEmpty()
+  clientOperationId = this[Transactions.clientOperationId].orEmpty(),
+  actorUserId = this[Transactions.userId].toString()
 )
 
 object Debtors: Table("debtors") {
@@ -4079,7 +4081,7 @@ private fun realtimeAudienceAllowsInsideTransaction(userId: UUID, update: Realti
   if (userHasStoreAccessInsideTransaction(userId, storeId)) return true
   val entity = update.entity.lowercase()
   // Branch members consume the parent's common catalogue; they do not gain another branch's API access.
-  if (entity.substringBefore('/') in setOf("stock", "stockbatches", "all", "stores")) {
+  if (entity.substringBefore('/') in setOf("stock", "stockbatches", "all", "stores", "store-people")) {
     val root = activeRootStoreIdForAccessInsideTransaction(storeId)
     if (root == storeId && activeBranchStoreIdsAccessibleToUserInsideTransaction(userId, storeId).isNotEmpty()) return true
   }
@@ -18025,6 +18027,7 @@ fun Application.module() {
         installClientUpdateRoutes(this@module.environment.config)
         installHelpRoutes(this@module.environment.config)
         installProfilePhotoRoutes()
+        installStorePeopleRoutes()
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
         installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope, this@module)
@@ -25560,3 +25563,9 @@ fun Application.module() {
     }
   }
 }
+
+// Narrow same-transaction permission bridges for store profile projection.
+internal fun storePeopleRootInsideTransaction(store: UUID): UUID? = activeRootStoreIdForAccessInsideTransaction(store)
+internal fun storePeopleIsOwnerInsideTransaction(user: UUID, store: UUID): Boolean = isStoreOwnerInsideTransaction(user,store)
+internal fun storePeopleCanAnalyzeInsideTransaction(user: UUID, store: UUID): Boolean =
+    userHasStorePermissionInsideTransaction(user,store,STORE_PERMISSION_ANALYTICS_VIEW)

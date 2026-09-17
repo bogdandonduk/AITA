@@ -1841,6 +1841,10 @@ fun AppConfiguration.MenuAppScaleScreen() {
                     isActive = stateValues.appSizeModeId == 1L
                 )
             }
+            item {
+                AppSizeModeSettingsItemWidget(id = 2L, name = storePeopleText("large"),
+                    description = storePeopleText("large_help"), isActive = stateValues.appSizeModeId == 2L)
+            }
         }
     }
 }
@@ -4906,9 +4910,9 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(32.dp)
+            .heightIn(min = 32.dp)
             .background(backgroundColor)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -4919,14 +4923,14 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
             text = when (displayedStatusKey) {
                 "connected" -> localizedStringResource(1138, "Server connected.")
                 "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
-                "unavailable" -> localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
+                "unavailable" -> storePeopleText("offline")
                 else -> localizedStringResource(1139, "Checking server connection…")
             },
             color = stateValues.AccentTextColor,
             fontSize = stateValues.smallTextSize,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
 

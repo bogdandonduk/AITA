@@ -54,8 +54,8 @@ private suspend fun RoutingCall.photoError(problem:PhotoProblem) {
     genericResponseNoPayload(status,eventMessage("account.ui.photo.error.${problem.code}"))
 }
 internal fun Route.installProfilePhotoActions(repository:ProfilePhotoRepository,budget:ProfilePhotoBudget=ProfilePhotoBudget(),
-    onChanged:suspend (UUID)->Unit={}) {
-    route("/users/profile-photo") {
+    onChanged:suspend (UUID)->Unit={}, path:String="/users/profile-photo") {
+    route(path) {
         get {
             val owner=call.checkPrincipal() ?: return@get
             call.response.header(HttpHeaders.CacheControl,"private, no-store")
@@ -99,8 +99,17 @@ internal fun Route.installProfilePhotoActions(repository:ProfilePhotoRepository,
     }
 }
 fun Route.installProfilePhotoRoutes() {
-    val repository=DatabaseProfilePhotos()
-    authenticate("auth-jwt") {installProfilePhotoActions(repository,onChanged={owner ->
-        RealtimeServerBus.publish(entity="users/profile-photo",userId=owner.toString())
-    })}
+    val budget=ProfilePhotoBudget()
+    authenticate("auth-jwt") {
+        // Old clients retain their private legacy endpoint. Its bytes cannot expose a Store photo.
+        installProfilePhotoActions(DatabaseModeProfilePhotos(ProfilePhotoMode.MARKETPLACE),budget,onChanged={owner ->
+            RealtimeServerBus.publish(entity="users/profile-photo",userId=owner.toString())
+        })
+        ProfilePhotoMode.entries.forEach { mode ->
+            installProfilePhotoActions(DatabaseModeProfilePhotos(mode),budget,onChanged={owner ->
+                RealtimeServerBus.publish(entity="users/profile-photo",userId=owner.toString())
+                if(mode==ProfilePhotoMode.STORE)publishStorePersonChanged(owner)
+            },path="/users/mode-profile-photo/${mode.name.lowercase()}")
+        }
+    }
 }

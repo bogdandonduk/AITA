@@ -42,10 +42,12 @@ class AppearanceCatalog private constructor(
             }
             val primaryDimensions = firstById(dimensions) { it.id }
             val fallbackDimensions = firstById(bundledDimensions) { it.id }
-            val indexedDimensions = listOf(0L, 1L).associateWith { mode ->
+            val indexedDimensions = listOf(0L, 1L, 2L).associateWith { mode ->
                 (primaryDimensions.keys + fallbackDimensions.keys + (0L..13L)).mapNotNull { id ->
-                    (primaryDimensions[id]?.extractValue(id, mode) ?: fallbackDimensions[id]?.extractValue(id, mode)
-                        ?: emptyList<StylizedDimensionGroupDataModel>().extractValue(id, mode))?.let { id to it }
+                    // extractValue also has hard-coded defaults. Pick the first actual group before
+                    // asking it to derive Large, otherwise a missing live group would mask the bundle.
+                    val chosen = primaryDimensions[id] ?: fallbackDimensions[id].orEmpty()
+                    chosen.extractValue(id, mode)?.let { id to it }
                 }.toMap()
             }
             val primaryColors = firstById(colors) { it.id }

@@ -21,8 +21,8 @@ class ProfilePhotoEditorTest {
             return ResponseDataModel(null,if(malformed)photo.copy(accountId="other") else photo,conflict,if(conflict)409 else 200)
         }
     }
-    private fun scenario(block:suspend (Backend,PhotoEditor)->Unit)=runBlocking {
-        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined);val b=Backend();val e=PhotoEditor("owner",{b.current},scope,b)
+    private fun scenario(mode:ProfilePhotoMode?=null,block:suspend (Backend,PhotoEditor)->Unit)=runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined);val b=Backend();b.photo=b.photo.copy(mode=mode);val e=PhotoEditor("owner",{b.current},scope,b,mode)
         try{block(b,e)}finally{scope.cancel()}
     }
     @Test fun selectingAndPreviewingDoesNotPersistPicture()=scenario{b,e->
@@ -67,5 +67,20 @@ class ProfilePhotoEditorTest {
     @Test fun lateWriteFromPreviousSessionCannotUpdateUi()=scenario{b,e->
         e.load();e.select(ProfilePhotoPick(byteArrayOf(1)));b.gate=CompletableDeferred();e.save()
         b.current=false;b.gate!!.complete(Unit);yield();assertNull(e.state.value.notice)
+    }
+    @Test fun anotherModeCannotBeLoadedIntoStorePhotoEditor()=scenario(ProfilePhotoMode.STORE){b,e->
+        b.photo=b.photo.copy(mode=ProfilePhotoMode.SUPPLIER);e.load()
+        assertNull(e.state.value.saved);assertNotNull(e.state.value.error)
+    }
+    @Test fun anotherModesAcknowledgementNeverCompletesStoreSave()=scenario(ProfilePhotoMode.STORE){b,e->
+        e.load();e.select(ProfilePhotoPick(byteArrayOf(1)))
+        b.photo=b.photo.copy(mode=ProfilePhotoMode.MARKETPLACE);e.save()
+        assertEquals(ProfilePhotoMode.STORE,e.state.value.saved?.mode)
+        assertNotNull(e.state.value.preview);assertNull(e.state.value.notice)
+    }
+    @Test fun modeSwitchInvalidatesInFlightPreviewWithoutChangingAnotherMode()=scenario(ProfilePhotoMode.STORE){b,e->
+        e.load();b.gate=CompletableDeferred();e.select(ProfilePhotoPick(byteArrayOf(1)))
+        b.current=false;b.gate!!.complete(Unit);yield()
+        assertNull(e.state.value.preview);assertEquals(0,b.changes)
     }
 }

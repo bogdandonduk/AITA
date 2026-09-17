@@ -1356,6 +1356,7 @@ internal fun AppConfiguration.WorkerMembershipCard(
             .background(stateValues.BackgroundColor)
             .padding(stateValues.marginTextFieldGroup)
     ) {
+        StorePersonLink(workerStoreId,worker.userId,worker.displayName)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -3440,6 +3441,7 @@ internal fun AppConfiguration.TransactionHistoryCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        StorePersonLink(transaction.storeId,transaction.actorUserId)
     }
 }
 
@@ -4170,17 +4172,8 @@ internal fun AppConfiguration.OperationLogCard(log: OperationLogDataModel) {
                 fontSize = stateValues.smallTextSize
             )
         }
-        val actorName = log.actorDisplayName.ifBlank { log.actorPublicId.ifBlank { log.actorUserId } }
-        Text(
-            text = buildAnnotatedString {
-                append("${localizedStringResource(668, "By")}: ")
-                withStyle(SpanStyle(color = stateValues.TextColor, fontWeight = FontWeight.Bold)) {
-                    append(actorName)
-                }
-            },
-            color = stateValues.PlaceholderTextColor,
-            fontSize = stateValues.smallTextSize
-        )
+        StorePersonLink(log.storeId,log.actorUserId,
+            log.actorDisplayName.ifBlank {storePeopleText("view_profile")})
         Text(
             text = "${localizedStringResource(669, "Place")}: ${log.storeName.visibleLocalizedString(stateValues.appLanguage, log.storePublicId.ifBlank { log.storeId })}",
             color = stateValues.PlaceholderTextColor,

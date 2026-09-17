@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 3,
+  "revision": 4,
   "tutorials": [
     {
       "id": "account.register",
@@ -284,8 +284,7 @@
       "modes": [
         "STORE",
         "BUYER",
-        "SUPPLIER",
-        "MANUFACTURER"
+        "SUPPLIER"
       ],
       "category": "ACCOUNT",
       "title": {
@@ -293,15 +292,15 @@
         "ru": "Добавить, изменить или удалить фото профиля"
       },
       "introduction": {
-        "en": "The picture belongs to your personal account. It is not a store logo or a public marketplace product image.",
-        "ru": "Фото относится к вашему личному аккаунту. Это не логотип магазина и не публичное изображение товара."
+        "en": "Store, Marketplace and Supplier each have a separate account picture. Changing one does not replace the others.",
+        "ru": "В режимах «Магазин», «Маркетплейс» и «Поставщик» используются отдельные фото аккаунта. Изменение одного не заменяет остальные."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → User account and find Profile picture. Wait for the saved picture or empty profile to load, then tap Choose picture or Change picture.",
-            "ru": "Откройте Меню → Аккаунт и найдите блок «Фото профиля». Дождитесь загрузки сохранённого фото или пустого профиля и нажмите «Выбрать фото» либо «Изменить фото»."
+            "en": "Select the intended app mode, then open Menu → User account → Profile picture. In Store mode this is your work picture, visible to authorized colleagues. Choose or change a picture.",
+            "ru": "Выберите нужный режим, затем откройте Меню → Аккаунт → Фото профиля. В режиме «Магазин» это рабочее фото, видимое коллегам с доступом. Выберите или измените фото."
           },
           "screenshots": []
         },
@@ -331,8 +330,8 @@
         }
       ],
       "caution": {
-        "en": "Only you can read this picture through the current account-photo service. AITA stores a normalized small JPEG, not your original file or its metadata. A timeout is not proof that a save failed: reload and check before changing it again.",
-        "ru": "Текущий сервис фото аккаунта выдаёт снимок только владельцу. AITA хранит уменьшенный JPEG, а не исходный файл и его метаданные. Истечение ожидания не доказывает, что сохранение не произошло: перезагрузите фото и проверьте результат перед новым изменением."
+        "en": "Store pictures can be viewed by authorized users sharing a store; detailed employee statistics require self or manager access. Marketplace and Supplier pictures remain separate. Previously private photos are preserved in Marketplace, not silently made visible to colleagues. A timeout is not proof of a failed save: reload and check before changing it again.",
+        "ru": "Рабочее фото могут видеть пользователи с доступом к общему магазину; подробная статистика доступна самому сотруднику и уполномоченным руководителям. Фото «Маркетплейса» и «Поставщика» остаются отдельными. Ранее личные фото сохраняются в «Маркетплейсе», а не становятся автоматически видны коллегам. Истечение ожидания не доказывает, что сохранение не произошло: сначала перезагрузите фото и проверьте результат."
       }
     },
     {
@@ -699,8 +698,8 @@
         {
           "id": "step-3",
           "text": {
-            "en": "Open Scale and select a size that keeps text and action buttons comfortable on this device.",
-            "ru": "В разделе масштаба выберите размер, при котором текст и кнопки удобны на устройстве."
+            "en": "Open Scale and choose Default, Big or Large. Large makes text moderately larger than Big without inflating every icon and gap. Your selection is saved with the account preferences.",
+            "ru": "Откройте «Масштаб» и выберите обычный, большой или крупный. Крупный режим умеренно увеличивает текст относительно большого, не раздувая все значки и отступы. Выбор сохраняется в настройках аккаунта."
           },
           "screenshots": []
         },
@@ -5139,6 +5138,59 @@
         }
       ],
       "caution": {}
+    },
+    {
+      "id": "team.employee-profile",
+      "modes": [
+        "STORE"
+      ],
+      "category": "TEAM",
+      "title": {
+        "en": "Open a colleague’s profile and activity",
+        "ru": "Открыть профиль и активность коллеги"
+      },
+      "introduction": {
+        "en": "A work identity and recorded activity within a shared store.",
+        "ru": "Рабочий профиль и записанная активность в общем магазине."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "In Store mode, open Workers and tap a person’s name. You can also open an employee profile from an operation-log actor or the profile action on a transaction-history card.",
+            "ru": "В режиме «Магазин» откройте «Сотрудники» и нажмите на имя. Профиль также открывается по автору записи в журнале операций или кнопке профиля в истории транзакций."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Check the store shown in the profile header, picture, role, job title and joining date where recorded. This is a store-scoped view, not a directory of all AITA users.",
+            "ru": "Проверьте магазин в заголовке, фото, роль, должность и дату начала работы, если они записаны. Это профиль в конкретном магазине, а не каталог всех пользователей AITA."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "When statistics are available, choose 7, 30 or 90 days. Review transaction counts, activity days, recorded actions and the horizontally scrolling daily chart.",
+            "ru": "Если статистика доступна, выберите 7, 30 или 90 дней. Просмотрите число транзакций, дней с операциями, записанных действий и прокручиваемый дневной график."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Read monetary totals separately for each currency. These are item totals, not collected cash or profit. Returns belong to the period in which they were recorded. Close the profile to return to your list.",
+            "ru": "Смотрите денежные суммы отдельно для каждой валюты. Это суммы товаров, а не полученные деньги или прибыль. Возвраты относятся к периоду их записи. Закройте профиль, чтобы вернуться к списку."
+          },
+          "screenshots": []
+        }
+      ],
+      "caution": {
+        "en": "Colleagues see basic identity and the Store picture. Detailed activity is for the employee and authorized managers. Unrelated stores, login contacts, security settings and salaries are not exposed.",
+        "ru": "Коллеги видят основные данные и рабочее фото. Подробная активность доступна сотруднику и уполномоченным руководителям. Данные других магазинов, контакты для входа, настройки безопасности и зарплаты не раскрываются."
+      }
     }
   ],
   "faqs": [
@@ -6882,8 +6934,7 @@
       "modes": [
         "STORE",
         "BUYER",
-        "SUPPLIER",
-        "MANUFACTURER"
+        "SUPPLIER"
       ],
       "category": "ACCOUNT",
       "question": {
@@ -6891,8 +6942,8 @@
         "ru": "Почему выбор фото профиля не сохранил его?"
       },
       "answer": {
-        "en": "Choosing a JPEG/PNG only prepares a centre-cropped preview. Check it and tap Save picture. The server must support profile pictures and be reachable. If saving times out, keep the preview and retry the same save, or reload to check the actual stored result. The picture is private to your account.",
-        "ru": "Выбор JPEG/PNG только подготавливает предпросмотр с обрезкой по центру. Проверьте его и нажмите «Сохранить фото». Сервер должен поддерживать фото профиля и быть доступен. При истечении ожидания сохраните предпросмотр и повторите то же сохранение либо перезагрузите фото, чтобы проверить фактический результат. Снимок доступен только вашему аккаунту."
+        "en": "Choosing a JPEG/PNG prepares a preview only. Review it and tap Save picture. Each app mode has a separate picture; the Store picture is shared only with authorized store colleagues. A connection to the updated server is needed. After a timeout, retry the same save or reload to check the stored result.",
+        "ru": "Выбор JPEG/PNG только готовит предпросмотр. Проверьте его и нажмите «Сохранить фото». У каждого режима отдельное фото; рабочее фото видно только коллегам с доступом к магазину. Нужно подключение к обновлённому серверу. После тайм-аута повторите то же сохранение либо перезагрузите фото для проверки результата."
       },
       "tutorialId": "account.profile-photo"
     }

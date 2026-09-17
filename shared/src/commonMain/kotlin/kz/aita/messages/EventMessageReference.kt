@@ -53,7 +53,7 @@ internal fun eventMessageLanguage(language: String): String =
 /** Shared by server writes, API compatibility rendering, offline caches, popups and history. */
 object EventMessages {
     internal val templates: Map<String, EventMessageTemplate> by lazy {
-        (coreEventMessageTemplates() + applicationEventMessageTemplates() + authenticationEventMessageTemplates() + subscriptionEventMessageTemplates() + companySupportMessageTemplates() + marketplaceEventMessageTemplates() + contactVerificationMessageTemplates() + inventoryContinuityMessageTemplates() + marketplaceProductMessageTemplates() + clientUpdateMessageTemplates() + tutorialMessageTemplates() + accountPresentationMessageTemplates()).also { definitions ->
+        (coreEventMessageTemplates() + applicationEventMessageTemplates() + authenticationEventMessageTemplates() + subscriptionEventMessageTemplates() + companySupportMessageTemplates() + marketplaceEventMessageTemplates() + contactVerificationMessageTemplates() + inventoryContinuityMessageTemplates() + marketplaceProductMessageTemplates() + clientUpdateMessageTemplates() + tutorialMessageTemplates() + accountPresentationMessageTemplates() + storePeopleMessageTemplates()).also { definitions ->
             check(definitions.map { it.key }.toSet().size == definitions.size) { "Duplicate event message key" }
             definitions.forEach { definition ->
                 val keys = placeholders(definition.en)

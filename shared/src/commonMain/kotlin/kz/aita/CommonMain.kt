@@ -126,6 +126,7 @@ const val DEFAULT_APP_LANGUAGE = "ru"
 val SUPPORTED_APP_LANGUAGES: List<String> = listOf("en", "ru", "kk", "tg", "ky", "uz")
 const val DEFAULT_APP_THEME_ID = 0L
 const val DEFAULT_APP_SIZE_MODE_ID = 0L
+const val LARGE_TEXT_SCALE_OVER_BIG = 1.125f
 
 fun normalizeAppLanguagePreference(language: String?): String {
     val value = canonicalLanguageCode(language)
@@ -137,7 +138,7 @@ fun normalizeAppThemePreference(themeId: Long?): Long {
 }
 
 fun normalizeAppSizeModePreference(sizeModeId: Long?): Long {
-    return if (sizeModeId == 1L) 1L else DEFAULT_APP_SIZE_MODE_ID
+    return sizeModeId?.takeIf { it in 0L..2L } ?: DEFAULT_APP_SIZE_MODE_ID
 }
 
 @kotlinx.serialization.Serializable
@@ -8242,6 +8243,13 @@ fun List<LocalizedStringGroupDataModel>?.extractString(id: Long, language: Strin
 fun List<StylizedDimensionGroupDataModel>.extractValue(id: Long, sizeModeId: Long): Float? {
     val normalizedSizeModeId = normalizeAppSizeModePreference(sizeModeId)
     val values = find { it.id == id }?.values
+    // Large is text-first: inherit Big geometry, increasing only typography by a measured step.
+    // This works even when an older server catalogue has not learned about mode 2 yet.
+    if (normalizedSizeModeId == 2L) {
+        values?.firstOrNull { it.sizeModeId == 2L }?.value?.let { return it }
+        val big = extractValue(id, 1L) ?: return null
+        return if (id in 0L..3L) big * LARGE_TEXT_SCALE_OVER_BIG else big
+    }
 
     return values?.firstOrNull { it.sizeModeId == normalizedSizeModeId }?.value
         ?: values?.firstOrNull { it.sizeModeId == -1L }?.value
@@ -14182,6 +14190,7 @@ private suspend fun scheduleRealtimeRefresh(
     force: Boolean = false
 ) {
     val cleanEntity = cleanRealtimeEntity(entity)
+    if (cleanEntity == "store-people" || cleanEntity?.substringBefore('/') in setOf("transactions", "logs", "workers", "workshifts", "stores", "user")) StorePeopleSignals.changed()
     if (cleanEntity == "users/profile-photo") {
         ProfilePhotoSignals.changed()
         return // Private invalidation already audience-filtered by the server socket.
@@ -21404,7 +21413,8 @@ data class TransactionDataModel(
     val cardPaymentOptionId: Int,
     val debtor: DebtorDataModel? = null,
     val timeMillis: Long,
-    val clientOperationId: String = ""
+    val clientOperationId: String = "",
+    val actorUserId: String? = null
 )
 
 private data class MutableAnalyticsReturnReasonAccumulator(

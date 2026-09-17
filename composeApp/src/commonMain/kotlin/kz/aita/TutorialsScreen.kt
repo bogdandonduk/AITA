@@ -80,8 +80,6 @@ private data class HelpSearchResult(val tutorials:List<HelpTutorial> = emptyList
         }
         val selected=book?.tutorials?.firstOrNull { it.id==fromFaq && mode in it.modes }
         Column(modifier.widthIn(max=940.dp).fillMaxWidth()) {
-            if(state.remoteUnavailable) Text(tutorialText("offline"),modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp),
-                color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
             if(selected!=null) {
                 actionButton(modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp),text=tutorialText("back_faq"),
                     autoLoading=false,confirmationRequired=false,onClick={fromFaq=null})
@@ -89,7 +87,7 @@ private data class HelpSearchResult(val tutorials:List<HelpTutorial> = emptyList
                     item(selected.id) { TutorialCard(selected,initiallyExpanded=true) }
                 }
             } else {
-                SimpleTextInput(Modifier.fillMaxWidth().padding(horizontal=8.dp),search,tutorialText(if(faq) "faq_search" else "search"),
+                SimpleTextInput(Modifier.fillMaxWidth().padding(horizontal=8.dp).padding(top=stateValues.marginTextField),search,tutorialText(if(faq) "faq_search" else "search"),
                     autoFocus=false,leadingIconPath=stateValues.drawablePathIconSearch,onValueChange={search=it.take(200)})
                 if(!faq && categories.size>1) tabRowWidget(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=4.dp),
                     tabs=listOf(TabContent("all",tutorialText("all"),AitaTabIcon.All){selectedCategory=null})+categories.map { cat ->

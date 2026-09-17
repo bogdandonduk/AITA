@@ -213,7 +213,7 @@ class ContactEmailConfirmationContracts(unittest.TestCase):
         for variant in (0, 1):
             name = f'145_{variant}'
             svg = ROOT / f'composeApp/src/commonMain/composeResources/drawable/{name}.svg'
-            matches = list(ROOT.glob(f'server/**/{name}.svg'))
+            matches = list(ROOT.glob(f'server/assets/**/{name}.svg'))
             self.assertEqual(1, len(matches))
             self.assertEqual(svg.read_bytes(), matches[0].read_bytes())
             ET.parse(svg)

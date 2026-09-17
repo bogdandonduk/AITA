@@ -4958,7 +4958,7 @@ internal fun AppConfiguration.SupplierPickerBottomSheet(
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
             actionButton(
-                text = localizedStringResource(635, "Add supplier here"),
+                text = storePeopleText("add_supplier"),
                 iconPath = stateValues.drawablePathIconAdd,
                 confirmationRequired = false,
                 onClick = { addMode = true }

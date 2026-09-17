@@ -4745,8 +4745,8 @@ object AppConfiguration {
             override val textFieldHeight: Dp get() = (textSize.value * textFieldHeightMultiplierRelativeToTextSize).dp
             override val wideTextFieldHeight: Dp get() = (textSize.value * 4f * textFieldHeightMultiplierRelativeToTextSize).dp
             override val textFieldIconPadding: Dp get() = appearanceResources.catalog.dimension(11L, appSizeModeId, 9f).dp
-            override val marginTextField: Dp get() = appearanceResources.catalog.dimension(12L, appSizeModeId, if (appSizeModeId == 1L) 10f else 8f).dp
-            override val marginTextFieldGroup: Dp get() = appearanceResources.catalog.dimension(13L, appSizeModeId, if (appSizeModeId == 1L) 28f else 24f).dp
+            override val marginTextField: Dp get() = appearanceResources.catalog.dimension(12L, appSizeModeId, if (appSizeModeId >= 1L) 10f else 8f).dp
+            override val marginTextFieldGroup: Dp get() = appearanceResources.catalog.dimension(13L, appSizeModeId, if (appSizeModeId >= 1L) 28f else 24f).dp
 
             override val AccentColor: Color get() = appearanceResources.color(0, appThemeId)
             override val BackgroundColor: Color get() = appearanceResources.color(1, appThemeId)
@@ -5758,7 +5758,7 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
         val themeIconPath = if (isDarkAppTheme(id)) stateValues.drawablePathIconThemeDark else stateValues.drawablePathIconThemeLight
         val themeIconRes = if (isDarkAppTheme(id)) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             CpImage(
                 modifier = Modifier
                     .padding(start = 12.dp, end = 4.dp)
@@ -5783,21 +5783,17 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
         }
 
         if (isActive) {
-            Row {
+            ThemeSelectionMark { markModifier ->
                 val drawableResIconCheck by stateValues.drawableResIconCheck.collectAsState()
 
                 CpImage(
-                    modifier = Modifier
-                        .padding(stateValues.textFieldIconPadding)
-                        .fillMaxHeight()
-                        .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                    modifier = markModifier,
                     url = stateValues.drawablePathIconCheck,
                     fallbackRes = drawableResIconCheck,
                     contentDescription = name,
                     tintColor = stateValues.AccentColor
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
             }
         }
 

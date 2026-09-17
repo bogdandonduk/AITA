@@ -127,11 +127,15 @@ class InventoryContinuityContracts(unittest.TestCase):
         self.assertNotIn('callbacks.onDetectedLanguage(texts.primaryLanguageTag)', text)
         self.assertIn('finishActiveSession = null', text)
 
-    def test_no_cache_screen_has_explicit_status_and_parent_sized_actions(self):
+    def test_offline_feedback_uses_top_banner_without_discarding_data_errors(self):
         text = (UI / 'InventoryLoadingUi.kt').read_text()
-        for term in ('inventory.no_offline_copy', 'InventoryLoadSource.None', 'Modifier.widthIn(max = 720.dp)',
-                     'diagnoseAitaConnection()', 'Modifier.fillMaxWidth()', 'InventoryFeedbackKind.SavedOffline'):
+        for term in ('InventoryLoadSource.None', 'InventoryFeedbackKind.SavedOffline',
+                     'InventoryFeedbackKind.NoCacheOffline', 'InventoryFeedbackKind.Denied',
+                     'InventoryFeedbackKind.CacheWriteFailure', 'LoadingSkeleton'):
             self.assertIn(term, text)
+        self.assertNotIn('actionButton(', text)
+        self.assertNotIn('diagnoseAitaConnection()', text)
+        self.assertNotIn('connection.probe_codes', text)
 
     def test_diagnostics_are_read_only_and_do_not_bypass_certificates(self):
         text = (SHARED / 'ConnectionDiagnostics.kt').read_text()

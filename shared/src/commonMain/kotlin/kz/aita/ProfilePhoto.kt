@@ -13,7 +13,8 @@ const val PROFILE_PHOTO_MAX_OUTPUT_BYTES = 512 * 1024
 const val PROFILE_PHOTO_EDGE = 512
 
 @Serializable data class ProfilePhotoSnapshot(
-    val accountId: String, val revision: Long = 0, val jpegBase64: String? = null, val updatedAtMillis: Long = 0
+    val accountId: String, val revision: Long = 0, val jpegBase64: String? = null, val updatedAtMillis: Long = 0,
+    val mode: ProfilePhotoMode? = null
 )
 @Serializable data class ProfilePhotoPreview(val jpegBase64: String)
 @Serializable data class ProfilePhotoChange(val expectedRevision: Long, val jpegBase64: String? = null)
@@ -24,21 +25,22 @@ fun profilePhotoJpegBytes(value: String?): ByteArray? {
         it.size in 4..PROFILE_PHOTO_MAX_OUTPUT_BYTES && profilePhotoHasBoundedFrame(it)
     }
 }
-fun validProfilePhotoSnapshot(value: ProfilePhotoSnapshot, owner: String): Boolean =
+fun validProfilePhotoSnapshot(value: ProfilePhotoSnapshot, owner: String, mode: ProfilePhotoMode? = null): Boolean =
+    (mode == null || value.mode == mode) &&
     value.accountId == owner && value.revision >= 0 && value.updatedAtMillis >= 0 &&
         (if (value.revision == 0L) value.jpegBase64 == null && value.updatedAtMillis == 0L
         else value.updatedAtMillis > 0L && (value.jpegBase64 == null || profilePhotoJpegBytes(value.jpegBase64) != null))
 
 object ProfilePhotoClient {
-    suspend fun load(generation: Long) = networkRequest<ProfilePhotoSnapshot, Unit>(HttpMethod.Get,
-        endpointUrl = "users/profile-photo", expectedSessionGeneration = generation)
-    suspend fun preview(bytes: ByteArray, generation: Long): ResponseDataModel<ProfilePhotoPreview> {
+    suspend fun load(generation: Long, mode: ProfilePhotoMode? = null) = networkRequest<ProfilePhotoSnapshot, Unit>(HttpMethod.Get,
+        endpointUrl = mode?.let { "users/mode-profile-photo/${it.name.lowercase()}" } ?: "users/profile-photo", expectedSessionGeneration = generation)
+    suspend fun preview(bytes: ByteArray, generation: Long, mode: ProfilePhotoMode? = null): ResponseDataModel<ProfilePhotoPreview> {
         require(bytes.size in 1..PROFILE_PHOTO_MAX_INPUT_BYTES)
-        return networkRequest(HttpMethod.Post, endpointUrl = "users/profile-photo/preview", body = bytes,
+        return networkRequest(HttpMethod.Post, endpointUrl = mode?.let { "users/mode-profile-photo/${it.name.lowercase()}/preview" } ?: "users/profile-photo/preview", body = bytes,
             contentType = ContentType.Application.OctetStream, expectedSessionGeneration = generation)
     }
-    suspend fun save(change: ProfilePhotoChange, generation: Long) = networkRequest<ProfilePhotoSnapshot, ProfilePhotoChange>(
-        HttpMethod.Put, endpointUrl = "users/profile-photo", body = change, expectedSessionGeneration = generation)
+    suspend fun save(change: ProfilePhotoChange, generation: Long, mode: ProfilePhotoMode? = null) = networkRequest<ProfilePhotoSnapshot, ProfilePhotoChange>(
+        HttpMethod.Put, endpointUrl = mode?.let { "users/mode-profile-photo/${it.name.lowercase()}" } ?: "users/profile-photo", body = change, expectedSessionGeneration = generation)
 }
 
 /** Read dimensions before passing downloaded bytes to a platform decoder. Only normalized JPEG frames are used. */
@@ -64,8 +66,8 @@ private fun profilePhotoHasBoundedFrame(bytes: ByteArray): Boolean {
     return false
 }
 
-fun profilePhotoAcknowledges(change: ProfilePhotoChange, result: ProfilePhotoSnapshot, owner: String): Boolean =
-    validProfilePhotoSnapshot(result, owner) && result.revision >= change.expectedRevision &&
+fun profilePhotoAcknowledges(change: ProfilePhotoChange, result: ProfilePhotoSnapshot, owner: String, mode: ProfilePhotoMode? = null): Boolean =
+    validProfilePhotoSnapshot(result, owner, mode) && result.revision >= change.expectedRevision &&
         result.revision - change.expectedRevision <= 1 &&
         ((change.jpegBase64 == null) == (result.jpegBase64 == null))
 
@@ -77,3 +79,12 @@ object ProfilePhotoSignals {
 }
 fun shouldRefreshProfilePhoto(signal:Long,observed:Long,hasPreview:Boolean,busy:Boolean):Boolean =
     signal!=observed && !hasPreview && !busy
+
+/** Explicit scopes: switching workspaces never copies a picture across their audiences. */
+@Serializable enum class ProfilePhotoMode { STORE, SUPPLIER, MARKETPLACE }
+fun profilePhotoModeForApp(mode: Int): ProfilePhotoMode? = when(mode) {
+    APP_MODE_STORE -> ProfilePhotoMode.STORE
+    APP_MODE_SUPPLIER -> ProfilePhotoMode.SUPPLIER
+    APP_MODE_BUYER -> ProfilePhotoMode.MARKETPLACE
+    else -> null
+}

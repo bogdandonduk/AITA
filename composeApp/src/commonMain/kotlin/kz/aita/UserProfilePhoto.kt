@@ -33,7 +33,7 @@ internal interface PhotoEditorBackend {
 }
 /** Screen-owned operations; every acknowledgement belongs to the exact account/session that opened it. */
 internal class PhotoEditor(private val owner:String,private val current:()->Boolean,
-    private val scope:CoroutineScope,private val backend:PhotoEditorBackend) {
+    private val scope:CoroutineScope,private val backend:PhotoEditorBackend,private val mode:ProfilePhotoMode?=null) {
     private val mutable=MutableStateFlow(PhotoEditorState())
     val state=mutable.asStateFlow()
     private fun error(response:ResponseDataModel<*>)=when(response.httpStatusCode) {
@@ -53,7 +53,7 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
     fun load()=run {
         val response=backend.load(); if(!current())return@run
         val photo=response.payload
-        mutable.value=if(!response.negative && photo!=null && validProfilePhotoSnapshot(photo,owner))
+        mutable.value=if(!response.negative && photo!=null && validProfilePhotoSnapshot(photo,owner,mode))
             mutable.value.copy(saved=photo,preview=null) else mutable.value.copy(error=error(response))
     }
     fun select(pick:ProfilePhotoPick) {
@@ -77,8 +77,8 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
         run {
             val response=backend.change(request);if(!current())return@run
             val result=response.payload
-            if(result!=null && validProfilePhotoSnapshot(result,owner) && result.revision>=saved.revision &&
-                (if(response.negative) response.httpStatusCode==409 else profilePhotoAcknowledges(request,result,owner))) {
+            if(result!=null && validProfilePhotoSnapshot(result,owner,mode) && result.revision>=saved.revision &&
+                (if(response.negative) response.httpStatusCode==409 else profilePhotoAcknowledges(request,result,owner,mode))) {
                 // A conflict must be reviewed afresh; never turn its new revision into an automatic overwrite.
                 mutable.value=mutable.value.copy(saved=result,preview=null,
                     error=if(response.negative)"conflict" else null,notice=if(response.negative)null else if(remove)"removed" else "saved")
@@ -90,15 +90,16 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
 @Composable internal fun AppConfiguration.UserProfilePhotoCard() {
     val owner=stateValues.userAccount?.id ?: return
     val generation=currentAuthenticatedSessionGeneration()
-    key(owner,generation) {
+    val mode=profilePhotoModeForApp(stateValues.appModeId) ?: return
+    key(owner,generation,mode) {
         val scope=rememberCoroutineScope()
         val editor=remember {PhotoEditor(owner,{
-            authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id==owner
+            authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id==owner && profilePhotoModeForApp(appModeState.value)==mode
         },scope,object:PhotoEditorBackend {
-            override suspend fun load()=ProfilePhotoClient.load(generation)
-            override suspend fun preview(bytes:ByteArray)=ProfilePhotoClient.preview(bytes,generation)
-            override suspend fun change(value:ProfilePhotoChange)=ProfilePhotoClient.save(value,generation)
-        })}
+            override suspend fun load()=ProfilePhotoClient.load(generation,mode)
+            override suspend fun preview(bytes:ByteArray)=ProfilePhotoClient.preview(bytes,generation,mode)
+            override suspend fun change(value:ProfilePhotoChange)=ProfilePhotoClient.save(value,generation,mode)
+        }, mode)}
         val state by editor.state.collectAsState()
         val photoRevision by ProfilePhotoSignals.revision.collectAsState()
         var observedPhotoRevision by remember {mutableStateOf(photoRevision)}
@@ -129,10 +130,10 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
                     contentDescription=accountPresentationText("photo.title"),tintColor=stateValues.PlaceholderTextColor)
                 if(state.busy)CircularProgressIndicator(Modifier.size(100.dp),color=stateValues.AccentColor)
             }
-            Text(accountPresentationText(if(state.preview!=null)"photo.preview" else "photo.help"),
-                color=if(state.preview!=null)stateValues.AccentColor else stateValues.PlaceholderTextColor,
-                fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth())
-            Text(accountPresentationText("photo.private"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
+            if(state.preview!=null) Text(storePeopleText("photo_unsaved"),color=stateValues.AccentColor,
+                fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
+            Text(storePeopleText(if(mode==ProfilePhotoMode.STORE)"photo_store_visibility" else "photo_separate"),
+                color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
             state.error?.let {code->Text(accountPresentationText("photo.error.${code.takeIf {it in setOf("size","format","conflict","busy","unavailable")} ?: "network"}"),
                 color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)}
             state.notice?.let {Text(accountPresentationText("photo.$it"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)}
