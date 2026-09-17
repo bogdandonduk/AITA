@@ -339,6 +339,7 @@ private fun AppConfiguration.IosBarcodeCameraScannerPane(
 }
 
 fun MainViewController(): UIViewController {
+    installIosRuntimeDiagnostics()
     installIosCommonPlatformBridges()
     installIosComposePlatformBridges()
     installIosVoiceInput()

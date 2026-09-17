@@ -2022,62 +2022,9 @@ private fun transactionKey(transactionTypeIndex: Int, clientId: Int): String {
     return "$transactionTypeIndex:$clientId"
 }
 
+private const val MAX_RETURN_REASON_LENGTH = 500
 const val SALE_METHOD_RETAIL = "retail"
 const val SALE_METHOD_WHOLESALE = "wholesale"
-
-val cartSaleMethodIdsState = MutableStateFlow<Map<String, String>>(emptyMap())
-
-fun getCartSaleMethodId(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String {
-    return cartSaleMethodIdsState.value["${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"]
-        ?: SALE_METHOD_RETAIL
-}
-
-fun setCartSaleMethodId(
-    transactionTypeIndex: Int,
-    clientId: Int,
-    goodsItemId: String,
-    saleMethodId: String
-) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val normalizedSaleMethodId = if (saleMethodId == SALE_METHOD_WHOLESALE) {
-            SALE_METHOD_WHOLESALE
-        } else {
-            SALE_METHOD_RETAIL
-        }
-
-        val updated = cartSaleMethodIdsState.value.toMutableMap().apply {
-            val key = "${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"
-            if (normalizedSaleMethodId == SALE_METHOD_RETAIL) {
-                remove(key)
-            } else {
-                this[key] = normalizedSaleMethodId
-            }
-        }
-
-        cartSaleMethodIdsState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-private fun removeCartSaleMethodId(transactionTypeIndex: Int, clientId: Int, goodsItemId: String) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = cartSaleMethodIdsState.value.toMutableMap().apply {
-            remove("${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId")
-        }
-        cartSaleMethodIdsState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-private fun removeCartSaleMethodIds(transactionTypeIndex: Int, clientId: Int) {
-    val prefix = "${transactionKey(transactionTypeIndex, clientId)}:"
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = cartSaleMethodIdsState.value.filterKeys { !it.startsWith(prefix) }
-        cartSaleMethodIdsState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
 
 fun saleMethodLocalizedName(saleMethodId: String): List<LocalizedStringDataModel> =
     if (saleMethodId == SALE_METHOD_WHOLESALE) {
@@ -2098,283 +2045,6 @@ fun saleMethodLocalizedName(saleMethodId: String): List<LocalizedStringDataModel
         )
     }
 
-private val transactionPaymentDraftsState =
-    MutableStateFlow<Map<String, TransactionPaymentDraftDataModel>>(emptyMap())
-
-fun getTransactionPaymentDraftsState(): StateFlow<Map<String, TransactionPaymentDraftDataModel>> =
-    transactionPaymentDraftsState.asStateFlow()
-
-val cartConditionChecksState = MutableStateFlow<Map<String, Boolean>>(emptyMap())
-
-fun getCartConditionChecksState(): StateFlow<Map<String, Boolean>> = cartConditionChecksState.asStateFlow()
-
-private fun cartScopedPrefix(transactionTypeIndex: Int, clientId: Int): String =
-    "${transactionKey(transactionTypeIndex, clientId)}:"
-
-fun setCartConditionChecked(conditionKey: String, checked: Boolean) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val cleanKey = conditionKey.trim().takeIf { it.isNotBlank() } ?: return@launch
-        val updated = cartConditionChecksState.value.toMutableMap().apply {
-            this[cleanKey] = checked
-        }
-        cartConditionChecksState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-fun pruneCartConditionChecks(transactionTypeIndex: Int, clientId: Int, validKeys: Set<String>) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val prefix = cartScopedPrefix(transactionTypeIndex, clientId)
-        val updated = cartConditionChecksState.value.filterKeys { key ->
-            !key.startsWith(prefix) || key in validKeys
-        }
-        if (updated != cartConditionChecksState.value) {
-            cartConditionChecksState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartConditionChecks(transactionTypeIndex: Int, clientId: Int, goodsItemId: String? = null) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val prefix = if (goodsItemId == null) {
-            cartScopedPrefix(transactionTypeIndex, clientId)
-        } else {
-            "${cartScopedPrefix(transactionTypeIndex, clientId)}$goodsItemId:"
-        }
-        val updated = cartConditionChecksState.value.filterKeys { !it.startsWith(prefix) }
-        if (updated != cartConditionChecksState.value) {
-            cartConditionChecksState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private val transactionCartScrollStatesState =
-    MutableStateFlow<Map<String, TransactionCartScrollStateDataModel>>(emptyMap())
-
-fun getTransactionCartScrollStatesState(): StateFlow<Map<String, TransactionCartScrollStateDataModel>> =
-    transactionCartScrollStatesState.asStateFlow()
-
-fun setTransactionCartScrollState(scrollState: TransactionCartScrollStateDataModel) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val key = transactionKey(scrollState.transactionTypeIndex, scrollState.clientId)
-        val cleanScrollState = scrollState.copy(
-            firstVisibleItemIndex = scrollState.firstVisibleItemIndex.coerceAtLeast(0),
-            firstVisibleItemScrollOffset = scrollState.firstVisibleItemScrollOffset.coerceAtLeast(0),
-            updatedAtMillis = getCurrentTimeMillis()
-        )
-        val updated = transactionCartScrollStatesState.value.toMutableMap().apply {
-            this[key] = cleanScrollState
-        }
-        transactionCartScrollStatesState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-fun clearTransactionCartScrollState(transactionTypeIndex: Int, clientId: Int) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = transactionCartScrollStatesState.value.toMutableMap().apply {
-            remove(transactionKey(transactionTypeIndex, clientId))
-        }
-        if (updated != transactionCartScrollStatesState.value) {
-            transactionCartScrollStatesState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-fun setTransactionPaymentDraft(draft: TransactionPaymentDraftDataModel) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = transactionPaymentDraftsState.value.toMutableMap().apply {
-            this[transactionKey(draft.transactionTypeIndex, draft.clientId)] = draft
-        }
-        transactionPaymentDraftsState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-fun getTransactionPaymentDraft(
-    transactionTypeIndex: Int,
-    clientId: Int
-): TransactionPaymentDraftDataModel? {
-    return transactionPaymentDraftsState.value[transactionKey(transactionTypeIndex, clientId)]
-}
-
-fun clearTransactionPaymentDraft(transactionTypeIndex: Int, clientId: Int) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = transactionPaymentDraftsState.value.toMutableMap().apply {
-            remove(transactionKey(transactionTypeIndex, clientId))
-        }
-        transactionPaymentDraftsState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-private val transactionSupplySupplierIdsState = MutableStateFlow<Map<String, String>>(emptyMap())
-
-fun getTransactionSupplySupplierIdsState(): StateFlow<Map<String, String>> = transactionSupplySupplierIdsState.asStateFlow()
-
-fun transactionSupplySupplierKey(transactionTypeIndex: Int, clientId: Int): String = "$transactionTypeIndex:$clientId"
-
-fun currentTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int): String? =
-    transactionSupplySupplierIdsState.value[transactionSupplySupplierKey(transactionTypeIndex, clientId)]
-
-fun setTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int, supplierId: String?) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val key = transactionSupplySupplierKey(transactionTypeIndex, clientId)
-        val updated = transactionSupplySupplierIdsState.value.toMutableMap().apply {
-            if (supplierId.isNullOrBlank()) remove(key) else put(key, supplierId)
-        }
-        transactionSupplySupplierIdsState.emit(updated)
-        persistTransactionCartUiState()
-    }
-}
-
-fun clearTransactionSupplySupplierId(transactionTypeIndex: Int, clientId: Int) {
-    setTransactionSupplySupplierId(transactionTypeIndex, clientId, null)
-}
-
-private val cartReturnBatchSelectionsState = MutableStateFlow<Map<String, CartReturnBatchSelectionDataModel>>(emptyMap())
-
-fun getCartReturnBatchSelectionsState(): StateFlow<Map<String, CartReturnBatchSelectionDataModel>> =
-    cartReturnBatchSelectionsState.asStateFlow()
-
-fun cartReturnBatchSelectionKey(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String =
-    "${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"
-
-fun currentCartReturnBatchSelection(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): CartReturnBatchSelectionDataModel? =
-    cartReturnBatchSelectionsState.value[cartReturnBatchSelectionKey(transactionTypeIndex, clientId, goodsItemId)]
-
-fun setCartReturnBatchSelection(
-    transactionTypeIndex: Int,
-    clientId: Int,
-    goodsItemId: String,
-    selection: CartReturnBatchSelectionDataModel?
-) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val cleanGoodsItemId = goodsItemId.trim().takeIf { it.isNotBlank() } ?: return@launch
-        val key = cartReturnBatchSelectionKey(transactionTypeIndex, clientId, cleanGoodsItemId)
-        val normalizedSelection = selection
-            ?.takeIf { transactionTypeIndex == 1 }
-            ?.let { selected ->
-                selected.copy(
-                    goodsItemId = cleanGoodsItemId,
-                    stockBatchId = selected.stockBatchId?.trim()?.takeIf { it.isNotBlank() },
-                    pricePerUnit = selected.pricePerUnit?.coerceAtLeast(0.0)?.roundMoney(),
-                    currencyCode = selected.currencyCode.trim().uppercase(),
-                    updatedAtMillis = getCurrentTimeMillis()
-                )
-            }
-
-        val updated = cartReturnBatchSelectionsState.value.toMutableMap().apply {
-            if (normalizedSelection == null) remove(key) else put(key, normalizedSelection)
-        }
-
-        if (updated != cartReturnBatchSelectionsState.value) {
-            cartReturnBatchSelectionsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartReturnBatchSelection(transactionTypeIndex: Int, clientId: Int, goodsItemId: String) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = cartReturnBatchSelectionsState.value.toMutableMap().apply {
-            remove(cartReturnBatchSelectionKey(transactionTypeIndex, clientId, goodsItemId))
-        }
-        if (updated != cartReturnBatchSelectionsState.value) {
-            cartReturnBatchSelectionsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartReturnBatchSelections(transactionTypeIndex: Int, clientId: Int) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val prefix = "${transactionKey(transactionTypeIndex, clientId)}:"
-        val updated = cartReturnBatchSelectionsState.value.filterKeys { !it.startsWith(prefix) }
-        if (updated != cartReturnBatchSelectionsState.value) {
-            cartReturnBatchSelectionsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartReturnBatchSelectionsByGoodsItemId(goodsItemId: String) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val suffix = ":$goodsItemId"
-        val updated = cartReturnBatchSelectionsState.value.filterKeys { key -> !key.endsWith(suffix) }
-        if (updated != cartReturnBatchSelectionsState.value) {
-            cartReturnBatchSelectionsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private const val MAX_RETURN_REASON_LENGTH = 500
-private val cartReturnReasonsState = MutableStateFlow<Map<String, String>>(emptyMap())
-
-fun getCartReturnReasonsState(): StateFlow<Map<String, String>> = cartReturnReasonsState.asStateFlow()
-
-fun cartReturnReasonKey(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String =
-    "${transactionKey(transactionTypeIndex, clientId)}:$goodsItemId"
-
-fun currentCartReturnReason(transactionTypeIndex: Int, clientId: Int, goodsItemId: String): String =
-    cartReturnReasonsState.value[cartReturnReasonKey(transactionTypeIndex, clientId, goodsItemId)].orEmpty()
-
-fun setCartReturnReason(transactionTypeIndex: Int, clientId: Int, goodsItemId: String, reason: String) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val key = cartReturnReasonKey(transactionTypeIndex, clientId, goodsItemId)
-        val boundedReason = reason.take(MAX_RETURN_REASON_LENGTH)
-        val updated = cartReturnReasonsState.value.toMutableMap().apply {
-            if (transactionTypeIndex == 1 && boundedReason.trim().isNotBlank()) {
-                this[key] = boundedReason
-            } else {
-                remove(key)
-            }
-        }
-        if (updated != cartReturnReasonsState.value) {
-            cartReturnReasonsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartReturnReason(transactionTypeIndex: Int, clientId: Int, goodsItemId: String) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = cartReturnReasonsState.value.toMutableMap().apply {
-            remove(cartReturnReasonKey(transactionTypeIndex, clientId, goodsItemId))
-        }
-        if (updated != cartReturnReasonsState.value) {
-            cartReturnReasonsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartReturnReasons(transactionTypeIndex: Int, clientId: Int) {
-    val prefix = cartScopedPrefix(transactionTypeIndex, clientId)
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = cartReturnReasonsState.value.filterKeys { !it.startsWith(prefix) }
-        if (updated != cartReturnReasonsState.value) {
-            cartReturnReasonsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
-
-private fun removeCartReturnReasonsByGoodsItemId(goodsItemId: String) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        val updated = cartReturnReasonsState.value.filterKeys { key ->
-            key.substringAfterLast(':') != goodsItemId
-        }
-        if (updated != cartReturnReasonsState.value) {
-            cartReturnReasonsState.emit(updated)
-            persistTransactionCartUiState()
-        }
-    }
-}
 
 fun transactionServerType(transactionTypeIndex: Int): String {
     return when (transactionTypeIndex) {
@@ -4567,7 +4237,9 @@ fun completeTransaction(
     receiptSnapshot: TransactionReceiptSnapshotDataModel,
     onCompleted: (() -> Unit)? = null
 ) {
+    val cartOwner = DynamicCarts.captureScope() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!DynamicCarts.isCurrent(cartOwner) || transaction.storeId != cartOwner.storeId) return@launch
         if (!completeTransactionMutex.tryLock()) {
             postInAppNotification(
                 localizedStringResourceMessage(
@@ -4602,9 +4274,11 @@ fun completeTransaction(
                 headers = transactionWithOperationId.storeId.takeIf { it.isNotBlank() }
                     ?.let { mapOf("store_id" to it) }
                     ?: emptyMap(),
+                expectedSessionGeneration = cartOwner.generation,
                 body = transactionWithOperationId
             )
 
+            if (!DynamicCarts.isCurrent(cartOwner)) return@launch
             if (response.negative || response.payload == null) {
                 val shouldQueueForCloudRetry = response.transportFailure ||
                     response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
@@ -4615,8 +4289,7 @@ fun completeTransaction(
                     val localCompleted = queueTransactionThroughLocalNetwork(transactionWithOperationId)
                     if (localCompleted != null) {
                         latestTransactionReceiptSnapshotState.emit(receiptSnapshot.copy(transaction = localCompleted))
-                        deleteCart(transactionTypeIndex, clientId)
-                        clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+                        DynamicCarts.delete(transactionTypeIndex, clientId, cartOwner)
                         postInAppNotification(
                             localNetworkMessage(
                                 id = 733,
@@ -4662,8 +4335,7 @@ fun completeTransaction(
                 )
             }
 
-            deleteCart(transactionTypeIndex, clientId)
-            clearTransactionPaymentDraft(transactionTypeIndex, clientId)
+            DynamicCarts.delete(transactionTypeIndex, clientId, cartOwner)
 
             activeStoreIdState.value?.let {
                 getStock(it)
@@ -7987,25 +7659,7 @@ val genericGoodsItemsState = MutableDataStateFlow<List<GenericGoodsItemDataModel
 
 val getGenericGoodsItemsMutex = Mutex()
 val getGenericGoodsCategoriesMutex = Mutex()
-val cartTransactionType0_clientId0_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType0_clientId1_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType0_clientId2_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType0_clientId3_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType0_clientId4_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType1_clientId0_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType1_clientId1_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType1_clientId2_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType1_clientId3_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType1_clientId4_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType2_clientId0_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType2_clientId1_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType2_clientId2_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType2_clientId3_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
-val cartTransactionType2_clientId4_state = MutableStateFlow<List<GoodsItemInCartDataModel>>(emptyList())
 val cartPersistenceHydratedState = MutableStateFlow(false)
-
-private val observedCartHydrationKeys = mutableSetOf<String>()
-private val observedCartHydrationMutex = Mutex()
 
 val stockState = MutableDataStateFlow<List<GoodsItemDataModel>>(GlobalScope)
 val parentStoreStockState = MutableDataStateFlow<List<GoodsItemDataModel>>(GlobalScope)
@@ -8453,11 +8107,12 @@ fun init() {
         // Load persisted configuration before starting collectors. Otherwise the initial bundled
         // server URL can overwrite the last working local server URL before the app has a chance
         // to use it, making the client appear to never reach the backend.
+        DynamicCarts.prepareLegacyImport()
         loadCachedApplicationData()
         startSupplierIdentityFocus()
         startAppCacheCollectors()
         AnalyticsWorkspace.start()
-        loadTransactionCartUiState()
+        DynamicCarts.adoptCurrent()
         initializeLocalBranchNetwork()
         startCloudConnectionHealthMonitor()
         syncPendingSessionCleanupsToServer()
@@ -8470,114 +8125,6 @@ fun init() {
 
     GlobalScope.launch(Dispatchers.ourIo) { observeActiveInventoryData() }
 
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(0, 0)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType0_clientId0_state, it, 0, 0)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(0, 1)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType0_clientId1_state, it, 0, 1)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-
-        observeCart(0, 2)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType0_clientId2_state, it, 0, 2)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-
-        observeCart(0, 3)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType0_clientId3_state, it, 0, 3)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(0, 4)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType0_clientId4_state, it, 0, 4)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-
-        observeCart(1, 0)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType1_clientId0_state, it, 1, 0)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(1, 1)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType1_clientId1_state, it, 1, 1)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(1, 2)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType1_clientId2_state, it, 1, 2)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(1, 3)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType1_clientId3_state, it, 1, 3)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(1, 4)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType1_clientId4_state, it, 1, 4)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(2, 0)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType2_clientId0_state, it, 2, 0)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(2, 1)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType2_clientId1_state, it, 2, 1)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(2, 2)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType2_clientId2_state, it, 2, 2)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-
-        observeCart(2, 3)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType2_clientId3_state, it, 2, 3)
-            }
-    }
-
-    GlobalScope.launch(Dispatchers.ourIo) {
-        observeCart(2, 4)
-            .collect {
-                emitObservedCartPreservingUntilStockLoaded(cartTransactionType2_clientId4_state, it, 2, 4)
-            }
-    }
     getGlobalAppConfiguration(true)
     getUser()
     getUserFinanceDashboard()
@@ -10955,6 +10502,7 @@ internal fun cloudEndpointRequiresAuthentication(endpointUrl: String): Boolean {
     return when {
         endpoint == "auth/session" -> true
         endpoint.startsWith("auth/security/") -> true
+        endpoint == "diagnostics/events/anonymous" -> false
         endpoint.startsWith("auth/") -> false
         endpoint.startsWith("config/") -> false
         endpoint.startsWith("res/") -> false
@@ -12408,48 +11956,6 @@ fun syncPendingSessionCleanupsToServer() {
     GlobalScope.launch(Dispatchers.ourIo) {
         syncPendingWorkshiftEndsToServerNow()
         syncPendingSessionCleanupsToServerNow()
-    }
-}
-
-private suspend fun persistTransactionCartUiState() {
-    putJsonCache(CACHE_CART_SALE_METHOD_IDS, cartSaleMethodIdsState.value)
-    putJsonCache(CACHE_TRANSACTION_PAYMENT_DRAFTS, transactionPaymentDraftsState.value)
-    putJsonCache(CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS, transactionSupplySupplierIdsState.value)
-    putJsonCache(CACHE_TRANSACTION_RETURN_REASONS, cartReturnReasonsState.value)
-    putJsonCache(CACHE_TRANSACTION_RETURN_BATCH_SELECTIONS, cartReturnBatchSelectionsState.value)
-    putJsonCache(CACHE_CART_CONDITION_CHECKS, cartConditionChecksState.value)
-    putJsonCache(CACHE_TRANSACTION_CART_SCROLL_STATES, transactionCartScrollStatesState.value)
-}
-
-private suspend fun loadTransactionCartUiState() {
-    getJsonCache<Map<String, String>>(CACHE_CART_SALE_METHOD_IDS)?.let { cached ->
-        cartSaleMethodIdsState.emit(cached.filterValues { it == SALE_METHOD_WHOLESALE })
-    }
-    getJsonCache<Map<String, TransactionPaymentDraftDataModel>>(CACHE_TRANSACTION_PAYMENT_DRAFTS)?.let { cached ->
-        transactionPaymentDraftsState.emit(cached)
-    }
-    getJsonCache<Map<String, String>>(CACHE_TRANSACTION_SUPPLY_SUPPLIER_IDS)?.let { cached ->
-        transactionSupplySupplierIdsState.emit(cached.filterValues { it.isNotBlank() })
-    }
-    getJsonCache<Map<String, String>>(CACHE_TRANSACTION_RETURN_REASONS)?.let { cached ->
-        cartReturnReasonsState.emit(cached.mapValues { it.value.take(MAX_RETURN_REASON_LENGTH) }.filterValues { it.trim().isNotBlank() })
-    }
-    getJsonCache<Map<String, CartReturnBatchSelectionDataModel>>(CACHE_TRANSACTION_RETURN_BATCH_SELECTIONS)?.let { cached ->
-        cartReturnBatchSelectionsState.emit(
-            cached.mapValues { (_, value) ->
-                value.copy(
-                    stockBatchId = value.stockBatchId?.trim()?.takeIf { it.isNotBlank() },
-                    pricePerUnit = value.pricePerUnit?.coerceAtLeast(0.0)?.roundMoney(),
-                    currencyCode = value.currencyCode.trim().uppercase()
-                )
-            }.filterKeys { it.startsWith("1:") }
-        )
-    }
-    getJsonCache<Map<String, Boolean>>(CACHE_CART_CONDITION_CHECKS)?.let { cached ->
-        cartConditionChecksState.emit(cached)
-    }
-    getJsonCache<Map<String, TransactionCartScrollStateDataModel>>(CACHE_TRANSACTION_CART_SCROLL_STATES)?.let { cached ->
-        transactionCartScrollStatesState.emit(cached)
     }
 }
 
@@ -15101,101 +14607,20 @@ fun refreshCloudConnectionManually() {
     manualCloudConnectionRefreshJob?.start()
 }
 
-fun upsertCart(
-    id: String,
-    transactionTypeIndex: Int,
-    clientId: Int,
-    quantity: QuantityDataModel
-) {
-    GlobalScope.launch {
-        appDatabase.app_databaseQueries.upsertCart(
-            id,
-            transactionTypeIndex.toLong(),
-            clientId.toLong(),
-            jsonBase.encodeToString(quantity)
-        )
-    }
-}
+fun upsertCart(id: String, transactionTypeIndex: Int, clientId: Int, quantity: QuantityDataModel) =
+    DynamicCarts.upsert(id, transactionTypeIndex, clientId, quantity)
 
 suspend fun deleteCart(transactionTypeIndex: Int, clientId: Int) {
-    appDatabase.app_databaseQueries.deleteCart(transactionTypeIndex.toLong(), clientId.toLong())
-    removeCartSaleMethodIds(transactionTypeIndex, clientId)
-    removeCartReturnReasons(transactionTypeIndex, clientId)
-    removeCartReturnBatchSelections(transactionTypeIndex, clientId)
-    removeCartConditionChecks(transactionTypeIndex, clientId)
-    clearTransactionCartScrollState(transactionTypeIndex, clientId)
-    clearTransactionPaymentDraft(transactionTypeIndex, clientId)
-    if (transactionTypeIndex == 2) {
-        clearTransactionSupplySupplierId(transactionTypeIndex, clientId)
-    }
+    DynamicCarts.delete(transactionTypeIndex, clientId)
 }
 
-fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) {
-    GlobalScope.launch {
-        appDatabase.app_databaseQueries.deleteCartById(id, transactionTypeIndex.toLong(), clientId.toLong())
-        removeCartSaleMethodId(transactionTypeIndex, clientId, id)
-        removeCartReturnReason(transactionTypeIndex, clientId, id)
-        removeCartReturnBatchSelection(transactionTypeIndex, clientId, id)
-        removeCartConditionChecks(transactionTypeIndex, clientId, id)
-    }
-}
+fun deleteCartById(id: String, transactionTypeIndex: Int, clientId: Int) =
+    DynamicCarts.removeItem(id, transactionTypeIndex, clientId)
 
-suspend fun deleteCartItemById(id: String) {
-    appDatabase.app_databaseQueries.deleteById(id)
-    removeCartReturnReasonsByGoodsItemId(id)
-    removeCartReturnBatchSelectionsByGoodsItemId(id)
-}
+suspend fun deleteCartItemById(id: String) = DynamicCarts.removeItemEverywhere(id)
 
 fun observeCart(transactionTypeIndex: Int, clientId: Int): Flow<List<GoodsItemInCartDataModel>?> =
-    appDatabase.app_databaseQueries.getCart(transactionTypeIndex.toLong(), clientId.toLong())
-        .asFlow()
-        .mapToList(Dispatchers.ourIo)
-        .map { rows ->
-            rows.map { row ->
-                GoodsItemInCartDataModel(
-                    id = row.id,
-                    transactionTypeIndex = row.transactionTypeIndex.toInt(),
-                    clientId = row.clientId.toInt(),
-                    quantity = jsonBase.decodeFromString(row.quantity),
-                    timeAdded = row.timeAdded
-                )
-            }
-        }
-
-private suspend fun markObservedCartHydrated(transactionTypeIndex: Int, clientId: Int) {
-    observedCartHydrationMutex.withLock {
-        observedCartHydrationKeys += transactionKey(transactionTypeIndex, clientId)
-        if (observedCartHydrationKeys.size >= 15 && !cartPersistenceHydratedState.value) {
-            cartPersistenceHydratedState.emit(true)
-        }
-    }
-}
-
-private suspend fun emitObservedCartPreservingUntilStockLoaded(
-    targetState: MutableStateFlow<List<GoodsItemInCartDataModel>>,
-    observedCart: List<GoodsItemInCartDataModel>?,
-    transactionTypeIndex: Int,
-    clientId: Int
-) {
-    val cart = observedCart.orEmpty()
-    val loadedStock = stockState.payloadValue
-
-    if (loadedStock == null) {
-        targetState.emit(cart)
-        markObservedCartHydrated(transactionTypeIndex, clientId)
-        return
-    }
-
-    val stockIds = loadedStock.map { it.id }.toSet()
-    val filtered = cart.filter { item ->
-        val stillExists = item.id in stockIds
-        if (!stillExists) deleteCartItemById(item.id)
-        stillExists
-    }
-
-    targetState.emit(filtered)
-    markObservedCartHydrated(transactionTypeIndex, clientId)
-}
+    DynamicCarts.cartState(transactionTypeIndex, clientId)
 
 private const val IN_APP_NOTIFICATION_DEDUPE_WINDOW_MILLIS = 10_000L
 private const val IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS = 60_000L
@@ -16403,7 +15828,9 @@ fun getNotifications() {
                     .sortedBy { it.createdAtMillis }
                     .forEach { notification ->
                         serverNotificationPopupIds += notification.id
-                        pushInAppNotification(notification.copy(shownAtMillis = now), transient = true)
+                        // Publish before merging history: a queued popup would see this same freshly
+                        // fetched event in history and mistakenly suppress itself as a duplicate.
+                        pushInAppNotificationNow(notification.copy(shownAtMillis = now), transient = true)
                     }
 
                 if (serverNotificationPopupIds.size > LOCAL_NOTIFICATION_HISTORY_LIMIT * 4) {
@@ -17339,6 +16766,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
     contentType: ContentType? = ContentType.Application.Json,
     expectedSessionGeneration: Long? = null
 ): ResponseDataModel<Response> {
+    val diagnosticRequestContext = captureNetworkDiagnosticContext(endpointUrl, expectedSessionGeneration)
     activeNetworkOperationsState.update { it + 1 }
     val requestStartedAtMillis = getCurrentTimeMillis()
     val requestAccountId = userAccountState.payloadValue?.id
@@ -17573,6 +17001,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
                     return decodedResponse
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
+                    recordUnexpectedNetworkDiagnostic(diagnosticRequestContext, throwable)
                     if (expectedSessionGeneration != null && !authenticatedSessionGenerationIsCurrent(expectedSessionGeneration))
                         return cloudSessionExpiredResponse()
                     val status = (throwable as? ResponseException)?.response?.status
@@ -18339,39 +17768,8 @@ fun getGenericGoodsCategories() {
     }
 }
 
-fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<GoodsItemInCartDataModel>> {
-    return when (transactionTypeIndex) {
-        0 -> {
-            when (clientId) {
-                0 -> cartTransactionType0_clientId0_state
-                1 -> cartTransactionType0_clientId1_state
-                2 -> cartTransactionType0_clientId2_state
-                3 -> cartTransactionType0_clientId3_state
-                else -> cartTransactionType0_clientId4_state
-            }
-        }
-
-        1 -> {
-            when (clientId) {
-                0 -> cartTransactionType1_clientId0_state
-                1 -> cartTransactionType1_clientId1_state
-                2 -> cartTransactionType1_clientId2_state
-                3 -> cartTransactionType1_clientId3_state
-                else -> cartTransactionType1_clientId4_state
-            }
-        }
-
-        else -> {
-            when (clientId) {
-                0 -> cartTransactionType2_clientId0_state
-                1 -> cartTransactionType2_clientId1_state
-                2 -> cartTransactionType2_clientId2_state
-                3 -> cartTransactionType2_clientId3_state
-                else -> cartTransactionType2_clientId4_state
-            }
-        }
-    }
-}
+fun getCartState(transactionTypeIndex: Int, clientId: Int): StateFlow<List<GoodsItemInCartDataModel>> =
+    DynamicCarts.cartState(transactionTypeIndex, clientId)
 
 /** A read has one account/store owner and a bounded lifetime; repeat taps do not queue more reads. */
 private inline fun <reified T> readInventoryResource(

@@ -5,6 +5,8 @@
             android:name="android.hardware.camera"
             android:required="false" />
 
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
     <!-- AITA_DIRECT_INSTALL_PERMISSION -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

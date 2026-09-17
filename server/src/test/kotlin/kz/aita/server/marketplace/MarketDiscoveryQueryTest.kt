@@ -25,7 +25,7 @@ class MarketDiscoveryQueryTest {
                 query.sql.startsWith("SELECT f.*") -> shop?.let { listOf(mapOf<Any, Any?>(
                     "store_id" to it.storeId, "display_name" to it.displayName, "city" to it.city,
                     "public_address" to it.publicAddress, "pickup_note" to it.pickupNote,
-                    "is_published" to it.published, "revision" to it.revision)) }.orEmpty()
+                    "is_published" to it.published, "revision" to it.revision, "share_branch_availability" to false)) }.orEmpty()
                 query.sql.startsWith("SELECT count(*),count(DISTINCT") -> listOf(mapOf<Any, Any?>(1 to 0L, 2 to 0L))
                 query.sql.startsWith("SELECT count(*) FROM buyer_saved_offers") -> listOf(mapOf<Any, Any?>(1 to 0L))
                 query.sql.startsWith("SELECT id,name,type_ids") || query.sql.startsWith("SELECT l.*") -> emptyList()

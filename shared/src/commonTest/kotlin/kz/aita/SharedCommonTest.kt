@@ -20,12 +20,12 @@ class SharedCommonTest {
 
     @Test
     fun unavailableHealthProbeBackoffIsBounded() {
-        assertEquals(15_000L, cloudConnectionUnavailableProbeDelayMillis(0))
-        assertEquals(30_000L, cloudConnectionUnavailableProbeDelayMillis(1))
-        assertEquals(60_000L, cloudConnectionUnavailableProbeDelayMillis(2))
-        assertEquals(120_000L, cloudConnectionUnavailableProbeDelayMillis(3))
-        assertEquals(120_000L, cloudConnectionUnavailableProbeDelayMillis(99))
-        assertEquals(15_000L, cloudConnectionUnavailableProbeDelayMillis(-5))
+        assertEquals(2_000L, cloudConnectionUnavailableProbeDelayMillis(0))
+        assertEquals(4_000L, cloudConnectionUnavailableProbeDelayMillis(1))
+        assertEquals(7_000L, cloudConnectionUnavailableProbeDelayMillis(2))
+        assertEquals(10_000L, cloudConnectionUnavailableProbeDelayMillis(3))
+        assertEquals(10_000L, cloudConnectionUnavailableProbeDelayMillis(99))
+        assertEquals(2_000L, cloudConnectionUnavailableProbeDelayMillis(-5))
     }
 
     @Test

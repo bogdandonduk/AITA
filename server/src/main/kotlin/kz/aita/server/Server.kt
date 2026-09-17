@@ -18028,6 +18028,7 @@ fun Application.module() {
         installHelpRoutes(this@module.environment.config)
         installProfilePhotoRoutes()
         installStorePeopleRoutes()
+    installRuntimeDiagnosticRoutes(this@module.environment.config, backgroundScope)
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
         installAitaAdvancedAuthenticationRoutes(tokenService, backgroundScope, this@module)

@@ -1577,6 +1577,7 @@ fun main() {
     migrateLegacyDesktopPersistentState(dataRoot)
 
     installDesktopDiagnosticLogging()
+    installDesktopRuntimeDiagnostics()
     if (!verifyDesktopGuiRuntime()) kotlin.system.exitProcess(2)
 
     configureClientServerUrlOverrideFromEnvironment()

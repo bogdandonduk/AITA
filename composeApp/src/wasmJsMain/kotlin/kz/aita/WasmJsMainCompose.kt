@@ -76,6 +76,7 @@ private fun installWasmComposePlatformBridges() {
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    installWebRuntimeDiagnostics()
     installWasmCommonPlatformBridges()
     installWasmComposePlatformBridges()
 

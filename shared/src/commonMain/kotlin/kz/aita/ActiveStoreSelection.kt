@@ -49,6 +49,7 @@ internal object ActiveStores {
                 putLocalKv(key(expected), jsonBase.encodeToString(ActiveStoreSelectionJournal.serializer(),
                     ActiveStoreSelectionJournal(selected.choice.storeId, selected.choice.explicitNone, selected.pendingSync)))
             }
+            DynamicCarts.prepareLegacyImport()
             // Retain compatibility keys, but never observe them as commands.
             if (coordinator.isCurrent(selected)) {
                 putLocalKv(KEY_ACTIVE_STORE_ID, selected.choice.storeId)

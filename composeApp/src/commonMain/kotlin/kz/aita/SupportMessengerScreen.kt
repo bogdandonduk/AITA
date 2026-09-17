@@ -115,13 +115,14 @@ fun AppConfiguration.MenuSupportScreen() {
                 if (selected == "agent" || removed.any { it.key == selected }) selected = "chat"
             }
         }
-        val tab = selected.takeIf { it in listOf("faq","chat") || (it == "agent" && canAgent) || conversations.any { c -> c.key == it } } ?: "chat"
+        val tab = selected.takeIf { it in listOf("faq","chat","diagnostics") || (it == "agent" && canAgent) || conversations.any { c -> c.key == it } } ?: "chat"
         AitaScreenColumn(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,appBar={
             ScreenAppBarWidget(title=localizedStringResource(813,"Support"),iconPath=stateValues.drawablePathIconSupport,
                 onBack={coroutineScope.launch{Navigation.Menu.pop(stateValues.isNarrowScreen)}})
         }) {
             tabRowWidget(Modifier.widthIn(max=1080.dp).fillMaxWidth().padding(horizontal=stateValues.marginTextField,vertical=4.dp),
                 tabs=buildList {
+                    add(TabContent("diagnostics",diagnosticsText("title")){selected=it})
                     add(TabContent("faq",localizedStringResource(814,"FAQ")){selected=it})
                     add(TabContent("chat",authUiText("Chats","Чаты","Чаттар","Чаттар")){selected=it})
                     if(canAgent) add(TabContent("agent",authUiText("Agent","Специалист","Маман","Агент")){selected=it})
@@ -141,6 +142,7 @@ fun AppConfiguration.MenuSupportScreen() {
                 },selectedIndexInitial=tab,persistSelection=false)
             tabsError?.let { SupportInlineError(it) }
             when {
+                tab=="diagnostics" -> DiagnosticsSettingsPane(Modifier.weight(1f))
                 tab=="faq" -> SupportHelpPane(Modifier.weight(1f))
                 account==null -> MessageText(Modifier.weight(1f).fillMaxWidth(),authUiText("Sign in to contact support","Войдите для связи с поддержкой","Қолдауға хабарласу үшін кіріңіз","Колдоого кайрылуу үчүн кириңиз"))
                 tab=="chat" || tab=="agent" -> key(account,tab) {

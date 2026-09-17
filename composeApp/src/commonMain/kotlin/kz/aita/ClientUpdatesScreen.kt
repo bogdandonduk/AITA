@@ -44,11 +44,15 @@ internal fun AppConfiguration.AppUpdateEffects() {
     val transport by cloudTransportStatusState.collectAsState()
     val account=stateValues.userAccount?.id
     val generation=currentAuthenticatedSessionGeneration()
+    SideEffect { RuntimeDiagnostics.updateContext(stateValues.appModeId.toString(),
+        stateValues.navigationScreensMain.lastOrNull()?.route.orEmpty(), stateValues.appLanguage, stateValues.activeStoreId) }
+    LaunchedEffect(account,generation) { RuntimeDiagnostics.sendNow() }
     LaunchedEffect(account,generation) {supportConversationBooks.forOwner(account,generation)}
     LaunchedEffect(Unit) {
         launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { AppUpdateWorkspace.notifications.collect { version ->
             postInAppNotification(eventMessage("updates.notification","version" to version),NotificationType.Positive,transient = true)
         } }
+        RuntimeDiagnostics.start()
         AppUpdateWorkspace.start()
         TutorialWorkspace.start()
     }

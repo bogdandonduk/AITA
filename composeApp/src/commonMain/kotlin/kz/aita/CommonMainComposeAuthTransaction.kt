@@ -1947,35 +1947,7 @@ internal fun AppConfiguration.TransactionPaneContent(
 }
 
 internal suspend fun resetTransactionCartNavigationState(transactionTypeIndex: Int, clientId: Int) {
-    when (transactionTypeIndex) {
-        0 -> Navigation.TransactionSale.run {
-            when (clientId) {
-                0 -> { clearLeftClient1(); clearRightClient1() }
-                1 -> { clearLeftClient2(); clearRightClient2() }
-                2 -> { clearLeftClient3(); clearRightClient3() }
-                3 -> { clearLeftClient4(); clearRightClient4() }
-                else -> { clearLeftClient5(); clearRightClient5() }
-            }
-        }
-        1 -> Navigation.TransactionReturn.run {
-            when (clientId) {
-                0 -> { clearLeftClient1(); clearRightClient1() }
-                1 -> { clearLeftClient2(); clearRightClient2() }
-                2 -> { clearLeftClient3(); clearRightClient3() }
-                3 -> { clearLeftClient4(); clearRightClient4() }
-                else -> { clearLeftClient5(); clearRightClient5() }
-            }
-        }
-        else -> Navigation.TransactionSupply.run {
-            when (clientId) {
-                0 -> { clearLeftClient1(); clearRightClient1() }
-                1 -> { clearLeftClient2(); clearRightClient2() }
-                2 -> { clearLeftClient3(); clearRightClient3() }
-                3 -> { clearLeftClient4(); clearRightClient4() }
-                else -> { clearLeftClient5(); clearRightClient5() }
-            }
-        }
-    }
+    Navigation.transactionWorkspace(transactionTypeIndex).resetCart(clientId)
 }
 
 @Composable
@@ -2032,7 +2004,9 @@ fun AppConfiguration.TransactionScreen() {
 
             val goodsInCart by getCartState(transactionTypeIndex, clientId).collectAsState()
             val cancelIconRes by stateValues.drawableResIconCancel.collectAsState()
-            var clearCartClientIdToConfirm by rememberSaveable(transactionTypeIndex) { mutableStateOf<Int?>(null) }
+            val cartBookState by DynamicCarts.state.collectAsState()
+            val currentCartOwner = cartBookState.owner?.takeIf { cartBookState.ready && DynamicCarts.isCurrent(it) }
+            var clearCartClientIdToConfirm by remember(currentCartOwner, transactionTypeIndex) { mutableStateOf<Int?>(null) }
 
             clearCartClientIdToConfirm?.let { targetClientId ->
                 val targetCart by getCartState(transactionTypeIndex, targetClientId).collectAsState()
@@ -2046,7 +2020,15 @@ fun AppConfiguration.TransactionScreen() {
                         positiveButtonText = stateValues.stringClear,
                         positiveAction = {
                             coroutineScope.launch {
-                                deleteCart(transactionTypeIndex, targetClientId)
+                                val owner = currentCartOwner ?: return@launch
+                                if (!DynamicCarts.isCurrent(owner)) return@launch
+                                val cleared = try { DynamicCarts.delete(transactionTypeIndex, targetClientId, owner) }
+                                    catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                                    catch (_: Exception) {
+                                        postInAppNotification(checkoutText("save_error"), NotificationType.Negative, transient = true)
+                                        false
+                                    }
+                                if (!cleared || !DynamicCarts.isCurrent(owner)) return@launch
                                 resetTransactionCartNavigationState(transactionTypeIndex, targetClientId)
                                 latestTransactionReceiptSnapshotState.value
                                     ?.takeIf { snapshot ->
@@ -2089,26 +2071,17 @@ fun AppConfiguration.TransactionScreen() {
 
             val supplySupplierIds by getTransactionSupplySupplierIdsState().collectAsState()
             val currentSupplySupplierId = supplySupplierIds[transactionSupplySupplierKey(transactionTypeIndex, clientId)]
-            var supplierSheetOpen by rememberSaveable(transactionTypeIndex, clientId) { mutableStateOf(false) }
-            var supplierInitialSheetDismissed by rememberSaveable(transactionTypeIndex, clientId) { mutableStateOf(false) }
-
-            LaunchedEffect(transactionTypeIndex, clientId, currentSupplySupplierId) {
-                if (transactionTypeIndex == 2 && currentSupplySupplierId.isNullOrBlank() && !supplierInitialSheetDismissed) {
-                    supplierSheetOpen = true
-                }
-            }
-
+            var supplierSheetOpen by remember(currentCartOwner, transactionTypeIndex, clientId) { mutableStateOf(false) }
             if (supplierSheetOpen && transactionTypeIndex == 2) {
                 SupplierPickerBottomSheet(
                     title = localizedStringResource(640, "Select supplier for supply"),
                     selectedSupplierId = currentSupplySupplierId,
                     onDismiss = {
-                        supplierInitialSheetDismissed = true
                         supplierSheetOpen = false
                     },
-                    onSupplierSelected = { supplier ->
+                    onSupplierSelected = selected@{ supplier ->
+                        if (currentCartOwner == null || !DynamicCarts.isCurrent(currentCartOwner)) return@selected
                         setTransactionSupplySupplierId(transactionTypeIndex, clientId, supplier.id)
-                        supplierInitialSheetDismissed = true
                         supplierSheetOpen = false
                         postInAppNotification(
                             "${localizedStringResource(641, "Supplier selected")}: ${supplier.visibleSupplierName(stateValues.appLanguage)}",
@@ -2118,13 +2091,6 @@ fun AppConfiguration.TransactionScreen() {
                     }
                 )
             }
-
-            TransactionSupplySupplierBanner(
-                transactionTypeIndex = transactionTypeIndex,
-                clientId = clientId,
-                selectedSupplierId = currentSupplySupplierId,
-                onSelectSupplier = { supplierSheetOpen = true }
-            )
 
 //      LaunchedEffect(goodsInCart) {
 //        if (goodsInCart.isEmpty())
@@ -2139,9 +2105,10 @@ fun AppConfiguration.TransactionScreen() {
 
             val latestReceiptSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
             val cartPersistenceHydrated by cartPersistenceHydratedState.collectAsState()
+            val cartNavigationReady by transactionNavigationRestoredState.collectAsState()
 
-            LaunchedEffect(cartPersistenceHydrated, goodsInCart, latestReceiptSnapshot) {
-                if (!cartPersistenceHydrated) return@LaunchedEffect
+            LaunchedEffect(currentCartOwner, transactionTypeIndex, clientId, cartPersistenceHydrated, cartNavigationReady, goodsInCart, latestReceiptSnapshot) {
+                if (!cartPersistenceHydrated || !cartNavigationReady || currentCartOwner == null || !DynamicCarts.isCurrent(currentCartOwner)) return@LaunchedEffect
 
                 val currentScreens = Navigation
                     .getCurrentTransactionScreens(transactionTypeIndex, clientId, stateValues.isNarrowScreen)
@@ -2154,197 +2121,18 @@ fun AppConfiguration.TransactionScreen() {
                             latestReceiptSnapshot?.paymentDraft?.clientId == clientId
 
                 if (goodsInCart.isEmpty() && !(showingReceipt && receiptBelongsHere)) {
-                    coroutineScope.launch {
-                        when (transactionTypeIndex) {
-                            0 -> Navigation.TransactionSale.clear()
-                            1 -> Navigation.TransactionReturn.clear()
-                            2 -> Navigation.TransactionSupply.clear()
-                        }
-                    }
+                    Navigation.transactionWorkspace(transactionTypeIndex).clearSlot(clientId, stateValues.isNarrowScreen)
                 }
             }
 
-            val navigationScreensLeft =
-                when (stateValues.navigationScreensMain.last()) {
-                    is NavigationScreenModel.Transaction.MainSale -> {
-                        when (stateValues.navigationTransactionSaleClientId) {
-                            0 -> stateValues.navigationScreensTransactionSaleLeftClient1
-                            1 -> stateValues.navigationScreensTransactionSaleLeftClient2
-                            2 -> stateValues.navigationScreensTransactionSaleLeftClient3
-                            3 -> stateValues.navigationScreensTransactionSaleLeftClient4
-                            else -> stateValues.navigationScreensTransactionSaleLeftClient5
-                        }
-                    }
+            val navigationScreensLeft by Navigation.getCurrentTransactionScreens(transactionTypeIndex, clientId, true).collectAsState()
+            val navigationScreensRight by Navigation.getCurrentTransactionScreens(transactionTypeIndex, clientId, false).collectAsState()
 
-                    is NavigationScreenModel.Transaction.MainReturn -> {
-                        when (stateValues.navigationTransactionReturnClientId) {
-                            0 -> stateValues.navigationScreensTransactionReturnLeftClient1
-                            1 -> stateValues.navigationScreensTransactionReturnLeftClient2
-                            2 -> stateValues.navigationScreensTransactionReturnLeftClient3
-                            3 -> stateValues.navigationScreensTransactionReturnLeftClient4
-                            else -> stateValues.navigationScreensTransactionReturnLeftClient5
-                        }
-                    }
-
-                    is NavigationScreenModel.Transaction.MainSupply -> {
-                        when (stateValues.navigationTransactionSupplyClientId) {
-                            0 -> stateValues.navigationScreensTransactionSupplyLeftClient1
-                            1 -> stateValues.navigationScreensTransactionSupplyLeftClient2
-                            2 -> stateValues.navigationScreensTransactionSupplyLeftClient3
-                            3 -> stateValues.navigationScreensTransactionSupplyLeftClient4
-                            else -> stateValues.navigationScreensTransactionSupplyLeftClient5
-                        }
-                    }
-
-                    else -> {
-                        emptyList()
-                    }
-                }
-
-            val navigationScreensRight =
-                when (stateValues.navigationScreensMain.last()) {
-                    is NavigationScreenModel.Transaction.MainSale -> {
-                        when (stateValues.navigationTransactionSaleClientId) {
-                            0 -> stateValues.navigationScreensTransactionSaleRightClient1
-                            1 -> stateValues.navigationScreensTransactionSaleRightClient2
-                            2 -> stateValues.navigationScreensTransactionSaleRightClient3
-                            3 -> stateValues.navigationScreensTransactionSaleRightClient4
-                            else -> stateValues.navigationScreensTransactionSaleRightClient5
-                        }
-                    }
-
-                    is NavigationScreenModel.Transaction.MainReturn -> {
-                        when (stateValues.navigationTransactionReturnClientId) {
-                            0 -> stateValues.navigationScreensTransactionReturnRightClient1
-                            1 -> stateValues.navigationScreensTransactionReturnRightClient2
-                            2 -> stateValues.navigationScreensTransactionReturnRightClient3
-                            3 -> stateValues.navigationScreensTransactionReturnRightClient4
-                            else -> stateValues.navigationScreensTransactionReturnRightClient5
-                        }
-                    }
-
-                    is NavigationScreenModel.Transaction.MainSupply -> {
-                        when (stateValues.navigationTransactionSupplyClientId) {
-                            0 -> stateValues.navigationScreensTransactionSupplyRightClient1
-                            1 -> stateValues.navigationScreensTransactionSupplyRightClient2
-                            2 -> stateValues.navigationScreensTransactionSupplyRightClient3
-                            3 -> stateValues.navigationScreensTransactionSupplyRightClient4
-                            else -> stateValues.navigationScreensTransactionSupplyRightClient5
-                        }
-                    }
-
-                    else -> {
-                        emptyList()
-                    }
-                }
-
-            Row(
-                modifier = Modifier
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.6f)
-            ) {
-                repeat(5) { index ->
-                    val cart by getCartState(transactionTypeIndex, index).collectAsState()
-                    val cartDistinctItemCount = cart.distinctBy { it.id }.size
-
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(38.dp)
-                            .padding(1.dp)
-                            .foregroundTactileShadow(stateValues.cornerRadius, elevated = clientId == index)
-                            .clip(RoundedCornerShape(stateValues.cornerRadius))
-                            .border(
-                                stateValues.unfocusedBorderWidth,
-                                stateValues.PlaceholderTextColor,
-                                RoundedCornerShape(
-                                    stateValues.cornerRadius
-                                )
-                            )
-                            .background(if (clientId == index) stateValues.AccentColor else stateValues.BackgroundColor)
-                            .aitaClickable(
-                                interactionSource = remember {
-                                    MutableInteractionSource()
-                                },
-                                indication = ripple(color = stateValues.TextColor),
-                                onClick = {
-                                    coroutineScope.launch {
-                                        when (stateValues.navigationScreensMain.last()) {
-                                            is NavigationScreenModel.Transaction.MainSale -> {
-                                                Navigation.TransactionSale.setClientId(index)
-                                            }
-                                            is NavigationScreenModel.Transaction.MainReturn -> {
-                                                Navigation.TransactionReturn.setClientId(index)
-                                            }
-                                            is NavigationScreenModel.Transaction.MainSupply -> {
-                                                Navigation.TransactionSupply.setClientId(index)
-                                            }
-                                            else -> {
-
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-
-                        CpImage(
-                            modifier = Modifier
-                                .size(22.dp),
-                            url = if (cart.isEmpty()) stateValues.drawablePathIconAddCart else stateValues.drawablePathIconCart,
-                            fallbackRes = Res.drawable._0_0,
-                            contentDescription = (index + 1).toString(),
-                            tintColor = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor
-                        )
-
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        Text(
-                            text = (index + 1).toString(),
-                            color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        AnimatedVisibility(visible = cart.isNotEmpty()) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = "($cartDistinctItemCount)",
-                                    color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor,
-                                    fontSize = stateValues.smallTextSize,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(RoundedCornerShape(999.dp))
-                                        .aitaClickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = ripple(color = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor),
-                                            onClick = { clearCartClientIdToConfirm = index }
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CpImage(
-                                        modifier = Modifier.size(16.dp),
-                                        url = stateValues.drawablePathIconCancel,
-                                        fallbackRes = cancelIconRes,
-                                        contentDescription = localizedStringResource(1176, "Clear cart?"),
-                                        tintColor = if (clientId == index) stateValues.AccentTextColor else stateValues.TextColor
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            TransactionCartTabsRow(
+                type = transactionTypeIndex, selected = clientId,
+                supplierId = currentSupplySupplierId, onSupplier = { supplierSheetOpen = true },
+                onClear = { clearCartClientIdToConfirm = it }
+            )
 
             val leftTransactionPaneModel =
                 navigationScreensLeft.lastOrNull() as? NavigationScreenModel.Transaction
@@ -2360,7 +2148,7 @@ fun AppConfiguration.TransactionScreen() {
                 transactionTypeIndex = transactionTypeIndex,
                 clientId = clientId,
                 currentCart = goodsInCart,
-                captureEnabled = visiblePaneModels.all {
+                captureEnabled = cartPersistenceHydrated && cartNavigationReady && visiblePaneModels.all {
                     it is NavigationScreenModel.Transaction.Selection || it is NavigationScreenModel.Transaction.Cart
                 }
             )

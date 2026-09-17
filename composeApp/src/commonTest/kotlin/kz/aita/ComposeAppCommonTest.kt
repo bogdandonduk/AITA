@@ -128,11 +128,12 @@ class ComposeAppCommonTest {
     }
 
     @Test
-    fun signInAndSecurityHubIsProminentWhileAppModeRemainsHidden() {
+    fun accountModeAndSecurityDestinationsRemainAvailable() {
         assertEquals(NavigationScreenModel.Menu.UserAccount, Navigation.Menu.listScreens[0])
-        assertEquals(NavigationScreenModel.Menu.Security, Navigation.Menu.listScreens[1])
+        assertEquals(NavigationScreenModel.Menu.AppMode, Navigation.Menu.listScreens[1])
+        assertTrue(NavigationScreenModel.Menu.Security in Navigation.Menu.listScreens)
         assertFalse(NavigationScreenModel.Menu.Security.isTemporarilyHiddenFromUi())
-        assertTrue(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
+        assertFalse(NavigationScreenModel.Menu.AppMode.isTemporarilyHiddenFromUi())
     }
 
     @Test
@@ -151,12 +152,12 @@ class ComposeAppCommonTest {
     }
 
     @Test
-    fun appModePickerOffersEveryWorkspaceFromEveryCurrentMode() {
+    fun appModePickerOffersReleasedWorkspacesWithoutAdvertisingManufacturer() {
         listOf(APP_MODE_STORE, APP_MODE_BUYER, APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER).forEach { currentMode ->
             assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_STORE, currentMode))
             assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_BUYER, currentMode))
             assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_SUPPLIER, currentMode))
-            assertTrue(appModeIsAvailableInCurrentRelease(APP_MODE_MANUFACTURER, currentMode))
+            assertFalse(appModeIsAvailableInCurrentRelease(APP_MODE_MANUFACTURER, currentMode))
         }
         assertFalse(appModeIsAvailableInCurrentRelease(Int.MIN_VALUE, APP_MODE_STORE))
     }
@@ -740,7 +741,7 @@ class ComposeAppCommonTest {
 
         assertEquals(2, groups.size)
         assertTrue(groups.any { group -> group.sources.size == 2 })
-        assertTrue(groups.any { group -> group.sources.single().sourceKey == "different-address" })
+        assertTrue(groups.any { group -> group.sources.singleOrNull()?.sourceKey == "different-address" })
     }
 
     @Test
@@ -955,7 +956,8 @@ class ComposeAppCommonTest {
             orders = emptyList(),
             lines = emptyList(),
             prices = emptyList(),
-            contracts = listOf(contract)
+            contracts = listOf(contract),
+            language = "en"
         )
 
         assertEquals(1, options.size)

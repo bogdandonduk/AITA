@@ -4,6 +4,7 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -70,7 +71,7 @@ private class AitaFlowTestEnvironment {
     var nextMoveResult: StockBatchMoveResultDataModel? = null
     var nextDecisionResult: StockBatchMoveResultDataModel? = null
     var nextCompletedTransaction: TransactionDataModel? = null
-    var forceNextCompleteTransactionFailure: Boolean = false
+    var failTransactionCompletions: Boolean = false
     var nextDebtorResponse: DebtorDataModel? = null
     var nextDeletedDebtorId: String? = null
     var nextSupplierResponse: SupplierDataModel? = null
@@ -79,12 +80,13 @@ private class AitaFlowTestEnvironment {
     var nextSupplierOrderResponse: SupplierOrderWithLinesDataModel? = null
     var nextDeletedSupplierOrderId: String? = null
     var nextSavedNotificationResponse: NotificationDataModel? = null
-    val requests: MutableList<RecordedAitaRequest> = mutableListOf()
+    val requests: MutableList<RecordedAitaRequest> = java.util.concurrent.CopyOnWriteArrayList()
 }
 
 class AitaSharedJvmFlowTest {
     private lateinit var environment: AitaFlowTestEnvironment
     private lateinit var originalHttpClient: HttpClient
+    private lateinit var originalEngineFactory: () -> HttpClientEngine
     private var originalCacheDirPath: String = cacheDirPath
     private var testSqlDriver: SqlDriver? = null
     private var originalGetSqlDelightDriver: (() -> SqlDriver?)? = null
@@ -106,6 +108,8 @@ class AitaSharedJvmFlowTest {
         getSqlDelightDriver = { driver }
 
         originalHttpClient = httpClient
+        originalEngineFactory = getHttpClientEngine
+        getHttpClientEngine = { buildAitaFlowMockEngine(environment) }
         originalGetStoredUserAuthTokens = getStoredUserAuthTokens
         originalSetStoredUserAuthTokens = setStoredUserAuthTokens
         originalGetStoredUserAccount = getStoredUserAccountDataModel
@@ -118,6 +122,9 @@ class AitaSharedJvmFlowTest {
         httpClient = buildAitaFlowMockClient(environment)
 
         resetAitaFlowSharedState()
+        globalAppConfigurationState.emit(DataState.Success(globalAppConfigurationState.payloadValue.copy(serverUrl = AITA_FLOW_TEST_SERVER_URL to "test")))
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
     }
 
     @AfterTest
@@ -126,6 +133,7 @@ class AitaSharedJvmFlowTest {
         stopRealtimeUpdates()
         runCatching { httpClient.close() }
         httpClient = originalHttpClient
+        getHttpClientEngine = originalEngineFactory
         getSqlDelightDriver = originalGetSqlDelightDriver
         getStoredUserAuthTokens = originalGetStoredUserAuthTokens
         setStoredUserAuthTokens = originalSetStoredUserAuthTokens
@@ -668,7 +676,7 @@ class AitaSharedJvmFlowTest {
         val transaction = aitaTestTransaction(id = "", type = transactionServerType(0), goodsItem = item, quantity = 3.0, pricePerUnit = 100.0, paidCash = 300.0)
         stockState.emit(DataState.Success(listOf(item)))
         stockBatchesState.emit(DataState.Success(listOf(batch)))
-        environment.forceNextCompleteTransactionFailure = true
+        environment.failTransactionCompletions = true
 
         val callback = CompletableDeferred<Unit>()
         completeTransaction(
@@ -1355,7 +1363,7 @@ class AitaSharedJvmFlowTest {
 
         markNotificationRead(serverUnread.id)
         waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().firstOrNull { it.id == serverUnread.id }?.readAtMillis != null }
-        assertTrue(environment.requests.any { it.method == "PUT" && it.path == "notifications/read" })
+        waitUntilAitaFlowCondition { environment.requests.any { it.method == "PUT" && it.path == "notifications/read" } }
 
         markAllNotificationsRead()
         waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().filter { it.isSavedOnServer }.all { it.readAtMillis != null } }
@@ -1573,7 +1581,7 @@ class AitaSharedJvmFlowTest {
         waitUntilAitaFlowCondition { supplierOrderLinesState.payloadValue.orEmpty().any { deliveredBatch.id in it.deliveredBatchIds } }
         waitUntilAitaFlowCondition { environment.requests.any { it.method == "GET" && it.path == "stockBatches/get" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID } }
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "supplierOrders/receive" })
-        assertTrue(stockBatchesState.payloadValue.orEmpty().any { it.id == deliveredBatch.id && it.supplierId == supplier.id })
+        waitUntilAitaFlowCondition { stockBatchesState.payloadValue.orEmpty().any { it.id == deliveredBatch.id && it.supplierId == supplier.id } }
 
         environment.nextDeletedSupplierOrderId = receivedOrder.order.id
         val deleteOrderCallback = CompletableDeferred<DataState<String>>()
@@ -1640,7 +1648,7 @@ private suspend fun waitUntilAitaFlowCondition(condition: suspend () -> Boolean)
 
 private suspend fun <T> requireAitaFlowSuccess(deferred: CompletableDeferred<DataState<T>>): DataState.Success<T> {
     val state = withTimeout(8_000L) { deferred.await() }
-    assertTrue(state is DataState.Success<*>, "Expected DataState.Success but got $state")
+    assertTrue(state is DataState.Success<*>, "Expected DataState.Success but got $state; message=${state.message}")
     @Suppress("UNCHECKED_CAST")
     return state as DataState.Success<T>
 }
@@ -1648,7 +1656,7 @@ private suspend fun <T> requireAitaFlowSuccess(deferred: CompletableDeferred<Dat
 private suspend fun currentAitaFlowCart(transactionTypeIndex: Int, clientId: Int): List<GoodsItemInCartDataModel> =
     observeCart(transactionTypeIndex, clientId).first().orEmpty()
 
-private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpClient = HttpClient(
+private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockEngine =
     MockEngine { request ->
         val path = request.url.encodedPath.trimStart('/')
         val queryParameters = request.url.parameters.names().associateWith { name ->
@@ -1663,8 +1671,7 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
             queryParameters = queryParameters
         )
 
-        if (path == "transactions/complete" && environment.forceNextCompleteTransactionFailure) {
-            environment.forceNextCompleteTransactionFailure = false
+        if (path == "transactions/complete" && environment.failTransactionCompletions) {
             return@MockEngine respond(
                 content = aitaTestNegativeEnvelope("Temporary server failure"),
                 status = HttpStatusCode.ServiceUnavailable,
@@ -1681,6 +1688,16 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
         }
 
         val body: String = when (path) {
+            "auth/session", "auth/ping" -> aitaTestSuccessEnvelope(Unit)
+            globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first.trim('/') -> {
+                val now = getCurrentTimeMillis()
+                aitaTestSuccessEnvelope(SubscriptionDashboardDataModel(
+                    StoreSubscriptionStateDataModel(storeId = request.headers["store_id"].orEmpty(),
+                        ownerUserId = AITA_FLOW_TEST_USER_ID, planId = SUBSCRIPTION_BASIC_PLAN,
+                        status = SUBSCRIPTION_STATUS_ACTIVE, startedAtMillis = now - 86_400_000,
+                        currentPeriodStartMillis = now - 86_400_000, currentPeriodEndMillis = now + 86_400_000),
+                    emptyList(), listOf(basicStoreSubscriptionPlan()), serverTimeMillis = now))
+            }
             "auth/logIn" -> aitaTestSuccessEnvelope(aitaTestTokenPair("login"))
             "auth/signUp" -> aitaTestSuccessEnvelope(aitaTestTokenPair("signup"))
             "auth/logOut" -> aitaTestSuccessNullEnvelope()
@@ -2061,7 +2078,8 @@ private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpC
             headers = aitaFlowResponseHeaders()
         )
     }
-) {
+
+private fun buildAitaFlowMockClient(environment: AitaFlowTestEnvironment): HttpClient = HttpClient(buildAitaFlowMockEngine(environment)) {
     expectSuccess = false
     install(ContentNegotiation) { json(jsonBase) }
     install(WebSockets)
@@ -2093,7 +2111,8 @@ private fun aitaTestNegativeEnvelope(message: String): String =
     )
 
 private inline fun <reified T> aitaTestSuccessEnvelope(payload: T): String =
-    jsonBase.encodeToString(ResponseDataModel(message = null, payload = payload, negative = false))
+    // The Ktor server encodes payload JSON inside its generic envelope, including primitive strings.
+    jsonBase.encodeToString(ResponseDataModel(message = null, payload = jsonBase.encodeToString(payload), negative = false))
 
 private fun aitaTestTokenPair(prefix: String): TokenPair = TokenPair(
     accessToken = "$prefix-access-token",

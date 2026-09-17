@@ -110,9 +110,9 @@ internal fun AppConfiguration.supplierContractScopeTitle(scope: String): String 
     else -> localizedStringResource(1491, "Partnership-wide")
 }
 
-internal fun AppConfiguration.supplierVisibleContractTitle(contract: SupplierPartnershipContractDataModel): String =
-    contract.title.visibleLocalizedString(stateValues.appLanguage, "")
-        .ifBlank { contract.summary.visibleLocalizedString(stateValues.appLanguage, "") }
+internal fun AppConfiguration.supplierVisibleContractTitle(contract: SupplierPartnershipContractDataModel, language: String = stateValues.appLanguage): String =
+    contract.title.visibleLocalizedString(language, "")
+        .ifBlank { contract.summary.visibleLocalizedString(language, "") }
         .ifBlank { supplierContractScopeTitle(contract.scopeType) }
 
 internal fun AppConfiguration.supplierVisibleContractSummary(contract: SupplierPartnershipContractDataModel): String =
@@ -276,7 +276,8 @@ internal fun AppConfiguration.buildSupplierContractGoodsOptions(
     orders: List<SupplierOrderDataModel>,
     lines: List<SupplierOrderLineDataModel>,
     prices: List<SupplierGoodsPriceDataModel>,
-    contracts: List<SupplierPartnershipContractDataModel> = emptyList()
+    contracts: List<SupplierPartnershipContractDataModel> = emptyList(),
+    language: String = stateValues.appLanguage
 ): List<SupplierContractGoodsUiModel> {
     val ordersById = orders
         .filter { it.isActive }
@@ -336,7 +337,7 @@ internal fun AppConfiguration.buildSupplierContractGoodsOptions(
                     .joinToString(" • ")
                     .ifBlank { sampleFacet.goodsItemId.take(12) },
                 priceText = latestPrice.supplierDeskMoneyText(),
-                quantityText = latestQuantity.quantityText(stateValues.appLanguage),
+                quantityText = latestQuantity.quantityText(language),
                 nameSnapshot = sampleFacet.nameSnapshot,
                 latestSupplyPrice = latestPrice,
                 latestQuantity = latestQuantity
@@ -370,14 +371,14 @@ internal fun AppConfiguration.buildSupplierContractGoodsOptions(
                     goodsItemId = goodsItemId,
                     title = term?.goodsItemNameSnapshot
                         .orEmpty()
-                        .visibleLocalizedString(stateValues.appLanguage, "")
+                        .visibleLocalizedString(language, "")
                         .ifBlank { goodsItemId.take(12) },
-                    subtitle = supplierVisibleContractTitle(contract)
+                    subtitle = supplierVisibleContractTitle(contract, language)
                         .ifBlank { goodsItemId.take(12) },
                     priceText = term?.supplyPrice
                         ?.takeIf { it.hasPositiveSupplierDeskPrice() }
                         .supplierDeskMoneyText(),
-                    quantityText = quantity?.quantityText(stateValues.appLanguage).orEmpty(),
+                    quantityText = quantity?.quantityText(language).orEmpty(),
                     nameSnapshot = term?.goodsItemNameSnapshot.orEmpty(),
                     latestSupplyPrice = term?.supplyPrice
                         ?.takeIf { it.hasPositiveSupplierDeskPrice() },
@@ -429,7 +430,7 @@ internal fun AppConfiguration.buildSupplierContractGoodsOptions(
                 priceText = price.supplyPrice
                     .takeIf { it.hasPositiveSupplierDeskPrice() }
                     .supplierDeskMoneyText(),
-                quantityText = quantity?.quantityText(stateValues.appLanguage).orEmpty(),
+                quantityText = quantity?.quantityText(language).orEmpty(),
                 nameSnapshot = nameSnapshot,
                 latestSupplyPrice = price.supplyPrice.takeIf { it.hasPositiveSupplierDeskPrice() }
                     ?: orderOptionsByKey[key]?.latestSupplyPrice,

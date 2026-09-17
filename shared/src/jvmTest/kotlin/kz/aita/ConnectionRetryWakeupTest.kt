@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
 class ConnectionRetryWakeupTest {
-    @Test fun availabilityInterruptsSixtySecondWait() = runBlocking {
+    @Test fun availabilityInterruptsSixtySecondWait() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         val waiting = async(start = CoroutineStart.UNDISPATCHED) { wake.await(wake.revision, 60_000L) }
         assertFalse(waiting.isCompleted)
@@ -13,7 +13,7 @@ class ConnectionRetryWakeupTest {
         assertTrue(withTimeout(1_000L) { waiting.await() })
     }
 
-    @Test fun signalDuringFailedHandshakeIsNotLostBeforeBackoffStarts() = runBlocking {
+    @Test fun signalDuringFailedHandshakeIsNotLostBeforeBackoffStarts() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         val beforeRequest = wake.revision
         wake.request() // onAvailable while a previous HTTP/WS attempt was still in progress
@@ -21,7 +21,7 @@ class ConnectionRetryWakeupTest {
         assertFalse(wake.await(wake.revision, 15L))
     }
 
-    @Test fun secondNetworkEventIsNotDroppedAfterAnImmediateFirstRetry() = runBlocking {
+    @Test fun secondNetworkEventIsNotDroppedAfterAnImmediateFirstRetry() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         val old = wake.revision
         wake.request()
@@ -31,7 +31,7 @@ class ConnectionRetryWakeupTest {
         assertTrue(withTimeout(1_000L) { wake.await(next, 60_000L) })
     }
 
-    @Test fun burstDoesNotQueueOneRetryPerCallback() = runBlocking {
+    @Test fun burstDoesNotQueueOneRetryPerCallback() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         val before = wake.revision
         coroutineScope { repeat(100) { launch(Dispatchers.Default) { wake.request() } } }
@@ -39,13 +39,13 @@ class ConnectionRetryWakeupTest {
         assertFalse(wake.await(wake.revision, 15L))
     }
 
-    @Test fun ordinaryTimerAndZeroWaitStillWorkWithoutSignals() = runBlocking {
+    @Test fun ordinaryTimerAndZeroWaitStillWorkWithoutSignals() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         assertFalse(wake.await(wake.revision, 15L))
         assertFalse(wake.await(wake.revision, 0L))
     }
 
-    @Test fun cancelDoesNotBecomeATimerExpiryOrARecoverySignal() = runBlocking {
+    @Test fun cancelDoesNotBecomeATimerExpiryOrARecoverySignal() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         val waiting = async(start = CoroutineStart.UNDISPATCHED) { wake.await(wake.revision, 60_000L) }
         waiting.cancel()
@@ -57,7 +57,7 @@ class ConnectionRetryWakeupTest {
         }
     }
 
-    @Test fun wakingRetryDoesNotCancelItsOwnedHandshake() = runBlocking {
+    @Test fun wakingRetryDoesNotCancelItsOwnedHandshake() = runBlocking<Unit> {
         val wake = ConnectionRetryWakeup()
         val slot = OwnedConnectionJob()
         val entered = CompletableDeferred<Unit>()
@@ -111,7 +111,7 @@ class ConnectionRetryWakeupTest {
         assertTrue(gate.claim(3L))
     }
 
-    @Test fun concurrentRecoveryCompletionsShareOneReconciliationClaim() = runBlocking {
+    @Test fun concurrentRecoveryCompletionsShareOneReconciliationClaim() = runBlocking<Unit> {
         val gate = ConnectionReconciliationGate({ 100L })
         val accepted = AtomicInteger()
         coroutineScope { repeat(100) { launch(Dispatchers.Default) { if (gate.claim(1L)) accepted.incrementAndGet() } } }

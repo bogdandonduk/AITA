@@ -606,14 +606,22 @@ private class ReceiptPdfPrintDocumentAdapter(
 object ReceiptPlatformAndroidBridge {
     var writeEscPosBytes: (suspend (ByteArray) -> Boolean)? = null
     @Volatile var bluetoothPrinterMacAddress: String? = null
+    @Volatile var receiptTarget: String? = null
+    internal var usb: UsbReceiptTransport? = null
 
-    fun configureBluetoothPrinter(macAddress: String?) {
-        bluetoothPrinterMacAddress = macAddress?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.isNotBlank() }
+    fun configureBluetoothPrinter(macAddress: String?) = configureTarget(macAddress)
+    fun configureTarget(value: String?) {
+        receiptTarget = value?.trim()?.takeIf { it.isNotBlank() }
+        bluetoothPrinterMacAddress = receiptTarget?.takeUnless { it.startsWith("usb:") }?.uppercase(Locale.ROOT)
     }
 
-    suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean =
-        writeEscPosBytes?.let { it(printerBytes.copyOf()) }
-            ?: BluetoothPrinterTransport.write(bluetoothPrinterMacAddress, printerBytes)
+    suspend fun writeEscPosBytesToConfiguredPrinter(printerBytes: ByteArray): Boolean {
+        writeEscPosBytes?.let { return it(printerBytes.copyOf()) }
+        val target = receiptTarget ?: return false
+        // A disconnected USB target must never reroute a receipt to Bluetooth.
+        return if (target.startsWith("usb:")) checkNotNull(usb).write(target, printerBytes)
+            else BluetoothPrinterTransport.write(target, printerBytes)
+    }
 }
 
 
@@ -665,10 +673,12 @@ fun installReceiptPlatformAndroid(context: Context) {
     }
     val receiptPrinterPreferences = appContext.getSharedPreferences("aita_receipt_printer", Context.MODE_PRIVATE)
     val labelPrinterPreferences = appContext.getSharedPreferences("aita_label_printer", Context.MODE_PRIVATE)
-    ReceiptPlatformAndroidBridge.configureBluetoothPrinter(receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
+    if (ReceiptPlatformAndroidBridge.usb == null) ReceiptPlatformAndroidBridge.usb = UsbReceiptTransport(appContext)
+    ReceiptPlatformAndroidBridge.configureTarget(receiptPrinterPreferences.getString("receipt_printer_target", null)
+        ?: receiptPrinterPreferences.getString("bluetooth_printer_mac_address", null))
     LabelPrinterAndroidBridge.configureBluetoothLabelPrinter(labelPrinterPreferences.getString("bluetooth_label_printer_mac_address", null))
     LabelPrinterAndroidBridge.configureProtocol(labelPrinterPreferences.getString("label_printer_protocol", LABEL_PRINTER_PROTOCOL_AUTO))
-    configuredReceiptPrinterDeviceIdState.value = ReceiptPlatformAndroidBridge.bluetoothPrinterMacAddress
+    configuredReceiptPrinterDeviceIdState.value = ReceiptPlatformAndroidBridge.receiptTarget
     configuredLabelPrinterProtocolState.value = LabelPrinterAndroidBridge.labelPrinterProtocol
     val activePrintWebViews = mutableListOf<WebView>()
 
@@ -929,7 +939,8 @@ fun installReceiptPlatformAndroid(context: Context) {
         }
     }
 
-    preparePlatformReceiptPrinterAction = {
+    preparePlatformReceiptPrinterAction = null
+    authorizeBluetoothReceiptPrintersAction = {
         try {
             BluetoothPrinterTransport.requestConnectPermission()
             ReceiptPlatformActionResult(true)
@@ -939,25 +950,23 @@ fun installReceiptPlatformAndroid(context: Context) {
 
     listPlatformReceiptPrinterDevicesAction = {
         withContext(Dispatchers.IO) {
-            listBluetoothReceiptPrinterDevices()
+            val selected = ReceiptPlatformAndroidBridge.receiptTarget
+            val wired = try { ReceiptPlatformAndroidBridge.usb?.discover(selected).orEmpty() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { emptyList() }
+            val paired = try { listBluetoothReceiptPrinterDevices() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { emptyList() }
+            val devices = (wired + paired).distinctBy { it.id }.toMutableList()
+            if (selected != null && devices.none { it.id == selected }) devices += PlatformReceiptPrinterDataModel(
+                selected, printerConnectionMessage("saved"), printerConnectionMessage("disconnected"), configured = true, available = false)
+            devices.sortedByDescending { it.configured }
         }
     }
 
     configurePlatformReceiptPrinterDeviceAction = { deviceId ->
-        val cleanAddress = deviceId?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.isNotBlank() }
-        require(cleanAddress == null || BluetoothAdapter.checkBluetoothAddress(cleanAddress)) { "Select a paired Bluetooth printer" }
-        if (cleanAddress != null) BluetoothPrinterTransport.requestConnectPermission()
-        // Commit durable selection before publishing it to the process.
-        val edit = receiptPrinterPreferences.edit()
-        if (cleanAddress == null) edit.remove("bluetooth_printer_mac_address") else edit.putString("bluetooth_printer_mac_address", cleanAddress)
-        check(edit.commit()) { "Could not save receipt printer selection" }
-        ReceiptPlatformAndroidBridge.configureBluetoothPrinter(cleanAddress)
-        ReceiptPlatformActionResult(
-            true,
-            if (deviceId.isNullOrBlank()) "Receipt printer cleared" else "Receipt printer selected"
-        )
+        selectAndroidReceiptPrinter(deviceId, receiptPrinterPreferences)
     }
-
 
     listPlatformLabelPrinterDevicesAction = {
         withContext(Dispatchers.IO) {
@@ -1007,7 +1016,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                 if (ReceiptPlatformAndroidBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
                     ReceiptPlatformActionResult(true, "Receipt sent to printer")
                 } else {
-                    ReceiptPlatformActionResult(false, "Android Bluetooth ESC/POS receipt printer is not configured")
+                    ReceiptPlatformActionResult(false, printerConnectionMessage("not_configured"))
                 }
             }.getOrElse { throwable ->
                 if (throwable is CancellationException) throw throwable
@@ -1022,7 +1031,7 @@ fun installReceiptPlatformAndroid(context: Context) {
                 if (ReceiptPlatformAndroidBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
                     ReceiptPlatformActionResult(true, "Receipt sent to printer")
                 } else {
-                    ReceiptPlatformActionResult(false, "Android Bluetooth ESC/POS receipt printer is not configured")
+                    ReceiptPlatformActionResult(false, printerConnectionMessage("not_configured"))
                 }
             }.getOrElse {
                 if (it is CancellationException) throw it
@@ -1503,6 +1512,7 @@ class AITA : Application() {
         super.onCreate()
 
         instance = this
+        kz.aita.installAndroidRuntimeDiagnostics(this)
         cacheDirPath = cacheDir.absolutePath
         getSqlDelightDriver =
             {

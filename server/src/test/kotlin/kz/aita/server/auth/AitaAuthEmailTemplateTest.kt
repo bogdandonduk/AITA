@@ -115,8 +115,8 @@ class AitaTajikKyrgyzAuthEmailTemplateTest {
         val expected = mapOf(
             "tg" to listOf("аутентификатор", "кодҳои барқарорсозиро нест", "ҳамаи сеансҳои воридшавиро анҷом",
                 "танҳо", "худатон дархост"),
-            "ky" to listOf("аутентификаторуңузду", "калыбына келтирүү коддорун өчүрүп", "бардык кирүү сессияларын аяктатат",
-                "өзүңүз суранган", "гана киргизиңиз")
+            "ky" to listOf("аутентификаторуңузду", "калыбына келтирүү коддорун өчүрүп", "бардык кирүү сеанстарын аяктатат",
+                "өзүңүз сурансаңыз", "гана киргизиңиз")
         )
         for ((language, phrases) in expected) {
             val copy = aitaAuthEmailCopy("TOTP_RECOVERY", language, "001234", 10)
@@ -131,8 +131,8 @@ class AitaTajikKyrgyzAuthEmailTemplateTest {
         val expected = mapOf(
             "tg" to listOf("гузарвожа", "почтаи электронӣ", "Ҳамаи сеансҳои", "кодҳои кӯҳнаи барқарорсозӣ",
                 "бекор карда шуданд", "фавран", "ҳисоби почтаи электронии худро ҳифз"),
-            "ky" to listOf("сырсөз", "электрондук почта коду", "Бардык кирүү сессиялары", "эски калыбына келтирүү коддору",
-                "жокко чыгарылды", "дароо", "электрондук почта аккаунтуңузду коргоңуз")
+            "ky" to listOf("сырсөз", "электрондук каттагы код", "Бардык кирүү сеанстары", "эски калыбына келтирүү коддору",
+                "жокко чыгарылды", "дароо", "электрондук почтаңызды коргоңуз")
         )
         for ((language, phrases) in expected) {
             val copy = aitaAuthEmailCopy("TOTP_RESET_NOTICE", language, "001234", 10)
@@ -147,7 +147,7 @@ class AitaTajikKyrgyzAuthEmailTemplateTest {
     @Test fun securityChangeCopyDoesNotBecomeAGenericSignInPrompt() {
         for ((language, instruction) in listOf(
             "tg" to "Барои тасдиқи тағйире, ки худатон дархост кардед",
-            "ky" to "Өзүңүз суранган өзгөртүүнү ырастоо үчүн"
+            "ky" to "Сиз суранган өзгөртүүнү ырастоо үчүн"
         )) {
             val copy = aitaAuthEmailCopy("SECURITY_EMAIL_PROOF", language, "001234", 10)
             assertTrue(copy.text.contains(instruction))

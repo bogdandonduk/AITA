@@ -68,6 +68,8 @@ internal fun InventoryLoadStatus.afterSessionChange(storeId: String?): Inventory
 
 /** All active-store publishers must go through this before exposing a new inventory scope. */
 internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIsCurrent: () -> Boolean = { true }) {
+    DynamicCarts.prepareLegacyImport()
+    DynamicCarts.flush()
     inventoryStateMutex.withLock {
         if (!selectionIsCurrent()) return@withLock
         val cleanId = storeId?.trim()?.takeIf { it.isNotEmpty() }
@@ -105,7 +107,13 @@ internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIs
             stockBatchMoveResultState.emit(DataState.Empty())
             resetOperationLogViews(owner, retain)
         }
-        activeStoreIdState.value = cleanId
+        if (owner != previous) latestTransactionReceiptSnapshotState.value = null
+        if (owner != previous || !DynamicCarts.state.value.ready) {
+            cartPersistenceHydratedState.value = false
+            publishCartUiState(CartUiState())
+            activeStoreIdState.value = cleanId
+            DynamicCarts.adoptCurrent()
+        } else activeStoreIdState.value = cleanId
     }
 }
 

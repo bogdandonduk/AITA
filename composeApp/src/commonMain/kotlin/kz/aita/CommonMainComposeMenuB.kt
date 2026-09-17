@@ -440,6 +440,7 @@ fun AppConfiguration.MenuDevicesScreen() {
     val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
     val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
     var refreshingReceiptPrinters by remember { mutableStateOf(false) }
+    var authorizingBluetooth by remember { mutableStateOf(false) }
     var printingReceipt by remember { mutableStateOf(false) }
     var savingReceiptPrinter by remember { mutableStateOf(false) }
     var receiptPrinterError by remember { mutableStateOf("") }
@@ -464,7 +465,7 @@ fun AppConfiguration.MenuDevicesScreen() {
     val labelPrintersRefreshedText = localizedStringResource(1302, "Label printers refreshed")
 
     fun refreshReceiptPrinters(showNotification: Boolean) {
-        if (refreshingReceiptPrinters || printingReceipt || savingReceiptPrinter) return
+        if (refreshingReceiptPrinters || printingReceipt || savingReceiptPrinter || authorizingBluetooth) return
         refreshingReceiptPrinters = true
         receiptPrinterError = ""
         refreshReceiptPrinterDevices(requestPermission = showNotification) { result ->
@@ -477,7 +478,7 @@ fun AppConfiguration.MenuDevicesScreen() {
     }
 
     fun selectReceiptPrinter(id: String?) {
-        if (savingReceiptPrinter || printingReceipt || refreshingReceiptPrinters) return
+        if (savingReceiptPrinter || printingReceipt || refreshingReceiptPrinters || authorizingBluetooth) return
         savingReceiptPrinter = true
         receiptPrinterError = ""
         configureReceiptPrinterDevice(id) { result ->
@@ -491,7 +492,7 @@ fun AppConfiguration.MenuDevicesScreen() {
     }
 
     fun sendTestReceipt() {
-        if (printingReceipt || savingReceiptPrinter || configuredReceiptPrinterId.isNullOrBlank()) return
+        if (printingReceipt || savingReceiptPrinter || authorizingBluetooth || configuredReceiptPrinterId.isNullOrBlank()) return
         printingReceipt = true
         receiptPrinterError = ""
         devicesScope.launch {
@@ -521,9 +522,30 @@ fun AppConfiguration.MenuDevicesScreen() {
         }
     }
 
+    fun authorizeReceiptBluetooth() {
+        val action = authorizeBluetoothReceiptPrintersAction ?: return
+        if (printingReceipt || savingReceiptPrinter || refreshingReceiptPrinters || authorizingBluetooth) return
+        authorizingBluetooth = true
+        devicesScope.launch {
+            var granted = false
+            try {
+                val result = action()
+                granted = result.success
+                receiptPrinterError = if (result.success) "" else result.message
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (_: Exception) { receiptPrinterError = printerConnectionText("bluetooth_denied") }
+            finally { authorizingBluetooth = false }
+            if (granted) refreshReceiptPrinters(showNotification = false)
+        }
+    }
+
     LaunchedEffect(Unit) {
         refreshReceiptPrinters(showNotification = false)
         refreshLabelPrinters(showNotification = false)
+        while (true) {
+            kotlinx.coroutines.delay(5_000)
+            refreshReceiptPrinters(showNotification = false)
+        }
     }
 
     AitaScreenColumn(
@@ -694,6 +716,12 @@ fun AppConfiguration.MenuDevicesScreen() {
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                         if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…", "Принтерлер изделүүдө…"),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        Text(printerConnectionText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        if (authorizeBluetoothReceiptPrintersAction != null) {
+                            AuthQuietAction(printerConnectionText("bluetooth_access"),
+                                !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !authorizingBluetooth,
+                                onClick = ::authorizeReceiptBluetooth)
+                        }
                         if (getPlatformName().startsWith("jvm", ignoreCase = true)) {
                             AuthQuietAction(authUiText("Enter printer address", "Ввести адрес принтера", "Принтер мекенжайын енгізу", "Принтердин дарегин киргизиңиз"),
                                 !printingReceipt && !savingReceiptPrinter) { showManualReceiptTarget = !showManualReceiptTarget }
@@ -715,8 +743,8 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = stateValues.marginTextFieldGroup),
-                                text = localizedStringResource(1256, "No paired thermal receipt printers found"),
-                                subText = localizedStringResource(1266, "Pair or connect the printer in system settings, then refresh this list."),
+                                text = printerConnectionText("no_printers"),
+                                subText = printerConnectionText("connect_help"),
                                 textSize = stateValues.textSize,
                                 subTextSize = stateValues.smallTextSize
                             )
@@ -1005,8 +1033,8 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
     ) {
         CpImage(
             modifier = Modifier.size(24.dp),
-            url = stateValues.drawablePathIconReceipt,
-            fallbackRes = stateValues.drawableResIconReceipt.value,
+            url = if (receiptPrinterTransport(printer.id) == "usb") usbReceiptIconPath() else stateValues.drawablePathIconReceipt,
+            fallbackRes = if (receiptPrinterTransport(printer.id) == "usb") usbReceiptIconResource() else stateValues.drawableResIconReceipt.value,
             contentDescription = printer.name.ifBlank { printer.id },
             tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor
         )
@@ -1020,6 +1048,8 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            Text(printerConnectionText("transport." + receiptPrinterTransport(printer.id)),
+                color = stateValues.AccentColor, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.SemiBold)
             printer.subtitle.takeIf { it.isNotBlank() }?.let {
                 Text(
                     text = it,
@@ -1036,7 +1066,7 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
             text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1257, "Use this printer"),
             iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconDevices,
             iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconDevices.value,
-            enabled = enabled && !selected,
+            enabled = enabled && !selected && printer.available,
             confirmationRequired = false,
             onClick = onSelect
         )

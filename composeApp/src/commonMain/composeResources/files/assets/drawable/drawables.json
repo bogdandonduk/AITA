@@ -2770,6 +2770,32 @@
           "path": "svg/212_1.svg"
         }
       ]
+    },
+    {
+      "id": 213,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/213_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/213_1.svg"
+        }
+      ]
+    },
+    {
+      "id": 214,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/214_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/214_1.svg"
+        }
+      ]
     }
   ]
 }

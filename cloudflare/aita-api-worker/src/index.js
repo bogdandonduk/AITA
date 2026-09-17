@@ -1,3 +1,5 @@
+import { setTrustedDiagnosticHeaders } from "./diagnostic-forwarding.js";
+
 const BOOTSTRAP_PATHS = new Set([
   "/.well-known/aita-server.json",
   "/config/server",
@@ -236,8 +238,9 @@ function bootstrapPayload(env) {
   };
 }
 
-function trustedForwardingHeaders(request, incomingUrl) {
+function trustedForwardingHeaders(request, incomingUrl, env) {
   const headers = new Headers(request.headers);
+  setTrustedDiagnosticHeaders(headers, request, env, incomingUrl);
   const clientIp = request.headers.get("cf-connecting-ip");
   headers.delete("x-forwarded-for");
   headers.delete("x-real-ip");
@@ -259,7 +262,7 @@ async function proxyToOrigin(request, env) {
   const targetUrl = new URL(`${incomingUrl.pathname}${incomingUrl.search}`, "http://localhost");
   const init = {
     method: request.method,
-    headers: trustedForwardingHeaders(request, incomingUrl),
+    headers: trustedForwardingHeaders(request, incomingUrl, env),
     redirect: "manual",
   };
   if (!BODYLESS_METHODS.has(request.method.toUpperCase())) {

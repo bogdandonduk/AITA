@@ -59,3 +59,7 @@ DELETE FROM key_value
 WHERE instr(key, :prefix) = 1
   AND key != :manifestKey
   AND (:keepPrefix = '' OR instr(key, :keepPrefix) != 1);
+
+-- Read-only legacy import. Old rows remain available for recovery.
+getAllCarts:
+SELECT * FROM cart ORDER BY timeAdded, id;

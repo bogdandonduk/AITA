@@ -67,3 +67,9 @@ clientUpdates:
 help:
   catalogFile: ${?AITA_HELP_CATALOG_FILE}
   screenshotDirectory: ${?AITA_HELP_SCREENSHOTS_DIR}
+
+# Reporting is enabled by user consent in the client. Store roles do not grant diagnostic review access.
+diagnostics:
+  enabled: ${?AITA_DIAGNOSTICS_ENABLED}
+  adminUserIds: ${?AITA_DIAGNOSTICS_ADMIN_USER_IDS}
+  gatewayKey: ${?AITA_DIAGNOSTICS_GATEWAY_KEY}
