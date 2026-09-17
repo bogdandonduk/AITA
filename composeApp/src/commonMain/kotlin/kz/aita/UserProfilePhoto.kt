@@ -6,8 +6,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
+import aita.composeapp.generated.resources.*
+import androidx.compose.material3.*
+import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +89,10 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
 }
 
 @Composable internal fun AppConfiguration.UserProfilePhotoCard() {
+    CompositionLocalProvider(LocalLoadingAnimationsEnabled provides false) { UserProfilePhotoContent() }
+}
+
+@Composable private fun AppConfiguration.UserProfilePhotoContent() {
     val owner=stateValues.userAccount?.id ?: return
     val generation=currentAuthenticatedSessionGeneration()
     val mode=profilePhotoModeForApp(stateValues.appModeId) ?: return
@@ -122,14 +127,48 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
             .border(stateValues.unfocusedBorderWidth,stateValues.PlaceholderTextColor.copy(alpha=.45f),RoundedCornerShape(stateValues.cornerRadius))
             .padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Text(accountPresentationText("photo.title"),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
-            Box(Modifier.size(112.dp).clip(CircleShape).background(stateValues.AccentColor.copy(alpha=.10f))
-                .border(2.dp,stateValues.AccentColor.copy(alpha=.6f),CircleShape),contentAlignment=Alignment.Center) {
-                val decoded=bitmap
-                if(decoded!=null)Image(decoded,accountPresentationText("photo.title"),Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-                else CpImage(Modifier.size(52.dp),url=stateValues.drawablePathIconPerson,fallbackRes=stateValues.drawableResIconPerson.value,
-                    contentDescription=accountPresentationText("photo.title"),tintColor=stateValues.PlaceholderTextColor)
-                if(state.busy)CircularProgressIndicator(Modifier.size(100.dp),color=stateValues.AccentColor)
+            var confirmRemove by remember(state.saved?.revision) { mutableStateOf(false) }
+            Box(Modifier.size(176.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(112.dp).clip(CircleShape).background(stateValues.AccentColor.copy(alpha=.10f))
+                    .border(2.dp,stateValues.AccentColor.copy(alpha=.6f),CircleShape),contentAlignment=Alignment.Center) {
+                    val decoded=bitmap
+                    if(decoded!=null)Image(decoded,accountPresentationText("photo.title"),Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
+                    else CpImage(Modifier.size(52.dp),url=stateValues.drawablePathIconPerson,fallbackRes=stateValues.drawableResIconPerson.value,
+                        contentDescription=accountPresentationText("photo.title"),tintColor=stateValues.PlaceholderTextColor)
+                }
+                val hasPicture = picture != null
+                PhotoRingAction(Modifier.align(Alignment.TopCenter),
+                    accountPresentationText(if (hasPicture) "photo.change" else "photo.choose"),
+                    if (hasPicture) stateValues.drawablePathIconEdit else uiAppearanceResourcesState.value.catalog.drawable(215L, stateValues.appThemeId),
+                    if (hasPicture) stateValues.drawableResIconEdit.value else if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._215_1 else Res.drawable._215_0,
+                    enabled = !state.busy && state.saved != null, onClick = pick)
+                if (state.preview != null) {
+                    PhotoRingAction(Modifier.align(Alignment.CenterEnd), accountPresentationText("photo.save"),
+                        stateValues.drawablePathIconCheck, stateValues.drawableResIconCheck.value,
+                        enabled = !state.busy, onClick = { editor.save() })
+                    PhotoRingAction(Modifier.align(Alignment.CenterStart), accountPresentationText("photo.discard"),
+                        stateValues.drawablePathIconCancel, stateValues.drawableResIconCancel.value,
+                        enabled = !state.busy, onClick = editor::discard)
+                } else {
+                    PhotoRingAction(Modifier.align(Alignment.CenterEnd), accountPresentationText("photo.retry"),
+                        stateValues.drawablePathIconRefresh, stateValues.drawableResIconRefresh.value,
+                        enabled = !state.busy, onClick = editor::load)
+                    if (state.saved?.jpegBase64 != null) {
+                        PhotoRingAction(Modifier.align(Alignment.BottomCenter), accountPresentationText("photo.remove"),
+                            stateValues.drawablePathIconDelete, stateValues.drawableResIconDelete.value,
+                            enabled = !state.busy, onClick = { confirmRemove = true })
+                    }
+                }
             }
+            if (confirmRemove) ModalDialogWidget(
+                title = stateValues.stringConfirm,
+                subTitle = accountPresentationText("photo.remove") + "?",
+                negativeButtonText = stateValues.stringCancel,
+                positiveButtonText = stateValues.stringDelete,
+                onDismiss = { confirmRemove = false },
+                negativeAction = { confirmRemove = false },
+                positiveAction = { confirmRemove = false; editor.save(remove = true) }
+            )
             if(state.preview!=null) Text(storePeopleText("photo_unsaved"),color=stateValues.AccentColor,
                 fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
             Text(storePeopleText(if(mode==ProfilePhotoMode.STORE)"photo_store_visibility" else "photo_separate"),
@@ -137,21 +176,25 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
             state.error?.let {code->Text(accountPresentationText("photo.error.${code.takeIf {it in setOf("size","format","conflict","busy","unavailable")} ?: "network"}"),
                 color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)}
             state.notice?.let {Text(accountPresentationText("photo.$it"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)}
-            if(state.saved!=null) {
-                actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText(if(state.saved?.jpegBase64==null)"photo.choose" else "photo.change"),
-                    iconPath=stateValues.drawablePathIconPerson,enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick=pick)
-                if(state.preview!=null) {
-                    actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.save"),
-                        iconPath=stateValues.drawablePathIconCheck,enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick={editor.save()})
-                    actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.discard"),
-                        enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick=editor::discard)
-                } else if(state.saved?.jpegBase64!=null) {
-                    actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.remove"),
-                        enabled=!state.busy,autoLoading=false,confirmationRequired=true,onClick={editor.save(remove=true)})
-                }
-            }
-            if(state.error!=null || state.saved==null)actionButton(modifier=Modifier.fillMaxWidth(),text=accountPresentationText("photo.retry"),
-                iconPath=stateValues.drawablePathIconRefresh,enabled=!state.busy,autoLoading=false,confirmationRequired=false,onClick=editor::load)
+
+        }
+    }
+}
+
+/** Fixed touch targets sit on the portrait ring, with no raised rectangular shadow. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppConfiguration.PhotoRingAction(modifier: Modifier, label: String, path: String,
+    resource: DrawableResource, enabled: Boolean, onClick: () -> Unit) {
+    TooltipBox(modifier = modifier,
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState()) {
+        IconButton(onClick = onClick, enabled = enabled,
+            modifier = Modifier.size(48.dp).clip(CircleShape).background(stateValues.BackgroundColor)
+                .border(stateValues.unfocusedBorderWidth,
+                    if (enabled) stateValues.AccentColor else stateValues.PlaceholderTextColor, CircleShape)) {
+            CpImage(Modifier.size(23.dp), url = path, fallbackRes = resource, contentDescription = label,
+                tintColor = if (enabled) stateValues.TextColor else stateValues.PlaceholderTextColor)
         }
     }
 }

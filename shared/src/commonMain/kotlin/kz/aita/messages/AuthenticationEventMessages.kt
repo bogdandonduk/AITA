@@ -2,7 +2,7 @@ package kz.aita
 
 /** Authentication presentation only; proof, policy and recipient decisions stay in the auth service. */
 internal fun authenticationEventMessageTemplates(): List<EventMessageTemplate> = listOf(
-    EventMessageTemplate("auth.client.server_update_required", "Update the AITA server to use this sign-in method.", "Обновите сервер AITA для этого способа входа.", "Бұл кіру тәсілі үшін AITA серверін жаңартыңыз.", ky = "Бул кирүү ыкмасын колдонуу үчүн AITA серверин жаңыртыңыз."),
+    EventMessageTemplate("auth.client.server_update_required", "Update the server to use this sign-in method.", "Обновите сервер для этого способа входа.", "Бұл кіру тәсілі үшін серверді жаңартыңыз.", ky = "Бул кирүү ыкмасын колдонуу үчүн серверди жаңыртыңыз."),
     EventMessageTemplate("auth.client.too_many_attempts", "Too many attempts. Try again later.", "Слишком много попыток. Попробуйте позже.", "Тым көп әрекет жасалды. Кейінірек қайталаңыз.", ky = "Аракеттер өтө көп. Кийинчерээк кайра аракет кылыңыз."),
     EventMessageTemplate("auth.client.server_sign_in_failed", "The server could not complete sign-in. Try again or contact the administrator.", "Сервер не смог выполнить вход. Повторите или обратитесь к администратору.", "Сервер кіруді аяқтай алмады. Қайталаңыз немесе әкімшіге хабарласыңыз.", ky = "Сервер кирүүнү аяктай алган жок. Кайра аракет кылыңыз же администраторго кайрылыңыз."),
     EventMessageTemplate("auth.message.sign_in_again_or_choose_an_available_email", "Sign in again or choose an available email", "Войдите заново или выберите доступный email", "Қайта кіріңіз немесе қолжетімді email таңдаңыз", ky = "Кайра кириңиз же жеткиликтүү электрондук почтаны тандаңыз"),

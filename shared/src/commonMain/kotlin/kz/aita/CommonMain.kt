@@ -7948,7 +7948,7 @@ fun List<StylizedDrawablePathsGroupDataModel>.extractPath(id: Long, themeId: Lon
         ?: values?.firstOrNull { it.themeId == -1L }?.path
         ?: values?.firstOrNull { it.themeId == DEFAULT_APP_THEME_ID }?.path
         ?: values?.firstOrNull()?.path
-        ?: if (id in 0L..212L) "svg/${id}_${variant}.svg" else null
+        ?: if (id in 0L..215L) "svg/${id}_${variant}.svg" else null
 }
 
 fun getFullDrawableRemoteResourceUrl(path: String): String {
@@ -10413,9 +10413,9 @@ internal fun nonAitaHttpResponseMessage(
     } else {
         localizedStringResourceMessage(
             id = 1140,
-            main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-            ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-            kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+            main = "Can’t reach server. Check Wi‑Fi or server address.",
+            ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+            kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
         )
     }
 }
@@ -10451,9 +10451,9 @@ internal fun networkTransportFailureMessage(
     throwable: Throwable? = null
 ): List<LocalizedStringDataModel> = localizedStringResourceMessage(
     id = 1140,
-    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+    main = "Can’t reach server. Check Wi‑Fi or server address.",
+    ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+    kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
 )
 
 @PublishedApi
@@ -10744,9 +10744,9 @@ internal fun recentAuthRefreshNonAuthFailureMessage(): List<LocalizedStringDataM
     return if (lastAuthRefreshNonAuthFailureWasTransportFailure) {
         localizedStringResourceMessage(
             id = 1140,
-            main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-            ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-            kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+            main = "Can’t reach server. Check Wi‑Fi or server address.",
+            ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+            kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
         )
     } else {
         localizedStringResourceMessage(
@@ -10900,9 +10900,9 @@ private suspend fun probeReachableAitaServerUrl(
         response = lastFailure ?: ResponseDataModel(
             message = localizedStringResourceMessage(
                 id = 1140,
-                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                main = "Can’t reach server. Check Wi‑Fi or server address.",
+                ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
             ),
             payload = null,
             negative = true,
@@ -13790,9 +13790,9 @@ private suspend fun cloudConnectionProbeRequest(reason: String): ResponseDataMod
         return ResponseDataModel(
             message = localizedStringResourceMessage(
                 id = 1140,
-                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                main = "Can’t reach server. Check Wi‑Fi or server address.",
+                ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
             ),
             payload = null,
             negative = true,
@@ -13830,9 +13830,9 @@ private data class CloudConnectionRecoveryResult(
 private fun unavailableCloudConnectionResponse(): ResponseDataModel<Unit> = ResponseDataModel(
     message = localizedStringResourceMessage(
         id = 1140,
-        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+        main = "Can’t reach server. Check Wi‑Fi or server address.",
+        ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+        kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
     ),
     payload = null,
     negative = true,
@@ -14542,9 +14542,9 @@ fun refreshCloudConnectionManually() {
                         } else {
                             localizedStringResourceMessage(
                                 id = 1140,
-                                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                                main = "Can’t reach server. Check Wi‑Fi or server address.",
+                                ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                                kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                             )
                         },
                         if (result.transportAvailable) NotificationType.Neutral else NotificationType.Negative,
@@ -14583,9 +14583,9 @@ fun refreshCloudConnectionManually() {
             postInAppNotification(
                 localizedStringResourceMessage(
                     id = 1140,
-                    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                    main = "Can’t reach server. Check Wi‑Fi or server address.",
+                    ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                    kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                 ),
                 NotificationType.Negative,
                 transient = true
@@ -14735,6 +14735,8 @@ private fun String.isCloudTransportFailureNotificationText(): Boolean {
     return listOf(
         "can't reach aita server",
         "can’t reach aita server",
+        "can’t reach server",
+        "can't reach server",
         "cannot reach server",
         "cannot connect to server",
         "server unavailable",
@@ -14840,16 +14842,16 @@ private fun String.isCloudTransportRecoveryNotificationText(): Boolean {
 
 private fun localizedCloudTransportFailureNotificationText(): String = localizedStringResourceText(
     id = 1140,
-    main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-    ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-    kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+    main = "Can’t reach server. Check Wi‑Fi or server address.",
+    ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+    kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
 )
 
 private fun localizedCloudTransportRecoveryNotificationText(): String = localizedStringResourceText(
     id = 1138,
-    main = "Server connected.",
-    ru = "Сервер подключён.",
-    kk = "Сервер қосылды."
+    main = "Server connected",
+    ru = "Сервер подключён",
+    kk = "Сервер қосылды"
 )
 
 private fun localizedCloudSessionRefreshNotificationText(): String = localizedStringResourceText(
@@ -16284,9 +16286,9 @@ fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? 
                 val fallbackMessage = if (response.transportFailure) {
                     localizedStringResourceMessage(
                         id = 1140,
-                        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                        main = "Can’t reach server. Check Wi‑Fi or server address.",
+                        ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                        kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
                     )
                 } else {
                     localizedStringResourceMessage(
@@ -17059,9 +17061,9 @@ suspend inline fun <reified Response, reified Body> networkRequest(
         lastServerErrorResponse ?: ResponseDataModel<Response>(
             message = lastTransportFailureMessage ?: localizedStringResourceMessage(
                 id = 1140,
-                main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-                ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-                kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+                main = "Can’t reach server. Check Wi‑Fi or server address.",
+                ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+                kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
             ),
             payload = null,
             negative = true,
@@ -17199,9 +17201,9 @@ internal fun <Response> nonAitaServerResponseDataModel(
 ): ResponseDataModel<Response> {
     val message = localizedStringResourceMessage(
         id = 1140,
-        main = "Can’t reach AITA server. Check Wi‑Fi or server address.",
-        ru = "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера.",
-        kk = "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+        main = "Can’t reach server. Check Wi‑Fi or server address.",
+        ru = "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера.",
+        kk = "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
     )
 
     return ResponseDataModel(

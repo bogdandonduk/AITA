@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.PI
 import kotlin.math.sin
 
+internal val LocalLoadingAnimationsEnabled = staticCompositionLocalOf { true }
+
 @Composable
 private fun rememberLoadingPhase(): Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
     val phase = remember { Animatable(-1f) }

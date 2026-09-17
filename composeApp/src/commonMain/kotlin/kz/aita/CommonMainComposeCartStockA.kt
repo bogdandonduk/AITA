@@ -12,6 +12,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
@@ -4265,6 +4271,10 @@ internal fun AppConfiguration.AitaBottomSheet(
             this !is NavigationScreenModel.Splash && this !is NavigationScreenModel.UserAuth
         } == true) 60.dp else 0.dp
 
+    val drag = remember { AitaSheetDragState() }
+    val density = LocalDensity.current.density
+    val sheetScroll = rememberSheetNestedScroll(drag, density, onDismiss)
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -4281,6 +4291,10 @@ internal fun AppConfiguration.AitaBottomSheet(
             Column(
                 modifier = Modifier
                     .aitaBottomSheetEntrance()
+                    .offset { IntOffset(0, drag.offset.roundToInt()) }
+                    .onSizeChanged { drag.height = it.height.toFloat() }
+                    .nestedScroll(sheetScroll)
+                    .observeSheetPointer(drag, density, onDismiss)
                     .widthIn(max = 720.dp)
                     .fillMaxWidth()
                     .heightIn(min = stateValues.screenHeight * 0.38f, max = (stateValues.screenHeight * 0.92f - bottomNavReserve).coerceAtLeast(stateValues.screenHeight * 0.50f))
@@ -4301,11 +4315,17 @@ internal fun AppConfiguration.AitaBottomSheet(
                         )
                     )
             ) {
+                Box(Modifier.fillMaxWidth().height(22.dp)
+                    .aitaSheetHandle(drag, density, onDismiss), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(36.dp, 4.dp).background(
+                        stateValues.PlaceholderTextColor.copy(alpha = .5f), RoundedCornerShape(2.dp)))
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
-                        .padding(horizontal = stateValues.marginTextFieldGroup),
+                        .padding(start = stateValues.marginTextFieldGroup, end = 6.dp)
+                        .aitaSheetHandle(drag, density, onDismiss),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -4329,16 +4349,15 @@ internal fun AppConfiguration.AitaBottomSheet(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    actionButton(
-                        text = "",
-                        iconPath = stateValues.drawablePathIconCancel,
-                        iconRes = stateValues.drawableResIconCancel.value,
-                        enabledColor = stateValues.BackgroundColor,
-                        textColor = stateValues.TextColor,
-                        iconTintColor = stateValues.TextColor,
-                        confirmationRequired = false,
-                        onClick = onDismiss
-                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .background(stateValues.BackgroundColor)
+                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = .5f),
+                            RoundedCornerShape(stateValues.cornerRadius))) {
+                        CpImage(Modifier.size(22.dp), url = stateValues.drawablePathIconCancel,
+                            fallbackRes = stateValues.drawableResIconCancel.value,
+                            contentDescription = stateValues.stringCancel, tintColor = stateValues.TextColor)
+                    }
                 }
 
                 Spacer(
@@ -4957,19 +4976,10 @@ internal fun AppConfiguration.SupplierPickerBottomSheet(
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-            actionButton(
-                text = storePeopleText("add_supplier"),
-                iconPath = stateValues.drawablePathIconAdd,
-                confirmationRequired = false,
-                onClick = { addMode = true }
-            )
-
-            Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
-                contentPadding = PaddingValues(bottom = stateValues.screenHeight / 6)
+                contentPadding = PaddingValues(bottom = stateValues.marginTextField)
             ) {
                 val q = search.trim()
                 val visibleSuppliers = suppliers
@@ -5001,6 +5011,15 @@ internal fun AppConfiguration.SupplierPickerBottomSheet(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
+            actionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = storePeopleText("add_supplier"),
+                iconPath = stateValues.drawablePathIconAdd,
+                autoLoading = false,
+                confirmationRequired = false,
+                onClick = { addMode = true }
+            )
         }
     }
 }

@@ -49,9 +49,10 @@ fun resolveLocalizedResource(
     bundled: List<LocalizedStringDataModel>?
 ): String? {
     val selected = if (canonicalLanguageCode(language) == "system") effectiveAppLanguage(language) else canonicalLanguageCode(language)
-    return primary?.exactLocalizedValue(selected) ?: bundled?.exactLocalizedValue(selected)
+    val value = primary?.exactLocalizedValue(selected) ?: bundled?.exactLocalizedValue(selected)
         ?: bundledTranslatedStringResource(id, selected)
         ?: primary?.extractLocalizedString(selected) ?: bundled?.extractLocalizedString(selected)
+    return value?.let { normalizeAppResourceCopy(id, it) }
 }
 
 /** Preserve first-row precedence while completing every language before legacy projection. */
@@ -65,4 +66,29 @@ fun mergeLocalizedStringGroups(
         values = group.values.withMissingLocalizedValues(firstBundled[group.id]?.values.orEmpty())) }
     firstBundled.forEach { (id, group) -> if (id !in result) result[id] = group }
     return result.values.toList()
+}
+
+/** App-owned resource copy only: never rewrite business names, messages or other user-authored text. */
+internal fun normalizeAppResourceCopy(id: Long, value: String): String {
+    val text = value
+        .replace("an AITA server", "a server")
+        .replace("AITA serveriga", "serverga")
+        .replace("AITA serveri", "server")
+        .replace("AITA server", "server")
+        .replace("Сервер AITA", "Сервер")
+        .replace("сервера AITA", "сервера")
+        .replace("сервер AITA", "сервер")
+        .replace("сервери AITA-ро", "серверро")
+        .replace("сервери AITA", "сервер")
+        .replace("AITA серверінің", "сервердің")
+        .replace("AITA серверинин", "сервердин")
+        .replace("AITA серверіне", "серверге")
+        .replace("AITA серверине", "серверге")
+        .replace("AITA серверін", "серверді")
+        .replace("AITA серверин", "серверди")
+        .replace("AITA сервері", "сервер")
+        .replace("AITA сервери", "сервер")
+        .replace("AITA сервер", "сервер")
+        .let { if (it.startsWith("сервер")) "С" + it.drop(1) else if (it.startsWith("serverga")) "S" + it.drop(1) else it }
+    return if (id == 1138L) text.trimEnd().removeSuffix(".") else text
 }

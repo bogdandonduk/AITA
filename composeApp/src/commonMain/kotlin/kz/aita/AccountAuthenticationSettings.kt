@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -218,10 +217,6 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (loading && settings == null) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = stateValues.AccentColor, trackColor = stateValues.PlaceholderTextColor.copy(alpha = 0.12f))
-                }
-
                 settings?.let { current ->
                     AuthSettingsInfoRow(authUiText("Main phone number", "Основной номер телефона", "Негізгі телефон нөмірі", "Негизги телефон номери"),
                         current.mainPhoneNumber.ifBlank { stateValues.userAccount?.phoneNumber.orEmpty() }

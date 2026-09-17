@@ -34921,31 +34921,31 @@
       "values": [
         {
           "language": "main",
-          "value": "Server connected."
+          "value": "Server connected"
         },
         {
           "language": "en",
-          "value": "Server connected."
+          "value": "Server connected"
         },
         {
           "language": "ru",
-          "value": "Сервер подключён."
+          "value": "Сервер подключён"
         },
         {
           "language": "kk",
-          "value": "Сервер қосылды."
+          "value": "Сервер қосылды"
         },
         {
           "language": "tg",
-          "value": "Сервер пайваст аст."
+          "value": "Сервер пайваст аст"
         },
         {
           "language": "uz",
-          "value": "Serverga ulanildi."
+          "value": "Serverga ulanildi"
         },
         {
           "language": "ky",
-          "value": "Сервер туташты."
+          "value": "Сервер туташты"
         }
       ]
     },
@@ -34987,31 +34987,31 @@
       "values": [
         {
           "language": "main",
-          "value": "Can’t reach AITA server. Check Wi‑Fi or server address."
+          "value": "Can’t reach server. Check Wi‑Fi or server address."
         },
         {
           "language": "en",
-          "value": "Can’t reach AITA server. Check Wi‑Fi or server address."
+          "value": "Can’t reach server. Check Wi‑Fi or server address."
         },
         {
           "language": "ru",
-          "value": "Сервер AITA недоступен. Проверьте Wi‑Fi или адрес сервера."
+          "value": "Сервер недоступен. Проверьте Wi‑Fi или адрес сервера."
         },
         {
           "language": "kk",
-          "value": "AITA сервері қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
+          "value": "Сервер қолжетімсіз. Wi‑Fi немесе сервер мекенжайын тексеріңіз."
         },
         {
           "language": "tg",
-          "value": "Пайвастшавӣ ба сервери AITA имконнопазир аст. Wi‑Fi ё суроғаи серверро санҷед."
+          "value": "Пайвастшавӣ ба сервер имконнопазир аст. Wi‑Fi ё суроғаи серверро санҷед."
         },
         {
           "language": "uz",
-          "value": "AITA serveriga ulanib boʻlmadi. Wi‑Fi yoki server manzilini tekshiring."
+          "value": "Serverga ulanib boʻlmadi. Wi‑Fi yoki server manzilini tekshiring."
         },
         {
           "language": "ky",
-          "value": "AITA серверине туташуу мүмкүн эмес. Wi-Fi тармагын же сервердин дарегин текшериңиз."
+          "value": "Серверге туташуу мүмкүн эмес. Wi-Fi тармагын же сервердин дарегин текшериңиз."
         }
       ]
     },

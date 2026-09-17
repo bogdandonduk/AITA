@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 4,
+  "revision": 5,
   "tutorials": [
     {
       "id": "account.register",
@@ -307,8 +307,8 @@
         {
           "id": "step-2",
           "text": {
-            "en": "Select one JPEG or PNG up to 8 MB in the system picker. On iOS use a picture saved in Files. A connection to the updated AITA server is required to prepare the preview.",
-            "ru": "Выберите в системном окне один JPEG или PNG размером до 8 МБ. На iOS используйте изображение из приложения «Файлы». Для подготовки предпросмотра нужно подключение к обновлённому серверу AITA."
+            "en": "Select one JPEG or PNG up to 8 MB in the system picker. On iOS use a picture saved in Files. A connection to the updated server is required to prepare the preview.",
+            "ru": "Выберите в системном окне один JPEG или PNG размером до 8 МБ. На iOS используйте изображение из приложения «Файлы». Для подготовки предпросмотра нужно подключение к обновлённому серверу."
           },
           "screenshots": []
         },
@@ -690,8 +690,8 @@
         {
           "id": "step-2",
           "text": {
-            "en": "Open Theme and choose Light, Dark, Purple or Blue. Purple and Blue use deep-colored backgrounds, white text and the same gold accent.",
-            "ru": "Откройте «Тема» и выберите светлую, тёмную, фиолетовую или синюю. В фиолетовой и синей темах используются глубокий цвет фона, белый текст и прежний золотой акцент."
+            "en": "Open Theme and choose from 18 named shades, including Porcelain White, Midnight Amethyst, Black Cherry Crimson and Pale Butter Yellow. Dark shades use white text; light shades use dark text and icons.",
+            "ru": "Откройте «Тема» и выберите один из 18 оттенков, например «Фарфоровый белый», «Полуночный аметист», «Черешневый багряный» или «Нежный сливочно-жёлтый». В тёмных темах текст белый, в светлых — тёмные текст и значки."
           },
           "screenshots": []
         },

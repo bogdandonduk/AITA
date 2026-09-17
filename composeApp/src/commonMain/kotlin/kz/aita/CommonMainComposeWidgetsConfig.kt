@@ -396,6 +396,8 @@ internal fun localDrawableResourceForPath(
         "145_1" -> Res.drawable._145_1
         "148_0" -> Res.drawable._148_0
         "148_1" -> Res.drawable._148_1
+        "215_0" -> Res.drawable._215_0
+        "215_1" -> Res.drawable._215_1
         else -> fallbackRes
     }
 }
@@ -5769,6 +5771,10 @@ fun AppConfiguration.AppThemeSettingsItemWidget(
                 tintColor = if (isActive) stateValues.AccentColor else stateValues.TextColor
             )
 
+            Box(Modifier.padding(start = 8.dp).size(24.dp)
+                .background(parseAppearanceColor(appThemeSwatch(id)), RoundedCornerShape(8.dp))
+                .border(1.dp, stateValues.PlaceholderTextColor, RoundedCornerShape(8.dp)))
+
             Text(
                 text = name,
                 modifier = Modifier
@@ -6014,7 +6020,8 @@ fun AppConfiguration.actionButton(
             )
 
     val resolvedIconRes = iconRes
-    val iconPresent = effectiveLoading || icon != null || inferredIconPath != null
+    val showBusyAnimation = effectiveLoading && LocalLoadingAnimationsEnabled.current
+    val iconPresent = showBusyAnimation || icon != null || inferredIconPath != null
     val iconSize = iconSizeOverride ?: when {
         inferredIconPath == stateValues.drawablePathIconBackArrow -> 18.dp
         textPresent -> 20.dp
@@ -6086,7 +6093,7 @@ fun AppConfiguration.actionButton(
         @Composable
         fun ActionButtonIconSlot() {
             AnimatedContent(
-                targetState = effectiveLoading,
+                targetState = showBusyAnimation,
                 transitionSpec = {
                     (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
                             scaleIn(initialScale = 0.68f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))

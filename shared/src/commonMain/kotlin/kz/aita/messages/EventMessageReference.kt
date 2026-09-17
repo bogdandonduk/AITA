@@ -107,8 +107,9 @@ object EventMessages {
         val resourceText = resourceId?.let { id ->
             val values = resourceLookup(id)
             val selected = eventMessageLanguage(language)
-            values?.exactLocalizedValue(selected) ?: bundledTranslatedStringResource(id, selected)
+            val text = values?.exactLocalizedValue(selected) ?: bundledTranslatedStringResource(id, selected)
                 ?: if (exact) null else values?.rawEventLocalizedText(selected)
+            text?.let { normalizeAppResourceCopy(id, it) }
         }
         val pattern = resourceText ?: (if (exact) template?.exactText(language) else template?.text(language)) ?: return null
         val required = placeholders(pattern)

@@ -96,7 +96,7 @@ class PasswordLoginCompatibilityTest {
         val unavailable = ResponseDataModel<Unit>(message = message, payload = null, negative = true, httpStatusCode = 503, transportFailure = true)
         assertEquals(unavailable, unavailable.withAuthFailureMessage())
         val missing = ResponseDataModel<Unit>(message = null, payload = null, negative = true, httpStatusCode = 404).withAuthFailureMessage()
-        assertTrue(missing.message.orEmpty().any { it.value.contains("Update the AITA server") })
+        assertTrue(missing.message.orEmpty().any { it.value.contains("Update the server") })
         assertFalse(missing.transportFailure)
     }
 }

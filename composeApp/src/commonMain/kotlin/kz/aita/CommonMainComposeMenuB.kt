@@ -242,6 +242,11 @@ internal fun AppConfiguration.SecuritySessionHistoryCard(event: SecuritySessionH
 
 @Composable
 fun AppConfiguration.MenuSecurityScreen() {
+    CompositionLocalProvider(LocalLoadingAnimationsEnabled provides false) { MenuSecurityContent() }
+}
+
+@Composable
+private fun AppConfiguration.MenuSecurityContent() {
     val sessionsState by securitySessionsState.value.collectAsState()
     val historyState by securitySessionHistoryState.value.collectAsState()
     val sessions = (sessionsState as? DataState.Success<List<SecuritySessionDataModel>>)?.payload.orEmpty()
@@ -4951,7 +4956,7 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
         Text(
             modifier = Modifier.weight(1f),
             text = when (displayedStatusKey) {
-                "connected" -> localizedStringResource(1138, "Server connected.")
+                "connected" -> localizedStringResource(1138, "Server connected")
                 "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
                 "unavailable" -> storePeopleText("offline")
                 else -> localizedStringResource(1139, "Checking server connection…")
@@ -5035,6 +5040,8 @@ internal fun String.isServerUnavailablePopupText(): Boolean {
     return listOf(
         "can't reach aita server",
         "can’t reach aita server",
+        "can’t reach server",
+        "can't reach server",
         "cannot reach server",
         "cannot connect to server",
         "server unavailable",
@@ -5922,9 +5929,9 @@ internal fun AppConfiguration.localizedNotificationMessage(message: String): Str
     EventMessages.render(reference, eventPresentationLanguage(), ::eventPresentationResourceValues)?.let { return it }
     val notificationKey = normalized.normalizedNotificationPopupKey()
     if (notificationKey.isServerUnavailablePopupText()) {
-        return localizedStringResource(1140, "Can’t reach AITA server. Check Wi‑Fi or server address.")
+        return localizedStringResource(1140, "Can’t reach server. Check Wi‑Fi or server address.")
     }
-    if (notificationKey.isServerRecoveryPopupText()) return localizedStringResource(1138, "Server connected.")
+    if (notificationKey.isServerRecoveryPopupText()) return localizedStringResource(1138, "Server connected")
     if (notificationKey.isSessionRefreshPopupText()) {
         return localizedStringResource(91, "Cloud sign-in expired. Sign in again to sync. Your local data stays available.")
     }
