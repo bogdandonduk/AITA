@@ -725,7 +725,9 @@ data class TransactionReceiptLineDataModel(
 data class ReceiptPlatformActionResult(
     val success: Boolean,
     val message: String = "",
-    val savedFile: SavedPdfFile? = null
+    val savedFile: SavedPdfFile? = null,
+    /** Canonical identity durably selected by the platform, for example after USB permission. */
+    val selectedDeviceId: String? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -933,8 +935,10 @@ fun configureReceiptPrinterDevice(deviceId: String?, onCompleted: ((ReceiptPlatf
                 val configured = configurePlatformReceiptPrinterDeviceAction?.invoke(clean)
                     ?: ReceiptPlatformActionResult(false, "Receipt printer configuration is not available on this platform")
                 if (configured.success) {
-                    configuredReceiptPrinterDeviceIdState.emit(clean)
-                    receiptPrinterDevicesState.emit(receiptPrinterDevicesState.value.map { it.copy(configured = it.id == clean) })
+                    val selected = if (clean == null) null else
+                        configured.selectedDeviceId?.trim()?.takeIf { it.isNotBlank() } ?: clean
+                    configuredReceiptPrinterDeviceIdState.emit(selected)
+                    receiptPrinterDevicesState.emit(receiptPrinterDevicesState.value.map { it.copy(configured = it.id == selected) })
                     try { reloadReceiptPrintersInside() }
                     catch (cancel: CancellationException) { throw cancel }
                     catch (_: Exception) { /* Discovery failure must not undo a successfully persisted selection. */ }
