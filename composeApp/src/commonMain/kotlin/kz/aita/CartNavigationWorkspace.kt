@@ -10,6 +10,7 @@ open class CartNavigationWorkspace(private val type: Int, private val integrated
     private val right = MutableStateFlow<Map<Int, MutableStateFlow<List<NavigationScreenModel.Transaction>>>>(emptyMap())
     private var narrow: Boolean? = null
     private var boundScope: CartScope? = null
+    private var restoredSlots: List<Int>? = null
     private fun state(id: Int, isLeft: Boolean): MutableStateFlow<List<NavigationScreenModel.Transaction>> {
         require(validCartSlot(type, id))
         val map = if (isLeft) left else right
@@ -51,29 +52,53 @@ open class CartNavigationWorkspace(private val type: Int, private val integrated
     }
     fun isVeryFirstScreen(isNarrowScreen: Boolean, clientId: Int) = state(clientId, isNarrowScreen).value.size <= 1
     suspend fun resetCart(id: Int) { clearAt(id, true); clearAt(id, false) }
-    suspend fun resetAll() { selected.value = 0; (left.value.keys + right.value.keys).forEach { resetCart(it) }; left.value = emptyMap(); right.value = emptyMap(); narrow = null }
+    suspend fun resetAll() { selected.value = 0; (left.value.keys + right.value.keys).forEach { resetCart(it) }; left.value = emptyMap(); right.value = emptyMap(); narrow = null; restoredSlots = null }
     internal suspend fun bind(owner: CartScope?) { resetAll(); boundScope = owner }
-    internal fun persistentSnapshot(): PersistedTransactionNavigationSectionDataModel {
-        val used = maxOf(selected.value, (left.value.keys + right.value.keys).maxOrNull() ?: 0) + 1
-        val count = maxOf(INITIAL_CART_SLOTS, used, if (integrated) DynamicCarts.counts.value[type] else 2)
+    internal suspend fun retainSlots(ids: List<Int>) {
+        require(ids.take(2) == listOf(0, 1))
+        (left.value.keys + right.value.keys).filterNot { it in ids }.forEach { resetCart(it) }
+        left.value = left.value.filterKeys { it in ids }
+        right.value = right.value.filterKeys { it in ids }
+        restoredSlots = ids
+        if (selected.value !in ids) selected.value = ids.lastOrNull { it < selected.value } ?: 0
+    }
+    private fun allocatedSlots(): List<Int> {
+        if (integrated) return DynamicCarts.state.value.book.activeSlots(type)
+        restoredSlots?.let { return it }
+        val count = maxOf(INITIAL_CART_SLOTS, selected.value + 1, ((left.value.keys + right.value.keys).maxOrNull() ?: 0) + 1)
         require(count <= MAX_CART_SLOTS)
-        return PersistedTransactionNavigationSectionDataModel(selected.value,
-            (0 until count).map { state(it, true).value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart) },
-            (0 until count).map { state(it, false).value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection) }, count)
+        return (0 until count).toList()
+    }
+    internal fun persistentSnapshot(): PersistedTransactionNavigationSectionDataModel {
+        val ids = allocatedSlots()
+        return PersistedTransactionNavigationSectionDataModel(selected.value.takeIf { it in ids } ?: ids.first(),
+            ids.map { state(it, true).value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Cart) },
+            ids.map { state(it, false).value.toCompactPersistentRoutes(NavigationScreenModel.Transaction.Selection) }, ids.size, ids)
     }
     internal suspend fun restorePersistentSnapshot(snapshot: PersistedTransactionNavigationSectionDataModel) {
         require(validCartSlot(type, snapshot.clientId))
         require(snapshot.left.size <= MAX_CART_SLOTS && snapshot.right.size <= MAX_CART_SLOTS)
         require(snapshot.slotCount == null || snapshot.slotCount in INITIAL_CART_SLOTS..MAX_CART_SLOTS)
         val meaningful = maxOf(snapshot.left.indexOfLast { it.size > 1 }, snapshot.right.indexOfLast { it.size > 1 }, snapshot.clientId)
-        val count = maxOf(INITIAL_CART_SLOTS, snapshot.slotCount ?: 2, meaningful + 1,
-            if (integrated) DynamicCarts.counts.value[type] else 2)
-        if (integrated && !DynamicCarts.reveal(type, count - 1)) return
-        for (id in 0 until count) {
-            state(id, true).value = snapshot.left.getOrNull(id).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart)
-            state(id, false).value = snapshot.right.getOrNull(id).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection)
+        val savedIds = snapshot.slots ?: run {
+            val count = maxOf(INITIAL_CART_SLOTS, snapshot.slotCount ?: 2, meaningful + 1)
+            require(count <= MAX_CART_SLOTS)
+            (0 until count).toList()
         }
-        selected.value = snapshot.clientId
+        require(savedIds.size in INITIAL_CART_SLOTS..MAX_CART_SLOTS && savedIds.take(2) == listOf(0, 1))
+        require(savedIds.distinct().size == savedIds.size && savedIds.all { validCartSlot(type, it) })
+        if (integrated && DynamicCarts.state.value.book.slots == null) {
+            if (!DynamicCarts.reveal(type, savedIds.max())) return
+        }
+        // The durable cart book wins over an older navigation snapshot after removal/crash.
+        val ids = if (integrated) DynamicCarts.state.value.book.activeSlots(type) else savedIds
+        retainSlots(ids)
+        for (id in ids) {
+            val position = savedIds.indexOf(id)
+            state(id, true).value = snapshot.left.getOrNull(position).toPersistentTransactionStack(NavigationScreenModel.Transaction.Cart)
+            state(id, false).value = snapshot.right.getOrNull(position).toPersistentTransactionStack(NavigationScreenModel.Transaction.Selection)
+        }
+        selected.value = snapshot.clientId.takeIf { it in ids } ?: ids.first()
         narrow = null
     }
     suspend fun init(isNarrowScreen: Boolean) {

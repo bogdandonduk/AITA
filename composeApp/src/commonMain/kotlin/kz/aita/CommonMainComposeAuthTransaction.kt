@@ -2010,26 +2010,32 @@ fun AppConfiguration.TransactionScreen() {
 
             clearCartClientIdToConfirm?.let { targetClientId ->
                 val targetCart by getCartState(transactionTypeIndex, targetClientId).collectAsState()
-                if (targetCart.isEmpty()) {
+                val removing = targetClientId >= INITIAL_CART_SLOTS
+                if (!cartBookState.book.contains(transactionTypeIndex, targetClientId) || (targetCart.isEmpty() && !removing)) {
                     LaunchedEffect(targetClientId) { clearCartClientIdToConfirm = null }
                 } else {
                     ModalDialogWidget(
-                        title = localizedStringResource(1176, "Clear cart?"),
-                        subTitle = localizedStringResource(1177, "This will remove all items and reset this cart's payment and receipt navigation."),
+                        title = if (removing) checkoutText("remove_cart") else localizedStringResource(1176, "Clear cart?"),
+                        subTitle = if (removing) checkoutText("remove_cart_details") else localizedStringResource(1177, "This will remove all items and reset this cart's payment and receipt navigation."),
                         negativeButtonText = stateValues.stringCancel,
-                        positiveButtonText = stateValues.stringClear,
+                        positiveButtonText = if (removing) stateValues.stringDelete else stateValues.stringClear,
                         positiveAction = {
                             coroutineScope.launch {
                                 val owner = currentCartOwner ?: return@launch
                                 if (!DynamicCarts.isCurrent(owner)) return@launch
-                                val cleared = try { DynamicCarts.delete(transactionTypeIndex, targetClientId, owner) }
+                                val cleared = try {
+                                    if (removing) DynamicCarts.remove(transactionTypeIndex, targetClientId, owner)
+                                    else DynamicCarts.delete(transactionTypeIndex, targetClientId, owner)
+                                }
                                     catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
                                     catch (_: Exception) {
                                         postInAppNotification(checkoutText("save_error"), NotificationType.Negative, transient = true)
                                         false
                                     }
                                 if (!cleared || !DynamicCarts.isCurrent(owner)) return@launch
-                                resetTransactionCartNavigationState(transactionTypeIndex, targetClientId)
+                                if (removing) Navigation.transactionWorkspace(transactionTypeIndex)
+                                    .retainSlots(DynamicCarts.state.value.book.activeSlots(transactionTypeIndex))
+                                else resetTransactionCartNavigationState(transactionTypeIndex, targetClientId)
                                 latestTransactionReceiptSnapshotState.value
                                     ?.takeIf { snapshot ->
                                         snapshot.paymentDraft.transactionTypeIndex == transactionTypeIndex &&
@@ -2038,7 +2044,7 @@ fun AppConfiguration.TransactionScreen() {
                                     ?.let { latestTransactionReceiptSnapshotState.emit(null) }
                                 clearCartClientIdToConfirm = null
                                 postInAppNotification(
-                                    localizedStringResource(1178, "Cart cleared"),
+                                    if (removing) checkoutText("cart_removed") else localizedStringResource(1178, "Cart cleared"),
                                     NotificationType.Positive,
                                     transient = true
                                 )
@@ -2120,7 +2126,9 @@ fun AppConfiguration.TransactionScreen() {
                     latestReceiptSnapshot?.paymentDraft?.transactionTypeIndex == transactionTypeIndex &&
                             latestReceiptSnapshot?.paymentDraft?.clientId == clientId
 
-                if (goodsInCart.isEmpty() && !(showingReceipt && receiptBelongsHere)) {
+                // An empty cart must still be allowed to show the item picker on a phone.
+                val showingPayment = currentScreens.lastOrNull() is NavigationScreenModel.Transaction.Payment
+                if (goodsInCart.isEmpty() && (showingPayment || (showingReceipt && !receiptBelongsHere))) {
                     Navigation.transactionWorkspace(transactionTypeIndex).clearSlot(clientId, stateValues.isNarrowScreen)
                 }
             }
@@ -2131,6 +2139,10 @@ fun AppConfiguration.TransactionScreen() {
             TransactionCartTabsRow(
                 type = transactionTypeIndex, selected = clientId,
                 supplierId = currentSupplySupplierId, onSupplier = { supplierSheetOpen = true },
+                onClearSupplier = {
+                    if (currentCartOwner != null && DynamicCarts.isCurrent(currentCartOwner))
+                        clearTransactionSupplySupplierId(transactionTypeIndex, clientId)
+                },
                 onClear = { clearCartClientIdToConfirm = it }
             )
 

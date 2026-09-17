@@ -64,13 +64,8 @@ actual var getSystemLocaleLanguage: () -> String = {
 
 actual var getPlatformName: () -> String = { "wasmJs" }
 
-actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    // The browser cache bridge still works through localStorage.
-    // SQLDelight's worker driver is intentionally not installed here because
-    // the generated JS/Wasm worker entry is bundler-specific and caused IDE/compiler
-    // errors on the current project setup. Returning null keeps Wasm startup safe.
-    null
-}
+// initializeBrowserDatabase installs the durable worker before the app starts.
+actual var getSqlDelightDriver: (() -> SqlDriver?)? = null
 
 actual object LocalAitaLanTransport {
     actual fun start(

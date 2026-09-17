@@ -216,7 +216,7 @@ kotlin {
                     implementation(libs.kotlinx.browser)
                     implementation(libs.ktor.client.js)
                     implementation(npm("@cashapp/sqldelight-sqljs-worker", "2.1.0"))
-                    implementation(npm("sql.js", "1.8.0"))
+                    implementation(npm("sql.js", "1.13.0"))
                     implementation(libs.sqlDelightWasmJsDriver)
                     implementation(libs.sqlDelightWasmJsCoroutinesExtensions)
                 }

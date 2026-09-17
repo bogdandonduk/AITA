@@ -91,6 +91,47 @@ class DynamicCartStoreTest {
         assertEquals(mapOf("2:19:item-19:check" to true), saved.ui.checks)
         assertEquals(20, saved.counts[2])
     }
+    @Test fun removalKeepsStableIdsAndEveryOtherCartsState() = runTest {
+        val f = Memory(a)
+        f.saved[a.storageKey] = CartBook(counts = listOf(4, 2, 2), lines = listOf(line(2), line(3)),
+            ui = CartUiState(suppliers = mapOf("0:2" to "removed", "0:3" to "retained")))
+        f.store.adopt(a)
+        assertTrue(f.store.change(a) { it.removeSlot(0, 2) })
+        val book = f.saved[a.storageKey]!!
+        assertEquals(listOf(0, 1, 3), book.activeSlots(0))
+        assertEquals(listOf(3), book.lines.map { it.slot })
+        assertEquals(mapOf("0:3" to "retained"), book.ui.suppliers)
+        assertFalse(f.store.reveal(a, 0, 2))
+        assertEquals(4, f.store.add(a, 0)) // Never reuse a removed ID held by a delayed callback.
+        assertEquals(listOf(0, 1, 3, 4), f.store.state.value.book.activeSlots(0))
+        val serialized = jsonBase.encodeToString(CartBook.serializer(), f.store.state.value.book)
+        assertEquals(f.store.state.value.book, jsonBase.decodeFromString(CartBook.serializer(), serialized).validated())
+    }
+    @Test fun minimumCartsCannotBeRemovedAndEmptyAddedCartsCan() = runTest {
+        val f = Memory(a); f.store.adopt(a)
+        for (id in 0..1) assertFailsWith<IllegalArgumentException> { f.store.change(a) { it.removeSlot(0, id) } }
+        val id = assertNotNull(f.store.add(a, 0))
+        f.store.change(a) { it.removeSlot(0, id) }
+        assertEquals(listOf(0, 1), f.store.state.value.book.activeSlots(0))
+        assertTrue(f.store.state.value.book.lines.isEmpty())
+    }
+    @Test fun removalCapacityIsReclaimedWithoutReusingAnIdentity() = runTest {
+        val f = Memory(a); f.store.adopt(a)
+        repeat(MAX_CART_SLOTS + 2) {
+            val id = assertNotNull(f.store.add(a, 0))
+            assertEquals(it + 2, id)
+            f.store.change(a) { book -> book.removeSlot(0, id) }
+        }
+        assertEquals(2, f.store.state.value.book.counts[0])
+    }
+    @Test fun failedRemovalPreservesCartAndWrongOwnerCannotRemoveIt() = runTest {
+        val f = Memory(a); f.store.adopt(a); f.store.add(a, 0); f.fail = true
+        assertFailsWith<IllegalStateException> { f.store.change(a) { it.removeSlot(0, 2) } }
+        assertTrue(f.store.state.value.book.contains(0, 2))
+        f.current = b
+        assertFalse(f.store.change(a) { it.removeSlot(0, 2) })
+        assertTrue(f.saved[a.storageKey]!!.contains(0, 2))
+    }
     @Test fun stateValueImmediatelyHidesAnotherOwner() = runTest {
         val f = Memory(a); f.saved[a.storageKey] = CartBook(lines = listOf(line(27)))
         f.store.adopt(a)

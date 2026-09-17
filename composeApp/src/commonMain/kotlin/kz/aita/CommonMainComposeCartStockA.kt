@@ -2718,9 +2718,9 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 }
                 val warm = warmWarehouse?.takeIf { it.owner == inventoryViewScopeKey() }
                 val projection = if (useWarmWarehouse) warm?.projection else projectionState.value?.second
-                val collectionsCurrent = collections?.stock === state.payload && collections?.batches === stateValues.stockBatches
+                val collectionsCurrent = collections?.matchesSources(inventoryViewScopeKey(), state.payload, stateValues.stockBatches) == true
                 val projectionCurrent = collectionsCurrent && if (useWarmWarehouse)
-                    warm != null && warm.selection == requestedSelection && warm.language == language && warm.stock === state.payload && warm.batches === stateValues.stockBatches
+                    warm != null && warm.selection == requestedSelection && warm.language == language && warm.stock == state.payload && warm.batches == stateValues.stockBatches.orEmpty()
                     else projectionState.value?.first === projectionRequest
                 if (projection == null) {
                     InventoryLoadFeedback(

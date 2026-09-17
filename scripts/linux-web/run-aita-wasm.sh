@@ -8,6 +8,7 @@ project_root="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 bind_address="127.0.0.1"
 port="8090"
 max_workers="${AITA_GRADLE_MAX_WORKERS:-4}"
+compiler_heap="${AITA_WASM_COMPILER_HEAP:-12288M}"
 build=true
 build_only=false
 
@@ -47,6 +48,9 @@ Options:
   --skip-build         Serve the existing production distribution
   --build-only         Build and verify the distribution, then exit
 
+AITA_WASM_COMPILER_HEAP controls the Kotlin linker heap (default: 12288M).
+The production linker needs more memory than an ordinary target compile.
+
 The default loopback binding is intentional. Reach it remotely over the existing
 Tailscale SSH connection with:
   ssh -N -L 8090:127.0.0.1:8090 aita-ubuntu
@@ -64,6 +68,7 @@ done
 ((EUID != 0)) || aita_die "Run the web build as the normal project owner, not as root or through sudo"
 [[ "$port" =~ ^[0-9]+$ ]] && ((port >= 1 && port <= 65535)) || aita_die "--port must be between 1 and 65535"
 [[ "$max_workers" =~ ^[1-9][0-9]*$ ]] || aita_die "--max-workers must be a positive integer"
+[[ "$compiler_heap" =~ ^[1-9][0-9]*[mMgG]$ ]] || aita_die "AITA_WASM_COMPILER_HEAP must be a size such as 12288M"
 project_root="$(cd -- "$project_root" && pwd)"
 [[ -f "$project_root/gradlew" ]] || aita_die "Gradle wrapper is missing under $project_root"
 [[ -w "$project_root" ]] || aita_die "Project root is not writable by $(id -un): $project_root"
@@ -91,6 +96,7 @@ if $build; then
     cd "$project_root"
     bash ./gradlew \
       -Paita.webOnly=true \
+      "-Pkotlin.daemon.jvmargs=-Xmx$compiler_heap" \
       -Porg.gradle.java.installations.auto-download=false \
       "-Porg.gradle.java.installations.paths=$JAVA_HOME" \
       :composeApp:wasmJsBrowserDistribution \

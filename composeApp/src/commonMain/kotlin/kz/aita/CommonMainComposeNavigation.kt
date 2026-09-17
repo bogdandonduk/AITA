@@ -3259,7 +3259,8 @@ internal data class PersistedTransactionNavigationSectionDataModel(
     val clientId: Int = 0,
     val left: List<List<String>> = emptyList(),
     val right: List<List<String>> = emptyList(),
-    val slotCount: Int? = null
+    val slotCount: Int? = null,
+    val slots: List<Int>? = null
 )
 
 @kotlinx.serialization.Serializable

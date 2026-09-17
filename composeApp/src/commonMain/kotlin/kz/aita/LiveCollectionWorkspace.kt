@@ -13,7 +13,12 @@ internal data class LiveStockCollections(
     val saleBatchesByItem: Map<String, List<GoodsBatchDataModel>>,
     val warehouseBatchesByItem: Map<String, List<GoodsBatchDataModel>>,
     val quantityByItem: Map<String, Double>
-)
+) {
+    // Compose and StateFlow conflate equal values: a newly opened screen can hold an equal
+    // list with a different reference from the app-lifetime worker's retained list.
+    fun matchesSources(owner: String?, items: List<GoodsItemDataModel>?, sourceBatches: List<GoodsBatchDataModel>?): Boolean =
+        this.owner == owner && stock == items && batches == sourceBatches.orEmpty()
+}
 
 internal data class WarehouseSelection(
     val query: String = "", val sort: String = "name", val ascending: Boolean = true,

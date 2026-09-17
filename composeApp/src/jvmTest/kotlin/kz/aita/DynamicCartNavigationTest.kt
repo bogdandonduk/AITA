@@ -46,6 +46,27 @@ class DynamicCartNavigationTest {
         assertFailsWith<IllegalArgumentException> { nav.restorePersistentSnapshot(PersistedTransactionNavigationSectionDataModel(slotCount = 1001)) }
         assertEquals(999, nav.ClientId.value)
     }
+    @Test fun removingSelectedTabSelectsNeighborWithoutMovingOtherStacks() = runBlocking {
+        val nav = CartNavigationWorkspace(2)
+        nav.setClientId(3); nav.go(NavigationScreenModel.Transaction.Payment, true)
+        nav.setClientId(2); nav.go(NavigationScreenModel.Transaction.Selection, true)
+        nav.retainSlots(listOf(0, 1, 3))
+        assertEquals(1, nav.ClientId.value)
+        assertEquals(listOf(NavigationScreenModel.Transaction.Cart), nav.screens(2, true).value)
+        assertEquals(NavigationScreenModel.Transaction.Payment, nav.screens(3, true).value.last())
+        val snapshot = nav.persistentSnapshot()
+        assertEquals(listOf(0, 1, 3), snapshot.slots)
+        val restored = CartNavigationWorkspace(2); restored.restorePersistentSnapshot(snapshot)
+        assertEquals(NavigationScreenModel.Transaction.Payment, restored.screens(3, true).value.last())
+        assertEquals(snapshot, restored.persistentSnapshot())
+    }
+    @Test fun sparseIdsBeyondTheActiveCartLimitRestoreWithoutAllocatingThousandsOfRoots() = runBlocking {
+        val nav = CartNavigationWorkspace(2)
+        nav.restorePersistentSnapshot(PersistedTransactionNavigationSectionDataModel(
+            clientId = 12345, slotCount = 3, slots = listOf(0, 1, 12345)))
+        assertEquals(12345, nav.ClientId.value)
+        assertEquals(3, nav.persistentSnapshot().left.size)
+    }
     @Test fun rebindingScopeDoesNotCarryOldCartAllocationOrDetails() = runBlocking {
         val nav = CartNavigationWorkspace(0); nav.setClientId(27); nav.go(NavigationScreenModel.Transaction.Payment, true)
         nav.bind(CartScope("another", "store", 2, 2))

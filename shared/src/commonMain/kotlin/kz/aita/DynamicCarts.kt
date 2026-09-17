@@ -89,7 +89,14 @@ object DynamicCarts {
         if (!queued) postInAppNotification(eventMessage("checkout.ui.save_error"), NotificationType.Negative, transient = true)
     }
     internal suspend fun flush() = work.drain()
-    internal fun editUiAsync(transform: (CartUiState) -> CartUiState) = changeAsync { it.copy(ui = transform(it.ui)) }
+    internal fun editUiAsync(transform: (CartUiState) -> CartUiState) = changeAsync { book ->
+        val updated = transform(book.ui)
+        book.copy(ui = if (book.slots == null) updated else updated.retainingCarts(book::contains))
+    }
+    suspend fun remove(type: Int, slot: Int, owner: CartScope? = captureScope()): Boolean {
+        require(validCartSlot(type, slot) && slot >= INITIAL_CART_SLOTS)
+        return owner?.let { captured -> work.run { store.change(captured) { it.removeSlot(type, slot) } } } ?: false
+    }
     suspend fun delete(type: Int, slot: Int, owner: CartScope? = captureScope()): Boolean {
         require(validCartSlot(type, slot))
         return owner?.let { captured -> work.run { store.change(captured) { book -> book.withoutCart(type, slot) } } } ?: false
@@ -97,6 +104,7 @@ object DynamicCarts {
     internal fun upsert(id: String, type: Int, slot: Int, quantity: QuantityDataModel) {
         require(id.isNotBlank() && validCartSlot(type, slot))
         changeAsync { book ->
+            if (book.slots != null && !book.contains(type, slot)) return@changeAsync book
             val old = book.lines.firstOrNull { it.id == id && it.type == type && it.slot == slot }
             val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis())
             book.copy(lines = (book.lines.filterNot { it.id == id && it.type == type && it.slot == slot } + row)

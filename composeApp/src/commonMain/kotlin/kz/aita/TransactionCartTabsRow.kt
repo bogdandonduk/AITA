@@ -21,18 +21,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-@Composable internal fun AppConfiguration.TransactionCartTabsRow(type: Int, selected: Int, supplierId: String?, onSupplier: () -> Unit, onClear: (Int) -> Unit) {
-    val counts by DynamicCarts.counts.collectAsState()
+@Composable internal fun AppConfiguration.TransactionCartTabsRow(type: Int, selected: Int, supplierId: String?, onSupplier: () -> Unit, onClearSupplier: () -> Unit, onClear: (Int) -> Unit) {
     val hydrated by cartPersistenceHydratedState.collectAsState()
     val navigationReady by transactionNavigationRestoredState.collectAsState()
     val bookState by DynamicCarts.state.collectAsState()
-    val count = counts[type]
+    val slots = bookState.book.activeSlots(type)
+    val count = slots.size
     val ready = hydrated && navigationReady
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
     val cartLabel = localizedStringResource(95, "Cart")
     var adding by remember(bookState.owner) { mutableStateOf(false) }
-    LaunchedEffect(selected, count) { if (selected in 0 until count) scroll.animateScrollToItem(selected) }
+    LaunchedEffect(selected, slots) { slots.indexOf(selected).takeIf { it >= 0 }?.let { scroll.animateScrollToItem(it) } }
     Column(Modifier.fillMaxWidth()) {
         if (bookState.failed) {
             Text(checkoutText("restore_error"), Modifier.padding(8.dp), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
@@ -47,17 +47,24 @@ import kotlinx.coroutines.launch
                 Row(Modifier.widthIn(max = if (stateValues.isNarrowScreen) 150.dp else 250.dp).heightIn(min = 44.dp)
                     .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.AccentColor.copy(alpha = .12f))
                     .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                    .clickable(enabled = ready, role = Role.Button, onClick = onSupplier).padding(horizontal = 10.dp, vertical = 6.dp),
+                    .clickable(enabled = ready, role = Role.Button, onClick = onSupplier).padding(start = 10.dp, end = if (supplierId == null) 10.dp else 0.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     CpImage(Modifier.size(20.dp), url = stateValues.drawablePathIconSuppliers, fallbackRes = stateValues.drawableResIconSuppliers.value,
                         contentDescription = null, tintColor = stateValues.AccentColor)
                     Text(title, Modifier.weight(1f, fill = false), color = stateValues.AccentColor, fontSize = stateValues.smallTextSize,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (supplierId != null) {
+                        IconButton(enabled = ready, onClick = onClearSupplier, modifier = Modifier.size(44.dp)) {
+                            CpImage(Modifier.size(16.dp), url = stateValues.drawablePathIconCancel, fallbackRes = stateValues.drawableResIconCancel.value,
+                                contentDescription = checkoutText("clear_supplier"), tintColor = stateValues.AccentColor)
+                        }
+                    }
                 }
             }
             LazyRow(Modifier.weight(1f), state = scroll, verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items((0 until count).toList(), key = { it }) { index ->
+                items(slots, key = { it }) { index ->
+                    val labelNumber = slots.indexOf(index) + 1
                     val cart by getCartState(type, index).collectAsState()
                     val active = selected == index
                     val tint = if (active) stateValues.AccentTextColor else stateValues.TextColor
@@ -65,18 +72,20 @@ import kotlinx.coroutines.launch
                         .background(if (active) stateValues.AccentColor else stateValues.BackgroundColor)
                         .border(stateValues.unfocusedBorderWidth, if (active) stateValues.AccentColor else stateValues.PlaceholderTextColor,
                             RoundedCornerShape(stateValues.cornerRadius))
-                        .semantics { this.selected = active; contentDescription = "$cartLabel ${index + 1}" }
+                        .semantics { this.selected = active; contentDescription = "$cartLabel $labelNumber" }
                         .clickable(enabled = ready, role = Role.Tab) { scope.launch { Navigation.transactionWorkspace(type).setClientId(index) } }
-                        .padding(start = 10.dp, end = if (cart.isEmpty()) 10.dp else 0.dp), verticalAlignment = Alignment.CenterVertically,
+                        .padding(start = 10.dp, end = if (cart.isEmpty() && index < INITIAL_CART_SLOTS) 10.dp else 0.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         CpImage(Modifier.size(20.dp), url = stateValues.drawablePathIconCart, fallbackRes = stateValues.drawableResIconCart.value,
                             contentDescription = null, tintColor = tint)
-                        Text((index + 1).toString(), fontWeight = FontWeight.Bold, color = tint, fontSize = stateValues.smallTextSize)
+                        Text(labelNumber.toString(), fontWeight = FontWeight.Bold, color = tint, fontSize = stateValues.smallTextSize)
                         if (cart.isNotEmpty()) {
                             Text("(${cart.size})", color = tint, fontSize = stateValues.smallTextSize)
+                        }
+                        if (index >= INITIAL_CART_SLOTS || cart.isNotEmpty()) {
                             IconButton(enabled = ready, onClick = { onClear(index) }, modifier = Modifier.size(44.dp)) {
                                 CpImage(Modifier.size(16.dp), url = stateValues.drawablePathIconCancel, fallbackRes = stateValues.drawableResIconCancel.value,
-                                    contentDescription = localizedStringResource(1176, "Clear cart?"), tintColor = tint)
+                                    contentDescription = if (index >= INITIAL_CART_SLOTS) checkoutText("remove_cart") else localizedStringResource(1176, "Clear cart?"), tintColor = tint)
                             }
                         }
                     }
