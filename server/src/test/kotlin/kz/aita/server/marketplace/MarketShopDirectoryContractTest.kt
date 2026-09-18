@@ -58,9 +58,10 @@ class MarketShopDirectoryContractTest {
         val f=Reads(0,emptyList());val request=MarketShopDirectoryRequest("  50% _shop 'quote  "," Astana ",40)
         MarketShopDirectoryRepository(f.db).search(user,request)
         for((sql,args) in f.seen) {
-            assertFalse(sql.contains("50%"));assertFalse(sql.contains("_shop"));assertFalse(sql.contains("'quote"))
-            assertEquals(listOf("50%","_shop","'quote","Astana"),args.drop(2).take(4))
-            assertEquals(args[0],args[1]);assertTrue((args[0] as Long)>0)
+            assertFalse(sql.contains("50%"));assertFalse(sql.contains("'_shop'"));assertFalse(sql.contains("'quote"))
+            val publicArgs = if(sql.startsWith("SELECT count(*)")) args else args.drop(1).also { assertEquals(user,args.first()) }
+            assertEquals(listOf("50%","_shop","'quote","Astana"),publicArgs.drop(2).take(4))
+            assertEquals(publicArgs[0],publicArgs[1]);assertTrue((publicArgs[0] as Long)>0)
             assertEquals(3,Regex("strpos\\(lower\\(f.display_name").findAll(sql).count())
             assertTrue(sql.contains("strpos(lower(f.city),lower(?))>0"));assertFalse(sql.contains(" ILIKE "))
         }

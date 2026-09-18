@@ -50,7 +50,7 @@ class MarketShoppingActivitySearchContractTest {
         assertEquals(20,result.entries.size);assertTrue(result.hasOlder);assertFalse(result.hasNewer)
         assertTrue(result.isValidActivitySearchPage(user.toString(),result.request))
         val(sql,args)=f.seen.single();assertEquals(listOf(user,21),args)
-        assertTrue(sql.endsWith("WHERE user_id=? ORDER BY created_at_millis DESC,command_id DESC LIMIT ?"))
+        assertTrue(sql.endsWith("WHERE user_id=? AND checklist_change IS NULL ORDER BY created_at_millis DESC,command_id DESC LIMIT ?"))
         assertTrue(sql.contains("NULL::jsonb AS activity_details"));assertFalse(sql.contains("session_id"));assertFalse(sql.contains("request_hash"))
     }
     @Test fun olderPageUsesBothCursorPartsAndAnOppositeExistenceRead() {
@@ -80,7 +80,7 @@ class MarketShoppingActivitySearchContractTest {
         val result=f.repo.activitySearch(user,request)
         assertEquals(id(11).toString(),result.request.filter.commandId)
         val(sql,args)=f.seen.single();assertEquals(listOf(user,id(11),21),args)
-        assertTrue(sql.contains("WHERE user_id=? AND command_id=?"));assertFalse(sql.contains("OFFSET"));assertFalse(sql.contains("stock_items"))
+        assertTrue(sql.contains("WHERE user_id=? AND checklist_change IS NULL AND command_id=?"));assertFalse(sql.contains("OFFSET"));assertFalse(sql.contains("stock_items"))
     }
     @Test fun referenceNotFoundMakesOneReadAndNoWrite() {
         val f=Reads();val page=f.repo.activitySearch(user,MarketShoppingActivitySearchRequest(MarketShoppingActivityFilter(commandId=id(11).toString())))
@@ -95,9 +95,9 @@ class MarketShoppingActivitySearchContractTest {
     }
     @Test fun allKindPredicatesAreExclusiveAndShareFiltersOnBackNavigation() {
         for((kind,predicate) in listOf(MARKET_ACTIVITY_BASKET to "basket_change IS NOT NULL",
-            MARKET_ACTIVITY_REPLACE to "basket_change IS NULL AND replaced_offer_id IS NOT NULL",
-            MARKET_ACTIVITY_REMOVE to "basket_change IS NULL AND replaced_offer_id IS NULL AND requested_units=0",
-            MARKET_ACTIVITY_QUANTITY to "basket_change IS NULL AND replaced_offer_id IS NULL AND requested_units>0")) {
+            MARKET_ACTIVITY_REPLACE to "basket_change IS NULL AND checklist_change IS NULL AND replaced_offer_id IS NOT NULL",
+            MARKET_ACTIVITY_REMOVE to "basket_change IS NULL AND checklist_change IS NULL AND replaced_offer_id IS NULL AND requested_units=0",
+            MARKET_ACTIVITY_QUANTITY to "basket_change IS NULL AND checklist_change IS NULL AND replaced_offer_id IS NULL AND requested_units>0")) {
             val f=Reads();f.rows=listOf(row(11))
             f.repo.activitySearch(user,MarketShoppingActivitySearchRequest(MarketShoppingActivityFilter(kind=kind),MarketShoppingActivityCursor(100,id(20).toString())))
             assertEquals(2,f.seen.size);assertTrue(f.seen.all { it.first.contains(predicate) })

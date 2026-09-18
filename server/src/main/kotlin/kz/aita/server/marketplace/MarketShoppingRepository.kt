@@ -39,7 +39,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         "SELECT * FROM buyer_shopping_lines WHERE user_id=? ORDER BY created_at_millis,offer_id", user) { row ->
         MarketShoppingLine(row.getString("offer_id"), row.getString("store_id"), row.getString("public_title"),
             row.getString("public_shop_name"), row.getInt("units"), jsonBase.decodeFromString(row.getString("basis")),
-            jsonBase.decodeFromString(row.getString("unit_name")), row.getLong("updated_at_millis"))
+            jsonBase.decodeFromString(row.getString("unit_name")), row.getLong("updated_at_millis"), row.getBoolean("collected"))
     }
     fun snapshot(user: UUID): MarketShoppingSnapshot {
         val now = System.currentTimeMillis()
@@ -86,7 +86,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         if (!request.isValidMarketShoppingCommand()) marketFail("market.shopping_invalid")
         val id = marketUuid(request.commandId)
         val basket = request.basketChange
-        val offer = if (basket == null) marketUuid(request.offerId) else null
+        val offer = if (basket == null && request.checklistChange == null) marketUuid(request.offerId) else null
         val replacing = request.replaceOfferId?.let(::marketUuid)
         val hash = commandHash(request)
         if (query("SELECT id FROM users WHERE id=? AND is_active FOR UPDATE", user) { it.getString(1) }.isEmpty())
@@ -108,10 +108,10 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         }
         execute("""INSERT INTO buyer_shopping_commands
             (user_id,command_id,request_hash,session_id,offer_id,requested_units,expected_revision,accepted,error_key,
-                applied_revision,created_at_millis,replaced_offer_id,reviewed_subtotal_minor,basket_change,activity_details)
-            VALUES (?,?,?,?,?,?,?,FALSE,?,NULL,?,?,?,?::jsonb,NULL)""", user, id, hash, session, offer, request.units,
+                applied_revision,created_at_millis,replaced_offer_id,reviewed_subtotal_minor,basket_change,checklist_change,activity_details)
+            VALUES (?,?,?,?,?,?,?,FALSE,?,NULL,?,?,?,?::jsonb,?::jsonb,NULL)""", user, id, hash, session, offer, request.units,
             request.expectedRevision, "market.shopping_cancelled", now, replacing, request.reviewedSubtotalMinor,
-            basket?.let { jsonBase.encodeToString(it) })
+            basket?.let { jsonBase.encodeToString(it) }, request.checklistChange?.let { jsonBase.encodeToString(it) })
         execute("UPDATE buyer_shopping_lists SET last_command_id=? WHERE user_id=?", id, user)
         return MarketShoppingOutcome(request.commandId, false, errorKey = "market.shopping_cancelled", snapshot = snapshot(user))
     }
@@ -141,6 +141,11 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         (basket_change IS NOT NULL) AS has_basket, basket_change->>'currencyCode' AS basket_currency,
         (basket_change->>'reviewedItemsSubtotalMinor')::bigint AS basket_subtotal,
         jsonb_array_length(basket_change->'lines') AS basket_lines,
+        (checklist_change IS NOT NULL) AS has_checklist,
+        jsonb_array_length(checklist_change->'offerIds') AS checklist_lines,
+        (SELECT count(*) FROM jsonb_array_elements(COALESCE(activity_details->'lines','[]'::jsonb)) AS r
+            WHERE r->'after' IS NULL OR r->'after'='null'::jsonb
+                OR COALESCE((r#>>'{before,collected}')::boolean,FALSE)<>COALESCE((r#>>'{after,collected}')::boolean,FALSE)) AS checklist_changes,
         (SELECT count(*) FROM jsonb_array_elements(COALESCE(basket_change->'lines','[]'::jsonb)) AS r
             WHERE r->>'sourceOfferId' <> r->>'targetOfferId') AS basket_changes,
         (activity_details IS NOT NULL) AS details_recorded,
@@ -151,6 +156,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
 
     private fun activityEntry(row: ResultSet): MarketShoppingActivityEntry {
         val basket = row.getBoolean("has_basket")
+        val checklist = row.getBoolean("has_checklist")
         val replaced = row.getString("replaced_offer_id")
         val units = row.getInt("requested_units")
         val expected = row.getLong("expected_revision")
@@ -159,20 +165,22 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
         val subtotal = row.getLong(if (basket) "basket_subtotal" else "reviewed_subtotal_minor").let { if (row.wasNull()) null else it }
         return MarketShoppingActivityEntry(row.getString("command_id"), row.getLong("created_at_millis"), expected,
             accepted, applied, row.getString("error_key"), when {
+                checklist -> MARKET_ACTIVITY_CHECKLIST
                 basket -> MARKET_ACTIVITY_BASKET
                 replaced != null -> MARKET_ACTIVITY_REPLACE
                 units == 0 -> MARKET_ACTIVITY_REMOVE
                 else -> MARKET_ACTIVITY_QUANTITY
             }, units, if (basket) row.getString("basket_currency") else if (subtotal != null) row.getString("detail_currency") else null,
-            subtotal, if (basket) row.getInt("basket_lines") else 1,
-            if (basket) row.getInt("basket_changes") else if (accepted && applied != expected) 1 else 0,
+            subtotal, if (checklist) row.getInt("checklist_lines") else if (basket) row.getInt("basket_lines") else 1,
+            if (checklist) row.getInt("checklist_changes") else if (basket) row.getInt("basket_changes") else if (accepted && applied != expected) 1 else 0,
             row.getString("activity_details")?.let { jsonBase.decodeFromString<MarketShoppingActivityDetails>(it) },
             row.getBoolean("details_recorded"), row.getString("preview_title"))
     }
 
     fun activity(user: UUID, request: MarketShoppingActivityRequest): MarketShoppingActivityPage {
         if (!request.isValidShoppingActivityRequest()) marketFail("market.shopping_activity_invalid")
-        val rows = query(activityProjection(includeDetails = false) + """ WHERE user_id=?
+        val legacy = if (request.includeChecklist) "" else " AND checklist_change IS NULL"
+        val rows = query(activityProjection(includeDetails = false) + """ WHERE user_id=?$legacy
             ORDER BY created_at_millis DESC,command_id DESC LIMIT ?""", user, request.limit + 1, map = ::activityEntry)
         return MarketShoppingActivityPage(user.toString(), request, rows.take(request.limit),
             rows.size > request.limit, System.currentTimeMillis())
@@ -185,13 +193,15 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
     fun activitySearch(user: UUID, request: MarketShoppingActivitySearchRequest): MarketShoppingActivitySearchPage {
         val input = request.normalizedActivitySearch() ?: marketFail("market.activity_search_invalid")
         val predicates = mutableListOf("user_id=?")
+        if (!input.includeChecklist) predicates += "checklist_change IS NULL"
         val args = mutableListOf<Any?>(user)
         input.filter.commandId?.let { predicates += "command_id=?"; args += marketUuid(it) }
         when (input.filter.kind) {
+            MARKET_ACTIVITY_CHECKLIST -> predicates += "checklist_change IS NOT NULL"
             MARKET_ACTIVITY_BASKET -> predicates += "basket_change IS NOT NULL"
-            MARKET_ACTIVITY_REPLACE -> predicates += "basket_change IS NULL AND replaced_offer_id IS NOT NULL"
-            MARKET_ACTIVITY_REMOVE -> predicates += "basket_change IS NULL AND replaced_offer_id IS NULL AND requested_units=0"
-            MARKET_ACTIVITY_QUANTITY -> predicates += "basket_change IS NULL AND replaced_offer_id IS NULL AND requested_units>0"
+            MARKET_ACTIVITY_REPLACE -> predicates += "basket_change IS NULL AND checklist_change IS NULL AND replaced_offer_id IS NOT NULL"
+            MARKET_ACTIVITY_REMOVE -> predicates += "basket_change IS NULL AND checklist_change IS NULL AND replaced_offer_id IS NULL AND requested_units=0"
+            MARKET_ACTIVITY_QUANTITY -> predicates += "basket_change IS NULL AND checklist_change IS NULL AND replaced_offer_id IS NULL AND requested_units>0"
         }
         when (input.filter.result) {
             MARKET_ACTIVITY_RESULT_APPLIED -> predicates += "accepted=TRUE AND applied_revision>expected_revision"
@@ -271,6 +281,70 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
     fun apply(user: UUID, session: UUID?, request: MarketShoppingCommand): MarketShoppingOutcome =
         applyCommand(user, session, request, replacement = false)
 
+    fun applyChecklist(user: UUID, session: UUID?, request: MarketShoppingCommand): MarketShoppingOutcome {
+        check(mutationStartedNanos == null)
+        mutationStartedNanos = System.nanoTime()
+        try { return market.withBasketReadBudget { applyChecklistInsideTransaction(user, session, request) } }
+        catch (failure: MarketFailure) {
+            if (failure.key in setOf("market.basket_busy", "market.basket_apply_busy")) marketFail("market.checklist_busy", 503)
+            throw failure
+        } catch (failure: SQLException) {
+            if (failure.sqlState in setOf("57014", "55P03")) marketFail("market.checklist_busy", 503)
+            throw failure
+        }
+        finally { mutationStartedNanos = null }
+    }
+
+    /** Uses the same revision lock and immutable outcome journal as every other list edit.
+     * A withdrawn offer can still be checked off; no current offer/price is required to remember
+     * what the buyer collected. Exact frozen IDs prevent a delayed bulk removal selecting more.
+     */
+    private fun applyChecklistInsideTransaction(user: UUID, session: UUID?, request: MarketShoppingCommand): MarketShoppingOutcome {
+        if (!request.isValidMarketShoppingCommand()) marketFail("market.checklist_invalid")
+        val change = request.checklistChange ?: marketFail("market.checklist_invalid")
+        val id = marketUuid(request.commandId)
+        val hash = commandHash(request)
+        if (query("SELECT id FROM users WHERE id=? AND is_active FOR UPDATE", user) { it.getString(1) }.isEmpty())
+            marketFail("market.shopping_denied", 403)
+        val now = System.currentTimeMillis()
+        execute("""INSERT INTO buyer_shopping_lists(user_id,created_at_millis,updated_at_millis)
+            VALUES (?,?,?) ON CONFLICT(user_id) DO NOTHING""", user, now, now)
+        val currentRevision = query("SELECT revision FROM buyer_shopping_lists WHERE user_id=? FOR UPDATE", user) { it.getLong(1) }.single()
+        val recorded = query("SELECT * FROM buyer_shopping_commands WHERE user_id=? AND command_id=?", user, id) {
+            Recorded(it.getString("request_hash"), it.getBoolean("accepted"), it.getString("error_key"),
+                it.getLong("applied_revision").let { value -> if (it.wasNull()) null else value })
+        }.singleOrNull()
+        if (recorded != null) {
+            if (recorded.hash != hash) marketFail("market.shopping_command_mismatch", 409)
+            return MarketShoppingOutcome(request.commandId, recorded.accepted, recorded.revision, true,
+                recorded.errorKey, snapshot(user))
+        }
+        val before = lines(user)
+        val current = MarketShoppingSnapshot(user.toString(), currentRevision, before.map { MarketShoppingQuotedLine(it) }, now)
+        val error = change.checklistIntentError(current, request.expectedRevision)
+        var applied: Long? = null
+        if (error == null) {
+            var changed = 0
+            change.offerIds.forEach { offer ->
+                changed += if (change.action == MARKET_CHECKLIST_REMOVE)
+                    execute("DELETE FROM buyer_shopping_lines WHERE user_id=? AND offer_id=? AND collected", user, marketUuid(offer))
+                else execute("""UPDATE buyer_shopping_lines SET collected=?,updated_at_millis=?
+                    WHERE user_id=? AND offer_id=? AND collected<>?""", change.action == MARKET_CHECKLIST_COLLECT,
+                    now, user, marketUuid(offer), change.action == MARKET_CHECKLIST_COLLECT)
+            }
+            applied = currentRevision + if (changed > 0) 1L else 0L
+            if (changed > 0) execute("UPDATE buyer_shopping_lists SET revision=?,updated_at_millis=? WHERE user_id=?", applied, now, user)
+        }
+        execute("""INSERT INTO buyer_shopping_commands
+            (user_id,command_id,request_hash,session_id,offer_id,requested_units,expected_revision,
+                accepted,error_key,applied_revision,created_at_millis,checklist_change,activity_details)
+            VALUES (?,?,?,?,NULL,0,?,?,?,?,?,?::jsonb,?::jsonb)""", user, id, hash, session, request.expectedRevision,
+            error == null, error, applied, now, jsonBase.encodeToString(change),
+            if (error == null) jsonBase.encodeToString(request.shoppingActivityDetails(before, lines(user))) else null)
+        execute("UPDATE buyer_shopping_lists SET last_command_id=? WHERE user_id=?", id, user)
+        return MarketShoppingOutcome(request.commandId, error == null, applied, errorKey = error, snapshot = snapshot(user))
+    }
+
     /** Apply a frozen currency plan as ONE list edit, not sequential single-line requests.
      * All checks precede the first line write. Outer transaction retries include outcome lookup.
      */
@@ -328,7 +402,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
                 if (reviewed.sourceOfferId != reviewed.targetOfferId) {
                     val offer = requireNotNull(quotes[index].offer)
                     check(execute("""UPDATE buyer_shopping_lines SET offer_id=?,store_id=?,public_title=?,
-                        public_shop_name=?,unit_name=?::jsonb,updated_at_millis=? WHERE user_id=? AND offer_id=?""",
+                        public_shop_name=?,unit_name=?::jsonb,collected=FALSE,updated_at_millis=? WHERE user_id=? AND offer_id=?""",
                         marketUuid(offer.id), marketUuid(offer.storefront.storeId), offer.title,
                         offer.storefront.displayName, jsonBase.encodeToString(offer.unitName), now, user,
                         marketUuid(reviewed.sourceOfferId)) == 1)
@@ -352,6 +426,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
 
     private fun applyCommand(user: UUID, session: UUID?, request: MarketShoppingCommand, replacement: Boolean): MarketShoppingOutcome {
         if (request.basketChange != null) marketFail("market.basket_apply_invalid")
+        if (request.checklistChange != null) marketFail("market.checklist_invalid")
         val id = marketUuid(request.commandId)
         val offerId = marketUuid(request.offerId)
         if (!request.isValidMarketShoppingCommand() || replacement != (request.replaceOfferId != null)) marketFail("market.shopping_invalid")
@@ -431,7 +506,7 @@ internal class MarketShoppingRepository(private val db: Connection, private val 
             }
             else if (request.units == 0) execute("DELETE FROM buyer_shopping_lines WHERE user_id=? AND offer_id=?", user, offerId)
             else if (current != null) {
-                if (changed) execute("UPDATE buyer_shopping_lines SET units=?,updated_at_millis=? WHERE user_id=? AND offer_id=?",
+                if (changed) execute("UPDATE buyer_shopping_lines SET units=?,collected=FALSE,updated_at_millis=? WHERE user_id=? AND offer_id=?",
                     request.units, now, user, offerId)
             } else {
                 val offer = requireNotNull(source)

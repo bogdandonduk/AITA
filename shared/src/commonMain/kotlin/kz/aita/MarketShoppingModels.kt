@@ -44,7 +44,8 @@ data class MarketShoppingLine(
     val units: Int,
     val basis: MarketShoppingBasis,
     val unitName: List<LocalizedStringDataModel> = emptyList(),
-    val updatedAtMillis: Long = 0L
+    val updatedAtMillis: Long = 0L,
+    val collected: Boolean = false
 )
 
 @Serializable
@@ -78,7 +79,8 @@ data class MarketShoppingCommand(
     val basis: MarketShoppingBasis? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val replaceOfferId: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val reviewedSubtotalMinor: Long? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER) val basketChange: MarketBasketChange? = null
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val basketChange: MarketBasketChange? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val checklistChange: MarketChecklistChange? = null
 )
 
 @Serializable
@@ -178,6 +180,10 @@ fun MarketShoppingSnapshot.shoppingGroups(): List<MarketShoppingGroup> = lines
 
 /** One shape check shared by the journal, UI and server. UUID parsing stays at the server boundary. */
 fun MarketShoppingCommand.isValidMarketShoppingCommand(): Boolean {
+    val checklist = checklistChange
+    if (checklist != null) return marketDiscoveryId(commandId) == commandId && expectedRevision >= 0L &&
+        expectedRevision < Long.MAX_VALUE && offerId.isEmpty() && units == 0 && basis == null &&
+        replaceOfferId == null && reviewedSubtotalMinor == null && basketChange == null && checklist.isValidChecklistChange()
     val basket = basketChange
     if (basket != null) return marketDiscoveryId(commandId) == commandId && expectedRevision >= 0L &&
         expectedRevision < Long.MAX_VALUE && offerId.isEmpty() && units == 0 && basis == null &&

@@ -12,10 +12,10 @@ const val MARKET_SHOPS_PROTOCOL = 1
  * window replaces the whole visible window in one snapshot; it never splices offset pages.
  */
 @Serializable
-data class MarketShopDirectoryRequest(val text: String = "", val city: String = "", val limit: Int = MARKET_SHOPS_PAGE_SIZE)
+data class MarketShopDirectoryRequest(val text: String = "", val city: String = "", val limit: Int = MARKET_SHOPS_PAGE_SIZE, val savedOnly: Boolean = false)
 
 @Serializable
-data class MarketShopDirectoryEntry(val storefront: MarketStorefront, val publishedOffers: Long)
+data class MarketShopDirectoryEntry(val storefront: MarketStorefront, val publishedOffers: Long, val saved: Boolean = false)
 
 @Serializable
 data class MarketShopDirectoryResult(
@@ -44,7 +44,7 @@ fun MarketShopDirectoryResult.isValidShopDirectoryResult(account: String, wanted
         shops.map { it.storefront.storeId }.distinct().size == shops.size &&
         shops.all entries@{ entry ->
             val shop = entry.storefront
-            if (!shop.isValidPublicMarketShop() || entry.publishedOffers < 0) return@entries false
+            if (!shop.isValidPublicMarketShop() || entry.publishedOffers < 0 || (normalized.savedOnly && !entry.saved)) return@entries false
             // Match the route's literal AND-of-terms search. An echoed request is not evidence
             // that the returned public rows actually belong to that city/name/address filter.
             val searchable = "${shop.displayName} ${shop.publicAddress}"

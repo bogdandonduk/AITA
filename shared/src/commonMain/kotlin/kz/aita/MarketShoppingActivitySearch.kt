@@ -30,7 +30,8 @@ data class MarketShoppingActivityCursor(val recordedAtMillis: Long, val commandI
 data class MarketShoppingActivitySearchRequest(
     val filter: MarketShoppingActivityFilter = MarketShoppingActivityFilter(),
     val boundary: MarketShoppingActivityCursor? = null,
-    val newer: Boolean = false
+    val newer: Boolean = false,
+    val includeChecklist: Boolean = false
 )
 
 @Serializable
@@ -57,7 +58,8 @@ fun MarketShoppingActivityCursor.compareActivityCursor(other: MarketShoppingActi
 
 fun MarketShoppingActivitySearchRequest.normalizedActivitySearch(): MarketShoppingActivitySearchRequest? {
     if (filter.kind != null && filter.kind !in setOf(MARKET_ACTIVITY_BASKET, MARKET_ACTIVITY_REPLACE,
-            MARKET_ACTIVITY_REMOVE, MARKET_ACTIVITY_QUANTITY)) return null
+            MARKET_ACTIVITY_REMOVE, MARKET_ACTIVITY_QUANTITY, MARKET_ACTIVITY_CHECKLIST)) return null
+    if (filter.kind == MARKET_ACTIVITY_CHECKLIST && !includeChecklist) return null
     if (filter.result != null && filter.result !in setOf(MARKET_ACTIVITY_RESULT_APPLIED,
             MARKET_ACTIVITY_RESULT_REJECTED, MARKET_ACTIVITY_RESULT_UNCHANGED, MARKET_ACTIVITY_RESULT_CANCELLED)) return null
     val reference = filter.commandId?.let { normalizedMarketChangeReference(it) ?: return null }
@@ -90,7 +92,8 @@ fun MarketShoppingActivitySearchPage.isValidActivitySearchPage(
     if (normalized.filter.commandId != null && (entries.size > 1 || hasOlder || hasNewer)) return false
     if (normalized.boundary == null && hasNewer) return false
     if ((if (normalized.newer) hasNewer else hasOlder) && entries.size != MARKET_SHOPPING_ACTIVITY_PAGE_SIZE) return false
-    if (entries.any { !it.isValidShoppingActivityEntry() || it.details != null || !normalized.filter.matchesActivity(it) }) return false
+    if (entries.any { !it.isValidShoppingActivityEntry() || it.details != null || !normalized.filter.matchesActivity(it) ||
+            (!normalized.includeChecklist && it.kind == MARKET_ACTIVITY_CHECKLIST) }) return false
     if (entries.zipWithNext().any { (a, b) -> a.activityCursor().compareActivityCursor(b.activityCursor()) <= 0 }) return false
     val boundary = normalized.boundary
     return boundary == null || entries.all {

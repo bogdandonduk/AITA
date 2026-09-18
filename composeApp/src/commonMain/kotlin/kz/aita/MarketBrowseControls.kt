@@ -1,6 +1,14 @@
 package kz.aita
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,6 +44,17 @@ internal fun AppConfiguration.MarketBrowseControls(
                 text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
                 enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
                 autoLoading = false, confirmationRequired = false, onClick = browse::clearFilters)
+        }
+        val roots = catalogue?.categories.orEmpty().filter { it.ancestorIds.isEmpty() }.take(8)
+        if (roots.isNotEmpty() && !browse.filtersExpanded) LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            items(roots,key={it.id}) { entry ->
+                val selected=browse.categoryId.value==entry.id
+                Text(entry.name.visibleLocalizedString(stateValues.appLanguage,""),
+                    Modifier.clip(RoundedCornerShape(14.dp)).background(if(selected) stateValues.AccentColor else stateValues.BackgroundColor)
+                        .border(1.dp,stateValues.TextColor.copy(alpha=.12f),RoundedCornerShape(14.dp))
+                        .clickable(role=Role.Tab) { browse.categoryId.value=if(selected) null else entry.id; browse.limit.value=MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore=null }
+                        .padding(horizontal=16.dp,vertical=12.dp),color=if(selected) stateValues.AccentTextColor else stateValues.TextColor,fontSize=stateValues.smallTextSize)
+            }
         }
         if (!browse.filtersExpanded && browse.filterCount > 0) Text(buildList {
             if (browse.shopId.value == null && browse.city.value.isNotBlank()) add(browse.city.value)

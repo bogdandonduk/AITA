@@ -49,6 +49,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
     val owner = remember(account, generation) { captureMarketRequestScope() }
     val revision by MarketplaceSignals.revision.collectAsState()
     val shopping = rememberMarketShoppingUiState()
+    val savedShops = rememberMarketSavedShops()
     val scope = rememberCoroutineScope()
     val browse = navigation.browse(savedOnly)
     SideEffect { navigation.entered(savedOnly) }
@@ -70,7 +71,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
     var saveFailure by remember(account, generation) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
     val fence = remember(account, generation) { MarketSavedReadFence() }
     // Category selection uses a local catalogue; unlike product dialogues it does not own I/O.
-    val directoryOpen = !savedOnly && shopId == null && browseSection == "shops"
+    val directoryOpen = shopId == null && browseSection == "shops"
     val dialogOwnsReads = openedId != null || compareTo != null || directoryOpen
     val latestDialogOwnsReads by rememberUpdatedState(dialogOwnsReads)
     val query = browse.query
@@ -183,7 +184,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
         appBar = {
             ScreenAppBarWidget(title = when {
                 shopId != null -> data.shop?.displayName ?: authUiText("Shop window", "Витрина", "Витрина", "Дүкөн витринасы")
-                savedOnly -> authUiText("Saved offers", "Сохранённое", "Сақталғандар", "Сакталган сунуштар")
+                savedOnly -> authUiText("Saved", "Сохранённое", "Сақталғандар", "Сакталган сунуштар")
                 else -> "AITA Market"
             }, iconPath = marketIconPath(if (savedOnly && shopId == null) 140 else 139))
         }
@@ -191,11 +192,11 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
         MarketBrowseListAction(shopping, onOpen = {
             scope.launch { if (owner?.isCurrent() == true) Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
         })
-        if (!savedOnly && shopId == null) sectionTabsWidget("buyer-market-sections:$account", listOf(
+        if (shopId == null) sectionTabsWidget("buyer-market-sections:$account", listOf(
             TabContent("products", authUiText("Products", "Товары", "Тауарлар", "Товарлар")),
             TabContent("shops", authUiText("Shops", "Магазины", "Дүкендер", "Дүкөндөр"))),
             selectedId = browseSection, onSelected = { browseSection = it })
-        if (directoryOpen) MarketShopDirectoryPanel(directory, Modifier.weight(1f).fillMaxWidth(), onVisit = ::visitShop)
+        if (directoryOpen) MarketShopDirectoryPanel(directory, savedShops, Modifier.weight(1f).fillMaxWidth(), onVisit = ::visitShop)
         else {
         LazyVerticalGrid(columns = GridCells.Adaptive(250.dp), state = gridState, modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -203,7 +204,13 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (shopId != null) {
                         data.shop?.let { shop ->
-                            Text("${shop.city} · ${shop.publicAddress}", color = stateValues.TextColor, fontSize = stateValues.textSize)
+                            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                                MarketShopIdentity(shop, Modifier.weight(1f))
+                                MarketHeartButton(savedShops.saved(shop.storeId),savedShops.canChange,
+                                    marketBrowseText(if(savedShops.saved(shop.storeId)) "market.unsave_shop" else "market.save_shop")) { savedShops.toggle(shop.storeId) }
+                            }
+                            Text(shop.publicAddress, color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+                            savedShops.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
                             if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
                         actionButton(text = if (savedOnly) authUiText("Back to saved", "К сохранённому", "Сақталғандарға оралу", "Сакталгандарга кайтуу")
@@ -211,8 +218,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                             else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу", "Маркетке кайтуу"),
                             autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
                     }
-                    if (shopId == null && !savedOnly) Text(marketBrowseText("market.browse_intro"),
-                        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    if (shopId == null) MarketExperienceHero(savedOnly)
                     MarketBrowseControls(browse, catalogue, onChooseCategory = { choosingCategory = true })
                     if (data.failure != null || saveFailure != null) Text((saveFailure ?: data.failure).orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
                         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
@@ -271,8 +277,9 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                         }
                     })
             }
-        }
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.Start) {
+            item(key="browse-footer",span={GridItemSpan(maxLineSpan)}) {
+        Column(Modifier.fillMaxWidth().padding(vertical=12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.Start) {
+            Text(marketBrowseText("market.availability_note"),color=stateValues.TextColor.copy(alpha=.65f),fontSize=stateValues.smallTextSize)
             val counts = data.result
             Column(Modifier.fillMaxWidth()) {
                 Text(when {
@@ -290,6 +297,8 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                     data.fresh = false; data.countsFresh = false; requests.trySend(Unit)
                 })
         }
+            }
+        }
         }
     }
     if (choosingCategory) catalogue?.let { loaded -> MarketCategoryPickerDialog(loaded, categoryId, onDismiss = { choosingCategory = false },
@@ -304,35 +313,40 @@ private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean
     estimateIsCurrent: () -> Boolean, onOpen: () -> Unit, onSaved: () -> Unit, onCompare: () -> Unit, onShop: () -> Unit) {
     val scope = rememberCoroutineScope()
     val inList = shopping.contains(offer.id)
-    Column(Modifier.fillMaxWidth().heightIn(min = 310.dp).foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-        .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)
-        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.30f), RoundedCornerShape(stateValues.cornerRadius))
-        .clickable(onClick = onOpen).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            CpImage(Modifier.size(42.dp), url = marketIconPath(139), fallbackRes = marketIconFallback(139), contentDescription = null, tintColor = stateValues.AccentColor)
-            Spacer(Modifier.weight(1f))
-            actionButton(text = "", iconPath = marketIconPath(140), iconRes = marketIconFallback(140),
-                iconContentDescription = if (offer.saved) authUiText("Unsave", "Не сохранять", "Сақтаудан алып тастау", "Сакталгандардан алып салуу") else authUiText("Save offer", "Сохранить", "Сақтау", "Сунушту сактоо"),
-                enabledColor = if (offer.saved) stateValues.AccentColor else stateValues.BackgroundColor,
-                textColor = if (offer.saved) stateValues.AccentTextColor else stateValues.TextColor,
-                enabled = !saving, autoLoading = false, confirmationRequired = false, onClick = onSaved)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)
+        .border(stateValues.unfocusedBorderWidth, stateValues.TextColor.copy(alpha=.12f),RoundedCornerShape(stateValues.cornerRadius))
+        .clickable(onClick=onOpen).padding(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.fillMaxWidth()) {
+            MarketProductPhoto(offer.product.imageUrls.firstOrNull(), offer.title, photoHeight=190.dp)
+            Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                MarketHeartButton(offer.saved,!saving,if(offer.saved) authUiText("Unsave","Не сохранять","Сақтаудан алып тастау","Сакталгандардан алып салуу")
+                    else authUiText("Save offer","Сохранить","Сақтау","Сунушту сактоо"),onSaved)
+            }
         }
-        MarketProductPhoto(offer.product.imageUrls.firstOrNull(), offer.title)
-        Text(offer.title, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        Text(marketPriceLabel(offer), color = changedValueColor(offer.priceMinor, "market:${offer.id}:${offer.currencyCode}:${stateValues.appLanguage}", stateValues.AccentColor),
-            fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
-        Text("${offer.storefront.displayName} · ${offer.storefront.city}", Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onShop).padding(vertical = 6.dp),
-            color = stateValues.AccentColor, fontSize = stateValues.smallTextSize, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(if (offer.availability == MARKET_AVAILABILITY_RECORDED) authUiText("Recorded in stock · not reserved", "Есть в учёте · не зарезервировано", "Есепте бар · резервтелмеген", "Кампада бар деп катталган · резервге коюлган эмес")
-            else authUiText("Confirm availability", "Уточните наличие", "Бар-жоғын нақтылаңыз", "Бар экенин ырастатуу"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        actionButton(text = if (inList) authUiText("In your list", "В вашем списке", "Сіздің тізіміңізде", "Тизмеңизде") else authUiText("Add to list", "В список покупок", "Тізімге қосу", "Тизмеге кошуу"),
-            iconPath = marketIconPath(143), iconRes = marketIconFallback(143), autoLoading = false, confirmationRequired = false,
-            enabled = inList || (canUseEstimate && shopping.canChange && offer.shoppingBasis() != null), onClick = {
-                if (inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
-                else if (estimateIsCurrent()) shopping.add(offer.id, 1, offer.shoppingBasis())
+        Column(Modifier.padding(horizontal=2.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            if(offer.product.brand.isNotBlank()) Text(offer.product.brand,color=stateValues.TextColor.copy(alpha=.65f),fontSize=stateValues.smallTextSize,maxLines=1,overflow=TextOverflow.Ellipsis)
+            Text(offer.title,color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
+            Text(marketPriceLabel(offer),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick=onShop).padding(vertical=8.dp),
+                verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)) {
+                CpImage(Modifier.size(18.dp),marketIconPath(139),marketIconFallback(139),null,stateValues.TextColor.copy(alpha=.65f))
+                Text("${offer.storefront.displayName} · ${offer.storefront.city}",color=stateValues.TextColor.copy(alpha=.75f),fontSize=stateValues.smallTextSize,maxLines=1,overflow=TextOverflow.Ellipsis)
+            }
+            Text(if(offer.availability==MARKET_AVAILABILITY_RECORDED) marketBrowseText("market.recorded")
+                else authUiText("Confirm availability","Уточните наличие","Бар-жоғын нақтылаңыз","Бар экенин ырастатуу"),
+                Modifier.clip(RoundedCornerShape(8.dp)).background(stateValues.AccentColor.copy(alpha=.09f)).padding(horizontal=8.dp,vertical=4.dp),
+                color=stateValues.TextColor.copy(alpha=.8f),fontSize=stateValues.smallTextSize)
+        }
+        actionButton(text=if(inList) authUiText("In your list","В вашем списке","Сіздің тізіміңізде","Тизмеңизде") else authUiText("Add to list","В список покупок","Тізімге қосу","Тизмеге кошуу"),
+            iconPath=marketIconPath(143),iconRes=marketIconFallback(143),autoLoading=false,confirmationRequired=false,
+            enabled=inList || (canUseEstimate && shopping.canChange && offer.shoppingBasis()!=null),
+            enabledColor=if(inList) stateValues.AccentColor.copy(alpha=.12f) else stateValues.AccentColor,
+            textColor=if(inList) stateValues.TextColor else stateValues.AccentTextColor,onClick={
+                if(inList) scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
+                else if(estimateIsCurrent()) shopping.add(offer.id,1,offer.shoppingBasis())
             })
-        if (offer.comparisonSelection() != null) actionButton(text = authUiText("Compare", "Сравнить", "Салыстыру", "Салыштыруу"),
-            iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = canUseEstimate, autoLoading = false, confirmationRequired = false,
-            enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = onCompare)
+        if(offer.comparisonSelection()!=null) actionButton(text=authUiText("Compare","Сравнить","Салыстыру","Салыштыруу"),
+            iconPath=marketIconPath(141),iconRes=marketIconFallback(141),enabled=canUseEstimate,autoLoading=false,confirmationRequired=false,
+            enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick=onCompare)
     }
 }

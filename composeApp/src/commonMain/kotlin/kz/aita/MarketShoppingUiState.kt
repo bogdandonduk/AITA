@@ -105,6 +105,12 @@ internal class MarketShoppingUiState(private val owner: MarketRequestScope?, pri
         if (command == null) { requireNewLineReview(); return false }
         return send(command)
     }
+    fun changeChecklist(review: MarketChecklistReview): Boolean {
+        if (!canChange) return false
+        val command = review.command(snapshot, newClientSideUuidString())
+        if (command == null) { requireNewLineReview(); return false }
+        return send(command)
+    }
     fun compareLine(review: MarketShoppingLineReview): MarketComparisonSelection? {
         if (!canChange) return null
         return review.comparison(snapshot).also { if (it == null) requireNewLineReview() }

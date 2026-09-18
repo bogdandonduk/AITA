@@ -141,11 +141,14 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
             textColor = stateValues.TextColor, onClick = ::continueBrowsing)
         val section = sectionTabsWidget("buyer-shopping:$account", listOf(
             TabContent("list", authUiText("Items", "Товары", "Тауарлар", "Товарлар")),
+            TabContent("trip", marketBrowseText("market.trip_title"), icon=AitaTabIcon.Checklist),
             TabContent("estimate", authUiText("By shop", "По магазинам", "Дүкен бойынша", "Дүкөн боюнча")),
             TabContent("activity", authUiText("Activity", "История", "Тарих", "Аракеттер"))),
             selectedId = view.section, onSelected = { view.section = it })
         MarketShoppingFeedback(state)
-        if (section == "activity") {
+        if (section == "trip") {
+            MarketShoppingTrip(state, Modifier.weight(1f).fillMaxWidth(), ::continueBrowsing)
+        } else if (section == "activity") {
             MarketShoppingActivityPanel(activityNavigation, Modifier.weight(1f).fillMaxWidth())
         } else {
             if (state.snapshot == null && state.loading) {
@@ -287,41 +290,44 @@ private fun AppConfiguration.ShoppingLineCard(row: MarketShoppingQuotedLine, sta
         MARKET_QUOTE_PRICE -> authUiText("Price needs confirmation", "Цену нужно уточнить", "Бағаны нақтылау қажет", "Бааны ырастатуу керек")
         else -> authUiText("No longer published · kept in your list", "Больше не опубликовано · сохранено в списке", "Енді жарияланбаған · тізімде сақталған", "Эми жарыяланган эмес · тизмеңизде сакталды")
     }
-    Column(Modifier.fillMaxWidth().border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.25f),
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)
+        .border(stateValues.unfocusedBorderWidth, stateValues.TextColor.copy(alpha = 0.12f),
         RoundedCornerShape(stateValues.cornerRadius)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(line.title, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Text("${line.shopName} · ${line.units} × $amount $unit", color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         Text(row.subtotalMinor?.let { marketMoneyLabel(it, line.basis.currencyCode) }
             ?: authUiText("Not included in subtotal", "Не включено в сумму", "Сомаға кірмейді", "Аралык суммага кошулган жок"),
-            color = changedValueColor(row.subtotalMinor, "shopping-line:${line.offerId}", stateValues.AccentColor),
+            color = stateValues.TextColor,
             fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
+        if (line.collected) Text(marketBrowseText("market.trip_quantity_reset"), color=stateValues.PlaceholderTextColor, fontSize=stateValues.smallTextSize)
         Text(status, color = if (row.status == MARKET_QUOTE_ESTIMATED) stateValues.PlaceholderTextColor else stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу") }, text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("−", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Decrease units", "Уменьшить количество", "Санды азайту", "Бирдиктерди азайтуу"),
-                enabled = editable && line.units > 1, autoLoading = false, confirmationRequired = false,
-                onClick = { review?.let { state.changeLine(it, line.units - 1) } })
-            Text(line.units.toString(), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-            actionButton(modifier = Modifier.semantics { contentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү") }, text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("+", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Increase units", "Увеличить количество", "Санды көбейту", "Бирдиктерди көбөйтүү"),
-                enabled = editable && line.units < MARKET_SHOPPING_MAX_UNITS, autoLoading = false, confirmationRequired = false,
-                onClick = { review?.let { state.changeLine(it, line.units + 1) } })
-            }
-            actionButton(text = eventMessage("market.shopping_quantity_edit").visibleLocalizedString(stateValues.appLanguage, ""),
-                enabled = editable, autoLoading = false, confirmationRequired = false,
-                onClick = onEditQuantity)
-            actionButton(text = "", iconPath = stateValues.drawablePathIconDelete,
-                iconContentDescription = authUiText("Remove from list", "Убрать из списка", "Тізімнен жою", "Тизмеден алып салуу"),
-                enabled = editable, autoLoading = false, confirmationRequired = false,
-                onClick = onRemove)
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            actionButton(modifier=Modifier.semantics { contentDescription=authUiText("Decrease quantity","Уменьшить количество","Санды азайту","Санды азайтуу") },text="",icon={Box(Modifier.size(22.dp),contentAlignment=Alignment.Center) {
+                Text("-",color=stateValues.AccentTextColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold)
+            }},iconContentDescription=authUiText("Decrease quantity","Уменьшить количество","Санды азайту","Санды азайтуу"),
+                enabled=editable && line.units>1,autoLoading=false,confirmationRequired=false,
+                onClick={review?.let {state.changeLine(it,line.units-1)}})
+            Text(line.units.toString(),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
+            actionButton(modifier=Modifier.semantics { contentDescription=authUiText("Increase quantity","Увеличить количество","Санды көбейту","Санды көбөйтүү") },text="",icon={Box(Modifier.size(22.dp),contentAlignment=Alignment.Center) {
+                Text("+",color=stateValues.AccentTextColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold)
+            }},iconContentDescription=authUiText("Increase quantity","Увеличить количество","Санды көбейту","Санды көбөйтүү"),
+                enabled=editable && line.units<MARKET_SHOPPING_MAX_UNITS,autoLoading=false,confirmationRequired=false,
+                onClick={review?.let {state.changeLine(it,line.units+1)}})
+            Spacer(Modifier.weight(1f))
+            actionButton(text="",iconPath=stateValues.drawablePathIconEdit,
+                iconContentDescription=eventMessage("market.shopping_quantity_edit").visibleLocalizedString(stateValues.appLanguage,""),
+                enabled=editable,autoLoading=false,confirmationRequired=false,
+                enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick=onEditQuantity)
+            actionButton(text="",iconPath=stateValues.drawablePathIconDelete,
+                iconContentDescription=authUiText("Remove from list","Убрать из списка","Тізімнен жою","Тизмеден алып салуу"),
+                enabled=editable,autoLoading=false,confirmationRequired=false,
+                enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick=onRemove)
         }
         if (review != null && line.comparisonSelection(review.expectedRevision) != null) actionButton(
             text = authUiText("Compare other shops", "Сравнить другие магазины", "Басқа дүкендерді салыстыру", "Башка дүкөндөрдү салыштыруу"),
             iconPath = marketIconPath(141), iconRes = marketIconFallback(141), enabled = editable,
-            autoLoading = false, confirmationRequired = false, onClick = onCompare)
+            autoLoading = false, confirmationRequired = false, enabledColor=stateValues.BackgroundColor, textColor=stateValues.TextColor, onClick = onCompare)
         if (row.offer != null) actionButton(text = authUiText("View current offer", "Посмотреть предложение", "Ағымдағы ұсынысты көру", "Учурдагы сунушту көрүү"),
-            autoLoading = false, confirmationRequired = false, onClick = onOpen)
+            autoLoading = false, confirmationRequired = false, enabledColor=stateValues.BackgroundColor, textColor=stateValues.TextColor, onClick = onOpen)
     }
 }

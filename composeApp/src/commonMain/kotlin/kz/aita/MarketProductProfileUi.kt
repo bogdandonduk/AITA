@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.kamel.image.KamelImage
@@ -30,9 +31,9 @@ internal fun AppConfiguration.marketProductText(key: String): String =
 /** Product pictures bypass numbered-icon filename resolution. This image-only client has no AITA
  * session headers. URLs never enter a backend downloader or its credentials/context. */
 @Composable
-internal fun AppConfiguration.MarketProductPhoto(url: String?, title: String, modifier: Modifier = Modifier) {
+internal fun AppConfiguration.MarketProductPhoto(url: String?, title: String, modifier: Modifier = Modifier, photoHeight: Dp = 170.dp) {
     val destination = remember(url) { url?.let(::marketPublicImageUrl) }
-    Box(modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(14.dp))
+    Box(modifier.fillMaxWidth().height(photoHeight).clip(RoundedCornerShape(14.dp))
         .background(stateValues.PlaceholderTextColor.copy(alpha = 0.06f)), contentAlignment = Alignment.Center) {
         if (destination == null) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -118,10 +119,15 @@ internal fun AppConfiguration.MarketProductFacts(product: MarketProductDetails) 
         "profile_storage" to product.storageInstructions).filter { it.second.isNotBlank() }
     if (facts.isEmpty() && product.attributes.isEmpty()) return
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(marketProductText("market.profile_facts"), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.textSize)
-        facts.forEach { (key, value) -> Text(marketProductText("market.$key") + ": " + value, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
-        product.attributes.forEach { Text(it.name + ": " + it.value, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
-        Text(marketProductText("market.profile_unknown"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        Text(marketProductText("market.profile_facts"),color=stateValues.TextColor,fontWeight=FontWeight.Bold,fontSize=stateValues.accentTextSize)
+        val rows=facts.map { marketProductText("market.${it.first}") to it.second } + product.attributes.map { it.name to it.value }
+        rows.forEachIndexed { index, (name,value) ->
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                .background(stateValues.TextColor.copy(alpha=if(index % 2 == 0) .035f else 0f)).padding(12.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text(name,color=stateValues.TextColor.copy(alpha=.6f),fontSize=stateValues.smallTextSize)
+                Text(value,color=stateValues.TextColor,fontSize=stateValues.textSize)
+            }
+        }
     }
 }
 
@@ -152,10 +158,28 @@ internal fun AppConfiguration.StockMarketplaceBadge(item: GoodsItemDataModel) {
 
 @Composable
 internal fun AppConfiguration.MarketProductGallery(product: MarketProductDetails, title: String) {
-    if (product.imageUrls.size <= 1) MarketProductPhoto(product.imageUrls.firstOrNull(), title)
-    else androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(product.imageUrls.size) { index ->
-            Box(Modifier.width(240.dp)) { MarketProductPhoto(product.imageUrls[index], title) }
+    var selected by remember(product.imageUrls) { mutableStateOf(0) }
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        MarketProductPhoto(product.imageUrls.getOrNull(selected),title,photoHeight=260.dp)
+        if(product.imageUrls.size > 1) {
+            androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                items(product.imageUrls.size) { index ->
+                    val label=marketBrowseText("market.photo_number","number" to (index+1).toString(),"total" to product.imageUrls.size.toString())
+                    Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp))
+                        .border(if(selected==index) 2.dp else 1.dp,if(selected==index) stateValues.AccentColor else stateValues.TextColor.copy(alpha=.1f),RoundedCornerShape(12.dp))
+                        .semantics { contentDescription=label }.clickable { selected=index }.padding(4.dp)) {
+                        // Only the selected full photo is decoded. Loading six originals just
+                        // to draw tiny previews can exhaust a tablet's native image memory.
+                        Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                            CpImage(Modifier.size(24.dp),marketIconPath(148),marketIconFallback(148),null,stateValues.TextColor.copy(alpha=.65f))
+                            Text((index+1).toString(),color=stateValues.TextColor,fontSize=stateValues.smallTextSize,
+                                fontWeight=if(selected==index) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+                }
+            }
+            Text(marketBrowseText("market.photo_number","number" to (selected+1).toString(),"total" to product.imageUrls.size.toString()),
+                color=stateValues.TextColor.copy(alpha=.6f),fontSize=stateValues.smallTextSize)
         }
     }
 }

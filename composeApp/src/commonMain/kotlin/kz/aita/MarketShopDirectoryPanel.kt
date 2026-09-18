@@ -25,10 +25,10 @@ import kotlin.time.TimeSource
  * to this account/session, not in Android saved state or an unbounded navigation payload.
  */
 @Stable
-internal class MarketShopDirectoryNavigation {
+internal class MarketShopDirectoryNavigation(val savedOnly: Boolean = false) {
     var text by mutableStateOf("")
     var city by mutableStateOf("")
-    var request by mutableStateOf(MarketShopDirectoryRequest())
+    var request by mutableStateOf(MarketShopDirectoryRequest(savedOnly=savedOnly))
     var result by mutableStateOf<MarketShopDirectoryResult?>(null)
     val scroll = LazyGridState()
 }
@@ -48,6 +48,7 @@ private class ShopDirectoryRead {
 @Composable
 internal fun AppConfiguration.MarketShopDirectoryPanel(
     navigation: MarketShopDirectoryNavigation,
+    savedShops: MarketSavedShopsUi,
     modifier: Modifier = Modifier,
     onVisit: (MarketStorefront) -> Unit
 ) {
@@ -93,7 +94,7 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
     DisposableEffect(data) { onDispose { data.active = false; data.invalidate(); requests.close() } }
     LaunchedEffect(navigation.text, navigation.city) {
         delay(350)
-        val query = MarketShopDirectoryRequest(navigation.text, navigation.city)
+        val query = MarketShopDirectoryRequest(navigation.text, navigation.city, savedOnly=navigation.savedOnly)
         if (query.text != navigation.request.text || query.city != navigation.request.city) {
             navigation.request = query
             navigation.scroll.scrollToItem(0)
@@ -152,8 +153,9 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item(key = "shop-search", span = { GridItemSpan(maxLineSpan) }) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(authUiText("Find a shop, then explore its window", "Найдите магазин и откройте его витрину", "Дүкенді тауып, витринасын ашыңыз", "Дүкөндү таап, андан кийин анын витринасын караңыз"),
-                    color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                if(navigation.savedOnly) MarketExperienceHero(true)
+                else Text(marketBrowseText("market.shops_intro"),color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
+                savedShops.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     if (maxWidth > 720.dp) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         aitaFormTextField(Modifier.weight(2f), navigation.text, { setSearch(text = it.take(120)) },
@@ -171,10 +173,6 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
                             identityKey = "shop-directory-city:$account", autoFocus = false, parentOwnsValue = true)
                     }
                 }
-                Text(authUiText("Each card is a published physical shop. Counts are published offers, not stock, opening hours or reservations. For product/category search, use Products.",
-                    "Каждая карточка — опубликованный физический магазин. Числа показывают предложения, не остатки, часы работы или резерв. Товары и категории ищите во вкладке «Товары».",
-                    "Әр карточка — жарияланған нақты дүкен. Сандар ұсыныстарды көрсетеді, қор, жұмыс уақыты не резерв емес. Тауар мен санатты «Тауарлар» қойындысынан іздеңіз.", "Ар бир карточка — жарыяланган чыныгы дүкөн. Сандар товар калдыгын, иш убактысын же резервди эмес, жарыяланган сунуштарды көрсөтөт. Товар же категория издөө үчүн «Товарлар» бөлүмүн колдонуңуз."),
-                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 if (navigation.text.isNotEmpty() || navigation.city.isNotEmpty()) actionButton(
                     text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
                     autoLoading = false, confirmationRequired = false, onClick = { setSearch(text = "", city = "") })
@@ -184,6 +182,7 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
         if (result == null && data.loading) items(4) { LoadingSkeleton(layout = LoadingLayout.ShopCard, modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp), rows = 1) }
         else if (result?.shops.isNullOrEmpty()) item(key = "shops-empty", span = { GridItemSpan(maxLineSpan) }) {
             Text(if (data.error != null || result == null) authUiText("Connect to load published shops", "Подключитесь для загрузки магазинов", "Жарияланған дүкендерді жүктеу үшін қосылыңыз", "Жарыяланган дүкөндөрдү жүктөө үчүн туташыңыз")
+                else if(navigation.savedOnly) marketBrowseText("market.saved_shops_empty") + "\n" + marketBrowseText("market.saved_shops_hint")
                 else authUiText("No published shops match yet. Try another city or clear the filters.", "Опубликованных магазинов пока нет. Попробуйте другой город или сбросьте фильтры.", "Сәйкес жарияланған дүкендер әзірше жоқ. Басқа қаланы көріңіз немесе сүзгілерді тазалаңыз.", "Дал келген жарыяланган дүкөндөр азырынча жок. Башка шаарды тандаңыз же чыпкаларды тазалаңыз."),
                 Modifier.padding(vertical = 24.dp), color = stateValues.TextColor, fontSize = stateValues.textSize)
         }
@@ -192,20 +191,20 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor)
                 .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = 0.25f), RoundedCornerShape(stateValues.cornerRadius))
                 .padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CpImage(Modifier.size(36.dp), url = marketIconPath(139), fallbackRes = marketIconFallback(139),
-                        contentDescription = null, tintColor = stateValues.AccentColor)
-                    Text(shop.displayName, Modifier.weight(1f), color = stateValues.TextColor, fontSize = stateValues.accentTextSize,
-                        fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                    MarketShopIdentity(shop,Modifier.weight(1f))
+                    MarketHeartButton(savedShops.saved(shop.storeId),fresh && savedShops.canChange,
+                        marketBrowseText(if(savedShops.saved(shop.storeId)) "market.unsave_shop" else "market.save_shop")) {
+                        if(resultIsCurrent()) savedShops.toggle(shop.storeId) else queueRefresh()
+                    }
                 }
-                Text(shop.city, color = stateValues.AccentColor, fontSize = stateValues.textSize)
                 SelectionContainer { Text(shop.publicAddress, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
                 if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor,
                     fontSize = stateValues.smallTextSize, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 Text(if (!fresh) eventMessage("market.shops_previous_count", "count" to entry.publishedOffers.toString())
                     .visibleLocalizedString(stateValues.appLanguage, "")
                     else if (entry.publishedOffers == 0L) authUiText("No published offers yet", "Пока нет опубликованных предложений", "Жарияланған ұсыныстар әзірше жоқ", "Жарыяланган сунуштар азырынча жок")
-                    else authUiText("${entry.publishedOffers} published offers", "Опубликованных предложений: ${entry.publishedOffers}", "${entry.publishedOffers} жарияланған ұсыныс", "${entry.publishedOffers} жарыяланган сунуш"),
+                    else marketBrowseText("market.shop_offers","count" to entry.publishedOffers.toString()),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 actionButton(text = authUiText("View shop", "Открыть магазин", "Дүкенді ашу", "Дүкөндү көрүү"), enabled = fresh,
                     autoLoading = false, confirmationRequired = false, onClick = { visitDisplayed(entry) })
@@ -227,7 +226,7 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
                 ) {
                     actionButton(text = authUiText("Refresh", "Обновить", "Жаңарту", "Жаңыртуу"), enabled = !data.loading && !inputPending,
                         loading = data.loading, autoLoading = false, confirmationRequired = false,
-                        onClick = { queueRefresh() })
+                        onClick = { queueRefresh(); savedShops.refresh() })
                     if (result != null && result.totalShops > result.shops.size && wanted.limit < MARKET_SHOPS_MAX_WINDOW)
                         actionButton(text = authUiText("More shops", "Ещё магазины", "Тағы дүкендер", "Дагы дүкөндөр"), enabled = fresh,
                             autoLoading = false, confirmationRequired = false,

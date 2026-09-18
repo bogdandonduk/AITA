@@ -27,7 +27,7 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
     var filtersExpanded by mutableStateOf(false)
     val grid = LazyGridState()
     var gridQuery: MarketDiscoveryQuery? = null
-    val directory = MarketShopDirectoryNavigation()
+    val directory = MarketShopDirectoryNavigation(savedOnly)
 
     val query: MarketDiscoveryQuery get() {
         val raw = MarketDiscoveryQuery(appliedSearch.value, if (shopId.value == null) appliedCity.value else "",

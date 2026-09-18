@@ -128,6 +128,7 @@ fun MarketBasketChange.basketQuotesError(quotes: List<MarketShoppingQuotedLine>)
 
 /** One transport identity/journal for single-line and basket commands, separate backend routes. */
 fun MarketShoppingCommand.shoppingMutationEndpoint(): String = when {
+    checklistChange != null -> "market/shopping-list/checklist"
     basketChange != null -> "market/shopping-list/apply-plan"
     replaceOfferId != null -> "market/shopping-list/replace"
     else -> "market/shopping-list"

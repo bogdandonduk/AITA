@@ -25,6 +25,7 @@ import kotlinx.coroutines.isActive
 private class ShoppingActivityReadLifetime { var active = true }
 
 private fun AppConfiguration.activityKind(entry: MarketShoppingActivityEntry): String = when (entry.kind) {
+    MARKET_ACTIVITY_CHECKLIST -> marketBrowseText("market.trip_title")
     MARKET_ACTIVITY_BASKET -> authUiText("Basket shop changes", "Замены магазинов в корзине", "Себеттегі дүкен ауыстырулары", "Себеттеги дүкөн өзгөртүүлөрү")
     MARKET_ACTIVITY_REPLACE -> authUiText("Offer replacement", "Замена предложения", "Ұсынысты ауыстыру", "Сунушту алмаштыруу")
     MARKET_ACTIVITY_REMOVE -> authUiText("Remove from list", "Удаление из списка", "Тізімнен жою", "Тизмеден алып салуу")
@@ -44,11 +45,12 @@ internal class MarketShoppingActivityNavigation {
     val reads = MarketShoppingActivityReadFence()
     var selection by mutableStateOf(Any())
         private set
-    private var selectedRequest by mutableStateOf(MarketShoppingActivitySearchRequest())
+    private var selectedRequest by mutableStateOf(MarketShoppingActivitySearchRequest(includeChecklist = true))
     var request: MarketShoppingActivitySearchRequest
         get() = selectedRequest
         set(value) {
-            if (selectedRequest != value) { reads.invalidate(); selection = Any(); selectedRequest = value }
+            val next = value.copy(includeChecklist = true)
+            if (selectedRequest != next) { reads.invalidate(); selection = Any(); selectedRequest = next }
         }
     var reference by mutableStateOf("")
     var referenceError by mutableStateOf(false)
@@ -215,6 +217,7 @@ autoLoading = false, confirmationRequired = false,
                             })
                         sectionTabsWidget("activity-kind:$account", listOf(
                             TabContent("all", authUiText("All types", "Все типы", "Барлық түрлер", "Бардык түрлөр")),
+                            TabContent(MARKET_ACTIVITY_CHECKLIST, marketBrowseText("market.trip_title"),icon=AitaTabIcon.Checklist),
                             TabContent(MARKET_ACTIVITY_QUANTITY, authUiText("Quantity", "Количество", "Саны", "Саны")),
                             TabContent(MARKET_ACTIVITY_REMOVE, authUiText("Removal", "Удаление", "Жою", "Алып салуу")),
                             TabContent(MARKET_ACTIVITY_REPLACE, authUiText("Replacement", "Замена", "Ауыстыру", "Алмаштыруу")),
@@ -396,8 +399,8 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
                     Column(Modifier.fillMaxWidth().border(stateValues.unfocusedBorderWidth,
                         stateValues.PlaceholderTextColor.copy(alpha = 0.25f), RoundedCornerShape(stateValues.cornerRadius))
                         .padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        change.before?.let { ActivitySelection(authUiText("Before", "Было", "Бұрын", "Мурун"), it) }
-                        change.after?.let { ActivitySelection(authUiText("After", "Стало", "Кейін", "Кийин"), it) }
+                        change.before?.let { ActivitySelection(authUiText("Before", "Было", "Бұрын", "Мурун"), it, entry.kind == MARKET_ACTIVITY_CHECKLIST) }
+                        change.after?.let { ActivitySelection(authUiText("After", "Стало", "Кейін", "Кийин"), it, entry.kind == MARKET_ACTIVITY_CHECKLIST) }
                         if (change.after == null) Text(authUiText("Removed from list", "Удалено из списка", "Тізімнен жойылды", "Тизмеден алынды"),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                     }
@@ -417,8 +420,9 @@ private fun AppConfiguration.MarketShoppingActivityDialog(entry: MarketShoppingA
 }
 
 @Composable
-private fun AppConfiguration.ActivitySelection(label: String, line: MarketShoppingLine) {
+private fun AppConfiguration.ActivitySelection(label: String, line: MarketShoppingLine, checklist: Boolean = false) {
     val unit = line.unitName.visibleLocalizedString(stateValues.appLanguage, authUiText("unit", "ед.", "бірл.", "бирдик"))
+    if (checklist) Text(marketBrowseText(if(line.collected) "market.trip_collected" else "market.trip_left"),color=stateValues.TextColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold)
     Text(label, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
     SelectionContainer { Text("${line.title} · ${line.shopName}", color = stateValues.TextColor, fontSize = stateValues.textSize) }
     Text("${line.units} × ${line.basis.pricedAmount.toString().removeSuffix(".0")} $unit", color = stateValues.TextColor, fontSize = stateValues.smallTextSize)

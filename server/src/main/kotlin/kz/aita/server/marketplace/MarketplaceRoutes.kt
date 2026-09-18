@@ -266,6 +266,28 @@ internal fun Route.marketplaceRoutes() {
                     }
                 } finally { basketApplyGate.release(user) }
             }
+            put("/shopping-list/checklist") {
+                val user = call.checkPrincipal() ?: return@put
+                call.response.header("Cache-Control", "private, no-store, max-age=0")
+                val admission = basketApplyGate.acquire(user, System.nanoTime() / 1_000_000L)
+                if (!admission.allowed) {
+                    call.response.header("Retry-After", admission.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests, eventMessage("market.checklist_busy"))
+                    return@put
+                }
+                try {
+                    val body = call.receiveAita<MarketShoppingCommand>()
+                    call.marketResult(after = { result: MarketShoppingOutcome ->
+                        if (!result.replayed) RealtimeServerBus.publish(
+                            entity = if (result.accepted) "market/shopping-list" else "market/shopping-activity",
+                            userId = user.toString(), reason = "shopping_checklist_changed")
+                    }) {
+                        val db = TransactionManager.current().connection.connection as Connection
+                        db.createStatement().use { it.execute("SET LOCAL statement_timeout = '5s'; SET LOCAL lock_timeout = '5s'") }
+                        MarketShoppingRepository(db, this).applyChecklist(user, call.currentJwtSessionId(), body)
+                    }
+                } finally { basketApplyGate.release(user) }
+            }
             put("/shopping-list/replace") {
                 val user = call.checkPrincipal() ?: return@put
                 val body = call.receiveAita<MarketShoppingCommand>()
@@ -294,6 +316,22 @@ internal fun Route.marketplaceRoutes() {
                 }) {
                     MarketShoppingRepository(TransactionManager.current().connection.connection as Connection, this)
                         .apply(user, call.currentJwtSessionId(), body)
+                }
+            }
+            get("/saved-shops") {
+                val user = call.checkPrincipal() ?: return@get
+                call.marketResult(readOnly = true) {
+                    MarketSavedShopsRepository(TransactionManager.current().connection.connection as Connection).snapshot(user)
+                }
+            }
+            put("/saved-shops") {
+                val user = call.checkPrincipal() ?: return@put
+                val body = call.receiveAita<MarketSavedShopChange>()
+                call.marketResult(transactionIsolation = Connection.TRANSACTION_SERIALIZABLE,
+                    after = { RealtimeServerBus.publish(entity="market/saved",userId=user.toString(),reason="saved_shops_changed") }) {
+                    val db = TransactionManager.current().connection.connection as Connection
+                    db.createStatement().use { it.execute("SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='5s'") }
+                    MarketSavedShopsRepository(db).change(user, body)
                 }
             }
             get("/saved") {

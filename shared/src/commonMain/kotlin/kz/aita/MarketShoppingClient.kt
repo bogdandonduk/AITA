@@ -114,6 +114,9 @@ class MarketShoppingDeliveryStore(
             if (command.basketChange != null && current.pending != pending &&
                 current.snapshot?.let { command.basketChange.basketIntentError(it, command.expectedRevision) } != null)
                 return@prepare current
+            if (command.checklistChange != null && current.pending != pending &&
+                current.snapshot?.let { command.checklistChange.checklistIntentError(it, command.expectedRevision) } != null)
+                return@prepare current
             try { current.prepare(pending).also { write(it) } }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { null }
@@ -217,8 +220,11 @@ class MarketShoppingDeliveryStore(
         if (!valid || outcome == null) {
             // A later 4xx cannot disprove a previous response-lost commit. Only a recorded outcome
             // retires the local identity. Unknown/malformed responses keep recovery visible.
-            return unresolved(if (pending.command.basketChange != null && response.httpStatusCode == 404)
-                eventMessage("market.basket_apply_upgrade") else response.message ?: eventMessage("market.shopping_pending"))
+            return unresolved(when {
+                pending.command.checklistChange != null && response.httpStatusCode == 404 -> eventMessage("market.checklist_upgrade")
+                pending.command.basketChange != null && response.httpStatusCode == 404 -> eventMessage("market.basket_apply_upgrade")
+                else -> response.message ?: eventMessage("market.shopping_pending")
+            })
         }
         return acknowledgeRecorded(scope, pending, outcome, preparedRevision)
     }

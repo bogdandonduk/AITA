@@ -310,6 +310,8 @@ class Run:
                 self.env['AITA_WEB_DIST'] = str(dist)
                 self.command('Profile photo chooser, save and cancellation in the browser',
                              ['node', 'scripts/linux-web/test/profile-photo-smoke.cjs'])
+                self.command('Marketplace browsing, saved shops and shopping trip in the browser',
+                             ['node', 'scripts/linux-web/test/marketplace-smoke.cjs'])
         finally:
             self.env.pop('AITA_WEB_LOCAL_ORIGIN', None)
             self.env.pop('AITA_WEB_DIST', None)

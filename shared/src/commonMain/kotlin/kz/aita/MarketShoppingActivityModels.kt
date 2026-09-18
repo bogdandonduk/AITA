@@ -43,7 +43,8 @@ data class MarketShoppingActivityEntry(
 }
 
 @Serializable
-data class MarketShoppingActivityRequest(val limit: Int = MARKET_SHOPPING_ACTIVITY_PAGE_SIZE)
+data class MarketShoppingActivityRequest(val limit: Int = MARKET_SHOPPING_ACTIVITY_PAGE_SIZE,
+    val includeChecklist: Boolean = false)
 
 @Serializable
 data class MarketShoppingActivityPage(
@@ -79,7 +80,7 @@ private fun MarketShoppingLine.validActivityLine(): Boolean =
 fun MarketShoppingActivityEntry.isValidShoppingActivityEntry(): Boolean {
     if (marketDiscoveryId(commandId) != commandId || recordedAtMillis <= 0L || expectedRevision < 0L ||
         kind !in setOf(MARKET_ACTIVITY_BASKET, MARKET_ACTIVITY_REPLACE,
-            MARKET_ACTIVITY_REMOVE, MARKET_ACTIVITY_QUANTITY) || requestedUnits !in 0..MARKET_SHOPPING_MAX_UNITS ||
+            MARKET_ACTIVITY_REMOVE, MARKET_ACTIVITY_QUANTITY, MARKET_ACTIVITY_CHECKLIST) || requestedUnits !in 0..MARKET_SHOPPING_MAX_UNITS ||
         reviewedLines !in 1..MARKET_SHOPPING_MAX_LINES || changedLines !in 0..reviewedLines) return false
     if (accepted) {
         if (expectedRevision == Long.MAX_VALUE || errorKey != null || appliedRevision == null ||
@@ -89,7 +90,10 @@ fun MarketShoppingActivityEntry.isValidShoppingActivityEntry(): Boolean {
     if (previewTitle != null && (previewTitle.isBlank() || previewTitle.length > 180)) return false
     if (reviewedCurrency != null && !reviewedCurrency.matches(Regex("[A-Z]{3}"))) return false
     if (reviewedSubtotalMinor != null && reviewedSubtotalMinor < 0L) return false
-    if (kind == MARKET_ACTIVITY_BASKET) {
+    if (kind == MARKET_ACTIVITY_CHECKLIST) {
+        if (requestedUnits != 0 || reviewedCurrency != null || reviewedSubtotalMinor != null ||
+            (changedLines > 0) != changed) return false
+    } else if (kind == MARKET_ACTIVITY_BASKET) {
         if (requestedUnits != 0 || reviewedCurrency == null || reviewedSubtotalMinor == null || changedLines == 0) return false
         if (accepted && !changed) return false
     } else {
@@ -108,6 +112,11 @@ fun MarketShoppingActivityEntry.isValidShoppingActivityEntry(): Boolean {
     val following = history.lines.mapNotNull { it.after?.offerId }
     if (previous.distinct().size != previous.size || following.distinct().size != following.size) return false
     return when (kind) {
+        MARKET_ACTIVITY_CHECKLIST -> history.lines.size == reviewedLines && history.lines.all {
+            val before = it.before; val after = it.after
+            before != null && (if (after == null) before.collected else
+                before.copy(collected = after.collected, updatedAtMillis = after.updatedAtMillis) == after)
+        } && history.lines.count { it.after == null || it.before?.collected != it.after.collected } == changedLines
         MARKET_ACTIVITY_BASKET -> history.lines.size == reviewedLines && history.lines.all {
             val before = it.before; val after = it.after
             before != null && after != null && before.units == after.units && before.basis == after.basis &&
@@ -123,7 +132,8 @@ fun MarketShoppingActivityEntry.isValidShoppingActivityEntry(): Boolean {
             val next = it.after
             val previousLine = it.before
             next != null && next.units == requestedUnits &&
-                (previousLine == null || previousLine.copy(units = next.units, updatedAtMillis = next.updatedAtMillis) == next) &&
+                (previousLine == null || previousLine.copy(units = next.units, updatedAtMillis = next.updatedAtMillis,
+                    collected = if (previousLine.units != next.units) false else previousLine.collected) == next) &&
                 changed == (previousLine?.units != next.units)
         }
     }
@@ -133,7 +143,8 @@ fun MarketShoppingActivityPage.isValidShoppingActivityPage(account: String, want
     protocolVersion == MARKET_SHOPPING_ACTIVITY_PROTOCOL && accountId == account && request == wanted &&
         wanted.isValidShoppingActivityRequest() && checkedAtMillis > 0L && entries.size <= wanted.limit &&
         (!hasMore || entries.size == wanted.limit) && entries.map { it.commandId }.distinct().size == entries.size &&
-        entries.all { it.isValidShoppingActivityEntry() && it.details == null } && entries.zipWithNext().all { (a, b) ->
+        entries.all { it.isValidShoppingActivityEntry() && it.details == null &&
+            (wanted.includeChecklist || it.kind != MARKET_ACTIVITY_CHECKLIST) } && entries.zipWithNext().all { (a, b) ->
             a.recordedAtMillis > b.recordedAtMillis || (a.recordedAtMillis == b.recordedAtMillis && a.commandId > b.commandId)
         }
 
@@ -145,7 +156,10 @@ fun MarketShoppingCommand.shoppingActivityDetails(
 ): MarketShoppingActivityDetails {
     val old = before.associateBy { it.offerId }; val next = after.associateBy { it.offerId }
     val basket = basketChange
-    val rows = if (basket != null) basket.lines.map {
+    val checklist = checklistChange
+    val rows = if (checklist != null) checklist.offerIds.map {
+        MarketShoppingActivityLine(requireNotNull(old[it]), next[it])
+    } else if (basket != null) basket.lines.map {
         MarketShoppingActivityLine(requireNotNull(old[it.sourceOfferId]), requireNotNull(next[it.targetOfferId]))
     } else {
         val previous = old[replaceOfferId ?: offerId]
@@ -165,6 +179,7 @@ fun MarketShoppingCommand.isValidShoppingOutcome(outcome: MarketShoppingOutcome,
     if (outcome.errorKey != null || expectedRevision == Long.MAX_VALUE ||
         applied !in expectedRevision..expectedRevision + 1L || outcome.snapshot.revision < applied) return false
     if (basketChange != null) return matchesBasketOutcome(outcome)
+    if (checklistChange != null) return matchesChecklistOutcome(outcome)
     if (replaceOfferId != null && applied != expectedRevision + 1L) return false
     // A later snapshot may reflect another device's subsequent edits. At the applied revision,
     // however, even an ordinary quantity/removal reply must actually contain its claimed effect.

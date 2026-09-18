@@ -101,7 +101,7 @@ class MarketBasketMutationContractTest {
                 assertTrue(sql.contains("basket_change")); assertTrue(sql.contains("activity_details")); val commandId=args[1] as UUID
                 check(commandId !in records)
                 if (sql.contains("FALSE,?,NULL,")) {
-                    assertEquals(12,args.size);assertEquals("market.shopping_cancelled",args[7])
+                    assertEquals(13,args.size);assertNull(args[12]);assertEquals("market.shopping_cancelled",args[7])
                     assertTrue(sql.endsWith("?::jsonb,NULL)"));recordedDetails=null
                     records[commandId]=Record(args[2] as String,false,args[7] as String,null)
                 } else {

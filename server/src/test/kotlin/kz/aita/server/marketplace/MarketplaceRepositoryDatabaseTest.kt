@@ -59,7 +59,7 @@ class MarketplaceRepositoryDatabaseTest {
                             'NEVER-PUBLIC-NOTE','[{"price":"77.77","currency":"KZT","supplierId":"NEVER-PUBLIC-SUPPLIER"}]');
                 """)
                 listOf("V46__paging_user_finances_and_store_subscriptions.sql","V101__per_location_subscriptions_and_promocodes.sql",
-                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql").forEach{exec(c,resource(it))}
+                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql").forEach{exec(c,resource(it))}
                 listOf(f.branch,f.parent,f.otherParent).forEach{store->exec(c,"""INSERT INTO store_subscription_states
                     (store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
                     VALUES ('$store','${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0)""")}
@@ -1769,6 +1769,176 @@ class MarketplaceRepositoryDatabaseTest {
     @Test fun disabledStorefrontReturnsNoPublicationIndex() = fixture { f, _ ->
         val status = tx(f) { it.stockPublicationStatus(f.owner, f.parent) }
         assertFalse(status.marketplaceEnabled); assertTrue(status.entries.isEmpty())
+    }
+
+    private fun checklistCommand(snapshot: MarketShoppingSnapshot, action: String,
+        ids: List<String> = snapshot.lines.map { it.line.offerId }) = MarketShoppingCommand(
+        UUID.randomUUID().toString(), snapshot.revision, "", 0, checklistChange = MarketChecklistChange(ids, action))
+
+    @Test fun checklistMarksIntentOnceAndNeverWritesStockOrMoney() = fixture { f,c ->
+        val offer=published(f);batch(f,c,total=20.0)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer,units=2))}.snapshot
+        assertFalse(added.lines.single().line.collected)
+        val stock=scalar(c,"SELECT quantity::text FROM stock_batches LIMIT 1")
+        val command=checklistCommand(added,MARKET_CHECKLIST_COLLECT)
+        val first=shoppingTx(f){it.applyChecklist(f.buyer,null,command)}
+        assertTrue(first.accepted);assertEquals(2L,first.appliedRevision);assertTrue(first.snapshot.lines.single().line.collected)
+        assertTrue(command.isValidShoppingOutcome(first,f.buyer.toString()))
+        val replay=shoppingTx(f){it.applyChecklist(f.buyer,null,command)}
+        assertTrue(replay.replayed);assertEquals(2L,replay.appliedRevision)
+        assertEquals(stock,scalar(c,"SELECT quantity::text FROM stock_batches LIMIT 1"))
+        assertEquals("0",scalar(c,"SELECT count(*) FROM transactions"))
+    }
+    @Test fun staleChecklistIsRejectedAndItsOutcomeRemainsImmutable() = fixture { f,c ->
+        val offer=published(f);batch(f,c,total=20.0)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val stale=checklistCommand(added,MARKET_CHECKLIST_COLLECT)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer,revision=1,units=2))}
+        val rejected=shoppingTx(f){it.applyChecklist(f.buyer,null,stale)}
+        assertFalse(rejected.accepted);assertEquals("market.shopping_changed",rejected.errorKey)
+        assertFalse(rejected.snapshot.lines.single().line.collected)
+        assertTrue(shoppingTx(f){it.applyChecklist(f.buyer,null,stale)}.replayed)
+    }
+    @Test fun quantityChangeResetsCheckmarkAndHistoryDescribesBothEffects() = fixture { f,c ->
+        val offer=published(f);batch(f,c,total=20.0)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        shoppingTx(f){it.applyChecklist(f.buyer,null,checklistCommand(added,MARKET_CHECKLIST_COLLECT))}
+        val edit=listCommand(f,offer,revision=2,units=3)
+        val result=shoppingTx(f){it.apply(f.buyer,null,edit)}
+        assertTrue(result.accepted);assertFalse(result.snapshot.lines.single().line.collected)
+        val activity=shoppingReadTx(f){it.activityDetail(f.buyer,edit.commandId)}
+        assertTrue(activity.isValidShoppingActivityEntry())
+        assertTrue(activity.details!!.lines.single().before!!.collected)
+        assertFalse(activity.details!!.lines.single().after!!.collected)
+    }
+    @Test fun removeCollectedRejectsUncheckedRowsAndCanRemoveWithdrawnCollectedRows() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val rejected=shoppingTx(f){it.applyChecklist(f.buyer,null,checklistCommand(added,MARKET_CHECKLIST_REMOVE))}
+        assertFalse(rejected.accepted);assertEquals("market.checklist_changed",rejected.errorKey)
+        val checked=shoppingTx(f){it.applyChecklist(f.buyer,null,checklistCommand(added,MARKET_CHECKLIST_COLLECT))}.snapshot
+        exec(c,"UPDATE marketplace_listings SET is_published=FALSE")
+        val command=checklistCommand(checked,MARKET_CHECKLIST_REMOVE)
+        val removed=shoppingTx(f){it.applyChecklist(f.buyer,null,command)}
+        assertTrue(removed.accepted);assertTrue(removed.snapshot.lines.isEmpty())
+        assertTrue(shoppingReadTx(f){it.activityDetail(f.buyer,command.commandId)}.isValidShoppingActivityEntry())
+    }
+    @Test fun checklistCancellationDoesNotBecomeAnEditOnRetry() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val command=checklistCommand(added,MARKET_CHECKLIST_COLLECT)
+        val cancelled=shoppingTx(f){it.cancel(f.buyer,null,command)}
+        assertEquals("market.shopping_cancelled",cancelled.errorKey)
+        val replay=shoppingTx(f){it.applyChecklist(f.buyer,null,command)}
+        assertTrue(replay.replayed);assertFalse(replay.accepted);assertFalse(replay.snapshot.lines.single().line.collected)
+        assertEquals(command.commandId,shoppingReadTx(f){it.lookup(f.buyer,command)}.outcome!!.commandId)
+    }
+    @Test fun oldHistoryWindowsRemainReadableAfterNewChecklistCommands() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val command=checklistCommand(added,MARKET_CHECKLIST_COLLECT)
+        shoppingTx(f){it.applyChecklist(f.buyer,null,command)}
+        val old=shoppingReadTx(f){it.activity(f.buyer,MarketShoppingActivityRequest())}
+        assertEquals(1,old.entries.size);assertTrue(old.isValidShoppingActivityPage(f.buyer.toString(),old.request))
+        val wanted=MarketShoppingActivitySearchRequest(includeChecklist=true)
+        val current=shoppingReadTx(f){it.activitySearch(f.buyer,wanted)}
+        assertEquals(2,current.entries.size);assertTrue(current.isValidActivitySearchPage(f.buyer.toString(),wanted))
+        assertTrue(shoppingReadTx(f){it.activityDetail(f.buyer,command.commandId)}.isValidShoppingActivityEntry())
+        val removes=wanted.copy(filter=MarketShoppingActivityFilter(kind=MARKET_ACTIVITY_REMOVE))
+        assertTrue(shoppingReadTx(f){it.activitySearch(f.buyer,removes)}.entries.isEmpty())
+    }
+    @Test fun checklistOnOldMutationRoutesIsNeverMisreadAsRemoval() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val command=checklistCommand(added,MARKET_CHECKLIST_COLLECT)
+        assertFailsWith<MarketFailure>{shoppingTx(f){it.apply(f.buyer,null,command)}}
+        assertFailsWith<MarketFailure>{shoppingTx(f){it.applyBasket(f.buyer,null,command)}}
+        assertFalse(shoppingReadTx(f){it.snapshot(f.buyer)}.lines.single().line.collected)
+    }
+    @Test fun checklistIsAccountIsolatedAndReadOnlyRecoveryDoesNotApply() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val command=checklistCommand(added,MARKET_CHECKLIST_COLLECT)
+        assertNull(shoppingReadTx(f){it.lookup(f.buyer,command)}.outcome)
+        assertFalse(shoppingTx(f){it.applyChecklist(f.owner,null,command)}.accepted)
+        assertFalse(shoppingReadTx(f){it.snapshot(f.buyer)}.lines.single().line.collected)
+    }
+    @Test fun checklistNoOpPreservesRevisionAndReportsNoChangedLines() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val command=checklistCommand(added,MARKET_CHECKLIST_UNCHECK)
+        val result=shoppingTx(f){it.applyChecklist(f.buyer,null,command)}
+        assertTrue(result.accepted);assertEquals(1L,result.appliedRevision)
+        val activity=shoppingReadTx(f){it.activityDetail(f.buyer,command.commandId)}
+        assertTrue(activity.isValidShoppingActivityEntry());assertEquals(0,activity.changedLines)
+    }
+    @Test fun checklistRollsBackWhenImmutableOutcomeCannotBeWritten() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        exec(c,"""CREATE FUNCTION fail_checklist_receipt() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$;
+            CREATE TRIGGER fail_checklist_receipt BEFORE INSERT ON buyer_shopping_commands FOR EACH ROW EXECUTE FUNCTION fail_checklist_receipt();""")
+        assertFailsWith<SQLException>{shoppingTx(f){it.applyChecklist(f.buyer,null,checklistCommand(added,MARKET_CHECKLIST_COLLECT))}}
+        val remaining=shoppingReadTx(f){it.snapshot(f.buyer)}
+        assertEquals(1L,remaining.revision);assertFalse(remaining.lines.single().line.collected)
+    }
+    @Test fun simultaneousChecklistChangesHaveOneRevisionWinner() = fixture { f,c ->
+        val offer=published(f);batch(f,c)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,offer))}.snapshot
+        val commands=listOf(checklistCommand(added,MARKET_CHECKLIST_COLLECT),checklistCommand(added,MARKET_CHECKLIST_COLLECT))
+        val pool=java.util.concurrent.Executors.newFixedThreadPool(2)
+        val start=java.util.concurrent.CountDownLatch(1)
+        try {
+            val jobs=commands.map{command->pool.submit<MarketShoppingOutcome>{start.await();shoppingTx(f){it.applyChecklist(f.buyer,null,command)}}}
+            start.countDown();val results=jobs.map{it.get(20,java.util.concurrent.TimeUnit.SECONDS)}
+            assertEquals(1,results.count{it.accepted});assertEquals(1,results.count{!it.accepted})
+            assertEquals(2L,shoppingReadTx(f){it.snapshot(f.buyer)}.revision)
+        } finally {start.countDown();pool.shutdownNow()}
+    }
+
+    private fun <T> savedShopsTx(f:Fixture, work:(MarketSavedShopsRepository)->T):T = DriverManager.getConnection(f.url,f.props).use { c ->
+        c.autoCommit=false;c.transactionIsolation=Connection.TRANSACTION_SERIALIZABLE
+        try {
+            exec(c,"SET LOCAL search_path TO ${f.schema},public")
+            work(MarketSavedShopsRepository(c)).also { c.commit() }
+        } catch(t:Throwable) {c.rollback();throw t}
+    }
+    @Test fun savedShopsArePrivateAndDirectoryFiltersBeforeCounting()=fixture { f,_ ->
+        storefront(f)
+        val first=savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),true,0))}
+        assertEquals(1,first.storeIds.size);assertEquals(1L,first.revision)
+        assertTrue(savedShopsTx(f){it.snapshot(f.owner)}.storeIds.isEmpty())
+        val result=directory(f,MarketShopDirectoryRequest(savedOnly=true))
+        assertEquals(1L,result.totalShops);assertTrue(result.shops.single().saved)
+        assertTrue(result.isValidShopDirectoryResult(f.buyer.toString(),result.request))
+        assertEquals(0L,directory(f,MarketShopDirectoryRequest(city="NoSuchCity",savedOnly=true)).totalShops)
+    }
+    @Test fun savedShopsRetryIsHarmlessButStaleIntentCannotUndoNewerEdit()=fixture { f,_ ->
+        storefront(f)
+        val save=MarketSavedShopChange(f.parent.toString(),true,0)
+        savedShopsTx(f){it.change(f.buyer,save)}
+        assertEquals(1L,savedShopsTx(f){it.change(f.buyer,save)}.revision)
+        savedShopsTx(f){it.change(f.buyer,save.copy(saved=false,expectedRevision=1))}
+        val failure=assertFailsWith<MarketFailure> { savedShopsTx(f){it.change(f.buyer,save)} }
+        assertEquals(409,failure.status)
+        assertTrue(savedShopsTx(f){it.snapshot(f.buyer)}.storeIds.isEmpty())
+    }
+    @Test fun privateAndExpiredShopsCannotBeSavedOrListedButWithdrawalCanBeUnsaved()=fixture { f,c ->
+        assertFailsWith<MarketFailure> { savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),true,0))} }
+        storefront(f)
+        savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),true,0))}
+        exec(c,"UPDATE marketplace_storefronts SET is_published=false WHERE store_id='${f.parent}'")
+        assertTrue(directory(f,MarketShopDirectoryRequest(savedOnly=true)).shops.isEmpty())
+        assertEquals(listOf(f.parent.toString()),savedShopsTx(f){it.snapshot(f.buyer)}.storeIds)
+        assertTrue(savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),false,1))}.storeIds.isEmpty())
+    }
+    @Test fun inactiveAccountsCannotChangeSavedShopsAndRollbacksLeaveNoBookmarks()=fixture { f,c ->
+        storefront(f)
+        exec(c,"UPDATE users SET is_active=false WHERE id='${f.buyer}'")
+        assertEquals(403,assertFailsWith<MarketFailure> {savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),true,0))}}.status)
+        exec(c,"UPDATE users SET is_active=true WHERE id='${f.buyer}'")
+        assertFailsWith<IllegalStateException> { savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),true,0));error("rollback")} }
+        assertTrue(savedShopsTx(f){it.snapshot(f.buyer)}.storeIds.isEmpty())
+        assertEquals(0L,savedShopsTx(f){it.snapshot(f.buyer)}.revision)
     }
 
 }
