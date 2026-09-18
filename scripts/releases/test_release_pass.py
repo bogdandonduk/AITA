@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -19,6 +21,49 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_server_result_uses_owner_readable_verified_state_not_root_only_metadata(self):
+        with TemporaryDirectory() as folder, patch.object(release, 'ROOT', Path(folder)):
+            root = Path(folder)
+            helper = root / 'helper'; helper.touch()
+            pointer = root / 'latest.json'; pointer.write_text('{"run_id":"run"}')
+            runs = root / 'runs'; (runs / 'run').mkdir(parents=True)
+            state = runs / 'run/state.json'
+            state.write_text(json.dumps(dict(commit='a'*40, result='success', deployment_verified=True)))
+            actual_path = Path
+            def path(value):
+                return {'/usr/local/sbin/aita-release-server': helper, '/var/lib/aita-ops/latest.json': pointer,
+                        '/var/lib/aita-ops/runs': runs}.get(str(value), actual_path(value))
+            run = release.Run(SimpleNamespace()); run.revision = 'a'*40
+            with patch.object(release, 'Path', side_effect=path), patch.object(run, 'command'):
+                run.server()
+                self.assertEqual(run.state['serverRun'], 'run')
+                state.write_text(json.dumps(dict(commit='b'*40, result='success', deployment_verified=True)))
+                with self.assertRaises(RuntimeError): run.server()
+            run.log.close()
+
+    def test_public_catalog_setup_contains_no_private_key_and_refuses_trust_rotation(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder); key_dir = root / '.config/aita/release-signing'; key_dir.mkdir(parents=True)
+            private = root / 'private.pem'; public_der = root / 'public.der'
+            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:2048', '-out', str(private)], check=True, capture_output=True)
+            subprocess.run(['openssl', 'pkey', '-in', str(private), '-pubout', '-outform', 'DER', '-out', str(public_der)], check=True, capture_output=True)
+            import base64
+            (key_dir / 'update-public.txt').write_text(base64.b64encode(public_der.read_bytes()).decode())
+            owner = SimpleNamespace(pw_dir=str(root), pw_uid=os.getuid(), pw_gid=os.getgid())
+            env = root / 'etc/client-releases.env'; dropin = root / 'systemd/40-client-releases.conf'
+            run = subprocess.run
+            def command(args, **kwargs):
+                if args[0] == '/usr/bin/systemctl': return SimpleNamespace(returncode=0)
+                return run(args, **kwargs)
+            with patch.object(access, 'CATALOG', root / 'catalog'), patch.object(access, 'FEED_ENV', env), patch.object(access, 'FEED_DROPIN', dropin), \
+                    patch.object(access.pwd, 'getpwnam', return_value=owner), patch.object(access.os, 'chown'), patch.object(access.subprocess, 'run', side_effect=command):
+                access.configure_public_catalog({'owner': 'bogdan'})
+                self.assertIn('AITA_UPDATE_PUBLIC_KEY=', env.read_text())
+                self.assertNotIn('PRIVATE', env.read_text())
+                access.configure_public_catalog({'owner': 'bogdan'})
+                env.write_text('AITA_UPDATE_PUBLIC_KEY=different\n')
+                with self.assertRaisesRegex(RuntimeError, 'rotation'): access.configure_public_catalog({'owner': 'bogdan'})
+
     def test_versions_cannot_escape_release_folder_or_exceed_native_limits(self):
         for value in ('../keys', '1.2.3/next', '01.0.0', '256.0.1', '1.256.0', '1.0.65536', '1.2.3;cmd'):
             with self.assertRaises(RuntimeError): release.release_identity(value, 2)

@@ -156,20 +156,20 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         mutableStateOf(false)
     }
 
-    LaunchedEffect(draftStorageKey, existing?.id, stateValues.goodsCategories.orEmpty().size) {
+    LaunchedEffect(draftStorageKey, existing?.id, stateValues.goodsCategories.orEmpty().size, AppStateWorkspace.restoreRevision.collectAsState().value) {
         persistentDraftLoaded = false
-        val restored = getPersistentUiDraftValue
+        val restored = readAppStateDraft
             ?.invoke(draftStorageKey)
             ?.toPersistentStockAddEditDraftOrNull()
         if (restored != null && (existing == null || restored.id == existing.id)) {
             draft = restored
         } else if (existing == null && draft.categoryIds.isEmpty()) {
-            val restoredRootCategoryId = getPersistentUiDraftValue
+            val restoredRootCategoryId = readAppStateDraft
                 ?.invoke(stockAddEditLastCategoryStorageKey("root"))
                 ?.takeIf { id ->
                     id.isNotBlank() && stateValues.goodsCategories.orEmpty().any { it.id == id }
                 }
-            val restoredSelectedCategoryId = getPersistentUiDraftValue
+            val restoredSelectedCategoryId = readAppStateDraft
                 ?.invoke(stockAddEditLastCategoryStorageKey("selected"))
                 ?.takeIf { id ->
                     id.isNotBlank() && stateValues.goodsCategories.orEmpty().any { it.id == id }
@@ -210,15 +210,15 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 
     LaunchedEffect(draft, draftStorageKey, persistentDraftLoaded) {
         if (persistentDraftLoaded) {
-            setPersistentUiDraftValue?.invoke(draftStorageKey, draft.toPersistentDraftStateString())
+            writeAppStateDraft?.invoke(draftStorageKey, draft.toPersistentDraftStateString())
         }
     }
 
     suspend fun clearPersistentStockAddEditDraft() {
-        setPersistentUiDraftValue?.invoke(draftStorageKey, null)
-        localizedGroupEditorPersistentKey("$draftStorageKey:name")?.let { setPersistentUiDraftValue?.invoke(it, null) }
-        localizedGroupEditorPersistentKey("$draftStorageKey:description")?.let { setPersistentUiDraftValue?.invoke(it, null) }
-        localizedGroupEditorPersistentKey("$draftStorageKey:note")?.let { setPersistentUiDraftValue?.invoke(it, null) }
+        writeAppStateDraft?.invoke(draftStorageKey, null)
+        localizedGroupEditorPersistentKey("$draftStorageKey:name")?.let { writeAppStateDraft?.invoke(it, null) }
+        localizedGroupEditorPersistentKey("$draftStorageKey:description")?.let { writeAppStateDraft?.invoke(it, null) }
+        localizedGroupEditorPersistentKey("$draftStorageKey:note")?.let { writeAppStateDraft?.invoke(it, null) }
     }
 
     var selectedTabId by rememberSaveable(existing?.id ?: "new_stock_item:$addStockItemSessionId") {
@@ -3218,6 +3218,11 @@ sealed class NavigationScreenModel(
             override val iconRes: DrawableResource
                 get() = AppConfiguration.stateValues.drawableResIconAppTheme.value
         }
+        data object AppState: Menu("MenuAppStateNavigationScreenModelRoute") {
+            override val iconPath: String get() = AppConfiguration.stateValues.drawablePathIconDevices
+            override val iconRes: DrawableResource get() = AppConfiguration.stateValues.drawableResIconDevices.value
+            override val name: String get() = AppConfiguration.appStateText("title")
+        }
         data object AppScale: Menu("MenuAppScaleNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconAppScale
@@ -3339,6 +3344,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.AppLanguage,
     NavigationScreenModel.Menu.AppTheme,
     NavigationScreenModel.Menu.AppScale,
+    NavigationScreenModel.Menu.AppState,
     NavigationScreenModel.UserAuth.Main,
     NavigationScreenModel.UserAuth.LogIn,
     NavigationScreenModel.UserAuth.SignUp,
@@ -3543,57 +3549,45 @@ object Navigation {
         )
     val Main = _Main.asStateFlow()
 
-    private var appNavigationPersistenceStarted = false
-
-    private fun appNavigationSnapshot(): PersistedAppNavigationStateDataModel =
-        PersistedAppNavigationStateDataModel(
-            main = Main.value.toCompactPersistentMainRoutes(),
-            stock = Stock.persistentSnapshot(),
-            menu = Menu.persistentSnapshot(),
-            userAuth = UserAuth.persistentSnapshot(),
-            stateHosts = persistentAppStateHostsSnapshot()
-        )
-
-    private suspend fun restorePersistedAppNavigation() {
-        try {
-            val snapshot = runCatching {
-                getLocalKv(APP_NAVIGATION_CACHE_KEY)
-                    ?.let { jsonBase.decodeFromString<PersistedAppNavigationStateDataModel>(it) }
-            }.getOrNull() ?: return
-
-            restorePersistentAppStateHosts(snapshot.stateHosts)
-            _Main.emit(snapshot.main.toPersistentMainStack())
-            Stock.restorePersistentSnapshot(snapshot.stock)
-            Menu.restorePersistentSnapshot(snapshot.menu)
-            UserAuth.restorePersistentSnapshot(snapshot.userAuth)
-        } finally {
-            appNavigationRestoredState.emit(true)
-        }
+    internal fun accountUiStateSnapshot(drafts: Map<String, String>): AppStateDocument {
+        fun safe(routes: List<String>) = routes.filter(::appStateSafeRoute).takeLast(2)
+        val stock = Stock.persistentSnapshot()
+        val menu = Menu.persistentSnapshot()
+        return AppStateDocument(navigation = mapOf(
+            "main" to safe(Main.value.toCompactPersistentMainRoutes()),
+            "stockLeft" to safe(stock.left), "stockRight" to safe(stock.right),
+            "menuLeft" to safe(menu.left), "menuRight" to safe(menu.right)),
+            hosts = persistentAppStateHostsSnapshot().filterKeys(::appStateSafeRoute)
+                .mapValues { (_, fields) -> fields.filterKeys(::appStateSafeKey) }.filterValues { it.isNotEmpty() },
+            drafts = drafts)
     }
 
-    suspend fun awaitAppNavigationRestore() {
-        while (!appNavigationRestoredState.value) {
-            delay(10)
+    internal suspend fun clearAccountUiState() {
+        persistentAppNavigationScreens().filter { appStateSafeRoute(it.route) }.forEach { host ->
+            host.state.value.keys.toList().forEach { host.removeState(it) }
         }
+        Stock.restorePersistentSnapshot(PersistedSplitNavigationStackDataModel())
+        Menu.restorePersistentSnapshot(PersistedSplitNavigationStackDataModel())
+        // Authentication and transaction workspaces own their own state and recovery flows.
     }
 
-    fun startAppNavigationPersistence() {
-        if (appNavigationPersistenceStarted) return
-        appNavigationPersistenceStarted = true
-
-        CoroutineScope(Dispatchers.ourIo).launch {
-            restorePersistedAppNavigation()
-            var lastRaw = ""
-            while (true) {
-                val raw = runCatching { jsonBase.encodeToString(appNavigationSnapshot()) }.getOrNull().orEmpty()
-                if (raw.isNotBlank() && raw != lastRaw) {
-                    putLocalKv(APP_NAVIGATION_CACHE_KEY, raw)
-                    lastRaw = raw
-                }
-                delay(320)
-            }
-        }
+    internal suspend fun restoreAccountUiState(document: AppStateDocument) {
+        if (!document.valid(APP_STATE_DEVICE_MAX_BYTES)) return
+        restorePersistentAppStateHosts(document.hosts)
+        Stock.restorePersistentSnapshot(PersistedSplitNavigationStackDataModel(document.navigation["stockLeft"].orEmpty(), document.navigation["stockRight"].orEmpty()))
+        val menu = PersistedSplitNavigationStackDataModel(document.navigation["menuLeft"].orEmpty(), document.navigation["menuRight"].orEmpty())
+        Menu.restorePersistentSnapshot(menu.copy(left = menu.left.filter { route ->
+            (persistentAppRouteToScreen(route) as? NavigationScreenModel.Menu)?.let { AppConfiguration.canOpenMenuDestination(it) } == true
+        }, right = menu.right.filter { route ->
+            (persistentAppRouteToScreen(route) as? NavigationScreenModel.Menu)?.let { AppConfiguration.canOpenMenuDestination(it) } == true
+        }))
+        document.navigation["main"]?.lastOrNull()?.let(::persistentAppRouteToScreen)?.takeIf {
+            it.isMainScreenCompatibleWithAppMode(appModeState.value)
+        }?.let { goMain(it) }
     }
+
+    suspend fun awaitAppNavigationRestore() { while (!appNavigationRestoredState.value) delay(10) }
+    fun startAppNavigationPersistence() = AppStateWorkspace.start()
 
     suspend fun showSubscriptionRecovery() {
         // Recover above the normal menu roots. A back action must lead somewhere real.
@@ -3897,6 +3891,7 @@ object Navigation {
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,
             NavigationScreenModel.Menu.AppScale,
+    NavigationScreenModel.Menu.AppState,
             NavigationScreenModel.Menu.Tutorials,
             NavigationScreenModel.Menu.ClientUpdate,
             NavigationScreenModel.Menu.About

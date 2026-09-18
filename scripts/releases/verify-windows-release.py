@@ -7,6 +7,31 @@ import os
 from pathlib import Path
 import subprocess
 
+UPGRADE_CODE = 'F100F3AF-CBA2-42E5-928D-8165D1A271A5'
+
+
+def verify_upgrade_identity(path, version):
+    script = r'''$ErrorActionPreference='Stop'
+$installer = New-Object -ComObject WindowsInstaller.Installer
+$db = $installer.OpenDatabase($env:AITA_VERIFY_FILE, 0)
+function Query($sql) {
+  $view = $db.OpenView($sql); $view.Execute(); $record = $view.Fetch()
+  if ($null -eq $record) { $view.Close(); return '' }
+  $value = $record.StringData(1); $view.Close(); return $value
+}
+@{upgradeCode=(Query "SELECT ``Value`` FROM ``Property`` WHERE ``Property``='UpgradeCode'");
+  version=(Query "SELECT ``Value`` FROM ``Property`` WHERE ``Property``='ProductVersion'");
+  removeExisting=(Query "SELECT ``Sequence`` FROM ``InstallExecuteSequence`` WHERE ``Action``='RemoveExistingProducts'");
+  relatedProducts=(Query 'SELECT `UpgradeCode` FROM `Upgrade`') } | ConvertTo-Json -Compress
+'''
+    output = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
+        env={**os.environ, 'AITA_VERIFY_FILE': str(path.resolve())}, text=True, capture_output=True, check=True)
+    identity = json.loads(output.stdout)
+    if (identity['upgradeCode'].strip('{}').upper() != UPGRADE_CODE or identity['version'] != version or
+            not identity['removeExisting'] or identity['relatedProducts'].strip('{}').upper() != UPGRADE_CODE):
+        raise RuntimeError('MSI must preserve AITA identity and remove related older versions during an upgrade')
+    return identity
+
 
 def verify_signature(path, production, expected):
     env = {**os.environ, 'AITA_VERIFY_FILE': str(path.resolve())}
@@ -35,6 +60,7 @@ def main():
     paths = [x for x in args.directory.iterdir() if x.suffix.lower() in ('.exe', '.msi')]
     if len(paths) != 2 or {x.suffix.lower() for x in paths} != {'.exe', '.msi'}:
         raise RuntimeError('Expected exactly one EXE and one MSI')
+    upgrade = verify_upgrade_identity(next(x for x in paths if x.suffix.lower() == '.msi'), args.version)
     for path in paths:
         signature = verify_signature(path, production, os.environ.get('AITA_WINDOWS_SIGNER_THUMBPRINT', ''))
         name = f'AITA-{args.version}-{args.build}-windows{path.suffix.lower()}'
@@ -47,7 +73,7 @@ def main():
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         artifacts.append(dict(name=name, sha256=digest, **signature))
     receipt = dict(version=args.version, build=args.build, revision=args.revision,
-                   production=production, artifacts=artifacts)
+                   production=production, artifacts=artifacts, upgrade=upgrade)
     (args.directory / 'windows-verification.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print('VERIFIED: Timestamped company signatures' if production else 'UNSIGNED PILOT: Authorized test-store installers; trusted Windows signing is deferred')
 

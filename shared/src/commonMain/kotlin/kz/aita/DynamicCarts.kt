@@ -136,3 +136,6 @@ object DynamicCarts {
         if (isCurrent(owner)) putLocalKv(owner.storageKey + ".navigation", raw)
     }
 }
+
+/** Installer handoff may exit the desktop process only after queued cart writes are durable. */
+suspend fun flushCartsBeforeClientUpdate() = DynamicCarts.flush()

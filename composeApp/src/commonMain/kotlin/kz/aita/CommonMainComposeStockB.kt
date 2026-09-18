@@ -2931,9 +2931,9 @@ internal fun AppConfiguration.StockLocalizedStringGroupEditor(
         mutableStateOf(sanitizeEditorItems(values.toDomainSelectionItems(fallbackLanguageId)))
     }
 
-    LaunchedEffect(persistentEditorKey, fallbackLanguageId, languageDomains.map { it.id }) {
+    LaunchedEffect(persistentEditorKey, fallbackLanguageId, languageDomains.map { it.id }, AppStateWorkspace.restoreRevision.collectAsState().value) {
         val key = persistentEditorKey ?: return@LaunchedEffect
-        val restored = getPersistentUiDraftValue?.invoke(key)
+        val restored = readAppStateDraft?.invoke(key)
             ?.toLocalizedGroupEditorItemsOrNull(fallbackLanguageId)
         if (!restored.isNullOrEmpty()) {
             data = sanitizeEditorItems(restored)
@@ -3039,7 +3039,7 @@ internal fun AppConfiguration.StockLocalizedStringGroupEditor(
 
         LaunchedEffect(sanitizedData, persistentEditorKey) {
             persistentEditorKey?.let { key ->
-                setPersistentUiDraftValue?.invoke(key, sanitizedData.toLocalizedGroupEditorStateString())
+                writeAppStateDraft?.invoke(key, sanitizedData.toLocalizedGroupEditorStateString())
             }
 
             val next = sanitizedData.toLocalizedStringsFromLanguageSelection()
@@ -3335,13 +3335,13 @@ internal fun AppConfiguration.rememberLatestStockAddEditCategorySelection(rootCa
             NavigationScreenModel.Stock.AddEditGoodsItem.setState(
                 NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_LAST_SELECTED_ROOT_CATEGORY_ID to it
             )
-            setPersistentUiDraftValue?.invoke(stockAddEditLastCategoryStorageKey("root"), it)
+            writeAppStateDraft?.invoke(stockAddEditLastCategoryStorageKey("root"), it)
         }
         cleanCategoryId?.let {
             NavigationScreenModel.Stock.AddEditGoodsItem.setState(
                 NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_LAST_SELECTED_CATEGORY_ID to it
             )
-            setPersistentUiDraftValue?.invoke(stockAddEditLastCategoryStorageKey("selected"), it)
+            writeAppStateDraft?.invoke(stockAddEditLastCategoryStorageKey("selected"), it)
         }
     }
 }

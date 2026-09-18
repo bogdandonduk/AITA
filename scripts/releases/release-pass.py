@@ -16,6 +16,9 @@ import sys
 import time
 from datetime import datetime, timezone
 import zipfile
+import functools
+import http.server
+import threading
 
 REPOSITORY = 'bogdandonduk/AITA'
 ACCOUNT = 'eb83f32e0d274f3e81e020d4776f666e'
@@ -84,7 +87,7 @@ def advice(error):
         (('resolve host', 'dns', 'https'), 'Check the apex CNAME and Pages custom-domain status. Do not disable certificate verification.'),
         (('401', 'oauth', 'authentication'), 'For Cloudflare, run npx --yes wrangler@4.134.0 login --device; for GitHub, run gh auth status.'),
         (('sudo', 'server helper'), 'The server helper needs one-time installation by the Ubuntu owner. No blanket passwordless sudo is required.'),
-        (('signature', 'certificate', 'windows signing'), 'Complete trusted Windows signing setup. Unsigned installers cannot pass the production publication gate.'),
+        (('signature', 'certificate', 'windows signing'), 'Verify the installer checksum and signing configuration. Trusted Windows mode requires a company certificate; pilot mode still rejects broken signatures.'),
         (('compil', 'test'), 'Fix the named compiler/test failure and rerun verification before publishing.'),
         (('already exists', 'collision'), 'Published assets are immutable. Inspect the saved result and existing release; use a new build number if bytes changed.'),
     ]:
@@ -164,6 +167,7 @@ class Run:
         public = SIGNING / 'update-public.txt'
         require(public.is_file(), 'Updater signing public key is missing; run setup-android-signing.py')
         self.env['AITA_UPDATE_PUBLIC_KEY'] = public.read_text().strip()
+        self.env['AITA_UPDATE_FEED_BASE'] = 'https://aita-api.bogdan-donduk.workers.dev/client-updates'
         self.say('SOURCE', self.revision)
 
     def verify(self):
@@ -221,6 +225,8 @@ class Run:
                     require(not path.is_symlink() and path.stat().st_size <= 25 * 1024 * 1024, 'Web file exceeds Pages size limit')
                     package.write(path, path.relative_to(dist))
         self.collect(archive, f'AITA-{self.args.version}-{self.args.build}-web.zip', 'web', None)
+        self.collect(ROOT / 'shared/build/generated/aitaClientBuild/client-build.json', 'web-client-build.json', 'web', None)
+        self.browser_check(dist)
         self.env['CLOUDFLARE_ACCOUNT_ID'] = ACCOUNT
         self.unchanged()
         # --force disables Wrangler's agent-specific Pages-to-Workers delegation. This is a Pages upload.
@@ -229,10 +235,32 @@ class Run:
             '--commit-message', f'AITA {self.tag}', '--force'])
         self.state['webUploadCompleted'] = True; self.save()
         self.command('Check aita.kz HTTPS', ['curl', '--fail', '--show-error', '--silent', '--max-time', '30', '--output', '/dev/null', 'https://aita.kz/'])
-        self.say('LIVE', 'https://aita.kz/ (HTTPS verified; inspect saved browser smoke results separately)')
+        self.browser_check()
+        self.say('LIVE', 'https://aita.kz/ (HTTPS, app startup, narrow/wide rendering and preference persistence verified)')
 
-    def windows(self):
-        self.command('Dispatch Windows production build', ['gh', 'workflow', 'run', 'build-windows-release.yml', '--repo', REPOSITORY,
+    def browser_check(self, dist=None):
+        # Use the production origin for API CORS, while routing only static assets locally before upload.
+        self.env.setdefault('NODE_PATH', '/tmp/aita-browser-check/node_modules')
+        self.env['AITA_WEB_URL'] = 'https://aita.kz/'
+        shots = self.folder / ('browser-before-upload' if dist else 'browser-live')
+        shots.mkdir(exist_ok=True); self.env['AITA_ARTIFACTS'] = str(shots)
+        server = None
+        if dist:
+            class Handler(http.server.SimpleHTTPRequestHandler):
+                extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, '.wasm': 'application/wasm'}
+                def log_message(self, *args): pass
+            server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Handler, directory=str(dist)))
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            self.env['AITA_WEB_LOCAL_ORIGIN'] = f'http://127.0.0.1:{server.server_port}'
+        try:
+            self.command('Browser smoke check before upload' if dist else 'Browser smoke check on aita.kz',
+                         ['node', 'scripts/linux-web/test/app-smoke.cjs'])
+        finally:
+            self.env.pop('AITA_WEB_LOCAL_ORIGIN', None)
+            if server: server.shutdown(); server.server_close()
+
+    def dispatch_windows(self):
+        self.command('Dispatch Windows release build', ['gh', 'workflow', 'run', 'build-windows-release.yml', '--repo', REPOSITORY,
             '--ref', 'master', '-f', f'production={str(self.args.windows_signing == "trusted").lower()}', '-f', f'version={self.args.version}', '-f', f'build={self.args.build}', '-f', f'revision={self.revision}'])
         deadline = time.monotonic() + 120
         run_id = None
@@ -246,7 +274,11 @@ class Run:
             time.sleep(5)
         require(run_id, 'Windows dispatch result unknown; inspect Actions before retrying')
         self.state['windowsRun'] = run_id; self.save()
-        self.command('Wait for signed Windows installers', ['gh', 'run', 'watch', str(run_id), '--repo', REPOSITORY, '--exit-status', '--interval', '30'])
+
+    def windows(self):
+        if not self.state.get('windowsRun'): self.dispatch_windows()
+        run_id = self.state['windowsRun']
+        self.command('Wait for Windows installers', ['gh', 'run', 'watch', str(run_id), '--repo', REPOSITORY, '--exit-status', '--interval', '30'])
         downloaded = self.folder / 'windows'
         self.command('Download verified Windows artifacts', ['gh', 'run', 'download', str(run_id), '--repo', REPOSITORY,
             '--name', f'AITA-Windows-{self.tag}' + ('' if self.args.windows_signing == 'trusted' else '-UNSIGNED-PILOT'), '--dir', str(downloaded)])
@@ -265,6 +297,7 @@ class Run:
             self.collect(path, name, 'windows', entry['thumbprint'])
         require({Path(e['name']).suffix.lower() for e in receipt['artifacts']} == {'.exe', '.msi'}, 'Both EXE and MSI are required')
         self.collect(downloaded / 'windows-verification.json', 'windows-verification.json', 'windows', None)
+        self.collect(downloaded / 'windows-client-build.json', 'windows-client-build.json', 'windows', None)
 
     def server(self):
         helper = Path('/usr/local/sbin/aita-release-server')
@@ -273,9 +306,53 @@ class Run:
         self.command('Follow backup, controlled restart and readiness', [sys.executable, 'scripts/linux-field-server/aita-ops.py', 'logs', '--update-only'])
         latest = json.loads(Path('/var/lib/aita-ops/latest.json').read_text())
         folder = Path('/var/lib/aita-ops/runs') / latest['run_id']
-        meta = json.loads((folder / 'meta.json').read_text()); result = json.loads((folder / 'state.json').read_text())
-        require(meta['commit'] == self.revision and result['result'] == 'success', 'Server update did not confirm this source revision; inspect updater log')
+        # The existing updater deliberately keeps meta.json root-only. Its root-owned final
+        # state is readable by the build owner's group and includes the verified source SHA.
+        result = json.loads((folder / 'state.json').read_text())
+        require(result.get('commit') == self.revision and result.get('result') == 'success' and result.get('deployment_verified') is True,
+                'Server update did not confirm this source revision; inspect updater log')
         self.state['serverRun'] = latest['run_id']; self.save()
+
+    def updater_feed(self):
+        catalog = Path('/var/lib/aita-client-releases')
+        require(catalog.is_dir() and os.access(catalog, os.W_OK), 'Install the server helper to configure the public updater catalog first')
+        require(self.state['stages'].get('server', {}).get('status') == 'complete', 'Verify this server update before publishing its public updater feed')
+        entries = []
+        for entry in self.state['artifacts']:
+            path = self.assets / entry['name']; suffix = path.suffix.lower()
+            if suffix not in ('.apk', '.msi', '.exe'): continue
+            platform = entry['platform']
+            require(platform in ('android', 'windows') and sha(path) == entry['sha256'], 'Invalid updater artifact')
+            entries.append(dict(os=platform.upper(), kind=suffix[1:].upper(), arch='UNIVERSAL' if platform == 'android' else 'X64',
+                minimumOsMajor=24 if platform == 'android' else 10, path=str(path), buildInfo=str(self.assets / f'{platform}-client-build.json')))
+        require(entries, 'No native installers available for the updater feed')
+        if self.state.get('webUploadCompleted'):
+            entries.append(dict(os='WEB', kind='WEB_RELOAD', url='https://aita.kz/', buildInfo=str(self.assets / 'web-client-build.json')))
+        spec = self.folder / 'updater-spec.json'
+        spec.write_text(json.dumps(dict(channel='release', id=self.tag, sequence=self.args.build,
+            version=self.args.version, build=self.args.build, notes={
+                'en': 'Account app state, safer updates and stability improvements. Windows: unsigned pilot installers. Android: signed APK.',
+                'ru': 'Состояние приложения в аккаунте, безопаснее обновления и улучшения стабильности. Windows: пилотные установщики без подписи. Android: подписанный APK.',
+                'kk': 'Аккаунттағы қолданба күйі, қауіпсіз жаңарту және тұрақтылық жақсартулары. Windows: қолтаңбасыз пилоттық орнатқыштар. Android: қол қойылған APK.',
+                'ky': 'Аккаунттагы колдонмо абалы, коопсуз жаңыртуу жана туруктуулук жакшыртылды. Windows: кол коюлбаган пилоттук орноткучтар. Android: кол коюлган APK.',
+                'tg': 'Ҳолати барнома дар ҳисоб, навсозии бехатартар ва устувории беҳтар. Windows: насбкунандаҳои озмоишӣ бе имзо. Android: APK бо имзо.',
+                'uz': 'Hisobdagi ilova holati, xavfsizroq yangilanish va barqarorlik yaxshilandi. Windows: imzosiz sinov o‘rnatuvchilari. Android: imzolangan APK.'}, artifacts=entries), indent=2))
+        base = self.env['AITA_UPDATE_FEED_BASE']
+        self.command('Publish signed updater metadata and immutable downloads', [sys.executable, 'scripts/releases/publish-client-release.py',
+            'publish', '--spec', str(spec), '--build-info', entries[0]['buildInfo'], '--private-key', str(SIGNING / 'update-private.pem'),
+            '--catalog', str(catalog), '--base-url', base])
+        fetched = self.folder / 'public-release.json'
+        self.command('Verify public updater feed over HTTPS', ['curl', '--fail', '--silent', '--show-error', '--max-time', '30',
+            '--output', str(fetched), base + '/release.json'])
+        require(sha(fetched) == sha(catalog / 'release.json'), 'Public updater feed is stale or differs from the signed publication')
+        for entry in entries:
+            if 'path' not in entry: continue
+            path = Path(entry['path']); destination = self.folder / ('download-check' + path.suffix)
+            self.command('Verify public installer download ' + path.suffix, ['curl', '--fail', '--silent', '--show-error', '--max-time', '300',
+                '--output', str(destination), base + '/artifacts/' + sha(path) + path.suffix])
+            require(sha(destination) == sha(path), 'Public installer download checksum mismatch')
+            destination.unlink()
+        self.state['updaterFeedPublished'] = True; self.save()
 
     def publish(self):
         self.unchanged()
@@ -285,7 +362,7 @@ class Run:
         manifest = {'version': self.args.version, 'build': self.args.build, 'revision': self.revision,
             'tag': self.tag, 'createdAt': utc(), 'artifacts': entries,
             'stages': {k: v for k, v in self.state['stages'].items() if k != 'github'}, 'visibility': 'private GitHub repository; downloads require repository access',
-            'windowsSigning': self.state.get('windowsSigning'), 'updaterFeedPublished': False}
+            'windowsSigning': self.state.get('windowsSigning'), 'updaterFeedPublished': self.state.get('updaterFeedPublished', False)}
         record = self.folder / 'release.json'; record.write_text(json.dumps(manifest, indent=2) + '\n')
         sums = self.folder / 'SHA256SUMS.txt'; sums.write_text(''.join(f"{e['sha256']}  {e['name']}\n" for e in entries))
         notes = self.folder / 'notes.txt'
@@ -336,9 +413,17 @@ def main():
         require(len(targets) == len(set(targets)) and set(targets) <= {'android', 'windows', 'web', 'server'}, 'Unknown/duplicate release target')
         if not run.stage('source', run.pin) or not run.stage('verification', run.verify):
             return 1
-        results = [run.stage(target, getattr(run, target)) for target in targets]
-        if args.publish:
+        if 'windows' in targets:
+            run.stage('windows-dispatch', run.dispatch_windows)
+        # The remote Windows runner builds while local Android/Pages work proceeds serially.
+        ordered = [t for t in targets if t != 'windows'] + (['windows'] if 'windows' in targets else [])
+        results = [run.stage(target, getattr(run, target)) for target in ordered]
+        if args.publish and 'server' in targets:
+            results.append(run.stage('updater-feed', run.updater_feed))
+        if args.publish and all(run.state['stages'].get(t, {}).get('status') == 'complete' for t in targets if t != 'server'):
             results.append(run.stage('github', run.publish))
+        elif args.publish:
+            run.say('HELD', 'GitHub publication waits for every requested client platform to pass. Verified local artifacts and logs are retained.')
         return 0 if all(results) else 1
     except Exception as error:
         run.say('STOP', str(error)); run.say('NEXT STEP', advice(error)); return 1

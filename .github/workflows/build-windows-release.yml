@@ -71,6 +71,8 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Prepare native Windows packaging tools
         shell: pwsh
         run: |
@@ -87,6 +89,8 @@ jobs:
       - name: Test and create application with bundled Java runtime
         shell: pwsh
         run: |
+          python -m unittest discover -s scripts/releases -p test_windows_handoff.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows updater handoff tests failed' }
           ./gradlew.bat :shared:jvmTest :composeApp:jvmTest :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
           if ($LASTEXITCODE -ne 0) { throw 'Windows build/tests failed' }
       - name: Sign application launcher before packaging
@@ -114,6 +118,7 @@ jobs:
           ./gradlew.bat :composeApp:packageMsi :composeApp:packageExe -x :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
           if ($LASTEXITCODE -ne 0) { throw 'Installer packaging failed' }
           New-Item -ItemType Directory -Force build/windows-signing | Out-Null
+          Copy-Item shared/build/generated/aitaClientBuild/client-build.json build/windows-signing/windows-client-build.json
           Copy-Item composeApp/build/compose/binaries/main/msi/*.msi build/windows-signing/
           Copy-Item composeApp/build/compose/binaries/main/exe/*.exe build/windows-signing/
       - name: Sign and timestamp installers

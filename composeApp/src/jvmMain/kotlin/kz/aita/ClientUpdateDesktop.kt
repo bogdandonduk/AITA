@@ -49,7 +49,18 @@ internal actual suspend fun handoffClientUpdate(release: ClientRelease, artifact
     if (prepared == null || prepared.build != release.build || prepared.releaseId != release.id || prepared.channel != release.channel) throw ClientUpdateFailure("integrity")
     val file = desktopUpdates().verifiedFile(prepared, artifact)
     when (clientUpdatePlatform().os) {
-        ClientOs.WINDOWS -> if (artifact.kind == InstallerKind.MSI) ProcessBuilder("msiexec.exe", "/i", file.absolutePath, "/norestart").start() else ProcessBuilder(file.absolutePath).start()
+        ClientOs.WINDOWS -> {
+            val launcher = windowsUpdateLauncher(System.getProperty("jpackage.app-path"))
+            if (artifact.kind == InstallerKind.MSI && launcher != null) {
+                withContext(Dispatchers.Main) { AppStateWorkspace.flush() }
+                flushCartsBeforeClientUpdate()
+                if (!startWindowsUpdateHandoff(file, artifact.sha256, launcher)) throw ClientUpdateFailure("install")
+                // Helper has verified the file and is waiting for this exact process to exit.
+                // The new process acknowledges the build before ManagedClientInstaller cleans up.
+                kotlin.system.exitProcess(0)
+            } else if (artifact.kind == InstallerKind.MSI) ProcessBuilder("msiexec.exe", "/i", file.absolutePath, "/norestart").start()
+            else ProcessBuilder(file.absolutePath).start()
+        }
         ClientOs.MACOS -> ProcessBuilder("/usr/bin/open", file.absolutePath).start()
         ClientOs.LINUX -> ProcessBuilder("xdg-open", file.absolutePath).start()
         else -> throw ClientUpdateFailure("unsupported")

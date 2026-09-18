@@ -4,6 +4,7 @@ Uses AITA's existing backup/build/readiness updater; grants no arbitrary sudo co
 Install: sudo python3 scripts/releases/server-release-access.py install --repo /home/bogdan/IdeaProjects/AITA --owner bogdan
 """
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -21,6 +22,9 @@ CONFIG = Path('/etc/aita-release.json')
 LAUNCHER = Path('/usr/local/sbin/aita-release-server')
 SUDOERS = Path('/etc/sudoers.d/aita-release')
 REMOTE_URLS = {'https://github.com/bogdandonduk/AITA.git', 'git@github.com:bogdandonduk/AITA.git'}
+CATALOG = Path('/var/lib/aita-client-releases')
+FEED_ENV = Path('/etc/aita/client-releases.env')
+FEED_DROPIN = Path('/etc/systemd/system/aita-server.service.d/40-client-releases.conf')
 
 
 def require(ok, text):
@@ -48,6 +52,38 @@ def validate_config(config):
     require(not owner_command(config, 'status', '--porcelain'), 'Server checkout must be clean')
 
 
+def configure_public_catalog(config):
+    owner = pwd.getpwnam(config['owner'])
+    key_file = Path(owner.pw_dir) / '.config/aita/release-signing/update-public.txt'
+    require(key_file.is_file() and not key_file.is_symlink() and key_file.stat().st_uid == owner.pw_uid,
+            'Create the updater signing key with setup-android-signing.py before installing this helper')
+    public = key_file.read_text().strip()
+    require(re.fullmatch(r'[A-Za-z0-9+/]{100,4096}={0,2}', public), 'Invalid updater public key')
+    der = base64.b64decode(public, validate=True)
+    parsed = subprocess.run(['/usr/bin/openssl', 'pkey', '-pubin', '-inform', 'DER', '-text', '-noout'],
+                            input=der, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    require(parsed.returncode == 0 and b'Modulus:' in parsed.stdout and
+            re.search(rb'\((2048|3072|4096|8192) bit\)', parsed.stdout), 'Updater public key must be RSA 2048 bits or stronger')
+    content = f'AITA_CLIENT_RELEASES_DIR={CATALOG}\nAITA_UPDATE_PUBLIC_KEY={public}\n'
+    for path in (CATALOG, FEED_ENV, FEED_DROPIN, FEED_DROPIN.parent):
+        require(not path.is_symlink(), 'Refusing symlinked release configuration')
+    if FEED_ENV.exists():
+        require(FEED_ENV.read_text() == content, 'Existing updater trust configuration differs; key rotation requires explicit review')
+    if CATALOG.exists():
+        require(CATALOG.is_dir() and CATALOG.stat().st_uid == owner.pw_uid, 'Existing release catalog has a different owner')
+    else:
+        CATALOG.mkdir(mode=0o755); os.chown(CATALOG, owner.pw_uid, owner.pw_gid)
+    FEED_ENV.parent.mkdir(mode=0o755, exist_ok=True)
+    FEED_ENV.write_text(content); FEED_ENV.chmod(0o644); os.chown(FEED_ENV, 0, 0)
+    FEED_DROPIN.parent.mkdir(mode=0o755, exist_ok=True)
+    dropin = '[Service]\nEnvironmentFile=/etc/aita/client-releases.env\n'
+    require(not FEED_DROPIN.exists() or FEED_DROPIN.read_text() == dropin, 'Existing service drop-in differs')
+    FEED_DROPIN.write_text(dropin); FEED_DROPIN.chmod(0o644); os.chown(FEED_DROPIN, 0, 0)
+    subprocess.run(['/usr/bin/systemctl', 'daemon-reload'], check=True)
+    print('READY: Public signed updater catalog; activation waits for the next managed server update')
+    print('Only the PUBLIC verification key is installed on the server; the private signing key stays with the release owner')
+
+
 def install(args):
     config = {'owner': args.owner, 'repo': str(Path(args.repo).resolve())}
     validate_config(config)
@@ -71,6 +107,7 @@ def install(args):
         temporary.replace(SUDOERS)
     finally:
         temporary.unlink(missing_ok=True)
+    configure_public_catalog(config)
     print('READY: Only the fixed AITA release launcher can run without a password')
     print('It requires one exact SHA matching clean, pushed origin/master; builds still run as the normal user')
     print('Existing encrypted backup, controlled restart and health checks remain mandatory')

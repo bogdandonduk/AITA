@@ -23305,6 +23305,7 @@ fun Application.module() {
 
     route("/user") {
       authenticate("auth-jwt") {
+        installAccountAppStateRoutes()
         get("/get") {
           val uuid = call.checkPrincipal() ?: return@get
 

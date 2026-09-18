@@ -1722,7 +1722,7 @@ fun AppConfiguration.genericTextField(
         // Debounce per-keystroke disk / keychain / encrypted-storage writes.
         // The field state updates immediately; persistence is flushed after the user pauses.
         delay(360)
-        setPersistentUiDraftValue?.invoke(key, textSnapshot)
+        writeAppStateDraft?.invoke(key, textSnapshot)
     }
 
     LaunchedEffect(persistentTextDraftMetaKey, pendingPersistentTextFieldMetaVersion) {
@@ -1730,14 +1730,14 @@ fun AppConfiguration.genericTextField(
         if (pendingPersistentTextFieldMetaVersion <= 0) return@LaunchedEffect
         val metaSnapshot = pendingPersistentTextFieldMeta
         delay(360)
-        setPersistentUiDraftValue?.invoke(key, metaSnapshot)
+        writeAppStateDraft?.invoke(key, metaSnapshot)
     }
 
-    LaunchedEffect(persistentTextDraftKey, persistentTextDraftMetaKey) {
+    LaunchedEffect(persistentTextDraftKey, persistentTextDraftMetaKey, AppStateWorkspace.restoreRevision.collectAsState().value) {
         persistentTextDraftLoaded = false
         val key = persistentTextDraftKey ?: return@LaunchedEffect
-        val stored = getPersistentUiDraftValue?.invoke(key)
-        val storedMeta = persistentTextDraftMetaKey?.let { getPersistentUiDraftValue?.invoke(it) }
+        val stored = readAppStateDraft?.invoke(key)
+        val storedMeta = persistentTextDraftMetaKey?.let { readAppStateDraft?.invoke(it) }
         persistentTextDraftLoaded = true
         if (stored != null && stored != stateValue && stored != textFieldValue.text) {
             val externalInitial = stateValue ?: valueInitial
@@ -1842,6 +1842,7 @@ fun AppConfiguration.genericTextField(
         val nextValue = TextFieldValue(nextText, selection = TextRange(nextText.length))
 
         val applyChange: () -> Unit = {
+            AppStateWorkspace.edited()
             lastLocalTextEditMillis = getCurrentTimeMillis()
             textFieldValue = nextValue
             val key = stateKey
@@ -2102,6 +2103,7 @@ fun AppConfiguration.genericTextField(
                         savePersistentTextFieldMeta(rawValue, isFocused)
                         return@onValueChange rawValue
                     }
+                    AppStateWorkspace.edited()
                     lastLocalTextEditMillis = getCurrentTimeMillis()
                     val nextText = rawValue.text
                     val nextSelection = if (nextText == rawValue.text) {
@@ -2377,7 +2379,8 @@ fun AppConfiguration.genericTextField(
                                                     indication = ripple(color = textColor, radius = cornerRadius)
                                                 ) {
                                                     val applyClear = {
-                                                        lastLocalTextEditMillis = getCurrentTimeMillis()
+                                                        AppStateWorkspace.edited()
+                    lastLocalTextEditMillis = getCurrentTimeMillis()
                                                         val emptyValue = TextFieldValue("")
                                                         textFieldValue = emptyValue
 
@@ -3072,11 +3075,11 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
         )
     }
 
-    LaunchedEffect(persistentGroupKey, fallbackSecondaryDomainId) {
+    LaunchedEffect(persistentGroupKey, fallbackSecondaryDomainId, AppStateWorkspace.restoreRevision.collectAsState().value) {
         persistentGroupLoaded = false
         persistentGroupRestored = false
         val restored = persistentGroupKey
-            ?.let { getPersistentUiDraftValue?.invoke(it) }
+            ?.let { readAppStateDraft?.invoke(it) }
             ?.toLocalizedGroupEditorItemsOrNull(fallbackSecondaryDomainId)
             ?.takeIf { it.isNotEmpty() }
         if (restored != null) {
@@ -3100,7 +3103,7 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
                 // Localized rows can update on every typed symbol. Persist after a tiny pause
                 // instead of doing a storage write for every recomposition/change.
                 delay(360)
-                setPersistentUiDraftValue?.invoke(key, data.toLocalizedGroupEditorStateString())
+                writeAppStateDraft?.invoke(key, data.toLocalizedGroupEditorStateString())
             }
         }
     }
@@ -3334,7 +3337,7 @@ fun AppConfiguration.domainSelectionTextField(
     LaunchedEffect(persistentSelectedDomainKey, lockedDomainId, primaryDomainIdsKey) {
         if (lockedDomainId != null) return@LaunchedEffect
         val restored = persistentSelectedDomainKey
-            ?.let { getPersistentUiDraftValue?.invoke(it) }
+            ?.let { readAppStateDraft?.invoke(it) }
             ?.takeIf { restoredId -> domains.any { it.id.equals(restoredId, ignoreCase = true) } }
         if (!restored.isNullOrBlank() && restored != selectedId) {
             selectedId = restored
@@ -3343,7 +3346,7 @@ fun AppConfiguration.domainSelectionTextField(
 
     LaunchedEffect(selectedId, persistentSelectedDomainKey, lockedDomainId) {
         if (lockedDomainId == null && !persistentSelectedDomainKey.isNullOrBlank() && selectedId.isNotBlank()) {
-            setPersistentUiDraftValue?.invoke(persistentSelectedDomainKey, selectedId)
+            writeAppStateDraft?.invoke(persistentSelectedDomainKey, selectedId)
         }
     }
 
@@ -3391,7 +3394,7 @@ fun AppConfiguration.domainSelectionTextField(
     LaunchedEffect(persistentSelectedSecondaryDomainKey, lockedSecondaryDomainId, secondaryDomainIdsKey) {
         if (lockedSecondaryDomainId != null) return@LaunchedEffect
         val restored = persistentSelectedSecondaryDomainKey
-            ?.let { getPersistentUiDraftValue?.invoke(it) }
+            ?.let { readAppStateDraft?.invoke(it) }
             ?.takeIf { restoredId -> secondaryDomains.orEmpty().any { it.id.equals(restoredId, ignoreCase = true) } }
         if (!restored.isNullOrBlank() && restored != selectedSecondaryId) {
             selectedSecondaryId = restored
@@ -3401,7 +3404,7 @@ fun AppConfiguration.domainSelectionTextField(
     LaunchedEffect(selectedSecondaryId, persistentSelectedSecondaryDomainKey, lockedSecondaryDomainId) {
         val cleanSelectedSecondaryId = selectedSecondaryId
         if (lockedSecondaryDomainId == null && !persistentSelectedSecondaryDomainKey.isNullOrBlank() && !cleanSelectedSecondaryId.isNullOrBlank()) {
-            setPersistentUiDraftValue?.invoke(persistentSelectedSecondaryDomainKey, cleanSelectedSecondaryId)
+            writeAppStateDraft?.invoke(persistentSelectedSecondaryDomainKey, cleanSelectedSecondaryId)
         }
     }
 

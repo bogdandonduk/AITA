@@ -21,7 +21,7 @@ import kotlin.test.*
  * restoration or network services. Screenshots are optional local verification artifacts.
  */
 class MarketBrowseControlsRenderTest {
-    private fun presentation(language: String, width: Int): AppConfiguration.StateValues = Proxy.newProxyInstance(
+    internal fun presentation(language: String, width: Int): AppConfiguration.StateValues = Proxy.newProxyInstance(
         AppConfiguration.StateValues::class.java.classLoader, arrayOf(AppConfiguration.StateValues::class.java)
     ) { _, method, _ ->
         val name = method.name.substringBefore('-')
