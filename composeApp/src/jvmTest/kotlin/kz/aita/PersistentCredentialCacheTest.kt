@@ -17,6 +17,21 @@ class PersistentCredentialCacheTest {
         } finally { pool.shutdownNow() }
     }
 
+    @Test fun ownershipReadsDoNotBlockWhileARefreshWaitsForDurableStorage() {
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val cache = PersistentCredentialCache({ "old" }, { _: String? -> entered.countDown(); release.await() })
+        assertEquals("old", cache.get())
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val writer = pool.submit { cache.set("new") }
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals("old", pool.submit(Callable { cache.get() }).get(1, java.util.concurrent.TimeUnit.SECONDS))
+            release.countDown(); writer.get(2, java.util.concurrent.TimeUnit.SECONDS)
+            assertEquals("new", cache.get())
+        } finally { release.countDown(); pool.shutdownNow() }
+    }
+
     @Test fun failedReadDoesNotDeleteOrCacheMissingCredentials() {
         var fail = true
         var stored: String? = "existing-session"

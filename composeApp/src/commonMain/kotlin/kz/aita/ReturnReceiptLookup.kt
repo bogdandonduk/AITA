@@ -1,6 +1,10 @@
 package kz.aita
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,16 +42,21 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
     var searching by remember(owner, slot) { mutableStateOf(false) }
     var status by remember(owner, slot) { mutableStateOf<String?>(null) }
     var retry by remember(owner, slot) { mutableStateOf(0) }
+    var lookupField by remember(owner, slot) { mutableStateOf<GenericTextFieldContent?>(null) }
     val field = key(owner, slot) {
         searchTextField(Modifier.fillMaxWidth().padding(stateValues.marginTextField),
             stateHost = null, stateKey = null, persistTextDraft = false, retainTextAcrossRecreation = false,
-            autoFocus = false, barcodeCamScanner = true, placeholderText = returnFlowText("search"),
+            autoFocus = false, barcodeCamScanner = true, captureTransactionBarcodeInput = true, placeholderText = returnFlowText("search"),
             onBarcodeScanned = { raw ->
                 val identity = parseTransactionReceiptBarcodeIdentity(raw)
-                if (identity == null) postInAppNotification(returnFlowText("invalid_barcode"), NotificationType.Negative, transient = true)
-                else { exactQuery = identity.transactionId ?: identity.clientOperationId; retry++ }
+                if (identity == null) {
+                    if (tryHandleTransactionBarcodeInput(raw + "\n", 1, slot, getCartState(1, slot).value)) {
+                        lookupField?.reset(); exactQuery = null; matches = emptyList(); status = null
+                    }
+                } else { exactQuery = identity.transactionId ?: identity.clientOperationId; retry++ }
             })
     }
+    SideEffect { lookupField = field }
     val typed = field.value.text.trim().take(160)
     LaunchedEffect(scan, owner, slot) {
         val pending = scan ?: return@LaunchedEffect
@@ -60,6 +69,11 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
     LaunchedEffect(typed) {
         val identity = parseTransactionReceiptBarcodeIdentity(typed)
         if (typed.isNotBlank()) exactQuery = identity?.let { it.transactionId ?: it.clientOperationId }
+        if (identity == null && typed.length in 4..32 && typed.looksLikeCompleteRetailBarcodeInput() &&
+            transactionStockCandidatesForUi(false).any { it.matchesScannedBarcode(typed) } &&
+            tryHandleTransactionBarcodeInput(typed, 1, slot, getCartState(1, slot).value)) {
+            field.reset(); exactQuery = null; matches = emptyList()
+        }
     }
     val query = exactQuery ?: typed
     val isExact = exactQuery != null
@@ -116,28 +130,35 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
     val scope = rememberCoroutineScope()
     val cart by getCartState(1, slot).collectAsState()
     var adding by remember(owner, slot, receipt.id) { mutableStateOf(false) }
+    var tab by remember(receipt.id, owner, slot) { mutableStateOf("receipt") }
     AitaBottomSheet(title = stateValues.stringReceipt, iconPath = stateValues.drawablePathIconReceipt, onDismiss = onDismiss) {
+        tabRowWidget(Modifier.fillMaxWidth().padding(8.dp), selectedIndexInitial = tab,
+            tabs = listOf(TabContent("receipt", stateValues.stringReceipt) { tab = it },
+                TabContent("items", "${returnFlowText("items")} · ${snapshot.lines.size}") { tab = it }),
+            unselectedContainerColor = stateValues.BackgroundColor)
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { Column(Modifier.fillMaxWidth().background(Color.White).padding(8.dp)) { ReceiptPreviewHeader(snapshot, labels) } }
-            items(snapshot.lines, key = { it.index }) { line ->
+            if (tab == "receipt") {
+                item { Column(Modifier.fillMaxWidth().background(Color.White).padding(8.dp)) { ReceiptPreviewHeader(snapshot, labels) } }
+                items(snapshot.lines, key = { it.index }) { line ->
+                    Column(Modifier.fillMaxWidth().background(Color.White).padding(8.dp)) { ReceiptPreviewLine(line, labels) }
+                }
+                item { Column(Modifier.fillMaxWidth().background(Color.White).padding(8.dp)) { ReceiptPreviewTotals(snapshot, labels) } }
+            } else items(snapshot.lines, key = { it.index }) { line ->
                 val original = receipt.goodsInTransaction[line.index]
                 val goods = transactionHistoryFindGoodsItem(original)?.takeIf { item ->
                     (original.goodsItemId.isNullOrBlank() || original.goodsItemId == item.id) && transactionStockCandidatesForUi(false).any { it.id == item.id } }
-                Column {
-                    Column(Modifier.fillMaxWidth().background(Color.White).padding(8.dp)) { ReceiptPreviewLine(line, labels) }
-                    val inCart = cart.any { it.id == goods?.id }
-                    if (goods == null) Text(returnFlowText("unavailable_item"), color = stateValues.PlaceholderTextColor)
-                    else if (inCart) Text(returnFlowText("already_added"), color = stateValues.PlaceholderTextColor)
-                    else actionButton(text = returnFlowText("add_return"), autoLoading = false, confirmationRequired = false,
-                        enabled = !adding && owner != null && line.quantity.total > 0.0,
-                        iconPath = stateValues.drawablePathIconTransactionReturn,
-                        onClick = {
-                            val captured = owner ?: return@actionButton
-                            if (!DynamicCarts.isCurrent(captured)) return@actionButton
+                val inCart = cart.any { it.id == goods?.id }
+                val canAdd = goods != null && !inCart && !adding && owner != null && line.quantity.total > 0.0
+                Row(Modifier.fillMaxWidth().border(stateValues.unfocusedBorderWidth,
+                    if (inCart) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+                    RoundedCornerShape(stateValues.cornerRadius)).aitaClickable(onClick = {
+                        val captured = owner
+                        if (canAdd && captured != null && goods != null && DynamicCarts.isCurrent(captured)) {
                             adding = true
                             scope.launch {
                                 try {
-                                    val added = DynamicCarts.addReceiptReturn(captured, slot, line.quantity,
+                                    val added = DynamicCarts.addReceiptReturn(captured, slot,
+                                        line.quantity.copy(total = receiptReturnMinimum(line.quantity, line.quantity.total)),
                                         CartReturnBatchSelectionDataModel(goodsItemId = goods.id,
                                             pricePerUnit = original.pricePerUnit, currencyCode = line.currencyCode,
                                             originalTransactionId = receipt.serverReceiptIdOrNull(),
@@ -146,6 +167,7 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
                                             sourceBatchAllocations = original.sourceBatchAllocations,
                                             shelfBatchIdAtSale = original.shelfBatchIdAtSale,
                                             originalReceiptTimeMillis = receipt.timeMillis,
+                                            originalReceiptQuantity = line.quantity.total,
                                             updatedAtMillis = getCurrentTimeMillis()))
                                     if (DynamicCarts.isCurrent(captured)) postInAppNotification(
                                         if (added) returnFlowText("added") else returnFlowText("already_added"),
@@ -154,10 +176,22 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
                                 catch (_: Exception) { if (DynamicCarts.isCurrent(captured)) postInAppNotification(checkoutText("save_error"), NotificationType.Negative, transient = true) }
                                 finally { adding = false }
                             }
-                        })
+                        }
+                    }).padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(original.name.visibleLocalizedString(stateValues.appLanguage,
+                            goods?.name?.visibleLocalizedString(stateValues.appLanguage, original.barcode) ?: original.barcode),
+                            color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
+                        Text(line.quantity.quantityText(stateValues.appLanguage), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        if (goods == null || inCart) Text(returnFlowText(if (goods == null) "unavailable_item" else "already_added"),
+                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    }
+                    if (canAdd) CpImage(Modifier.size(stateValues.iconSize), url = stateValues.drawablePathIconAdd,
+                        fallbackRes = stateValues.drawableResIconAdd.collectAsState().value,
+                        contentDescription = returnFlowText("add_return"), tintColor = stateValues.AccentColor)
                 }
             }
-            item { Column(Modifier.fillMaxWidth().background(Color.White).padding(8.dp)) { ReceiptPreviewTotals(snapshot, labels) } }
         }
         actionButton(Modifier.fillMaxWidth().padding(8.dp), text = stateValues.stringCart, autoLoading = false, confirmationRequired = false, onClick = onDismiss)
     }

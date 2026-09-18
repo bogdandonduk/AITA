@@ -3089,6 +3089,7 @@ fun Application.configureJwtAuth() {
 }
 
 class TokenService(private val cfg: JwtConfig) {
+  internal var onOtherDeviceSignInInsideTransaction: ((UUID, UUID, Map<String, String>?, Long) -> Unit)? = null
 
   private val algorithm = Algorithm
     .HMAC256(cfg.secret)
@@ -3152,6 +3153,8 @@ class TokenService(private val cfg: JwtConfig) {
       if (!verifyInsideTransaction()) return@newSuspendedTransaction false
 
       val oldSameDeviceSessionIds = sameDeviceSessionIdsInsideTransaction(userId, metaParam)
+      val otherDeviceExists = RefreshSessions.selectAll().where { RefreshSessions.userId eq userId }
+        .any { isDifferentSignInDevice(it[RefreshSessions.meta], metaParam) }
 
       if (oldSameDeviceSessionIds.isNotEmpty()) {
         RefreshSessions.update({ RefreshSessions.id inList oldSameDeviceSessionIds }) {
@@ -3184,6 +3187,7 @@ class TokenService(private val cfg: JwtConfig) {
         metaParam = metaParam,
         now = nowMillis
       )
+      if (otherDeviceExists) onOtherDeviceSignInInsideTransaction?.invoke(userId, sessionId, metaParam, nowMillis)
       true
     }
 
@@ -3191,6 +3195,7 @@ class TokenService(private val cfg: JwtConfig) {
       signAccessAsync.cancel()
       return@coroutineScope null
     }
+    RealtimeServerBus.publish(entity = "notifications", userId = userId.toString(), reason = "signed_in")
     TokenPair(
       signAccessAsync.await(),
       REFRESH_SESSION_NEVER_EXPIRES_AT_MILLIS,
@@ -5525,8 +5530,9 @@ private fun insertOperationLogInsideTransaction(
     val resources = serverEventResourceCatalogue()
     val titleText = eventTextForStorage("", title, resources = resources)
     val detailsText = eventTextForStorage("", details, resources = resources)
+    val logId = UUID.randomUUID()
     OperationLogs.insert {
-      it[OperationLogs.id] = UUID.randomUUID()
+      it[OperationLogs.id] = logId
       it[OperationLogs.rootStoreId] = rootStoreId
       it[OperationLogs.storeId] = storeId
       it[OperationLogs.storePublicId] = storeRow?.get(Stores.publicId).orEmpty()
@@ -5545,6 +5551,17 @@ private fun insertOperationLogInsideTransaction(
       it[OperationLogs.metadata] = metadata
       it[OperationLogs.createdAtMillis] = now
     }
+    // Durable remote activity only for recipients already allowed to view this store's log.
+    // The initiating user's own confirmation remains local and does not inflate missed counts.
+    storeWorkerNotificationRecipientUserIdsInsideTransaction(storeId, managersOnly = false)
+      .filter { it != actorUserId && userHasStorePermissionInsideTransaction(it, storeId, STORE_PERMISSION_LOGS_VIEW) }
+      .forEach { recipient ->
+        insertServerNotificationInsideTransaction(recipient, storeId,
+          EventMessageReference("notifications.activity.title"),
+          titleText.reference ?: EventMessageReference("notifications.activity.body"),
+          category = "activity", metadata = mapOf("operationId" to "activity_${logId}_$recipient",
+            "actorUserId" to actorUserId.toString(), "operationLogId" to logId.toString()), nowMillis = now)
+      }
   }
 }
 
@@ -5870,7 +5887,7 @@ private fun notificationMetadataForStorage(
     }
 }
 
-private fun insertServerNotificationInsideTransaction(
+internal fun insertServerNotificationInsideTransaction(
   userId: UUID,
   storeId: UUID?,
   title: String,
@@ -5960,7 +5977,7 @@ private fun insertServerNotificationInsideTransaction(
     .toNotificationDataModel()
 }
 
-private fun insertServerNotificationInsideTransaction(
+internal fun insertServerNotificationInsideTransaction(
   userId: UUID,
   storeId: UUID?,
   title: EventMessageReference,
@@ -6016,6 +6033,7 @@ private fun notifyEmploymentRequestCreatedInsideTransaction(
   insertServerNotificationInsideTransaction(
     userId = requesterUserId,
     storeId = storeId,
+    source = "app",
     title = EventMessageReference("worker.request_sent.title"),
     message = workerEvent("worker.request_sent.body", storeName),
     type = NotificationType.Positive,
@@ -6064,6 +6082,7 @@ private fun notifyEmploymentDecisionInsideTransaction(
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
+    source = if (workerUserId == actorUserId) "app" else "server",
     title = EventMessageReference("worker.decision.$actionText.title"),
     message = workerEvent(
       if (direction == WORKER_REQUEST_DIRECTION_STORE_TO_USER) "worker.invitation.$actionText" else "worker.application.$actionText",
@@ -6193,6 +6212,7 @@ private fun notifyWorkerRemovalDecisionInsideTransaction(
   insertServerNotificationInsideTransaction(
     userId = workerUserId,
     storeId = storeId,
+    source = if (workerUserId == actorUserId) "app" else "server",
     title = EventMessageReference(if (accepted) "worker.removal_confirmed.title" else "worker.removal_declined.title"),
     message = workerEvent(if (accepted) "worker.removal_confirmed.body" else "worker.removal_declined.body", storeName),
     type = if (accepted) NotificationType.Positive else NotificationType.Neutral,
@@ -18866,12 +18886,13 @@ fun Application.module() {
           val now = System.currentTimeMillis()
           val storeId = body.storeId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
           val category = body.category.ifBlank { body.type.name.lowercase() }
-          val source = body.source.ifBlank { "app" }
+          val source = "app" // Clients cannot manufacture server/security-origin events.
           val dedupeCutoff = now - NOTIFICATION_RECENT_DUPLICATE_WINDOW_MILLIS
           val operationId = notificationOperationIdFromMetadata(body.metadata) ?: notificationOperationIdFromId(body.id)
           val incomingIsLoading = isLoadingNotificationIntent(body.type, category, body.metadata, body.title, body.message)
           val incomingIsResult = isResultNotificationIntent(body.type, body.metadata)
-          val metadataForStorage = notificationMetadataForStorage(body.metadata, operationId, incomingIsLoading, incomingIsResult)
+          val metadataForStorage = notificationMetadataForStorage(body.metadata, operationId, incomingIsLoading, incomingIsResult) +
+            mapOf("actorUserId" to userId.toString(), "originInstallationId" to metaFrom(call)["installationId"].orEmpty())
           val requestedNotificationId = body.id.ifBlank {
             operationId?.let { if (incomingIsLoading) "loading_${userId}_$it" else "operation_${userId}_$it" }
               ?: "${now}_${body.type.name}_${body.message.hashCode()}"

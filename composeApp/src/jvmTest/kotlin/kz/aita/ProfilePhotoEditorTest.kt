@@ -25,6 +25,11 @@ class ProfilePhotoEditorTest {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined);val b=Backend();b.photo=b.photo.copy(mode=mode);val e=PhotoEditor("owner",{b.current},scope,b,mode)
         try{block(b,e)}finally{scope.cancel()}
     }
+    @Test fun selectionRetriesMissingInitialSnapshotInsteadOfSilentlyDoingNothing()=scenario{b,e->
+        e.select(ProfilePhotoPick(byteArrayOf(1)))
+        assertEquals(1,b.loads);assertEquals(1,b.previews);assertNotNull(e.state.value.preview)
+        assertEquals(0,b.changes)
+    }
     @Test fun selectingAndPreviewingDoesNotPersistPicture()=scenario{b,e->
         e.load();e.select(ProfilePhotoPick(byteArrayOf(1)));assertEquals(1,b.previews);assertEquals(0,b.changes)
         assertNotNull(e.state.value.preview);assertNull(e.state.value.saved!!.jpegBase64)

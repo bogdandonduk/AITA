@@ -5729,6 +5729,8 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
 @Composable
 fun AppConfiguration.MenuListScreen() {
     val clientUpdate by AppUpdateWorkspace.state.collectAsState()
+    val unreadCount = rememberRemoteUnreadCount()
+    val updateGlow = updateAttentionGlow(clientUpdate.hasUpdate)
     val subscriptionAccess = rememberStoreSubscriptionAccess()
     AitaScreenColumn(
         modifier = Modifier
@@ -5756,12 +5758,16 @@ fun AppConfiguration.MenuListScreen() {
                 .weight(1f)
         ) {
             items(
-                items = filteredMenuDestinations().filter { it != NavigationScreenModel.Menu.ClientUpdate || clientUpdate.hasUpdate },
+                items = orderedMenuDestinations(filteredMenuDestinations(), clientUpdate.hasUpdate),
                 key = { model -> model.route }
             ) { model ->
+                val updateItem = model == NavigationScreenModel.Menu.ClientUpdate
+                val unreadItem = model == NavigationScreenModel.Menu.Notifications && unreadCount > 0
+                val attentionText = if (updateItem) Color(0xFF062D35) else if (unreadItem) Color(0xFF102D50) else null
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(if (updateItem) Color(0xFF2BD3CD) else if (unreadItem) Color(0xFF9CC8FF) else Color.Transparent)
                         .defaultMinSize(minHeight = stateValues.textFieldHeight)
                         .aitaClickable(
                             interactionSource = remember {
@@ -5770,6 +5776,7 @@ fun AppConfiguration.MenuListScreen() {
                             indication = ripple(color = stateValues.TextColor)
                         ) {
                             if (canOpenMenuDestination(model)) {
+                                if (unreadItem) requestUnreadNotifications()
                                 coroutineScope.launch { Navigation.Menu.go(model, stateValues.isNarrowScreen) }
                             } else {
                                 postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative)
@@ -5795,7 +5802,7 @@ fun AppConfiguration.MenuListScreen() {
                             url = model.iconPath,
                             fallbackRes = model.iconRes,
                             contentDescription = model.name,
-                            tintColor = if (isActive)
+                            tintColor = attentionText ?: if (isActive)
                                 stateValues.AccentColor
                             else
                                 stateValues.TextColor
@@ -5806,12 +5813,13 @@ fun AppConfiguration.MenuListScreen() {
                         modifier = Modifier
                             .weight(1f)
                             .padding(end = stateValues.marginTextFieldGroup, top = stateValues.marginTextField, bottom = stateValues.marginTextField),
-                        text = model.name,
-                        color = if (isActive)
+                        text = if (unreadItem) "${model.name} · $unreadCount" else model.name,
+                        color = attentionText ?: if (isActive)
                             stateValues.AccentColor
                         else
                             stateValues.TextColor,
-                        fontWeight = if (isActive)
+                        style = androidx.compose.ui.text.TextStyle(shadow = if (updateItem) androidx.compose.ui.graphics.Shadow(Color.White.copy(alpha = updateGlow), blurRadius = 10f * updateGlow) else null),
+                        fontWeight = if (isActive || updateItem || unreadItem)
                             FontWeight.Bold
                         else
                             FontWeight.Normal,

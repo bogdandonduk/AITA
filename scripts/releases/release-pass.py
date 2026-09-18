@@ -306,8 +306,13 @@ class Run:
         try:
             self.command('Browser smoke check before upload' if dist else 'Browser smoke check on aita.kz',
                          ['node', 'scripts/linux-web/test/app-smoke.cjs'])
+            if dist:
+                self.env['AITA_WEB_DIST'] = str(dist)
+                self.command('Profile photo chooser, save and cancellation in the browser',
+                             ['node', 'scripts/linux-web/test/profile-photo-smoke.cjs'])
         finally:
             self.env.pop('AITA_WEB_LOCAL_ORIGIN', None)
+            self.env.pop('AITA_WEB_DIST', None)
             if server: server.shutdown(); server.server_close()
 
     def reuse_windows(self):

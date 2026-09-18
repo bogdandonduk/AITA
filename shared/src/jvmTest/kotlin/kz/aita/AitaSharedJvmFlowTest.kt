@@ -12,6 +12,8 @@ import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
 import kz.aita.auth.allowsStoredSessionAuthorization
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -353,6 +355,24 @@ class AitaSharedJvmFlowTest {
         assertEquals(originalTokens, logoutSnapshot)
         assertFalse(installed)
         assertNull(environment.storedTokens)
+    }
+
+    @Test
+    fun loginFencesRequestsThatStartedWhileCredentialPersistenceWasPending() = runBlocking {
+        val oldSetter = setStoredUserAuthTokens
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        setStoredUserAuthTokens = { tokens -> entered.countDown(); release.await(); oldSetter?.invoke(tokens) }
+        try {
+            val login = async(Dispatchers.Default) { installAuthenticatedSession(aitaTestTokenPair("slow-login")) }
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            val intermediate = currentAuthenticatedSessionGeneration()
+            release.countDown()
+            val installed = login.await()
+            assertTrue(installed != intermediate)
+            assertFalse(authenticatedSessionGenerationIsCurrent(intermediate))
+            assertTrue(authenticatedSessionGenerationIsCurrent(installed))
+        } finally { release.countDown(); setStoredUserAuthTokens = oldSetter }
     }
 
     @Test
@@ -1390,7 +1410,13 @@ class AitaSharedJvmFlowTest {
         getNotifications()
 
         waitUntilAitaFlowCondition { notificationsState.payloadValue.orEmpty().any { it.id == serverUnread.id } }
-        waitUntilAitaFlowCondition { activeInAppNotificationsState.value.any { it.id == serverUnread.id || it.message == serverUnread.message } }
+        waitUntilAitaFlowCondition { activeInAppNotificationsState.value.any { it.category == MISSED_NOTIFICATION_CATEGORY } }
+        val summary = activeInAppNotificationsState.value.single { it.category == MISSED_NOTIFICATION_CATEGORY }
+        assertEquals("notifications.missed", summary.messageTemplate?.key)
+        val popupIds = activeInAppNotificationsState.value.map { it.id }
+        getNotifications()
+        delay(150L)
+        assertEquals(popupIds, activeInAppNotificationsState.value.map { it.id })
         assertTrue(environment.requests.any { it.method == "GET" && it.path == "notifications/get" })
 
         markNotificationRead(serverUnread.id)

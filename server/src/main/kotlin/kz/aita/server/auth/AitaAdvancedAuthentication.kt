@@ -62,6 +62,7 @@ private const val AUTH_PURPOSE_PHONE = "PHONE_ALIAS"
 private const val AUTH_PURPOSE_EMAIL_ALIAS = "EMAIL_ALIAS"
 private const val AUTH_PURPOSE_TOTP_RECOVERY = "TOTP_RECOVERY"
 private const val AUTH_PURPOSE_TOTP_NOTICE = "TOTP_RESET_NOTICE"
+internal const val AUTH_PURPOSE_SIGN_IN_NOTICE = "NEW_DEVICE_SIGN_IN_NOTICE"
 private const val AUTH_OUTBOX_PENDING = "PENDING"
 private const val AUTH_OUTBOX_PROCESSING = "PROCESSING"
 private const val AUTH_OUTBOX_RETRY = "RETRY_WAIT"
@@ -1290,7 +1291,7 @@ internal class AitaAdvancedAuthService(
         }
         val primary = normalizeAitaEmail(user[Users.email])
         val binding = challenge[AuthOneTimeChallenges.deliveryEmailHash] ?: return primary
-        val candidates = listOfNotNull(primary) + if (challenge[AuthOneTimeChallenges.purpose] in setOf(AUTH_PURPOSE_PHONE, AUTH_PURPOSE_TOTP_RECOVERY, AUTH_PURPOSE_TOTP_NOTICE, AUTH_PURPOSE_SECURITY_EMAIL)) emptyList() else
+        val candidates = listOfNotNull(primary) + if (challenge[AuthOneTimeChallenges.purpose] in setOf(AUTH_PURPOSE_PHONE, AUTH_PURPOSE_TOTP_RECOVERY, AUTH_PURPOSE_TOTP_NOTICE, AUTH_PURPOSE_SECURITY_EMAIL, AUTH_PURPOSE_SIGN_IN_NOTICE)) emptyList() else
             AuthLoginEmails.selectAll().where {
                 (AuthLoginEmails.userId eq id) and (AuthLoginEmails.isPrimary eq false) and AuthLoginEmails.verifiedAtMillis.isNotNull()
             }.map { it[AuthLoginEmails.emailNormalized] }
@@ -1884,6 +1885,28 @@ internal class AitaAdvancedAuthService(
         }
     }
 
+    internal fun notifyOtherDeviceSignInInside(userId: UUID, sessionId: UUID, meta: Map<String, String>?, now: Long) {
+        val user = Users.selectAll().where { Users.id eq userId }.single()
+        val title = kz.aita.EventMessageReference("security.signin.title")
+        val device = listOfNotNull(meta?.get("deviceName"), meta?.get("platformName")).filter { it.isNotBlank() }
+            .distinct().joinToString(" · ").take(180).ifBlank { "AITA" }
+        val message = kz.aita.EventMessageReference("security.signin.body", mapOf("device" to device))
+        kz.aita.server.insertServerNotificationInsideTransaction(userId, null, title, message,
+            category = "security", metadata = mapOf("notificationId" to "signin_$sessionId",
+                "originInstallationId" to meta?.get("installationId").orEmpty(),
+                "actorUserId" to userId.toString(), "sessionId" to sessionId.toString()), nowMillis = now)
+        // Same transactional outbox as authentication mail; delivery retries never reissue a session.
+        if (!config.emailReady) return
+        val destination = normalizeAitaEmail(user[Users.email]) ?: return
+        val verified = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq userId }
+            .singleOrNull()?.get(AuthSecurityProfiles.emailVerifiedAtMillis) != null ||
+            AuthLoginEmails.selectAll().where { (AuthLoginEmails.userId eq userId) and
+                (AuthLoginEmails.emailNormalized eq destination) and AuthLoginEmails.verifiedAtMillis.isNotNull() }.any()
+        if (!verified) return
+        createEmailChallengeInside(userId, destination, AUTH_PURPOSE_SIGN_IN_NOTICE, user[Users.appLanguage],
+            crypto.hmac("sign-in-notice", sessionId.toString()), crypto.hmac("ip", "internal-notice"), now, now + 86_400_000L)
+    }
+
     internal fun enqueueOldEmailChangeNoticeInside(userId: UUID, oldEmail: String, locale: String) {
         val destination = normalizeAitaEmail(oldEmail) ?: return
         val now = System.currentTimeMillis()
@@ -2214,6 +2237,7 @@ internal fun advancedAuthService(tokenService: TokenService, application: Applic
                 config.configurationIssue
             )
             AitaAdvancedAuthService(tokenService, config, application).also { service ->
+                tokenService.onOtherDeviceSignInInsideTransaction = service::notifyOtherDeviceSignInInside
                 application.attributes.put(AdvancedAuthServiceKey, service)
                 application.monitor.subscribe(ApplicationStopped) { service.close() }
             }

@@ -10,6 +10,11 @@ internal fun aitaAuthEmailCopy(purpose: String, locale: String, code: String, tt
     val tg = emailLanguage == "tg"
     val ky = emailLanguage == "ky"
     val uz = emailLanguage == "uz"
+    if (purpose == AUTH_PURPOSE_SIGN_IN_NOTICE) {
+        val title = requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("security.signin.title"), emailLanguage))
+        val detail = requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("security.signin.email"), emailLanguage))
+        return AuthEmailCopy("AITA · $title", aitaAuthEmailLayout(title, detail, null, "", "AITA", emailLanguage), "AITA · $title\n\n$detail")
+    }
     if (purpose == AUTH_PURPOSE_CONTACT_NOTICE) {
         val title = requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("contact.notice_title"), emailLanguage))
         val detail = requireNotNull(kz.aita.EventMessages.render(kz.aita.EventMessageReference("contact.notice_detail"), emailLanguage))

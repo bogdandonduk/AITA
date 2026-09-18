@@ -43,3 +43,12 @@ fun validLinkedReturnQuantity(original: Double, alreadyReturned: Double, request
 fun GoodsBatchDataModel.isReturnDestination(): Boolean = isActive && status in setOf(
     StockBatchStatusDataModel.Delivered, StockBatchStatusDataModel.OnShelf, StockBatchStatusDataModel.SoldOut
 )
+
+/** Piece returns start at one; measured goods retain their original fractional unit. */
+fun receiptReturnMinimum(quantity: QuantityDataModel, maximum: Double): Double =
+    if (quantity.roundTotal) 1.0 else minOf(quantity.pricedAmount.takeIf { it > 0.0 } ?: 1.0, maximum)
+
+fun validReceiptCartQuantity(quantity: QuantityDataModel, maximum: Double?): Boolean = maximum == null ||
+    (maximum.isFinite() && maximum > 0.0 && quantity.total.isFinite() &&
+        quantity.total >= receiptReturnMinimum(quantity, maximum) - 0.000001 &&
+        quantity.total <= maximum + 0.000001 && (!quantity.roundTotal || quantity.total % 1.0 == 0.0))

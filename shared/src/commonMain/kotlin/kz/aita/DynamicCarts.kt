@@ -105,6 +105,11 @@ object DynamicCarts {
         require(id.isNotBlank() && validCartSlot(type, slot))
         changeAsync { book ->
             if (book.slots != null && !book.contains(type, slot)) return@changeAsync book
+            val maximum = if (type == 1) book.ui.batches[cartReturnBatchSelectionKey(type, slot, id)]?.originalReceiptQuantity else null
+            if (!validReceiptCartQuantity(quantity, maximum)) {
+                postInAppNotification(eventMessage("return.quantity_limit"), NotificationType.Negative, transient = true)
+                return@changeAsync book
+            }
             val old = book.lines.firstOrNull { it.id == id && it.type == type && it.slot == slot }
             val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis())
             book.copy(lines = (book.lines.filterNot { it.id == id && it.type == type && it.slot == slot } + row)
@@ -118,7 +123,7 @@ object DynamicCarts {
         val saved = work.run { store.change(owner) { book ->
             if (!book.contains(1, slot) || book.lines.any { it.type == 1 && it.slot == slot && it.id == selection.goodsItemId }) book
             else {
-                require(quantity.total.isFinite() && quantity.total > 0.0)
+                require(quantity.total.isFinite() && quantity.total > 0.0 && validReceiptCartQuantity(quantity, selection.originalReceiptQuantity))
                 val key = cartReturnBatchSelectionKey(1, slot, selection.goodsItemId)
                 added = true
                 book.copy(lines = book.lines + StoredCartLine(selection.goodsItemId, 1, slot, quantity, getCurrentTimeMillis()),

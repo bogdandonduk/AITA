@@ -113,7 +113,7 @@ class AitaAuthenticatorRecoveryDatabaseTest {
             TransactionManager.defaultDatabase = db
             try {
                 transaction(db = db) {
-                    SchemaUtils.create(Users, RefreshSessions, SecuritySessionEvents)
+                    SchemaUtils.create(Users, RefreshSessions, SecuritySessionEvents, Notifications)
                     // Reproduce pre-V98 session shape, then execute the actual additive migrations.
                     exec("ALTER TABLE refresh_sessions DROP COLUMN security_invalidated")
                     listOf("V93__email_password_recovery_and_authenticator_security.sql",
@@ -121,14 +121,17 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                         "V96__verified_additional_login_emails.sql", "V97__authenticator_login_requirement.sql",
                         "V98__authenticator_sign_in_and_email_recovery.sql",
                         "V99__email_second_factor_and_single_extra_email.sql",
-                        "V111__scoped_contact_email_confirmation.sql").forEach { name ->
+                        "V111__scoped_contact_email_confirmation.sql", "V119__new_device_sign_in_notices.sql").forEach { name ->
                         val sql = requireNotNull(javaClass.getResourceAsStream("/db/migration/$name")).bufferedReader().use { it.readText() }
                         exec(sql)
                     }
                 }
                 testApplication {
                     lateinit var service: AitaAdvancedAuthService
-                    application { service = AitaAdvancedAuthService(tokens, config, this) }
+                    application {
+                        service = AitaAdvancedAuthService(tokens, config, this)
+                        tokens.onOtherDeviceSignInInsideTransaction = service::notifyOtherDeviceSignInInside
+                    }
                     startApplication()
                     block(Fixture(db, service))
                 }
@@ -138,6 +141,38 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                 DriverManager.getConnection(url, props).use { it.createStatement().use { st -> st.execute("DROP SCHEMA $schema CASCADE") } }
             }
         }
+    }
+
+    @Test fun otherDeviceLoginPersistsOneAlertAndOneEncryptedEmailWithoutRepeatingOnRefresh() = fixture {
+        val id = user()
+        sql { Users.update({ Users.id eq id }) { it[appLanguage] = "en" } }
+        service.settings(id)
+        sql { AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq id }) { it[emailVerifiedAtMillis] = System.currentTimeMillis() } }
+        tokens.newPair(id, device)
+        assertEquals(0, sql { Notifications.selectAll().count().toInt() })
+        val nextDevice = device + ("installationId" to "other-installation")
+        val signedIn = tokens.newPair(id, nextDevice)
+        val notice = sql { Notifications.selectAll().single().toNotificationDataModel() }
+        assertEquals("security", notice.category)
+        assertEquals("other-installation", notice.metadata["originInstallationId"])
+        assertEquals(id.toString(), notice.userId)
+        val flowId = sql { AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.purpose eq AUTH_PURPOSE_SIGN_IN_NOTICE }.single()[AuthOneTimeChallenges.publicId].toString() }
+        val mail = email(flowId)
+        assertEquals(mainEmail, mail["to"]!!.jsonArray.single().jsonPrimitive.content)
+        assertTrue(mail["text"]!!.jsonPrimitive.content.contains("another device"))
+        assertFalse(mail["text"]!!.jsonPrimitive.content.contains(signedIn.refreshToken))
+        tokens.rotate(signedIn.refreshToken, nextDevice)
+        assertEquals(1, sql { Notifications.selectAll().count().toInt() })
+        assertEquals(1, sql { AuthEmailOutbox.selectAll().count().toInt() })
+    }
+    @Test fun rejectedLoginCannotCreateAlertsAndUnverifiedEmailIsNeverMailed() = fixture {
+        val id = user()
+        tokens.newPair(id, device)
+        assertNull(tokens.newPairAfterVerification(id, device + ("installationId" to "other")) { false })
+        assertEquals(0, sql { Notifications.selectAll().count().toInt() })
+        tokens.newPair(id, device + ("installationId" to "other"))
+        assertEquals(1, sql { Notifications.selectAll().count().toInt() })
+        assertEquals(0, sql { AuthEmailOutbox.selectAll().count().toInt() })
     }
 
     @Test fun mainPhoneWithNoExtraProfileQueuesCodeToMainEmail() = fixture {

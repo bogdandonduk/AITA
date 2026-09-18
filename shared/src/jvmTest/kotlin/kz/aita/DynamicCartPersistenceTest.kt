@@ -33,6 +33,22 @@ class DynamicCartPersistenceTest {
             getSqlDelightDriver = oldDriver; setAppDatabaseForTests(null); driver.close()
         }
     }
+    @Test fun receiptQuantityLimitSurvivesStoreSwitchAndEveryCartMutation() = fixture {
+        publishActiveInventoryStoreId("cart-store-a")
+        val owner = assertNotNull(DynamicCarts.captureScope())
+        assertTrue(DynamicCarts.addReceiptReturn(owner, 0, quantity(1.0), CartReturnBatchSelectionDataModel(
+            goodsItemId = "receipt-item", originalTransactionId = "receipt", originalTransactionLineIndex = 0, originalReceiptQuantity = 3.0)))
+        assertFalse(DynamicCarts.addReceiptReturn(owner, 0, quantity(1.0), CartReturnBatchSelectionDataModel("receipt-item")))
+        for (invalid in listOf(0.0, 4.0, 1.5, Double.NaN)) upsertCart("receipt-item", 1, 0, quantity(invalid))
+        DynamicCarts.flush()
+        assertEquals(1.0, getCartState(1, 0).value.single().quantity.total)
+        upsertCart("receipt-item", 1, 0, quantity(3.0)); DynamicCarts.flush()
+        publishActiveInventoryStoreId("cart-store-b"); publishActiveInventoryStoreId("cart-store-a")
+        upsertCart("receipt-item", 1, 0, quantity(4.0)); DynamicCarts.flush()
+        assertEquals(3.0, getCartState(1, 0).value.single().quantity.total)
+        upsertCart("manual-item", 1, 0, quantity(20.0)); DynamicCarts.flush()
+        assertEquals(20.0, getCartState(1, 0).value.single { it.id == "manual-item" }.quantity.total)
+    }
     @Test fun legacyCartFiveAndDraftOnlyCartsSurviveImportWithoutDeletingOldRows() = fixture {
         appDatabase.app_databaseQueries.upsertCart("legacy", 0L, 4L, jsonBase.encodeToString(QuantityDataModel.serializer(), quantity(3.0)))
         putLocalKv("cache_json:transaction_supply_supplier_ids", "{\"2:4\":\"supplier-old\"}")

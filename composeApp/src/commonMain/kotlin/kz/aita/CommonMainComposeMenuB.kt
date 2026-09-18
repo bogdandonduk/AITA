@@ -5206,6 +5206,20 @@ internal fun List<NotificationDataModel>.compactForPopupDisplay(): List<Notifica
 
 @Composable
 fun AppConfiguration.MainScreen() {
+    val modeReady by accountAppModeReadyState.collectAsState()
+    val navigationReady by AppStateWorkspace.readyScope.collectAsState()
+    LaunchedEffect(Unit) { Navigation.startAppNavigationPersistence() }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+        coroutineScope.launch { AppStateWorkspace.flush() }
+    }
+    // Keep the same splash until account mode, store and local navigation have been adopted.
+    // A published account alone is not permission to render the default Marketplace workspace.
+    if (stateValues.userAccount != null &&
+        (modeReady != (stateValues.userAccount!!.id to currentAuthenticatedSessionGeneration()) ||
+            navigationReady == null || !AppStateWorkspace.readyForCurrentScope())) {
+        SplashScreen()
+        return
+    }
     AppUpdateEffects()
     val subscriptionGate = rememberStoreSubscriptionGate()
     val subscriptionAccess = subscriptionGate == StoreSubscriptionGate.Active
@@ -5317,7 +5331,10 @@ fun AppConfiguration.MainScreen() {
                             compact = true,
                             onDismiss = { dismissInAppNotification(notification.id) },
                             onOpenHistory = {
-                                markNotificationRead(notification.id)
+                                if (notification.category == MISSED_NOTIFICATION_CATEGORY) {
+                                    requestUnreadNotifications()
+                                    dismissInAppNotification(notification.id, markAsRead = false)
+                                } else markNotificationRead(notification.id)
                                 coroutineScope.launch {
                                     Navigation.goMain(NavigationScreenModel.Menu.Main)
                                     Navigation.Menu.go(NavigationScreenModel.Menu.Notifications, stateValues.isNarrowScreen)
@@ -5392,7 +5409,10 @@ fun AppConfiguration.MainScreen() {
                                 compact = false,
                                 onDismiss = { dismissInAppNotification(notification.id) },
                                 onOpenHistory = {
-                                    markNotificationRead(notification.id)
+                                    if (notification.category == MISSED_NOTIFICATION_CATEGORY) {
+                                        requestUnreadNotifications()
+                                        dismissInAppNotification(notification.id, markAsRead = false)
+                                    } else markNotificationRead(notification.id)
                                     coroutineScope.launch {
                                         Navigation.goMain(NavigationScreenModel.Menu.Main)
                                         Navigation.Menu.go(NavigationScreenModel.Menu.Notifications, stateValues.isNarrowScreen)
@@ -5515,7 +5535,10 @@ fun AppConfiguration.MainScreen() {
                                 url = model.iconPath, fallbackRes = model.iconRes,
                                 contentDescription = model.name, tintColor = iconTintColor
                             )
-                            if (model == NavigationScreenModel.Menu.Main) MenuUpdateMarker(Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-3).dp))
+                            if (model == NavigationScreenModel.Menu.Main) {
+                                MenuUpdateMarker(Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-3).dp))
+                                MenuNotificationsMarker(Modifier.align(Alignment.TopStart).offset(x = (-4).dp, y = (-3).dp))
+                            }
                         }
 
                         Text(
@@ -5788,7 +5811,11 @@ fun AppConfiguration.NotificationsScreen(
     onBack: (() -> Unit)? = null
 ) {
     var search by rememberSaveable { mutableStateOf("") }
-    var selectedCategory by rememberSaveable { mutableStateOf("all") }
+    val unreadRequest by unreadNotificationsOpenRequest.collectAsState()
+    var selectedCategory by rememberSaveable { mutableStateOf(if (unreadRequest > 0) "unread" else "all") }
+    LaunchedEffect(unreadRequest) {
+        if (unreadRequest > 0) { selectedCategory = "unread"; unreadNotificationsOpenRequest.value = 0 }
+    }
     val prepared by LiveCollectionWorkspace.notifications.collectAsState()
     val projection = prepared?.takeIf { it.account == stateValues.userAccount?.id && it.generation == currentAuthenticatedSessionGeneration() }
     val searchedNotifications = projection?.searched.orEmpty()

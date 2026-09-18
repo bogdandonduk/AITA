@@ -27,9 +27,8 @@ internal data class AppModeChoice(
 
 /** Null on an old account means “not migrated”, NOT “replace the old user's choice with Buyer”. */
 internal fun initialAccountAppMode(serverMode: Int?, saved: SavedAppMode?, legacyOwnedMode: Int?): SavedAppMode = when {
-    saved?.pending == true && isSelectableAppMode(saved.mode) -> saved
+    saved != null && isSelectableAppMode(saved.mode) -> saved
     isSelectableAppMode(serverMode) -> SavedAppMode(requireNotNull(serverMode))
-    saved != null && isSelectableAppMode(saved.mode) -> saved.copy(pending = true)
     isSelectableAppMode(legacyOwnedMode) -> SavedAppMode(requireNotNull(legacyOwnedMode), pending = true)
     else -> SavedAppMode(APP_MODE_STORE, pending = true) // Preserve pre-feature business-account fallback.
 }
@@ -118,7 +117,11 @@ internal class AccountAppModeCoordinator(
     } }
 }
 
+val accountAppModeReadyState = MutableStateFlow<Pair<String, Long>?>(null)
+fun localWorkspaceScopeReady(): Boolean = AccountAppModes.ready() && ActiveStores.readyForNavigation
+
 internal object AccountAppModes {
+    fun ready(): Boolean = owner()?.let { (it.accountId to it.generation) == accountAppModeReadyState.value } ?: true
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.ourIo)
     private fun owner()=userAccountState.payloadValue?.id?.takeIf { it.isNotBlank() && getStoredUserAuthTokens?.invoke()!=null }
         ?.let { AppModeOwner(it,currentAuthenticatedSessionGeneration()) }
@@ -139,7 +142,10 @@ internal object AccountAppModes {
                 userAccountState.emit(DataState.Success(merged));setStoredUserAccountDataModel?.invoke(merged)
             }
         })
-    fun select(mode: Int)=coordinator.select(owner(),mode)
+    fun select(mode: Int) {
+        coordinator.select(owner(),mode)
+        accountAppModeReadyState.value = owner()?.let { it.accountId to it.generation }
+    }
     fun retryPending()=coordinator.retryPending()
     fun mergeAccount(account: UserAccountDataModel): UserAccountDataModel = coordinator.snapshot.let { s ->
         if(s.owner==owner() && s.owner?.accountId==account.id && s.hydrated) account.copy(appModeId=s.mode) else account
@@ -152,7 +158,14 @@ internal object AccountAppModes {
             val cachedId=getStoredUserAccountDataModel?.invoke()?.id
             val legacy=if(cachedId==account.id && account.appModeId==null) getLocalKv(KEY_APP_MODE)?.toIntOrNull() else null
             coordinator.adopt(expected,account.appModeId,authoritative,legacy)
+            if (expected == owner()) accountAppModeReadyState.value = expected.accountId to expected.generation
         } catch(cancel: CancellationException) { throw cancel }
-        catch(_: Exception) { logCloudConnectionDiagnostic("App-mode restore interrupted; current choice retained") }
+        catch(_: Exception) {
+            if (expected == owner()) {
+                coordinator.select(expected, account.appModeId?.takeIf(::isSelectableAppMode) ?: APP_MODE_STORE)
+                accountAppModeReadyState.value = expected.accountId to expected.generation
+            }
+            logCloudConnectionDiagnostic("App-mode restore interrupted; current choice retained")
+        }
     }
 }

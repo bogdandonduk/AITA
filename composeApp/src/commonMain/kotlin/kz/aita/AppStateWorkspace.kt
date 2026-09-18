@@ -3,6 +3,7 @@ package kz.aita
 import io.ktor.http.HttpMethod
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,10 +26,16 @@ internal object AppStateWorkspace {
     private val mutex = Mutex()
     private val storageMutex = Mutex()
     private val memory = mutableMapOf<String, LocalAppState>()
+    val readyScope = MutableStateFlow<String?>(null)
+    fun readyForCurrentScope(): Boolean = readyScope.value == "${current().key}:${current().generation}"
+    private var localNavigation: LocalNavigationPlace? = null
+    private var restoredNavigation = false
+    private var savedNavigation: LocalNavigationPlace? = null
     val restoreRevision = MutableStateFlow(0L)
     private val record = MutableStateFlow(LocalAppState())
     val state = MutableStateFlow(AppStateUi())
     private var owner: Owner? = null
+    private var syncJob: Job? = null
     private var loaded = false
     private var started = false
     private var device = true
@@ -50,21 +57,46 @@ internal object AppStateWorkspace {
         if (started) return
         started = true
         job.launch {
+            kotlinx.coroutines.flow.combine(Navigation.Main, Navigation.Stock.Left, Navigation.Stock.Right,
+                Navigation.Menu.Left, Navigation.Menu.Right) { _, _, _, _, _ -> Unit }.collect {
+                mutex.withLock { owner?.takeIf { loaded && belongs(it) }?.let { expected ->
+                    try { persistNavigation(expected) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { publish("unavailable") }
+                } }
+            }
+        }
+        job.launch {
             while (isActive) {
                 try { mutex.withLock { tick() } }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { publish("unavailable") }
-                finally { appNavigationRestoredState.value = true }
+                catch (_: Exception) {
+                    publish("unavailable")
+                    if (belongs(owner)) {
+                        readyScope.value = "${owner!!.key}:${owner!!.generation}"
+                        appNavigationRestoredState.value = true
+                    }
+                }
+                finally { if (loaded && belongs(owner)) appNavigationRestoredState.value = true }
                 delay(500)
             }
         }
     }
     private suspend fun tick() {
         val expected = current()
+        if (expected.id != "anonymous" && !localWorkspaceScopeReady()) return
         if (owner != expected || !loaded) {
             owner?.let { if (loaded) memory[it.key] = record.value }
+            syncJob?.cancel(); syncJob = null
+            readyScope.value = null
             owner = expected; loaded = false; remote = null; firstRead = true; nextSync = 0; persisted = null; change++
             record.value = LocalAppState()
+            localNavigation = getLocalKv("${expected.key}:place")?.let {
+                runCatching { jsonBase.decodeFromString<LocalNavigationPlace>(it) }.getOrNull()?.takeIf { it.valid() }
+            }
+            savedNavigation = localNavigation
+            restoredNavigation = localNavigation != null
+            if (!belongs(expected)) return
             // Do not let another account's singleton StateHosts become this account's drafts.
             Navigation.clearAccountUiState()
             device = getLocalKv("${expected.key}:device") != "false"
@@ -77,7 +109,13 @@ internal object AppStateWorkspace {
             if (!belongs(expected)) return
             record.value = saved ?: LocalAppState()
             persisted = saved; restoredLocal = saved != null; loaded = true
-            if (saved != null) Navigation.restoreAccountUiState(saved.document)
+            if (saved != null) {
+                Navigation.restoreAccountUiState(saved.document)
+                if (localNavigation == null) localNavigation = Navigation.localNavigationSnapshot().takeIf { it.valid() }
+                restoredNavigation = localNavigation != null
+            }
+            localNavigation?.let { Navigation.restoreLocalNavigation(it) }
+            readyScope.value = "${expected.key}:${expected.generation}"
             restoreRevision.value++
             appNavigationRestoredState.value = true
             publish(if (expected.id == "anonymous") "local" else "loading")
@@ -85,11 +123,23 @@ internal object AppStateWorkspace {
         }
         if (!belongs(expected)) return
         capture()
+        persistNavigation(expected)
         persist(expected)
         if (expected.id != "anonymous" && getCurrentTimeMillis() >= nextSync && remote == null) {
             nextSync = getCurrentTimeMillis() + 15_000
-            sync(expected)
+            if (syncJob?.isActive != true) syncJob = job.launch {
+                try { sync(expected) }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { if (belongs(expected)) publish("unavailable") }
+            }
         }
+    }
+    private suspend fun persistNavigation(expected: Owner) {
+        if (!belongs(expected)) return
+        val place = Navigation.localNavigationSnapshot()
+        if (!place.valid() || place == savedNavigation) return
+        putLocalKv("${expected.key}:place", jsonBase.encodeToString(place))
+        if (belongs(expected)) { localNavigation = place; savedNavigation = place }
     }
     private fun capture() {
         if (!loaded) return
@@ -124,7 +174,9 @@ internal object AppStateWorkspace {
             }
             AppStateMerge.RESTORE -> {
                 record.value = LocalAppState(server.document ?: before.document, server.revision, server.enabled, false)
+                val place = localNavigation.takeIf { restoredNavigation }
                 server.document?.let { Navigation.restoreAccountUiState(it) }
+                place?.let { Navigation.restoreLocalNavigation(it) }
                 restoreRevision.value++; change++; persisted = null
             }
             AppStateMerge.CONFLICT -> { remote = server; publish("conflict"); return }
@@ -223,7 +275,7 @@ internal object AppStateWorkspace {
         restoreRevision.value++; remote = null; change++; nextSync = 0; persisted = null
         persist(expected); publish("pending")
     } }
-    suspend fun flush() = mutex.withLock { owner?.takeIf(::belongs)?.let { capture(); persist(it) } }
+    suspend fun flush() = mutex.withLock { owner?.takeIf(::belongs)?.let { capture(); persistNavigation(it); persist(it) } }
 }
 
 internal fun ownsDraftKey(key: String, owner: String, store: String?): Boolean = appStateSafeKey(key) &&

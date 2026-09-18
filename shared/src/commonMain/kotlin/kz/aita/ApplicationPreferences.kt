@@ -157,7 +157,7 @@ internal object AppPreferences {
             val merged = account.copy(appLanguage = selected.value.appLanguage,
                 appThemeId = selected.value.appThemeId, appSizeModeId = selected.value.appSizeModeId)
             userAccountState.emit(DataState.Success(merged))
-            setStoredUserAccountDataModel?.invoke(merged)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(merged) }
             putLocalKv(journalKey(id), null)
             dirty.updateAndGet { map -> if (map[id] == selected) map - id else map }
         }

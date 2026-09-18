@@ -211,7 +211,9 @@ fun AppConfiguration.GoodsItemInCartWidget(
     }
 
     fun runIfSaleQuantityAvailable(targetTotal: Double, action: () -> Unit) {
-        if (transactionTypeIndex == 0 && targetTotal > currentAvailableSaleQuantity() + 0.000001) {
+        if (transactionTypeIndex == 1 && !validReceiptCartQuantity(goodsItemInCart.quantity.copy(total = targetTotal), returnBatchSelection?.originalReceiptQuantity)) {
+            quantityLimitError = EventMessages.render(EventMessageReference("return.quantity_limit"), stateValues.appLanguage).orEmpty()
+        } else if (transactionTypeIndex == 0 && targetTotal > currentAvailableSaleQuantity() + 0.000001) {
             showQuantityLimitError()
         } else {
             quantityLimitError = null

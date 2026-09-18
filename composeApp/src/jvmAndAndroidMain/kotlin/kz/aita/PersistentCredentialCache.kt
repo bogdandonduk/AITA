@@ -7,20 +7,20 @@ internal class PersistentCredentialCache<T>(
     private val read: () -> T?,
     private val write: (T?) -> Unit
 ) {
-    private var loaded = false
-    private var value: T? = null
+    private data class Snapshot<T>(val value: T?)
+    @Volatile private var snapshot: Snapshot<T>? = null
 
-    @Synchronized fun get(): T? {
-        if (!loaded) {
-            value = read()
-            loaded = true
+    // A UI ownership check must not wait behind an encrypted disk write. Until that write
+    // commits, the last durable credential is still the current credential.
+    fun get(): T? {
+        snapshot?.let { return it.value }
+        return synchronized(this) {
+            snapshot?.value ?: if (snapshot != null) null else read().also { snapshot = Snapshot(it) }
         }
-        return value
     }
 
     @Synchronized fun set(next: T?) {
         write(next)
-        value = next
-        loaded = true
+        snapshot = Snapshot(next)
     }
 }

@@ -62,8 +62,19 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
         if(pick.error!=null){mutable.value=mutable.value.copy(error=pick.error);return}
         val bytes=pick.bytes ?: return
         if(bytes.size !in 1..PROFILE_PHOTO_MAX_INPUT_BYTES){mutable.value=mutable.value.copy(error="size");return}
-        if(mutable.value.saved==null)return
         run {
+            // A failed initial read must not silently disable choosing a picture. Retry the
+            // revision read here; never invent revision zero or overwrite an unseen photo.
+            if (mutable.value.saved == null) {
+                val loaded = backend.load()
+                if (!current()) return@run
+                val saved = loaded.payload
+                if (loaded.negative || saved == null || !validProfilePhotoSnapshot(saved, owner, mode)) {
+                    mutable.value = mutable.value.copy(error = error(loaded))
+                    return@run
+                }
+                mutable.value = mutable.value.copy(saved = saved)
+            }
             val response=backend.preview(bytes);if(!current())return@run
             val value=response.payload?.jpegBase64
             mutable.value=if(!response.negative && profilePhotoJpegBytes(value)!=null)
@@ -141,7 +152,7 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
                     accountPresentationText(if (hasPicture) "photo.change" else "photo.choose"),
                     if (hasPicture) stateValues.drawablePathIconEdit else uiAppearanceResourcesState.value.catalog.drawable(215L, stateValues.appThemeId),
                     if (hasPicture) stateValues.drawableResIconEdit.value else if (isDarkAppTheme(stateValues.appThemeId)) Res.drawable._215_1 else Res.drawable._215_0,
-                    enabled = !state.busy && state.saved != null, onClick = pick)
+                    enabled = !state.busy, onClick = pick)
                 if (state.preview != null) {
                     PhotoRingAction(Modifier.align(Alignment.CenterEnd), accountPresentationText("photo.save"),
                         stateValues.drawablePathIconCheck, stateValues.drawableResIconCheck.value,
@@ -186,15 +197,19 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
 @Composable
 private fun AppConfiguration.PhotoRingAction(modifier: Modifier, label: String, path: String,
     resource: DrawableResource, enabled: Boolean, onClick: () -> Unit) {
-    TooltipBox(modifier = modifier,
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState()) {
-        IconButton(onClick = onClick, enabled = enabled,
-            modifier = Modifier.size(48.dp).clip(CircleShape).background(stateValues.BackgroundColor)
-                .border(stateValues.unfocusedBorderWidth,
-                    if (enabled) stateValues.AccentColor else stateValues.PlaceholderTextColor, CircleShape)) {
-            CpImage(Modifier.size(23.dp), url = path, fallbackRes = resource, contentDescription = label,
-                tintColor = if (enabled) stateValues.TextColor else stateValues.PlaceholderTextColor)
+    // Alignment parent data belongs on a direct child of the portrait Box. TooltipBox
+    // forwards its modifier to an inner anchor, which otherwise stacks every action centrally.
+    Box(modifier) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState()) {
+            IconButton(onClick = onClick, enabled = enabled,
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(stateValues.BackgroundColor)
+                    .border(stateValues.unfocusedBorderWidth,
+                        if (enabled) stateValues.AccentColor else stateValues.PlaceholderTextColor, CircleShape)) {
+                CpImage(Modifier.size(23.dp), url = path, fallbackRes = resource, contentDescription = label,
+                    tintColor = if (enabled) stateValues.TextColor else stateValues.PlaceholderTextColor)
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ internal fun AppConfiguration.appStateText(key: String) = eventMessage("app_stat
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(appStateText("help"), color = stateValues.TextColor, fontSize = stateValues.textSize)
+            Text(appStateText("navigation_local"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(appStateText("device"), Modifier.weight(1f), color = stateValues.TextColor, fontSize = stateValues.textSize)
                 Switch(state.device, { AppStateWorkspace.setDevice(it) }, enabled = state.status != "loading", colors = colors, modifier = Modifier.semantics { contentDescription = deviceLabel })

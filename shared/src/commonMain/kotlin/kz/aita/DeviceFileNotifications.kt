@@ -64,8 +64,8 @@ fun isDeviceFileNotification(notification: NotificationDataModel): Boolean = not
 fun notificationForBusinessActionGuard(
     latest: NotificationDataModel?,
     active: List<NotificationDataModel>
-): NotificationDataModel? = if (latest != null && isDeviceFileNotification(latest)) {
-    active.firstOrNull { !isDeviceFileNotification(it) }
+): NotificationDataModel? = if (latest != null && (isDeviceFileNotification(latest) || latest.category == MISSED_NOTIFICATION_CATEGORY)) {
+    active.firstOrNull { !isDeviceFileNotification(it) && it.category != MISSED_NOTIFICATION_CATEGORY }
 } else latest
 
 fun safeReceiptPdfFileName(fileName: String): String {

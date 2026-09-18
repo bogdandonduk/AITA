@@ -690,6 +690,7 @@ data class CartReturnBatchSelectionDataModel(
     val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
     val shelfBatchIdAtSale: String? = null,
     val originalReceiptTimeMillis: Long? = null,
+    val originalReceiptQuantity: Double? = null,
     val stockBatchId: String? = null,
     val pricePerUnit: Double? = null,
     val currencyCode: String = "",
@@ -10624,8 +10625,15 @@ private fun authenticatedSessionRefreshIsCurrent(
 @PublishedApi
 internal suspend fun installAuthenticatedSession(tokenPair: TokenPair): Long =
     authSessionMutationMutex.withLock {
-        val generation = advanceAuthenticatedSessionGenerationLocked()
-        setStoredUserAuthTokens?.invoke(tokenPair)
+        advanceAuthenticatedSessionGenerationLocked()
+        try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAuthTokens?.invoke(tokenPair) }
+        } finally {
+            // Durable writes yield to the UI. Fence requests started during that interval,
+            // which may still have captured the previous cached credential.
+            advanceAuthenticatedSessionGenerationLocked()
+        }
+        val generation = currentAuthenticatedSessionGeneration()
         clearCloudAuthRequestMemory(tokenPair)
         markCloudAccessTokenValidated(tokenPair.accessToken)
         clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_REACHABLE)
@@ -10646,7 +10654,7 @@ internal suspend fun installRefreshedAuthenticatedSession(
     if (!authenticatedSessionRefreshIsCurrent(expectedGeneration, expectedRefreshToken)) {
         return@withLock false
     }
-    setStoredUserAuthTokens?.invoke(tokenPair)
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAuthTokens?.invoke(tokenPair) }
     clearAuthRefreshNonAuthFailure()
     clearCloudAuthRequestMemory(tokenPair)
     markCloudAccessTokenValidated(tokenPair.accessToken)
@@ -10665,9 +10673,9 @@ internal suspend fun clearAuthenticatedSessionStorage(expectedGeneration: Long? 
         if (expectedGeneration != null && authenticatedSessionGeneration != expectedGeneration) return@withLock null
         val tokenSnapshot = getStoredUserAuthTokens?.invoke()
         advanceAuthenticatedSessionGenerationLocked()
-        setStoredUserAuthTokens?.invoke(null)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAuthTokens?.invoke(null) }
         clearCloudAuthRequestMemory(null)
-        setStoredUserAccountDataModel?.invoke(null)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(null) }
         clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
         httpClient.authProvider<BearerAuthProvider>()?.clearToken()
         tokenSnapshot
@@ -13649,7 +13657,7 @@ private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
         getGenericGoodsCategories()
         refreshGenericGoodsItems(limit = 200)
     }
-    if (anyEntityMatches("notifications")) getNotifications()
+    if (anyEntityMatches("notifications", "stock", "stockbatches", "transactions", "workshifts", "workers", "logs")) getNotifications()
     if (anyEntityMatches("company")) CompanyEmployment.refresh()
     if (anyEntityMatches("support")) {
         getSupportTickets()
@@ -14910,7 +14918,7 @@ private fun NotificationDataModel.isSessionStatusNotification(): Boolean {
 }
 
 private fun NotificationDataModel.isLocalOnlyNotification(): Boolean =
-    isDeviceFileNotification(this) || isConnectionStatusNotification() || isSessionStatusNotification()
+    category == MISSED_NOTIFICATION_CATEGORY || isDeviceFileNotification(this) || isConnectionStatusNotification() || isSessionStatusNotification()
 
 private fun NotificationDataModel.withHumanFriendlyNotificationText(): NotificationDataModel {
     val combined = notificationStatusCombinedText()
@@ -15523,7 +15531,7 @@ private fun rememberDismissedNotificationPopupLocked(notification: NotificationD
     dismissedNotificationPopupKeysUntil[notification.dedupeKey()] = now + IN_APP_NOTIFICATION_DISMISS_SUPPRESSION_MILLIS
 }
 
-private suspend fun pushInAppNotificationNow(notification: NotificationDataModel, transient: Boolean) {
+internal suspend fun pushInAppNotificationNow(notification: NotificationDataModel, transient: Boolean) {
     val now = getCurrentTimeMillis()
     val preparedNotification = notification.withHumanFriendlyNotificationText().copy(shownAtMillis = now)
     val key = preparedNotification.dedupeKey()
@@ -15815,37 +15823,10 @@ fun getNotifications() {
                 if (!authenticatedSessionGenerationIsCurrent(generation)) return@history
                 val serverNotifications = response.payload.orEmpty().filterNot { it.isLocalOnlyNotification() }
                 val currentNotifications = notificationsState.payloadValue.orEmpty().filterNot { it.isLocalOnlyNotification() }
-                val previousIds = currentNotifications.map { it.id }.toSet()
-                val now = getCurrentTimeMillis()
-                val recentPreviousByKey = currentNotifications
-                    .filter { now - it.createdAtMillis <= IN_APP_NOTIFICATION_HISTORY_DEDUPE_WINDOW_MILLIS }
-                    .groupBy { it.dedupeKey() }
-
-                serverNotifications
-                    .asSequence()
-                    .filter { notification ->
-                        val recentDuplicates = recentPreviousByKey[notification.dedupeKey()].orEmpty()
-                        notification.isSavedOnServer &&
-                            notification.id.isNotBlank() &&
-                            notification.id !in previousIds &&
-                            notification.id !in serverNotificationPopupIds &&
-                            recentDuplicates.none { previous -> notification.isHistoryDuplicateOf(previous) } &&
-                            notification.readAtMillis == null &&
-                            notification.message.isNotBlank() &&
-                            (notification.createdAtMillis >= notificationPopupBootMillis || now - notification.createdAtMillis <= SERVER_NOTIFICATION_POPUP_FRESH_WINDOW_MILLIS)
-                    }
-                    .sortedBy { it.createdAtMillis }
-                    .forEach { notification ->
-                        serverNotificationPopupIds += notification.id
-                        // Publish before merging history: a queued popup would see this same freshly
-                        // fetched event in history and mistakenly suppress itself as a duplicate.
-                        pushInAppNotificationNow(notification.copy(shownAtMillis = now), transient = true)
-                    }
-
-                if (serverNotificationPopupIds.size > LOCAL_NOTIFICATION_HISTORY_LIMIT * 4) {
-                    val visibleServerIds = serverNotifications.map { it.id }.toSet()
-                    serverNotificationPopupIds.retainAll(visibleServerIds)
-                }
+                // Announce remote unread events once, before merging them into visible history.
+                // Local read marks made while this request was in flight remain authoritative.
+                MissedNotifications.accept(mergeNotificationSnapshot(before, currentNotifications, serverNotifications), generation)
+                if (!authenticatedSessionGenerationIsCurrent(generation)) return@history
 
                 val merged = mergeNotificationSnapshot(before, currentNotifications, serverNotifications)
                     .dedupeRecentNotificationHistory()
@@ -16675,7 +16656,7 @@ internal suspend fun refreshUserAccountNow(
     AccountAppModes.acceptAccount(payload, authoritative = true)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
     val currentAccount = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(account))
-    setStoredUserAccountDataModel?.invoke(currentAccount)
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(currentAccount) }
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
 
@@ -16724,7 +16705,7 @@ fun updateUser(
                     response.message,
                     NotificationType.Positive
                 )
-                setStoredUserAccountDataModel?.invoke(account)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(account) }
             }
         }
     }

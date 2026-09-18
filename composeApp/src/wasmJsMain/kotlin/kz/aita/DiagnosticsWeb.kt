@@ -1,16 +1,17 @@
+@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
 package kz.aita
 
 private var webDiagnosticsInstalled = false
-private fun ownBrowserJournal(onGranted: () -> Unit, onUnavailable: () -> Unit): Unit = js("""(onGranted, onUnavailable) => {
+private fun ownBrowserJournal(onGranted: () -> Unit, onUnavailable: () -> Unit): Unit = js("""{
     if (!navigator.locks || !navigator.locks.request) { onUnavailable(); return; }
     navigator.locks.request('aita.runtime-diagnostics.journal', async () => {
         onGranted();
         await new Promise(() => {});
     }).catch(() => onUnavailable());
 }""")
-private fun browserJournalRead(): String? = js("() => localStorage.getItem('aita.runtime-diagnostics')")
-private fun browserJournalWrite(value: String): Unit = js("(value) => localStorage.setItem('aita.runtime-diagnostics', value)")
-private fun browserFamily(): String = js("""() => {
+private fun browserJournalRead(): String? = js("localStorage.getItem('aita.runtime-diagnostics')")
+private fun browserJournalWrite(value: String): Unit = js("localStorage.setItem('aita.runtime-diagnostics', value)")
+private fun browserFamily(): String = js("""{
     const ua = navigator.userAgent || '';
     for (const name of ['Firefox', 'Edg', 'Chrome', 'Version']) {
         const found = ua.match(new RegExp(name + '/([0-9]{1,4})'));
@@ -18,7 +19,7 @@ private fun browserFamily(): String = js("""() => {
     }
     return 'Browser';
 }""")
-private fun browserErrorHooks(report: (String, String, String) -> Unit): Unit = js("""(report) => {
+private fun browserErrorHooks(report: (String, String, String) -> Unit): Unit = js("""{
     const send = (value, category) => {
         try {
             const type = value && typeof value.name === 'string' ? value.name : 'BrowserError';

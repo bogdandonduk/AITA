@@ -12,6 +12,10 @@ private data class ActiveStoreSelectionJournal(
 )
 
 internal object ActiveStores {
+    private val failedRestoreOwner = kotlinx.coroutines.flow.MutableStateFlow<ActiveStoreOwner?>(null)
+    // A failed local read must leave Settings/account access usable, without overwriting
+    // the unread store selection or pretending it was successfully restored.
+    val readyForNavigation: Boolean get() = hydrated || owner()?.let { failedRestoreOwner.value == it } == true
     private const val LEGACY_OWNER_KEY = "active-store.owner.v2"
     private fun key(owner: ActiveStoreOwner) = "active-store.selection.v2:${owner.accountId}"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.ourIo + CoroutineExceptionHandler { _, failure ->
@@ -78,7 +82,7 @@ internal object ActiveStores {
                 userAccountState.payloadValue?.takeIf { it.id == selected.owner?.accountId }?.let { account ->
                     val merged = account.copy(activeStoreId = selected.choice.storeId)
                     userAccountState.emit(DataState.Success(merged))
-                    setStoredUserAccountDataModel?.invoke(merged)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(merged) }
                 }
             }
         }
@@ -93,9 +97,15 @@ internal object ActiveStores {
 
     suspend fun acceptAccount(account: UserAccountDataModel, applyServerSelection: Boolean = true) {
         val expected = owner()?.takeIf { it.accountId == account.id } ?: return
-        try { coordinator.adopt(expected, account.activeStoreId, applyServerSelection) }
+        try {
+            coordinator.adopt(expected, account.activeStoreId, applyServerSelection)
+            failedRestoreOwner.compareAndSet(expected, null)
+        }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { logCloudConnectionDiagnostic("Active-store restoration interrupted; current selection retained") }
+        catch (_: Exception) {
+            if (expected == owner()) failedRestoreOwner.value = expected
+            logCloudConnectionDiagnostic("Active-store restoration interrupted; current selection retained")
+        }
     }
 
     fun mergeAccount(account: UserAccountDataModel): UserAccountDataModel {

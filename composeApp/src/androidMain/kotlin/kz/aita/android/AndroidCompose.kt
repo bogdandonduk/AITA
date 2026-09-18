@@ -78,6 +78,9 @@ import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
@@ -1140,7 +1143,7 @@ private const val ALIAS_KEYSTORE = "aita_keystore"
 // of overlapping decryptions when a large inventory is recomposed/restored.
 private val encryptedStorageMutex = Mutex()
 
-suspend fun getEncryptedValue(key: String): String? = encryptedStorageMutex.withLock {
+suspend fun getEncryptedValue(key: String): String? = withContext(Dispatchers.IO) { encryptedStorageMutex.withLock {
     val base64 = AITA.get().tokensDataStore.data.first()[stringPreferencesKey(key)]
         ?: return@withLock null
     val blob = Base64.decode(base64, Base64.DEFAULT)
@@ -1160,9 +1163,9 @@ suspend fun getEncryptedValue(key: String): String? = encryptedStorageMutex.with
         }
     }
     error("Encrypted storage read did not finish")
-}
+} }
 
-suspend fun setEncryptedValue(key: String, value: String?) = encryptedStorageMutex.withLock {
+suspend fun setEncryptedValue(key: String, value: String?) = withContext(Dispatchers.IO) { encryptedStorageMutex.withLock {
     val preferencesKey = stringPreferencesKey(key)
     if (value == null) {
         AITA.get().tokensDataStore.edit { it.remove(preferencesKey) }
@@ -1175,7 +1178,7 @@ suspend fun setEncryptedValue(key: String, value: String?) = encryptedStorageMut
         AITA.get().tokensDataStore.edit { it[preferencesKey] = base64 }
     }
     Unit
-}
+} }
 
 private suspend fun getOrCreateAndroidInstallationId(): String {
     val existing = getEncryptedValue("key_installation_id")?.takeIf { it.isNotBlank() }
@@ -1210,6 +1213,7 @@ private fun getOrCreateKey(): SecretKey {
 class MainActivity: ComponentActivity() {
 
     private val cloudConnectionSignals by lazy { AndroidCloudConnectionSignals(this) }
+    private val responsiveness = AndroidUiResponsiveness()
 
     val viewModel: MainActivityViewModel by viewModels()
 
@@ -1271,13 +1275,12 @@ class MainActivity: ComponentActivity() {
 
 //    enableFullscreen()
 
-        cloudConnectionSignals.start()
         setContent {
-            AppConfiguration(
-                {
-                    MainScreen()
-                }
-            )
+            val startup by AITA.get().startup.collectAsState()
+            if (startup == "ready") {
+                LaunchedEffect(Unit) { cloudConnectionSignals.start() }
+                AppConfiguration({ MainScreen() })
+            } else AndroidStartupScreen(startup == "failed", AITA.get()::startInitialization)
         }
     }
 
@@ -1463,7 +1466,13 @@ class MainActivity: ComponentActivity() {
         updatePhoneOrientationPolicy(newConfig)
     }
 
+    override fun onStart() {
+        super.onStart()
+        responsiveness.start()
+    }
+
     override fun onStop() {
+        responsiveness.stop()
         runCatching { stopPlatformVoiceInput?.invoke() }
         super.onStop()
     }
@@ -1486,13 +1495,56 @@ class MainActivity: ComponentActivity() {
     }
 }
 
+@Composable private fun AndroidStartupScreen(failed: Boolean, retry: () -> Unit) {
+    val context = LocalContext.current
+    val dark = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    val color = if (dark) Color.White else Color.Black
+    Column(Modifier.fillMaxSize().background(if (dark) Color(0xff12151a) else Color(0xfffffaf0)),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Image(painterResource(kz.aita.R.drawable.ic_launcher_foreground), "AITA", Modifier.size(144.dp))
+        if (failed) {
+            val language = context.resources.configuration.locales[0].language
+            val message = when (language) {
+                "ru" -> "Не удалось прочитать данные на устройстве. Данные сохранены. Повторить"
+                "kk" -> "Құрылғыдағы деректерді оқу мүмкін болмады. Деректер сақталды. Қайталау"
+                "ky" -> "Түзмөктөгү маалымат окулган жок. Маалымат сакталды. Кайталоо"
+                "tg" -> "Маълумоти дастгоҳ хонда нашуд. Маълумот нигоҳ дошта шуд. Такрор"
+                "uz" -> "Qurilma maʼlumotlari oʻqilmadi. Maʼlumotlar saqlandi. Qayta urinish"
+                else -> "Could not read device storage. Your data is preserved. Try again"
+            }
+            androidx.compose.material3.TextButton(onClick = retry) {
+                Text(message, color = color, textAlign = TextAlign.Center, modifier = Modifier.padding(20.dp))
+            }
+        }
+    }
+}
+
 @HiltAndroidApp
 class AITA : Application() {
+    val startup = MutableStateFlow("loading")
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var startupJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
-
         instance = this
+        startInitialization()
+    }
+
+    fun startInitialization() {
+        if (startupJob?.isActive == true || startup.value == "ready") return
+        startup.value = "loading"
+        startupJob = startupScope.launch {
+            try { initializePlatform(); startup.value = "ready" }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) {
+                RuntimeDiagnostics.capture(error, "android.startup")
+                startup.value = "failed"
+            }
+        }
+    }
+
+    private suspend fun initializePlatform() {
         kz.aita.installAndroidRuntimeDiagnostics(this)
         cacheDirPath = cacheDir.absolutePath
         getSqlDelightDriver =
@@ -1520,6 +1572,9 @@ class AITA : Application() {
                 setEncryptedValue("key_user_account", value?.let { jsonBase.encodeToString(it) })
             } }
         )
+        // Prime both caches before composing anything that checks account ownership.
+        authCache.get()
+        accountCache.get()
         getStoredUserAuthTokens = authCache::get
         setStoredUserAuthTokens = authCache::set
         getStoredUserAccountDataModel = accountCache::get
@@ -1553,27 +1608,16 @@ class AITA : Application() {
             }
         }
 
-        getClientDeviceInfo = {
-            runBlocking(Dispatchers.IO) {
-                val packageInfo = runCatching { packageManager.getPackageInfo(packageName, 0) }.getOrNull()
-                val manufacturer = Build.MANUFACTURER.orEmpty().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-                val model = Build.MODEL.orEmpty()
-                val deviceTitle = listOf(manufacturer, model)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" ")
-                    .ifBlank { "Android device" }
-
-                ClientDeviceInfoDataModel(
-                    installationId = getOrCreateAndroidInstallationId(),
-                    deviceName = deviceTitle,
-                    platformName = "Android",
-                    osName = "Android ${Build.VERSION.RELEASE ?: ""} (SDK ${Build.VERSION.SDK_INT})",
-                    appName = "AITA",
-                    appVersion = packageInfo?.versionName.orEmpty(),
-                    localeLanguage = getSystemLocaleLanguage()
-                )
-            }
-        }
+        val packageInfo = runCatching { packageManager.getPackageInfo(packageName, 0) }.getOrNull()
+        val manufacturer = Build.MANUFACTURER.orEmpty().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        val deviceInfo = ClientDeviceInfoDataModel(
+            installationId = getOrCreateAndroidInstallationId(),
+            deviceName = listOf(manufacturer, Build.MODEL.orEmpty()).filter { it.isNotBlank() }
+                .joinToString(" ").ifBlank { "Android device" },
+            platformName = "Android", osName = "Android ${Build.VERSION.RELEASE.orEmpty()} (SDK ${Build.VERSION.SDK_INT})",
+            appName = "AITA", appVersion = packageInfo?.versionName.orEmpty()
+        )
+        getClientDeviceInfo = { deviceInfo.copy(localeLanguage = getSystemLocaleLanguage()) }
 
         init()
     }

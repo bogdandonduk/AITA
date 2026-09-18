@@ -31,20 +31,20 @@ class AccountAppModeTest {
         f.c.adopt(f.owner,APP_MODE_BUYER,true,APP_MODE_STORE)
         assertEquals(APP_MODE_BUYER,f.visible);assertFalse(f.c.snapshot.pending)
     }
-    @Test fun existingExplicitStoreAndSupplierPreferencesArePreserved()=scenario { f->
+    @Test fun savedLocalModeSurvivesANewSessionAndDifferentServerPreference()=scenario { f->
         f.c.adopt(f.owner,APP_MODE_SUPPLIER,true,APP_MODE_BUYER);assertEquals(APP_MODE_SUPPLIER,f.visible)
-        f.owner=f.owner.copy(generation=2);f.c.adopt(f.owner,APP_MODE_STORE,true);assertEquals(APP_MODE_STORE,f.visible)
+        f.owner=f.owner.copy(generation=2);f.c.adopt(f.owner,APP_MODE_STORE,true);assertEquals(APP_MODE_SUPPLIER,f.visible)
     }
     @Test fun unmigratedOwnerCanKeepTheirLegacyChoice()=scenario { f->
         f.c.adopt(f.owner,null,true,APP_MODE_SUPPLIER)
         assertEquals(APP_MODE_SUPPLIER,f.visible);assertTrue(f.c.snapshot.pending)
         assertEquals(SavedAppMode(APP_MODE_SUPPLIER,true),f.saved[f.owner.accountId])
     }
-    @Test fun oldCachedAccountCannotOverrideALiveServerChoice()=scenario { f->
+    @Test fun cachedLocalNavigationModeDoesNotFlashToADifferentLivePreference()=scenario { f->
         f.c.adopt(f.owner,null,false,APP_MODE_STORE)
         assertTrue(f.sent.isEmpty());assertFalse(f.c.snapshot.pending)
         f.c.adopt(f.owner,APP_MODE_BUYER,true)
-        assertEquals(APP_MODE_BUYER,f.visible);assertTrue(f.sent.isEmpty())
+        assertEquals(APP_MODE_STORE,f.visible);assertTrue(f.sent.isEmpty())
     }
     @Test fun aNewerLocalClickBeatsALateAccountResponse()=scenario { f->
         f.c.adopt(f.owner,APP_MODE_BUYER,false)

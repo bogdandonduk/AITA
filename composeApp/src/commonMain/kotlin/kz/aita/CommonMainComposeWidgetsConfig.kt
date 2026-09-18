@@ -82,6 +82,10 @@ val kamelConfig = KamelConfig {
     }
     fileFetcher()
     takeFrom(KamelConfig.Core)
+    // Raster entries may be large photos. Keeping 100 decoded images retains native/GPU
+    // memory in the browser even after their screen has closed. Icons use separate caches.
+    imageBitmapCacheSize = 16
+    animatedImageCacheSize = 4
 
     svgDecoder()
     imageBitmapDecoder()
