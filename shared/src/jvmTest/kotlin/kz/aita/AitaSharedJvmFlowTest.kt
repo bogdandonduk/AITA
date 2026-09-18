@@ -13,7 +13,9 @@ import io.ktor.http.*
 import kz.aita.auth.allowsStoredSessionAuthorization
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -84,6 +86,7 @@ private class AitaFlowTestEnvironment {
 }
 
 class AitaSharedJvmFlowTest {
+    private var preexistingGlobalJobs: Set<Job> = emptySet()
     private lateinit var environment: AitaFlowTestEnvironment
     private lateinit var originalHttpClient: HttpClient
     private lateinit var originalEngineFactory: () -> HttpClientEngine
@@ -97,6 +100,7 @@ class AitaSharedJvmFlowTest {
 
     @BeforeTest
     fun setUp() = runBlocking {
+        preexistingGlobalJobs = GlobalScope.coroutineContext[Job]!!.children.toSet()
         originalCacheDirPath = cacheDirPath
         cacheDirPath = Files.createTempDirectory("aita-flow-jvm-test").toString()
         environment = AitaFlowTestEnvironment()
@@ -122,15 +126,35 @@ class AitaSharedJvmFlowTest {
         httpClient = buildAitaFlowMockClient(environment)
 
         resetAitaFlowSharedState()
+        // Each fixture is a fresh login. Late store/worker responses from a preceding
+        // test must not own this fixture merely because it uses the same account ID.
+        installAuthenticatedSession(requireNotNull(environment.storedTokens))
         globalAppConfigurationState.emit(DataState.Success(globalAppConfigurationState.payloadValue.copy(serverUrl = AITA_FLOW_TEST_SERVER_URL to "test")))
         userAccountState.emit(DataState.Success(aitaTestUserAccount()))
-        publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)
+        // Initialize the selection coordinator as login does, not only its inventory view.
+        ActiveStores.acceptAccount(aitaTestUserAccount().copy(activeStoreId = AITA_FLOW_SOURCE_STORE_ID))
+        assertEquals(AITA_FLOW_SOURCE_STORE_ID, activeStoreIdState.value)
     }
 
     @AfterTest
     fun tearDown() {
-        runBlocking { publishActiveInventoryStoreId(null) }
-        stopRealtimeUpdates()
+        runBlocking {
+            clearAuthenticatedSessionStorage()
+            stopRealtimeUpdates()
+            // Login and recovery start long-lived health/refresh jobs. Finish this
+            // fixture's jobs before replacing its HTTP client or closing its database.
+            // Preserve jobs that belonged to the surrounding test process already.
+            withTimeout(8_000L) {
+                while (true) {
+                    val owned = GlobalScope.coroutineContext[Job]!!.children
+                        .filterNot { it in preexistingGlobalJobs }.toList()
+                    if (owned.isEmpty()) break
+                    owned.forEach { it.cancel() }
+                    owned.joinAll()
+                }
+            }
+            publishActiveInventoryStoreId(null)
+        }
         runCatching { httpClient.close() }
         httpClient = originalHttpClient
         getHttpClientEngine = originalEngineFactory
