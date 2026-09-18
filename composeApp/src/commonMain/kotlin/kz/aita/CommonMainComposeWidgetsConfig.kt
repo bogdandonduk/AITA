@@ -3105,13 +3105,12 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
         }
     }
 
-    var availableDomains by rememberSaveable { mutableStateOf(domains) }
-    var availableSecondaryDomains by rememberSaveable { mutableStateOf(secondaryDomains) }
-
-    LaunchedEffect(data) {
-        availableDomains = domains.filter { domain -> data.find { it.selectedDomainId == domain.id } == null }
-        availableSecondaryDomains =
-            secondaryDomains?.filter { secondaryDomain -> data.find { it.selectedSecondaryDomainId == secondaryDomain.id } == null }
+    // Derived catalogues can be large; only editor choices belong in saved state.
+    val availableDomains = remember(domains, data) {
+        domains.filter { domain -> data.none { it.selectedDomainId == domain.id } }
+    }
+    val availableSecondaryDomains = remember(secondaryDomains, data) {
+        secondaryDomains?.filter { domain -> data.none { it.selectedSecondaryDomainId == domain.id } }
     }
 
     Column(

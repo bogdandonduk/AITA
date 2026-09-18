@@ -2601,9 +2601,11 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 var appliedSearchQuery: String by rememberSaveable(searchQuery, transactionTypeIndex) {
                     mutableStateOf(searchQuery.orEmpty())
                 }
-                var selectedStockItemIds by rememberSaveable(activeStoreId, stateValues.userAccount?.id) {
-                    mutableStateOf(emptyList<String>())
-                }
+                // Whole-catalogue selections/order are working memory, not Android Bundle data.
+                // Saving thousands of IDs exceeds Binder's activity-stop transaction limit.
+                val warehouseOwner = inventoryViewScopeKey()
+                val workingState = rememberWarehouseListWorkingState(warehouseOwner, searchQuery, transactionTypeIndex)
+                var selectedStockItemIds by workingState.selectedIds
                 var selectedWarehouseFilterId by remember(searchQuery, transactionTypeIndex) {
                     mutableStateOf(STOCK_WAREHOUSE_FILTER_TOTAL)
                 }
@@ -2685,9 +2687,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         }
                 }
 
-                var lastNonQuantitySortOrderIds by rememberSaveable(searchQuery, transactionTypeIndex) {
-                    mutableStateOf(emptyList<String>())
-                }
+                var lastNonQuantitySortOrderIds by workingState.sortOrderIds
                 val language = stateValues.appLanguage
                 val fallbackOrderIds = if (selectedSortMode == "quantity") lastNonQuantitySortOrderIds else emptyList()
                 val projectionRequest = remember(

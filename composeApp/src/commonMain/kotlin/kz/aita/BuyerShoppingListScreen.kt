@@ -122,6 +122,8 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
     fun listDialogIsOpen(): Boolean = quantityEdit != null || removal != null || openedId != null || comparison != null || planning
     val displayed = state.snapshot
     val groups = displayed?.shoppingGroups().orEmpty()
+    val view = navigation.shoppingList
+    val visibleRows = view.rows(displayed)
     AitaScreenColumn(
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1120.dp,
@@ -140,7 +142,8 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
         val section = sectionTabsWidget("buyer-shopping:$account", listOf(
             TabContent("list", authUiText("Items", "Товары", "Тауарлар", "Товарлар")),
             TabContent("estimate", authUiText("By shop", "По магазинам", "Дүкен бойынша", "Дүкөн боюнча")),
-            TabContent("activity", authUiText("Activity", "История", "Тарих", "Аракеттер"))))
+            TabContent("activity", authUiText("Activity", "История", "Тарих", "Аракеттер"))),
+            selectedId = view.section, onSelected = { view.section = it })
         MarketShoppingFeedback(state)
         if (section == "activity") {
             MarketShoppingActivityPanel(activityNavigation, Modifier.weight(1f).fillMaxWidth())
@@ -165,7 +168,12 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
                         onClick = { if (!listDialogIsOpen() && state.canChange) planning = true })
                 }
                 if (section == "list") {
-                    if (displayed != null) items(displayed.lines, key = { it.line.offerId }) { row ->
+                    if (!displayed?.lines.isNullOrEmpty()) item(key = "list-filters") { MarketShoppingListControls(view, displayed) }
+                    if (displayed != null && displayed.lines.isNotEmpty() && visibleRows.isEmpty()) item(key = "no-matches") {
+                        Text(marketBrowseText("market.list_no_matches"), color = stateValues.PlaceholderTextColor,
+                            fontSize = stateValues.textSize, modifier = Modifier.padding(vertical = 16.dp))
+                    }
+                    if (displayed != null) items(visibleRows, key = { it.line.offerId }) { row ->
                         val review = displayed.reviewShoppingLine(row.line)
                         ShoppingLineCard(row, state, review, onOpen = {
                             if (!listDialogIsOpen()) openedId = row.line.offerId
@@ -200,6 +208,8 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
                             if (group.unpricedLines > 0) Text(authUiText("Incomplete: ${group.unpricedLines} lines are excluded. They are not free.",
                                 "Неполная сумма: ${group.unpricedLines} строк не включены. Это не бесплатные товары.",
                                 "Сома толық емес: ${group.unpricedLines} жол кірмейді. Олар тегін емес.", "Толук эмес: ${group.unpricedLines} сап эсепке кошулган жок. Алар бекер эмес."), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                            actionButton(text = marketBrowseText("market.list_review_shop"), autoLoading = false,
+                                confirmationRequired = false, onClick = { view.reviewShop(group.storeId, group.currencyCode) })
                             actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), iconPath = marketIconPath(139),
                                 iconRes = marketIconFallback(139), autoLoading = false, confirmationRequired = false, onClick = {
                                     visitShop(group.storeId)

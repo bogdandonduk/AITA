@@ -55,7 +55,7 @@ class MarketBrowseControlsRenderTest {
         }
     } as AppConfiguration.StateValues
 
-    private fun verify(width: Int, language: String, fontScale: Float) {
+    private fun verify(width: Int, language: String, fontScale: Float, shopping: Boolean = false) {
         val failure = AtomicReference<Throwable?>()
         SwingUtilities.invokeAndWait {
             val stateField = AppConfiguration::class.java.getDeclaredField("stateValues")
@@ -67,7 +67,10 @@ class MarketBrowseControlsRenderTest {
                 val scene = ImageComposeScene(width, 1100, Density(1f, fontScale)) {
                     Column(Modifier.fillMaxSize().background(Color(0xFF17181B)).padding(12.dp)) {
                         Box(Modifier.fillMaxWidth().onGloballyPositioned { bounds = it.boundsInRoot() }) {
-                            AppConfiguration.MarketBrowseControls(browse, null, {})
+                            if (shopping) AppConfiguration.MarketShoppingListControls(MarketShoppingListView(),
+                                MarketShoppingSnapshot("render-buyer", lines = listOf(MarketShoppingQuotedLine(
+                                    MarketShoppingLine("milk", "shop", "Milk", "Shop", 1, MarketShoppingBasis(null, "KZT", "piece", 1.0))))))
+                            else AppConfiguration.MarketBrowseControls(browse, null, {})
                         }
                     }
                 }
@@ -78,7 +81,7 @@ class MarketBrowseControlsRenderTest {
                         scene.render(++frame * 16_000_000L).use { image ->
                             image.encodeToData()?.use { png ->
                                 File(directory).mkdirs()
-                                File(directory, "market-controls-$width-$language-$label.png").writeBytes(png.bytes)
+                                File(directory, "market-controls-$width-$language-$shopping-$label.png").writeBytes(png.bytes)
                             }
                         }
                     }
@@ -86,11 +89,11 @@ class MarketBrowseControlsRenderTest {
                 try {
                     render("collapsed")
                     val collapsed = assertNotNull(bounds)
-                    assertTrue(collapsed.height < 260f, "Search should leave room for products: $collapsed")
+                    assertTrue(collapsed.height < (if (shopping) 410f else 260f), "Search should leave room for products: $collapsed")
                     browse.filtersExpanded = true
                     render("expanded")
                     val expanded = assertNotNull(bounds)
-                    assertTrue(expanded.height > collapsed.height + 70f)
+                    if (!shopping) assertTrue(expanded.height > collapsed.height + 70f)
                     assertTrue(expanded.left >= 0f && expanded.right <= width)
                     assertTrue(expanded.bottom < 1100f)
                 } finally { scene.close() }
@@ -103,4 +106,7 @@ class MarketBrowseControlsRenderTest {
     @Test fun narrowSearchLeavesSpaceForOffers() = verify(390, "en", 1f)
     @Test fun narrowTranslatedFiltersFitWithLargeText() = verify(320, "ru", 1.4f)
     @Test fun wideSearchAndOptionalFiltersStayWithinTheirContainer() = verify(1120, "kk", 1f)
+    @Test fun shoppingReviewControlsFitNarrowEnglish() = verify(390, "en", 1f, shopping = true)
+    @Test fun shoppingReviewControlsFitLargeRussianText() = verify(390, "ru", 1.4f, shopping = true)
+    @Test fun shoppingReviewControlsFitWideKazakh() = verify(1024, "kk", 1f, shopping = true)
 }

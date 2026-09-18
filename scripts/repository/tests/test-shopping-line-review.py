@@ -13,7 +13,7 @@ SERVER = ROOT / "server/src/main/kotlin/kz/aita/server/marketplace"
 class ShoppingLineReviewWiring(unittest.TestCase):
     def test_displayed_snapshot_owns_rows_and_reviews(self):
         source = (UI / "BuyerShoppingListScreen.kt").read_text()
-        for text in ("val displayed = state.snapshot", "items(displayed.lines", "displayed.reviewShoppingLine(row.line)",
+        for text in ("val displayed = state.snapshot", "val visibleRows = view.rows(displayed)", "items(visibleRows", "displayed.reviewShoppingLine(row.line)",
                      "removal = review", "state.compareLine(it)", "MarketShoppingRemoveDialog(review, state"):
             self.assertIn(text, source)
         self.assertNotIn("state.change(", source)

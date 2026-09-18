@@ -1,0 +1,145 @@
+name: Build AITA Windows Release
+run-name: AITA Windows v${{ inputs.version }}-b${{ inputs.build }}
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Increasing MAJOR.MINOR.PATCH installer version
+        required: true
+      build:
+        description: Increasing release build number
+        required: true
+      revision:
+        description: Exact reviewed commit (40 hex characters)
+        required: true
+      production:
+        description: Require trusted signing (false produces the authorized unsigned pilot installers)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: aita-windows-release
+  cancel-in-progress: false
+jobs:
+  windows:
+    if: github.ref == 'refs/heads/master'
+    runs-on: windows-2025
+    timeout-minutes: 70
+    env:
+      AITA_RELEASE_VERSION: ${{ inputs.version }}
+      AITA_RELEASE_BUILD: ${{ inputs.build }}
+      AITA_RELEASE_REVISION: ${{ inputs.revision }}
+      AITA_RELEASE_CHANNEL: release
+      AITA_RELEASE_DISTRIBUTION: direct
+      AITA_UPDATE_PUBLIC_KEY: ${{ vars.AITA_UPDATE_PUBLIC_KEY }}
+      AITA_UPDATE_FEED_BASE: ${{ vars.AITA_UPDATE_FEED_BASE }}
+      JAVA_VERSION: '21'
+      AITA_WORKFLOW_REVISION: ${{ github.sha }}
+      AITA_WINDOWS_SIGNER_THUMBPRINT: ${{ vars.AITA_WINDOWS_SIGNER_THUMBPRINT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.revision }}
+          persist-credentials: false
+      - name: Validate release identity and signing setup
+        shell: pwsh
+        env:
+          PRODUCTION: ${{ inputs.production }}
+          SIGNING_PROVIDER: ${{ vars.AITA_WINDOWS_SIGNING_PROVIDER }}
+          SIGNING_USERNAME: ${{ secrets.AITA_ESIGNER_USERNAME }}
+          SIGNING_PASSWORD: ${{ secrets.AITA_ESIGNER_PASSWORD }}
+          SIGNING_CREDENTIAL: ${{ secrets.AITA_ESIGNER_CREDENTIAL_ID }}
+          SIGNING_TOTP: ${{ secrets.AITA_ESIGNER_TOTP_SECRET }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:AITA_RELEASE_REVISION -ne $env:AITA_WORKFLOW_REVISION) { throw 'Release must build the pushed master commit that started this workflow' }
+          if ($env:AITA_RELEASE_REVISION -notmatch '^[a-f0-9]{40}$' -or (git rev-parse HEAD) -ne $env:AITA_RELEASE_REVISION) { throw 'Commit mismatch' }
+          if ($env:AITA_RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$' -or $env:AITA_RELEASE_BUILD -notmatch '^[1-9]\d*$') { throw 'Invalid version/build' }
+          if (-not $env:AITA_UPDATE_PUBLIC_KEY -or -not $env:AITA_UPDATE_FEED_BASE) { throw 'Configure updater public key and feed variables first' }
+          if ($env:PRODUCTION -eq 'true') {
+            if ($env:SIGNING_PROVIDER -ne 'sslcom-esigner') { throw 'Windows signing is not configured. Set up a supported trusted certificate provider before production publication.' }
+            if (-not $env:AITA_WINDOWS_SIGNER_THUMBPRINT) { throw 'Configure the expected company signing certificate thumbprint' }
+            foreach ($name in @('SIGNING_USERNAME','SIGNING_PASSWORD','SIGNING_CREDENTIAL','SIGNING_TOTP')) {
+              if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing signing credential: $name" }
+            }
+          }
+          "AITA_RELEASE_BUILT_AT=$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))" >> $env:GITHUB_ENV
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+      - name: Prepare native Windows packaging tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+          if ($LASTEXITCODE -ne 0) { throw 'Android SDK setup failed' }
+          $zip = Join-Path $env:RUNNER_TEMP 'wix.zip'
+          Invoke-WebRequest 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip' -OutFile $zip
+          # Exact WiX 3.14.1 bytes, verified before running packaging tools.
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() -ne '6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31') { throw 'WiX download checksum mismatch' }
+          $wix = Join-Path $env:RUNNER_TEMP 'wix'
+          Expand-Archive $zip $wix
+          $wix >> $env:GITHUB_PATH
+      - name: Test and create application with bundled Java runtime
+        shell: pwsh
+        run: |
+          ./gradlew.bat :shared:jvmTest :composeApp:jvmTest :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
+          if ($LASTEXITCODE -ne 0) { throw 'Windows build/tests failed' }
+      - name: Sign application launcher before packaging
+        if: ${{ inputs.production }}
+        uses: SSLcom/esigner-codesign@cf5f6c1d38ad10f47e3ed9aca873f429b1a8d85b # v1.3.2
+        with:
+          command: sign
+          username: ${{ secrets.AITA_ESIGNER_USERNAME }}
+          password: ${{ secrets.AITA_ESIGNER_PASSWORD }}
+          credential_id: ${{ secrets.AITA_ESIGNER_CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.AITA_ESIGNER_TOTP_SECRET }}
+          file_path: ${{ github.workspace }}/composeApp/build/compose/binaries/main/app/AITA/AITA.exe
+          override: true
+          environment_name: PROD
+          clean_logs: true
+      - name: Verify launcher and package EXE/MSI
+        shell: pwsh
+        env:
+          PRODUCTION: ${{ inputs.production }}
+        run: |
+          if ($env:PRODUCTION -eq 'true') {
+            $signature = Get-AuthenticodeSignature 'composeApp/build/compose/binaries/main/app/AITA/AITA.exe'
+            if ($signature.Status -ne 'Valid' -or -not $signature.TimeStamperCertificate) { throw 'Application launcher lacks valid timestamped signature' }
+          }
+          ./gradlew.bat :composeApp:packageMsi :composeApp:packageExe -x :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
+          if ($LASTEXITCODE -ne 0) { throw 'Installer packaging failed' }
+          New-Item -ItemType Directory -Force build/windows-signing | Out-Null
+          Copy-Item composeApp/build/compose/binaries/main/msi/*.msi build/windows-signing/
+          Copy-Item composeApp/build/compose/binaries/main/exe/*.exe build/windows-signing/
+      - name: Sign and timestamp installers
+        if: ${{ inputs.production }}
+        uses: SSLcom/esigner-codesign@cf5f6c1d38ad10f47e3ed9aca873f429b1a8d85b # v1.3.2
+        with:
+          command: batch_sign
+          username: ${{ secrets.AITA_ESIGNER_USERNAME }}
+          password: ${{ secrets.AITA_ESIGNER_PASSWORD }}
+          credential_id: ${{ secrets.AITA_ESIGNER_CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.AITA_ESIGNER_TOTP_SECRET }}
+          dir_path: ${{ github.workspace }}/build/windows-signing
+          override: true
+          environment_name: PROD
+          clean_logs: true
+      - name: Verify production signatures and record checksums
+        shell: pwsh
+        env:
+          PRODUCTION: ${{ inputs.production }}
+        run: |
+          python scripts/releases/verify-windows-release.py --directory build/windows-signing --version $env:AITA_RELEASE_VERSION --build $env:AITA_RELEASE_BUILD --revision $env:AITA_RELEASE_REVISION --production $env:PRODUCTION
+          if ($LASTEXITCODE -ne 0) { throw 'Windows release verification failed' }
+      - name: Save signed release or explicitly unsigned pilot artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.production && format('AITA-Windows-v{0}-b{1}', inputs.version, inputs.build) || format('AITA-Windows-v{0}-b{1}-UNSIGNED-PILOT', inputs.version, inputs.build) }}
+          path: build/windows-signing/*
+          if-no-files-found: error
+          retention-days: 30

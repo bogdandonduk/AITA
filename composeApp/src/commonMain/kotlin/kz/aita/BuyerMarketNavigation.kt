@@ -79,6 +79,7 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
 internal class BuyerMarketNavigation(private val owner: MarketAccountScope?) {
     val market = BuyerBrowseNavigation(false)
     val saved = BuyerBrowseNavigation(true)
+    val shoppingList = MarketShoppingListView()
     var lastSavedOnly = false
         private set
     fun browse(savedOnly: Boolean) = if (savedOnly) saved else market

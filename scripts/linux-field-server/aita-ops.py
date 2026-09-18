@@ -1424,6 +1424,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--no-follow", action="store_true", help="return once the managed job starts; inspect later with logs/status")
     p = sub.add_parser("logs", help="reattach to update output; then view AITA server logs")
     p.add_argument("--history", action="store_true", help="scroll/search the saved update log with less (q to quit)")
+    p.add_argument("--update-only", action="store_true", help="return the managed update result without following server logs")
     sub.add_parser("status", help="read current server and last managed update state")
     p = sub.add_parser("connection", help="read-only local, public Worker/origin and tunnel diagnostics")
     p.add_argument("--public-url", default=DEFAULT_PUBLIC_ORIGIN)
@@ -1465,6 +1466,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return status()
     if args.command == "logs":
         run = latest_run()
+        if args.update_only:
+            if run is None:
+                raise OpsError("No managed update has a saved result yet.")
+            return follow_update(run, server_logs=False)
         if args.history and run:
             require_tools("less")
             return subprocess.call(["less", "-R", "+G", str(run / "update.log")])

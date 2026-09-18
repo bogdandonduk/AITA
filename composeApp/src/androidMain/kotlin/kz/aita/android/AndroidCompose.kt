@@ -89,6 +89,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kz.aita.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.security.KeyStore
@@ -1134,66 +1136,45 @@ class MainActivityViewModel @Inject constructor(): ViewModel() {
 
 private const val ALIAS_KEYSTORE = "aita_keystore"
 
-suspend fun getEncryptedValue(key: String): String? {
-    val preferencesKey = stringPreferencesKey(key)
+// Android Keystore has a bounded operation pool. Ownership checks must not start hundreds
+// of overlapping decryptions when a large inventory is recomposed/restored.
+private val encryptedStorageMutex = Mutex()
 
-    val base64: String = AITA.get()
-        .tokensDataStore
-        .data
-        .map { it[preferencesKey] }
-        .first() ?: return null
-
+suspend fun getEncryptedValue(key: String): String? = encryptedStorageMutex.withLock {
+    val base64 = AITA.get().tokensDataStore.data.first()[stringPreferencesKey(key)]
+        ?: return@withLock null
     val blob = Base64.decode(base64, Base64.DEFAULT)
-    val key: SecretKey = getOrCreateKey()
-
-    return try {
-        val iv = blob.copyOfRange(0, 12)
-        val ct = blob.copyOfRange(12, blob.size)
-
-        val cipher = Cipher
-            .getInstance("AES/GCM/NoPadding")
-            .apply {
-                init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+    require(blob.size >= 28) { "Encrypted storage value is truncated" }
+    val secretKey = getOrCreateKey()
+    // Retry only crypto failures, with a fresh operation. Never catch VM errors or cancellation,
+    // never erase credentials/drafts on a failed read, and never treat a failure as a missing key.
+    repeat(2) { attempt ->
+        try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, blob, 0, 12))
             }
-
-        val plain = cipher.doFinal(ct)
-
-        plain.decodeToString()
-    } catch (throwable: Throwable) {
-        if (throwable is kotlinx.coroutines.CancellationException) throw throwable
-        AITA.get().tokensDataStore.edit { it.remove(preferencesKey) }
-        throwable.printStackTrace()
-
-        null
+            return@withLock cipher.doFinal(blob, 12, blob.size - 12).decodeToString()
+        } catch (error: java.security.GeneralSecurityException) {
+            if (attempt == 1 || error is javax.crypto.AEADBadTagException) throw error
+            kotlinx.coroutines.delay(50)
+        }
     }
+    error("Encrypted storage read did not finish")
 }
 
-suspend fun setEncryptedValue(key: String, value: String?) {
-
+suspend fun setEncryptedValue(key: String, value: String?) = encryptedStorageMutex.withLock {
     val preferencesKey = stringPreferencesKey(key)
-
     if (value == null) {
         AITA.get().tokensDataStore.edit { it.remove(preferencesKey) }
-        return
-    }
-
-    val key: SecretKey = getOrCreateKey()
-
-    val plain = value.encodeToByteArray()
-
-    val cipher = Cipher
-        .getInstance("AES/GCM/NoPadding")
-        .apply {
-            init(Cipher.ENCRYPT_MODE, key)
+    } else {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+            init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         }
-
-    val iv = cipher.iv                                 // 12-byte nonce
-    val ct = cipher.doFinal(plain)                     // ciphertext + 16-byte tag
-
-    val blob = iv + ct
-    val base64 = Base64.encodeToString(blob, Base64.NO_WRAP)
-
-    AITA.get().tokensDataStore.edit { it[preferencesKey] = base64 }
+        val blob = cipher.iv + cipher.doFinal(value.encodeToByteArray())
+        val base64 = Base64.encodeToString(blob, Base64.NO_WRAP)
+        AITA.get().tokensDataStore.edit { it[preferencesKey] = base64 }
+    }
+    Unit
 }
 
 private suspend fun getOrCreateAndroidInstallationId(): String {
@@ -1523,26 +1504,26 @@ class AITA : Application() {
                 )
             }
 
-        getStoredUserAuthTokens = {
-            runBlocking(Dispatchers.IO) {
-                getEncryptedValue("key_auth_tokens")?.run { jsonBase.decodeFromString<TokenPair>(this) }
-            }
-        }
-        setStoredUserAuthTokens = {
-            runBlocking(Dispatchers.IO) {
-                setEncryptedValue("key_auth_tokens", it?.run { jsonBase.encodeToString(this) })
-            }
-        }
-        getStoredUserAccountDataModel = {
-            runBlocking {
-                getEncryptedValue("key_user_account")?.run { jsonBase.decodeFromString<UserAccountDataModel>(this) }
-            }
-        }
-        setStoredUserAccountDataModel = { value ->
-            runBlocking {
-                setEncryptedValue("key_user_account", value?.run { jsonBase.encodeToString(this) })
-            }
-        }
+        val authCache = PersistentCredentialCache<TokenPair>(
+            read = { runBlocking(Dispatchers.IO) {
+                getEncryptedValue("key_auth_tokens")?.let { jsonBase.decodeFromString<TokenPair>(it) }
+            } },
+            write = { value -> runBlocking(Dispatchers.IO) {
+                setEncryptedValue("key_auth_tokens", value?.let { jsonBase.encodeToString(it) })
+            } }
+        )
+        val accountCache = PersistentCredentialCache<UserAccountDataModel>(
+            read = { runBlocking(Dispatchers.IO) {
+                getEncryptedValue("key_user_account")?.let { jsonBase.decodeFromString<UserAccountDataModel>(it) }
+            } },
+            write = { value -> runBlocking(Dispatchers.IO) {
+                setEncryptedValue("key_user_account", value?.let { jsonBase.encodeToString(it) })
+            } }
+        )
+        getStoredUserAuthTokens = authCache::get
+        setStoredUserAuthTokens = authCache::set
+        getStoredUserAccountDataModel = accountCache::get
+        setStoredUserAccountDataModel = accountCache::set
 
         getPersistentUiDraftValue = { key ->
             getEncryptedValue("key_ui_draft_" + key.hashCode().toString())

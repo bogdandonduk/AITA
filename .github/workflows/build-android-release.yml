@@ -6,11 +6,9 @@ on:
       version_name:
         description: Android version name (normally MAJOR.MINOR.PATCH)
         required: true
-        default: "1.0.0"
       version_code:
         description: Positive, always-increasing Android version code
         required: true
-        default: "1"
       channel:
         description: Client release channel
         type: choice
@@ -30,6 +28,7 @@ concurrency:
 
 jobs:
   build-android-release:
+    if: github.ref == 'refs/heads/master'
     name: Build signed Android AAB and APK
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -136,6 +135,9 @@ jobs:
 
       - name: Verify and collect Android artifacts
         shell: bash
+        env:
+          AITA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.AITA_ANDROID_KEYSTORE_PASSWORD }}
+          AITA_ANDROID_KEY_ALIAS: ${{ secrets.AITA_ANDROID_KEY_ALIAS }}
         run: |
           set -Eeuo pipefail
           apk="$(find composeApp/build/outputs/apk/release -type f -name '*.apk' -print -quit)"
@@ -146,7 +148,8 @@ jobs:
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
           [[ -x "$apksigner" ]] || { echo "apksigner was not found." >&2; exit 1; }
           "$apksigner" verify --verbose --print-certs "$apk"
-          jarsigner -verify -strict -certs "$aab"
+          jarsigner -verify -strict -certs -keystore "$AITA_ANDROID_KEYSTORE_PATH" \
+            -storepass:env AITA_ANDROID_KEYSTORE_PASSWORD "$aab" "$AITA_ANDROID_KEY_ALIAS"
 
           release_dir="composeApp/build/release/android"
           mkdir -p "$release_dir"
@@ -172,3 +175,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           path: composeApp/build/release/android/*
+
+      - name: Remove runner signing key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/aita-android-upload.jks"
