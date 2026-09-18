@@ -4,6 +4,8 @@ from pathlib import Path
 import re
 import subprocess
 
+TEST_FIXTURE = 'shared/src/jvmTest/kotlin/kz/aita/AitaSharedJvmFlowTest.kt'
+
 
 def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
@@ -17,7 +19,7 @@ def validate(source_root, tooling_root, revision, tooling_revision):
     subprocess.run(['git', '-C', str(tooling_root), 'merge-base', '--is-ancestor', revision, tooling_revision], check=True)
     changed = git(tooling_root, 'diff', '--name-only', revision, tooling_revision, '--').splitlines()
     forbidden = [path for path in changed if not (
-        path.startswith('scripts/releases/') or path == '.github/workflows/build-windows-release.yml')]
+        path.startswith('scripts/releases/') or path in ('.github/workflows/build-windows-release.yml', TEST_FIXTURE))]
     if forbidden:
         raise RuntimeError('Verification repair changes application source: ' + ', '.join(forbidden))
     print(f'PINNED: Application {revision}; verification tools {tooling_revision}')

@@ -51,6 +51,13 @@ class ReleaseSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'changes application source'):
             self.validate()
 
+    def test_explicit_test_fixture_repair_keeps_application_source_pinned(self):
+        fixture = self.tooling / validator.TEST_FIXTURE
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('wait for asynchronous request before asserting')
+        self.commit()
+        self.validate()
+
     def test_deleted_application_file_cannot_reuse_source(self):
         (self.tooling / 'app.kt').unlink()
         self.commit()

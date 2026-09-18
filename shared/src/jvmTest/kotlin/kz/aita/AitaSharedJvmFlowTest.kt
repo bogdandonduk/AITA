@@ -821,6 +821,8 @@ class AitaSharedJvmFlowTest {
 
         setActiveStoreId(rootStore.id)
         waitUntilAitaFlowCondition { activeStoreIdState.value == rootStore.id && getLocalKv(KEY_ACTIVE_STORE_ID) == rootStore.id }
+        // Local persistence/publication precede the asynchronous server sync.
+        waitUntilAitaFlowCondition { environment.requests.any { it.method == "PUT" && it.path == "stores/active" } }
         assertTrue(environment.requests.any { it.method == "PUT" && it.path == "stores/active" })
 
         val branch = aitaTestStore(

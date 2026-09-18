@@ -76,6 +76,9 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python build/release-tools/scripts/releases/validate-windows-source.py --source-root . --tooling-root build/release-tools --revision $env:AITA_RELEASE_REVISION --tooling-revision $env:AITA_WORKFLOW_REVISION
           if ($LASTEXITCODE -ne 0) { throw 'Source or release tooling commit mismatch' }
+          # This explicitly allowed fixture repair waits for asynchronous store synchronization.
+          # Application sources stay at AITA_RELEASE_REVISION; the receipt records test/tool revision.
+          Copy-Item build/release-tools/shared/src/jvmTest/kotlin/kz/aita/AitaSharedJvmFlowTest.kt shared/src/jvmTest/kotlin/kz/aita/AitaSharedJvmFlowTest.kt -Force
           if ($env:AITA_RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$' -or $env:AITA_RELEASE_BUILD -notmatch '^[1-9]\d*$') { throw 'Invalid version/build' }
           if (-not $env:AITA_UPDATE_PUBLIC_KEY -or -not $env:AITA_UPDATE_FEED_BASE) { throw 'Configure updater public key and feed variables first' }
           if ($env:PRODUCTION -eq 'true') {

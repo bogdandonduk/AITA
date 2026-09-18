@@ -21,6 +21,30 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_metadata_sequence_advances_after_partial_platform_publication(self):
+        import base64
+        with TemporaryDirectory() as folder:
+            catalog = Path(folder)
+            self.assertEqual(release.next_feed_sequence(catalog, 3), 3)
+            def saved(sequence):
+                payload = base64.b64encode(json.dumps({'sequence':sequence}).encode()).decode()
+                (catalog / 'release.json').write_text(json.dumps({'payload':payload}))
+            saved(3)
+            self.assertEqual(release.next_feed_sequence(catalog, 3), 4)
+            saved(4)
+            self.assertEqual(release.next_feed_sequence(catalog, 4), 5)
+            saved(8)
+            self.assertEqual(release.next_feed_sequence(catalog, 12), 12)
+            for invalid in (True, 0, -1, '4', 9_007_199_254_740_991):
+                saved(invalid)
+                with self.assertRaises(RuntimeError): release.next_feed_sequence(catalog, 4)
+
+    def test_corrupt_catalog_never_resets_the_metadata_sequence(self):
+        with TemporaryDirectory() as folder:
+            catalog = Path(folder)
+            (catalog / 'release.json').write_text('not a release')
+            with self.assertRaises(ValueError): release.next_feed_sequence(catalog, 4)
+
     def test_reused_windows_run_must_match_source_identity_workflow_and_success(self):
         with TemporaryDirectory() as folder, patch.object(release, 'ROOT', Path(folder)):
             run = release.Run(SimpleNamespace(windows_run=123)); run.revision = 'a'*40; run.tag = 'v1.0.2-b3'

@@ -5,6 +5,7 @@ build/releases. Signing material stays outside Git. No Worker deployment or auto
 """
 from __future__ import annotations
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -65,6 +66,20 @@ def release_identity(version, build):
     version_tuple(version)
     require(1 <= build <= 2_100_000_000, 'Build must be 1..2100000000')
     return f'v{version}-b{build}'
+
+
+def next_feed_sequence(catalog, build):
+    """A later platform may finish the same build; metadata still needs a new sequence."""
+    existing = catalog / 'release.json'
+    if not existing.exists():
+        return build
+    envelope = json.loads(existing.read_text())
+    current = json.loads(base64.b64decode(envelope['payload'], validate=True))['sequence']
+    require(type(current) is int and 1 <= current < 9_007_199_254_740_991,
+            'Existing updater sequence is invalid or exhausted; inspect the catalog before publishing')
+    # The publisher independently verifies the existing signature, monotonicity and immutable
+    # artifacts under its publication lock. Reading this number does not establish trust.
+    return max(build, current + 1)
 
 
 def load_signing():
@@ -341,7 +356,7 @@ class Run:
         if self.state.get('webUploadCompleted'):
             entries.append(dict(os='WEB', kind='WEB_RELOAD', url='https://aita.kz/', buildInfo=str(self.assets / 'web-client-build.json')))
         spec = self.folder / 'updater-spec.json'
-        spec.write_text(json.dumps(dict(channel='release', id=self.tag, sequence=self.args.build,
+        spec.write_text(json.dumps(dict(channel='release', id=self.tag, sequence=next_feed_sequence(catalog, self.args.build),
             version=self.args.version, build=self.args.build, notes={
                 'en': 'Account app state, safer updates and stability improvements. Windows: unsigned pilot installers. Android: signed APK.',
                 'ru': 'Состояние приложения в аккаунте, безопаснее обновления и улучшения стабильности. Windows: пилотные установщики без подписи. Android: подписанный APK.',
