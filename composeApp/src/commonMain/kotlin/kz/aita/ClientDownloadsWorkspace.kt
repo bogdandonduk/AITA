@@ -14,6 +14,7 @@ internal data class DownloadEntry(val id: String, val version: String, val build
 internal data class DownloadsState(val entries: List<DownloadEntry> = emptyList(), val loaded: Boolean = false,
     val loading: Boolean = false, val error: String? = null, val progress: Float? = null, val savingId: String? = null,
     val destinationLabel: String? = null, val canChooseFolder: Boolean = false,
+    val folderReady: Boolean = false, val folderChanging: Boolean = false, val folderError: String? = null,
     val savedId: String? = null, val savedDestination: String? = null,
     val webVersion: String? = null, val webBuild: Long? = null, val webNotes: Map<String, String> = emptyMap())
 internal data class ClientDownloadResult(val destination: String? = null, val cancelled: Boolean = false)
@@ -23,6 +24,24 @@ internal expect suspend fun clientDownloadsFolderLabel(folder: String?): String?
 @Composable internal expect fun rememberDownloadsFolderPicker(onChosen: (String?) -> Unit): () -> Unit
 internal expect suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?,
     progress: (Long, Long) -> Unit): ClientDownloadResult
+
+internal data class DownloadFolderInspection(val folder: String?, val loaded: Boolean,
+    val label: String? = null, val error: String? = null)
+
+/** A broken folder must not hide recovery controls or prevent a catalogue refresh. */
+internal suspend fun inspectDownloadFolder(current: String?, loaded: Boolean,
+    readPreference: suspend () -> String?, resolveLabel: suspend (String?) -> String?): DownloadFolderInspection {
+    var folder = current
+    var preferenceLoaded = loaded
+    return try {
+        if (!preferenceLoaded) {
+            folder = readPreference()
+            preferenceLoaded = true
+        }
+        DownloadFolderInspection(folder, preferenceLoaded, resolveLabel(folder))
+    } catch (cancel: CancellationException) { throw cancel }
+    catch (_: Exception) { DownloadFolderInspection(folder, preferenceLoaded, error = "storage") }
+}
 
 /** Public signed binaries only. No account token, installer launch, or GitHub credential is used. */
 internal object DownloadsWorkspace {
@@ -40,16 +59,16 @@ internal object DownloadsWorkspace {
     fun reportProblem(reason: String) { mutable.update { it.copy(error = reason) } }
 
     fun refresh() {
-        if (mutable.value.loading) return
-        mutable.update { it.copy(loading = true, error = null) }
+        if (mutable.value.loading || mutable.value.folderChanging || mutable.value.savingId != null) return
+        mutable.update { it.copy(loading = true, error = null, canChooseFolder = clientDownloadsCanChooseFolder()) }
         scope.launch {
             try {
-                if (!folderLoaded) {
-                    folder = readClientUpdatePreference("downloads-folder")
-                    folderLoaded = true
-                }
-                val destination = clientDownloadsFolderLabel(folder)
-                mutable.update { it.copy(canChooseFolder = clientDownloadsCanChooseFolder(), destinationLabel = destination) }
+                val inspection = inspectDownloadFolder(folder, folderLoaded,
+                    { readClientUpdatePreference("downloads-folder") }, ::clientDownloadsFolderLabel)
+                folder = inspection.folder
+                folderLoaded = inspection.loaded
+                mutable.update { it.copy(destinationLabel = inspection.label, folderReady = inspection.error == null,
+                    folderError = inspection.error, error = inspection.error) }
                 val key = Base64.decode(backend.publicKey)
                 if (key.size !in 256..2048 || !isPublicClientReleaseUrl(backend.feedBase)) throw ClientUpdateFailure("configuration")
                 if (accepted == null) {
@@ -93,20 +112,25 @@ internal object DownloadsWorkspace {
     }
 
     fun setFolder(value: String?) {
-        if (mutable.value.savingId != null) return
+        if (mutable.value.savingId != null || mutable.value.loading || mutable.value.folderChanging) return
+        mutable.update { it.copy(folderChanging = true) }
         scope.launch {
             try {
                 val label = clientDownloadsFolderLabel(value)
                 writeClientUpdatePreference("downloads-folder", value)
                 folder = value; folderLoaded = true
-                mutable.update { it.copy(destinationLabel = label, error = null) }
+                mutable.update { it.copy(destinationLabel = label, folderReady = true, folderError = null, error = null) }
             } catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { mutable.update { it.copy(error = "storage") } }
+            finally { mutable.update { it.copy(folderChanging = false) } }
         }
     }
 
     fun save(entryId: String) {
-        if (mutable.value.savingId != null) return
+        if (mutable.value.savingId != null || mutable.value.loading || mutable.value.folderChanging) return
+        if (!mutable.value.folderReady) {
+            mutable.update { it.copy(error = "storage") }; return
+        }
         val entry = mutable.value.entries.firstOrNull { it.id == entryId } ?: return
         val file = files[entryId] ?: return
         if (release?.let { clientReleaseProblem(it, backend.nowMillis(), channel) == null } != true) {

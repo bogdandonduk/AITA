@@ -68,15 +68,16 @@ internal fun AppConfiguration.DownloadFolderSettings() {
         Text(downloadsText("folder"), color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
         Text(downloadsText("folder_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         if (downloads.canChooseFolder) {
-            SelectionContainer {
+            if (downloads.destinationLabel != null || downloads.folderError == null) SelectionContainer {
                 Text(downloads.destinationLabel ?: downloadsText("default_folder"), color = stateValues.TextColor, fontSize = stateValues.textSize)
             }
             actionButton(text = downloadsText("choose_folder"), autoLoading = false, confirmationRequired = false,
-                enabled = downloads.savingId == null, onClick = chooseFolder)
-            if (downloads.destinationLabel != null) actionButton(text = downloadsText("reset_folder"), autoLoading = false,
-                confirmationRequired = false, enabled = downloads.savingId == null, onClick = { DownloadsWorkspace.setFolder(null) })
+                enabled = downloads.savingId == null && !downloads.loading && !downloads.folderChanging, onClick = chooseFolder)
+            actionButton(text = downloadsText("reset_folder"), autoLoading = false,
+                confirmationRequired = false, enabled = downloads.savingId == null && !downloads.loading && !downloads.folderChanging,
+                onClick = { DownloadsWorkspace.setFolder(null) })
         } else Text(downloadsText("browser_folder"), color = stateValues.TextColor, fontSize = stateValues.textSize)
-        downloads.error?.takeIf { it in setOf("storage", "space", "unsupported") }?.let { error ->
+        (downloads.folderError ?: downloads.error?.takeIf { it in setOf("storage", "space", "unsupported") })?.let { error ->
             Text(updateText("error.$error"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
         }
         DownloadSavedLocation(downloads)
@@ -134,7 +135,7 @@ internal fun AppConfiguration.DownloadsScreen() {
                                 scope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.Settings) }
                             })
                         actionButton(text = updateText("check"), autoLoading = false, confirmationRequired = false,
-                            enabled = !downloads.loading && downloads.savingId == null, onClick = DownloadsWorkspace::refresh)
+                            enabled = !downloads.loading && !downloads.folderChanging && downloads.savingId == null, onClick = DownloadsWorkspace::refresh)
                     }
                 }
                 listOf("android" to "Android", "windows" to "Windows", "web" to "Web", "macos" to "macOS", "ios" to "iOS").forEach { (platform, title) ->
@@ -182,7 +183,8 @@ internal fun AppConfiguration.DownloadsScreen() {
                                                 Text("${entry.fileName} · ${downloadFileSize(entry.sizeBytes)}", color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                                 if (entry.kind == "APK" || entry.kind == "AAB") Text(downloadsText(entry.kind.lowercase()), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                                 actionButton(text = downloadsText("file", "kind" to entry.kind), iconPath = downloadsIconPath(), iconRes = downloadsIconResource(),
-                                                    autoLoading = false, confirmationRequired = false, enabled = downloads.savingId == null,
+                                                    autoLoading = false, confirmationRequired = false,
+                                                    enabled = downloads.savingId == null && downloads.folderReady && !downloads.loading && !downloads.folderChanging,
                                                     onClick = { DownloadsWorkspace.save(entry.id) })
                                             }
                                         }
