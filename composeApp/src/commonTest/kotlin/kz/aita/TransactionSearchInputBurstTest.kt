@@ -32,4 +32,23 @@ class TransactionSearchInputBurstTest {
         val name = "coffee"
         name.indices.forEach { i -> assertFalse(burst.edited(name.take(i), name.take(i+1), i * 20L)) }
     }
+    @Test fun coalescedScannerKeyEventsStillCompleteWithoutATerminator() {
+        val burst = TransactionSearchInputBurst()
+        val code = "2112345010006"
+        var length = 0
+        var recognized = false
+        listOf(2, 2, 2, 2, 2, 2, 1).forEachIndexed { i, added ->
+            recognized = burst.edited(code.take(length), code.take(length + added), i * 16L)
+            length += added
+        }
+        assertTrue(recognized)
+    }
+    @Test fun twoBatchesCanFormAShortScannerCodeButSlowManualChunksDoNot() {
+        val burst = TransactionSearchInputBurst()
+        assertFalse(burst.edited("", "1234", 0))
+        assertTrue(burst.edited("1234", "123456", 16))
+        burst.reset()
+        assertFalse(burst.edited("", "1234", 0))
+        assertFalse(burst.edited("1234", "123456", 300))
+    }
 }

@@ -8,14 +8,13 @@ internal class TransactionSearchInputBurst {
     fun edited(previous: String, next: String, now: Long): Boolean {
         if (next.isEmpty() || !next.startsWith(previous) || next.length <= previous.length) { reset(); return false }
         val added = next.length - previous.length
-        if (added > 1) {
-            reset()
-            return added >= 4 && next.looksLikeCompleteRetailBarcodeInput()
-        }
-        fastCharacters = if (previousMillis != Long.MIN_VALUE && now >= previousMillis && now - previousMillis <= 50)
-            fastCharacters + 1 else 1
+        val rapidAppend = previousMillis != Long.MIN_VALUE && now >= previousMillis && now - previousMillis <= 50
+        fastCharacters = if (rapidAppend) fastCharacters + added else added
         previousMillis = now
-        return fastCharacters >= 4 && next.length in 4..64 && next.all(Char::isDigit)
+        // Compose may report several HID key events together in one editor update.
+        // Count their characters, while keeping a lone pasted short prefix editable.
+        return next.length in 4..64 && next.all(Char::isDigit) &&
+            ((added >= 4 && next.looksLikeCompleteRetailBarcodeInput()) || (rapidAppend && fastCharacters >= 4))
     }
 }
 
