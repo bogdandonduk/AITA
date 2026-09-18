@@ -648,6 +648,9 @@ class AitaSharedJvmFlowTest {
         val supplyTransaction = aitaTestTransaction(id = "completed-supply", type = transactionServerType(2), paidCash = 0.0, paidCard = 1500.0)
 
         for ((transactionTypeIndex, completed) in listOf(1 to returnTransaction, 2 to supplyTransaction)) {
+            // The completion callback precedes the transaction coroutine's finally block.
+            // Wait for cleanup before submitting the next transaction to its tryLock guard.
+            waitUntilAitaFlowCondition { !completeTransactionInProgressState.value }
             environment.nextCompletedTransaction = completed
             val draft = aitaTestPaymentDraft(transactionTypeIndex = transactionTypeIndex, clientId = 0, paidCash = completed.paidCash, paidCard = completed.paidCard)
             val callback = CompletableDeferred<Unit>()
@@ -1317,6 +1320,9 @@ class AitaSharedJvmFlowTest {
     @Test
     fun menuNotificationsPersistDedupeMergePopupsAndMarkReadCorrectly() = runBlocking {
         environment.storedTokens = aitaTestTokenPair("notifications")
+        // Replacing the mock login must also replace its validated background-sync token.
+        clearCloudAuthRequestMemory(environment.storedTokens)
+        assertTrue(currentCloudSessionIsReadyForBackgroundSync())
         userAccountState.emit(DataState.Success(aitaTestUserAccount()))
         activeStoreIdState.emit(AITA_FLOW_SOURCE_STORE_ID)
         notificationsState.emit(DataState.Success(emptyList()))
