@@ -82,6 +82,21 @@ def next_feed_sequence(catalog, build):
     return max(build, current + 1)
 
 
+def draft_release_assets(tag, revision):
+    # A draft can lack a Git tag; GitHub's releases/tags endpoint then returns 404.
+    # gh resolves the draft for the authenticated owner and supplies its stable REST ID URL.
+    view = json.loads(capture(['gh', 'release', 'view', tag, '--repo', REPOSITORY,
+                              '--json', 'apiUrl,tagName,targetCommitish,isDraft']))
+    require(view['isDraft'] and view['tagName'] == tag and view['targetCommitish'] == revision,
+            'GitHub draft identity changed before asset verification')
+    require(re.fullmatch(re.escape(f'https://api.github.com/repos/{REPOSITORY}/releases/') + '[0-9]+', view['apiUrl']),
+            'Unexpected GitHub draft API URL')
+    remote = json.loads(capture(['gh', 'api', view['apiUrl']]))
+    require(remote['draft'] and remote['tag_name'] == tag and remote['target_commitish'] == revision,
+            'GitHub draft identity changed while reading its assets')
+    return remote['assets']
+
+
 def load_signing():
     config = SIGNING / 'android.json'
     require(config.is_file() and not config.is_symlink() and config.stat().st_mode & 0o077 == 0,
@@ -402,9 +417,11 @@ class Run:
         self.state['githubDraftCreated'] = self.tag; self.save()
         self.command('Upload immutable release assets', ['gh', 'release', 'upload', self.tag, '--repo', REPOSITORY,
             *[str(self.assets / e['name']) for e in entries], str(record), str(sums)])
-        remote = json.loads(capture(['gh', 'api', f'repos/{REPOSITORY}/releases/tags/{self.tag}']))['assets']
+        remote = draft_release_assets(self.tag, self.revision)
         received = {x['name']: x for x in remote}
-        require(all(e['name'] in received and received[e['name']]['size'] == e['bytes'] and received[e['name']].get('digest') == 'sha256:' + e['sha256'] for e in entries), 'Uploaded release asset verification failed')
+        expected = entries + [dict(name=p.name, bytes=p.stat().st_size, sha256=sha(p)) for p in (record, sums)]
+        require(set(received) == {e['name'] for e in expected} and all(received[e['name']]['size'] == e['bytes'] and
+                received[e['name']].get('digest') == 'sha256:' + e['sha256'] for e in expected), 'Uploaded release asset verification failed')
         self.command('Publish verified GitHub release', ['gh', 'release', 'edit', self.tag, '--repo', REPOSITORY, '--draft=false'])
         destination = ROOT / 'releases' / f'{self.args.version}-build-{self.args.build}'
         destination.mkdir(parents=True, exist_ok=False)

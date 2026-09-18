@@ -21,6 +21,19 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_draft_assets_are_read_by_release_id_before_a_tag_exists(self):
+        url = 'https://api.github.com/repos/bogdandonduk/AITA/releases/123'
+        view = dict(apiUrl=url, tagName='v1.0.2-b3', targetCommitish='a'*40, isDraft=True)
+        remote = dict(draft=True, tag_name=view['tagName'], target_commitish='a'*40, assets=[{'name':'app.apk'}])
+        with patch.object(release, 'capture', side_effect=[json.dumps(view), json.dumps(remote)]) as request:
+            self.assertEqual(release.draft_release_assets(view['tagName'], 'a'*40), remote['assets'])
+            self.assertEqual(request.call_args_list[1].args[0], ['gh', 'api', url])
+        for change in ({'apiUrl':'https://api.github.com/repos/elsewhere/project/releases/123'},
+                       {'targetCommitish':'b'*40}, {'isDraft':False}):
+            with patch.object(release, 'capture', return_value=json.dumps(view | change)) as request:
+                with self.assertRaises(RuntimeError): release.draft_release_assets(view['tagName'], 'a'*40)
+                self.assertEqual(request.call_count, 1)
+
     def test_metadata_sequence_advances_after_partial_platform_publication(self):
         import base64
         with TemporaryDirectory() as folder:
