@@ -24,14 +24,17 @@ function Get-Process { param($Id, $ErrorAction) return $null }
 function Start-Process {
  param($FilePath, $ArgumentList, $Verb, [switch]$Wait, [switch]$PassThru)
  $script:calls.Add($FilePath)
- if ($FilePath.EndsWith('msiexec.exe')) { return [pscustomobject]@{ ExitCode = [int]$env:AITA_TEST_EXIT } }
+ if ($FilePath.EndsWith('msiexec.exe')) {
+   [IO.File]::WriteAllText($env:AITA_TEST_INSTALL_ARGS, $ArgumentList)
+   return [pscustomobject]@{ ExitCode = [int]$env:AITA_TEST_EXIT }
+ }
 }
 '''
             helper.write_text(prefix + script + "\nConvertTo-Json -InputObject @($script:calls) | Set-Content -Encoding UTF8 -LiteralPath $env:AITA_TEST_CALLS\n")
             env = dict(os.environ, AITA_UPDATE_READY=str(folder / 'ready'), AITA_UPDATE_LAUNCHER=str(launcher),
                 AITA_UPDATE_INSTALLER=str(installer), AITA_UPDATE_PARENT='99999999', AITA_UPDATE_LOG=str(folder / 'install.log'),
                 AITA_UPDATE_SHA256=hashlib.sha256(installer.read_bytes()).hexdigest() if matching else '0'*64,
-                AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output))
+                AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output), AITA_TEST_INSTALL_ARGS=str(folder / 'args.txt'))
             execution = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
                            env=env, check=True, capture_output=True, text=True, timeout=30)
             calls = json.loads(output.read_text(encoding='utf-8-sig'))
@@ -40,6 +43,7 @@ function Start-Process {
             self.assertFalse(helper.exists())
             self.assertEqual(len(calls), 2 if matching else 0, execution.stdout + execution.stderr)
             if matching: self.assertEqual(calls[-1], str(launcher))
+            if matching: self.assertIn('INSTALLDIR="' + str(folder) + '"', (folder / 'args.txt').read_text(encoding='utf-8-sig'))
             if not matching: self.assertIn('Installer checksum mismatch', execution.stdout)
             if matching and exit_code == 1602: self.assertIn('Windows Installer returned 1602', execution.stdout)
 

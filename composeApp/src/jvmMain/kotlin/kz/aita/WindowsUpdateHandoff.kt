@@ -36,7 +36,11 @@ try {
     if (${'$'}parent -and -not ${'$'}parent.WaitForExit(120000)) { throw 'AITA did not finish saving; installation was cancelled' }
     ${'$'}parentExited = ${'$'}true
     if ((Get-AitaInstallerHash ${'$'}installer) -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer changed after handoff' }
-    ${'$'}arguments = '/i "' + ${'$'}installer + '" /passive /norestart /L*V "' + ${'$'}log + '"'
+    # jpackage's MSI exposes INSTALLDIR. Preserve a user's chosen installation folder
+    # so the verified existing launcher path remains the relaunch path after the upgrade.
+    ${'$'}installDirectory = [IO.Path]::GetDirectoryName(${'$'}launcher)
+    ${'$'}installArgument = if (${'$'}installDirectory -match '\s') { 'INSTALLDIR="' + ${'$'}installDirectory.TrimEnd('\') + '"' } else { 'INSTALLDIR=' + ${'$'}installDirectory }
+    ${'$'}arguments = '/i "' + ${'$'}installer + '" ' + ${'$'}installArgument + ' /passive /norestart /L*V "' + ${'$'}log + '"'
     ${'$'}result = Start-Process -FilePath (Join-Path ${'$'}env:SystemRoot 'System32\msiexec.exe') -ArgumentList ${'$'}arguments -Verb RunAs -Wait -PassThru
     if (${'$'}result.ExitCode -notin @(0, 3010)) { throw ('Windows Installer returned ' + ${'$'}result.ExitCode) }
     Write-Output 'AITA update installed. Starting the updated app.'
