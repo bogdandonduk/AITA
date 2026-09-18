@@ -64,6 +64,21 @@ class ReleaseSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'changes application source'):
             self.validate()
 
+    def test_android_alias_fixture_can_correct_its_platform_assumption(self):
+        fixture = self.tooling / validator.ANDROID_ALIAS_FIXTURE
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('POSIX-only canonical path assumption')
+        self.commit()
+        self.validate()
+
+    def test_updater_implementation_cannot_be_replaced_by_a_fixture_repair(self):
+        application = self.tooling / 'composeApp/src/jvmAndAndroidMain/kotlin/kz/aita/ManagedClientInstaller.kt'
+        application.parent.mkdir(parents=True)
+        application.write_text('changed production updater')
+        self.commit()
+        with self.assertRaisesRegex(RuntimeError, 'changes application source'):
+            self.validate()
+
     def test_incorrect_checkout_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'Checked out commits'):
             validator.validate(self.source, self.tooling, '0' * 40, self.revision)

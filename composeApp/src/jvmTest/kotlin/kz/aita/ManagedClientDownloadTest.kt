@@ -53,6 +53,10 @@ class ManagedClientDownloadTest {
         val alias = root.resolve("os-cache-alias")
         Files.createSymbolicLink(alias.toPath(), realCache.toPath())
         try {
+            // This Android regression relies on POSIX canonical paths. NTFS does not
+            // resolve parent symlinks through File.canonicalFile; its own link tests still run.
+            org.junit.Assume.assumeTrue("Requires Android/POSIX canonical parent aliases",
+                alias.canonicalFile == realCache.canonicalFile)
             // Android can expose /data/user/0 while the canonical private parent is /data/data.
             assertFailsWith<ClientUpdateFailure> { ManagedClientInstaller(alias.resolve("client-updates")) { _, _ -> } }
             fun open() = ManagedClientInstaller(privateClientInstallerDirectory(alias), testConnection = { connection }) { a, b ->

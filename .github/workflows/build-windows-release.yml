@@ -79,6 +79,9 @@ jobs:
           # This explicitly allowed fixture repair waits for asynchronous store synchronization.
           # Application sources stay at AITA_RELEASE_REVISION; the receipt records test/tool revision.
           Copy-Item build/release-tools/shared/src/jvmTest/kotlin/kz/aita/AitaSharedJvmFlowTest.kt shared/src/jvmTest/kotlin/kz/aita/AitaSharedJvmFlowTest.kt -Force
+          # The Android parent-alias regression requires POSIX canonical-path semantics.
+          # Its assumption skips only that case on NTFS; all Windows link-security tests run.
+          Copy-Item build/release-tools/composeApp/src/jvmTest/kotlin/kz/aita/ManagedClientDownloadTest.kt composeApp/src/jvmTest/kotlin/kz/aita/ManagedClientDownloadTest.kt -Force
           if ($env:AITA_RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$' -or $env:AITA_RELEASE_BUILD -notmatch '^[1-9]\d*$') { throw 'Invalid version/build' }
           if (-not $env:AITA_UPDATE_PUBLIC_KEY -or -not $env:AITA_UPDATE_FEED_BASE) { throw 'Configure updater public key and feed variables first' }
           if ($env:PRODUCTION -eq 'true') {
