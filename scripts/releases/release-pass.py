@@ -259,6 +259,18 @@ class Run:
             self.env.pop('AITA_WEB_LOCAL_ORIGIN', None)
             if server: server.shutdown(); server.server_close()
 
+    def reuse_windows(self):
+        run_id = self.args.windows_run
+        require(isinstance(run_id, int) and run_id > 0, 'Windows run ID must be a positive integer')
+        run = json.loads(capture(['gh', 'run', 'view', str(run_id), '--repo', REPOSITORY,
+            '--json', 'headSha,workflowName,displayTitle,status,conclusion']))
+        require(run['headSha'] == self.revision and run['workflowName'] == 'Build AITA Windows Release' and
+                run['displayTitle'] == f'AITA Windows {self.tag}', 'Existing Windows run does not match this exact source and release identity')
+        require(run['status'] in ('queued', 'in_progress') or run['conclusion'] == 'success',
+                'Existing Windows run failed; inspect its diagnostics before starting a corrected build')
+        self.state['windowsRun'] = run_id; self.save()
+        self.say('REUSE', f'Windows run {run_id}; artifact identity, checksums and signing mode will be verified before collection')
+
     def dispatch_windows(self):
         self.command('Dispatch Windows release build', ['gh', 'workflow', 'run', 'build-windows-release.yml', '--repo', REPOSITORY,
             '--ref', 'master', '-f', f'production={str(self.args.windows_signing == "trusted").lower()}', '-f', f'version={self.args.version}', '-f', f'build={self.args.build}', '-f', f'revision={self.revision}'])
@@ -402,6 +414,7 @@ def main():
     parser.add_argument('--build', type=int)
     parser.add_argument('--targets', default='android,windows,web,server')
     parser.add_argument('--windows-signing', choices=['pilot', 'trusted'], default='pilot', help='Owner-authorized unsigned pilot now; trusted signing later')
+    parser.add_argument('--windows-run', type=int, help='Reuse an existing Windows CI run for this exact source SHA, version and build')
     parser.add_argument('--publish', action='store_true', help='upload completed targets to GitHub Releases')
     args = parser.parse_args()
     run = Run(args)
@@ -414,7 +427,8 @@ def main():
         if not run.stage('source', run.pin) or not run.stage('verification', run.verify):
             return 1
         if 'windows' in targets:
-            run.stage('windows-dispatch', run.dispatch_windows)
+            if not run.stage('windows-dispatch', run.reuse_windows if args.windows_run else run.dispatch_windows):
+                return 1
         # The remote Windows runner builds while local Android/Pages work proceeds serially.
         ordered = [t for t in targets if t != 'windows'] + (['windows'] if 'windows' in targets else [])
         results = [run.stage(target, getattr(run, target)) for target in ordered]

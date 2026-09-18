@@ -36,7 +36,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows updater handoff tests failed' }
   windows:
     needs: handoff
-    if: github.ref == 'refs/heads/master'
+    # Pilot artifacts can validate a review branch before its fast-forward to master.
+    # Trusted signing is confined to master; publication still requires pushed master.
+    if: github.ref == 'refs/heads/master' || inputs.production == false
     runs-on: windows-2025
     timeout-minutes: 70
     env:
@@ -66,7 +68,7 @@ jobs:
           SIGNING_TOTP: ${{ secrets.AITA_ESIGNER_TOTP_SECRET }}
         run: |
           $ErrorActionPreference = 'Stop'
-          if ($env:AITA_RELEASE_REVISION -ne $env:AITA_WORKFLOW_REVISION) { throw 'Release must build the pushed master commit that started this workflow' }
+          if ($env:AITA_RELEASE_REVISION -ne $env:AITA_WORKFLOW_REVISION) { throw 'Release must build the exact commit that started this workflow' }
           if ($env:AITA_RELEASE_REVISION -notmatch '^[a-f0-9]{40}$' -or (git rev-parse HEAD) -ne $env:AITA_RELEASE_REVISION) { throw 'Commit mismatch' }
           if ($env:AITA_RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$' -or $env:AITA_RELEASE_BUILD -notmatch '^[1-9]\d*$') { throw 'Invalid version/build' }
           if (-not $env:AITA_UPDATE_PUBLIC_KEY -or -not $env:AITA_UPDATE_FEED_BASE) { throw 'Configure updater public key and feed variables first' }
@@ -159,3 +161,14 @@ jobs:
           path: build/windows-signing/*
           if-no-files-found: error
           retention-days: 30
+      - name: Preserve native test and packaging diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AITA-Windows-diagnostics-${{ github.run_id }}
+          path: |
+            shared/build/test-results/jvmTest/*.xml
+            composeApp/build/test-results/jvmTest/*.xml
+            composeApp/build/compose/logs/**
+          if-no-files-found: ignore
+          retention-days: 14

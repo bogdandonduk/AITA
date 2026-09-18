@@ -31,11 +31,13 @@ internal class ManagedClientInstaller(
     private val root = directory.canonicalFile
     init {
         if (directory.absoluteFile != root || (!root.isDirectory && !root.mkdirs())) throw ClientUpdateFailure("storage")
+        if (managedInstallerFileIdentity(root) != root) throw ClientUpdateFailure("storage")
     }
     private fun child(name: String): File {
         if (!Regex("[A-Za-z0-9._-]{1,160}").matches(name)) throw ClientUpdateFailure("storage")
         val file = File(root, name)
-        if (file.canonicalFile != file.absoluteFile || file.canonicalFile.parentFile != root) throw ClientUpdateFailure("storage")
+        val identity = managedInstallerFileIdentity(file)
+        if (identity != file.absoluteFile || identity.parentFile != root) throw ClientUpdateFailure("storage")
         return file
     }
     private fun journalName(channel: ReleaseChannel) = "${channel.name.lowercase()}-pending.json"

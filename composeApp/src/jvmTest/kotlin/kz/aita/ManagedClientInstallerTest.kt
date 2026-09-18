@@ -43,9 +43,31 @@ class ManagedClientInstallerTest {
         assertFailsWith<ClientUpdateFailure>{cache.readPreference("../secret")}
         val outside=Files.createTempFile("aita-outside-",".txt").toRealPath()
         try {
+            Files.writeString(outside,"outside data must survive")
             Files.createSymbolicLink(root.toPath().resolve("pref-linked"),outside)
             assertFailsWith<ClientUpdateFailure>{cache.readPreference("linked")}
+            assertFailsWith<ClientUpdateFailure>{cache.writePreference("linked","replacement")}
+            assertFailsWith<ClientUpdateFailure>{cache.writePreference("linked",null)}
+            assertEquals("outside data must survive",Files.readString(outside))
         } finally {Files.deleteIfExists(root.toPath().resolve("pref-linked"));Files.deleteIfExists(outside)}
+    }
+    @Test fun danglingLinksCannotCreateFilesOutsideOwnedDirectory()=withRoot{root,cache->
+        val outside=Files.createTempDirectory("aita-outside-directory-").toRealPath()
+        val missing=outside.resolve("must-not-be-created.txt")
+        try {
+            Files.createSymbolicLink(root.toPath().resolve("pref-linked"),missing)
+            assertFailsWith<ClientUpdateFailure>{cache.readPreference("linked")}
+            assertFailsWith<ClientUpdateFailure>{cache.writePreference("linked","replacement")}
+            assertFalse(Files.exists(missing))
+        } finally {Files.deleteIfExists(root.toPath().resolve("pref-linked"));Files.deleteIfExists(missing);Files.deleteIfExists(outside)}
+    }
+    @Test fun linkedRootCannotRedirectTheInstallerDirectory()=withRoot{root,_->
+        val outside=Files.createTempDirectory("aita-outside-root-").toRealPath()
+        val linked=root.toPath().resolve("linked-root")
+        try {
+            Files.createSymbolicLink(linked,outside)
+            assertFailsWith<ClientUpdateFailure>{ManagedClientInstaller(linked.toFile()){_,_->}}
+        } finally {Files.deleteIfExists(linked);Files.deleteIfExists(outside)}
     }
     @Test fun restoreRequiresTheSameReleaseAndArtifact()=withRoot{root,cache->runBlocking{
         val(record,artifact)=fixture(root)

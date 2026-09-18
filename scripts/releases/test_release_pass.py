@@ -21,6 +21,19 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_reused_windows_run_must_match_source_identity_workflow_and_success(self):
+        with TemporaryDirectory() as folder, patch.object(release, 'ROOT', Path(folder)):
+            run = release.Run(SimpleNamespace(windows_run=123)); run.revision = 'a'*40; run.tag = 'v1.0.2-b3'
+            good = dict(headSha=run.revision, workflowName='Build AITA Windows Release',
+                        displayTitle='AITA Windows v1.0.2-b3', status='completed', conclusion='success')
+            with patch.object(release, 'capture', return_value=json.dumps(good)):
+                run.reuse_windows()
+                self.assertEqual(run.state['windowsRun'], 123)
+            for change in ({'headSha':'b'*40}, {'workflowName':'Unrelated'}, {'displayTitle':'AITA Windows v1.0.1-b2'}, {'conclusion':'failure'}):
+                with patch.object(release, 'capture', return_value=json.dumps(good | change)):
+                    with self.assertRaises(RuntimeError): run.reuse_windows()
+            run.log.close()
+
     def test_server_result_uses_owner_readable_verified_state_not_root_only_metadata(self):
         with TemporaryDirectory() as folder, patch.object(release, 'ROOT', Path(folder)):
             root = Path(folder)
