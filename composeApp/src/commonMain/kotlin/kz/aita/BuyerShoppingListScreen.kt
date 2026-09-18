@@ -99,11 +99,19 @@ internal fun AppConfiguration.MarketShoppingRecoveryControls(state: MarketShoppi
 }
 
 @Composable
-internal fun AppConfiguration.BuyerShoppingListScreen() {
+internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNavigation) {
     val state = rememberMarketShoppingUiState()
     val account = stateValues.userAccount?.id
     val generation = currentAuthenticatedSessionGeneration()
     val scope = rememberCoroutineScope()
+    fun continueBrowsing() {
+        scope.launch { navigation.continueDestination()?.let { Navigation.goMain(it) } }
+    }
+    fun visitShop(id: String) {
+        scope.launch {
+            if (navigation.visitShop(id)) Navigation.goMain(NavigationScreenModel.Buyer.Main.Home)
+        }
+    }
     var openedId by remember(account, generation) { mutableStateOf<String?>(null) }
     var comparison by remember(account, generation) { mutableStateOf<MarketComparisonSelection?>(null) }
     var planning by remember(account, generation) { mutableStateOf(false) }
@@ -126,6 +134,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
             "Сатып алуды дүкен бойынша жоспарлаңыз. Бұл — тауар есебі, тапсырыс не резерв емес.", "Дүкөндөр боюнча пландаңыз. Бул тапшырык же резерв эмес, товарлардын болжолдуу суммалары."),
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        actionButton(modifier = Modifier.padding(horizontal = 16.dp), text = marketBrowseText("market.browse_continue"),
+            autoLoading = false, confirmationRequired = false, enabledColor = stateValues.BackgroundColor,
+            textColor = stateValues.TextColor, onClick = ::continueBrowsing)
         val section = sectionTabsWidget("buyer-shopping:$account", listOf(
             TabContent("list", authUiText("Items", "Товары", "Тауарлар", "Товарлар")),
             TabContent("estimate", authUiText("By shop", "По магазинам", "Дүкен бойынша", "Дүкөн боюнча")),
@@ -145,8 +156,6 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                         Text(if (state.snapshot == null) authUiText("Connect to load your list", "Подключитесь, чтобы загрузить список", "Тізімді жүктеу үшін қосылыңыз", "Тизмеңизди жүктөө үчүн туташыңыз")
                             else authUiText("Start with something you need", "Начните с нужного товара", "Қажетті тауардан бастаңыз", "Керектүү нерсеңизден баштаңыз"),
                             Modifier.padding(16.dp), color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-                        actionButton(text = authUiText("Explore the market", "Открыть маркет", "Маркетке өту", "Маркетти карап чыгуу"), confirmationRequired = false, autoLoading = false,
-                            onClick = { scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) } })
                     }
                 }
                 if (!state.snapshot?.lines.isNullOrEmpty()) item(key = "plan-basket") {
@@ -193,8 +202,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
                                 "Сома толық емес: ${group.unpricedLines} жол кірмейді. Олар тегін емес.", "Толук эмес: ${group.unpricedLines} сап эсепке кошулган жок. Алар бекер эмес."), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                             actionButton(text = authUiText("Visit shop", "Открыть магазин", "Дүкенге өту", "Дүкөнгө өтүү"), iconPath = marketIconPath(139),
                                 iconRes = marketIconFallback(139), autoLoading = false, confirmationRequired = false, onClick = {
-                                    NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to group.storeId)
-                                    scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+                                    visitShop(group.storeId)
                                 })
                         }
                     }
@@ -232,9 +240,8 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
         MarketShoppingRemoveDialog(review, state, onDismiss = { removal = null })
     }
     openedId?.let { id -> MarketOfferDetailDialog(id, state, onDismiss = { openedId = null }, onVisitShop = { shop ->
-        NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
         openedId = null
-        scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+        visitShop(shop.storeId)
     }, onCompare = { offer ->
         openedId = null
         comparisonCity = ""
@@ -246,13 +253,11 @@ internal fun AppConfiguration.BuyerShoppingListScreen() {
         planning = false; comparisonCity = city; comparison = selected
     }, onVisitShop = { shop ->
         planning = false
-        NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
-        scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+        visitShop(shop.storeId)
     })
     comparison?.let { selection -> MarketComparisonDialog(selection, state, initialCity = comparisonCity, onDismiss = { comparison = null }, onVisitShop = { shop ->
         comparison = null
-        NavigationScreenModel.Buyer.Main.Home.setStateNow("market-shop:$account" to shop.storeId)
-        scope.launch { Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+        visitShop(shop.storeId)
     }) }
 }
 

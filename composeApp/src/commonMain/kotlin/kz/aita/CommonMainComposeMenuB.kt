@@ -5197,6 +5197,9 @@ fun AppConfiguration.MainScreen() {
     val accountForSubscription = stateValues.userAccount?.id
     val storeForSubscription = stateValues.activeStoreId
     val sessionForSubscription = currentAuthenticatedSessionGeneration()
+    val buyerNavigation = remember(accountForSubscription, sessionForSubscription) {
+        BuyerMarketNavigation(captureMarketRequestScope())
+    }
     var denialOpened by remember(accountForSubscription, storeForSubscription, sessionForSubscription) {
         mutableStateOf(false)
     }
@@ -5340,8 +5343,8 @@ fun AppConfiguration.MainScreen() {
                         is NavigationScreenModel.Transaction.MainSale, NavigationScreenModel.Transaction.MainReturn, NavigationScreenModel.Transaction.MainSupply -> TransactionScreen()
                         is NavigationScreenModel.Stock -> StockScreen()
                         is NavigationScreenModel.Supplier -> SupplierScreen()
-                        NavigationScreenModel.Buyer.Main.Shopping -> BuyerShoppingListScreen()
-                        is NavigationScreenModel.Buyer -> BuyerMarketplaceScreen()
+                        NavigationScreenModel.Buyer.Main.Shopping -> BuyerShoppingListScreen(buyerNavigation)
+                        is NavigationScreenModel.Buyer -> BuyerMarketplaceScreen(buyerNavigation)
                         is NavigationScreenModel.Menu -> MenuScreen()
                         else -> {}
                     }

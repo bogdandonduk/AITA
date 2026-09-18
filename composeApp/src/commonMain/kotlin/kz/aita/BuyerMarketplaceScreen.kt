@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,9 +27,6 @@ internal fun AppConfiguration.marketPriceLabel(offer: MarketOffer): String {
     return "${marketMoneyLabel(minor, offer.currencyCode.orEmpty())} / $amount $unit"
 }
 
-private data class BuyerReturnPoint(val query: MarketDiscoveryQuery, val search: String, val city: String,
-    val limit: Int, val index: Int, val offset: Int)
-
 @Stable
 private class BuyerBrowseData {
     var active = true
@@ -46,7 +42,7 @@ private class BuyerBrowseData {
 }
 
 @Composable
-internal fun AppConfiguration.BuyerMarketplaceScreen() {
+internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavigation) {
     val account = stateValues.userAccount?.id
     val generation = currentAuthenticatedSessionGeneration()
     val savedOnly = stateValues.navigationScreensMain.last() == NavigationScreenModel.Buyer.Main.Saved
@@ -54,19 +50,17 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     val revision by MarketplaceSignals.revision.collectAsState()
     val shopping = rememberMarketShoppingUiState()
     val scope = rememberCoroutineScope()
-    val home = NavigationScreenModel.Buyer.Main.Home
-    var browseSection by rememberSaveable(account) { mutableStateOf("products") }
-    val directory = remember(account, generation) { MarketShopDirectoryNavigation() }
-    var search by rememberSaveable(account, savedOnly) { mutableStateOf("") }
-    var city by rememberSaveable(account, savedOnly) { mutableStateOf("") }
-    var appliedSearch by rememberSaveable(account, savedOnly) { mutableStateOf("") }
-    var appliedCity by rememberSaveable(account, savedOnly) { mutableStateOf("") }
-    var categoryId by rememberSaveable(account, savedOnly) { mutableStateOf<String?>(null) }
-    var sort by rememberSaveable(account, savedOnly) { mutableStateOf(MARKET_DISCOVERY_RECENT) }
-    var limit by rememberSaveable(account, savedOnly) { mutableStateOf(MARKET_DISCOVERY_PAGE_SIZE) }
-    var shopId by remember(account, savedOnly) { mutableStateOf(if (savedOnly) null else home.state.value["market-shop:$account"]?.takeIf { it.isNotBlank() }) }
-    var returnPoint by remember(account, generation, savedOnly) { mutableStateOf<BuyerReturnPoint?>(null) }
-    var scrollRestore by remember(account, generation, savedOnly) { mutableStateOf<BuyerReturnPoint?>(null) }
+    val browse = navigation.browse(savedOnly)
+    SideEffect { navigation.entered(savedOnly) }
+    var browseSection by browse.section
+    val directory = browse.directory
+    var search by browse.search
+    var city by browse.city
+    var appliedSearch by browse.appliedSearch
+    var appliedCity by browse.appliedCity
+    var categoryId by browse.categoryId
+    var limit by browse.limit
+    var shopId by browse.shopId
     var catalogue by remember(account, generation) { mutableStateOf<MarketCategoryCatalogue?>(null) }
     val latestCatalogue by rememberUpdatedState(catalogue)
     var choosingCategory by remember(account, generation, savedOnly) { mutableStateOf(false) }
@@ -79,40 +73,23 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
     val directoryOpen = !savedOnly && shopId == null && browseSection == "shops"
     val dialogOwnsReads = openedId != null || compareTo != null || directoryOpen
     val latestDialogOwnsReads by rememberUpdatedState(dialogOwnsReads)
-    val rawQuery = MarketDiscoveryQuery(appliedSearch, if (shopId == null) appliedCity else "", shopId, categoryId, savedOnly && shopId == null, sort)
-    val query = rawQuery.normalizedDiscoveryQuery() ?: rawQuery
+    val query = browse.query
     val data = remember(account, generation, query) { BuyerBrowseData() }
     val latestLimit by rememberUpdatedState(limit)
     val requests = remember(account, generation, query) { Channel<Unit>(Channel.CONFLATED) }
-    val gridState = rememberLazyGridState()
+    val gridState = rememberBuyerBrowseGrid(browse, resultsReady = data.page != null)
     val inputPending = search != appliedSearch || (shopId == null && city != appliedCity)
     LaunchedEffect(account, savedOnly, search, city, shopId) {
         delay(350)
-        if (appliedSearch != search || appliedCity != city) {
-            appliedSearch = search; appliedCity = city; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
+        if (appliedSearch != search || (shopId == null && appliedCity != city)) {
+            appliedSearch = search; appliedCity = city; limit = MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore = null
         }
     }
     fun visitShop(shop: MarketStorefront) {
-        if (shopId == null) returnPoint = BuyerReturnPoint(query, appliedSearch, appliedCity, limit,
-            gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
-        openedId = null; compareTo = null; shopId = shop.storeId
-        search = ""; appliedSearch = ""; categoryId = null; sort = MARKET_DISCOVERY_RECENT
-        limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
-        if (!savedOnly) home.setStateNow("market-shop:$account" to shop.storeId)
+        if (owner?.isCurrent() != true || !browse.visitShop(shop.storeId)) return
+        openedId = null; compareTo = null; browse.scrollRestore = null
     }
-    fun leaveShop() {
-        val point = returnPoint
-        shopId = null; returnPoint = null
-        search = point?.search.orEmpty(); appliedSearch = point?.search.orEmpty()
-        city = point?.city ?: city; appliedCity = point?.city ?: city
-        categoryId = point?.query?.categoryId; sort = point?.query?.sort ?: MARKET_DISCOVERY_RECENT
-        limit = point?.limit ?: MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = point
-        if (!savedOnly) home.setStateNow("market-shop:$account" to "")
-    }
-    fun clearFilters() {
-        search = ""; appliedSearch = ""; city = ""; appliedCity = ""; categoryId = null
-        limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null
-    }
+    fun leaveShop() { browse.leaveShop() }
     DisposableEffect(data, requests) { onDispose { data.active = false; requests.close() } }
     LaunchedEffect(requests, revision, limit, dialogOwnsReads) {
         if (!dialogOwnsReads) { data.fresh = false; data.countsFresh = false; requests.trySend(Unit) }
@@ -168,18 +145,10 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
             if (!latestDialogOwnsReads) { data.fresh = false; data.countsFresh = false; requests.trySend(Unit) }
         }
     }
-    LaunchedEffect(query) {
-        if (scrollRestore?.query != query) { scrollRestore = null; gridState.scrollToItem(0) }
-    }
-    LaunchedEffect(query, data.page, scrollRestore) {
-        val point = scrollRestore
-        if (point != null && point.query == query && data.page != null) {
-            gridState.scrollToItem(point.index, point.offset); scrollRestore = null
-        }
-    }
-
     fun catalogueIsCurrent(currentRevision: Long = MarketplaceSignals.revision.value): Boolean =
-        data.active && data.fresh && !data.loading && !inputPending && !latestDialogOwnsReads && owner?.isCurrent() == true &&
+        data.active && data.fresh && !data.loading && browse.query == query &&
+            browse.search.value == browse.appliedSearch.value && (browse.shopId.value != null || browse.city.value == browse.appliedCity.value) &&
+            !latestDialogOwnsReads && owner?.isCurrent() == true &&
             data.result?.matchesDiscoveryRead(MarketDiscoveryRequest(query, limit), data.readRevision, currentRevision) == true
 
     fun acknowledgeSaved(page: MarketPage) {
@@ -208,7 +177,6 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
 
     val catalogueReady = catalogueIsCurrent(revision)
     val rows = data.page?.offers.orEmpty()
-    val selectedCategory = catalogue?.categories?.firstOrNull { it.id == categoryId }
     AitaScreenColumn(
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1440.dp,
@@ -220,6 +188,9 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
             }, iconPath = marketIconPath(if (savedOnly && shopId == null) 140 else 139))
         }
     ) {
+        MarketBrowseListAction(shopping, onOpen = {
+            scope.launch { if (owner?.isCurrent() == true) Navigation.goMain(NavigationScreenModel.Buyer.Main.Shopping) }
+        })
         if (!savedOnly && shopId == null) sectionTabsWidget("buyer-market-sections:$account", listOf(
             TabContent("products", authUiText("Products", "Товары", "Тауарлар", "Товарлар")),
             TabContent("shops", authUiText("Shops", "Магазины", "Дүкендер", "Дүкөндөр"))),
@@ -240,42 +211,9 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
                             else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу", "Маркетке кайтуу"),
                             autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
                     }
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        if (maxWidth > 720.dp && shopId == null) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            aitaFormTextField(Modifier.weight(2f), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод", "Товар же штрихкод"),
-                                identityKey = "market-search:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
-                            aitaFormTextField(Modifier.weight(1f), city, { city = it.take(100) }, authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес", "Шаар · милдеттүү эмес"),
-                                identityKey = "market-city:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
-                        } else Column {
-                            aitaFormTextField(Modifier.fillMaxWidth(), search, { search = it.take(120) }, authUiText("Product or barcode", "Товар или штрихкод", "Тауар не штрихкод", "Товар же штрихкод"),
-                                identityKey = "market-search:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
-                            if (shopId == null) aitaFormTextField(Modifier.fillMaxWidth(), city, { city = it.take(100) },
-                                authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес", "Шаар · милдеттүү эмес"), identityKey = "market-city:$account:$savedOnly", autoFocus = false, parentOwnsValue = true)
-                        }
-                    }
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        actionButton(text = selectedCategory?.name?.visibleLocalizedString(stateValues.appLanguage, "")?.substringAfterLast(" / ")
-                            ?: if (categoryId == null) authUiText("All categories", "Все категории", "Барлық санаттар", "Бардык категориялар")
-                                else authUiText("Selected category", "Выбранная категория", "Таңдалған санат", "Тандалган категория"),
-                            iconPath = marketIconPath(18), iconRes = marketIconFallback(18), autoLoading = false, confirmationRequired = false,
-                             enabled = catalogue != null, onClick = { choosingCategory = true })
-                        if (categoryId != null) actionButton(text = authUiText("Clear category", "Сбросить категорию", "Санатты алып тастау", "Категорияны тазалоо"),
-                            autoLoading = false, confirmationRequired = false,
-                            enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
-                            onClick = { categoryId = null; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null })
-                        if (search.isNotEmpty() || city.isNotEmpty() || categoryId != null) actionButton(text = authUiText("Clear filters", "Сбросить фильтры", "Сүзгілерді тазалау", "Чыпкаларды тазалоо"),
-                            autoLoading = false, confirmationRequired = false,
-                            enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor, onClick = ::clearFilters)
-                    }
-                    sectionTabsWidget("market-sort:$account:$savedOnly", listOf(
-                        TabContent(MARKET_DISCOVERY_RECENT, if (query.savedOnly) authUiText("Recently saved", "Недавно сохранённые", "Жақында сақталған", "Жакында сакталган")
-                            else authUiText("Newest listings", "Новые предложения", "Жаңа ұсыныстар", "Эң жаңы жарыялар")),
-                        TabContent(MARKET_DISCOVERY_TITLE, authUiText("By name", "По названию", "Атауы бойынша", "Аталышы боюнча"))),
-                        selectedId = sort, onSelected = { sort = it; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null })
-                    Text(authUiText("Categories include their subcategories. Counts are published offers, not available stock or a reservation.",
-                        "Категории включают подкатегории. Счётчики показывают опубликованные предложения, не остатки и не резерв.",
-                        "Санаттар ішкі санаттарды қамтиды. Санақ жарияланған ұсыныстарды көрсетеді, қор не резерв емес.", "Категориялар ички категорияларын камтыйт. Сандар кампадагы товарды же резервди эмес, жарыяланган сунуштарды көрсөтөт."),
+                    if (shopId == null && !savedOnly) Text(marketBrowseText("market.browse_intro"),
                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    MarketBrowseControls(browse, catalogue, onChooseCategory = { choosingCategory = true })
                     if (data.failure != null || saveFailure != null) Text((saveFailure ?: data.failure).orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
                         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     MarketShoppingFeedback(shopping)
@@ -355,7 +293,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen() {
         }
     }
     if (choosingCategory) catalogue?.let { loaded -> MarketCategoryPickerDialog(loaded, categoryId, onDismiss = { choosingCategory = false },
-        onSelected = { id -> categoryId = id; choosingCategory = false; limit = MARKET_DISCOVERY_PAGE_SIZE; scrollRestore = null }) }
+        onSelected = { id -> categoryId = id; choosingCategory = false; limit = MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore = null }) }
     openedId?.let { id -> MarketOfferDetailDialog(id, shopping, onDismiss = { openedId = null }, onVisitShop = ::visitShop,
         onCompare = { offer -> openedId = null; compareTo = offer.comparisonSelection() }) }
     compareTo?.let { target -> MarketComparisonDialog(target, shopping, onDismiss = { compareTo = null }, onVisitShop = ::visitShop, initialCity = appliedCity) }

@@ -98,7 +98,12 @@ class DiscoveryReadContracts(unittest.TestCase):
                       'canUseEstimate = catalogueReady', 'else if (estimateIsCurrent()) shopping.add',
                       'catalogueReady && data.countsFresh && counts != null'):
             self.assertIn(value, source)
-        self.assertIn('!data.loading && !inputPending && !latestDialogOwnsReads', source)
+        # Retained callbacks inspect live draft/query values, not an old composition's boolean.
+        for value in ('!data.loading && browse.query == query',
+                      'browse.search.value == browse.appliedSearch.value',
+                      'browse.shopId.value != null || browse.city.value == browse.appliedCity.value',
+                      '!latestDialogOwnsReads && owner?.isCurrent() == true'):
+            self.assertIn(value, source)
         self.assertIn('data.fresh = false; data.countsFresh = false; requests.trySend(Unit)', source)
         self.assertIn('fence.reconcile(checked.result.page, readRevision, query.savedOnly)', source)
 
