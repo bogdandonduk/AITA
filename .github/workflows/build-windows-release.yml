@@ -22,7 +22,20 @@ concurrency:
   group: aita-windows-release
   cancel-in-progress: false
 jobs:
+  handoff:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exercise native Windows updater handoff
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/releases -p test_windows_handoff.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows updater handoff tests failed' }
   windows:
+    needs: handoff
     if: github.ref == 'refs/heads/master'
     runs-on: windows-2025
     timeout-minutes: 70
@@ -89,8 +102,6 @@ jobs:
       - name: Test and create application with bundled Java runtime
         shell: pwsh
         run: |
-          python -m unittest discover -s scripts/releases -p test_windows_handoff.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Windows updater handoff tests failed' }
           ./gradlew.bat :shared:jvmTest :composeApp:jvmTest :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
           if ($LASTEXITCODE -ne 0) { throw 'Windows build/tests failed' }
       - name: Sign application launcher before packaging

@@ -32,13 +32,13 @@ function Start-Process {
                 AITA_UPDATE_INSTALLER=str(installer), AITA_UPDATE_PARENT='99999999', AITA_UPDATE_LOG=str(folder / 'install.log'),
                 AITA_UPDATE_SHA256=hashlib.sha256(installer.read_bytes()).hexdigest() if matching else '0'*64,
                 AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output))
-            subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
+            execution = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
                            env=env, check=True, capture_output=True, text=True, timeout=30)
             calls = json.loads(output.read_text(encoding='utf-8-sig'))
             self.assertEqual(user_data.read_bytes(), b'keep this work')
             self.assertTrue(installer.exists(), 'New app acknowledges installation before installer cleanup')
             self.assertFalse(helper.exists())
-            self.assertEqual(len(calls), 2 if matching else 0)
+            self.assertEqual(len(calls), 2 if matching else 0, execution.stdout + execution.stderr)
             if matching: self.assertEqual(calls[-1], str(launcher))
 
     def test_installs_and_relaunches_without_deleting_local_work(self): self.simulate()
