@@ -22,6 +22,18 @@ suspend fun initializeBrowserDatabase() {
                 }
             }
         }
+        // One SQL statement is atomic, and the worker acknowledges it only after IndexedDB
+        // commits. No transaction may stay open across unrelated coroutine requests.
+        writeCacheRowsPlatformAction = { rows ->
+            require(rows.isNotEmpty() && rows.size <= 4096)
+            val sql = "INSERT OR REPLACE INTO key_value(key, value) VALUES " + rows.joinToString(",") { "(?, ?)" }
+            driver.execute(null, sql, rows.size * 2) {
+                rows.forEachIndexed { index, (key, value) ->
+                    bindString(index * 2, key)
+                    bindString(index * 2 + 1, value)
+                }
+            }.await()
+        }
         getSqlDelightDriver = { driver }
     } catch (failure: Throwable) {
         driver.close()

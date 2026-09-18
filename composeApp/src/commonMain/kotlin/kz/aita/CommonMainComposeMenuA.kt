@@ -3839,6 +3839,12 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
             activeReceiptAction = action
             receiptScope.launch {
                 try {
+                    if (action == "print" && preferHtmlDocumentPrinting) {
+                        val html = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels).toPrintHtml(fileName)
+                        if (!actionOwner.isCurrent()) return@launch
+                        receiptActionNotification(printHtmlDocument(fileName, html), deviceWorkflowText("print_opened"), actionOwner)
+                        return@launch
+                    }
                     val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {
                         snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
                     }.also { pdfCache.value = it }

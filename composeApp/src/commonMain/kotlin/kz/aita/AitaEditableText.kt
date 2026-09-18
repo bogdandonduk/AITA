@@ -20,6 +20,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -122,10 +123,12 @@ internal fun AitaEditableText(
     cursorBrush: Brush,
     inputFilter: ((String) -> Boolean)?,
     inputTransform: ((String) -> String)?,
+    onSubmitText: ((String) -> Boolean)? = null,
     decorationBox: @Composable (@Composable () -> Unit) -> Unit
 ) {
     val bridge = remember(identityKey) { AitaTextFieldBridge(value) }
     val accept by rememberUpdatedState(onValueChange)
+    val submit by rememberUpdatedState(onSubmitText)
     var acceptanceRevision by remember(bridge) { mutableIntStateOf(0) }
     // Read the revision in composition: rejected/capped input must also get a reconciliation
     // pass when the parent value stays unchanged.
@@ -138,7 +141,19 @@ internal fun AitaEditableText(
     }
     BasicTextField(
         state = bridge.state,
-        modifier = modifier,
+        modifier = if (onSubmitText == null) modifier else modifier.onPreviewKeyEvent { event ->
+            if (enabled && !readOnly && event.type == KeyEventType.KeyDown &&
+                (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.Tab)) {
+                // Flush the live editor before Enter, including scanners that deliver the
+                // entire barcode and terminator before the parent has recomposed.
+                if (bridge.reportEditorChange(accept)) acceptanceRevision++
+                if (submit?.invoke(bridge.editorValue().text) == true) {
+                    bridge.updateFromParent(TextFieldValue(""))
+                    acceptanceRevision++
+                    true
+                } else false
+            } else false
+        },
         enabled = enabled,
         readOnly = readOnly,
         inputTransformation = InputTransformation {

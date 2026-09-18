@@ -11,7 +11,7 @@ before(async () => {
     if (req.url.startsWith('/aita-db-worker.js')) {
       res.setHeader('Content-Type', 'text/javascript');
       const quota = req.url.includes('quota') ? "IDBObjectStore.prototype.put = function() { throw new DOMException('Simulated quota failure', 'QuotaExceededError'); };\n" : '';
-      res.end(quota + workerSource);
+      res.end(quota + workerSource.replace('committedBytes = bytes;', 'committedBytes = bytes; self.postMessage({durableWrite: true});'));
     } else if (req.url === '/sql-wasm.js' || req.url === '/sql-wasm.wasm') {
       res.setHeader('Content-Type', req.url.endsWith('.wasm') ? 'application/wasm' : 'text/javascript');
       res.end(fs.readFileSync(require.resolve('sql.js/dist' + req.url)));
@@ -27,7 +27,8 @@ async function page(quota=false) {
   const page = await context.newPage(); await page.goto(origin);
   await page.evaluate(quota => {
     window.worker = new Worker('/aita-db-worker.js' + (quota ? '?quota' : ''));
-    let next = 0;
+    let next = 0; window.durableWrites = 0;
+    worker.addEventListener('message', e => { if (e.data.durableWrite) window.durableWrites++; });
     window.query = (sql, params=[], action='exec') => new Promise((resolve, reject) => {
       const id = next++;
       const timer = setTimeout(() => reject(new Error('Worker request timed out')), 10000);
@@ -76,5 +77,27 @@ test('durable writes, reload, rollback, competing tab, and failed storage write'
   await p.close();
   p = await page();
   assert.deepEqual(await sql(p, 'SELECT value FROM key_value'), [['committed']]);
+  await p.close();
+});
+
+test('large cache chunk batch persists once and a quota failure preserves the committed generation', async () => {
+  let p = await page();
+  await sql(p, 'CREATE TABLE IF NOT EXISTS key_value (key TEXT PRIMARY KEY, value TEXT)');
+  await sql(p, 'INSERT OR REPLACE INTO key_value VALUES (?, ?)', ['cache-manifest', 'old']);
+  const rows = Array.from({length:128}, (_,i) => ['cache-chunk-'+i, 'Ж₸'.repeat(32768)]);
+  rows.push(['cache-manifest','new']);
+  const statement = 'INSERT OR REPLACE INTO key_value(key,value) VALUES '+rows.map(()=>'(?,?)').join(',');
+  const before = await p.evaluate(() => durableWrites);
+  await sql(p, statement, rows.flat());
+  assert.equal(await p.evaluate(() => durableWrites), before+1);
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key=?', ['cache-manifest']), [['new']]);
+  await p.close(); p = await page(true);
+  const failedRows = [['cache-new-generation','unsaved'], ['cache-manifest','uncommitted']];
+  await assert.rejects(sql(p, 'INSERT OR REPLACE INTO key_value VALUES (?,?),(?,?)', failedRows.flat()), /quota failure/);
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key=?', ['cache-manifest']), [['new']]);
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key=?', ['cache-new-generation']), []);
+  await p.close(); p = await page();
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key=?', ['cache-manifest']), [['new']]);
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key=?', ['cache-chunk-127']), [[rows[127][1]]]);
   await p.close();
 });

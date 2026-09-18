@@ -1677,6 +1677,9 @@ fun AppConfiguration.genericTextField(
         }
     }
     var textFieldValue by textFieldValueState
+    val barcodeBurst = remember(textFieldIdentityKey) { TransactionSearchInputBurst() }
+    var pendingBarcodeScan by remember(textFieldIdentityKey) { mutableStateOf<PendingTransactionSearchScan?>(null) }
+
     // Render the accepted parent value in this composition, including when an over-limit
     // typed edit is rejected/clamped to the same value as before. An effect keyed only
     // by valueInitial misses that case and leaves the rejected text on screen.
@@ -1778,6 +1781,24 @@ fun AppConfiguration.genericTextField(
 
     var isFocused by rememberSaveable(textFieldIdentityKey) {
         mutableStateOf(isFocusedInitial || (initialTextFieldMeta.focused && platformAllowsAutomaticTextFieldFocus()))
+    }
+
+    fun clearScannedSearch() {
+        val emptyValue = TextFieldValue("")
+        pendingBarcodeScan = null
+        barcodeBurst.reset()
+        textFieldValue = emptyValue
+        stateKey?.let { key -> coroutineScope.launch { stateHost?.setState(key to "") } }
+        savePersistentTextDraft("")
+        savePersistentTextFieldMeta(emptyValue, isFocused)
+    }
+    LaunchedEffect(pendingBarcodeScan) {
+        val request = pendingBarcodeScan ?: return@LaunchedEffect
+        delay(160)
+        if (captureTransactionBarcodeInput && isFocused && textFieldValue.text == request.text &&
+            request.handler === activeTransactionBarcodeHandler && request.owner.isCurrent() &&
+            request.inventoryOwner == inventoryViewScopeKey() &&
+            request.handler(request.text + "\n")) clearScannedSearch()
     }
 
     var focusRequester by remember(textFieldIdentityKey) {
@@ -2133,18 +2154,10 @@ fun AppConfiguration.genericTextField(
                         selection = nextSelection
                     )
 
-                    val barcodeHandler = if (captureTransactionBarcodeInput) activeTransactionBarcodeHandler else null
-                    if (barcodeHandler != null && barcodeHandler(nextText)) {
-                        val emptyValue = TextFieldValue("")
-                        textFieldValue = emptyValue
-                        stateKey?.run {
-                            coroutineScope.launch {
-                                stateHost?.setState(stateKey to "")
-                            }
-                        }
-                        savePersistentTextDraft("")
-                        savePersistentTextFieldMeta(emptyValue, isFocused)
-                        return@onValueChange emptyValue
+                    if (captureTransactionBarcodeInput) {
+                        val handler = activeTransactionBarcodeHandler
+                        pendingBarcodeScan = if (handler != null && barcodeBurst.edited(textFieldValue.text, nextText, getCurrentTimeMillis()))
+                            PendingTransactionSearchScan(nextText, handler, captureReceiptActionOwner(), inventoryViewScopeKey()) else null
                     }
 
                     dispatchAcceptedTextInput(nextText, null, onValueChange) {
@@ -2184,6 +2197,11 @@ fun AppConfiguration.genericTextField(
 
                         updateIsFocusedAction?.invoke(it)
                     },
+                onSubmitText = if (captureTransactionBarcodeInput) { text ->
+                    val handled = text.isNotBlank() && activeTransactionBarcodeHandler?.invoke(text + "\n") == true
+                    if (handled) clearScannedSearch()
+                    handled
+                } else null,
                 keyboardOptions = KeyboardOptions.Default.copy(
                     keyboardType = keyboardType,
                     imeAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).ime

@@ -13,3 +13,5 @@
   Cache-Control: no-cache
 /sql-wasm.wasm
   Cache-Control: no-cache
+/aita-print.js
+  Cache-Control: no-cache

@@ -10,3 +10,13 @@ fun securitySessionDisplayMetadata(metadata: Map<String, String>): Map<String, S
         mapOf("localeLanguage" to language)
     } else emptyMap()
 }
+
+/** Older sessions may contain a reverse-resolved loopback hostname. Keep the actual address. */
+fun securitySessionDisplayIp(raw: String): String {
+    val value = raw.trim()
+    return when {
+        value.equals("localhost", ignoreCase = true) -> ""
+        value.startsWith("localhost/", ignoreCase = true) -> value.substringAfter('/').trim()
+        else -> value
+    }
+}

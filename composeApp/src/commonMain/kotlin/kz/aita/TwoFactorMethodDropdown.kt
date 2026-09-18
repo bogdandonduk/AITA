@@ -39,7 +39,11 @@ internal fun factorSelectionAction(chosen:AitaLoginSecondFactor,current:AitaLogi
                     fallbackRes=stateValues.drawableResIconExpandMore.value,contentDescription=null,tintColor=stateValues.TextColor)
             }
             DropdownMenu(expanded=expanded && enabled,onDismissRequest={expanded=false},
-                modifier=Modifier.width(with(density){width.toDp()}).background(stateValues.BackgroundColor)) {
+                modifier=Modifier.width(with(density){width.toDp()}),
+                shape=RoundedCornerShape(stateValues.cornerRadius),
+                containerColor=stateValues.BackgroundColor,
+                tonalElevation=0.dp,
+                border=BorderStroke(stateValues.unfocusedBorderWidth,stateValues.AccentColor)) {
                 listOf(AitaLoginSecondFactor.NONE,AitaLoginSecondFactor.EMAIL,AitaLoginSecondFactor.AUTHENTICATOR).forEach {method->
                     val available=when(method){AitaLoginSecondFactor.NONE->true;AitaLoginSecondFactor.EMAIL->emailAvailable;else->authenticatorAvailable}
                     DropdownMenuItem(text={Text(label(method),color=if(!available)stateValues.PlaceholderTextColor else if(method==selected)stateValues.AccentColor else stateValues.TextColor,

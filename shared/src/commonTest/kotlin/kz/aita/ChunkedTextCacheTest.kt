@@ -74,4 +74,22 @@ class ChunkedTextCacheTest {
         try { withTimeout(1000) { cache.put("fast","fast");assertEquals("fast",cache.get("fast")) } }
         finally { release.complete(Unit);slow.join() }
     }
+    @Test fun atomicBatchCommitsManifestWithChunksAndFailedBatchKeepsOldGeneration() = runTest {
+        val rows = mutableMapOf<String, String>()
+        var sequence = 0
+        var fail = false
+        val cache = ChunkedTextCache(read = { key, _ -> rows[key] },
+            write = { _, _ -> error("Batch implementation must own every write") },
+            remove = { rows.remove(it); Unit }, removePrefixExcept = { prefix, keep ->
+                rows.keys.removeAll { it.startsWith(prefix) && it != prefix + "manifest" && !it.startsWith(keep) }; Unit
+            }, newGeneration = { (++sequence).toString(16) }, chunkSize = 8, maxLength = 1024,
+            writeBatch = { batch -> if (fail) error("quota"); rows.putAll(batch) })
+        cache.put("stock", "old 🛒 snapshot".repeat(5))
+        fail = true
+        assertFailsWith<IllegalStateException> { cache.put("stock", "new snapshot".repeat(5)) }
+        assertEquals("old 🛒 snapshot".repeat(5), cache.get("stock"))
+        fail = false
+        cache.put("stock", "replacement")
+        assertEquals("replacement", cache.get("stock"))
+    }
 }

@@ -146,7 +146,7 @@ internal fun AppConfiguration.SecuritySessionCard(session: SecuritySessionDataMo
         Spacer(modifier = Modifier.height(10.dp))
         SecuritySessionInfoLine(localizedStringResource(233, "Signed in"), securitySessionDateTimeText(session.createdAtMillis))
         SecuritySessionInfoLine(localizedStringResource(234, "Expires"), securitySessionDateTimeText(session.expiresAtMillis))
-        SecuritySessionInfoLine("IP", session.ipAddress)
+        SecuritySessionInfoLine("IP", securitySessionDisplayIp(session.ipAddress))
         SecuritySessionInfoLine(localizedStringResource(235, "Language"), session.localeLanguage)
         // User-agent is intentionally hidden from the card; platform and app version above are readable enough.
 
@@ -235,7 +235,7 @@ internal fun AppConfiguration.SecuritySessionHistoryCard(event: SecuritySessionH
         SecuritySessionInfoLine(localizedStringResource(1124, "Event time"), securitySessionDateTimeText(event.createdAtMillis))
         SecuritySessionInfoLine(localizedStringResource(1126, "Device"), device)
         SecuritySessionInfoLine(localizedStringResource(235, "Language"), displayMetadata["localeLanguage"].orEmpty())
-        SecuritySessionInfoLine("IP", event.ipAddress)
+        SecuritySessionInfoLine("IP", securitySessionDisplayIp(event.ipAddress))
         SecuritySessionInfoLine(localizedStringResource(1127, "Details"), deviceDetails)
     }
 }
@@ -502,7 +502,13 @@ fun AppConfiguration.MenuDevicesScreen() {
         receiptPrinterError = ""
         devicesScope.launch {
             try {
-                val result = withContext(Dispatchers.Default) {
+                val result = if (preferHtmlDocumentPrinting) {
+                    printHtmlDocument(testReceiptTitle, AitaPdfDocument(listOf(
+                        AitaPdfBlock("AITA", AitaPdfRole.Store), AitaPdfBlock(testReceiptTitle, AitaPdfRole.Title),
+                        AitaPdfBlock(receiptUiDateTime(getCurrentTimeMillis())), AitaPdfBlock("100 ₸"),
+                        AitaPdfBlock("", barcodePayload = transactionReceiptBarcodePayload("00000000-0000-0000-0000-000000000001"))
+                    )).toPrintHtml(testReceiptTitle))
+                } else withContext(Dispatchers.Default) {
                     printReceiptEscPos(
                         buildReceiptPrinterTestEscPosBytes(title = testReceiptTitle, dateText = receiptUiDateTime(getCurrentTimeMillis())),
                         ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
@@ -624,7 +630,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                 item(key = "MenuDevicesScreen:$section:2") {
                     DeviceSettingsCard(
                         title = localizedStringResource(1254, "Thermal receipt printer"),
-                        subtitle = localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+                        subtitle = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
                         iconPath = stateValues.drawablePathIconReceipt,
                         iconRes = stateValues.drawableResIconReceipt.value
                     ) {
@@ -709,7 +715,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
                         Text(
-                            text = localizedStringResource(1255, "Detected receipt printers"),
+                            text = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print") else localizedStringResource(1255, "Detected receipt printers"),
                             color = stateValues.TextColor,
                             fontSize = stateValues.accentTextSize,
                             fontWeight = FontWeight.Bold
@@ -721,7 +727,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                         if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…", "Принтерлер изделүүдө…"),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        Text(printerConnectionText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        Text(if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else printerConnectionText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         if (authorizeBluetoothReceiptPrintersAction != null) {
                             AuthQuietAction(printerConnectionText("bluetooth_access"),
                                 !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !authorizingBluetooth,
@@ -773,7 +779,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                 item(key = "MenuDevicesScreen:$section:3") {
                     DeviceSettingsCard(
                         title = localizedStringResource(1276, "Sticky label printer"),
-                        subtitle = localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
+                        subtitle = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
                         iconPath = stateValues.drawablePathIconLabelPrinter,
                         iconRes = stateValues.drawableResIconLabelPrinter.value
                     ) {
@@ -891,39 +897,42 @@ fun AppConfiguration.MenuDevicesScreen() {
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                        Text(
-                            text = localizedStringResource(1287, "Label printer protocol"),
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.accentTextSize,
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (!preferHtmlDocumentPrinting) {
+                            Text(
+                                text = localizedStringResource(1287, "Label printer protocol"),
+                                color = stateValues.TextColor,
+                                fontSize = stateValues.accentTextSize,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
+                            Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-                        tabRowWidget(
-                            modifier = Modifier.fillMaxWidth(),
-                            tabs = listOf(
-                                TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
-                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                                },
-                                TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
-                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                                },
-                                TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
-                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                                },
-                                TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
-                                    configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
-                                }
-                            ),
-                            selectedIndexInitial = normalizeLabelPrinterProtocol(configuredLabelPrinterProtocol),
-                            textSize = stateValues.smallTextSize
-                        )
+                            tabRowWidget(
+                                modifier = Modifier.fillMaxWidth(),
+                                tabs = listOf(
+                                    TabContent(LABEL_PRINTER_PROTOCOL_AUTO, localizedStringResource(1294, "Auto protocol")) {
+                                        configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                    },
+                                    TabContent(LABEL_PRINTER_PROTOCOL_TSPL, localizedStringResource(1295, "TSPL")) {
+                                        configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                    },
+                                    TabContent(LABEL_PRINTER_PROTOCOL_ZPL, localizedStringResource(1296, "ZPL")) {
+                                        configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                    },
+                                    TabContent(LABEL_PRINTER_PROTOCOL_CPCL, localizedStringResource(1297, "CPCL")) {
+                                        configureLabelPrinterProtocol(it) { result -> coroutineScope.launch { receiptActionNotification(result, labelPrinterProtocolSelectedText) } }
+                                    }
+                                ),
+                                selectedIndexInitial = normalizeLabelPrinterProtocol(configuredLabelPrinterProtocol),
+                                textSize = stateValues.smallTextSize
+                            )
+
+                        }
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
                         Text(
-                            text = localizedStringResource(1278, "Detected label printers"),
+                            text = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print") else localizedStringResource(1278, "Detected label printers"),
                             color = stateValues.TextColor,
                             fontSize = stateValues.accentTextSize,
                             fontWeight = FontWeight.Bold
@@ -2355,6 +2364,12 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
         activeExport = action
         exportScope.launch {
             try {
+                if (action == "print" && preferHtmlDocumentPrinting) {
+                    val html = snapshot.buildAnalyticsReportPdfDocument().toPrintHtml(fileName)
+                    if (!owner.isCurrent()) return@launch
+                    receiptActionNotification(printHtmlDocument(fileName, html), printSuccessText, owner)
+                    return@launch
+                }
                 val bytes = pdfCache ?: withContext(Dispatchers.Default) { snapshot.buildAnalyticsReportPdfBytes() }.also { pdfCache = it }
                 if (!owner.isCurrent()) return@launch
                 val result = when (action) {
@@ -2364,7 +2379,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                 }
                 receiptActionNotification(result, when (action) { "pdf" -> saveSuccessText; "share" -> shareSuccessText; else -> printSuccessText }, owner)
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) { if (owner.isCurrent()) postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative, transient = true) }
+            catch (_: Exception) { if (owner.isCurrent()) postInAppNotification(deviceWorkflowText("report_failed"), NotificationType.Negative, transient = true) }
             finally { activeExport = null }
         }
     }
@@ -2378,7 +2393,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
         MessageText(
             modifier = Modifier.fillMaxWidth(),
             text = localizedStringResource(1240, "Printable summary"),
-            subText = localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+            subText = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
             textSize = stateValues.textSize,
             subTextSize = stateValues.smallTextSize
         )

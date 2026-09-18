@@ -9,11 +9,14 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="preload" href="composeResources/aita.composeapp.generated.resources/font/noto_sans_regular.ttf" as="fetch" type="font/ttf" crossorigin>
+    <link rel="preload" href="composeResources/aita.composeapp.generated.resources/font/noto_sans_bold.ttf" as="fetch" type="font/ttf" crossorigin>
     <link type="text/css" rel="stylesheet" href="styles.css">
 </head>
 <body>
 <main id="aita-startup" role="status" style="padding:24px;font:18px system-ui">AITA</main>
     <noscript>AITA requires JavaScript and WebAssembly support.</noscript>
+    <script src="aita-print.js"></script>
     <script>
         // A refreshed document must also refresh its entry script. Older installations can
         // still have a fresh, long-lived HTTP cache entry from before no-cache was enabled.

@@ -56,11 +56,7 @@ private fun installWasmComposePlatformBridges() {
         }
     }
 
-    receiptPrintUsesCurrentPage = true
-    printReceiptPlatformAction = { _, _, _ ->
-        runCatching { window.print() }
-        ReceiptPlatformActionResult(true, "Browser print dialog opened")
-    }
+    installBrowserPrinting()
 
     getCameraScannerPermissionState = { PlatformPermissionState.Granted }
 
@@ -88,7 +84,7 @@ fun main() {
             init()
             document.getElementById("aita-startup")?.remove()
             ComposeViewport(document.body!!) {
-                AppConfiguration({ MainScreen() })
+                BrowserTypography { AppConfiguration({ MainScreen() }) }
             }
         } catch (failure: Throwable) {
             val alreadyOpen = failure.message.orEmpty().contains("already open in another tab")

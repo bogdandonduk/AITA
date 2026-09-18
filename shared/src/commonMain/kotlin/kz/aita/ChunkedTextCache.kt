@@ -12,7 +12,8 @@ internal class ChunkedTextCache(
     private val removePrefixExcept: suspend (prefix: String, keepPrefix: String) -> Unit,
     private val newGeneration: () -> String = { Random.nextLong().toULong().toString(16) + Random.nextLong().toULong().toString(16) },
     private val chunkSize: Int = 64 * 1024,
-    private val maxLength: Int = 128 * 1024 * 1024
+    private val maxLength: Int = 128 * 1024 * 1024,
+    private val writeBatch: (suspend (List<Pair<String, String>>) -> Unit)? = null
 ) {
     private val registryMutex = Mutex()
     private val keyMutexes = mutableMapOf<String, Mutex>()
@@ -46,17 +47,23 @@ internal class ChunkedTextCache(
         val generation = newGeneration()
         require(generation.isNotEmpty() && generation.length <= 64 && generation.all { it in 'a'..'f' || it in '0'..'9' })
         val generationPrefix = prefix(key) + generation + ":"
+        val rows = if (writeBatch != null) mutableListOf<Pair<String, String>>() else null
         var offset = 0
         var index = 0
         do {
             var end = (offset + chunkSize).coerceAtMost(text.length)
             // A SQLite TEXT value must not end with half a surrogate pair.
             if (end < text.length && text[end - 1].isHighSurrogate() && text[end].isLowSurrogate()) end--
-            write(generationPrefix + index, text.substring(offset, end))
+            val row = generationPrefix + index to text.substring(offset, end)
+            if (rows != null) rows += row else write(row.first, row.second)
             offset = end
             index++
         } while (offset < text.length)
-        write(manifest(key), "1|$generation|${text.length}|$index|${cacheTextChecksum(text)}")
+        val header = manifest(key) to "1|$generation|${text.length}|$index|${cacheTextChecksum(text)}"
+        if (rows != null) {
+            rows += header
+            writeBatch!!.invoke(rows)
+        } else write(header.first, header.second)
         // Interrupted cleanup is harmless: only the committed generation is ever read.
         remove(key)
         removePrefixExcept(prefix(key), generationPrefix)

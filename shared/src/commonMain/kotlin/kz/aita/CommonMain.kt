@@ -849,7 +849,7 @@ data class ReceiptTextLabelsDataModel(
 var saveReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var shareReceiptPdfFile: (suspend (fileName: String, pdfBytes: ByteArray, whatsappOnly: Boolean) -> ReceiptPlatformActionResult)? = null
 var printReceiptEscPosBytes: (suspend (printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
-// A browser prints the current page; it does not consume a native PDF or ESC/POS document.
+// Legacy platform compatibility; current browser printing uses a prepared HTML document.
 var receiptPrintUsesCurrentPage: Boolean = false
 var printReceiptPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray, printerBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
 var printPdfDocumentPlatformAction: (suspend (fileName: String, pdfBytes: ByteArray) -> ReceiptPlatformActionResult)? = null
@@ -918,7 +918,7 @@ suspend fun printHtmlDocument(fileName: String, html: String, notConfiguredMessa
 private val receiptPrinterSelectionMutex = Mutex()
 
 private suspend fun reloadReceiptPrintersInside() {
-    val list = listPlatformReceiptPrinterDevicesAction ?: error("Printer discovery is unavailable on this platform")
+    val list = listPlatformReceiptPrinterDevicesAction ?: error(deviceWorkflowText("discovery_unavailable"))
     val devices = list()
     val selected = devices.firstOrNull { it.configured }?.id ?: configuredReceiptPrinterDeviceIdState.value
     // Disappearance from discovery is not permission to forget the user's durable selection.
@@ -983,6 +983,7 @@ suspend fun printStockItemLabel(
     protocol: String = label.protocol,
     notConfiguredMessage: String = "Sticky label printer is not configured for this platform"
 ): ReceiptPlatformActionResult {
+    if (preferHtmlDocumentPrinting) return printStockItemLabelDocument(label, notConfiguredMessage)
     val normalizedProtocol = normalizeLabelPrinterProtocol(protocol)
     return printLabelPrinterBytes?.invoke(
         buildStockItemLabelPrinterBytes(label.copy(protocol = normalizedProtocol))
@@ -1004,7 +1005,7 @@ suspend fun printStockItemLabelDocument(
         html = cleanLabel.buildStockItemLabelHtml(),
         notConfiguredMessage = notConfiguredMessage
     )
-    if (htmlResult.success) return htmlResult
+    if (htmlResult.success || preferHtmlDocumentPrinting) return htmlResult
 
     return printPdfDocument(
         fileName = cleanLabel.stockItemLabelDocumentFileName(),
@@ -1025,7 +1026,7 @@ suspend fun printStockItemLabelsDocument(
         html = cleanLabels.buildStockItemLabelsSheetHtml(),
         notConfiguredMessage = notConfiguredMessage
     )
-    if (htmlResult.success) return htmlResult
+    if (htmlResult.success || preferHtmlDocumentPrinting) return htmlResult
 
     return printPdfDocument(
         fileName = cleanLabels.stockItemLabelsSheetDocumentFileName(),
@@ -1975,7 +1976,7 @@ fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPlainText(): String {
     return builder.toString()
 }
 
-fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray = renderAitaPdfDocument(
+fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfDocument(): AitaPdfDocument =
     AitaPdfDocument(
         blocks = buildAnalyticsReportPlainText().lines().mapIndexed { index, text ->
             AitaPdfBlock(text, when {
@@ -1987,7 +1988,8 @@ fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray =
         },
         width = 595f, maxHeight = 842f, minHeight = 842f, margin = 42f, bodySize = 10f
     )
-)
+
+fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray = renderAitaPdfDocument(buildAnalyticsReportPdfDocument())
 
 fun AnalyticsReportSnapshotDataModel.analyticsReportPdfFileName(): String {
     val safeStore = storeName

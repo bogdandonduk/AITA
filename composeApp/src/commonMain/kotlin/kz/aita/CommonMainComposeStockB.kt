@@ -654,6 +654,7 @@ fun AppConfiguration.StockBatchEditor(
                 StockSinglePriceEditor(
                     title = stateValues.stringSupplyPrice,
                     price = draft.supplyPrice,
+                    quickFillSalePrices = listOfNotNull(draft.salePriceOverride) + goodsItem.salePrices,
                     quickFillPrices = listOfNotNull(selectedSupplierRememberedSupplyPrice, goodsItem.supplyPrices.firstOrNull()) + goodsItem.supplyPrices,
                     onChanged = { draft = draft.copy(supplyPrice = it.copy(supplierId = draft.supplierId.orEmpty())) }
                 )
@@ -2271,6 +2272,8 @@ fun AppConfiguration.StockSupplierPricesPage(
                             onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
                             onValueChange = { supplyPriceText = it }
                         )
+                        SupplyPriceQuickFills(goodsItem.salePrices, defaultCurrency, supplyPriceText) { supplyPriceText = it }
+
 
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -2618,6 +2621,7 @@ fun AppConfiguration.StockAddEditPricesPage(
 
             StockSinglePriceEditor(
                 title = stateValues.stringSupplyPrice,
+                quickFillSalePrices = draft.salePrices,
                 price = draft.supplyPrices.firstOrNull()
                     ?: PriceDataModel(
                         price = "",
@@ -2643,6 +2647,7 @@ fun AppConfiguration.StockSinglePriceEditor(
     title: String,
     price: PriceDataModel,
     quickFillPrices: List<PriceDataModel> = emptyList(),
+    quickFillSalePrices: List<PriceDataModel> = emptyList(),
     onChanged: (PriceDataModel) -> Unit
 ) {
     val quickFills = quickFillPrices
@@ -2695,6 +2700,10 @@ fun AppConfiguration.StockSinglePriceEditor(
                 )
             }
         )
+
+        SupplyPriceQuickFills(quickFillSalePrices, price.currency, price.price) {
+            onChanged(price.copy(price = it))
+        }
 
         if (quickFills.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -3126,6 +3135,7 @@ internal fun AppConfiguration.StockPriceGroupEditor(
     placeholder: String,
     prices: List<PriceDataModel>,
     addText: String,
+    quickFillSalePrices: List<PriceDataModel> = emptyList(),
     onChanged: (List<PriceDataModel>) -> Unit
 ) {
     val currencies = stockCurrencyDomains()
@@ -3206,6 +3216,10 @@ internal fun AppConfiguration.StockPriceGroupEditor(
                     value.isEmpty() || value.isNumericalDoubleString()
                 }
             )
+
+            SupplyPriceQuickFills(quickFillSalePrices, content.selectedSecondaryId ?: fallbackCurrency, content.value.text) {
+                content.replaceText(it)
+            }
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
@@ -4816,6 +4830,7 @@ internal fun AppConfiguration.StockAddEditPricesTab(
             StockPriceGroupEditor(
                 title = stateValues.stringSupplyPrice,
                 placeholder = stateValues.stringEnterSupplyPrice,
+                quickFillSalePrices = draft.salePrices,
                 prices = draft.supplyPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
                 addText = "${stateValues.stringAdd} ${stateValues.stringSupplyPrice}",
                 onChanged = {

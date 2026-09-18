@@ -2221,7 +2221,7 @@ internal fun advancedAuthService(tokenService: TokenService, application: Applic
     }
 
 private fun ApplicationCall.authClientIp(): String = aitaAuthClientIp(
-    request.origin.remoteHost, request.headers["X-Forwarded-For"], request.headers["X-AITA-Edge"]
+    request.local.remoteAddress, request.headers["X-Forwarded-For"], request.headers["X-AITA-Edge"]
 )
 
 private fun authMeta(call: ApplicationCall, deviceInfo: kz.aita.ClientDeviceInfoDataModel?): Map<String, String> =

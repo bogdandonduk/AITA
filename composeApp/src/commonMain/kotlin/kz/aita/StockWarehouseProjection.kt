@@ -21,19 +21,7 @@ internal fun buildStockWarehouseProjection(
     filterId: String,
     fallbackOrderIds: List<String>
 ): StockWarehouseProjection {
-    val search = if (query.isBlank()) StockWarehouseSearchResult(baseItems) else {
-        val candidate = query.transactionBarcodeCandidate() ?: query
-        val embedded = candidate.parseEmbeddedWeightBarcodeFormats()
-        if (embedded.isNotEmpty()) {
-            val matches = baseItems.filter { item ->
-                item.matchesScannedBarcode(candidate) || embedded.any { item.matchesEmbeddedWeightBarcode(it) }
-            }
-            StockWarehouseSearchResult(matches, matches.singleOrNull(), candidate)
-        } else {
-            val matches = baseItems.search<GoodsItemDataModel>(query)
-            StockWarehouseSearchResult(matches.first, if (matches.second) matches.first.firstOrNull() else null, query)
-        }
-    }
+    val search = typedStockSearch(baseItems, query)
     val preferred = preferredOrderIds.filter { it.isNotBlank() }.withIndex().associate { it.value to it.index }
     val defaultSorted = stockWarehouseDefaultSortedItems(
         search.items, preferred, sortMode.takeUnless { it == "quantity" }, ascending, language
@@ -48,4 +36,24 @@ internal fun buildStockWarehouseProjection(
         stockWarehouseItemsForFilter(filterId, unfiltered, batchesByItem),
         stockWarehouseMetricsForUi(unfiltered, batchesByItem)
     )
+}
+
+/** Typed search is literal. Weighted-barcode decoding belongs to the explicit scanner path. */
+internal fun typedStockSearch(items: List<GoodsItemDataModel>, query: String): StockWarehouseSearchResult {
+    val text = query.trim()
+    if (text.isEmpty()) return StockWarehouseSearchResult(items)
+    fun GoodsItemDataModel.tokens() = (barcodes + barcodeModels.map { it.value } + allBarcodeValues())
+        .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    val exact = mutableListOf<GoodsItemDataModel>()
+    val matching = mutableListOf<GoodsItemDataModel>()
+    // A numeric search must never match a price or a shorter weighted-product alias.
+    val numeric = text.all(Char::isDigit)
+    items.forEach { item ->
+        val codes = item.tokens()
+        if (codes.any { it.equals(text, ignoreCase = true) }) exact += item
+        else if (codes.any { it.startsWith(text, ignoreCase = true) } || (!numeric &&
+            (item.containsSearchOperands - codes.toSet()).any { it.contains(text, ignoreCase = true) })) matching += item
+    }
+    if (exact.isNotEmpty()) return StockWarehouseSearchResult(exact, exact.singleOrNull(), text)
+    return StockWarehouseSearchResult(matching, null, text)
 }

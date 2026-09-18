@@ -1173,7 +1173,7 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
             val candidate = transactionHidBuffer(raw, if (transactionTypeIndex == 1) 64 else 32)
 
             // Keep a scanner terminator for completion detection; never store it in the buffer.
-            buffer = if (barcodeHandler(raw)) "" else candidate
+            buffer = if (raw.any { it == '\n' || it == '\r' || it == '\t' } && barcodeHandler(raw)) "" else candidate
         },
         modifier = Modifier
             .size(1.dp)
@@ -1202,6 +1202,13 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
         )
     )
 
+    LaunchedEffect(buffer, captureEnabled) {
+        if (!captureEnabled || buffer.length < 4) return@LaunchedEffect
+        val owner = captureReceiptActionOwner()
+        val inventoryOwner = inventoryViewScopeKey()
+        delay(160)
+        if (owner.isCurrent() && inventoryOwner == inventoryViewScopeKey() && barcodeHandler(buffer + "\n")) buffer = ""
+    }
     LaunchedEffect(captureEnabled) { if (!captureEnabled) buffer = "" }
     TransactionBarcodeFocusEffect(
         contextKey = "$transactionTypeIndex:$clientId:${stateValues.activeStoreId}",
@@ -1748,24 +1755,6 @@ fun AppConfiguration.TransactionSelectionScreen(
             onBarcodeCaptureFocusRequested?.invoke()
         }
 
-        val addToCartFromSearchAction: (GoodsItemDataModel, String) -> Unit = { goodsItem, query ->
-            if (!tryHandleTransactionBarcodeInput(
-                    rawInput = query,
-                    transactionTypeIndex = context.transactionTypeIndex,
-                    clientId = context.clientId,
-                    currentCart = goodsInCart
-                )
-            ) {
-                addToCartAction(goodsItem)
-            }
-
-            coroutineScope.launch {
-                context.stateHost.setState(NavigationScreenModel.KEY_STATE_SEARCH_QUERY to "")
-                delay(120)
-                onBarcodeCaptureFocusRequested?.invoke()
-            }
-        }
-
         val selectedTransactionFilterId = scopeRowContent.id
         val transactionSearchQuery = searchTextFieldContent.value.text.trim()
         val transactionSearchAcrossAllStock = transactionSearchQuery.isNotBlank()
@@ -1802,8 +1791,8 @@ fun AppConfiguration.TransactionSelectionScreen(
         StockWarehouseScreenContent(
             modifier = Modifier.weight(1f),
             searchQuery = searchTextFieldContent.value.text,
-            onExactSearchHit = addToCartAction,
-            onExactSearchHitWithQuery = addToCartFromSearchAction,
+            // Typed input shows candidates until tapped or submitted. Scanner completion
+            // is owned by the HID/camera handler, never by a partial search projection.
             disableIfOutOfStock = context.transactionTypeIndex == 0,
             showStockType = false,
             showBatches = false,
@@ -3005,6 +2994,12 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
             activeReceiptAction = action // reserve synchronously, before launching
             receiptScope.launch {
                 try {
+                    if (action == "print" && preferHtmlDocumentPrinting) {
+                        val html = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels).toPrintHtml(fileName)
+                        if (!actionOwner.isCurrent()) return@launch
+                        receiptActionNotification(printHtmlDocument(fileName, html), deviceWorkflowText("print_opened"), actionOwner)
+                        return@launch
+                    }
                     val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {
                         snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
                     }.also { pdfCache.value = it }
@@ -4725,9 +4720,9 @@ internal fun AppConfiguration.DebtPercentQuickButtons(
     baseAmount: Double,
     currencySymbol: String,
     currentAmount: Double,
+    percents: List<Double> = listOf(10.0, 25.0, 50.0, 75.0, 100.0),
     onSelected: (Double) -> Unit
 ) {
-    val percents = listOf(10.0, 25.0, 50.0, 75.0, 100.0)
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxWidth()

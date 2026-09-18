@@ -544,3 +544,8 @@ internal fun buildBundledLocalizedStringFallbacks(): Map<Long, Map<String, Strin
         putReceiptSupportStringFallbacks()
     }
 
+
+/** Web phones retain control of their keyboard; wide stock can receive a scanner immediately. */
+internal fun warehouseSearchAllowsAutomaticFocus(platform: String, narrow: Boolean): Boolean =
+    platform.contains("desktop", true) || platform.contains("jvm", true) ||
+        (!narrow && platform.contains("wasm", true))

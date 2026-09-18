@@ -19,15 +19,21 @@ internal suspend fun readLocalKvBounded(key: String, maxCharacters: Int): String
     return result.toString()
 }
 
-private val jsonTextCache = ChunkedTextCache(
+/** Browser snapshots can atomically insert all chunks without exporting SQLite for every row. */
+internal var writeCacheRowsPlatformAction: (suspend (List<Pair<String, String>>) -> Unit)? = null
+
+// The browser installs its batch writer before init() first accesses this lazy cache.
+// Native platforms retain streaming chunk writes and their bounded memory usage.
+private val jsonTextCache by lazy { ChunkedTextCache(
     read = ::readLocalKvBounded,
     write = { key, value -> putLocalKv(key, value) },
     remove = ::deleteLocalKv,
+    writeBatch = writeCacheRowsPlatformAction,
     removePrefixExcept = { prefix, keep ->
         // Preserve the manifest as well as the new generation. Exact prefix matching avoids SQL LIKE wildcards.
         appDatabase.app_databaseQueries.deleteKvPrefixExcept(prefix = prefix, manifestKey = prefix + "manifest", keepPrefix = keep)
     }
-)
+) }
 
 internal suspend fun readJsonCacheText(key: String): String? = jsonTextCache.get(key)
 internal suspend fun writeJsonCacheText(key: String, text: String) = jsonTextCache.put(key, text)

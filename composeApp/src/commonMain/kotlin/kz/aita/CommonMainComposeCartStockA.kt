@@ -2611,8 +2611,10 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     mutableStateOf(STOCK_WAREHOUSE_FILTER_TOTAL)
                 }
 
+                var scannedBarcodeMatches by remember(warehouseOwner) { mutableStateOf<Pair<String, Set<String>>?>(null) }
                 if (searchQuery == null) {
-                    val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
+                    var cameraSearchField: GenericTextFieldContent? = null
+                    val autoFocusSearch = warehouseSearchAllowsAutomaticFocus(getPlatformName(), stateValues.isNarrowScreen)
                     val searchTextFieldContent =
                         searchTextField(
                             modifier = Modifier
@@ -2622,8 +2624,15 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             isFocusedInitial = autoFocusSearch,
                             autoFocus = autoFocusSearch,
                             forceRefocus = false,
-                            barcodeCamScanner = true
+                            barcodeCamScanner = true,
+                            onBarcodeScanned = { raw ->
+                                val candidate = raw.transactionBarcodeCandidate() ?: raw.trim()
+                                scannedBarcodeMatches = candidate to stockPayload.filter { it.matchesTransactionBarcode(candidate) }.map { it.id }.toSet()
+                                cameraSearchField?.replaceText(candidate, applyTransform = false)
+                            }
                         )
+
+                    cameraSearchField = searchTextFieldContent
 
                     LaunchedEffect(autoFocusSearch) {
                         if (autoFocusSearch) {
@@ -2634,6 +2643,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
 
                     LaunchedEffect(searchTextFieldContent.value) {
                         lSearchQuery = searchTextFieldContent.value.text
+                        if (scannedBarcodeMatches?.first != lSearchQuery) scannedBarcodeMatches = null
                     }
                 } else {
                     LaunchedEffect(searchQuery) {
@@ -2672,8 +2682,10 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         ?: onExactSearchHit?.invoke(item)
                 }
 
-                val baseItems = remember(stockPayload, onFilter, transactionTypeIndex, activeStoreId, sellableItemIdsForActiveStore, stockPayloadAlreadyScopedForTransaction) {
+                val baseItems = remember(stockPayload, onFilter, transactionTypeIndex, activeStoreId, sellableItemIdsForActiveStore, stockPayloadAlreadyScopedForTransaction, scannedBarcodeMatches, appliedSearchQuery) {
                     stockPayload
+                        .let { payload -> scannedBarcodeMatches?.takeIf { it.first == appliedSearchQuery }?.second
+                            ?.let { ids -> payload.filter { it.id in ids } } ?: payload }
                         .let { payload -> onFilter?.let { filterAction -> payload.filter { filterAction(it) } } ?: payload }
                         .let { filtered ->
                             when {
@@ -2696,9 +2708,10 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     language, warehouseQuantityByItem, warehouseBatchesByItem, selectedWarehouseFilterId,
                     showWarehouseInfoTile, fallbackOrderIds, activeStoreId
                 ) { Any() }
-                val useWarmWarehouse = showWarehouseInfoTile && stockItemsOverride == null && onFilter == null && preferredOrderIds.isEmpty()
+                val projectionQuery = if (scannedBarcodeMatches?.first == appliedSearchQuery) "" else appliedSearchQuery
+                val useWarmWarehouse = scannedBarcodeMatches == null && showWarehouseInfoTile && stockItemsOverride == null && onFilter == null && preferredOrderIds.isEmpty()
                 val warmWarehouse by LiveCollectionWorkspace.warehouse.collectAsState()
-                val requestedSelection = WarehouseSelection(appliedSearchQuery, selectedSortMode, sortAscending,
+                val requestedSelection = WarehouseSelection(projectionQuery, selectedSortMode, sortAscending,
                     if (showWarehouseInfoTile) selectedWarehouseFilterId else STOCK_WAREHOUSE_FILTER_TOTAL, fallbackOrderIds)
                 LaunchedEffect(useWarmWarehouse, requestedSelection) {
                     if (useWarmWarehouse) LiveCollectionWorkspace.selectWarehouse(requestedSelection)
@@ -2710,7 +2723,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 LaunchedEffect(projectionRequest, useWarmWarehouse) {
                     if (!useWarmWarehouse) {
                         val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                            buildStockWarehouseProjection(baseItems, appliedSearchQuery, preferredOrderIds, selectedSortMode,
+                            buildStockWarehouseProjection(baseItems, projectionQuery, preferredOrderIds, selectedSortMode,
                                 sortAscending, language, warehouseQuantityByItem, warehouseBatchesByItem,
                                 requestedSelection.filter, fallbackOrderIds)
                         }
@@ -4325,7 +4338,7 @@ internal fun AppConfiguration.AitaBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
-                        .padding(start = stateValues.marginTextFieldGroup, end = 6.dp)
+                        .padding(start = stateValues.marginTextFieldGroup, end = 12.dp)
                         .aitaSheetHandle(drag, density, onDismiss),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -4351,10 +4364,7 @@ internal fun AppConfiguration.AitaBottomSheet(
                     )
 
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)
-                        .clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor.copy(alpha = .5f),
-                            RoundedCornerShape(stateValues.cornerRadius))) {
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))) {
                         CpImage(Modifier.size(22.dp), url = stateValues.drawablePathIconCancel,
                             fallbackRes = stateValues.drawableResIconCancel.value,
                             contentDescription = stateValues.stringCancel, tintColor = stateValues.TextColor)
@@ -5121,7 +5131,7 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
         categoryIds = emptyList(),
         salePrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
         returnPrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
-        supplyPrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
+        supplyPrices = listOf(PriceDataModel(price = "0", currency = defaultCurrency, supplierId = "")),
         wholesalePrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
         noteLocalized = emptyLocalizedItemForCurrentLanguage()
     )
