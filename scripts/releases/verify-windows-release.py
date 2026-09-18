@@ -6,39 +6,93 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import struct
 
 UPGRADE_CODE = 'F100F3AF-CBA2-42E5-928D-8165D1A271A5'
 
 
-def verify_icon(path, expected_icon):
-    script = r'''$ErrorActionPreference='Stop'
-Add-Type -AssemblyName System.Drawing
-$actual = [System.Drawing.Icon]::ExtractAssociatedIcon($env:AITA_VERIFY_FILE)
-if ($null -eq $actual) { throw 'Installer has no icon' }
-$expected = [System.Drawing.Icon]::new($env:AITA_VERIFY_ICON, $actual.Size)
-$actualBitmap = $actual.ToBitmap()
-$expectedBitmap = $expected.ToBitmap()
-try {
-  if ($actualBitmap.Size -ne $expectedBitmap.Size) { throw 'Installer icon has the wrong size' }
-  for ($y = 0; $y -lt $actualBitmap.Height; $y++) {
-    for ($x = 0; $x -lt $actualBitmap.Width; $x++) {
-      $a = $actualBitmap.GetPixel($x, $y); $e = $expectedBitmap.GetPixel($x, $y)
-      if ($a.A -ne $e.A -or ($a.A -ne 0 -and $a.ToArgb() -ne $e.ToArgb())) {
-        throw 'Installer icon differs from AITA artwork'
-      }
+def read_ico_frames(data):
+    if len(data) < 6:
+        raise RuntimeError('Truncated icon file')
+    reserved, kind, count = struct.unpack_from('<HHH', data)
+    if reserved or kind != 1 or not 1 <= count <= 256 or len(data) < 6 + 16 * count:
+        raise RuntimeError('Invalid icon directory')
+    frames = []
+    for i in range(count):
+        entry = data[6 + i * 16:22 + i * 16]
+        length, offset = struct.unpack_from('<II', entry, 8)
+        if not length or offset < 6 + 16 * count or offset + length > len(data):
+            raise RuntimeError('Invalid icon frame bounds')
+        frames.append((entry[:8], data[offset:offset + length]))
+    return frames
+
+
+def executable_icon_frames(path):
+    # Read PE resources as data only. Rendering and re-saving HICONs can change alpha
+    # pixels; checking original resources also verifies every embedded resolution.
+    import ctypes as ct
+    from ctypes import wintypes as wt
+    kernel = ct.WinDLL('kernel32', use_last_error=True)
+    callback_type = ct.WINFUNCTYPE(wt.BOOL, wt.HMODULE, ct.c_void_p, ct.c_void_p, ct.c_ssize_t)
+    functions = {
+        'LoadLibraryExW': ([wt.LPCWSTR, wt.HANDLE, wt.DWORD], wt.HMODULE),
+        'FreeLibrary': ([wt.HMODULE], wt.BOOL),
+        'EnumResourceNamesW': ([wt.HMODULE, ct.c_void_p, callback_type, ct.c_ssize_t], wt.BOOL),
+        'FindResourceW': ([wt.HMODULE, ct.c_void_p, ct.c_void_p], wt.HANDLE),
+        'SizeofResource': ([wt.HMODULE, wt.HANDLE], wt.DWORD),
+        'LoadResource': ([wt.HMODULE, wt.HANDLE], wt.HANDLE),
+        'LockResource': ([wt.HANDLE], ct.c_void_p),
     }
-  }
-  @{width=$actualBitmap.Width; height=$actualBitmap.Height; matchesAitaIcon=$true} | ConvertTo-Json -Compress
-} finally {
-  $actualBitmap.Dispose(); $expectedBitmap.Dispose(); $actual.Dispose(); $expected.Dispose()
-}
-'''
-    output = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
-        env={**os.environ, 'AITA_VERIFY_FILE': str(path.resolve()), 'AITA_VERIFY_ICON': str(expected_icon.resolve())},
-        text=True, capture_output=True, timeout=60)
-    if output.returncode:
-        raise RuntimeError('EXE must display the AITA icon: ' + output.stderr.strip())
-    return dict(json.loads(output.stdout), sourceSha256=hashlib.sha256(expected_icon.read_bytes()).hexdigest())
+    for name, (arguments, result) in functions.items():
+        function = getattr(kernel, name); function.argtypes = arguments; function.restype = result
+    module = kernel.LoadLibraryExW(str(path.resolve()), None, 0x40 | 0x20)
+    if not module:
+        raise ct.WinError(ct.get_last_error())
+    try:
+        names = []
+        @callback_type
+        def collect(_, __, name, ___):
+            names.append((name or 0) if not name or name <= 65535 else ct.wstring_at(name))
+            return True
+        if not kernel.EnumResourceNamesW(module, 14, collect, 0) or not names:
+            raise RuntimeError('Executable has no icon group')
+        def resource(kind, name):
+            pointer = name if isinstance(name, int) else ct.cast(ct.c_wchar_p(name), ct.c_void_p)
+            info = kernel.FindResourceW(module, pointer, kind)
+            if not info:
+                raise ct.WinError(ct.get_last_error())
+            size = kernel.SizeofResource(module, info)
+            address = kernel.LockResource(kernel.LoadResource(module, info))
+            if not address or not 0 < size <= 16 * 1024 * 1024:
+                raise RuntimeError('Invalid executable icon resource')
+            return ct.string_at(address, size)
+        group = resource(14, names[0])
+        if len(group) < 6:
+            raise RuntimeError('Truncated executable icon group')
+        reserved, kind, count = struct.unpack_from('<HHH', group)
+        if reserved or kind != 1 or not 1 <= count <= 256 or len(group) != 6 + 14 * count:
+            raise RuntimeError('Invalid executable icon group')
+        frames = []
+        for i in range(count):
+            entry = group[6 + i * 14:20 + i * 14]
+            length, identity = struct.unpack_from('<IH', entry, 8)
+            data = resource(3, identity)
+            if len(data) != length:
+                raise RuntimeError('Executable icon resource size mismatch')
+            frames.append((entry[:8], data))
+        return frames
+    finally:
+        kernel.FreeLibrary(module)
+
+
+def verify_icon(path, expected_icon):
+    expected = read_ico_frames(expected_icon.read_bytes())
+    actual = executable_icon_frames(path)
+    if actual != expected:
+        raise RuntimeError('EXE must display the AITA icon at every embedded resolution')
+    return dict(matchesAitaIcon=True, frames=len(actual),
+                sizes=[{'width':meta[0] or 256, 'height':meta[1] or 256} for meta, _ in actual],
+                sourceSha256=hashlib.sha256(expected_icon.read_bytes()).hexdigest())
 
 
 def verify_upgrade_identity(path, version):

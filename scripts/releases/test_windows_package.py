@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import struct
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -12,21 +13,37 @@ verifier = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verifier)
 
 
+class IconFileTests(unittest.TestCase):
+    def test_reference_icon_contains_all_expected_resolutions(self):
+        icon = Path(__file__).resolve().parents[2] / 'composeApp/src/jvmMain/resources/drawable/app_icon.ico'
+        frames = verifier.read_ico_frames(icon.read_bytes())
+        self.assertEqual([16, 20, 24, 32, 40, 48, 64, 128, 256], [metadata[0] or 256 for metadata, _ in frames])
+        self.assertTrue(all(image.startswith(b'\x89PNG\r\n\x1a\n') for _, image in frames))
+
+    def test_empty_truncated_and_out_of_bounds_icon_files_are_rejected(self):
+        for content in (b'', struct.pack('<HHH', 0, 1, 1),
+                        struct.pack('<HHH', 0, 1, 1) + bytes(8) + struct.pack('<II', 100, 22)):
+            with self.assertRaises(RuntimeError):
+                verifier.read_ico_frames(content)
+
+
 @unittest.skipUnless(os.name == 'nt', 'MSI databases require native Windows Installer COM')
 class WindowsPackageTests(unittest.TestCase):
     def test_extracted_executable_icon_matches_its_own_artwork_and_rejects_another_icon(self):
         with TemporaryDirectory(prefix="AITA icon ' ") as name:
             icon = Path(name) / 'original.ico'
-            script = r'''$ErrorActionPreference='Stop'
-Add-Type -AssemblyName System.Drawing
-$icon = [System.Drawing.Icon]::ExtractAssociatedIcon($env:AITA_TEST_EXE)
-$file = [System.IO.File]::Create($env:AITA_TEST_ICON)
-try { $icon.Save($file) } finally { $file.Dispose(); $icon.Dispose() }
-'''
-            subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
-                env=dict(os.environ, AITA_TEST_EXE=sys.executable, AITA_TEST_ICON=str(icon)),
-                check=True, capture_output=True, timeout=30)
+            frames = verifier.executable_icon_frames(Path(sys.executable))
+            entries, images = [], []
+            offset = 6 + 16 * len(frames)
+            for metadata, image in frames:
+                entries.append(metadata + struct.pack('<II', len(image), offset))
+                images.append(image)
+                offset += len(image)
+            icon.write_bytes(struct.pack('<HHH', 0, 1, len(frames)) + b''.join(entries + images))
             self.assertTrue(verifier.verify_icon(Path(sys.executable), icon)['matchesAitaIcon'])
+            damaged = bytearray(icon.read_bytes()); damaged[-1] ^= 1; icon.write_bytes(damaged)
+            with self.assertRaisesRegex(RuntimeError, 'EXE must display the AITA icon'):
+                verifier.verify_icon(Path(sys.executable), icon)
             aita_icon = Path(__file__).resolve().parents[2] / 'composeApp/src/jvmMain/resources/drawable/app_icon.ico'
             with self.assertRaisesRegex(RuntimeError, 'EXE must display the AITA icon'):
                 verifier.verify_icon(Path(sys.executable), aita_icon)
