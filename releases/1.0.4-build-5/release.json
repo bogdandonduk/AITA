@@ -1,0 +1,141 @@
+{
+  "version": "1.0.4",
+  "build": 5,
+  "revision": "81ece9715054a75bfbd6cf7c34aa96f661574ef5",
+  "tag": "v1.0.4-b5",
+  "createdAt": "2026-09-18T12:56:29Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.0.4-5-android.apk",
+      "sha256": "61ca5d83c41bbeb70040ad2e0e1438c696f505e35aa89b43710322b35ceb7a9c",
+      "bytes": 68471449,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/AITA-1.0.4-5-android.apk"
+    },
+    {
+      "name": "AITA-1.0.4-5-android.aab",
+      "sha256": "48796b22dadb761ed6be65db21c99609d739d756cac065b9cc4e583c15b2ba3c",
+      "bytes": 43137561,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/AITA-1.0.4-5-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "524c9c261f4bae40a4c77c4bb0955ef871e7ceb2f5fa90b3b6d4addd7a1eaf65",
+      "bytes": 856,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.0.4-5-windows.exe",
+      "sha256": "b366725d9453b12b1bce302dfc09e4801aa02c1f05eb39c25db3bd9af1761e85",
+      "bytes": 132680192,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/AITA-1.0.4-5-windows.exe"
+    },
+    {
+      "name": "AITA-1.0.4-5-windows.msi",
+      "sha256": "4a22f39a53c10565eeed8985de0931dd8cf7845b09da582e41ff7cefb11b3431",
+      "bytes": 132075972,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/AITA-1.0.4-5-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "bd2ab57c1aada02b67bc52ade8c4fea3c0a17c2c22f69ea542003d28a6d74e8f",
+      "bytes": 874,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "61a0cadfbfca33776f6daf378808dae1c88bd8da81a67db9a02e1563ffb3e254",
+      "bytes": 856,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/windows-client-build.json"
+    },
+    {
+      "name": "AITA-1.0.4-5-web.zip",
+      "sha256": "2e728a96cb84e91abf31796d4f02bf4f6158898363a353476f0686cddcee553a",
+      "bytes": 9684545,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/AITA-1.0.4-5-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "524c9c261f4bae40a4c77c4bb0955ef871e7ceb2f5fa90b3b6d4addd7a1eaf65",
+      "bytes": 856,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.4-b5/web-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "More reliable stock caching in the web app; precise barcode suggestions with separate manual and scanner input; system print dialogs for receipts, labels and reports; bundled currency and Cyrillic fonts; supply-price percentage shortcuts; consistent sheet close buttons and two-factor dropdown styling; wide-screen stock search focus; clearer report/storage/printer messages; cleaned session IP display.",
+    "ru": "\u041d\u0430\u0434\u0451\u0436\u043d\u0435\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u043e\u0441\u0442\u0430\u0442\u043a\u043e\u0432 \u0432 \u0432\u0435\u0431-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0438; \u0442\u043e\u0447\u043d\u044b\u0435 \u043f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u043e\u0432 \u0441 \u0440\u0430\u0437\u0434\u0435\u043b\u0435\u043d\u0438\u0435\u043c \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0432\u0432\u043e\u0434\u0430 \u0438 \u0441\u043a\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f; \u0441\u0438\u0441\u0442\u0435\u043c\u043d\u0430\u044f \u043f\u0435\u0447\u0430\u0442\u044c \u0447\u0435\u043a\u043e\u0432, \u044d\u0442\u0438\u043a\u0435\u0442\u043e\u043a \u0438 \u043e\u0442\u0447\u0451\u0442\u043e\u0432; \u0432\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0435 \u0448\u0440\u0438\u0444\u0442\u044b \u0432\u0430\u043b\u044e\u0442 \u0438 \u043a\u0438\u0440\u0438\u043b\u043b\u0438\u0446\u044b; \u043f\u0440\u043e\u0446\u0435\u043d\u0442\u043d\u044b\u0435 \u043f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0438 \u0446\u0435\u043d\u044b \u0437\u0430\u043a\u0443\u043f\u043a\u0438; \u0435\u0434\u0438\u043d\u044b\u0439 \u0441\u0442\u0438\u043b\u044c \u0437\u0430\u043a\u0440\u044b\u0442\u0438\u044f \u0448\u0442\u043e\u0440\u043e\u043a \u0438 \u0432\u044b\u0431\u043e\u0440\u0430 \u0434\u0432\u0443\u0445\u0444\u0430\u043a\u0442\u043e\u0440\u043d\u043e\u0439 \u0437\u0430\u0449\u0438\u0442\u044b; \u0444\u043e\u043a\u0443\u0441 \u043f\u043e\u0438\u0441\u043a\u0430 \u0441\u043a\u043b\u0430\u0434\u0430 \u043d\u0430 \u0448\u0438\u0440\u043e\u043a\u043e\u043c \u044d\u043a\u0440\u0430\u043d\u0435; \u043f\u043e\u043d\u044f\u0442\u043d\u0435\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u043f\u0435\u0447\u0430\u0442\u0438 \u0438 \u0445\u0440\u0430\u043d\u0438\u043b\u0438\u0449\u0430; \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 IP \u0441\u0435\u0430\u043d\u0441\u043e\u0432.",
+    "kk": "\u0412\u0435\u0431-\u049b\u043e\u043b\u0434\u0430\u043d\u0431\u0430\u0434\u0430 \u049b\u043e\u0440\u0434\u044b \u0441\u0430\u049b\u0442\u0430\u0443 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b; \u049b\u043e\u043b\u043c\u0435\u043d \u0435\u043d\u0433\u0456\u0437\u0443 \u043c\u0435\u043d \u0441\u043a\u0430\u043d\u0435\u0440\u043b\u0435\u0443\u0433\u0435 \u0431\u04e9\u043b\u0435\u043a \u043d\u0430\u049b\u0442\u044b \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434 \u04b1\u0441\u044b\u043d\u044b\u0441\u0442\u0430\u0440\u044b; \u0447\u0435\u043a\u0442\u0435\u0440\u0434\u0456, \u0436\u0430\u043f\u0441\u044b\u0440\u043c\u0430\u043b\u0430\u0440 \u043c\u0435\u043d \u0435\u0441\u0435\u043f\u0442\u0435\u0440\u0434\u0456 \u0436\u04af\u0439\u0435\u043b\u0456\u043a \u0431\u0430\u0441\u044b\u043f \u0448\u044b\u0493\u0430\u0440\u0443; \u0432\u0430\u043b\u044e\u0442\u0430 \u0436\u04d9\u043d\u0435 \u043a\u0438\u0440\u0438\u043b\u043b \u049b\u0430\u0440\u0456\u043f\u0442\u0435\u0440\u0456 \u049b\u043e\u0441\u044b\u043b\u0434\u044b; \u0441\u0430\u0442\u044b\u043f \u0430\u043b\u0443 \u0431\u0430\u0493\u0430\u0441\u044b\u043d\u044b\u04a3 \u043f\u0430\u0439\u044b\u0437\u0434\u044b\u049b \u04b1\u0441\u044b\u043d\u044b\u0441\u0442\u0430\u0440\u044b; \u0442\u0435\u0440\u0435\u0437\u0435\u043d\u0456 \u0436\u0430\u0431\u0443 \u0436\u04d9\u043d\u0435 \u0435\u043a\u0456 \u0444\u0430\u043a\u0442\u043e\u0440\u043b\u044b \u049b\u043e\u0440\u0493\u0430\u0443\u0434\u044b \u0442\u0430\u04a3\u0434\u0430\u0443 \u0441\u0442\u0438\u043b\u0456 \u0431\u0456\u0440\u0456\u0437\u0434\u0435\u043d\u0434\u0456\u0440\u0456\u043b\u0434\u0456; \u043a\u0435\u04a3 \u044d\u043a\u0440\u0430\u043d\u0434\u0430 \u049b\u043e\u0439\u043c\u0430 \u0456\u0437\u0434\u0435\u0443 \u0444\u043e\u043a\u0443\u0441\u044b; \u0431\u0430\u0441\u044b\u043f \u0448\u044b\u0493\u0430\u0440\u0443 \u0436\u04d9\u043d\u0435 \u0441\u0430\u049b\u0442\u0430\u0443 \u0445\u0430\u0431\u0430\u0440\u043b\u0430\u0440\u044b \u043d\u0430\u049b\u0442\u044b\u043b\u0430\u043d\u0434\u044b; \u0441\u0435\u0430\u043d\u0441 IP \u043a\u04e9\u0440\u0441\u0435\u0442\u0456\u043b\u0456\u043c\u0456 \u0442\u04af\u0437\u0435\u0442\u0456\u043b\u0434\u0456.",
+    "ky": "\u0412\u0435\u0431 \u043a\u043e\u043b\u0434\u043e\u043d\u043c\u043e\u0434\u043e \u0442\u043e\u0432\u0430\u0440 \u043a\u0430\u043b\u0434\u044b\u0433\u044b\u043d \u0441\u0430\u043a\u0442\u043e\u043e \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b; \u043a\u043e\u043b \u043c\u0435\u043d\u0435\u043d \u043a\u0438\u0440\u0433\u0438\u0437\u04af\u04af \u0436\u0430\u043d\u0430 \u0441\u043a\u0430\u043d\u0435\u0440\u043b\u04e9\u04e9 \u04af\u0447\u04af\u043d \u0442\u0430\u043a \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434 \u0441\u0443\u043d\u0443\u0448\u0442\u0430\u0440\u044b; \u0447\u0435\u043a\u0442\u0435\u0440\u0434\u0438, \u044d\u0442\u0438\u043a\u0435\u0442\u043a\u0430\u043b\u0430\u0440\u0434\u044b \u0436\u0430\u043d\u0430 \u043e\u0442\u0447\u0451\u0442\u0442\u043e\u0440\u0434\u0443 \u0441\u0438\u0441\u0442\u0435\u043c\u0430\u043b\u044b\u043a \u0431\u0430\u0441\u044b\u043f \u0447\u044b\u0433\u0430\u0440\u0443\u0443; \u0432\u0430\u043b\u044e\u0442\u0430 \u0436\u0430\u043d\u0430 \u043a\u0438\u0440\u0438\u043b\u043b \u0430\u0440\u0438\u043f\u0442\u0435\u0440\u0438 \u043a\u043e\u0448\u0443\u043b\u0434\u0443; \u0441\u0430\u0442\u044b\u043f \u0430\u043b\u0443\u0443 \u0431\u0430\u0430\u0441\u044b\u043d\u044b\u043d \u043f\u0430\u0439\u044b\u0437\u0434\u044b\u043a \u0441\u0443\u043d\u0443\u0448\u0442\u0430\u0440\u044b; \u0442\u0435\u0440\u0435\u0437\u0435\u043d\u0438 \u0436\u0430\u0431\u0443\u0443 \u0436\u0430\u043d\u0430 \u044d\u043a\u0438 \u0444\u0430\u043a\u0442\u043e\u0440\u043b\u0443\u0443 \u043a\u043e\u0440\u0433\u043e\u043e\u043d\u0443 \u0442\u0430\u043d\u0434\u043e\u043e \u0441\u0442\u0438\u043b\u0438 \u0431\u0438\u0440\u0434\u0435\u0439\u043b\u0435\u0448\u0442\u0438\u0440\u0438\u043b\u0434\u0438; \u043a\u0435\u04a3 \u044d\u043a\u0440\u0430\u043d\u0434\u0430 \u043a\u0430\u043c\u043f\u0430 \u0438\u0437\u0434\u04e9\u04e9\u0441\u04af\u043d\u04af\u043d \u0444\u043e\u043a\u0443\u0441\u0443; \u0431\u0430\u0441\u044b\u043f \u0447\u044b\u0433\u0430\u0440\u0443\u0443 \u0436\u0430\u043d\u0430 \u0441\u0430\u043a\u0442\u043e\u043e \u0431\u0438\u043b\u0434\u0438\u0440\u04af\u04af\u043b\u04e9\u0440\u04af \u0442\u0430\u043a\u0442\u0430\u043b\u0434\u044b; \u0441\u0435\u0430\u043d\u0441 IP \u043a\u04e9\u0440\u0441\u04e9\u0442\u04af\u043b\u04af\u0448\u04af \u043e\u04a3\u0434\u043e\u043b\u0434\u0443.",
+    "tg": "\u0417\u0430\u0445\u0438\u0440\u0430\u0438 \u0431\u0430\u049b\u0438\u044f\u0438 \u043c\u043e\u043b \u0434\u0430\u0440 \u0432\u0435\u0431 \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434; \u043f\u0435\u0448\u043d\u0438\u04b3\u043e\u0434\u04b3\u043e\u0438 \u0434\u0430\u049b\u0438\u049b\u0438 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434 \u0431\u043e \u0432\u0443\u0440\u0443\u0434\u0438 \u0434\u0430\u0441\u0442\u04e3 \u0432\u0430 \u0441\u043a\u0430\u043d\u0435\u0440\u043a\u0443\u043d\u0438\u0438 \u04b7\u0443\u0434\u043e\u0433\u043e\u043d\u0430; \u0447\u043e\u043f\u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u0430\u0432\u0438\u0438 \u0440\u0430\u0441\u0438\u0434\u04b3\u043e, \u0442\u0430\u043c\u0493\u0430\u04b3\u043e \u0432\u0430 \u04b3\u0438\u0441\u043e\u0431\u043e\u0442\u04b3\u043e; \u04b3\u0443\u0440\u0443\u0444\u0438 \u0430\u0441\u044a\u043e\u0440 \u0432\u0430 \u043a\u0438\u0440\u0438\u043b\u043b\u04e3 \u0438\u043b\u043e\u0432\u0430 \u0448\u0443\u0434; \u043f\u0435\u0448\u043d\u0438\u04b3\u043e\u0434\u04b3\u043e\u0438 \u0444\u043e\u0438\u0437\u0438\u0438 \u043d\u0430\u0440\u0445\u0438 \u0445\u0430\u0440\u0438\u0434; \u0443\u0441\u043b\u0443\u0431\u0438 \u044f\u0433\u043e\u043d\u0430\u0438 \u043f\u04ef\u0448\u0438\u0434\u0430\u043d\u0438 \u0440\u0430\u0432\u0437\u0430\u043d\u0430 \u0432\u0430 \u0438\u043d\u0442\u0438\u0445\u043e\u0431\u0438 \u043c\u0443\u04b3\u043e\u0444\u0438\u0437\u0430\u0442\u0438 \u0434\u0443\u043e\u043c\u0438\u043b\u0430; \u0444\u043e\u043a\u0443\u0441\u0438 \u04b7\u0443\u0441\u0442\u0443\u04b7\u04ef\u0438 \u0430\u043d\u0431\u043e\u0440 \u0434\u0430\u0440 \u044d\u043a\u0440\u0430\u043d\u0438 \u0432\u0430\u0441\u0435\u044a; \u043f\u0430\u0451\u043c\u04b3\u043e\u0438 \u0440\u0430\u0432\u0448\u0430\u043d\u0442\u0430\u0440\u0438 \u0447\u043e\u043f \u0432\u0430 \u0437\u0430\u0445\u0438\u0440\u0430; \u043d\u0430\u043c\u043e\u0438\u0448\u0438 IP-\u0438 \u0441\u0435\u0430\u043d\u0441 \u0438\u0441\u043b\u043e\u04b3 \u0448\u0443\u0434.",
+    "uz": "Veb ilovada qoldiqni saqlash yaxshilandi; qo\u2018lda kiritish va skanerlash uchun aniq shtrix-kod takliflari; cheklar, yorliqlar va hisobotlarni tizim orqali chop etish; valyuta va kirill shriftlari qo\u2018shildi; xarid narxini foiz bilan tez to\u2018ldirish; oynani yopish va ikki bosqichli himoyani tanlash uslubi birxillashtirildi; keng ekranda ombor qidiruvi fokusi; chop etish va xotira xabarlari aniqlashtirildi; seans IP ko\u2018rinishi tuzatildi."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:29:37Z",
+      "finishedAt": "2026-09-18T12:29:38Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:29:38Z",
+      "finishedAt": "2026-09-18T12:32:11Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:32:11Z",
+      "finishedAt": "2026-09-18T12:32:21Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:32:21Z",
+      "finishedAt": "2026-09-18T12:36:56Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:54:36Z",
+      "finishedAt": "2026-09-18T12:54:36Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:39:53Z",
+      "finishedAt": "2026-09-18T12:52:35Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:14:47Z",
+      "finishedAt": "2026-09-18T12:18:07Z",
+      "revision": "f155880a41003b6f7db64e10e4729679924d4739",
+      "reusedFromRun": "20260918T121139Z-600571",
+      "verifiedCompatibleClientRevision": "81ece9715054a75bfbd6cf7c34aa96f661574ef5",
+      "clientOnlyDifference": [
+        "composeApp/src/commonMain/kotlin/kz/aita/TransactionSearchInput.kt",
+        "composeApp/src/commonTest/kotlin/kz/aita/TransactionSearchInputBurstTest.kt"
+      ]
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-18T12:54:36Z",
+      "finishedAt": "2026-09-18T12:56:29Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
