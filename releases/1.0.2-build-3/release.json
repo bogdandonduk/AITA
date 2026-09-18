@@ -1,0 +1,126 @@
+{
+  "version": "1.0.2",
+  "build": 3,
+  "revision": "73e4203d4d105174ad994cbb62762c9fdeb32689",
+  "tag": "v1.0.2-b3",
+  "createdAt": "2026-09-18T09:19:54Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.0.2-3-android.apk",
+      "sha256": "50367ea6914194e38b409a1ce6a80e1dbc2f5e25d1fb1dfab19b351ab570d16f",
+      "bytes": 67737267,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/AITA-1.0.2-3-android.apk"
+    },
+    {
+      "name": "AITA-1.0.2-3-android.aab",
+      "sha256": "2c640362f5fa60049eceba46959000af3f8064c149ad8fac094a9bc32c74169f",
+      "bytes": 42399382,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/AITA-1.0.2-3-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "0773aea4783933212b54ad8d701582eb67c381ffecc44ac2d5043f891510edc9",
+      "bytes": 856,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.0.2-3-web.zip",
+      "sha256": "9d592d4dbe38663e705a8542f4517b9685e98038070f8336d9f8faf823e40fa6",
+      "bytes": 9015716,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/AITA-1.0.2-3-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "0773aea4783933212b54ad8d701582eb67c381ffecc44ac2d5043f891510edc9",
+      "bytes": 856,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/web-client-build.json"
+    },
+    {
+      "name": "AITA-1.0.2-3-windows.exe",
+      "sha256": "4cb9c30a799896692b481cd965db9d1c73457055b4478f382f47ac80091099d8",
+      "bytes": 131770880,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/AITA-1.0.2-3-windows.exe"
+    },
+    {
+      "name": "AITA-1.0.2-3-windows.msi",
+      "sha256": "5f01be80c79c2c7cad73fef672fab865f0196faf8531b6feaf7c9295f8694a7e",
+      "bytes": 131166660,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/AITA-1.0.2-3-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "a5abfa83450209e6d4ba31e1b2b52aeded360e1fbc21b59910add80b78a2d9b1",
+      "bytes": 874,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "9ae4af1c92785421ecbbc3cafec4b91eebe43e0ddd74d031542511e9250b0f6c",
+      "bytes": 856,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.0.2-b3/windows-client-build.json"
+    }
+  ],
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-18T08:15:23Z",
+      "finishedAt": "2026-09-18T08:15:24Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-18T08:15:24Z",
+      "finishedAt": "2026-09-18T08:18:15Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-18T08:18:15Z",
+      "finishedAt": "2026-09-18T08:18:16Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-18T08:18:16Z",
+      "finishedAt": "2026-09-18T08:23:04Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-18T08:23:04Z",
+      "finishedAt": "2026-09-18T08:26:33Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-18T08:26:33Z",
+      "finishedAt": "2026-09-18T08:27:40Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-18T09:17:03Z",
+      "finishedAt": "2026-09-18T09:18:20Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-18T09:18:20Z",
+      "finishedAt": "2026-09-18T09:19:54Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
