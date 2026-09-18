@@ -4,6 +4,7 @@ importScripts('/sql-wasm.js');
 let database;
 let storage;
 let inTransaction = false;
+let transactionChanged = false;
 let committedBytes;
 
 function readSnapshot() {
@@ -68,22 +69,34 @@ async function execute(request) {
         case 'exec': {
             if (!request.sql) throw new Error('Missing SQL query');
             result = database.exec(request.sql, request.params)[0] || result;
-            const readOnly = /^\s*(SELECT|WITH\b[\s\S]*?SELECT|PRAGMA\s+user_version\s*$)/i.test(request.sql);
-            if (!inTransaction && !readOnly) await persist();
+            // A CTE can precede UPDATE/DELETE/INSERT as well as SELECT. Do not acknowledge
+            // one of those writes without storing it just because a nested SELECT exists.
+            // Ambiguous statements are deliberately treated as writes.
+            const statement = request.sql.trim().replace(/;\s*$/, '');
+            const readOnly = /^PRAGMA\s+user_version\s*$/i.test(statement) ||
+                (/^(SELECT\b|WITH\b[\s\S]*?\bSELECT\b)/i.test(statement) && !statement.includes(';') &&
+                    !/\b(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|PRAGMA|VACUUM|REINDEX|ATTACH|DETACH|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(statement));
+            if (!readOnly) {
+                if (inTransaction) transactionChanged = true;
+                else await persist();
+            }
             break;
         }
         case 'begin_transaction':
             database.run('BEGIN TRANSACTION');
             inTransaction = true;
+            transactionChanged = false;
             break;
         case 'end_transaction':
             database.run('COMMIT');
             inTransaction = false;
-            await persist();
+            if (transactionChanged) await persist();
+            transactionChanged = false;
             break;
         case 'rollback_transaction':
             database.run('ROLLBACK');
             inTransaction = false;
+            transactionChanged = false;
             break;
         default:
             throw new Error('Unsupported database action');

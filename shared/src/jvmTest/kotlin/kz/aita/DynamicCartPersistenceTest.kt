@@ -99,4 +99,21 @@ class DynamicCartPersistenceTest {
         assertEquals("ordered", getCartState(2, 0).value.single().id)
         assertEquals("second", currentTransactionSupplySupplierId(2, 0))
     }
+    @Test fun receiptReturnSourceAndQuantityPersistAtomicallyAndRejectStaleOwner() = fixture {
+        publishActiveInventoryStoreId("cart-store-a")
+        val captured = assertNotNull(DynamicCarts.captureScope())
+        val selection = CartReturnBatchSelectionDataModel("receipt-item", pricePerUnit = 72.5, currencyCode = "KZT",
+            originalTransactionId = "00000000-0000-4000-8000-000000000001", originalTransactionLineIndex = 2,
+            returnDestinationKind = StockBatchKindDataModel.RETURNED,
+            sourceBatchAllocations = listOf(TransactionStockAllocationDataModel("batch-old", "cart-store-a", 2.0)))
+        assertTrue(DynamicCarts.addReceiptReturn(captured, 0, quantity(2.0), selection))
+        assertFalse(DynamicCarts.addReceiptReturn(captured, 0, quantity(9.0), selection.copy(originalTransactionLineIndex = 3)))
+        publishActiveInventoryStoreId("cart-store-b")
+        assertFalse(DynamicCarts.addReceiptReturn(captured, 0, quantity(2.0), selection))
+        assertTrue(getCartState(1, 0).value.isEmpty())
+        publishActiveInventoryStoreId("cart-store-a")
+        assertEquals(2.0, getCartState(1, 0).value.single().quantity.total)
+        assertEquals(selection, currentCartReturnBatchSelection(1, 0, "receipt-item"))
+    }
+
 }

@@ -53,4 +53,11 @@ class TransactionBarcodeFocusPolicyTest {
     }
     @Test fun scannerSuffixesDoNotPolluteNextBuffer() = assertEquals("4870000001234", transactionHidBuffer("4870000001234\r\n\t"))
     @Test fun abandonedOrPastedBuffersAreBounded() = assertEquals("2".repeat(32), transactionHidBuffer("1".repeat(40) + "2".repeat(32)))
+    @Test fun receiptHidInputPreservesFullIdentityAndAimPrefixCharacterByCharacter() {
+        val payload = transactionReceiptBarcodePayload("12345678-1234-4234-9234-123456789abc")!!
+        var buffer = ""
+        for (char in "]C0$payload") buffer = transactionHidBuffer(buffer + char, 64)
+        assertEquals("12345678-1234-4234-9234-123456789abc", parseTransactionReceiptBarcode(buffer + "\r\n"))
+    }
+
 }

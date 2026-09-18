@@ -5,7 +5,7 @@ import java.awt.Font
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 
-internal actual fun renderReceiptRaster(lines: List<String>): ByteArray? {
+internal actual fun renderReceiptRaster(lines: List<String>, barcodePayload: String?): ByteArray? {
     // Logical fonts include platform fallbacks for Cyrillic/Kazakh. No external font download.
     val regular = Font(Font.MONOSPACED, Font.PLAIN, 20)
     val heading = Font(Font.MONOSPACED, Font.BOLD, 20)
@@ -29,6 +29,7 @@ internal actual fun renderReceiptRaster(lines: List<String>): ByteArray? {
             graphics.drawString(line.text, x, 23)
             encoder.strip(image.width, image.height, image.getRGB(0, 0, image.width, image.height, null, 0, image.width))
         }
+        barcodePayload?.let(encoder::barcode)
         encoder.finish()
     } finally {
         graphics.dispose()

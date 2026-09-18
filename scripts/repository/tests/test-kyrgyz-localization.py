@@ -127,7 +127,14 @@ class KyrgyzLocalizationContractsTest(unittest.TestCase):
             key = f"support.tabs.{action}"
             self.assertIn(key, templates)
             self.assertTrue(templates[key][-1].strip())
-        self.assertGreaterEqual(count + migrated + 3 + 4, 604)
+        # The shared marketplace controls removed duplicate wide/narrow search labels
+        # and replaced the long hint/explore action with the localized shopping-list action.
+        browse = (COMPOSE / "MarketBrowseControls.kt").read_text(encoding="utf-8")
+        self.assertEqual(1, browse.count('authUiText("Product or barcode"'))
+        self.assertEqual(1, browse.count('authUiText("City · optional"'))
+        self.assertIn('authUiText("Shopping list"', browse)
+        self.assertIn('MarketBrowseControls(browse, catalogue', (COMPOSE / "BuyerMarketplaceScreen.kt").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(count + migrated + 3 + 4 + 3, 604)
         self.assertEqual(count, len(calls))
         for filename, (en, ru, kk, ky) in calls:
             self.assertTrue(ky.strip(), (filename, en))

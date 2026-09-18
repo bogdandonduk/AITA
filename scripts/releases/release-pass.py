@@ -41,6 +41,26 @@ def sha(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def ordered_release_targets(targets):
+    # Old clients remain compatible with the additive server protocol. New web clients
+    # must not reach an older backend that would ignore their explicit return destination.
+    return (["server"] if "server" in targets else []) + [t for t in targets if t not in {"server", "windows"}] + (["windows"] if "windows" in targets else [])
+
+
+def read_release_notes(path=None):
+    notes = json.loads(Path(path).read_text()) if path else {
+        'en': 'AITA release. See the versioned release record for changes and verification.',
+        'ru': 'Выпуск AITA. Изменения и проверки указаны в записи этой версии.',
+        'kk': 'AITA шығарылымы. Өзгерістер мен тексерулер нұсқа жазбасында көрсетілген.',
+        'ky': 'AITA чыгарылышы. Өзгөртүүлөр жана текшерүүлөр версия жазуусунда көрсөтүлгөн.',
+        'tg': 'Нашри AITA. Тағйирот ва санҷишҳо дар сабти версия оварда шудаанд.',
+        'uz': 'AITA nashri. O‘zgarishlar va tekshiruvlar versiya yozuvida ko‘rsatilgan.'}
+    require(isinstance(notes, dict) and set(notes) == {'en', 'ru', 'kk', 'ky', 'tg', 'uz'} and
+            all(isinstance(v, str) and 0 < len(v.strip()) <= 24000 for v in notes.values()),
+            'Release notes must contain nonempty EN/RU/KK/KY/TG/UZ strings, at most 24000 characters each')
+    return notes
+
+
 def redact(text, secrets=()):
     for value in sorted((v for v in secrets if len(v) >= 6), key=len, reverse=True):
         text = text.replace(value, '[REDACTED]')
@@ -185,6 +205,7 @@ class Run:
         remote = capture(['git', 'ls-remote', 'origin', 'refs/heads/master']).split()[0]
         require(self.revision == remote, 'Release source must exactly match pushed origin/master')
         self.tag = release_identity(self.args.version, self.args.build)
+        self.state["notes"] = read_release_notes(getattr(self.args, "notes_file", None))
         for record in (ROOT / 'releases').glob('*/release.json'):
             old = json.loads(record.read_text())
             require(self.args.build > int(old['build']) and version_tuple(self.args.version) > version_tuple(old['version']),
@@ -362,23 +383,18 @@ class Run:
         entries = []
         for entry in self.state['artifacts']:
             path = self.assets / entry['name']; suffix = path.suffix.lower()
-            if suffix not in ('.apk', '.msi', '.exe'): continue
+            if suffix not in ('.apk', '.aab', '.msi', '.exe'): continue
             platform = entry['platform']
             require(platform in ('android', 'windows') and sha(path) == entry['sha256'], 'Invalid updater artifact')
             entries.append(dict(os=platform.upper(), kind=suffix[1:].upper(), arch='UNIVERSAL' if platform == 'android' else 'X64',
-                minimumOsMajor=24 if platform == 'android' else 10, path=str(path), buildInfo=str(self.assets / f'{platform}-client-build.json')))
+                minimumOsMajor=24 if platform == 'android' else 10, path=str(path), buildInfo=str(self.assets / f'{platform}-client-build.json'),
+                publisherSigned=platform == 'android' or self.state.get('windowsSigning') == 'trusted Authenticode'))
         require(entries, 'No native installers available for the updater feed')
         if self.state.get('webUploadCompleted'):
             entries.append(dict(os='WEB', kind='WEB_RELOAD', url='https://aita.kz/', buildInfo=str(self.assets / 'web-client-build.json')))
         spec = self.folder / 'updater-spec.json'
         spec.write_text(json.dumps(dict(channel='release', id=self.tag, sequence=next_feed_sequence(catalog, self.args.build),
-            version=self.args.version, build=self.args.build, notes={
-                'en': 'Account app state, safer updates and stability improvements. Windows: unsigned pilot installers. Android: signed APK.',
-                'ru': 'Состояние приложения в аккаунте, безопаснее обновления и улучшения стабильности. Windows: пилотные установщики без подписи. Android: подписанный APK.',
-                'kk': 'Аккаунттағы қолданба күйі, қауіпсіз жаңарту және тұрақтылық жақсартулары. Windows: қолтаңбасыз пилоттық орнатқыштар. Android: қол қойылған APK.',
-                'ky': 'Аккаунттагы колдонмо абалы, коопсуз жаңыртуу жана туруктуулук жакшыртылды. Windows: кол коюлбаган пилоттук орноткучтар. Android: кол коюлган APK.',
-                'tg': 'Ҳолати барнома дар ҳисоб, навсозии бехатартар ва устувории беҳтар. Windows: насбкунандаҳои озмоишӣ бе имзо. Android: APK бо имзо.',
-                'uz': 'Hisobdagi ilova holati, xavfsizroq yangilanish va barqarorlik yaxshilandi. Windows: imzosiz sinov o‘rnatuvchilari. Android: imzolangan APK.'}, artifacts=entries), indent=2))
+            version=self.args.version, build=self.args.build, notes=self.state["notes"], artifacts=entries), indent=2))
         base = self.env['AITA_UPDATE_FEED_BASE']
         self.command('Publish signed updater metadata and immutable downloads', [sys.executable, 'scripts/releases/publish-client-release.py',
             'publish', '--spec', str(spec), '--build-info', entries[0]['buildInfo'], '--private-key', str(SIGNING / 'update-private.pem'),
@@ -402,13 +418,14 @@ class Run:
         require(entries, 'No verified release artifacts to upload')
         require(all(sha(self.assets / e['name']) == e['sha256'] for e in entries), 'Artifact changed after verification')
         manifest = {'version': self.args.version, 'build': self.args.build, 'revision': self.revision,
-            'tag': self.tag, 'createdAt': utc(), 'artifacts': entries,
+            'tag': self.tag, 'createdAt': utc(), 'artifacts': entries, 'notes': self.state['notes'],
             'stages': {k: v for k, v in self.state['stages'].items() if k != 'github'}, 'visibility': 'private GitHub repository; downloads require repository access',
             'windowsSigning': self.state.get('windowsSigning'), 'updaterFeedPublished': self.state.get('updaterFeedPublished', False)}
         record = self.folder / 'release.json'; record.write_text(json.dumps(manifest, indent=2) + '\n')
         sums = self.folder / 'SHA256SUMS.txt'; sums.write_text(''.join(f"{e['sha256']}  {e['name']}\n" for e in entries))
         notes = self.folder / 'notes.txt'
         notes.write_text(f'AITA {self.args.version}, build {self.args.build}\nSource: {self.revision}\n\n'
+            + self.state['notes']['en'] + '\n\n'
             + '\n'.join(f"{k}: {v['status']}" for k, v in self.state['stages'].items())
             + '\n\nSee release.json for signing verification, checksums and platform status.\n')
         # Create as draft: interrupted uploads cannot expose an incomplete release as complete.
@@ -447,6 +464,7 @@ def main():
     parser.add_argument('--targets', default='android,windows,web,server')
     parser.add_argument('--windows-signing', choices=['pilot', 'trusted'], default='pilot', help='Owner-authorized unsigned pilot now; trusted signing later')
     parser.add_argument('--windows-run', type=int, help='Reuse an existing Windows CI run for this exact source SHA, version and build')
+    parser.add_argument('--notes-file', type=Path, help='JSON release notes in EN/RU/KK/KY/TG/UZ; pinned at the start of the pass')
     parser.add_argument('--publish', action='store_true', help='upload completed targets to GitHub Releases')
     args = parser.parse_args()
     run = Run(args)
@@ -462,11 +480,18 @@ def main():
             if not run.stage('windows-dispatch', run.reuse_windows if args.windows_run else run.dispatch_windows):
                 return 1
         # The remote Windows runner builds while local Android/Pages work proceeds serially.
-        ordered = [t for t in targets if t != 'windows'] + (['windows'] if 'windows' in targets else [])
-        results = [run.stage(target, getattr(run, target)) for target in ordered]
+        ordered = ordered_release_targets(targets)
+        results = []
+        for target in ordered:
+            if target == 'web' and 'server' in targets and run.state['stages'].get('server', {}).get('status') != 'complete':
+                run.state['stages']['web'] = {'status': 'held', 'error': 'Compatible server deployment did not succeed'}
+                run.save(); run.say('HELD', 'Web publication waits for the compatible server. Local native builds can still finish.')
+                results.append(False)
+                continue
+            results.append(run.stage(target, getattr(run, target)))
         if args.publish and 'server' in targets:
             results.append(run.stage('updater-feed', run.updater_feed))
-        if args.publish and all(run.state['stages'].get(t, {}).get('status') == 'complete' for t in targets if t != 'server'):
+        if args.publish and all(run.state['stages'].get(t, {}).get('status') == 'complete' for t in targets):
             results.append(run.stage('github', run.publish))
         elif args.publish:
             run.say('HELD', 'GitHub publication waits for every requested client platform to pass. Verified local artifacts and logs are retained.')

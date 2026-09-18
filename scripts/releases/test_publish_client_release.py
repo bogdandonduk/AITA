@@ -61,6 +61,34 @@ class PublishClientReleaseTest(unittest.TestCase):
         self.assertTrue((self.catalog / "artifacts" / artifact["url"].split("/")[-1]).is_file())
         self.assertFalse((self.catalog / ".publish.lock").exists())
 
+    def test_aab_is_download_only_and_history_preserves_published_versions(self):
+        (self.root / "app.apk").write_bytes(b"signed APK fixture")
+        (self.root / "app.aab").write_bytes(b"signed AAB fixture")
+        self.data["artifacts"] = [dict(os="ANDROID", kind=kind, path="app." + kind.lower(), publisherSigned=True) for kind in ("APK", "AAB")]
+        self.save()
+        def decoded():
+            with tempfile.TemporaryDirectory() as tmp:
+                return publisher.verify_envelope(publisher.read_json(self.publish()), base64.b64decode(self.build["publicKey"]), Path(tmp))
+        first = decoded()
+        self.assertEqual(["APK"], [x["kind"] for x in first["artifacts"]])
+        self.assertEqual(["APK", "AAB"], [x["kind"] for x in first["downloads"][0]["files"]])
+        self.assertTrue(all(x["publisherSigned"] for x in first["downloads"][0]["files"]))
+        self.assertTrue(any(x.suffix == ".aab" for x in (self.catalog / "artifacts").iterdir()))
+        self.data.update(build=3, sequence=3, id="release-3", version="1.0.3")
+        self.build.update(build="3", version="1.0.3"); self.save()
+        second = decoded()
+        self.assertEqual([3, 2], [x["build"] for x in second["downloads"]])
+        self.assertEqual(first["downloads"][0], second["downloads"][1])
+
+    def test_same_build_cannot_replace_a_download_only_aab(self):
+        (self.root / "app.aab").write_bytes(b"first signed bundle")
+        self.data["artifacts"].append(dict(os="ANDROID", kind="AAB", path="app.aab"))
+        self.save(); old = self.publish().read_bytes()
+        (self.root / "app.aab").write_bytes(b"changed bundle")
+        self.data["sequence"] += 1; self.save()
+        with self.assertRaises(ValueError): self.publish()
+        self.assertEqual(old, (self.catalog / "release.json").read_bytes())
+
     def test_equal_or_lower_build_cannot_replace_release(self):
         old = self.publish().read_bytes()
         with self.assertRaises(ValueError): self.publish()

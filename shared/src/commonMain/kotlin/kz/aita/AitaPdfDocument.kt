@@ -2,7 +2,7 @@ package kz.aita
 
 /** Semantic text, not localized word matching. Dimensions are PDF points, independent of UI scale. */
 enum class AitaPdfRole { Body, Store, Address, Title, Heading, Total, Divider }
-data class AitaPdfBlock(val text: String, val role: AitaPdfRole = AitaPdfRole.Body)
+data class AitaPdfBlock(val text: String, val role: AitaPdfRole = AitaPdfRole.Body, val barcodePayload: String? = null)
 data class AitaPdfStyle(val size: Float, val bold: Boolean = false, val centered: Boolean = false)
 data class AitaPdfDocument(
     val blocks: List<AitaPdfBlock>,
@@ -20,7 +20,7 @@ data class AitaPdfDocument(
         else -> AitaPdfStyle(bodySize)
     }
 }
-data class AitaPdfLine(val text: String, val style: AitaPdfStyle, val x: Float, val baseline: Float, val divider: Boolean = false)
+data class AitaPdfLine(val text: String, val style: AitaPdfStyle, val x: Float, val baseline: Float, val divider: Boolean = false, val barcode: ReceiptBarcodeGeometry? = null)
 data class AitaPdfPage(val width: Float, val height: Float, val lines: List<AitaPdfLine>)
 
 /** Native glyph rendering is required. There is deliberately no ASCII/Helvetica fallback. */
@@ -92,6 +92,18 @@ fun layoutAitaPdfDocument(
     }
     for (block in document.blocks) {
         val style = document.style(block.role)
+        block.barcodePayload?.let { payload ->
+            val moduleWidth = 0.72f // 0.254 mm; do not squeeze bars to fit a narrow page.
+            val barcode = transactionReceiptBarcodeGeometry(payload, moduleWidth, 36f,
+                vertical = transactionReceiptBarcodeModules(payload).size * moduleWidth > contentWidth)
+            require(barcode.width <= contentWidth && barcode.height <= document.maxHeight - document.margin * 2) {
+                "Receipt barcode does not fit the page"
+            }
+            if (y + barcode.height > document.maxHeight - document.margin && lines.isNotEmpty()) finishPage()
+            lines += AitaPdfLine("", style, document.margin + (contentWidth - barcode.width) / 2f, y, barcode = barcode)
+            y += barcode.height
+        }
+        if (block.barcodePayload != null) continue
         val (ascent, descent) = metrics(style)
         require(ascent.isFinite() && descent.isFinite() && ascent <= 0 && descent >= 0)
         val step = maxOf(style.size * 1.4f, descent - ascent + 2f)

@@ -883,6 +883,7 @@ fun AppConfiguration.TransactionCartScreen() {
             )
         }
     ) {
+        if (context.transactionTypeIndex == 1 && ReturnReceiptLookup(context.clientId)) return@AitaScreenColumn
         val goodsInCart by getCartState(
             context.transactionTypeIndex,
             context.clientId
@@ -1319,7 +1320,7 @@ fun AppConfiguration.TransactionCartScreen() {
                 actionButton(
                     autoLoading = false,
                     modifier = Modifier.fillMaxWidth(),
-                    text = stateValues.stringPayment,
+                    text = if (context.transactionTypeIndex == 1) returnFlowText("batches") else stateValues.stringPayment,
                     enabled = stateValues.latestNotification == null && invalidPromotionRestrictions.isEmpty() && invalidWholesaleCartItems.isEmpty() && firstUncheckedCondition == null,
                     onDisabledClick = {
                         val firstRestriction = invalidPromotionRestrictions.firstOrNull()
@@ -1346,7 +1347,7 @@ fun AppConfiguration.TransactionCartScreen() {
                         coroutineScope.launch {
                             when (context.transactionTypeIndex) {
                                 0 -> Navigation.TransactionSale.go(NavigationScreenModel.Transaction.Payment)
-                                1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Payment)
+                                1 -> Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.ReturnBatches)
                                 else -> Navigation.TransactionSupply.go(NavigationScreenModel.Transaction.Payment)
                             }
                         }
@@ -5761,6 +5762,7 @@ internal data class GoodsBatchDraft(
     val additionalNotes: String = "",
     val additionalNotesLocalized: List<LocalizedStringDataModel> = emptyList(),
     val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered,
+    val kind: StockBatchKindDataModel = StockBatchKindDataModel.NORMAL,
     val promotions: List<StockPromotionDataModel> = emptyList()
 )
 
@@ -5794,7 +5796,8 @@ internal fun GoodsBatchDraft.toNavigationStateString(): String {
         manufacturedDateText,
         additionalNotes,
         status.name,
-        jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), additionalNotesLocalized)
+        jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), additionalNotesLocalized),
+        kind.name
     ).joinToString(GOODS_BATCH_DRAFT_SEPARATOR) { it.cleanForGoodsBatchDraftState() }
 }
 
@@ -5860,7 +5863,8 @@ internal fun goodsBatchDraftFromNavigationStateString(raw: String): GoodsBatchDr
             additionalNotesLocalized = localizedNotes.ifEmpty {
                 values.getOrNull(notesIndex).orEmpty().takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList()
             },
-            status = StockBatchStatusDataModel.valueOf(values.getOrNull(statusIndex).orEmpty().ifBlank { StockBatchStatusDataModel.Delivered.name })
+            status = StockBatchStatusDataModel.valueOf(values.getOrNull(statusIndex).orEmpty().ifBlank { StockBatchStatusDataModel.Delivered.name }),
+            kind = values.getOrNull(localizedNotesIndex + 1)?.let { runCatching { StockBatchKindDataModel.valueOf(it) }.getOrNull() } ?: StockBatchKindDataModel.NORMAL
         )
     }.getOrNull()
 }
@@ -6210,6 +6214,7 @@ internal fun GoodsBatchDataModel.toDraft(
             additionalNotes?.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList()
         },
         status = status,
+        kind = kind,
         promotions = promotions
     )
 }

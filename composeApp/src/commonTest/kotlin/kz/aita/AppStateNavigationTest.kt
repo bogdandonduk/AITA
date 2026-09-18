@@ -4,7 +4,10 @@ import kotlin.test.*
 
 class AppStateNavigationTest {
     @Test fun settingsAvailableInEveryModeAndWithoutSubscription() {
-        for (mode in 0..3) assertTrue(NavigationScreenModel.Menu.AppState in menuDestinationsForAppMode(mode))
+        for (mode in 0..3) {
+            assertTrue(NavigationScreenModel.Menu.Settings in menuDestinationsForAppMode(mode))
+            assertFalse(NavigationScreenModel.Menu.AppState in menuDestinationsForAppMode(mode))
+        }
         assertFalse(menuDestinationRequiresStoreSubscription(NavigationScreenModel.Menu.AppState))
         assertEquals(NavigationScreenModel.Menu.AppState, persistentAppRouteToScreen(NavigationScreenModel.Menu.AppState.route))
     }

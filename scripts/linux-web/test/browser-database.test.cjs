@@ -57,11 +57,20 @@ test('durable writes, reload, rollback, competing tab, and failed storage write'
   await p.evaluate(() => query(null, [], 'begin_transaction'));
   await sql(p, 'UPDATE key_value SET value = ?', ['committed']);
   await p.evaluate(() => query(null, [], 'end_transaction'));
+  await sql(p, 'WITH target AS (SELECT key FROM key_value WHERE key = ?) UPDATE key_value SET value = ? WHERE key IN (SELECT key FROM target)', ['cart', 'cte-committed']);
+  await p.close();
+  p = await page();
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value'), [['cte-committed']]);
+  await sql(p, 'UPDATE key_value SET value = ?', ['committed']);
   const second = await page();
   await assert.rejects(sql(second, 'SELECT value FROM key_value'), /already open in another tab/);
   await second.close(); await p.close();
   p = await page(true);
   assert.deepEqual(await sql(p, 'SELECT value FROM key_value'), [['committed']]);
+  // A read-only transaction does not export/rewrite the entire database (even at quota).
+  await p.evaluate(() => query(null, [], 'begin_transaction'));
+  assert.deepEqual(await sql(p, 'WITH target AS (SELECT value FROM key_value) SELECT value FROM target'), [['committed']]);
+  await p.evaluate(() => query(null, [], 'end_transaction'));
   await assert.rejects(sql(p, 'UPDATE key_value SET value = ?', ['must-not-publish']), /quota failure/);
   assert.deepEqual(await sql(p, 'SELECT value FROM key_value'), [['committed']]);
   await p.close();

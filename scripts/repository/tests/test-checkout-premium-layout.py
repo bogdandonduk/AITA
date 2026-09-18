@@ -44,13 +44,13 @@ class CheckoutPremiumLayoutTest(unittest.TestCase):
     def test_payment_or_receipt_in_either_pane_disables_scanning(self):
         text = body('CommonMainComposeAuthTransaction.kt', 'AppConfiguration.TransactionScreen')
         self.assertIn('listOf(leftTransactionPaneModel, rightTransactionPaneModel)', text)
-        self.assertIn('captureEnabled = visiblePaneModels.all', text)
+        self.assertIn('captureEnabled = cartPersistenceHydrated && cartNavigationReady && visiblePaneModels.all', text)
         self.assertIn('it is NavigationScreenModel.Transaction.Selection || it is NavigationScreenModel.Transaction.Cart', text)
 
     def test_hidden_input_keeps_complete_buffer_and_scanner_terminator(self):
         text = body('CommonMainComposeAuthTransaction.kt', 'AppConfiguration.TransactionBarcodeHidInput')
         self.assertNotIn('removePrefix(buffer)', text)
-        self.assertIn('transactionHidBuffer(raw)', text)
+        self.assertIn('transactionHidBuffer(raw, if (transactionTypeIndex == 1) 64 else 32)', text)
         self.assertIn('barcodeHandler(raw)', text)
         self.assertIn('barcodeHandler("$buffer\\n")', text)
         self.assertIn('enabled = captureEnabled', text)

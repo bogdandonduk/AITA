@@ -14,7 +14,7 @@ class MenuTabsRefinementTest(unittest.TestCase):
     def test_numbered_artwork_matches_all_platforms(self):
         text=(KOTLIN/"AitaTabIcons.kt").read_text()
         families=[int(x) for x in re.findall(r"^    \w+\((\d+)\)",text,re.M)]
-        self.assertEqual(61,len(families)); self.assertEqual(len(families),len(set(families)))
+        self.assertEqual(set(range(149, 210)) | {216, 217}, set(families)); self.assertEqual(len(families),len(set(families)))
         keep=(ROOT/"composeApp/src/androidMain/res/raw/aita_tab_icons_keep.xml").read_text()
         for family in families:
             for variant in (0,1):

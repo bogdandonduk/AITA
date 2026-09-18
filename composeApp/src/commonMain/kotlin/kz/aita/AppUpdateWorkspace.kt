@@ -198,7 +198,7 @@ internal interface ClientUpdateBackend {
     suspend fun clean(installed: ClientBuildIdentity)
 }
 
-private class PlatformClientUpdateBackend : ClientUpdateBackend {
+internal class PlatformClientUpdateBackend : ClientUpdateBackend {
     override val publicKey get() = GeneratedClientBuild.publicKey
     override val feedBase get() = GeneratedClientBuild.feedBase
     override fun nowMillis() = Clock.System.now().toEpochMilliseconds()

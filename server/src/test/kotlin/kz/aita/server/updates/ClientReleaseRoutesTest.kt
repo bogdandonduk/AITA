@@ -46,8 +46,10 @@ class ClientReleaseRoutesTest {
     @Test fun filesAreServedOnlyThroughContentAddressedNames()=temporary{root->
         val directory=Files.createDirectory(root.resolve("artifacts"));val name="a".repeat(64)+".pkg";Files.writeString(directory.resolve(name),"abc")
         Files.writeString(directory.resolve("secret.txt"),"secret")
+        val bundle="b".repeat(64)+".aab";Files.writeString(directory.resolve(bundle),"bundle")
         testApplication{application{routing{installClientUpdateRoutes(ClientReleaseCatalog(root,pair.public.encoded){now})}}
             assertEquals("abc",client.get("/client-updates/artifacts/$name").bodyAsText())
+            assertEquals("bundle",client.get("/client-updates/artifacts/$bundle").bodyAsText())
             assertEquals(HttpStatusCode.NotFound,client.get("/client-updates/artifacts/secret.txt").status)
         }
     }

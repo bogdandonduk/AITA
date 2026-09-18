@@ -1008,6 +1008,10 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
     clientId: Int,
     currentCart: List<GoodsItemInCartDataModel>
 ): Boolean {
+    if (transactionTypeIndex == 1 && requestReturnReceiptScan(rawInput, clientId)) return true
+    val receiptInput = rawInput.trim().removePrefix("]C0")
+    if (transactionTypeIndex == 1 && receiptInput.startsWith("9910") && receiptInput.length <= 44 &&
+        rawInput.none { it == '\n' || it == '\r' || it == '\t' }) return false
     val candidate = rawInput.transactionBarcodeCandidate() ?: return false
 
     if (candidate.length > 32) return false
@@ -1166,7 +1170,7 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
         value = buffer,
         enabled = captureEnabled,
         onValueChange = { raw ->
-            val candidate = transactionHidBuffer(raw)
+            val candidate = transactionHidBuffer(raw, if (transactionTypeIndex == 1) 64 else 32)
 
             // Keep a scanner terminator for completion detection; never store it in the buffer.
             buffer = if (barcodeHandler(raw)) "" else candidate
@@ -1939,6 +1943,7 @@ internal fun AppConfiguration.TransactionPaneContent(
         when (model) {
             is NavigationScreenModel.Transaction.Cart -> TransactionCartScreen()
             is NavigationScreenModel.Transaction.Selection -> TransactionSelectionScreen(onBarcodeCaptureFocusRequested = onBarcodeCaptureFocusRequested)
+            is NavigationScreenModel.Transaction.ReturnBatches -> ReturnBatchSelectionScreen()
             is NavigationScreenModel.Transaction.Payment -> TransactionPaymentScreen()
             is NavigationScreenModel.Transaction.ReceiptPreview -> TransactionReceiptPreviewScreen()
             else -> {}
@@ -2508,6 +2513,7 @@ internal fun AppConfiguration.ReceiptPreviewTotals(
         center = true,
         bold = true
     )
+    ReceiptTransactionBarcodeFooter(snapshot)
 }
 
 internal fun AppConfiguration.receiptActionNotification(
@@ -2591,7 +2597,13 @@ internal fun AppConfiguration.buildTransactionReceiptLines(
             } else {
                 ""
             },
-            stockBatchId = if (transactionTypeIndex == 1) resolvedReturn?.selection?.stockBatchId else null
+            stockBatchId = if (transactionTypeIndex == 1) resolvedReturn?.selection?.stockBatchId else null,
+            originalTransactionId = returnSelection?.originalTransactionId,
+            originalTransactionLineIndex = returnSelection?.originalTransactionLineIndex,
+            originalClientOperationId = returnSelection?.originalClientOperationId,
+            returnDestinationKind = returnSelection?.returnDestinationKind,
+            sourceBatchAllocations = returnSelection?.sourceBatchAllocations.orEmpty(),
+            shelfBatchIdAtSale = returnSelection?.shelfBatchIdAtSale
         )
     }
 }
@@ -2903,7 +2915,11 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     quantityUnit = it.quantity,
                     currencyCode = it.currencyCode,
                     returnReason = if (context.transactionTypeIndex == 1) it.returnReason.trim() else "",
-                    stockBatchId = if (context.transactionTypeIndex == 1) it.stockBatchId else null
+                    stockBatchId = if (context.transactionTypeIndex == 1) it.stockBatchId else null,
+                    originalTransactionId = it.originalTransactionId,
+                    originalTransactionLineIndex = it.originalTransactionLineIndex,
+                    originalClientOperationId = it.originalClientOperationId,
+                    returnDestinationKind = it.returnDestinationKind
                 )
             },
             paidCash = draft.paidCash,
@@ -3037,12 +3053,16 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     text = stateValues.stringComplete,
                     loading = stateValues.completeTransactionInProgress,
                     loadingText = localizedStringResource(224, "Completing transaction"),
-                    enabled = snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
+                    enabled = (alreadyCompleted || context.transactionTypeIndex != 1 || returnDestinationsReady(context.clientId)) && snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
                     iconPath = completeReceiptIconPath,
                     iconRes = completeReceiptIconRes,
                     iconTintColor = Color.White,
                     iconSizeOverride = 22.dp,
                     onClick = {
+                        if (context.transactionTypeIndex == 1 && !returnDestinationsReady(context.clientId)) {
+                            coroutineScope.launch { Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.ReturnBatches) }
+                            return@actionButton
+                        }
                         completeTransaction(
                             transaction = currentTransaction.copy(timeMillis = getCurrentTimeMillis()),
                             transactionTypeIndex = context.transactionTypeIndex,
@@ -4232,6 +4252,12 @@ internal fun AppConfiguration.defaultReturnBatchFor(
         ?: candidateBatches.firstOrNull { it.quantity.total > 0.000001 }
         ?: candidateBatches.firstOrNull()
 
+internal fun PriceDataModel.withReturnSelectionPrice(selection: CartReturnBatchSelectionDataModel?): PriceDataModel {
+    val amount = selection?.pricePerUnit?.takeIf { it.isFinite() && it >= 0.0 }
+    val priced = amount?.let { withMoneyAmount(it) } ?: this
+    return if (!selection?.currencyCode.isNullOrBlank()) priced.copy(currency = selection!!.currencyCode) else priced
+}
+
 internal fun AppConfiguration.resolveReturnBatchSelection(
     goodsItem: GoodsItemDataModel,
     cartItem: GoodsItemInCartDataModel,
@@ -4241,18 +4267,17 @@ internal fun AppConfiguration.resolveReturnBatchSelection(
     val defaultCurrency = selection?.currencyCode?.takeIf { it.isNotBlank() } ?: defaultTransactionCurrencyCode()
     val candidates = returnCandidateBatchesFor(goodsItem, allBatches)
     val selectedBatch = selection?.stockBatchId?.let { selectedId -> candidates.firstOrNull { it.id == selectedId } }
-    val batch = selectedBatch ?: defaultReturnBatchFor(goodsItem, candidates)
+    val batch = if (selection?.returnDestinationKind == StockBatchKindDataModel.RETURNED || selection?.stockBatchId != null)
+        selectedBatch else defaultReturnBatchFor(goodsItem, candidates)
     val basePrice = goodsItem.priceForTransaction(
         transactionTypeIndex = 1,
         saleMethodId = SALE_METHOD_RETAIL,
         quantityTotal = cartItem.quantity.total,
         batch = batch
     ).withFallbackCurrency(defaultCurrency)
-    val selectedAmount = selection?.pricePerUnit?.takeIf { it >= 0.0 }
-    val price = (selectedAmount?.let { basePrice.withMoneyAmount(it) } ?: basePrice).withFallbackCurrency(defaultCurrency)
-    val normalized = CartReturnBatchSelectionDataModel(
-        goodsItemId = goodsItem.id,
-        stockBatchId = batch?.id,
+    val price = basePrice.withReturnSelectionPrice(selection).withFallbackCurrency(defaultCurrency)
+    val normalized = (selection ?: CartReturnBatchSelectionDataModel(goodsItemId = goodsItem.id)).copy(
+        stockBatchId = selection?.stockBatchId ?: batch?.id,
         pricePerUnit = price.price.toMoneyDouble().roundMoney(),
         currencyCode = price.currency.ifBlank { defaultCurrency },
         updatedAtMillis = selection?.updatedAtMillis ?: 0L
@@ -4283,7 +4308,7 @@ internal fun AppConfiguration.returnBatchSummaryText(
     allBatches: List<GoodsBatchDataModel>,
     currencyCode: String
 ): String {
-    if (batch == null) return localizedStringResource(1315, "Returned no-stock batch")
+    if (batch == null) return returnFlowText("returned")
     val index = allBatches.indexOfFirst { it.id == batch.id }.takeIf { it >= 0 }?.plus(1)
     val price = returnBatchPriceForDisplay(goodsItem, batch, currencyCode)
     return listOfNotNull(
@@ -4305,7 +4330,8 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
     onDismiss: () -> Unit,
     onConfirm: (CartReturnBatchSelectionDataModel) -> Unit
 ) {
-    val autoFocusAmount = platformAllowsAutomaticTextFieldFocus()
+    val receiptPriceLocked = selection?.originalTransactionId != null || selection?.originalClientOperationId != null
+    val autoFocusAmount = !receiptPriceLocked && platformAllowsAutomaticTextFieldFocus()
     val suppressSystemKeyboard = getPlatformName().contains("android", ignoreCase = true)
     val keyboardController = LocalSoftwareKeyboardController.current
     val defaultResolved = remember(goodsItem.id, cartItem.quantity.total, allBatches, selection) {
@@ -4324,7 +4350,7 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
     }
     val filteredBatches = remember(candidateBatches, amountText, defaultCurrency) {
         val hasTypedPrice = amountText.isNotBlank()
-        if (!hasTypedPrice) {
+        if (!hasTypedPrice || receiptPriceLocked) {
             candidateBatches
         } else {
             candidateBatches.filter { batch ->
@@ -4371,11 +4397,11 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
                 isFocusedInitial = autoFocusAmount,
                 autoFocus = autoFocusAmount,
                 forceRefocus = false,
-                readOnly = suppressSystemKeyboard,
+                readOnly = suppressSystemKeyboard || receiptPriceLocked,
                 keyboardType = KeyboardType.Decimal,
                 imeWithAction = ImeWithAction(ImeAction.Done),
                 leadingIconPath = stateValues.drawablePathIconTransactionReturn,
-                showClearButton = true,
+                showClearButton = !receiptPriceLocked,
                 selectionBackgroundColor = stateValues.AccentColor,
                 selectionFocusTextColor = stateValues.AccentTextColor,
                 updateIsFocusedAction = { focusState ->
@@ -4384,7 +4410,7 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
                 onTransformValue = { paymentInputNormalize(it.trim().replace(',', '.')) },
                 onValueChange = { rawValue, applyChange ->
                     val normalized = paymentInputNormalize(rawValue.trim().replace(',', '.'))
-                    if (normalized.isEmpty() || normalized == "." || normalized.matches(Regex("^\\d*(\\.\\d{0,2})?$"))) {
+                    if (!receiptPriceLocked && (normalized.isEmpty() || normalized == "." || normalized.matches(Regex("^\\d*(\\.\\d{0,2})?$")))) {
                         amountText = normalized
                         applyChange()
                     }
@@ -4405,7 +4431,7 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            TransactionNumpad(
+            if (!receiptPriceLocked) TransactionNumpad(
                 modifier = Modifier.fillMaxWidth(),
                 allowDecimal = true,
                 onInput = { token ->
@@ -4540,9 +4566,9 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
                     enabledColor = stateValues.AccentColor,
                     onClick = {
                         onConfirm(
-                            CartReturnBatchSelectionDataModel(
-                                goodsItemId = goodsItem.id,
+                            (selection ?: CartReturnBatchSelectionDataModel(goodsItemId = goodsItem.id)).copy(
                                 stockBatchId = selectedBatchId.takeIf { selectedId -> candidateBatches.any { it.id == selectedId } },
+                                returnDestinationKind = if (selectedBatchId.isNullOrBlank()) selection?.returnDestinationKind else null,
                                 pricePerUnit = enteredAmount,
                                 currencyCode = defaultCurrency,
                                 updatedAtMillis = getCurrentTimeMillis()
@@ -5133,6 +5159,13 @@ fun AppConfiguration.TransactionPaymentScreen() {
         ).collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
         val returnBatchSelections by getCartReturnBatchSelectionsState().collectAsState()
+
+        if (context.transactionTypeIndex == 1 && !returnDestinationsReady(context.clientId)) {
+            Text(returnFlowText("choose"), color = stateValues.TextColor)
+            actionButton(text = returnFlowText("batches"), autoLoading = false, confirmationRequired = false,
+                onClick = { coroutineScope.launch { Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.ReturnBatches) } })
+            return@AitaScreenColumn
+        }
 
         val lines = remember(
             goodsInCart,

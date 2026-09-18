@@ -65,10 +65,15 @@ enum class AitaTabIcon(val family: Int) {
     Basket(206),
     Info(207),
     Barcode(208),
-    CashRegister(209)
+    CashRegister(209),
+    AppState(216),
+    Downloads(217)
 }
 
 internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
+    "app_state" -> AitaTabIcon.AppState
+    "downloads" -> AitaTabIcon.Downloads
+    "diagnostics" -> AitaTabIcon.Security
     "all", "generic", "overview", "category" -> AitaTabIcon.All
     "quick" -> AitaTabIcon.Quick
     "in_stock", "stock", "allocation", "products", "goods_item" -> AitaTabIcon.Stock
@@ -136,6 +141,8 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
 internal fun AppConfiguration.tabIconResource(icon: AitaTabIcon): DrawableResource {
     val dark = isDarkAppTheme(stateValues.appThemeId)
     return when(icon) {
+        AitaTabIcon.AppState -> if (dark) Res.drawable._216_1 else Res.drawable._216_0
+        AitaTabIcon.Downloads -> if (dark) Res.drawable._217_1 else Res.drawable._217_0
         AitaTabIcon.All -> if (dark) Res.drawable._149_1 else Res.drawable._149_0
         AitaTabIcon.Quick -> if (dark) Res.drawable._150_1 else Res.drawable._150_0
         AitaTabIcon.Stock -> if (dark) Res.drawable._151_1 else Res.drawable._151_0

@@ -13,33 +13,25 @@ actual fun getCurrentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpoch
 
 private const val browserStoragePrefix = "aita."
 
-private fun browserGet(key: String): String? = runCatching { localStorage.getItem(browserStoragePrefix + key) }.getOrNull()
+private fun browserGet(key: String): String? = localStorage.getItem(browserStoragePrefix + key)
 private fun browserSet(key: String, value: String?) {
-    runCatching {
-        if (value == null) localStorage.removeItem(browserStoragePrefix + key)
-        else localStorage.setItem(browserStoragePrefix + key, value)
-    }
+    if (value == null) localStorage.removeItem(browserStoragePrefix + key)
+    else localStorage.setItem(browserStoragePrefix + key, value)
 }
 
-actual var getStoredUserAuthTokens: (() -> TokenPair?)? = {
-    runCatching {
-        browserGet("auth_tokens")?.let { jsonBase.decodeFromString<TokenPair>(it) }
-    }.getOrNull()
-}
+private val browserTokens = DecodedStoredValue<TokenPair>(
+    read = { browserGet("auth_tokens") }, write = { browserSet("auth_tokens", it) },
+    decode = { jsonBase.decodeFromString<TokenPair>(it) }, encode = { jsonBase.encodeToString(it) }
+)
+actual var getStoredUserAuthTokens: (() -> TokenPair?)? = browserTokens::get
+actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = browserTokens::set
 
-actual var setStoredUserAuthTokens: ((TokenPair?) -> Unit)? = { tokens ->
-    browserSet("auth_tokens", tokens?.let { jsonBase.encodeToString(it) })
-}
-
-actual var getStoredUserAccountDataModel: (() -> UserAccountDataModel?)? = {
-    runCatching {
-        browserGet("user_account")?.let { jsonBase.decodeFromString<UserAccountDataModel>(it) }
-    }.getOrNull()
-}
-
-actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = { user ->
-    browserSet("user_account", user?.let { jsonBase.encodeToString(it) })
-}
+private val browserAccount = DecodedStoredValue<UserAccountDataModel>(
+    read = { browserGet("user_account") }, write = { browserSet("user_account", it) },
+    decode = { jsonBase.decodeFromString<UserAccountDataModel>(it) }, encode = { jsonBase.encodeToString(it) }
+)
+actual var getStoredUserAccountDataModel: (() -> UserAccountDataModel?)? = browserAccount::get
+actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = browserAccount::set
 
 actual var getPersistentUiDraftValue: (suspend (String) -> String?)? = { key ->
     browserGet("ui_draft_" + key.hashCode().toString())

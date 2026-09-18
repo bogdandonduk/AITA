@@ -18,9 +18,9 @@ internal fun transactionBarcodeFocusTarget(
 }
 
 /** BasicTextField gives us the WHOLE edited value, not just the newest scanner character. */
-internal fun transactionHidBuffer(raw: String): String = raw
+internal fun transactionHidBuffer(raw: String, maxLength: Int = 32): String = raw
     .filterNot { it == '\r' || it == '\n' || it == '\t' }
-    .takeLast(32)
+    .takeLast(maxLength.coerceIn(32, 64))
 
 internal fun transactionPrefersVisibleSearch(platformName: String, isNarrowScreen: Boolean): Boolean {
     val platform = platformName.lowercase()

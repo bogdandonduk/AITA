@@ -2312,6 +2312,8 @@ fun AppConfiguration.searchTextField(
     updateIsFocusedAction: ((FocusState) -> Unit)? = null,
     forceRefocus: Boolean = false,
     barcodeCamScanner: Boolean = false,
+    placeholderText: String = stateValues.stringSearchByAnyData,
+    onBarcodeScanned: ((String) -> Unit)? = null,
     captureTransactionBarcodeInput: Boolean = false,
     focusedBorderWidth: Dp = stateValues.focusedBorderWidth,
     unfocusedBorderWidth: Dp = stateValues.unfocusedBorderWidth,
@@ -2425,7 +2427,7 @@ fun AppConfiguration.searchTextField(
             autoFocus = autoFocus,
             updateIsFocusedAction = updateIsFocusedAction,
             forceRefocus = forceRefocus,
-            placeholderText = stateValues.stringSearchByAnyData,
+            placeholderText = placeholderText,
             focusedBorderWidth = focusedBorderWidth,
             unfocusedBorderWidth = unfocusedBorderWidth,
             focusedBorderColor = focusedBorderColor,
@@ -2453,7 +2455,7 @@ fun AppConfiguration.searchTextField(
         )
 
         val onCameraBarcodeDetected: (String) -> Unit = { raw ->
-            val candidate = raw.transactionBarcodeCandidate() ?: raw.trim()
+            val candidate = if (onBarcodeScanned != null) raw.trim() else raw.transactionBarcodeCandidate() ?: raw.trim()
             if (candidate.isNotBlank()) {
                 val now = getCurrentTimeMillis()
                 val repeatedTooSoon = candidate.normalizedTransactionBarcode() == lastCameraBarcode.normalizedTransactionBarcode() &&
@@ -2464,7 +2466,9 @@ fun AppConfiguration.searchTextField(
                     lastCameraBarcodeMillis = now
                     barcodeFillHighlightPulseKey += 1
 
-                    if (captureTransactionBarcodeInput) {
+                    if (onBarcodeScanned != null) {
+                        onBarcodeScanned(candidate)
+                    } else if (captureTransactionBarcodeInput) {
                         val handled = activeTransactionBarcodeHandler?.invoke(candidate) == true
                         if (!handled) {
                             postInAppNotification(
@@ -2886,6 +2890,12 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.stringSelect
         }
 
+        data object ReturnBatches: Transaction("TransactionReturnBatchesNavigationScreenModelRoute") {
+            override val iconPath: String get() = AppConfiguration.stateValues.drawablePathIconStock
+            override val iconRes: DrawableResource get() = AppConfiguration.stateValues.drawableResIconStock.value
+            override val name: String get() = with(AppConfiguration) { returnFlowText("batches") }
+        }
+
         data object Payment: Transaction("TransactionPaymentNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = ""
@@ -3218,9 +3228,20 @@ sealed class NavigationScreenModel(
             override val iconRes: DrawableResource
                 get() = AppConfiguration.stateValues.drawableResIconAppTheme.value
         }
+        data object Settings: Menu("MenuSettingsNavigationScreenModelRoute") {
+            override val iconPath: String get() = AppConfiguration.stateValues.drawablePathIconSettings
+            override val iconRes: DrawableResource get() = AppConfiguration.stateValues.drawableResIconSettings.value
+            override val name: String get() = AppConfiguration.settingsText("title")
+        }
+        data object Downloads: Menu("MenuDownloadsNavigationScreenModelRoute") {
+            override val iconPath: String get() = AppConfiguration.downloadsIconPath()
+            override val iconRes: DrawableResource get() = AppConfiguration.downloadsIconResource()
+            override val name: String get() = AppConfiguration.downloadsText("title")
+        }
+        // Retain the old saved route as an alias to Settings → App state.
         data object AppState: Menu("MenuAppStateNavigationScreenModelRoute") {
-            override val iconPath: String get() = AppConfiguration.stateValues.drawablePathIconDevices
-            override val iconRes: DrawableResource get() = AppConfiguration.stateValues.drawableResIconDevices.value
+            override val iconPath: String get() = AppConfiguration.appStateIconPath()
+            override val iconRes: DrawableResource get() = AppConfiguration.appStateIconResource()
             override val name: String get() = AppConfiguration.appStateText("title")
         }
         data object AppScale: Menu("MenuAppScaleNavigationScreenModelRoute") {
@@ -3303,6 +3324,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Transaction.MainSupply,
     NavigationScreenModel.Transaction.Cart,
     NavigationScreenModel.Transaction.Selection,
+    NavigationScreenModel.Transaction.ReturnBatches,
     NavigationScreenModel.Transaction.Payment,
     NavigationScreenModel.Transaction.ReceiptPreview,
     NavigationScreenModel.Stock.Main,
@@ -3345,6 +3367,8 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.AppTheme,
     NavigationScreenModel.Menu.AppScale,
     NavigationScreenModel.Menu.AppState,
+    NavigationScreenModel.Menu.Settings,
+    NavigationScreenModel.Menu.Downloads,
     NavigationScreenModel.UserAuth.Main,
     NavigationScreenModel.UserAuth.LogIn,
     NavigationScreenModel.UserAuth.SignUp,
@@ -3475,6 +3499,7 @@ internal fun NavigationScreenModel.Transaction.toPersistentTransactionRoute(): S
 internal fun persistentTransactionRouteToScreen(route: String): NavigationScreenModel.Transaction? = when (route) {
     NavigationScreenModel.Transaction.Cart.route -> NavigationScreenModel.Transaction.Cart
     NavigationScreenModel.Transaction.Selection.route -> NavigationScreenModel.Transaction.Selection
+    NavigationScreenModel.Transaction.ReturnBatches.route -> NavigationScreenModel.Transaction.ReturnBatches
     NavigationScreenModel.Transaction.Payment.route -> NavigationScreenModel.Transaction.Payment
     NavigationScreenModel.Transaction.ReceiptPreview.route -> NavigationScreenModel.Transaction.ReceiptPreview
     else -> null
@@ -3891,7 +3916,8 @@ object Navigation {
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,
             NavigationScreenModel.Menu.AppScale,
-    NavigationScreenModel.Menu.AppState,
+            NavigationScreenModel.Menu.Settings,
+            NavigationScreenModel.Menu.Downloads,
             NavigationScreenModel.Menu.Tutorials,
             NavigationScreenModel.Menu.ClientUpdate,
             NavigationScreenModel.Menu.About

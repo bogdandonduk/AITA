@@ -122,6 +122,8 @@ object Transactions: Table("transactions") {
 }
 
 object TransactionReturnItems: Table("transaction_return_items") {
+  val originalTransactionId = uuid("original_transaction_id").nullable()
+  val originalTransactionLineIndex = integer("original_transaction_line_index").nullable()
   val id = uuid("id").uniqueIndex()
   val transactionId = uuid("transaction_id").references(Transactions.id, onDelete = ReferenceOption.CASCADE)
   val userId = uuid("user_id")
@@ -1947,6 +1949,7 @@ object StockItems: Table("stock_items") {
 }
 
 object StockBatchesV2: Table("stock_batches") {
+  val kind = text("kind").default(StockBatchKindDataModel.NORMAL.name)
   val id = uuid("id")
   val goodsItemId = uuid("goods_item_id").references(StockItems.id, onDelete = ReferenceOption.CASCADE)
   val userId = uuid("user_id")
@@ -3588,6 +3591,8 @@ private fun prewarmSharedRuntimeSerializers() {
   touch("DebtorDataModel") { DebtorDataModel.serializer() }
   touch("ExpirationPeriodDataModel") { ExpirationPeriodDataModel.serializer() }
   touch("GoodsBatchDataModel") { GoodsBatchDataModel.serializer() }
+  touch("StockBatchKindDataModel") { StockBatchKindDataModel.serializer() }
+  touch("TransactionStockAllocationDataModel") { TransactionStockAllocationDataModel.serializer() }
   touch("GoodsBatchShelfQueueDataModel") { GoodsBatchShelfQueueDataModel.serializer() }
   touch("GoodsItemBarcodeDataModel") { GoodsItemBarcodeDataModel.serializer() }
   touch("GoodsItemDataModel") { GoodsItemDataModel.serializer() }
@@ -3769,6 +3774,8 @@ private fun prewarmSharedRuntimeSerializers() {
 
   listOf(
     "kz.aita.MoneyDataModel",
+    "kz.aita.StockBatchKindDataModel",
+    "kz.aita.TransactionStockAllocationDataModel",
     "kz.aita.StockBatchStatusDataModel",
     "kz.aita.StockBatchMovementStatusDataModel",
     "kz.aita.SupplierOrderStatusDataModel",
@@ -5435,6 +5442,7 @@ private fun batchChangedFieldsInsideTransaction(
   body: GoodsBatchDataModel
 ): List<String> = buildList {
   if (previousRow[StockBatchesV2.goodsItemId] != goodsItemId) add("item")
+  if (previousRow[StockBatchesV2.kind] != body.kind.name) add("batch kind")
   if (previousRow[StockBatchesV2.supplierId] != nextSupplierId) add("supplier")
   if (previousRow[StockBatchesV2.supplierOrderId] != nextSupplierOrderId) add("supplier order")
   if (previousRow[StockBatchesV2.quantity] != body.quantity) add("quantity")
@@ -15802,6 +15810,7 @@ private fun Long.supplierProfileCountAsInt(): Int = coerceAtMost(Int.MAX_VALUE.t
 private fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
   return GoodsBatchDataModel(
     id = this[StockBatchesV2.id].toString(),
+    kind = StockBatchKindDataModel.valueOf(this[StockBatchesV2.kind]),
     goodsItemId = this[StockBatchesV2.goodsItemId].toString(),
     userId = this[StockBatchesV2.userId].toString(),
     storeId = this[StockBatchesV2.storeId].toString(),
@@ -16807,12 +16816,12 @@ private fun activeStockBatchesForGoodsItemInsideTransaction(
     )
 }
 
-private data class NormalizedTransactionGoodsResult(
+internal data class NormalizedTransactionGoodsResult(
   val lines: List<GoodsItemInTransactionDataModel>?,
   val errorCode: String? = null
 )
 
-private fun normalizeTransactionGoodsInsideTransaction(
+internal fun normalizeTransactionGoodsInsideTransaction(
   storeId: UUID,
   transactionType: String,
   lines: List<GoodsItemInTransactionDataModel>,
@@ -16827,8 +16836,43 @@ private fun normalizeTransactionGoodsInsideTransaction(
   }
 
   val normalizedLines = mutableListOf<GoodsItemInTransactionDataModel>()
+  val pendingLinkedReturnQuantities = mutableMapOf<Pair<UUID, Int>, Double>()
+  val visibleStoreIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
+    ?: stockVisibleStoreIdsInsideTransaction(storeId)
 
   for (line in lines) {
+    if (!line.quantity.isFinite() || line.quantity <= 0.0 || !line.pricePerUnit.isFinite()) {
+      return NormalizedTransactionGoodsResult(null, "invalid_quantity")
+    }
+    val hasOriginalReference = !line.originalTransactionId.isNullOrBlank() ||
+      !line.originalClientOperationId.isNullOrBlank() || line.originalTransactionLineIndex != null
+    val originalReceipt = if (transactionType == "return" && hasOriginalReference) {
+      val sourceId = line.originalTransactionId?.takeIf { it.isNotBlank() }
+        ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+      val sourceOperation = line.originalClientOperationId?.trim()?.takeIf { it.isNotBlank() }
+      val index = line.originalTransactionLineIndex?.takeIf { it >= 0 }
+        ?: return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
+      if (sourceId == null && sourceOperation == null) return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
+      val row = Transactions.selectAll().where {
+        (Transactions.storeId inList visibleStoreIds) and (Transactions.type eq "purchase") and
+          (if (sourceId != null) Transactions.id eq sourceId else Transactions.clientOperationId eq sourceOperation!!)
+      }.singleOrNull() ?: return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
+      if (sourceOperation != null && row[Transactions.clientOperationId] != sourceOperation) {
+        return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
+      }
+      val sourceLine = row[Transactions.goodsInTransaction].getOrNull(index)
+        ?: return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
+      val key = row[Transactions.id] to index
+      val previousQuantity = TransactionReturnItems.select(TransactionReturnItems.quantity).where {
+        (TransactionReturnItems.originalTransactionId eq key.first) and
+          (TransactionReturnItems.originalTransactionLineIndex eq index)
+      }.sumOf { it[TransactionReturnItems.quantity] } + pendingLinkedReturnQuantities.getOrElse(key) { 0.0 }
+      if (!validLinkedReturnQuantity(sourceLine.quantity, previousQuantity, line.quantity)) {
+        return NormalizedTransactionGoodsResult(null, "return_receipt_quantity")
+      }
+      pendingLinkedReturnQuantities[key] = pendingLinkedReturnQuantities.getOrElse(key) { 0.0 } + line.quantity
+      row to sourceLine
+    } else null
     val itemRow = findStockItemRowForTransactionLineInsideTransaction(
       storeId = storeId,
       line = line,
@@ -16837,6 +16881,15 @@ private fun normalizeTransactionGoodsInsideTransaction(
     ) ?: return NormalizedTransactionGoodsResult(null, "not_found")
 
     val goodsItem = itemRow.toGoodsItemDataModel()
+    originalReceipt?.second?.let { sourceLine ->
+      val sameItem = sourceLine.goodsItemId?.takeIf { it.isNotBlank() }?.let { it == goodsItem.id }
+        ?: goodsItem.allBarcodeValues().any { storedBarcodeMatchesScannedTransactionBarcode(it, sourceLine.barcode) }
+      if (!sameItem) return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
+    }
+    if (line.returnDestinationKind != null &&
+      (transactionType != "return" || line.returnDestinationKind == StockBatchKindDataModel.NORMAL || !line.stockBatchId.isNullOrBlank())) {
+      return NormalizedTransactionGoodsResult(null, "return_batch_not_found")
+    }
     val requestedStockBatchIdText = if (transactionType == "return") {
       line.stockBatchId?.trim()?.takeIf { it.isNotBlank() }
     } else {
@@ -16866,7 +16919,8 @@ private fun normalizeTransactionGoodsInsideTransaction(
       activeBatchRows.firstOrNull { row -> row[StockBatchesV2.id] == selectedId }
         ?: return NormalizedTransactionGoodsResult(null, "return_batch_not_found")
     }
-    val activeBatch = (selectedReturnBatchRow ?: activeBatchRows.firstOrNull())?.toGoodsBatchDataModel()
+    val activeBatch = (selectedReturnBatchRow ?: activeBatchRows.firstOrNull()
+      ?.takeIf { line.returnDestinationKind == null })?.toGoodsBatchDataModel()
 
     val requestedSaleMethodId = if (line.saleMethodId == SALE_METHOD_WHOLESALE) {
       SALE_METHOD_WHOLESALE
@@ -16900,6 +16954,7 @@ private fun normalizeTransactionGoodsInsideTransaction(
     )
 
     val normalizedPricePerUnit = when {
+      originalReceipt != null -> originalReceipt.second.pricePerUnit
       transactionType == "return" && line.pricePerUnit >= 0.0 -> line.pricePerUnit
       transactionType == "accept" && line.pricePerUnit > 0.0 -> line.pricePerUnit
       resolvedPrice.price.isNotBlank() -> resolvedPrice.price.toMoneyDouble()
@@ -16913,10 +16968,17 @@ private fun normalizeTransactionGoodsInsideTransaction(
       name = goodsItem.name.takeIf { it.isNotEmpty() } ?: line.name,
       goodsItemId = goodsItem.id.takeIf { it.isNotBlank() } ?: line.goodsItemId,
       quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity),
-      currencyCode = line.currencyCode?.takeIf { it.isNotBlank() }
+      currencyCode = originalReceipt?.second?.currencyCode?.takeIf { it.isNotBlank() }
+        ?: line.currencyCode?.takeIf { it.isNotBlank() }
         ?: resolvedPrice.currency.takeIf { it.isNotBlank() },
       returnReason = if (transactionType == "return") line.returnReason.trim().take(500) else "",
-      stockBatchId = if (transactionType == "return") selectedReturnBatchRow?.get(StockBatchesV2.id)?.toString() else null
+      stockBatchId = if (transactionType == "return") selectedReturnBatchRow?.get(StockBatchesV2.id)?.toString() else null,
+      originalTransactionId = originalReceipt?.first?.get(Transactions.id)?.toString(),
+      originalTransactionLineIndex = line.originalTransactionLineIndex.takeIf { originalReceipt != null },
+      originalClientOperationId = originalReceipt?.first?.get(Transactions.clientOperationId),
+      returnDestinationKind = line.returnDestinationKind.takeIf { transactionType == "return" },
+      sourceBatchAllocations = emptyList(),
+      shelfBatchIdAtSale = null
     )
   }
 
@@ -17214,12 +17276,12 @@ private fun subtractStockForTransactionLineInsideTransaction(
   requestedQuantity: Double,
   now: Long,
   visibleStoreIdsOverride: List<UUID>? = null
-): Boolean {
+): List<TransactionStockAllocationDataModel>? {
   val goodsItemId = itemRow[StockItems.id]
   val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
   val quantityToSubtract = requestedQuantity.coerceAtLeast(0.0)
 
-  if (!quantityToSubtract.isFinite() || quantityToSubtract <= 0.0) return true
+  if (!quantityToSubtract.isFinite() || quantityToSubtract <= 0.0) return null
 
   val batches = activeStockBatchesForGoodsItemInsideTransaction(
     storeId = storeId,
@@ -17232,19 +17294,17 @@ private fun subtractStockForTransactionLineInsideTransaction(
        row[StockBatchesV2.status] != StockBatchStatusDataModel.SoldOut.name
   }
 
-  val available = batches.sumOf { it[StockBatchesV2.quantity].total }
-  if (available + 0.000001 < quantityToSubtract)
-    return false
+  val allocations = planTransactionStockConsumption(batches.map { batch ->
+    TransactionStockAllocationDataModel(batch[StockBatchesV2.id].toString(), batch[StockBatchesV2.storeId].toString(), batch[StockBatchesV2.quantity].total)
+  }, quantityToSubtract) ?: return null
+  val batchesById = batches.associateBy { it[StockBatchesV2.id].toString() }
 
-  var remaining = quantityToSubtract
-
-  for (batch in batches) {
-    if (remaining <= 0.0) break
-
+  for (allocation in allocations) {
+    val batch = batchesById.getValue(allocation.stockBatchId)
     val batchId = batch[StockBatchesV2.id]
     val currentQuantity = batch[StockBatchesV2.quantity]
     val currentTotal = currentQuantity.total.coerceAtLeast(0.0)
-    val taken = kotlin.math.min(currentTotal, remaining)
+    val taken = allocation.quantity
     val nextTotal = (currentTotal - taken).coerceAtLeast(0.0)
     val nextQuantity = currentQuantity.copy(total = nextTotal)
     val nextStatus = if (!nextTotal.isFinite() || nextTotal <= 0.000001) {
@@ -17259,7 +17319,6 @@ private fun subtractStockForTransactionLineInsideTransaction(
       it[StockBatchesV2.updatedAtMillis] = now
     }
 
-    remaining -= taken
   }
 
   updateGoodsItemActiveShelfBatchInsideTransaction(
@@ -17269,7 +17328,7 @@ private fun subtractStockForTransactionLineInsideTransaction(
     visibleStoreGroup = true,
     visibleStoreIdsOverride = visibleStoreIdsOverride
   )
-  return true
+  return allocations
 }
 
 private fun addStockForTransactionLineInsideTransaction(
@@ -17283,8 +17342,9 @@ private fun addStockForTransactionLineInsideTransaction(
   preferredStockBatchIdText: String? = null,
   preferredCurrencyCode: String? = null,
   isReturnTransaction: Boolean = false,
+  destinationKind: StockBatchKindDataModel? = null,
   visibleStoreIdsOverride: List<UUID>? = null
-): Boolean {
+): String? {
   val goodsItemId = itemRow[StockItems.id]
   val activeShelfBatchId = itemRow[StockItems.activeShelfBatchId]
   val quantityToAdd = addedQuantity.coerceAtLeast(0.0)
@@ -17294,7 +17354,7 @@ private fun addStockForTransactionLineInsideTransaction(
   val preferredStockBatchId = preferredStockBatchIdText
     ?.trim()
     ?.takeIf { it.isNotBlank() }
-    ?.let { runCatching { UUID.fromString(it) }.getOrNull() ?: return false }
+    ?.let { runCatching { UUID.fromString(it) }.getOrNull() ?: return null }
   val currencyCode = preferredCurrencyCode?.trim()?.takeIf { it.isNotBlank() }
     ?: (
        itemRow[StockItems.returnPrices] + itemRow[StockItems.salePrices] + itemRow[StockItems.supplyPrices] + itemRow[StockItems.wholesalePrices]
@@ -17302,7 +17362,7 @@ private fun addStockForTransactionLineInsideTransaction(
     ?: ""
   val returnedNoStockBatchNote = "aita_returned_no_stock_batch"
 
-  if (!quantityToAdd.isFinite() || quantityToAdd <= 0.0) return true
+  if (!quantityToAdd.isFinite() || quantityToAdd <= 0.0) return null
 
   val candidateBatches = activeStockBatchesForGoodsItemInsideTransaction(
     storeId = storeId,
@@ -17322,25 +17382,34 @@ private fun addStockForTransactionLineInsideTransaction(
   }
 
   val preferredBatch = preferredStockBatchId?.let { selectedId ->
-    candidateBatches.firstOrNull { row -> row[StockBatchesV2.id] == selectedId } ?: return false
+    candidateBatches.firstOrNull { row -> row[StockBatchesV2.id] == selectedId } ?: return null
   }
 
-  val targetBatch = preferredBatch
-    ?: candidateBatches.firstOrNull { row ->
+  // Explicit Returned creates its own per-item record, inside the committed return. Universal
+  // reuses a compatible per-item pool; unrelated goods/units never share a quantity field.
+  val targetBatch = when (destinationKind) {
+    StockBatchKindDataModel.RETURNED -> null
+    StockBatchKindDataModel.UNIVERSAL -> candidateBatches.firstOrNull { row ->
+      row[StockBatchesV2.kind] == StockBatchKindDataModel.UNIVERSAL.name && row[StockBatchesV2.storeId] == storeId
+    }
+    else -> preferredBatch ?: candidateBatches.firstOrNull { row ->
       row[StockBatchesV2.status] != StockBatchStatusDataModel.Deleted.name &&
-         row[StockBatchesV2.status] != StockBatchStatusDataModel.WrittenOff.name &&
-         (preferredSupplierId == null || row[StockBatchesV2.supplierId] == preferredSupplierId)
-    }
-    ?: if (isReturnTransaction) {
-      candidateBatches.firstOrNull { row -> row[StockBatchesV2.additionalNotes] == returnedNoStockBatchNote }
-    } else {
-      null
-    }
+        row[StockBatchesV2.status] != StockBatchStatusDataModel.WrittenOff.name &&
+        (preferredSupplierId == null || row[StockBatchesV2.supplierId] == preferredSupplierId ||
+          row[StockBatchesV2.kind] == StockBatchKindDataModel.UNIVERSAL.name)
+    } ?: if (isReturnTransaction) candidateBatches.firstOrNull { row ->
+      row[StockBatchesV2.additionalNotes] == returnedNoStockBatchNote
+    } else null
+  }
 
   if (targetBatch != null) {
     val batchId = targetBatch[StockBatchesV2.id]
     val currentQuantity = targetBatch[StockBatchesV2.quantity]
-    val nextQuantity = currentQuantity.copy(total = currentQuantity.total + quantityToAdd)
+    val nextTotal = currentQuantity.total + quantityToAdd
+    if (!nextTotal.isFinite()) return null
+    if (targetBatch[StockBatchesV2.kind] == StockBatchKindDataModel.UNIVERSAL.name &&
+      currentQuantity.id != defaultServerQuantityForGoodsItem(itemRow[StockItems.measurementUnitId], 0.0).id) return null
+    val nextQuantity = currentQuantity.copy(total = nextTotal)
     val currentStatus = targetBatch[StockBatchesV2.status]
     val nextStatus = if (currentStatus == StockBatchStatusDataModel.SoldOut.name) {
       StockBatchStatusDataModel.Delivered.name
@@ -17361,7 +17430,7 @@ private fun addStockForTransactionLineInsideTransaction(
       }
     }
 
-    return true
+    return batchId.toString()
   }
 
   val fallbackPrice = PriceDataModel(
@@ -17379,6 +17448,7 @@ private fun addStockForTransactionLineInsideTransaction(
   StockBatchesV2.insert {
     it[id] = batchId
     it[StockBatchesV2.goodsItemId] = goodsItemId
+    it[StockBatchesV2.kind] = (destinationKind ?: if (isReturnTransaction) StockBatchKindDataModel.RETURNED else StockBatchKindDataModel.NORMAL).name
     it[StockBatchesV2.userId] = userId
     it[StockBatchesV2.storeId] = storeId
     it[StockBatchesV2.supplierId] = preferredSupplierId
@@ -17396,8 +17466,8 @@ private fun addStockForTransactionLineInsideTransaction(
     it[StockBatchesV2.shelfPosition] = null
     it[StockBatchesV2.shelfPriority] = 0
     it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
-    it[StockBatchesV2.additionalNotes] = if (isReturnTransaction) returnedNoStockBatchNote else null
-    it[StockBatchesV2.additionalNotesLocalized] = if (isReturnTransaction) {
+    it[StockBatchesV2.additionalNotes] = if (isReturnTransaction && destinationKind == null) returnedNoStockBatchNote else null
+    it[StockBatchesV2.additionalNotesLocalized] = if (isReturnTransaction && destinationKind == null) {
       eventMessage("message.returned_items_with_no_previous_stock_batch")
     } else {
       emptyList()
@@ -17408,15 +17478,17 @@ private fun addStockForTransactionLineInsideTransaction(
     it[StockBatchesV2.isActive] = true
   }
 
-  StockItems.update({ StockItems.id eq goodsItemId }) {
-    it[StockItems.activeShelfBatchId] = batchId
-    it[StockItems.updatedAtMillis] = now
+  if (activeShelfBatchId == null || destinationKind == null) {
+    StockItems.update({ StockItems.id eq goodsItemId }) {
+      it[StockItems.activeShelfBatchId] = batchId
+      it[StockItems.updatedAtMillis] = now
+    }
   }
 
-  return true
+  return batchId.toString()
 }
 
-private fun syncTransactionReturnItemsInsideTransaction(
+internal fun syncTransactionReturnItemsInsideTransaction(
   userId: UUID,
   storeId: UUID,
   transactionId: UUID,
@@ -17435,6 +17507,8 @@ private fun syncTransactionReturnItemsInsideTransaction(
       row[TransactionReturnItems.userId] = userId
       row[TransactionReturnItems.storeId] = storeId
       row[TransactionReturnItems.lineIndex] = index
+      row[TransactionReturnItems.originalTransactionId] = line.originalTransactionId?.let { UUID.fromString(it) }
+      row[TransactionReturnItems.originalTransactionLineIndex] = line.originalTransactionLineIndex
       row[TransactionReturnItems.goodsItemId] = line.goodsItemId
         ?.takeIf { it.isNotBlank() }
         ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
@@ -17450,51 +17524,46 @@ private fun syncTransactionReturnItemsInsideTransaction(
   }
 }
 
-private fun applyTransactionStockMutationInsideTransaction(
+internal fun applyTransactionStockMutationInsideTransaction(
   userId: UUID,
   storeId: UUID,
   transaction: TransactionDataModel,
   now: Long,
   visibleStoreIdsOverride: List<UUID>? = null
-): Boolean {
+): List<GoodsItemInTransactionDataModel>? {
+  val completedLines = mutableListOf<GoodsItemInTransactionDataModel>()
   for (line in transaction.goodsInTransaction) {
     val itemRow = findStockItemRowForTransactionLineInsideTransaction(
       storeId = storeId,
       line = line,
       preferAvailableBatches = transaction.type == "purchase",
       visibleStoreIdsOverride = visibleStoreIdsOverride
-    ) ?: return false
+    ) ?: return null
 
-    val ok = when (transaction.type) {
-      "purchase" -> subtractStockForTransactionLineInsideTransaction(
-        storeId = storeId,
-        itemRow = itemRow,
-        requestedQuantity = line.quantity,
-        now = now,
-        visibleStoreIdsOverride = visibleStoreIdsOverride
-      )
-
-      "return", "accept" -> addStockForTransactionLineInsideTransaction(
-        userId = userId,
-        storeId = storeId,
-        itemRow = itemRow,
-        addedQuantity = line.quantity,
-        now = now,
-        preferredPricePerUnit = line.pricePerUnit,
-        preferredSupplierIdText = line.supplierIdText,
-        preferredStockBatchIdText = line.stockBatchId,
-        preferredCurrencyCode = line.currencyCode,
-        isReturnTransaction = transaction.type == "return",
-        visibleStoreIdsOverride = visibleStoreIdsOverride
-      )
-
-      else -> false
+    val completedLine = when (transaction.type) {
+      "purchase" -> {
+        val allocations = subtractStockForTransactionLineInsideTransaction(
+          storeId = storeId, itemRow = itemRow, requestedQuantity = line.quantity, now = now,
+          visibleStoreIdsOverride = visibleStoreIdsOverride
+        ) ?: return null
+        line.copy(sourceBatchAllocations = allocations, shelfBatchIdAtSale = itemRow[StockItems.activeShelfBatchId]?.toString())
+      }
+      "return", "accept" -> {
+        val batchId = addStockForTransactionLineInsideTransaction(
+          userId = userId, storeId = storeId, itemRow = itemRow, addedQuantity = line.quantity, now = now,
+          preferredPricePerUnit = line.pricePerUnit, preferredSupplierIdText = line.supplierIdText,
+          preferredStockBatchIdText = line.stockBatchId, preferredCurrencyCode = line.currencyCode,
+          isReturnTransaction = transaction.type == "return", destinationKind = line.returnDestinationKind,
+          visibleStoreIdsOverride = visibleStoreIdsOverride
+        ) ?: return null
+        line.copy(stockBatchId = batchId)
+      }
+      else -> return null
     }
-
-    if (!ok) return false
+    completedLines += completedLine
   }
 
-  return true
+  return completedLines
 }
 
 private data class StoreAddressRefreshCandidate(
@@ -19838,6 +19907,7 @@ fun Application.module() {
               it[StockBatchesV2.supplierId] = sourceBatchRow[StockBatchesV2.supplierId]
               it[StockBatchesV2.supplierOrderId] = sourceBatchRow[StockBatchesV2.supplierOrderId]
               it[StockBatchesV2.quantity] = moveQuantity
+              it[StockBatchesV2.kind] = sourceBatchRow[StockBatchesV2.kind]
               it[StockBatchesV2.supplyPrice] = sourceBatchRow[StockBatchesV2.supplyPrice]
               it[StockBatchesV2.salePriceOverride] = sourceBatchRow[StockBatchesV2.salePriceOverride]
               it[StockBatchesV2.returnPriceOverride] = sourceBatchRow[StockBatchesV2.returnPriceOverride]
@@ -20225,17 +20295,17 @@ fun Application.module() {
               if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_BATCH_CREATE, requireWorkshift = true))
                 return@newSuspendedTransaction run { rollback(); null }
 
-              val itemExists = StockItems
+              val inventoryItem = StockItems
                 .selectAll()
                 .where {
                   (StockItems.id eq goodsItemId) and
                      (StockItems.storeId eq storeId) and
                      (StockItems.isActive eq true)
                 }
-                .empty()
-                .not()
+                .singleOrNull()
 
-              if (!itemExists)
+              if (inventoryItem == null || (body.kind == StockBatchKindDataModel.UNIVERSAL &&
+                  body.quantity.id != defaultServerQuantityForGoodsItem(inventoryItem[StockItems.measurementUnitId], 0.0).id))
                 return@newSuspendedTransaction run { rollback(); null }
 
               val requestedBatchId = body.id
@@ -20295,6 +20365,7 @@ fun Application.module() {
                 it[StockBatchesV2.supplierOrderId] = nextSupplierOrderId
 
                 it[StockBatchesV2.quantity] = body.quantity
+                it[StockBatchesV2.kind] = body.kind.name
 
                 it[StockBatchesV2.supplyPrice] = sanitizedSupplyPrice
                 it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
@@ -20441,7 +20512,17 @@ fun Application.module() {
                 supplierId = nextSupplierId?.toString().orEmpty()
               )
               val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
+              val previousBatchRow = StockBatchesV2
+                .selectAll()
+                .where {
+                  (StockBatchesV2.id eq id) and
+                     (StockBatchesV2.storeId eq storeId)
+                }
+                .singleOrNull()
+                ?: return@newSuspendedTransaction run { rollback(); null }
+
               val sanitizedBody = body.copy(
+                kind = StockBatchKindDataModel.valueOf(previousBatchRow[StockBatchesV2.kind]),
                 supplierId = nextSupplierId?.toString(),
                 supplierOrderId = nextSupplierOrderId?.toString(),
                 supplyPrice = sanitizedSupplyPrice,
@@ -20451,14 +20532,12 @@ fun Application.module() {
                 additionalNotesLocalized = cleanLocalizedValues(body.additionalNotesLocalized)
               )
 
-              val previousBatchRow = StockBatchesV2
-                .selectAll()
-                .where {
-                  (StockBatchesV2.id eq id) and
-                     (StockBatchesV2.storeId eq storeId)
-                }
-                .singleOrNull()
-                ?: return@newSuspendedTransaction run { rollback(); null }
+              if (sanitizedBody.kind == StockBatchKindDataModel.UNIVERSAL) {
+                val measurement = StockItems.select(StockItems.measurementUnitId).where { StockItems.id eq goodsItemId }
+                  .singleOrNull()?.get(StockItems.measurementUnitId) ?: return@newSuspendedTransaction run { rollback(); null }
+                if (body.quantity.id != defaultServerQuantityForGoodsItem(measurement, 0.0).id)
+                  return@newSuspendedTransaction run { rollback(); null }
+              }
 
               val hasPendingMovement = StockBatchMovements
                 .select(StockBatchMovements.id)
@@ -20490,6 +20569,7 @@ fun Application.module() {
                 it[StockBatchesV2.supplierOrderId] = nextSupplierOrderId
 
                 it[StockBatchesV2.quantity] = body.quantity
+                it[StockBatchesV2.kind] = sanitizedBody.kind.name
 
                 it[StockBatchesV2.supplyPrice] = sanitizedSupplyPrice
                 it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
@@ -25332,6 +25412,38 @@ fun Application.module() {
 
     route("/transactions") {
       authenticate("auth-jwt") {
+        get("/search") {
+          val userId = call.checkPrincipal() ?: return@get
+          val storeId = runCatching { UUID.fromString(call.request.header("store_id")) }.getOrNull()
+            ?: return@get call.respondAitaUnauthorized()
+          val query = call.request.queryParameters["query"].orEmpty().trim()
+          val exact = call.request.queryParameters["exact"] == "true"
+          if (!validReturnReceiptQuery(query, exact)) {
+            return@get call.genericListResponse(status = HttpStatusCode.OK, payload = emptyList<TransactionDataModel>())
+          }
+          val receipts = newSuspendedTransaction(aitaServerIoContext) {
+            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_TRANSACTION_HISTORY_VIEW, requireWorkshift = false)) {
+              return@newSuspendedTransaction null
+            }
+            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
+            val exactId = runCatching { UUID.fromString(query) }.getOrNull()
+            val escapedPrefix = query.replace("_", "\\_") + "%"
+            Transactions.selectAll().where {
+              (Transactions.storeId inList visibleStoreIds) and (Transactions.type eq "purchase") and
+                (if (exact) {
+                  if (exactId != null) (Transactions.id eq exactId) or (Transactions.clientOperationId eq query)
+                  else Transactions.clientOperationId eq query
+                } else {
+                  (Transactions.id.castTo<String>(TextColumnType()) like escapedPrefix.lowercase()) or
+                    (Transactions.clientOperationId like escapedPrefix)
+                })
+            }.orderBy(Transactions.timeMillis, SortOrder.DESC).limit(20).map { it.toTransactionDataModel() }
+          }
+          receipts?.let { call.genericListResponse(status = HttpStatusCode.OK, payload = it) }
+            ?: call.respondAitaUnauthorized()
+        }
+
         get("/get") {
           val userId = call.checkPrincipal() ?: return@get
           val storeId = runCatching {
@@ -25380,6 +25492,8 @@ fun Application.module() {
 
               if (!userHasStoreAccessInsideTransaction(userId, storeId))
                 return@newSuspendedTransaction null
+
+              lockStockInventoryInsideTransaction(listOf(storeId))
 
               requestClientOperationId?.let { operationId ->
                 Transactions
@@ -25430,12 +25544,14 @@ fun Application.module() {
                   "price_unavailable" -> eventMessage("message.transaction_price_is_not_available")
                   "promotion_restriction" -> eventMessage("message.promotion_restriction_is_not_satisfied")
                   "return_batch_not_found" -> eventMessage("message.selected_return_stock_batch_was_not_found")
+                  "return_receipt_invalid" -> eventMessage("message.return_receipt_invalid")
+                  "return_receipt_quantity" -> eventMessage("message.return_receipt_quantity")
                   else -> eventMessage("message.not_enough_stock_or_item_barcode_was_not_found")
                 }
                 return@newSuspendedTransaction null
               }
 
-              val transactionToSave = body.copy(goodsInTransaction = normalizedGoodsInTransaction)
+              var transactionToSave = body.copy(goodsInTransaction = normalizedGoodsInTransaction)
 
               val transactionTotal = transactionToSave.goodsInTransaction
                 .sumOf { it.quantity * it.pricePerUnit }
@@ -25449,10 +25565,16 @@ fun Application.module() {
                 return@newSuspendedTransaction null
               }
 
+              if (transactionToSave.type == "return" && transactionToSave.goodsInTransaction.any { it.originalTransactionId != null } &&
+                (!uploadedPaymentTotal.isFinite() || kotlin.math.abs(uploadedPaymentTotal - transactionTotal) > 0.01)) {
+                transactionFailureMessage = eventMessage("message.return_receipt_payment")
+                return@newSuspendedTransaction null
+              }
+
               val id = UUID.randomUUID()
               val timeMillis = body.timeMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
 
-              val stockMutationOk = applyTransactionStockMutationInsideTransaction(
+              val completedStockLines = applyTransactionStockMutationInsideTransaction(
                 userId = userId,
                 storeId = storeId,
                 transaction = transactionToSave,
@@ -25460,11 +25582,13 @@ fun Application.module() {
                 visibleStoreIdsOverride = visibleStoreIds
               )
 
-              if (!stockMutationOk) {
+              if (completedStockLines == null) {
                 rollback()
                 transactionFailureMessage = eventMessage("message.not_enough_stock_or_item_barcode_was_not_found")
                 return@newSuspendedTransaction null
               }
+
+              transactionToSave = transactionToSave.copy(goodsInTransaction = completedStockLines)
 
               val savedDebtor = transactionToSave.debtor
                 ?.takeIf { it.debtAmount > 0.0 }

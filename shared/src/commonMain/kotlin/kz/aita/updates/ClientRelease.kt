@@ -44,7 +44,10 @@ data class ClientRelease(
     val publishedAtMillis: Long,
     val expiresAtMillis: Long,
     val notes: Map<String, String> = emptyMap(),
-    val artifacts: List<ClientArtifact> = emptyList()
+    val artifacts: List<ClientArtifact> = emptyList(),
+    // Additive download-only catalogue. Older updater clients ignore this field, so AAB
+    // never enters the installer enum/list they must decode to receive normal updates.
+    val downloads: List<ClientDownloadVersion> = emptyList()
 ) {
     val identity: String get() = "${channel.name}:$build:$id"
     fun notesFor(language: String): String = notes[language.substringBefore('-').substringBefore('_')]

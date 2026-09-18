@@ -175,6 +175,7 @@ kotlin {
 
         if (!aitaWebOnlyBuild) {
             getByName("jvmTest").dependencies {
+                implementation("com.google.zxing:core:3.5.3") // Independent receipt barcode decoder verification only.
                 implementation(libs.kotlin.test)
                 implementation(libs.kotlin.testJunit)
                 implementation(libs.sqlDelightJvmDriver)

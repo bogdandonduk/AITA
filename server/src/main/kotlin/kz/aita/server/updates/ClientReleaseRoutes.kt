@@ -54,7 +54,7 @@ internal class ClientReleaseCatalog(private val directory: Path?, private val pu
         Snapshot(text, "\"$tag\"", verified.release).also { cache[channel] = Cached(modified,size,it) }
     }
     suspend fun artifact(name: String): java.io.File? = withContext(Dispatchers.IO) {
-        if (!Regex("[0-9a-f]{64}\\.(apk|msi|exe|pkg|dmg|deb|rpm)").matches(name)) return@withContext null
+        if (!Regex("[0-9a-f]{64}\\.(apk|aab|msi|exe|pkg|dmg|deb|rpm)").matches(name)) return@withContext null
         val root = root() ?: return@withContext null
         val folder = root.resolve("artifacts")
         val file = folder.resolve(name)

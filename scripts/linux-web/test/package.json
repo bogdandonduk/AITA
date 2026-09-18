@@ -1,6 +1,6 @@
 {
   "name": "aita-browser-storage-tests",
   "private": true,
-  "scripts": { "test": "node --test browser-database.test.cjs" },
+  "scripts": { "test": "node --test *.test.cjs" },
   "devDependencies": { "playwright": "1.58.2", "sql.js": "1.13.0" }
 }

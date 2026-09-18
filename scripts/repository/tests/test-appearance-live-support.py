@@ -88,7 +88,8 @@ class AppearanceLiveSupportTest(unittest.TestCase):
         self.assertEqual(book.read_bytes(), mirror.read_bytes())
         data = json.loads(book.read_text()); by_id = {t['id']: t for t in data['tutorials']}
         self.assertIn('it does not resolve', by_id['settings.support']['steps'][3]['text']['en'])
-        self.assertIn('Purple or Blue', by_id['settings.appearance']['steps'][1]['text']['en'])
+        self.assertIn('18 named shades', by_id['settings.appearance']['steps'][1]['text']['en'])
+        self.assertIn('Dark shades use white text; light shades use dark text', by_id['settings.appearance']['steps'][1]['text']['en'])
 
 
 if __name__ == "__main__": unittest.main()

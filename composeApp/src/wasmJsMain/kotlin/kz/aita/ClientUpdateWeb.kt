@@ -31,6 +31,7 @@ private fun webInstall(releaseUrl: String, build: String, result: (Boolean)->Uni
       const refresh = () => {
         if (finished) return;
         const next = new URL(location.href); next.searchParams.set('_aita_build',build);
+        next.searchParams.set('_aita_refresh', Date.now().toString());
         if (done(true)) location.replace(next.href);
       };
       timer = setTimeout(() => done(false), 15000);
@@ -87,6 +88,8 @@ internal actual suspend fun restoreClientInstaller(release: ClientRelease,artifa
 internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) = Unit
 internal actual suspend fun handoffClientUpdate(release: ClientRelease,artifact: ClientArtifact,prepared: PreparedClientInstaller?): UpdateHandoff {
     if(artifact.kind!=InstallerKind.WEB_RELOAD || artifact!=selectClientArtifact(release,clientUpdatePlatform()) || !clientReleaseIsNewer(release,installedClientBuild())) throw ClientUpdateFailure("integrity")
+    AppStateWorkspace.flush()
+    flushCartsBeforeClientUpdate()
     val ok = suspendCancellableCoroutine<Boolean> { c -> webInstall(artifact.url,release.build.toString()) { if(c.isActive) c.resume(it) } }
     if(!ok) throw ClientUpdateFailure("unavailable")
     return UpdateHandoff.RELOADING

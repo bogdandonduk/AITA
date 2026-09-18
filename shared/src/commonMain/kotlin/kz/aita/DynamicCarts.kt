@@ -111,6 +111,23 @@ object DynamicCarts {
                 .sortedWith(compareBy<StoredCartLine> { it.addedAt }.thenBy { it.id }))
         }
     }
+    /** The receipt source and quantity must become durable together, in the captured store/session. */
+    suspend fun addReceiptReturn(owner: CartScope, slot: Int, quantity: QuantityDataModel,
+        selection: CartReturnBatchSelectionDataModel): Boolean {
+        var added = false
+        val saved = work.run { store.change(owner) { book ->
+            if (!book.contains(1, slot) || book.lines.any { it.type == 1 && it.slot == slot && it.id == selection.goodsItemId }) book
+            else {
+                require(quantity.total.isFinite() && quantity.total > 0.0)
+                val key = cartReturnBatchSelectionKey(1, slot, selection.goodsItemId)
+                added = true
+                book.copy(lines = book.lines + StoredCartLine(selection.goodsItemId, 1, slot, quantity, getCurrentTimeMillis()),
+                    ui = book.ui.copy(batches = book.ui.batches + (key to selection), payments = book.ui.payments - "1:$slot"))
+            }
+        } }
+        return saved && added && isCurrent(owner)
+    }
+
     internal fun removeItem(id: String, type: Int, slot: Int) {
         require(validCartSlot(type, slot))
         changeAsync { book -> book.copy(lines = book.lines.filterNot { it.id == id && it.type == type && it.slot == slot },

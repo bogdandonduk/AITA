@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 
-internal actual fun renderReceiptRaster(lines: List<String>): ByteArray? {
+internal actual fun renderReceiptRaster(lines: List<String>, barcodePayload: String?): ByteArray? {
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = 20f }
     val regular = Typeface.create("monospace", Typeface.NORMAL)
     val heading = Typeface.create("monospace", Typeface.BOLD)
@@ -28,6 +28,7 @@ internal actual fun renderReceiptRaster(lines: List<String>): ByteArray? {
             bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
             encoder.strip(bitmap.width, bitmap.height, pixels)
         }
+        barcodePayload?.let(encoder::barcode)
         encoder.finish()
     } finally {
         bitmap.recycle()

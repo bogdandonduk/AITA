@@ -104,7 +104,12 @@ actual fun renderAitaPdfDocument(document: AitaPdfDocument): ByteArray {
         val content = buildString {
             append("0 g 0 G\n")
             for (line in page.lines) {
-                if (line.divider) {
+                val barcode = line.barcode
+                if (barcode != null) {
+                    barcode.bars.forEach { bar ->
+                        append("${(line.x + bar.x).pdfN()} ${(page.height - line.baseline - bar.y - bar.height).pdfN()} ${bar.width.pdfN()} ${bar.height.pdfN()} re f\n")
+                    }
+                } else if (line.divider) {
                     append("0.6 w ${document.margin.pdfN()} ${(page.height - line.baseline).pdfN()} m ${(page.width - document.margin).pdfN()} ${(page.height - line.baseline).pdfN()} l S\n")
                 } else if (line.text.isNotEmpty()) {
                     append("BT 1 0 0 1 ${line.x.pdfN()} ${(page.height - line.baseline).pdfN()} Tm\n")

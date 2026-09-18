@@ -27,7 +27,14 @@ actual fun renderAitaPdfDocument(document: AitaPdfDocument): ByteArray {
             try {
                 native.canvas.drawColor(Color.WHITE)
                 page.lines.forEach { line ->
-                    if (line.divider) {
+                    val barcode = line.barcode
+                    if (barcode != null) {
+                        val ink = Paint().apply { color = Color.BLACK }
+                        barcode.bars.forEach { bar ->
+                            native.canvas.drawRect(line.x + bar.x, line.baseline + bar.y,
+                                line.x + bar.x + bar.width, line.baseline + bar.y + bar.height, ink)
+                        }
+                    } else if (line.divider) {
                         val rule = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; strokeWidth = 0.6f }
                         native.canvas.drawLine(document.margin, line.baseline, page.width - document.margin, line.baseline, rule)
                     } else native.canvas.drawText(line.text, line.x, line.baseline, paint(line.style))

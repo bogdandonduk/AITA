@@ -28,7 +28,14 @@ actual fun renderAitaPdfDocument(document: AitaPdfDocument): ByteArray {
             CGContextSetRGBFillColor(context, 1.0, 1.0, 1.0, 1.0)
             CGContextFillRect(context, CGRectMake(0.0, 0.0, page.width.toDouble(), page.height.toDouble()))
             page.lines.forEach { line ->
-                if (line.divider) {
+                val barcode = line.barcode
+                if (barcode != null) {
+                    CGContextSetRGBFillColor(context, 0.0, 0.0, 0.0, 1.0)
+                    barcode.bars.forEach { bar ->
+                        CGContextFillRect(context, CGRectMake((line.x + bar.x).toDouble(),
+                            (line.baseline + bar.y).toDouble(), bar.width.toDouble(), bar.height.toDouble()))
+                    }
+                } else if (line.divider) {
                     CGContextSetRGBStrokeColor(context, 0.0, 0.0, 0.0, 1.0)
                     CGContextSetLineWidth(context, 0.6)
                     CGContextMoveToPoint(context, document.margin.toDouble(), line.baseline.toDouble())

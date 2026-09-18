@@ -251,6 +251,10 @@ fun AppConfiguration.StockBatchCard(
                 )
             }
 
+            if (batch.kind != StockBatchKindDataModel.NORMAL) StockCardInfoLine(
+                title = returnFlowText("batch_kind"), value = returnFlowText(batch.kind.name.lowercase()), textColor = stateValues.AccentColor
+            )
+
             StockCardInfoLine(
                 title = localizedStringResource(200, "Status"),
                 value = stockBatchStatusText(batch.status),
@@ -493,6 +497,17 @@ fun AppConfiguration.StockBatchEditor(
                 .padding(stateValues.marginTextField)
         ) {
             item {
+                if (existingBatch == null) SimpleDropdownField(
+                    title = returnFlowText("batch_kind"), selectedId = draft.kind.name, placeholder = stateValues.stringSelect,
+                    options = StockBatchKindDataModel.entries.map { DropdownOption(it.name, returnFlowText(it.name.lowercase())) },
+                    onSelected = { val next = StockBatchKindDataModel.valueOf(it)
+                        draft = draft.copy(kind = next, quantityUnitId = if (next == StockBatchKindDataModel.UNIVERSAL) goodsItem.measurementUnitId.ifBlank { defaultUnit.id } else draft.quantityUnitId) }
+                )
+                else Text("${returnFlowText("batch_kind")}: ${returnFlowText(draft.kind.name.lowercase())}", color = stateValues.TextColor)
+                if (draft.kind == StockBatchKindDataModel.UNIVERSAL) Text(returnFlowText("universal_detail"),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                Spacer(Modifier.height(stateValues.marginTextField))
+
                 SimpleDropdownField(
                     title = stateValues.stringSupplier,
                     selectedId = draft.supplierId,
@@ -553,7 +568,9 @@ fun AppConfiguration.StockBatchEditor(
                 SimpleDropdownField(
                     title = localizedStringResource(270, "Unit"),
                     selectedId = draft.quantityUnitId,
-                    options = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.map {
+                    options = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.filter {
+                        draft.kind != StockBatchKindDataModel.UNIVERSAL || it.id == goodsItem.measurementUnitId.ifBlank { defaultUnit.id }
+                    }.map {
                         DropdownOption(
                             id = it.id,
                             title = it.immutableUnitName.extractLocalizedString(stateValues.appLanguage)
@@ -762,6 +779,7 @@ fun AppConfiguration.StockBatchEditor(
                         shelfPosition = existingBatch?.shelfPosition,
                         shelfPriority = existingBatch?.shelfPriority ?: stateValues.stockBatches.orEmpty().count { it.goodsItemId == goodsItem.id },
                         status = draft.status,
+                        kind = draft.kind,
                         additionalNotes = draft.additionalNotes.takeIf { it.isNotBlank() },
                         additionalNotesLocalized = draft.additionalNotesLocalized.filter { it.value.isNotBlank() },
                         createdAtMillis = existingBatch?.createdAtMillis ?: now,

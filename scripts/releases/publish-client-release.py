@@ -22,9 +22,9 @@ from urllib.parse import urlsplit, parse_qs
 
 MAX_METADATA = 262_144
 MAX_INSTALLER = 2_147_483_648
-FILE_KINDS = {"APK", "MSI", "EXE", "PKG", "DMG", "DEB", "RPM"}
+FILE_KINDS = {"APK", "AAB", "MSI", "EXE", "PKG", "DMG", "DEB", "RPM"}
 KINDS = {
-    "ANDROID": {"APK", "PLAY_STORE"}, "WINDOWS": {"MSI", "EXE"},
+    "ANDROID": {"APK", "AAB", "PLAY_STORE"}, "WINDOWS": {"MSI", "EXE"},
     "MACOS": {"PKG", "DMG", "APP_STORE"}, "LINUX": {"DEB", "RPM"},
     "IOS": {"APP_STORE", "TESTFLIGHT"}, "WEB": {"WEB_RELOAD"},
 }
@@ -195,7 +195,7 @@ def publish(spec_path: Path, info_path: Path, private: Path, catalog: Path, base
     notes = spec.get("notes", {})
     require(isinstance(notes, dict) and len(notes) <= 12 and all(re.fullmatch(r"[a-z]{2,3}",k) and isinstance(v,str) and len(v) <= 24_000 for k,v in notes.items()), "Invalid localized notes")
     entries = spec.get("artifacts", []); require(isinstance(entries, list) and 1 <= len(entries) <= 32, "Supply 1..32 artifacts")
-    artifacts = []; copies = []; identities = set()
+    artifacts = []; download_only = []; copies = []; identities = set(); signing = {}
     for entry in entries:
         # A single channel can include APK + Play and desktop artifacts. Validate each
         # artifact's actual build-info sidecar instead of treating one distribution as global.
@@ -241,7 +241,11 @@ def publish(spec_path: Path, info_path: Path, private: Path, catalog: Path, base
                 require(channel == "RELEASE", "Use TestFlight for iOS test-channel releases")
             item["url"] = url
         require(public_url(item["url"]), "Generated artifact URL is invalid")
-        artifacts.append(item)
+        if "publisherSigned" in entry:
+            require(type(entry["publisherSigned"]) is bool, "Invalid publisher signing status")
+            signing[identity] = entry["publisherSigned"]
+        (download_only if kind == "AAB" else artifacts).append(item)
+    require(artifacts, "At least one normal updater artifact is required")
     catalog = catalog.expanduser().absolute()
     require(not catalog.is_symlink() and catalog.resolve() == catalog, "Catalog path must be canonical, not symlinked")
     catalog.mkdir(parents=True, exist_ok=True)
@@ -252,6 +256,7 @@ def publish(spec_path: Path, info_path: Path, private: Path, catalog: Path, base
     try:
         with tempfile.TemporaryDirectory(prefix=".aita-signing-", dir=str(catalog)) as tmp:
             temp = Path(tmp); destination = catalog / (channel.lower() + ".json")
+            old = None
             if destination.exists():
                 old = verify_envelope(read_json(destination), public_der, temp)
                 require(old["channel"] == channel and sequence > old["sequence"] and build >= old["build"] and version(ver) >= version(old["version"]),
@@ -265,10 +270,32 @@ def publish(spec_path: Path, info_path: Path, private: Path, catalog: Path, base
                     require(identifier == old["id"] and ver == old["version"] and
                             all(previous in artifacts for previous in old["artifacts"]),
                             "Same-build refresh must preserve release identity and every existing artifact")
+            download_files = [{k: item[k] for k in ("os", "arch", "kind", "url", "bytes", "sha256")}
+                              for item in artifacts + download_only if item["kind"] in {"APK", "AAB", "EXE", "MSI"}]
+            for download in download_files:
+                identity = (download["os"], download["arch"], download["kind"])
+                if identity in signing: download["publisherSigned"] = signing[identity]
+            history = old.get("downloads", []) if old else []
+            if old and not history:
+                old_files = [{k: item[k] for k in ("os", "arch", "kind", "url", "bytes", "sha256")}
+                             for item in old["artifacts"] if item["kind"] in {"APK", "EXE", "MSI"}]
+                if old_files:
+                    history = [dict(id=old["id"], version=old["version"], build=old["build"], notes=old.get("notes", {}), files=old_files)]
+            for previous in history:
+                if previous["build"] == build:
+                    require(all(any(all(candidate.get(key) == value for key, value in item.items()) for candidate in download_files)
+                                for item in previous["files"]), "Same-build refresh must preserve every download")
+            downloads = ([dict(id=identifier, version=ver, build=build, notes=notes, files=download_files)] if download_files else [])
+            downloads += [previous for previous in history if previous["build"] != build]
+            downloads = downloads[:20]
             now = int(time.time() * 1000)
             release = dict(schema=1, channel=channel, sequence=sequence, id=identifier, version=ver, build=build,
-                           publishedAtMillis=now, expiresAtMillis=now + days * 86_400_000, notes=notes, artifacts=artifacts)
-            payload = canonical_json(release); require(len(payload) <= 180_000, "Release payload too large")
+                           publishedAtMillis=now, expiresAtMillis=now + days * 86_400_000, notes=notes, artifacts=artifacts,
+                           downloads=downloads)
+            payload = canonical_json(release)
+            while len(payload) > 180_000 and len(downloads) > 1:
+                downloads.pop(); payload = canonical_json(release)
+            require(len(payload) <= 180_000, "Release payload too large")
             signature = openssl("dgst", "-sha256", "-sign", str(private), data=payload)
             envelope = dict(algorithm="RS256", payload=base64.b64encode(payload).decode("ascii"), signature=base64.b64encode(signature).decode("ascii"))
             encoded = canonical_json(envelope); require(len(encoded) <= MAX_METADATA, "Envelope too large")

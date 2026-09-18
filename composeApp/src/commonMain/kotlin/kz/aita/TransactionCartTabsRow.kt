@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -33,6 +34,7 @@ import kotlinx.coroutines.launch
     val cartLabel = localizedStringResource(95, "Cart")
     var adding by remember(bookState.owner) { mutableStateOf(false) }
     LaunchedEffect(selected, slots) { slots.indexOf(selected).takeIf { it >= 0 }?.let { scroll.animateScrollToItem(it) } }
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
     Column(Modifier.fillMaxWidth()) {
         if (bookState.failed) {
             Text(checkoutText("restore_error"), Modifier.padding(8.dp), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
@@ -111,5 +113,7 @@ import kotlinx.coroutines.launch
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
     }
 }
+}
+
 internal fun AppConfiguration.checkoutText(key: String) =
     eventMessage("checkout.ui.$key").extractLocalizedString(stateValues.appLanguage).orEmpty()

@@ -10,7 +10,7 @@ internal const val RECEIPT_RASTER_MAX_BYTES = 8 * 1024 * 1024
 internal data class ReceiptRasterLine(val text: String, val heading: Boolean = false)
 
 /** Null only on platforms whose printing path is PDF/browser rather than raw ESC/POS. */
-internal expect fun renderReceiptRaster(lines: List<String>): ByteArray?
+internal expect fun renderReceiptRaster(lines: List<String>, barcodePayload: String? = null): ByteArray?
 
 /** Layout contains Unicode text, never printer commands. Avoid splitting surrogate pairs. */
 internal fun layoutReceiptRasterLines(
@@ -72,14 +72,16 @@ internal fun layoutReceiptRasterLines(
 }
 
 /** Small strips avoid a receipt-height bitmap and the tiny image buffers in thermal printers. */
-internal class ReceiptRasterEncoder {
+internal class ReceiptRasterEncoder(private val documentCommands: Boolean = true) {
     private var buffer = ByteArray(4096)
     private var size = 0
 
     init {
-        command(0x1b, 0x40) // reset
-        command(0x1c, 0x2e) // leave multibyte character mode for trailing feed commands
-        command(0x1b, 0x61, 0) // left aligned raster canvas (heading is centered in the bitmap)
+        if (documentCommands) {
+            command(0x1b, 0x40) // reset
+            command(0x1c, 0x2e) // leave multibyte character mode for trailing feed commands
+            command(0x1b, 0x61, 0) // left aligned raster canvas (heading is centered in the bitmap)
+        }
     }
 
     private fun reserve(count: Int) {
@@ -115,9 +117,33 @@ internal class ReceiptRasterEncoder {
         }
     }
 
+    fun barcode(payload: String) {
+        // A full UUID cannot fit across 58 mm with reliable two-dot bars. Rotate the same
+        // Code 128 symbol, preserving both ten-module quiet zones and integer printer dots.
+        val modules = transactionReceiptBarcodeModules(payload)
+        val moduleDots = 2
+        val barWidth = 96
+        val left = (RECEIPT_RASTER_WIDTH - barWidth) / 2
+        val rows = modules.size * moduleDots
+        var top = 0
+        while (top < rows) {
+            val height = minOf(32, rows - top)
+            val pixels = IntArray(RECEIPT_RASTER_WIDTH * height) { 0xffffffff.toInt() }
+            repeat(height) { y ->
+                if (modules[(top + y) / moduleDots]) {
+                    for (x in left until left + barWidth) pixels[y * RECEIPT_RASTER_WIDTH + x] = 0xff000000.toInt()
+                }
+            }
+            strip(RECEIPT_RASTER_WIDTH, height, pixels)
+            top += height
+        }
+    }
+
     fun finish(): ByteArray {
-        command(0x1b, 0x64, 3) // feed three lines only after all raster strips
-        command(0x1d, 0x56, 0x42, 0) // optional cutter, as in the existing receipt path
+        if (documentCommands) {
+            command(0x1b, 0x64, 3) // feed three lines only after all raster strips
+            command(0x1d, 0x56, 0x42, 0) // optional cutter, as in the existing receipt path
+        }
         return buffer.copyOf(size)
     }
 }
@@ -127,3 +153,7 @@ fun receiptPrinterWriteTimeoutMillis(byteCount: Int): Long {
     require(byteCount in 1..RECEIPT_RASTER_MAX_BYTES) { "Invalid printer data size" }
     return (30_000L + ((byteCount.toLong() + 4095L) / 4096L) * 1000L).coerceAtMost(180_000L)
 }
+
+/** Raw strips for the text ESC/POS fallback; its caller owns the existing feed/cut sequence. */
+internal fun receiptBarcodeRasterBytes(payload: String): ByteArray =
+    ReceiptRasterEncoder(documentCommands = false).apply { barcode(payload) }.finish()

@@ -21,6 +21,20 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_compatible_backend_precedes_web_and_windows_collection_stays_last(self):
+        self.assertEqual(['server', 'android', 'web', 'windows'], release.ordered_release_targets(['android', 'windows', 'web', 'server']))
+        self.assertEqual(['web', 'windows'], release.ordered_release_targets(['windows', 'web']))
+
+    def test_release_notes_require_real_localized_text_and_preserve_newlines(self):
+        with TemporaryDirectory() as folder:
+            path = Path(folder) / 'notes.json'
+            notes = release.read_release_notes()
+            notes['en'] = 'Receipt lookup\nReturn batch selection'
+            path.write_text(json.dumps(notes))
+            self.assertEqual(notes, release.read_release_notes(path))
+            del notes['ky']; path.write_text(json.dumps(notes))
+            with self.assertRaises(RuntimeError): release.read_release_notes(path)
+
     def test_draft_assets_are_read_by_release_id_before_a_tag_exists(self):
         url = 'https://api.github.com/repos/bogdandonduk/AITA/releases/123'
         view = dict(apiUrl=url, tagName='v1.0.2-b3', targetCommitish='a'*40, isDraft=True)

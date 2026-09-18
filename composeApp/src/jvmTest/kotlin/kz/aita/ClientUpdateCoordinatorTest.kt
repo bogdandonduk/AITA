@@ -20,10 +20,11 @@ class ClientUpdateCoordinatorTest {
         var fetches = 0; var installs = 0; var preparations = 0; var cleans = 0
         var response = ClientUpdateFeedReply(204)
         var storageFailure = false; var fetchFailure = false
+        var clientPlatform = ClientPlatform(ClientOs.MACOS, ClientArch.ARM64, 15)
         var preparationGate: CompletableDeferred<Unit>? = null
         override fun nowMillis() = time
         override fun installedBuild() = build
-        override fun platform() = ClientPlatform(ClientOs.MACOS, ClientArch.ARM64, 15)
+        override fun platform() = clientPlatform
         override suspend fun readPreference(name: String) = values[name]
         override suspend fun writePreference(name: String, value: String?) {
             if (storageFailure) throw ClientUpdateFailure("storage")
@@ -82,6 +83,26 @@ class ClientUpdateCoordinatorTest {
     @Test fun actualNewExecutableClearsTheOfferWithoutLaunchingInstaller() = scenario { b, c, _ ->
         b.announce(); c.start(); c.downloadUpdate(); b.build = b.build.copy(build = 2); c.installUpdate()
         assertEquals(0, b.installs); assertFalse(c.state.value.hasUpdate); assertEquals(2L, c.state.value.installed.build)
+    }
+    @Test fun reloadedWebBuildClearsCachedOfferButAnOldRuntimeStillOffersTheVerifiedUpdate() = scenario { b, c, notes ->
+        b.clientPlatform = ClientPlatform(ClientOs.WEB, ClientArch.UNIVERSAL)
+        val release = b.release().copy(artifacts = listOf(ClientArtifact(ClientOs.WEB, ClientArch.UNIVERSAL,
+            InstallerKind.WEB_RELOAD, "https://app.example.org/")))
+        b.values["release-accepted"] = b.envelope(release)
+        b.build = b.build.copy(build = release.build)
+        b.fetchFailure = true
+        c.start()
+        assertFalse(c.state.value.hasUpdate)
+        assertTrue(notes.isEmpty())
+
+        val oldRuntimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            b.build = b.build.copy(build = release.build - 1)
+            val oldRuntime = ClientUpdateCoordinator(b, oldRuntimeScope)
+            oldRuntime.start()
+            assertTrue(oldRuntime.state.value.hasUpdate)
+            assertEquals(release.build, oldRuntime.state.value.available?.build)
+        } finally { oldRuntimeScope.cancel() }
     }
     @Test fun missingTrustKeyDoesNotFetchOrOfferAnything() = scenario { b, c, _ ->
         b.publicKey = ""; b.announce(); c.start(); assertFalse(c.state.value.configured); assertEquals(0, b.fetches)

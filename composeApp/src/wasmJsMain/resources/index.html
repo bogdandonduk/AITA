@@ -14,6 +14,20 @@
 <body>
 <main id="aita-startup" role="status" style="padding:24px;font:18px system-ui">AITA</main>
     <noscript>AITA requires JavaScript and WebAssembly support.</noscript>
-    <script type="application/javascript" src="composeApp.js"></script>
+    <script>
+        // A refreshed document must also refresh its entry script. Older installations can
+        // still have a fresh, long-lived HTTP cache entry from before no-cache was enabled.
+        // These parameters only select the download; the signed feed is compared with the
+        // build identity compiled into the running Wasm application.
+        const entry = new URL('composeApp.js', location.href);
+        const requested = new URL(location.href).searchParams;
+        for (const name of ['_aita_build', '_aita_refresh']) {
+            const value = requested.get(name);
+            if (value && /^[0-9]{1,20}$/.test(value)) entry.searchParams.set(name, value);
+        }
+        const script = document.createElement('script');
+        script.src = entry.href;
+        document.body.appendChild(script);
+    </script>
 </body>
 </html>

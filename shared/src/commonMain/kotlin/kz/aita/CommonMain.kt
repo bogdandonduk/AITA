@@ -683,6 +683,13 @@ data class TransactionCartScrollStateDataModel(
 @kotlinx.serialization.Serializable
 data class CartReturnBatchSelectionDataModel(
     val goodsItemId: String,
+    val originalTransactionId: String? = null,
+    val originalTransactionLineIndex: Int? = null,
+    val originalClientOperationId: String? = null,
+    val returnDestinationKind: StockBatchKindDataModel? = null,
+    val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
+    val shelfBatchIdAtSale: String? = null,
+    val originalReceiptTimeMillis: Long? = null,
     val stockBatchId: String? = null,
     val pricePerUnit: Double? = null,
     val currencyCode: String = "",
@@ -715,7 +722,13 @@ data class TransactionReceiptLineDataModel(
     val saleMethodId: String = SALE_METHOD_RETAIL,
     val saleMethodName: List<LocalizedStringDataModel> = saleMethodLocalizedName(saleMethodId),
     val returnReason: String = "",
-    val stockBatchId: String? = null
+    val stockBatchId: String? = null,
+    val originalTransactionId: String? = null,
+    val originalTransactionLineIndex: Int? = null,
+    val originalClientOperationId: String? = null,
+    val returnDestinationKind: StockBatchKindDataModel? = null,
+    val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
+    val shelfBatchIdAtSale: String? = null
 ) {
     val total: Double
         get() = quantity.total * pricePerUnit
@@ -1911,13 +1924,15 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPdfDocument(language: String
     appendLine("${labels.vat}: ${labels.vatNotSpecified}")
     appendLine("${labels.fiscalStatus}: ${labels.nonFiscalSoftwareReceipt}")
     appendLine(labels.thankYou)
+    transaction.receiptBarcodePayload()?.let { blocks += AitaPdfBlock("", barcodePayload = it) }
 
     return AitaPdfDocument(blocks)
 }
 
 
 fun TransactionReceiptSnapshotDataModel.buildReceiptPlainText(language: String, labels: ReceiptTextLabelsDataModel): String =
-    buildReceiptPdfDocument(language, labels).blocks.joinToString(separator = "\n", postfix = "\n") { it.text }
+    buildReceiptPdfDocument(language, labels).blocks.filter { it.barcodePayload == null }
+        .joinToString(separator = "\n", postfix = "\n") { it.text }
 
 
 private fun pdfEscape(value: String): String {
@@ -1989,7 +2004,8 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String
     val plainLines = buildReceiptPlainText(language, labels)
         .lines()
         .dropLastWhile { it.isBlank() }
-    renderReceiptRaster(plainLines)?.let { return it }
+    val barcodePayload = transaction.receiptBarcodePayload()
+    renderReceiptRaster(plainLines, barcodePayload)?.let { return it }
     val bytes = mutableListOf<Byte>()
     bytes.startReceiptEscPosDocument()
 
@@ -2005,6 +2021,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptEscPosBytes(language: String
     plainLines.drop(if (header.isBlank()) 0 else 1).forEach { line ->
         bytes.addEscPosWrappedLine(line)
     }
+    barcodePayload?.let { bytes.addAll(receiptBarcodeRasterBytes(it).toList()) }
     bytes.finishReceiptEscPosDocument()
     return bytes.toByteArray()
 }
@@ -12185,34 +12202,11 @@ private suspend fun enqueueLocalNetworkOperation(operation: LocalNetworkQueuedOp
 private fun transactionLocalId(operationId: String): String = "local_${operationId.takeLast(48)}"
 
 private fun TransactionDataModel.withClientOperationId(): TransactionDataModel =
-    if (clientOperationId.isNotBlank()) this else copy(
-        clientOperationId = createClientOperationId(
-            "txn",
-            listOf(
-                storeId,
-                type,
-                timeMillis.toString(),
-                paidCash.toString(),
-                paidCard.toString(),
-                goodsInTransaction.joinToString("|") { line ->
-                    listOf(
-                        line.goodsItemId.orEmpty(),
-                        line.barcode,
-                        line.quantity.toString(),
-                        line.pricePerUnit.toString(),
-                        line.saleMethodId,
-                        line.supplierIdText.orEmpty(),
-                        line.returnReason.trim(),
-                        line.stockBatchId.orEmpty()
-                    ).joinToString(":")
-                }
-            ).joinToString(";")
-        )
-    )
+    if (clientOperationId.isNotBlank()) this else copy(clientOperationId = "txn-${newDiagnosticId()}")
 
 private fun queuedTransactionOperation(transaction: TransactionDataModel): LocalNetworkQueuedOperationDataModel =
     LocalNetworkQueuedOperationDataModel(
-        id = transaction.clientOperationId.ifBlank { createClientOperationId("txn") },
+        id = transaction.clientOperationId.ifBlank { "txn-${newDiagnosticId()}" },
         operationType = LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE,
         storeId = transaction.storeId,
         branchStoreId = activeStoreIdState.value,
@@ -12309,7 +12303,7 @@ private suspend fun queueWorkshiftEndForCloud(
     return request to operation
 }
 
-private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: GoodsItemDataModel?, line: GoodsItemInTransactionDataModel, transactionType: String): List<GoodsBatchDataModel> {
+private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: GoodsItemDataModel?, line: GoodsItemInTransactionDataModel, transactionType: String, storeId: String): List<GoodsBatchDataModel> {
     if (item == null) return batches
     val delta = when (transactionType) {
         "sale", "purchase" -> -line.quantity
@@ -12318,12 +12312,22 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
     }
     if (delta == 0.0) return batches
 
+    val eligible = batches.filter { it.goodsItemId == item.id && it.isActive &&
+        (transactionType != "return" || it.isReturnDestination()) }
     val candidateIds = mutableListOf<String>().apply {
         line.stockBatchId?.takeIf { it.isNotBlank() }?.let { add(it) }
         item.activeShelfBatchId?.let { add(it) }
-        addAll(batches.filter { it.goodsItemId == item.id && it.isActive }.sortedBy { it.shelfPriority }.map { it.id })
+        addAll(eligible.sortedBy { it.shelfPriority }.map { it.id })
     }.distinct()
-    val targetId = candidateIds.firstOrNull { id -> batches.any { it.id == id } }
+    val targetId = when {
+        transactionType == "return" && line.returnDestinationKind == StockBatchKindDataModel.RETURNED -> null
+        transactionType == "return" && line.returnDestinationKind == StockBatchKindDataModel.UNIVERSAL ->
+            eligible.firstOrNull { it.kind == StockBatchKindDataModel.UNIVERSAL && it.storeId == storeId }?.id
+        !line.stockBatchId.isNullOrBlank() -> eligible.firstOrNull { it.id == line.stockBatchId }?.id
+        else -> candidateIds.firstOrNull { id -> eligible.any { it.id == id } }
+    }
+    // Keep an unavailable explicit destination unresolved for server review; do not redirect it.
+    if (targetId == null && !line.stockBatchId.isNullOrBlank()) return batches
     if (targetId == null) {
         if (transactionType != "return" || delta <= 0.0) return batches
         val now = getCurrentTimeMillis()
@@ -12335,14 +12339,15 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
             id = createClientOperationId("local-return-batch", item.id + line.barcode + now.toString()),
             goodsItemId = item.id,
             userId = item.userId,
-            storeId = item.storeId,
+            storeId = storeId,
+            kind = line.returnDestinationKind ?: StockBatchKindDataModel.RETURNED,
             quantity = line.quantityUnit?.copy(total = delta) ?: QuantityDataModel("0", emptyList(), delta, 1.0, true),
             supplyPrice = item.supplyPrices.firstOrNull() ?: item.salePrices.firstOrNull() ?: item.returnPrices.firstOrNull() ?: fallbackPrice,
             returnPriceOverride = fallbackPrice,
             deliveredAtMillis = now,
             status = StockBatchStatusDataModel.Delivered,
-            additionalNotes = "aita_returned_no_stock_batch",
-            additionalNotesLocalized = listOf(
+            additionalNotes = if (line.returnDestinationKind == null) "aita_returned_no_stock_batch" else null,
+            additionalNotesLocalized = if (line.returnDestinationKind != null) emptyList() else listOf(
                 LocalizedStringDataModel("main", "Returned items with no previous stock batch"),
                 LocalizedStringDataModel("ru", "Возвраты без предыдущей складской партии"),
                 LocalizedStringDataModel("kk", "Алдыңғы қойма партиясы жоқ қайтарымдар"),
@@ -12378,7 +12383,7 @@ private suspend fun applyLocalQueuedTransaction(transaction: TransactionDataMode
         val item = stock.firstOrNull { goods ->
             goods.id == line.goodsItemId || goods.allBarcodeValues().any { it == line.barcode || it.toStoredGoodsItemBarcode() == line.barcode.toStoredGoodsItemBarcode() }
         }
-        updatedBatches = mutateLocalBatchQuantity(updatedBatches, item, line, completed.type)
+        updatedBatches = mutateLocalBatchQuantity(updatedBatches, item, line, completed.type, completed.storeId)
     }
     stockBatchesState.emit(DataState.Success(updatedBatches, message))
 
@@ -19541,7 +19546,8 @@ data class GoodsBatchDataModel(
     val updatedAtMillis: Long = 0L,
     val createdByUserId: String? = null,
 
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val kind: StockBatchKindDataModel = StockBatchKindDataModel.NORMAL
 )
 
 //@kotlinx.serialization.Serializable
@@ -19692,7 +19698,13 @@ data class GoodsItemInTransactionDataModel(
     val quantityUnit: QuantityDataModel? = null,
     val currencyCode: String? = null,
     val returnReason: String = "",
-    val stockBatchId: String? = null
+    val stockBatchId: String? = null,
+    val originalTransactionId: String? = null,
+    val originalTransactionLineIndex: Int? = null,
+    val originalClientOperationId: String? = null,
+    val returnDestinationKind: StockBatchKindDataModel? = null,
+    val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
+    val shelfBatchIdAtSale: String? = null
 )
 
 @kotlinx.serialization.Serializable

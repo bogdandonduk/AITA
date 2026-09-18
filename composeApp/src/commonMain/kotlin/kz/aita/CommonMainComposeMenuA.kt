@@ -4877,7 +4877,9 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.AppTheme -> {
                         MenuAppThemeScreen()
                     }
-                    is NavigationScreenModel.Menu.AppState -> { MenuAppStateScreen() }
+                    is NavigationScreenModel.Menu.AppState -> { MenuSettingsScreen(legacyAppState = true) }
+                    is NavigationScreenModel.Menu.Settings -> { MenuSettingsScreen() }
+                    is NavigationScreenModel.Menu.Downloads -> { DownloadsScreen() }
                     is NavigationScreenModel.Menu.AppScale -> {
                         MenuAppScaleScreen()
                     }
@@ -4984,7 +4986,9 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppTheme -> {
                             MenuAppThemeScreen()
                         }
-                        is NavigationScreenModel.Menu.AppState -> { MenuAppStateScreen() }
+                        is NavigationScreenModel.Menu.AppState -> { MenuSettingsScreen(legacyAppState = true) }
+                        is NavigationScreenModel.Menu.Settings -> { MenuSettingsScreen() }
+                        is NavigationScreenModel.Menu.Downloads -> { DownloadsScreen() }
                         is NavigationScreenModel.Menu.AppScale -> {
                             MenuAppScaleScreen()
                         }
@@ -5086,7 +5090,9 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppTheme -> {
                             MenuAppThemeScreen()
                         }
-                        is NavigationScreenModel.Menu.AppState -> { MenuAppStateScreen() }
+                        is NavigationScreenModel.Menu.AppState -> { MenuSettingsScreen(legacyAppState = true) }
+                        is NavigationScreenModel.Menu.Settings -> { MenuSettingsScreen() }
+                        is NavigationScreenModel.Menu.Downloads -> { DownloadsScreen() }
                         is NavigationScreenModel.Menu.AppScale -> {
                             MenuAppScaleScreen()
                         }
@@ -5174,7 +5180,8 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
         NavigationScreenModel.Menu.AppScale,
-        NavigationScreenModel.Menu.AppState,
+        NavigationScreenModel.Menu.Settings,
+        NavigationScreenModel.Menu.Downloads,
         NavigationScreenModel.Menu.ClientUpdate,
         NavigationScreenModel.Menu.About
     )
@@ -5190,7 +5197,8 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
         NavigationScreenModel.Menu.AppScale,
-        NavigationScreenModel.Menu.AppState,
+        NavigationScreenModel.Menu.Settings,
+        NavigationScreenModel.Menu.Downloads,
         NavigationScreenModel.Menu.ClientUpdate,
         NavigationScreenModel.Menu.About
     )

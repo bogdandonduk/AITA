@@ -16,16 +16,6 @@ import kotlinx.coroutines.launch
 
 internal fun AppConfiguration.appStateText(key: String) = eventMessage("app_state.$key").extractLocalizedString(stateValues.appLanguage).orEmpty()
 
-@Composable internal fun AppConfiguration.MenuAppStateScreen() {
-    val state by AppStateWorkspace.state.collectAsState()
-    AitaScreenColumn(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, appBar = {
-        ScreenAppBarWidget(title = appStateText("title"), iconPath = stateValues.drawablePathIconDevices,
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
-    }) {
-        AppStateSettingsPane(state)
-    }
-}
-
 @Composable internal fun AppConfiguration.AppStateSettingsPane(state: AppStateUi) {
     val colors = SwitchDefaults.colors(checkedThumbColor = stateValues.AccentTextColor, checkedTrackColor = stateValues.AccentColor,
         uncheckedThumbColor = stateValues.TextColor, uncheckedTrackColor = stateValues.BackgroundColor,
