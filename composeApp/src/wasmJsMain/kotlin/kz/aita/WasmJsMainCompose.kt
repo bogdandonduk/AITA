@@ -88,7 +88,7 @@ fun main() {
             }
         } catch (failure: Throwable) {
             val alreadyOpen = failure.message.orEmpty().contains("already open in another tab")
-            document.getElementById("aita-startup")?.textContent = browserStartupFailureText(alreadyOpen)
+            document.getElementById("aita-startup-message")?.textContent = browserStartupFailureText(alreadyOpen)
         }
     }
 }

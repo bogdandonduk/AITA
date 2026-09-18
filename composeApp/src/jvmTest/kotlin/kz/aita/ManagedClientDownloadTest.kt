@@ -48,6 +48,32 @@ class ManagedClientDownloadTest {
         assertEquals(saved,cache.restore(release,artifact)); assertTrue(connection.disconnected)
         assertFalse(root.listFiles().orEmpty().any { it.name.endsWith(".part") })
     }
+    @Test fun privateCacheParentAliasCanDownloadAndRestoreWithoutAcceptingLinkedUpdateDirectory() = scenario { root, _, release, artifact, connection ->
+        val realCache = root.resolve("app-cache").apply { mkdirs() }
+        val alias = root.resolve("os-cache-alias")
+        Files.createSymbolicLink(alias.toPath(), realCache.toPath())
+        try {
+            // Android can expose /data/user/0 while the canonical private parent is /data/data.
+            assertFailsWith<ClientUpdateFailure> { ManagedClientInstaller(alias.resolve("client-updates")) { _, _ -> } }
+            fun open() = ManagedClientInstaller(privateClientInstallerDirectory(alias), testConnection = { connection }) { a, b ->
+                Files.move(a.toPath(), b.toPath(), StandardCopyOption.REPLACE_EXISTING); Unit
+            }
+            val cache = open()
+            val saved = cache.prepare(release, artifact) { _, _ -> }
+            val reopened = open()
+            assertEquals(saved, reopened.restore(release, artifact))
+            assertContentEquals(content, reopened.verifiedFile(saved, artifact).readBytes())
+
+            val updates = realCache.resolve("client-updates")
+            assertTrue(updates.deleteRecursively())
+            val outside = root.resolve("outside").apply { mkdirs() }
+            Files.createSymbolicLink(updates.toPath(), outside.toPath())
+            try {
+                assertFailsWith<ClientUpdateFailure> { open() }
+                assertTrue(outside.listFiles().orEmpty().isEmpty())
+            } finally { Files.delete(updates.toPath()) }
+        } finally { Files.deleteIfExists(alias.toPath()) }
+    }
     @Test fun truncatedResponseNeverCommitsInstallerOrJournal() = scenario(bytes=content.copyOf(99),declared=null) { root, cache, release, artifact, connection ->
         assertFailsWith<ClientUpdateFailure> { cache.prepare(release,artifact) { _,_ -> } }
         assertNull(cache.restore(release,artifact)); assertTrue(connection.disconnected)

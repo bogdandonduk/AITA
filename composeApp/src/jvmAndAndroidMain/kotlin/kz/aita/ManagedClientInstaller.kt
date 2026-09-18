@@ -22,6 +22,11 @@ internal fun verifyRsaClientRelease(payload: ByteArray, signature: ByteArray, ke
     Signature.getInstance("SHA256withRSA").run { initVerify(publicKey); update(payload); verify(signature) }
 }.getOrDefault(false)
 
+/** Resolve only the OS-provided private cache parent (Android can alias /data/user/0).
+ * The updater-owned child and its files still pass the strict no-symlink checks. */
+internal fun privateClientInstallerDirectory(appCacheDirectory: File): File =
+    File(appCacheDirectory.canonicalFile, "client-updates")
+
 /** This directory contains only updater-owned, content-addressed artifacts. No Downloads-folder sweeps. */
 internal class ManagedClientInstaller(
     directory: File,

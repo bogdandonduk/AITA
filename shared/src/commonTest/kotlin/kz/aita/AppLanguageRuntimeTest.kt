@@ -3,6 +3,16 @@ package kz.aita
 import kotlin.test.*
 
 class AppLanguageRuntimeTest {
+    @Test fun cachedScaleLabelsAreCorrectedWithoutRewritingOtherResources() {
+        for ((language, old, expected) in listOf(Triple("ru", "Крупный", "Большой"), Triple("tg", "Калон", "Бузург"))) {
+            val stale = listOf(LocalizedStringDataModel(language, old))
+            assertEquals(expected, resolveLocalizedResource(912, language, stale, null))
+            assertEquals(expected, AppearanceCatalog.build(strings = listOf(LocalizedStringGroupDataModel(912, stale))).string(912, language))
+            assertEquals(old, resolveLocalizedResource(9999, language, stale, null))
+            assertNotEquals(expected, eventMessage("people.ui.large").extractLocalizedString(language))
+        }
+    }
+
     @Test fun sixLanguagesAndLegacyAliasesNormalizeConsistently() {
         for ((tag, expected) in listOf("TG_tj" to "tg", "TJ" to "tg", "ky-KG" to "ky",
             "UZ_Latn_UZ" to "uz", "KK-kz" to "kk", "kz" to "kk", "ru-RU" to "ru", "en-US" to "en")) {

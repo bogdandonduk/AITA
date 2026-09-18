@@ -3,6 +3,7 @@ import importlib.util
 import os
 from pathlib import Path
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -13,6 +14,23 @@ spec.loader.exec_module(verifier)
 
 @unittest.skipUnless(os.name == 'nt', 'MSI databases require native Windows Installer COM')
 class WindowsPackageTests(unittest.TestCase):
+    def test_extracted_executable_icon_matches_its_own_artwork_and_rejects_another_icon(self):
+        with TemporaryDirectory(prefix="AITA icon ' ") as name:
+            icon = Path(name) / 'original.ico'
+            script = r'''$ErrorActionPreference='Stop'
+Add-Type -AssemblyName System.Drawing
+$icon = [System.Drawing.Icon]::ExtractAssociatedIcon($env:AITA_TEST_EXE)
+$file = [System.IO.File]::Create($env:AITA_TEST_ICON)
+try { $icon.Save($file) } finally { $file.Dispose(); $icon.Dispose() }
+'''
+            subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
+                env=dict(os.environ, AITA_TEST_EXE=sys.executable, AITA_TEST_ICON=str(icon)),
+                check=True, capture_output=True, timeout=30)
+            self.assertTrue(verifier.verify_icon(Path(sys.executable), icon)['matchesAitaIcon'])
+            aita_icon = Path(__file__).resolve().parents[2] / 'composeApp/src/jvmMain/resources/drawable/app_icon.ico'
+            with self.assertRaisesRegex(RuntimeError, 'EXE must display the AITA icon'):
+                verifier.verify_icon(Path(sys.executable), aita_icon)
+
     def inspect(self, version='1.0.2', upgrade=verifier.UPGRADE_CODE, remove=True):
         with TemporaryDirectory(prefix="AITA MSI ' ") as name:
             path = Path(name) / 'identity.msi'

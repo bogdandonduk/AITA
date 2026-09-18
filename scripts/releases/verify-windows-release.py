@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Authenticode on native Windows, then emit the production publication receipt."""
+"""Verify native Windows installer identity, icon and Authenticode before publication."""
 import argparse
 import hashlib
 import json
@@ -8,6 +8,37 @@ from pathlib import Path
 import subprocess
 
 UPGRADE_CODE = 'F100F3AF-CBA2-42E5-928D-8165D1A271A5'
+
+
+def verify_icon(path, expected_icon):
+    script = r'''$ErrorActionPreference='Stop'
+Add-Type -AssemblyName System.Drawing
+$actual = [System.Drawing.Icon]::ExtractAssociatedIcon($env:AITA_VERIFY_FILE)
+if ($null -eq $actual) { throw 'Installer has no icon' }
+$expected = [System.Drawing.Icon]::new($env:AITA_VERIFY_ICON, $actual.Size)
+$actualBitmap = $actual.ToBitmap()
+$expectedBitmap = $expected.ToBitmap()
+try {
+  if ($actualBitmap.Size -ne $expectedBitmap.Size) { throw 'Installer icon has the wrong size' }
+  for ($y = 0; $y -lt $actualBitmap.Height; $y++) {
+    for ($x = 0; $x -lt $actualBitmap.Width; $x++) {
+      $a = $actualBitmap.GetPixel($x, $y); $e = $expectedBitmap.GetPixel($x, $y)
+      if ($a.A -ne $e.A -or ($a.A -ne 0 -and $a.ToArgb() -ne $e.ToArgb())) {
+        throw 'Installer icon differs from AITA artwork'
+      }
+    }
+  }
+  @{width=$actualBitmap.Width; height=$actualBitmap.Height; matchesAitaIcon=$true} | ConvertTo-Json -Compress
+} finally {
+  $actualBitmap.Dispose(); $expectedBitmap.Dispose(); $actual.Dispose(); $expected.Dispose()
+}
+'''
+    output = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
+        env={**os.environ, 'AITA_VERIFY_FILE': str(path.resolve()), 'AITA_VERIFY_ICON': str(expected_icon.resolve())},
+        text=True, capture_output=True, timeout=60)
+    if output.returncode:
+        raise RuntimeError('EXE must display the AITA icon: ' + output.stderr.strip())
+    return dict(json.loads(output.stdout), sourceSha256=hashlib.sha256(expected_icon.read_bytes()).hexdigest())
 
 
 def verify_upgrade_identity(path, version):
@@ -55,6 +86,7 @@ def main():
     p.add_argument('--version', required=True)
     p.add_argument('--build', required=True, type=int)
     p.add_argument('--revision', required=True)
+    p.add_argument('--icon', required=True, type=Path)
     p.add_argument('--production', choices=['true', 'false'], required=True)
     args = p.parse_args()
     production = args.production == 'true'
@@ -63,6 +95,7 @@ def main():
     if len(paths) != 2 or {x.suffix.lower() for x in paths} != {'.exe', '.msi'}:
         raise RuntimeError('Expected exactly one EXE and one MSI')
     upgrade = verify_upgrade_identity(next(x for x in paths if x.suffix.lower() == '.msi'), args.version)
+    icon = verify_icon(next(x for x in paths if x.suffix.lower() == '.exe'), args.icon)
     for path in paths:
         signature = verify_signature(path, production, os.environ.get('AITA_WINDOWS_SIGNER_THUMBPRINT', ''))
         name = f'AITA-{args.version}-{args.build}-windows{path.suffix.lower()}'
@@ -76,7 +109,7 @@ def main():
         artifacts.append(dict(name=name, sha256=digest, **signature))
     receipt = dict(version=args.version, build=args.build, revision=args.revision,
                    verificationRevision=os.environ.get('AITA_WORKFLOW_REVISION', args.revision),
-                   production=production, artifacts=artifacts, upgrade=upgrade)
+                   production=production, artifacts=artifacts, upgrade=upgrade, icon=icon)
     (args.directory / 'windows-verification.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print('VERIFIED: Timestamped company signatures' if production else 'UNSIGNED PILOT: Authorized test-store installers; trusted Windows signing is deferred')
 

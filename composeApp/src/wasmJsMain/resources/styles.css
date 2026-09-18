@@ -5,3 +5,28 @@ html, body {
     padding: 0;
     overflow: hidden;
 }
+
+#aita-startup {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 24px;
+    box-sizing: border-box;
+    background: #fffaf0;
+    color: #30343d;
+    font: 16px/1.5 system-ui, sans-serif;
+    text-align: center;
+}
+#aita-startup img {
+    width: clamp(112px, 24vw, 160px);
+    height: auto;
+}
+#aita-startup-message { max-width: 480px; margin: 0; }
+#aita-startup-message:empty { display: none; }
+@media (prefers-color-scheme: dark) {
+    #aita-startup { background: #12151a; color: #f3f4f6; }
+}

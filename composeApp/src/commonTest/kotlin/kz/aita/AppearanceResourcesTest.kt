@@ -4,6 +4,16 @@ import androidx.compose.ui.graphics.toArgb
 import kotlin.test.*
 
 class AppearanceResourcesTest {
+    @Test fun bigAndLargeHaveDistinctLabelsInEveryLanguage() {
+        for (language in SUPPORTED_APP_LANGUAGES) {
+            val big = assertNotNull(bundledLocalizedStringFallbacks[912]?.get(language))
+            val large = assertNotNull(eventMessage("people.ui.large").extractLocalizedString(language))
+            assertNotEquals(big, large, language)
+        }
+        assertEquals("Большой", bundledLocalizedStringFallbacks[912]?.get("ru"))
+        assertEquals("Крупный", eventMessage("people.ui.large").extractLocalizedString("ru"))
+    }
+
     @Test fun bothDefaultPalettesInitializeWithoutResourceIo() {
         val palettes = UiAppearanceResources(AppearanceCatalog.build())
         assertEquals(0xffffffff.toInt(), palettes.color(1,0).toArgb())

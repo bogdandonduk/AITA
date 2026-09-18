@@ -1,6 +1,7 @@
 // THIS IS build.gradle of composeApp module
 import com.android.build.api.dsl.ApplicationExtension
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -14,6 +15,16 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.ksp) apply false
+}
+
+// Compose 1.9.2 supplies --icon for the app image, but omits it when packaging that
+// existing image. jpackage's EXE wrapper otherwise keeps its generic Java icon.
+tasks.withType<AbstractJPackageTask>().configureEach {
+    if (targetFormat == TargetFormat.Exe || targetFormat == TargetFormat.Msi) {
+        val installerIcon = layout.projectDirectory.file("src/jvmMain/resources/drawable/app_icon.ico")
+        inputs.file(installerIcon)
+        freeArgs.addAll("--icon", installerIcon.asFile.absolutePath)
+    }
 }
 
 val aitaWebOnlyBuild = providers.gradleProperty("aita.webOnly")

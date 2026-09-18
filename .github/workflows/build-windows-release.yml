@@ -156,12 +156,12 @@ jobs:
           override: true
           environment_name: PROD
           clean_logs: true
-      - name: Verify production signatures and record checksums
+      - name: Verify installer icon, upgrade identity, signatures and checksums
         shell: pwsh
         env:
           PRODUCTION: ${{ inputs.production }}
         run: |
-          python build/release-tools/scripts/releases/verify-windows-release.py --directory build/windows-signing --version $env:AITA_RELEASE_VERSION --build $env:AITA_RELEASE_BUILD --revision $env:AITA_RELEASE_REVISION --production $env:PRODUCTION
+          python build/release-tools/scripts/releases/verify-windows-release.py --directory build/windows-signing --version $env:AITA_RELEASE_VERSION --build $env:AITA_RELEASE_BUILD --revision $env:AITA_RELEASE_REVISION --production $env:PRODUCTION --icon composeApp/src/jvmMain/resources/drawable/app_icon.ico
           if ($LASTEXITCODE -ne 0) { throw 'Windows release verification failed' }
       - name: Save signed release or explicitly unsigned pilot artifacts
         uses: actions/upload-artifact@v4

@@ -1,6 +1,7 @@
 package kz.aita
 
 internal fun settingsDownloadsMessageTemplates() = listOf(
+    EventMessageTemplate("downloads.auth_link", "Download AITA for your devices", "Скачать AITA для ваших устройств", "Құрылғыларыңызға AITA жүктеп алу", ky = "Түзмөктөрүңүз үчүн AITA жүктөп алуу", tg = "Боргирии AITA барои дастгоҳҳои шумо", uz = "Qurilmalaringiz uchun AITA’ni yuklab olish"),
     EventMessageTemplate("settings.title", "Settings", "Настройки", "Баптаулар", ky = "Жөндөөлөр", tg = "Танзимот", uz = "Sozlamalar"),
     EventMessageTemplate("downloads.title", "Downloads", "Загрузки", "Жүктеулер", ky = "Жүктөөлөр", tg = "Боргириҳо", uz = "Yuklamalar"),
     EventMessageTemplate("downloads.intro", "AITA on your devices", "AITA на ваших устройствах", "Құрылғыларыңыздағы AITA", ky = "Түзмөктөрүңүздөгү AITA", tg = "AITA дар дастгоҳҳои шумо", uz = "Qurilmalaringizda AITA"),

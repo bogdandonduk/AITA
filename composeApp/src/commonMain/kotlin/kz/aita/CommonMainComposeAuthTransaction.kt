@@ -607,6 +607,36 @@ internal var userAuthScreenScrollFirstVisibleItemScrollOffset: Int = 0
 
 @Composable
 fun AppConfiguration.UserAuthScreen() {
+    val publicDestination = (if (stateValues.isNarrowScreen) stateValues.navigationScreensUserAuthLeft
+        else stateValues.navigationScreensUserAuthRight).lastOrNull()
+    val openPublicPage: (NavigationScreenModel.UserAuth) -> Unit = { destination ->
+        coroutineScope.launch {
+            if (stateValues.isNarrowScreen) Navigation.UserAuth.goLeft(destination)
+            else Navigation.UserAuth.goRight(destination)
+        }
+    }
+    val closePublicPage: () -> Unit = {
+        coroutineScope.launch {
+            if (stateValues.isNarrowScreen) Navigation.UserAuth.popLeft() else Navigation.UserAuth.popRight()
+        }
+    }
+    if (publicDestination == NavigationScreenModel.UserAuth.Downloads) {
+        DownloadsScreen(onBack = closePublicPage,
+            onOpenFolderSettings = { openPublicPage(NavigationScreenModel.UserAuth.DownloadSettings) })
+        return
+    }
+    if (publicDestination == NavigationScreenModel.UserAuth.DownloadSettings) {
+        AitaScreenColumn(Modifier.fillMaxSize(), appBar = {
+            ScreenAppBarWidget(title = downloadsText("folder"), iconPath = downloadsIconPath(), onBack = closePublicPage)
+        }) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                    DownloadFolderSettings()
+                }
+            }
+        }
+        return
+    }
     Column(
         modifier = Modifier.fillMaxSize().imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -626,11 +656,11 @@ fun AppConfiguration.UserAuthScreen() {
 
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize(),
+                .weight(1f).fillMaxWidth(),
             state = authListState,
             contentPadding = PaddingValues(
                 top = if (stateValues.isNarrowScreen) 0.dp else stateValues.screenHeight / 18,
-                bottom = 112.dp
+                bottom = 32.dp
             ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -709,6 +739,9 @@ fun AppConfiguration.UserAuthScreen() {
                     }
                 }
             }
+        }
+        Box(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp), contentAlignment = Alignment.Center) {
+            AuthQuietAction(downloadsText("auth_link")) { openPublicPage(NavigationScreenModel.UserAuth.Downloads) }
         }
     }
 }

@@ -3,6 +3,12 @@ package kz.aita
 import kotlin.test.*
 
 class SettingsDownloadsNavigationTest {
+    @Test fun publicDownloadsRoutesRestoreToTheGuestScreens() {
+        for (screen in listOf(NavigationScreenModel.UserAuth.Downloads, NavigationScreenModel.UserAuth.DownloadSettings)) {
+            assertEquals(screen, persistentAppRouteToScreen(screen.route))
+        }
+    }
+
     @Test fun everyAppModeOffersSettingsAndDownloadsWithoutAnAppStateMenuItem() {
         for (mode in listOf(APP_MODE_STORE, APP_MODE_BUYER, APP_MODE_SUPPLIER, APP_MODE_MANUFACTURER)) {
             val destinations = menuDestinationsForAppMode(mode)
@@ -28,7 +34,8 @@ class SettingsDownloadsNavigationTest {
     @Test fun visibleNewScreenDescriptionsExistInEverySupportedLanguage() {
         for (language in listOf("en", "ru", "kk", "ky", "tg", "uz")) {
             for (key in listOf("settings.title", "downloads.title", "downloads.folder", "downloads.android", "downloads.windows",
-                "downloads.web", "downloads.macos", "downloads.ios", "downloads.browser_folder", "downloads.aab")) {
+                "downloads.web", "downloads.macos", "downloads.ios", "downloads.browser_folder", "downloads.aab",
+                "downloads.auth_link", "updates.android_install_help", "updates.error.signing")) {
                 assertFalse(eventMessage(key).extractLocalizedString(language).isNullOrBlank(), "$language: $key")
             }
         }

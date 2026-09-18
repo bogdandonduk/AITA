@@ -10,11 +10,10 @@ import kz.aita.android.MainActivity
 import kz.aita.updates.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.security.MessageDigest
 
 private fun updateActivity() = MainActivity.getOrNull() ?: throw ClientUpdateFailure("unavailable")
-private fun androidUpdates() = ManagedClientInstaller(File(updateActivity().applicationContext.cacheDir,"client-updates")) { a,b -> android.system.Os.rename(a.path,b.path) }
+private fun androidUpdates() = ManagedClientInstaller(privateClientInstallerDirectory(updateActivity().applicationContext.cacheDir)) { a,b -> android.system.Os.rename(a.path,b.path) }
 internal actual fun installedClientBuild(): ClientBuildIdentity = runCatching {
     @Suppress("DEPRECATION") val info = updateActivity().packageManager.getPackageInfo(updateActivity().packageName, 0)
     GeneratedClientBuild.identity.copy(version = info.versionName ?: GeneratedClientBuild.identity.version,
@@ -61,7 +60,7 @@ internal actual suspend fun handoffClientUpdate(release: ClientRelease, artifact
         fun fingerprint(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
         @Suppress("DEPRECATION") val oldSigners = (if(Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures).orEmpty().map { fingerprint(it.toByteArray()) }.toSet()
         @Suppress("DEPRECATION") val newHistory = (if(Build.VERSION.SDK_INT >= 28) target.signingInfo?.let { if(it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory } else target.signatures).orEmpty().map { fingerprint(it.toByteArray()) }.toSet()
-        if(oldSigners.isEmpty() || !newHistory.containsAll(oldSigners)) throw ClientUpdateFailure("package")
+        if(oldSigners.isEmpty() || !newHistory.containsAll(oldSigners)) throw ClientUpdateFailure("signing")
         f
     }
     return withContext(Dispatchers.Main) {

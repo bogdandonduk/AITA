@@ -138,6 +138,9 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
             InformationCard {
                 if(artifact.isFile) {
                     Text(updateText("safe_install"),color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
+                    if (current.platform?.os == ClientOs.ANDROID) {
+                        Text(updateText("android_install_help"), color=stateValues.PlaceholderTextColor, fontSize=stateValues.smallTextSize)
+                    }
                     Text(updateText("cleanup"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                     Text("${artifact.kind.name} · ${updateSize(artifact.bytes)}",color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                     if(current.phase==ClientUpdatePhase.DOWNLOADING) {
@@ -172,7 +175,7 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
 @Composable
 private fun AppConfiguration.UpdateCheckFooter(current: ClientUpdateState) {
     current.problem?.let { reason ->
-        val known=setOf("configuration","network","integrity","expired","storage","space","package","install","unavailable","unsupported")
+        val known=setOf("configuration","network","integrity","expired","storage","space","package","signing","install","unavailable","unsupported")
         Text(updateText("error.${reason.takeIf { it in known } ?: "install"}"),color=if(reason=="configuration") stateValues.PlaceholderTextColor else stateValues.ErrorColor,fontSize=stateValues.smallTextSize)
     }
     current.lastCheckedAtMillis?.let { Text("${updateText("last_check")}: ${releaseDate(it)}",color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize) }

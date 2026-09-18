@@ -3270,6 +3270,12 @@ sealed class NavigationScreenModel(
             override val iconRes: DrawableResource
                 get() = AppConfiguration.stateValues.drawableResIconAdd.value
         }
+        data object Downloads: UserAuth("UserAuthDownloadsNavigationScreenModelRoute") {
+            override val iconRes: DrawableResource get() = AppConfiguration.downloadsIconResource()
+        }
+        data object DownloadSettings: UserAuth("UserAuthDownloadSettingsNavigationScreenModelRoute") {
+            override val iconRes: DrawableResource get() = AppConfiguration.downloadsIconResource()
+        }
     }
 
     object Splash: NavigationScreenModel("SplashNavigationScreenModelRoute") {
@@ -3372,6 +3378,8 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.UserAuth.Main,
     NavigationScreenModel.UserAuth.LogIn,
     NavigationScreenModel.UserAuth.SignUp,
+    NavigationScreenModel.UserAuth.Downloads,
+    NavigationScreenModel.UserAuth.DownloadSettings,
     NavigationScreenModel.Buyer.Main.Home,
     NavigationScreenModel.Buyer.Main.Search,
     NavigationScreenModel.Buyer.Main.Saved,

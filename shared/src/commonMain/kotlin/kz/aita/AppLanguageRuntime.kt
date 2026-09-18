@@ -70,6 +70,11 @@ fun mergeLocalizedStringGroups(
 
 /** App-owned resource copy only: never rewrite business names, messages or other user-authored text. */
 internal fun normalizeAppResourceCopy(id: Long, value: String): String {
+    // Correct stale app-owned scale labels from older bundled or downloaded catalogues.
+    if (id == 912L) {
+        if (value == "Крупный") return "Большой"
+        if (value == "Калон") return "Бузург"
+    }
     val text = value
         .replace("an AITA server", "a server")
         .replace("AITA serveriga", "serverga")

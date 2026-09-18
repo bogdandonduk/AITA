@@ -96,14 +96,14 @@ private fun AppConfiguration.DownloadSavedLocation(downloads: DownloadsState) {
 }
 
 @Composable
-internal fun AppConfiguration.DownloadsScreen() {
+internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOpenFolderSettings: (() -> Unit)? = null) {
     val downloads by DownloadsWorkspace.state.collectAsState()
     val scope = rememberCoroutineScope()
     var webOpenFailed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { DownloadsWorkspace.refresh() }
     AitaScreenColumn(Modifier.fillMaxSize(), appBar = {
         ScreenAppBarWidget(title = downloadsText("title"), iconPath = downloadsIconPath(),
-            onBack = { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) } })
+            onBack = onBack ?: { coroutineScope.launch { Navigation.Menu.pop(stateValues.isNarrowScreen) }; Unit })
     }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(Modifier.widthIn(max = 840.dp).fillMaxSize(), contentPadding = PaddingValues(16.dp),
@@ -131,8 +131,10 @@ internal fun AppConfiguration.DownloadsScreen() {
                         DownloadSavedLocation(downloads)
                         actionButton(text = downloadsText("folder"), iconPath = stateValues.drawablePathIconSettings,
                             autoLoading = false, confirmationRequired = false, onClick = {
-                                NavigationScreenModel.Menu.Settings.setStateNow("settings_section" to "downloads")
-                                scope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.Settings) }
+                                if (onOpenFolderSettings != null) onOpenFolderSettings() else {
+                                    NavigationScreenModel.Menu.Settings.setStateNow("settings_section" to "downloads")
+                                    scope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.Settings) }
+                                }
                             })
                         actionButton(text = updateText("check"), autoLoading = false, confirmationRequired = false,
                             enabled = !downloads.loading && !downloads.folderChanging && downloads.savingId == null, onClick = DownloadsWorkspace::refresh)
