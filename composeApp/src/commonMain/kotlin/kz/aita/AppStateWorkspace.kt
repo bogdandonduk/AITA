@@ -156,8 +156,12 @@ internal object AppStateWorkspace {
         record.value.document.drafts[key]?.let { return it }
         // Import old device drafts on demand, preserving work from releases before account sync.
         if (!device || !legacyAllowed || record.value.revision > 0) return null
+        val atRead = change
         val value = getPersistentUiDraftValue?.invoke(key) ?: return null
         if (!belongs(expected)) return null
+        // Storage can finish after a scan cleared this draft or the user typed again.
+        record.value.document.drafts[key]?.let { return it }
+        if (change != atRead || !device || !legacyAllowed || record.value.revision > 0) return null
         record.update { it.copy(document = it.document.copy(drafts = it.document.drafts + (key to value)), dirty = true) }
         change++
         return value
@@ -170,6 +174,23 @@ internal object AppStateWorkspace {
         persist(expected)
         // Remove an imported legacy value only after the aggregate journal is durable.
         if (device && belongs(expected)) setPersistentUiDraftValue?.invoke(key, if (record.value.document.valid(APP_STATE_DEVICE_MAX_BYTES)) null else value)
+    }
+    /** A consumed scan must stay cleared even if its field leaves composition before debounce. */
+    fun clearDraft(key: String) {
+        val expected = owner
+        if (!loaded || !belongs(expected) || !ownsDraftKey(key, expected!!.id, expected.scope.store)) return
+        record.update { it.copy(document = it.document.copy(drafts = it.document.drafts + (key to "")), dirty = true) }
+        change++
+        job.launch {
+            try {
+                persist(expected)
+                if (device && belongs(expected)) {
+                    setPersistentUiDraftValue?.invoke(key,
+                        if (record.value.document.valid(APP_STATE_DEVICE_MAX_BYTES)) null else record.value.document.drafts[key])
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { if (belongs(expected)) publish("unavailable") }
+        }
     }
     fun setDevice(enabled: Boolean) = job.launch { mutex.withLock {
         val expected = owner ?: return@withLock

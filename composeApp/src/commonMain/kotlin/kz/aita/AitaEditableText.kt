@@ -41,6 +41,12 @@ internal class AitaTextFieldBridge(initialValue: TextFieldValue) {
 
     fun editorValue(): TextFieldValue = TextFieldValue(state.text.toString(), state.selection)
 
+    fun resetFromParent(value: TextFieldValue) {
+        parentValue = value.editorSnapshot()
+        awaitingParentValue = null
+        setEditorValue(parentValue)
+    }
+
     fun updateFromParent(value: TextFieldValue) {
         val incoming = value.editorSnapshot()
         val awaiting = awaitingParentValue
@@ -124,16 +130,23 @@ internal fun AitaEditableText(
     inputFilter: ((String) -> Boolean)?,
     inputTransform: ((String) -> String)?,
     onSubmitText: ((String) -> Boolean)? = null,
+    resetRevision: Int = 0,
     decorationBox: @Composable (@Composable () -> Unit) -> Unit
 ) {
     val bridge = remember(identityKey) { AitaTextFieldBridge(value) }
     val accept by rememberUpdatedState(onValueChange)
     val submit by rememberUpdatedState(onSubmitText)
     var acceptanceRevision by remember(bridge) { mutableIntStateOf(0) }
+    var appliedResetRevision by remember(bridge) { mutableIntStateOf(resetRevision) }
     // Read the revision in composition: rejected/capped input must also get a reconciliation
     // pass when the parent value stays unchanged.
     @Suppress("UNUSED_VARIABLE") val revision = acceptanceRevision
-    SideEffect { bridge.updateFromParent(value) }
+    SideEffect {
+        if (appliedResetRevision != resetRevision) {
+            bridge.resetFromParent(value)
+            appliedResetRevision = resetRevision
+        } else bridge.updateFromParent(value)
+    }
     LaunchedEffect(bridge) {
         snapshotFlow { bridge.editorValue() }.collect {
             if (bridge.reportEditorChange(accept)) acceptanceRevision++
@@ -148,7 +161,7 @@ internal fun AitaEditableText(
                 // entire barcode and terminator before the parent has recomposed.
                 if (bridge.reportEditorChange(accept)) acceptanceRevision++
                 if (submit?.invoke(bridge.editorValue().text) == true) {
-                    bridge.updateFromParent(TextFieldValue(""))
+                    bridge.resetFromParent(TextFieldValue(""))
                     acceptanceRevision++
                     true
                 } else false

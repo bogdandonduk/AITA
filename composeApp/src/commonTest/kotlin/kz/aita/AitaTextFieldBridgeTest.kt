@@ -61,6 +61,25 @@ class AitaTextFieldBridgeTest {
         bridge.updateFromParent(TextFieldValue(""))
         assertEquals("", bridge.editorValue().text)
     }
+    @Test fun scannerCompletionClearsBeforeTheFirstParentAcknowledgement() {
+        val bridge = AitaTextFieldBridge(TextFieldValue(""))
+        bridge.edit("2112345010006")
+        bridge.reportEditorChange { it }
+        bridge.resetFromParent(TextFieldValue(""))
+        bridge.updateFromParent(TextFieldValue(""))
+        assertEquals("", bridge.editorValue().text)
+        assertFalse(bridge.reportEditorChange { error("A handled barcode must not be submitted again") })
+        bridge.edit("12345678")
+        var nextScan = ""
+        assertTrue(bridge.reportEditorChange { nextScan = it.text; it })
+        assertEquals("12345678", nextScan)
+    }
+    @Test fun authoritativeResetClearsLiveInputEvenWhenParentIsAlreadyEmpty() {
+        val bridge = AitaTextFieldBridge(TextFieldValue(""))
+        bridge.edit("12345678")
+        bridge.resetFromParent(TextFieldValue(""))
+        assertEquals(TextFieldValue(""), bridge.editorValue())
+    }
     @Test fun perCharacterPasswordFormattingNeverChangesLength() {
         val bridge = AitaTextFieldBridge(TextFieldValue("a🛒б", TextRange(2)))
         bridge.state.edit {

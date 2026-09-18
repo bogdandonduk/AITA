@@ -24,3 +24,23 @@ internal data class PendingTransactionSearchScan(
     val owner: ReceiptActionOwner,
     val inventoryOwner: String?
 )
+
+/** A hidden HID input and the camera must reset the same visible search as its own editor. */
+internal class TransactionSearchCompletion {
+    private var active: (() -> Unit)? = null
+    fun attach(reset: () -> Unit): () -> Unit {
+        active = reset
+        return { if (active === reset) active = null }
+    }
+    fun handled() { active?.invoke() }
+}
+
+internal val transactionSearchCompletion = TransactionSearchCompletion()
+
+/** A delayed disk read must not resurrect a query after typing or a completed scan. */
+internal class TextDraftRestoreGuard {
+    var revision = 0L
+        private set
+    fun edited() { revision++ }
+    fun accepts(startedAt: Long) = revision == startedAt
+}

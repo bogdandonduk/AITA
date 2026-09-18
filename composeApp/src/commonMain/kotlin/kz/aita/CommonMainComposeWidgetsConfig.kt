@@ -1677,6 +1677,8 @@ fun AppConfiguration.genericTextField(
         }
     }
     var textFieldValue by textFieldValueState
+    val draftRestoreGuard = remember(textFieldIdentityKey) { TextDraftRestoreGuard() }
+    var editorResetRevision by remember(textFieldIdentityKey) { mutableIntStateOf(0) }
     val barcodeBurst = remember(textFieldIdentityKey) { TransactionSearchInputBurst() }
     var pendingBarcodeScan by remember(textFieldIdentityKey) { mutableStateOf<PendingTransactionSearchScan?>(null) }
 
@@ -1753,9 +1755,11 @@ fun AppConfiguration.genericTextField(
     LaunchedEffect(persistentTextDraftKey, persistentTextDraftMetaKey, AppStateWorkspace.restoreRevision.collectAsState().value) {
         persistentTextDraftLoaded = false
         val key = persistentTextDraftKey ?: return@LaunchedEffect
+        val restoreRevision = draftRestoreGuard.revision
         val stored = readAppStateDraft?.invoke(key)
         val storedMeta = persistentTextDraftMetaKey?.let { readAppStateDraft?.invoke(it) }
         persistentTextDraftLoaded = true
+        if (!draftRestoreGuard.accepts(restoreRevision)) return@LaunchedEffect
         if (stored != null && stored != stateValue && stored != textFieldValue.text) {
             val externalInitial = stateValue ?: valueInitial
             if (externalInitial == null || textFieldValue.text == externalInitial || textFieldValue.text.isBlank()) {
@@ -1785,12 +1789,26 @@ fun AppConfiguration.genericTextField(
 
     fun clearScannedSearch() {
         val emptyValue = TextFieldValue("")
+        draftRestoreGuard.edited()
+        AppStateWorkspace.edited()
+        lastLocalTextEditMillis = getCurrentTimeMillis()
         pendingBarcodeScan = null
         barcodeBurst.reset()
         textFieldValue = emptyValue
-        stateKey?.let { key -> coroutineScope.launch { stateHost?.setState(key to "") } }
+        editorResetRevision++
+        stateKey?.let { key -> stateHost?.setStateNow(key to "") }
+        persistentTextDraftKey?.let(AppStateWorkspace::clearDraft)
         savePersistentTextDraft("")
         savePersistentTextFieldMeta(emptyValue, isFocused)
+    }
+    val latestClearScannedSearch by rememberUpdatedState(::clearScannedSearch)
+    val scannerInventoryOwner = if (captureTransactionBarcodeInput) inventoryViewScopeKey() else null
+    DisposableEffect(captureTransactionBarcodeInput, textFieldIdentityKey, scannerInventoryOwner) {
+        val owner = captureReceiptActionOwner()
+        val detach = if (captureTransactionBarcodeInput) transactionSearchCompletion.attach {
+            if (owner.isCurrent() && scannerInventoryOwner == inventoryViewScopeKey()) latestClearScannedSearch()
+        } else null
+        onDispose { detach?.invoke() }
     }
     LaunchedEffect(pendingBarcodeScan) {
         val request = pendingBarcodeScan ?: return@LaunchedEffect
@@ -1798,7 +1816,7 @@ fun AppConfiguration.genericTextField(
         if (captureTransactionBarcodeInput && isFocused && textFieldValue.text == request.text &&
             request.handler === activeTransactionBarcodeHandler && request.owner.isCurrent() &&
             request.inventoryOwner == inventoryViewScopeKey() &&
-            request.handler(request.text + "\n")) clearScannedSearch()
+            request.handler(request.text + "\n") && textFieldValue.text == request.text) clearScannedSearch()
     }
 
     var focusRequester by remember(textFieldIdentityKey) {
@@ -1844,9 +1862,14 @@ fun AppConfiguration.genericTextField(
     }
 
     var voiceLanguageStatus by remember(textFieldIdentityKey) { mutableStateOf("") }
+    var voiceDetectedLanguage by remember(textFieldIdentityKey) { mutableStateOf<String?>(null) }
+    val voiceSession = remember(textFieldIdentityKey) {
+        VoiceFieldSession { currentAuthenticatedSessionGeneration() to inventoryViewScopeKey() }
+    }
 
-    DisposableEffect(textFieldIdentityKey) {
+    DisposableEffect(textFieldIdentityKey, currentAuthenticatedSessionGeneration(), inventoryViewScopeKey()) {
         onDispose {
+            voiceSession.cancel()
             if (isVoiceListening) stopPlatformVoiceInput?.invoke()
             isVoiceListening = false
         }
@@ -1877,6 +1900,7 @@ fun AppConfiguration.genericTextField(
         val nextValue = TextFieldValue(nextText, selection = TextRange(nextText.length))
 
         val applyChange: () -> Unit = {
+            draftRestoreGuard.edited()
             AppStateWorkspace.edited()
             lastLocalTextEditMillis = getCurrentTimeMillis()
             textFieldValue = nextValue
@@ -1899,7 +1923,27 @@ fun AppConfiguration.genericTextField(
             enabled &&
             !readOnly &&
             platformSupportsVoiceInput() &&
-            keyboardType != KeyboardType.Password
+            keyboardType != KeyboardType.Password && keyboardType != KeyboardType.NumberPassword
+
+    fun applyVoiceText(raw: String, final: Boolean) {
+        if (!isVoiceListening || raw.isBlank()) return
+        val numberField = when (keyboardType) {
+            KeyboardType.Number -> VoiceNumberField.Integer
+            KeyboardType.Decimal -> VoiceNumberField.Decimal
+            KeyboardType.Phone -> VoiceNumberField.Digits
+            else -> VoiceNumberField.Text
+        }
+        val normalized = voiceTextForField(raw, voiceDetectedLanguage ?: voicePermissionRequestText.primaryLanguageTag, numberField)
+        val transformed = normalized?.let { onTransformValue?.invoke(it) ?: it }
+        // A positive-only field must not silently strip a spoken minus sign.
+        val preservesSign = normalized?.startsWith('-') != true || transformed?.startsWith('-') == true
+        if (normalized != null && preservesSign) {
+            voiceStatusText = normalized
+            if (final || numberField == VoiceNumberField.Text) applyExternalTextReplacement(normalized)
+        } else if (final) {
+            postInAppNotification(eventMessage("voice.number_not_recognized"), NotificationType.Neutral, transient = true)
+        }
+    }
 
     fun postVoiceInputUnavailable() {
         postInAppNotification(
@@ -1921,72 +1965,83 @@ fun AppConfiguration.genericTextField(
             return
         }
 
+        val ownsVoiceSession = voiceSession.begin()
         isVoiceListening = true
         voiceLevel = 0.18f
         voiceStatusText = localizedStringResource(1007, "Listening…")
         voiceLanguageStatus = ""
+        voiceDetectedLanguage = null
 
         coroutineScope.launch {
+            if (!ownsVoiceSession()) return@launch
             starter(
                 voicePermissionRequestText,
                 VoiceInputCallbacks(
                     onLanguageMode = { mode ->
-                        voiceLanguageStatus = eventMessage(when (mode) {
-                            VoiceLanguageMode.AutomaticRequested -> "voice.auto_requested"
-                            VoiceLanguageMode.DetectionOnly -> "voice.detection_only"
-                            VoiceLanguageMode.DeviceDefault -> "voice.device_default"
-                        }).extractLocalizedString(stateValues.appLanguage).orEmpty()
+                        if (ownsVoiceSession()) {
+                            voiceLanguageStatus = eventMessage(when (mode) {
+                                VoiceLanguageMode.AutomaticRequested -> "voice.auto_requested"
+                                VoiceLanguageMode.DetectionOnly -> "voice.detection_only"
+                                VoiceLanguageMode.DeviceDefault -> "voice.device_default"
+                            }).extractLocalizedString(stateValues.appLanguage).orEmpty()
+                        }
                     },
                     onPartialText = { partial ->
-                        if (partial.isNotBlank()) {
-                            voiceStatusText = partial
-                            applyExternalTextReplacement(partial)
-                        }
+                        if (ownsVoiceSession()) applyVoiceText(partial, final = false)
                     },
                     onFinalText = { finalText ->
-                        if (finalText.isNotBlank()) {
-                            voiceStatusText = finalText
-                            applyExternalTextReplacement(finalText)
-                        }
+                        if (ownsVoiceSession()) applyVoiceText(finalText, final = true)
                     },
                     onAmplitude = { level ->
-                        voiceLevel = level.coerceIn(0f, 1f)
+                        if (ownsVoiceSession()) voiceLevel = level.coerceIn(0f, 1f)
                     },
                     onDetectedLanguage = { languageTag ->
-                        voiceLanguageStatus = localizedStringResource(1057, "Detected language") + ": " + languageTag
+                        if (ownsVoiceSession()) {
+                            voiceDetectedLanguage = normalizedDetectedLanguage(languageTag)
+                            voiceLanguageStatus = localizedStringResource(1057, "Detected language") + ": " + languageTag
+                        }
                     },
                     onDenied = {
-                        isVoiceListening = false
-                        voiceLevel = 0f
-                        postInAppNotification(
-                            localizedStringResourceMessage(
-                                id = 1005,
-                                main = "Microphone access was denied",
-                                ru = "Доступ к микрофону запрещён",
-                                kk = "Микрофонға рұқсат берілмеді"
-                            ),
-                            NotificationType.Negative,
-                            transient = true
-                        )
+                        if (ownsVoiceSession()) {
+                            voiceSession.cancel()
+                            isVoiceListening = false
+                            voiceLevel = 0f
+                            postInAppNotification(
+                                localizedStringResourceMessage(
+                                    id = 1005,
+                                    main = "Microphone access was denied",
+                                    ru = "Доступ к микрофону запрещён",
+                                    kk = "Микрофонға рұқсат берілмеді"
+                                ),
+                                NotificationType.Negative,
+                                transient = true
+                            )
+                        }
                     },
                     onError = { message ->
-                        isVoiceListening = false
-                        voiceLevel = 0f
-                        postInAppNotification(
-                            listOf(
-                                LocalizedStringDataModel("main", message.ifBlank { localizedStringResource(1009, "Voice input is not available on this device") }),
-                                LocalizedStringDataModel("en", message.ifBlank { localizedStringResource(1009, "Voice input is not available on this device") }),
-                                LocalizedStringDataModel("ru", message.ifBlank { "Голосовой ввод недоступен" }),
-                                LocalizedStringDataModel("kk", message.ifBlank { "Дауыспен енгізу қолжетімсіз" }),
-                                LocalizedStringDataModel("ky", message.ifBlank { "Бул түзмөктө үн менен киргизүү жеткиликтүү эмес" })
-                            ),
-                            NotificationType.Negative,
-                            transient = true
-                        )
+                        if (ownsVoiceSession()) {
+                            voiceSession.cancel()
+                            isVoiceListening = false
+                            voiceLevel = 0f
+                            postInAppNotification(
+                                listOf(
+                                    LocalizedStringDataModel("main", message.ifBlank { localizedStringResource(1009, "Voice input is not available on this device") }),
+                                    LocalizedStringDataModel("en", message.ifBlank { localizedStringResource(1009, "Voice input is not available on this device") }),
+                                    LocalizedStringDataModel("ru", message.ifBlank { "Голосовой ввод недоступен" }),
+                                    LocalizedStringDataModel("kk", message.ifBlank { "Дауыспен енгізу қолжетімсіз" }),
+                                    LocalizedStringDataModel("ky", message.ifBlank { "Бул түзмөктө үн менен киргизүү жеткиликтүү эмес" })
+                                ),
+                                NotificationType.Negative,
+                                transient = true
+                            )
+                        }
                     },
                     onFinished = {
-                        isVoiceListening = false
-                        voiceLevel = 0f
+                        if (ownsVoiceSession()) {
+                            voiceSession.cancel()
+                            isVoiceListening = false
+                            voiceLevel = 0f
+                        }
                     }
                 )
             )
@@ -2129,6 +2184,7 @@ fun AppConfiguration.genericTextField(
         CompositionLocalProvider(LocalTextSelectionColors provides textSelectionColors) {
             AitaEditableText(
                 identityKey = textFieldIdentityKey,
+                resetRevision = editorResetRevision,
                 value = displayedTextFieldValue,
                 onValueChange = onValueChange@ { rawValue ->
                     if (rawValue.text == textFieldValue.text) {
@@ -2161,9 +2217,11 @@ fun AppConfiguration.genericTextField(
                     }
 
                     dispatchAcceptedTextInput(nextText, null, onValueChange) {
+                        draftRestoreGuard.edited()
                         textFieldValue = nextValue
                         stateKey?.let { key ->
-                            coroutineScope.launch { stateHost?.setState(key to nextText) }
+                            if (captureTransactionBarcodeInput) stateHost?.setStateNow(key to nextText)
+                            else coroutineScope.launch { stateHost?.setState(key to nextText) }
                         }
                         savePersistentTextDraft(nextText)
                         savePersistentTextFieldMeta(nextValue, isFocused)
@@ -2199,7 +2257,7 @@ fun AppConfiguration.genericTextField(
                     },
                 onSubmitText = if (captureTransactionBarcodeInput) { text ->
                     val handled = text.isNotBlank() && activeTransactionBarcodeHandler?.invoke(text + "\n") == true
-                    if (handled) clearScannedSearch()
+                    if (handled && textFieldValue.text.isNotEmpty()) clearScannedSearch()
                     handled
                 } else null,
                 keyboardOptions = KeyboardOptions.Default.copy(
@@ -2315,6 +2373,7 @@ fun AppConfiguration.genericTextField(
                                                         isFocused = true
                                                         focusRequester.requestFocus()
                                                         if (isVoiceListening) {
+                                                            voiceSession.cancel()
                                                             stopPlatformVoiceInput?.invoke()
                                                             isVoiceListening = false
                                                             voiceLevel = 0f
@@ -2550,6 +2609,7 @@ fun AppConfiguration.genericTextField(
 
         LaunchedEffect(isFocused) {
             if (!isFocused && isVoiceListening) {
+                voiceSession.cancel()
                 stopPlatformVoiceInput?.invoke()
                 isVoiceListening = false
                 voiceLevel = 0f
@@ -2570,6 +2630,8 @@ fun AppConfiguration.genericTextField(
             }
         },
         onReset = {
+            draftRestoreGuard.edited()
+            editorResetRevision++
             val emptyValue = TextFieldValue()
             textFieldValue = emptyValue
             stateKey?.let { keyName ->

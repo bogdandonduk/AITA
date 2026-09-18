@@ -1151,12 +1151,14 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
     val latestCaptureEnabled by rememberUpdatedState(captureEnabled)
     val barcodeHandler: (String) -> Boolean = remember(transactionTypeIndex, clientId) {
         { input ->
-            latestCaptureEnabled && !transactionBarcodeModalOpen() && tryHandleTransactionBarcodeInput(
+            val handled = latestCaptureEnabled && !transactionBarcodeModalOpen() && tryHandleTransactionBarcodeInput(
                 rawInput = input,
                 transactionTypeIndex = transactionTypeIndex,
                 clientId = clientId,
                 currentCart = latestCart
             )
+            if (handled) transactionSearchCompletion.handled()
+            handled
         }
     }
     DisposableEffect(barcodeHandler) {
@@ -1800,7 +1802,8 @@ fun AppConfiguration.TransactionSelectionScreen(
             stockItemsOverride = transactionSelectionStockItems,
             preferredOrderIds = selectedPreferredOrderIds,
             scrollStateHost = context.stateHost,
-            scrollStateKey = "transaction_selection_scroll_${context.transactionTypeIndex}_${context.clientId}_${selectedTransactionFilterId}",
+            scrollStateKey = "transaction_selection_scroll_${context.transactionTypeIndex}_${context.clientId}_${selectedTransactionFilterId}" +
+                if (transactionSearchAcrossAllStock) "_search" else "",
             onFilter = null,
             onClick = addToCartAction
         )
