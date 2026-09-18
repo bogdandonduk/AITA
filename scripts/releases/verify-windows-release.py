@@ -15,9 +15,9 @@ def verify_upgrade_identity(path, version):
 $installer = New-Object -ComObject WindowsInstaller.Installer
 $db = $installer.OpenDatabase($env:AITA_VERIFY_FILE, 0)
 function Query($sql) {
-  $view = $db.OpenView($sql); $view.Execute(); $record = $view.Fetch()
-  if ($null -eq $record) { $view.Close(); return '' }
-  $value = $record.StringData(1); $view.Close(); return $value
+  $view = $db.OpenView($sql); [void]$view.Execute(); $record = $view.Fetch()
+  if ($null -eq $record) { [void]$view.Close(); return '' }
+  $value = $record.StringData(1); [void]$view.Close(); return $value
 }
 @{upgradeCode=(Query "SELECT ``Value`` FROM ``Property`` WHERE ``Property``='UpgradeCode'");
   version=(Query "SELECT ``Value`` FROM ``Property`` WHERE ``Property``='ProductVersion'");
@@ -25,7 +25,9 @@ function Query($sql) {
   relatedProducts=(Query 'SELECT `UpgradeCode` FROM `Upgrade`') } | ConvertTo-Json -Compress
 '''
     output = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
-        env={**os.environ, 'AITA_VERIFY_FILE': str(path.resolve())}, text=True, capture_output=True, check=True)
+        env={**os.environ, 'AITA_VERIFY_FILE': str(path.resolve())}, text=True, capture_output=True)
+    if output.returncode:
+        raise RuntimeError('Could not inspect MSI upgrade identity: ' + output.stderr.strip())
     identity = json.loads(output.stdout)
     if (identity['upgradeCode'].strip('{}').upper() != UPGRADE_CODE or identity['version'] != version or
             not identity['removeExisting'] or identity['relatedProducts'].strip('{}').upper() != UPGRADE_CODE):
@@ -73,6 +75,7 @@ def main():
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         artifacts.append(dict(name=name, sha256=digest, **signature))
     receipt = dict(version=args.version, build=args.build, revision=args.revision,
+                   verificationRevision=os.environ.get('AITA_WORKFLOW_REVISION', args.revision),
                    production=production, artifacts=artifacts, upgrade=upgrade)
     (args.directory / 'windows-verification.json').write_text(json.dumps(receipt, indent=2) + '\n')
     print('VERIFIED: Timestamped company signatures' if production else 'UNSIGNED PILOT: Authorized test-store installers; trusted Windows signing is deferred')
