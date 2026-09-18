@@ -19,15 +19,23 @@ ${'$'}installer = ${'$'}env:AITA_UPDATE_INSTALLER
 ${'$'}parentId = [int]${'$'}env:AITA_UPDATE_PARENT
 ${'$'}log = ${'$'}env:AITA_UPDATE_LOG
 ${'$'}parentExited = ${'$'}false
+function Get-AitaInstallerHash([string]${'$'}path) {
+    # Windows PowerShell can inherit a PSModulePath from PowerShell 7 that hides Get-FileHash.
+    # Use the built-in cryptographic runtime instead; verification remains mandatory twice.
+    ${'$'}stream = [IO.File]::OpenRead(${'$'}path)
+    ${'$'}sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString(${'$'}sha.ComputeHash(${'$'}stream)).Replace('-', '').ToLowerInvariant() }
+    finally { ${'$'}sha.Dispose(); ${'$'}stream.Dispose() }
+}
 try {
     if (-not (Test-Path -LiteralPath ${'$'}launcher -PathType Leaf)) { throw 'Installed AITA launcher is missing' }
     if ([IO.Path]::GetExtension(${'$'}installer) -ne '.msi') { throw 'Automatic update requires MSI' }
-    if ((Get-FileHash -LiteralPath ${'$'}installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer checksum mismatch' }
+    if ((Get-AitaInstallerHash ${'$'}installer) -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer checksum mismatch' }
     [IO.File]::WriteAllText(${'$'}ready, 'ready')
     ${'$'}parent = Get-Process -Id ${'$'}parentId -ErrorAction SilentlyContinue
     if (${'$'}parent -and -not ${'$'}parent.WaitForExit(120000)) { throw 'AITA did not finish saving; installation was cancelled' }
     ${'$'}parentExited = ${'$'}true
-    if ((Get-FileHash -LiteralPath ${'$'}installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer changed after handoff' }
+    if ((Get-AitaInstallerHash ${'$'}installer) -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer changed after handoff' }
     ${'$'}arguments = '/i "' + ${'$'}installer + '" /passive /norestart /L*V "' + ${'$'}log + '"'
     ${'$'}result = Start-Process -FilePath (Join-Path ${'$'}env:SystemRoot 'System32\msiexec.exe') -ArgumentList ${'$'}arguments -Verb RunAs -Wait -PassThru
     if (${'$'}result.ExitCode -notin @(0, 3010)) { throw ('Windows Installer returned ' + ${'$'}result.ExitCode) }

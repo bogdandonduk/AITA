@@ -40,6 +40,8 @@ function Start-Process {
             self.assertFalse(helper.exists())
             self.assertEqual(len(calls), 2 if matching else 0, execution.stdout + execution.stderr)
             if matching: self.assertEqual(calls[-1], str(launcher))
+            if not matching: self.assertIn('Installer checksum mismatch', execution.stdout)
+            if matching and exit_code == 1602: self.assertIn('Windows Installer returned 1602', execution.stdout)
 
     def test_installs_and_relaunches_without_deleting_local_work(self): self.simulate()
     def test_hash_mismatch_never_launches_installer_or_exits_app(self): self.simulate(False)
