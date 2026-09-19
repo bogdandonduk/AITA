@@ -79,6 +79,10 @@ fun StockMarketplaceProfile.fromCurrentStock(
 fun GoodsItemDataModel.effectiveMarketplaceProfile(): StockMarketplaceProfile =
     (marketplaceProfile ?: StockMarketplaceProfile()).fromCurrentStock(name, description, imagePaths)
 
+/** A branch receives an editable snapshot; its stock fields must not replace the parent's public text. */
+fun GoodsItemDataModel.marketplaceProfileForBranchCopy(): StockMarketplaceProfile =
+    effectiveMarketplaceProfile().copy(automaticFromStock = false)
+
 /** Null in legacy edits means 'keep', not 'clear'. Automatic drafts track permitted stock fields. */
 fun GoodsItemDataModel.marketplaceProfileForSave(previous: StockMarketplaceProfile? = null): StockMarketplaceProfile =
     (marketplaceProfile ?: previous ?: StockMarketplaceProfile()).fromCurrentStock(name, description, imagePaths)

@@ -86,7 +86,7 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
     "diagnostics" -> AitaTabIcon.Security
     "all", "generic", "overview", "category" -> AitaTabIcon.All
     "quick" -> AitaTabIcon.Quick
-    "items", "in_stock", "stock", "allocation", "products", "goods_item" -> AitaTabIcon.Stock
+    "items", "in_stock", "shelf", "warehouse", "stock", "allocation", "products", "goods_item" -> AitaTabIcon.Stock
     "fresh", "current_release" -> AitaTabIcon.Fresh
     "popular", "rankings" -> AitaTabIcon.Popular
     "previous_releases", "recent", "history", "activity", "audit", "added", "created" -> AitaTabIcon.Recent
@@ -114,14 +114,14 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
     "remove", "removals" -> AitaTabIcon.Remove
     "roles" -> AitaTabIcon.Roles
     "shops", "store", "owned", "storefront", "current", "one_shop" -> AitaTabIcon.Store
-    "parent", "two_shops" -> AitaTabIcon.Branches
+    "parent", "two_shops", "locations" -> AitaTabIcon.Branches
     "contracts", "agreements", "acceptance" -> AitaTabIcon.Contract
     "paid", "pay", "billing" -> AitaTabIcon.Payment
     "receipt", "invoices", "charges" -> AitaTabIcon.Receipt
     "balance" -> AitaTabIcon.Wallet
     "top_up", "extract" -> AitaTabIcon.Topup
     "orders", "list", "listings", "basket_orders" -> AitaTabIcon.Orders
-    "handoff", "followup", "handoff_flow" -> AitaTabIcon.Truck
+    "handoff", "followup", "handoff_flow", "incoming" -> AitaTabIcon.Truck
     "technical", "system", "operations", "actions", "set" -> AitaTabIcon.Settings
     "verification", "readiness", "guard", "gate", "health", "authenticator-code" -> AitaTabIcon.Security
     "phone" -> AitaTabIcon.Phone
@@ -142,7 +142,7 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
     "recovery", "return", "returns" -> AitaTabIcon.Recover
     "replace", "comparison" -> AitaTabIcon.Compare
     "trip", "basket" -> AitaTabIcon.Basket
-    "info" -> AitaTabIcon.Info
+    "info", "product" -> AitaTabIcon.Info
     "auto", "tspl", "zpl", "cpcl" -> AitaTabIcon.Barcode
     "cashregister", "cashRegister", "cash_register" -> AitaTabIcon.CashRegister
     else -> AitaTabIcon.Info

@@ -67,12 +67,12 @@ class MarketShopDirectoryContractTest {
         }
         assertEquals(40,f.seen.last().second.last())
     }
-    @Test fun countAndWindowShareThePhysicalLocationPublicationAndSubscriptionPredicate() {
+    @Test fun countAndWindowShareTheInternetBranchPublicationAndSubscriptionPredicate() {
         val f=Reads(0,emptyList());MarketShopDirectoryRepository(f.db).search(user,MarketShopDirectoryRequest())
         val predicate=MarketplacePublicVisibility.shopPredicate.replace(Regex("\\s+")," ").trim()
         for((sql,_) in f.seen) {
-            assertTrue(sql.contains(predicate));assertTrue(sql.contains("e.store_id=f.store_id"))
-            assertTrue(sql.contains("s.parent_store_id IS NULL"))
+            assertTrue(sql.contains(predicate));assertTrue(sql.contains("e.store_id=s.id"))
+            assertTrue(sql.contains("s.parent_store_id IS NOT NULL AND s.branch_type='INTERNET'"))
             assertTrue(sql.contains("e.current_period_end_millis IS NULL AND NOT e.auto_renew"))
         }
     }

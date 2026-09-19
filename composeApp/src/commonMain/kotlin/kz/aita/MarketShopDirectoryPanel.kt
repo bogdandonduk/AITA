@@ -145,7 +145,7 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
             } finally { if (data.active) data.loading = false }
         }
     }
-    LaunchedEffect(data) { while (isActive) { delay(MARKET_SHOP_DIRECTORY_FRESH_MILLIS); queueRefresh() } }
+    LaunchedEffect(data) { while (isActive) { delay(MARKET_SHOP_DIRECTORY_FRESH_MILLIS); awaitClientBackgroundWork(); queueRefresh() } }
     val result = navigation.result?.takeIf { it.accountId == account && it.request == wanted.normalizedShopDirectoryRequest() }
     val fresh = resultIsCurrent(signal)
     LazyVerticalGrid(columns = GridCells.Adaptive(300.dp), modifier = modifier, state = navigation.scroll,

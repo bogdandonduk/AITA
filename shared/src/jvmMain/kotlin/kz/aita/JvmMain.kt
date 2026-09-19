@@ -445,6 +445,8 @@ object ReceiptPlatformJvmBridge {
         val clean = name.lowercase(Locale.ROOT)
         return listOf(
             "aokia",
+            "ap58",
+            "ap-58",
             "ak-3558",
             "ak3558",
             "xp-58",
@@ -502,22 +504,10 @@ object ReceiptPlatformJvmBridge {
             ?.name
     }
 
-    private fun printServiceCandidateSubtitle(
-        configured: Boolean,
-        probableReceiptPrinter: Boolean,
-        defaultPrinter: Boolean,
-        healthNotes: List<String>
-    ): String {
-        val platform = if (isWindows()) "Windows" else "System"
-        val base = when {
-            configured -> "$platform RAW ESC/POS printer • selected"
-            probableReceiptPrinter && defaultPrinter -> "$platform default printer • likely AOKIA/XP-58 thermal receipt printer"
-            probableReceiptPrinter -> "$platform printer • likely AOKIA/XP-58 thermal receipt printer"
-            defaultPrinter -> "$platform default printer • choose only if this is the thermal ESC/POS printer"
-            else -> "$platform printer • choose only if it accepts raw ESC/POS receipt bytes"
-        }
+    private fun printServiceCandidateSubtitle(healthNotes: List<String>): String {
+        val base = deviceWorkflowText("raw_receipt_help")
         val healthText = healthNotes.take(4).joinToString(" • ").takeIf { it.isNotBlank() }
-        return if (healthText == null) base else "$base • Status: $healthText"
+        return if (healthText == null) base else "$base • $healthText"
     }
 
     private fun printAttributeText(value: String): String {
@@ -587,26 +577,21 @@ object ReceiptPlatformJvmBridge {
     }
 
     private fun listSystemPrintServiceCandidates(configured: String): List<PlatformReceiptPrinterDataModel> {
-        val defaultServiceName = defaultPrintServiceName()
         val services = systemPrintServices()
-        val includeAllWindowsServices = isWindows() && services.size <= 12
         return services.mapNotNull { service ->
             val serviceName = service.name?.trim().orEmpty()
             if (serviceName.isBlank()) return@mapNotNull null
-            val probableReceiptPrinter = likelyReceiptPrinterName(serviceName)
             val isConfigured = configuredMatchesPrintService(configured, serviceName)
-            val isDefault = defaultServiceName?.equals(serviceName, ignoreCase = true) == true
-            if (!probableReceiptPrinter && !isConfigured && !isDefault && !includeAllWindowsServices) return@mapNotNull null
             val healthNotes = printServiceHealthNotes(service)
+            val details = listOfNotNull(
+                runCatching { service.getAttribute(PrinterMakeAndModel::class.java)?.value }.getOrNull(),
+                runCatching { service.getAttribute(PrinterInfo::class.java)?.value }.getOrNull(),
+                runCatching { service.getAttribute(PrinterLocation::class.java)?.value }.getOrNull()
+            ).map { it.trim().take(160) }.filter { it.isNotBlank() && !it.equals(serviceName, true) }.distinct()
             PlatformReceiptPrinterDataModel(
                 id = serviceId(serviceName),
                 name = serviceName,
-                subtitle = printServiceCandidateSubtitle(
-                    configured = isConfigured,
-                    probableReceiptPrinter = probableReceiptPrinter,
-                    defaultPrinter = isDefault,
-                    healthNotes = healthNotes
-                ),
+                subtitle = printServiceCandidateSubtitle(healthNotes) + details.joinToString(separator = " • ", prefix = if (details.isEmpty()) "" else " • "),
                 configured = isConfigured,
                 // Windows Java PrintService status attributes are frequently stale for cheap USB
                 // thermal drivers. Keep an installed queue selectable; the exact Win32 RAW path
@@ -1353,6 +1338,7 @@ finally {
 
             loadPersistedEscPosDevicePath()
             val target = configuredTarget().takeIf { it.isNotBlank() } ?: return false
+            check(target != SYSTEM_DOCUMENT_PRINTER_ID) { deviceWorkflowText("receipt_driver_help") }
             val startedAtNanos = System.nanoTime()
             val parsed = parseReceiptPrinterTarget(target)
             return runInterruptible(Dispatchers.IO) {

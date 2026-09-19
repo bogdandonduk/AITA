@@ -416,6 +416,10 @@ internal fun localDrawableResourceForPath(
         "221_1" -> Res.drawable._221_1
         "222_0" -> Res.drawable._222_0
         "222_1" -> Res.drawable._222_1
+        "225_0" -> Res.drawable._225_0
+        "225_1" -> Res.drawable._225_1
+        "226_0" -> Res.drawable._226_0
+        "226_1" -> Res.drawable._226_1
         else -> fallbackRes
     }
 }
@@ -598,7 +602,9 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
     onDragFinished: (Int, Int) -> Unit,
     onDragCancelled: () -> Unit
 ) {
-    val isActiveShelf = batch.id == goodsItem.activeShelfBatchId
+    val shelfContext=currentStoreModel(batch.storeId)?.isManagementStore()!=true
+    val canUseShelf=enabled && shelfContext
+    val isActiveShelf = shelfContext && batch.id == goodsItem.activeShelfBatchId
     val supplierName = stateValues.suppliers
         .orEmpty()
         .find { it.id == batch.supplierId }
@@ -611,7 +617,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
     val isDragging = draggedBatchId == batch.id
     val draggedIndex = draggedBatchId?.let { id -> batches.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
     val density = LocalDensity.current
-    val cardStepPx = with(density) { 208.dp.toPx() }
+    val cardStepPx = with(density) { (STOCK_BATCH_PREVIEW_WIDTH_DP + STOCK_BATCH_PREVIEW_GAP_DP).dp.toPx() }
 
     var dragOffsetPx by remember(batch.id) { mutableStateOf(0f) }
 
@@ -628,29 +634,18 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
         label = "batchShelfPreviewPushedOffset"
     )
 
-    fun dragBounds(): ClosedFloatingPointRange<Float> {
-        if (batches.isEmpty()) return 0f..0f
-        val min = -index * cardStepPx
-        val max = (batches.lastIndex - index) * cardStepPx
-        return min..max
-    }
-
-    fun currentTargetIndex(): Int {
-        if (batches.isEmpty()) return index
-        val deltaSlots = round(dragOffsetPx / cardStepPx).toInt()
-        return (index + deltaSlots).coerceIn(0, batches.lastIndex)
-    }
+    fun currentTargetIndex(): Int = stockBatchPreviewTarget(index, batches.size, cardStepPx, dragOffsetPx)
 
     val cardShape = RoundedCornerShape(stateValues.cornerRadius)
 
     Column(
         modifier = Modifier
-            .widthIn(min = 190.dp, max = 260.dp)
+            .width(STOCK_BATCH_PREVIEW_WIDTH_DP.dp)
             .zIndex(if (isDragging) 2f else 0f)
             .graphicsLayer {
                 translationX = if (isDragging) dragOffsetPx else animatedPushedOffset
-                scaleX = if (isDragging) 1.035f else 1f
-                scaleY = if (isDragging) 1.035f else 1f
+                // Keep the full outline inside the row at every text/UI scale.
+                // A lifted shadow and accent border communicate the drag without enlarging it.
                 alpha = if (isDragging) 0.97f else 1f
                 shadowElevation = if (isDragging) with(density) { 6.dp.toPx() } else 0f
                 shape = cardShape
@@ -666,8 +661,8 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
                 },
                 cardShape
             )
-            .pointerInput(enabled, batch.id, goodsItem.activeShelfBatchId, batches.map { it.id }, index) {
-                if (!enabled) return@pointerInput
+            .pointerInput(canUseShelf, batch.id, goodsItem.activeShelfBatchId, batches.map { it.id }, index) {
+                if (!canUseShelf) return@pointerInput
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
                         dragOffsetPx = 0f
@@ -676,8 +671,9 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        val bounds = dragBounds()
-                        dragOffsetPx = (dragOffsetPx + dragAmount.x).coerceIn(bounds.start, bounds.endInclusive)
+                        dragOffsetPx = stockBatchPreviewDragOffset(
+                            index, batches.size, cardStepPx, dragOffsetPx + dragAmount.x
+                        )
                         onDragTargetChanged(currentTargetIndex())
                     },
                     onDragEnd = {
@@ -692,7 +688,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
                 )
             }
             .aitaClickable(
-                enabled = enabled,
+                enabled = canUseShelf,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor)
             ) {
@@ -706,14 +702,26 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
             }
             .padding(10.dp)
     ) {
-        Text(
-            text = "#${index + 1}${if (isActiveShelf) " • ${localizedStringResource(812, "active")}" else ""}",
-            color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
-            fontSize = stateValues.smallTextSize,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            CpImage(
+                modifier = Modifier.size(18.dp),
+                url = marketIconPath(AitaTabIcon.Stock.family),
+                fallbackRes = tabIconResource(AitaTabIcon.Stock),
+                contentDescription = localizedStringResource(138, "Batches"),
+                tintColor = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.PlaceholderTextColor
+            )
+            Text(
+                text = "#${index + 1}${if (isActiveShelf) " • ${localizedStringResource(812, "active")}" else ""}",
+                color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -798,7 +806,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
             )
         }
 
-        batch.shelfPosition?.takeIf { it.isNotBlank() }?.let {
+        batch.shelfPosition?.takeIf { shelfContext && it.isNotBlank() }?.let {
             StockCardInfoLine(
                 title = localizedStringResource(344, "Shelf position"),
                 value = it,
@@ -806,7 +814,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
             )
         }
 
-        StockCardInfoLine(
+        if(shelfContext) StockCardInfoLine(
             title = localizedStringResource(345, "Priority"),
             value = batch.shelfPriority.toString(),
             textColor = stateValues.TextColor
@@ -866,6 +874,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
     onPrintLabel: ((GoodsItemDataModel) -> Unit)? = null,
     shelfActionsEnabled: Boolean = true
 ) {
+    val managementStore=currentStoreModel(stateValues.activeStoreId ?: goodsItem.storeId)?.isManagementStore()==true
     val language = stateValues.appLanguage
     val itemName = remember(goodsItem.name, language) {
         goodsItem.name.visibleLocalizedString(language, "Unnamed item")
@@ -895,7 +904,10 @@ fun AppConfiguration.GoodsItemInStockWidget(
         .joinToString(", ")
     }
 
-    val shelfBatches = remember(batches, goodsItem) { batches.sortedForShelf(goodsItem) }
+    val shelfBatches = remember(batches, goodsItem, managementStore) {
+        if(managementStore) batches.sortedWith(compareBy<GoodsBatchDataModel> { it.expirationDateMillis ?: Long.MAX_VALUE }.thenBy { it.createdAtMillis })
+        else batches.sortedForShelf(goodsItem)
+    }
     val totalQuantity = remember(shelfBatches) { shelfBatches.sumOf { it.quantity.total } }
     val quantityUnitText = shelfBatches
         .firstOrNull()
@@ -904,8 +916,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
         ?.extractLocalizedString(stateValues.appLanguage)
         .orEmpty()
 
-    val activeBatch = remember(shelfBatches, goodsItem) {
-        shelfBatches.find { it.id == goodsItem.activeShelfBatchId } ?: shelfBatches.bestBatchForSale(goodsItem)
+    val activeBatch = remember(shelfBatches, goodsItem, managementStore) {
+        if(managementStore) null else shelfBatches.find { it.id == goodsItem.activeShelfBatchId } ?: shelfBatches.bestBatchForSale(goodsItem)
     }
 
     val expirationStatusText = activeBatch?.expirationDateMillis?.toStockDateInputText()?.let {
@@ -1247,15 +1259,15 @@ fun AppConfiguration.GoodsItemInStockWidget(
         if (showBatchStrip) {
             Spacer(modifier = Modifier.height(10.dp))
 
-            var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
-            var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
+            var draggedBatchId by remember(goodsItem.id,stateValues.activeStoreId,stateValues.userAccount?.id) { mutableStateOf<String?>(null) }
+            var dragTargetIndex by remember(goodsItem.id,stateValues.activeStoreId,stateValues.userAccount?.id) { mutableStateOf<Int?>(null) }
 
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(STOCK_BATCH_PREVIEW_GAP_DP.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 12.dp, bottom = 12.dp)
+                    .padding(start = 10.dp, end = 6.dp, bottom = 12.dp)
                     .clipToBounds()
             ) {
                 itemsIndexed(shelfBatches, key = { _, batch -> batch.id }) { batchIndex, batch ->
@@ -1264,7 +1276,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                         goodsItem = goodsItem,
                         batches = shelfBatches,
                         index = batchIndex,
-                        enabled = shelfActionsEnabled && !selectionMode,
+                        enabled = shelfActionsEnabled && !managementStore && !selectionMode,
                         draggedBatchId = draggedBatchId,
                         dragTargetIndex = dragTargetIndex,
                         onDragStart = { id ->
@@ -1277,7 +1289,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                         onDragFinished = { from, to ->
                             draggedBatchId = null
                             dragTargetIndex = null
-                            if (shelfActionsEnabled && !selectionMode && from != to) {
+                            if (shelfActionsEnabled && !managementStore && !selectionMode && from != to) {
                                 reorderShelfBatches(
                                     goodsItem = goodsItem,
                                     batches = shelfBatches,

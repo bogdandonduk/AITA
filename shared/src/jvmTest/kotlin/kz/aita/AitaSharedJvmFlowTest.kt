@@ -787,6 +787,53 @@ class AitaSharedJvmFlowTest {
     }
 
     @Test
+    fun unreadableCachedAccountStillRecoversFromAuthoritativeUserRead() = runBlocking {
+        val expectedTokens = environment.storedTokens
+        userAccountState.emit(DataState.Empty())
+        userAccountState.payload.first { it == null }
+        getStoredUserAccountDataModel = { throw IllegalArgumentException("Invalid cached account encoding") }
+        environment.requests.clear()
+        try {
+            val response = withTimeout(5_000L) {
+                refreshUserAccountNow(currentAuthenticatedSessionGeneration(), refreshRelatedData = false)
+            }
+            assertFalse(response.negative)
+            assertEquals(AITA_FLOW_TEST_USER_ID, response.payload?.id)
+            assertEquals(AITA_FLOW_TEST_USER_ID, environment.storedAccount?.id)
+            assertEquals(expectedTokens, environment.storedTokens, "A damaged account cache must not erase authentication")
+            assertEquals(1, environment.requests.count { it.path == "user/get" })
+        } finally { getStoredUserAccountDataModel = { environment.storedAccount } }
+    }
+
+    @Test
+    fun storesReadWaitsForAccountInsteadOfStartingWithoutAnOwner() = runBlocking {
+        userAccountState.emit(DataState.Empty())
+        userAccountState.payload.first { it == null }
+        environment.requests.clear()
+        repeat(5) { getStores() }
+        delay(150L)
+        assertEquals(0, environment.requests.count { it.path == "stores/get" })
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        userAccountState.payload.first { it?.id == AITA_FLOW_TEST_USER_ID }
+        ActiveStores.acceptAccount(aitaTestUserAccount())
+        getStores()
+        waitUntilAitaFlowCondition { environment.requests.any { it.path == "stores/get" } && !getStoresMutex.isLocked }
+        assertEquals(1, environment.requests.count { it.path == "stores/get" })
+    }
+
+    @Test
+    fun unhydratedStoreSelectionDoesNotRefetchTheSameStoreList() = runBlocking {
+        // A new login invalidates the old selection owner before its local journal hydrates.
+        installAuthenticatedSession(aitaTestTokenPair("unhydrated-stores"))
+        assertFalse(ActiveStores.hydrated)
+        environment.requests.clear()
+        getStores()
+        waitUntilAitaFlowCondition { environment.requests.any { it.path == "stores/get" } && !getStoresMutex.isLocked }
+        delay(150L)
+        assertEquals(1, environment.requests.count { it.path == "stores/get" })
+    }
+
+    @Test
     fun loadsStoresBranchesWorkerMembershipsAndEmploymentRequestsFromServer() = runBlocking {
         val branch = aitaTestStore(
             id = AITA_FLOW_DESTINATION_STORE_ID,

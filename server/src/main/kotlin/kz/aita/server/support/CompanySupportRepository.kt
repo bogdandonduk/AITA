@@ -128,7 +128,7 @@ internal class CompanySupportRepository(private val db: Connection, private val 
     private fun cleanBody(text: String): String = text.trim().also {
         if (it.isEmpty() || it.length>4000 || '\u0000' in it) supportFail("support.invalid", 400)
     }
-    private fun cleanMeta(meta: Map<String,String>) = meta.filterKeys { it in setOf("clientLanguage","clientPlatform") }.mapValues {
+    private fun cleanMeta(meta: Map<String,String>): Map<String,String> = meta.filterKeys { it in setOf("clientLanguage","clientPlatform") }.mapValues {
         if ('\u0000' in it.value) supportFail("support.invalid",400)
         it.value.take(64).let { text -> if(text.lastOrNull()?.isHighSurrogate()==true) text.dropLast(1) else text }
     }.toSortedMap()

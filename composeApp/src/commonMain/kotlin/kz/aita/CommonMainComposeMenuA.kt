@@ -1692,7 +1692,7 @@ internal fun AppConfiguration.WorkerMembershipCard(
 @Composable
 fun AppConfiguration.MenuWorkersScreen() {
     val activeStoreId = stateValues.activeStoreId
-    val storeAccess = rememberStoreSubscriptionAccess(activeStoreId)
+    val storeAccess = rememberStoreWorkspaceAccess(activeStoreId)
     val canViewStoreWorkers = storeAccess && activeStoreId != null && currentUserCanViewWorkers(activeStoreId)
     val canManageStoreRequests = storeAccess && activeStoreId != null && currentUserCanInviteWorkers(activeStoreId)
     val myMembershipsPayload by myWorkerMembershipsState.payload.collectAsState()
@@ -3837,10 +3837,10 @@ fun AppConfiguration.MenuTransactionHistoryReceiptPreviewScreen() {
             activeReceiptAction = action
             receiptScope.launch {
                 try {
-                    if (action == "print" && preferHtmlDocumentPrinting) {
-                        val html = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels).toPrintHtml(fileName)
+                    if (action == "print" && receiptUsesSystemDocumentPrinting()) {
+                        val document = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels)
                         if (!actionOwner.isCurrent()) return@launch
-                        receiptActionNotification(printHtmlDocument(fileName, html), deviceWorkflowText("print_opened"), actionOwner)
+                        receiptActionNotification(printReceiptDocument(fileName, document), deviceWorkflowText("print_opened"), actionOwner)
                         return@launch
                     }
                     val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {
@@ -4559,7 +4559,7 @@ internal fun AppConfiguration.subscriptionStatusText(status: String): String {
 
 @Composable
 fun AppConfiguration.MenuStoresScreen() {
-    val selectedLocationHasAccess = rememberStoreSubscriptionAccess()
+    val selectedLocationHasAccess = rememberStoreWorkspaceAccess()
     AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -4781,7 +4781,7 @@ fun AppConfiguration.MenuStoresScreen() {
 
 @Composable
 fun AppConfiguration.MenuScreen() {
-    val subscriptionAccess = rememberStoreSubscriptionAccess()
+    val subscriptionAccess = rememberStoreWorkspaceAccess()
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -5151,7 +5151,7 @@ internal fun menuDestinationRequiresStoreSubscription(model: NavigationScreenMod
 }
 
 internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenModel.Menu): Boolean {
-    if (menuDestinationRequiresStoreSubscription(model) && !currentStoreHasSubscriptionAccess(stateValues.activeStoreId)) return false
+    if (menuDestinationRequiresStoreSubscription(model) && !currentStoreHasWorkspaceAccess(stateValues.activeStoreId)) return false
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return when (model) {
@@ -5160,13 +5160,13 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
         NavigationScreenModel.Menu.OperationLogs -> activeOwnerFallback || currentUserCanViewLogs(activeStoreId)
         NavigationScreenModel.Menu.Analytics -> activeOwnerFallback || currentUserCanViewAnalytics(activeStoreId)
         NavigationScreenModel.Menu.Workers -> true // Personal employment remains available without a store subscription.
-        NavigationScreenModel.Menu.ShopWindow -> currentUserOwnsStore(activeStoreId)
+        NavigationScreenModel.Menu.ShopWindow -> currentStoreModel(activeStoreId)?.isInternetBranch() == true && currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.Stores -> true
         NavigationScreenModel.Menu.Suppliers -> activeOwnerFallback || currentUserCanViewSuppliers(activeStoreId) || currentUserCanViewSupplierOrders(activeStoreId) || currentUserCanManageSupplierOrders(activeStoreId) || currentUserCanReceiveSupplierOrders(activeStoreId)
         NavigationScreenModel.Menu.Debtors -> activeOwnerFallback || currentUserCanViewDebtors(activeStoreId) || currentUserCanManageDebtorPayments(activeStoreId)
         NavigationScreenModel.Menu.GoodsCategories -> activeOwnerFallback || currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.StoreSubscription,
-        NavigationScreenModel.Menu.StoreSubscriptionPlans -> true // Members see access; only billing managers can change it.
+        NavigationScreenModel.Menu.StoreSubscriptionPlans -> currentStoreModel(activeStoreId)?.isManagementStore() != true // Billing belongs to a branch.
         else -> true
     }
 }
@@ -5221,16 +5221,16 @@ internal fun AppConfiguration.filteredMenuDestinations(): List<NavigationScreenM
 }
 
 internal fun AppConfiguration.filteredMainBottomDestinations(
-    hasSubscriptionAccess: Boolean = currentStoreHasSubscriptionAccess(stateValues.activeStoreId)
+    hasSubscriptionAccess: Boolean = currentStoreHasWorkspaceAccess(stateValues.activeStoreId)
 ): List<NavigationScreenModel> {
     if (!hasSubscriptionAccess) return listOf(NavigationScreenModel.Menu.Main)
     val activeStoreId = stateValues.activeStoreId
     val activeOwnerFallback = currentUserOwnsActiveStoreForUi()
     return Navigation.bottomNavBarScreensStore.filter { model ->
         when (model) {
-            NavigationScreenModel.Transaction.MainSale -> activeOwnerFallback || currentUserCanUseTransactionType(activeStoreId, 0)
-            NavigationScreenModel.Transaction.MainReturn -> activeOwnerFallback || currentUserCanUseTransactionType(activeStoreId, 1)
-            NavigationScreenModel.Transaction.MainSupply -> activeOwnerFallback || currentUserCanUseTransactionType(activeStoreId, 2)
+            NavigationScreenModel.Transaction.MainSale -> currentStoreSupportsTransactions(activeStoreId) && (activeOwnerFallback || currentUserCanUseTransactionType(activeStoreId, 0))
+            NavigationScreenModel.Transaction.MainReturn -> currentStoreSupportsTransactions(activeStoreId) && (activeOwnerFallback || currentUserCanUseTransactionType(activeStoreId, 1))
+            NavigationScreenModel.Transaction.MainSupply -> currentStoreSupportsTransactions(activeStoreId) && (activeOwnerFallback || currentUserCanUseTransactionType(activeStoreId, 2))
             NavigationScreenModel.Stock.Main -> activeOwnerFallback || currentUserCanViewStock(activeStoreId)
             else -> true
         }
@@ -5734,7 +5734,7 @@ fun AppConfiguration.MenuListScreen() {
     val clientUpdate by AppUpdateWorkspace.state.collectAsState()
     val unreadCount = rememberRemoteUnreadCount()
     val updateGlow = updateAttentionGlow(clientUpdate.hasUpdate)
-    val subscriptionAccess = rememberStoreSubscriptionAccess()
+    val subscriptionAccess = rememberStoreWorkspaceAccess()
     AitaScreenColumn(
         modifier = Modifier
             .fillMaxSize(),
@@ -5745,7 +5745,7 @@ fun AppConfiguration.MenuListScreen() {
             )
         }
     ) {
-        if (subscriptionAccess && stateValues.appModeId == APP_MODE_STORE) {
+        if (subscriptionAccess && stateValues.appModeId == APP_MODE_STORE && currentStoreSupportsTransactions(stateValues.activeStoreId)) {
             stateValues.activeWorkshift?.takeIf { it.isActive && it.endedAtMillis == null && it.storeId == stateValues.activeStoreId }?.let { workshift ->
                 ActiveWorkshiftMenuTile(workshift = workshift)
             }

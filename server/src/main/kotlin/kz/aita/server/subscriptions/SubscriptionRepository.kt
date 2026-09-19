@@ -27,7 +27,7 @@ internal class SubscriptionRepository(private val db: Connection) {
                    CASE WHEN s.parent_store_id IS NULL THEN s.owner_user_ids->>0 ELSE p.owner_user_ids->>0 END AS owner_id,
                    COALESCE(NULLIF(s.country_locales->>0, ''), p.country_locales->>0, '') AS region
             FROM stores s LEFT JOIN stores p ON p.id = s.parent_store_id
-            WHERE s.id = ? AND s.is_active AND (s.parent_store_id IS NULL OR p.is_active)
+            WHERE s.id = ? AND s.is_active AND s.parent_store_id IS NOT NULL AND p.is_active
         """.trimIndent(), storeId) { row ->
             if (row.getString("parent_store_id") != parent) subscriptionFailure("subscription.changed")
             val owner = row.getString("owner_id")?.let { runCatching { UUID.fromString(it) }.getOrNull() }

@@ -71,6 +71,6 @@ internal fun AppConfiguration.rememberMarketSavedShops(): MarketSavedShopsUi {
             state.read()
         }
     }
-    LaunchedEffect(state) { while (isActive) { delay(30_000); state.refresh() } }
+    LaunchedEffect(state) { while (isActive) { delay(30_000); awaitClientBackgroundWork(); state.refresh() } }
     return state
 }

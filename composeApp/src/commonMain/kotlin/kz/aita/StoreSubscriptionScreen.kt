@@ -40,6 +40,18 @@ internal fun AppConfiguration.rememberStoreSubscriptionAccess(storeId: String? =
     rememberStoreSubscriptionGate(storeId) == StoreSubscriptionGate.Active
 
 @Composable
+internal fun AppConfiguration.rememberStoreWorkspaceGate(storeId: String? = stateValues.activeStoreId): StoreSubscriptionGate {
+    val store = stateValues.stores.findStoreOrBranchForUi(storeId)
+    if (store?.isManagementStore() == true) return if (currentStoreHasWorkspaceAccess(storeId))
+        StoreSubscriptionGate.Active else StoreSubscriptionGate.Required
+    return rememberStoreSubscriptionGate(storeId)
+}
+
+@Composable
+internal fun AppConfiguration.rememberStoreWorkspaceAccess(storeId: String? = stateValues.activeStoreId): Boolean =
+    rememberStoreWorkspaceGate(storeId) == StoreSubscriptionGate.Active
+
+@Composable
 internal fun AppConfiguration.SubscriptionRequiredPane(modifier: Modifier = Modifier) {
     val store = stateValues.activeStoreId
     val loading by subscriptionLoadingStoreIdState.collectAsState()

@@ -36,6 +36,49 @@ class AitaPrintDocumentTest {
             }
         }
     }
+    @Test fun rollPreferenceOnlyChangesPreparedPrintCopyAndKeepsBarcodeScale() {
+        val original = AitaPdfDocument(listOf(AitaPdfBlock("Receipt")))
+        for (width in listOf(58, 80)) {
+            val printCopy = original.forReceiptPaper(width)
+            assertEquals(width * 72f / 25.4f, printCopy.width)
+            assertEquals(0f, printCopy.minHeight)
+            assertEquals((if (width == 58) 48f else 72f) * 72f / 25.4f,
+                printCopy.width - 2 * printCopy.margin, .001f)
+            assertContains(printCopy.toPrintHtml("Receipt"), "aita-receipt-paper")
+        }
+        assertEquals(226f, original.width)
+        assertEquals(80, normalizedReceiptPaperWidthMm(10))
+        assertEquals(80, normalizedReceiptPaperWidthMm(null))
+        assertEquals(58, normalizedReceiptPaperWidthMm(58))
+    }
+    @Test fun directPrinterSelectionNeverSilentlySwitchesToDriverPrinting() {
+        val oldHtml = preferHtmlDocumentPrinting
+        val oldReceipt = configuredReceiptPrinterDeviceIdState.value
+        val oldLabel = configuredLabelPrinterDeviceIdState.value
+        try {
+            preferHtmlDocumentPrinting = false
+            configuredReceiptPrinterDeviceIdState.value = "print-service:XP-58"
+            configuredLabelPrinterDeviceIdState.value = "service:TSPL Printer"
+            assertFalse(receiptUsesSystemDocumentPrinting())
+            assertFalse(labelUsesSystemDocumentPrinting())
+            configuredReceiptPrinterDeviceIdState.value = SYSTEM_DOCUMENT_PRINTER_ID
+            configuredLabelPrinterDeviceIdState.value = SYSTEM_DOCUMENT_PRINTER_ID
+            assertTrue(receiptUsesSystemDocumentPrinting())
+            assertTrue(labelUsesSystemDocumentPrinting())
+        } finally {
+            preferHtmlDocumentPrinting = oldHtml
+            configuredReceiptPrinterDeviceIdState.value = oldReceipt
+            configuredLabelPrinterDeviceIdState.value = oldLabel
+        }
+    }
+    @Test fun printerGuidanceHasAllSixLanguages() {
+        listOf("raw_receipt_help", "desktop_system_print", "receipt_paper", "receipt_system_help", "receipt_driver_help",
+            "label_system_help", "print_busy", "print_cancelled", "print_queued", "driver_print_failed", "paper_save_failed").forEach { key ->
+            listOf("en", "ru", "kk", "ky", "tg", "uz").forEach { language ->
+                assertFalse(deviceWorkflowText(key, language).isBlank(), "$key $language")
+            }
+        }
+    }
     @Test fun sessionHostnamesAreRemovedWithoutChangingAddresses() {
         assertEquals("", securitySessionDisplayIp("localhost"))
         assertEquals("127.0.0.1", securitySessionDisplayIp("localhost/127.0.0.1"))

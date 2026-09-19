@@ -82,12 +82,12 @@ class StoreSubscriptionPolicyTest {
     }
     @Test fun businessEndpointsRequireEntitlementIndependentOfOwners() {
         listOf("stock/get", "/stockBatches/move", "transactions/complete", "cashRegister/extract", "debtors/get",
-            "analytics/get", "logs/get", "operationLogs/get", "workers/start", "workshifts/start", "stores/update", "stores/delete",
+            "analytics/get", "logs/get", "operationLogs/get", "workers/start", "workshifts/start",
             "payments/integrations/provider").forEach { assertTrue(storeSubscriptionRequiredForEndpoint(it), it) }
     }
     @Test fun recoveryAndBillingRemainAvailableWithoutPaidAccess() {
         listOf("auth/logIn", "subscriptions/store/update", "subscriptions/store/quote", "subscriptions/store/command",
-            "stores/get", "stores/active", "stores/add", "user/get", "finance/topup/create", "workshifts/end", "workers/my/get",
+            "stores/get", "stores/active", "stores/add", "stores/update", "stores/delete", "user/get", "finance/topup/create", "workshifts/end", "workers/my/get",
             "workers/removal/confirm", "workers/invitations/decline", "payments/balance", "payments/topups").forEach {
             assertFalse(storeSubscriptionRequiredForEndpoint(it), it)
         }

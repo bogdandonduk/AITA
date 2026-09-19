@@ -4,9 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -96,19 +94,41 @@ internal fun AppConfiguration.StockMarketplaceEditor(draft: StockAddEditDraft, i
         product = saved.product.copy(imageUrls = images.mapNotNull(::marketPublicImageUrl).distinct().take(MARKET_PRODUCT_MAX_IMAGES))) else saved
     val identity = "stock-profile:${stateValues.userAccount?.id}:${stateValues.activeStoreId}:${draft.id}"
     fun change(next: StockMarketplaceProfile) = onDraftChanged(draft.copy(marketplaceProfile = next))
-    Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(marketProductText("market.profile_private"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+    val activeStore = stateValues.stores.findStoreOrBranchForUi(stateValues.activeStoreId)
+    val accountId = stateValues.userAccount?.id
+    val generation = currentAuthenticatedSessionGeneration()
+    var showParentProfile by remember(identity, generation) { mutableStateOf(false) }
+    // Both stock editors provide the bounded outer list and own vertical scrolling.
+    Column(modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(marketProductText(if (activeStore?.isManagementStore() == true) "market.profile_parent_generic" else "market.profile_private"),
+            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        if (activeStore?.isInternetBranch() == true) actionButton(
+            text = marketProductText("market.profile_parent"), iconPath = parentStoreStockIconPath(),
+            iconRes = parentStoreStockIconFallback(), autoLoading = false, confirmationRequired = false,
+            onClick = { showParentProfile = true })
         MarketPublishToggle(marketProductText("market.profile_auto"), profile.automaticFromStock, true) { automatic ->
             change(profile.copy(automaticFromStock = automatic))
         }
-        MarketEditorField(profile.name.visibleLocalizedString(stateValues.appLanguage, ""), marketProductText("market.profile_title"),
-            "$identity:title", !profile.automaticFromStock) { change(profile.copy(name = profile.name.withSingleLanguageValue(stateValues.appLanguage, it.take(180)))) }
-        MarketEditorField(profile.description.visibleLocalizedString(stateValues.appLanguage, ""), marketProductText("market.profile_description"),
-            "$identity:description", !profile.automaticFromStock, true) { change(profile.copy(description = profile.description.withSingleLanguageValue(stateValues.appLanguage, it.take(2000)))) }
+        MarketEditorField(profile.name.marketplaceProfileDraftText(stateValues.appLanguage), marketProductText("market.profile_title"),
+            "$identity:title", !profile.automaticFromStock) { change(profile.copy(name = profile.name.withMarketplaceProfileDraftText(stateValues.appLanguage, it.take(180)))) }
+        MarketEditorField(profile.description.marketplaceProfileDraftText(stateValues.appLanguage), marketProductText("market.profile_description"),
+            "$identity:description", !profile.automaticFromStock, true) { change(profile.copy(description = profile.description.withMarketplaceProfileDraftText(stateValues.appLanguage, it.take(2000)))) }
         MarketProductFields(profile.product, identity, true, photosEnabled = !profile.automaticFromStock) { change(profile.copy(product = it)) }
         Text(marketProductText("market.profile_review"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         Spacer(Modifier.height(40.dp))
     }
+    if (showParentProfile && activeStore?.isInternetBranch() == true) ParentStoreStockSelectionBottomSheet(
+        activeStoreId = activeStore.id, draft = draft,
+        existing = stateValues.stock.orEmpty().firstOrNull { it.id == draft.id }, profileOnly = true,
+        onDismiss = { showParentProfile = false },
+        onApply = { parentItem ->
+            if (stateValues.userAccount?.id == accountId && currentAuthenticatedSessionGeneration() == generation &&
+                stateValues.activeStoreId == activeStore.id && parentItem.storeId == activeStore.parentStoreId) {
+                change(parentItem.marketplaceProfileForBranchCopy())
+                showParentProfile = false
+                postInAppNotification(marketProductText("market.profile_parent_applied"), NotificationType.Positive, transient = true)
+            }
+        })
 }
 
 @Composable

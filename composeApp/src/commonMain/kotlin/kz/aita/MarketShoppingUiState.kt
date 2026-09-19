@@ -200,6 +200,6 @@ internal fun AppConfiguration.rememberMarketShoppingUiState(): MarketShoppingUiS
     DisposableEffect(state) { onDispose { state.active = false; state.refreshRequests.close() } }
     LaunchedEffect(state) { state.run() }
     LaunchedEffect(state, remote) { state.refresh() }
-    LaunchedEffect(state) { while (isActive) { delay(30_000); state.refresh() } }
+    LaunchedEffect(state) { while (isActive) { delay(30_000); awaitClientBackgroundWork(); state.refresh() } }
     return state
 }

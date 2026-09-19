@@ -48,7 +48,7 @@ class InventoryContinuityContracts(unittest.TestCase):
         self.assertNotIn('showBatches = showBatches && projectionCurrent', text)
         self.assertIn('page = page.coerceIn', text)
         self.assertIn('shelfActionsEnabled = canOperateThisStoreInventory', text)
-        self.assertIn('enabled = shelfActionsEnabled && !selectionMode', (UI / 'CommonMainComposeWidgetsConfig.kt').read_text())
+        self.assertIn('enabled = shelfActionsEnabled && !managementStore && !selectionMode', (UI / 'CommonMainComposeWidgetsConfig.kt').read_text())
 
     def test_retained_indexes_are_started_at_application_root(self):
         text = (UI / 'LiveCollectionWorkspace.kt').read_text()

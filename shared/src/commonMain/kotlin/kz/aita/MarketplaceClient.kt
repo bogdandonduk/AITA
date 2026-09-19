@@ -55,15 +55,16 @@ suspend fun loadMarketPublication(scope: MarketRequestScope): ResponseDataModel<
     return networkRequest<MarketPublicationDashboard,Unit>(HttpMethod.Get,endpointUrl="market/seller",
         headers=mapOf("store_id" to scope.storeId),expectedSessionGeneration=scope.generation)
 }
-suspend fun saveMarketStorefront(scope: MarketRequestScope, value: MarketStorefront): ResponseDataModel<MarketPublicationDashboard> {
-    if(!scope.isCurrent() || scope.storeId!=value.storeId) return cloudSessionExpiredResponse()
-    return networkRequest(HttpMethod.Put,endpointUrl="market/seller/storefront",headers=mapOf("store_id" to value.storeId),
-        body=MarketStorefrontUpdate(value),expectedSessionGeneration=scope.generation)
+suspend fun saveMarketStorefront(scope: MarketRequestScope, value: MarketStorefront,
+    locationStoreIds: List<String>? = null): ResponseDataModel<MarketPublicationDashboard> {
+    if(!scope.isCurrent() || scope.storeId!=value.operatingBranchId) return cloudSessionExpiredResponse()
+    return networkRequest(HttpMethod.Put,endpointUrl="market/seller/storefront",headers=mapOf("store_id" to value.operatingBranchId),
+        body=MarketStorefrontUpdate(value, locationStoreIds),expectedSessionGeneration=scope.generation)
 }
 suspend fun saveMarketListing(scope: MarketRequestScope, value: MarketListing): ResponseDataModel<MarketPublicationDashboard> {
-    if(!scope.isCurrent() || scope.storeId!=value.storeId) return cloudSessionExpiredResponse()
-    return networkRequest(HttpMethod.Put,endpointUrl="market/seller/listing",headers=mapOf("store_id" to value.storeId),
-        body=MarketListingUpdate(value, replaceProduct=true),expectedSessionGeneration=scope.generation)
+    if(!scope.isCurrent() || scope.storeId==null) return cloudSessionExpiredResponse()
+    return networkRequest(HttpMethod.Put,endpointUrl="market/seller/listing",headers=mapOf("store_id" to scope.storeId),
+        body=MarketListingUpdate(value, replaceProduct=true, branchStoreId=scope.storeId),expectedSessionGeneration=scope.generation)
 }
 
 suspend fun loadMarketOffer(scope: MarketRequestScope, id: String): ResponseDataModel<MarketOffer> {

@@ -601,56 +601,59 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val existingPrice = offer.existingPrice
-    val minOrderTemplate = existingPrice?.minOrderQuantity ?: offer.quantityTemplate
-    val packageTemplate = existingPrice?.packageQuantity ?: offer.quantityTemplate
+    val latestMinOrderTemplate = existingPrice?.minOrderQuantity ?: offer.quantityTemplate
+    val latestPackageTemplate = existingPrice?.packageQuantity ?: offer.quantityTemplate
+
+    val draftHost = NavigationScreenModel.Supplier.Catalog.Main
+    val accountId = stateValues.userAccount?.id.orEmpty()
+    val sessionGeneration = currentAuthenticatedSessionGeneration()
+    val draftKey = supplierCatalogOfferDraftKey(accountId, offer.supplierId, offer.storeId, offer.goodsItemId)
+    val latestFields = SupplierCatalogOfferFields(
+        price = (existingPrice?.supplyPrice?.takeIf { offer.hasUsablePrice } ?: offer.expectedPrice)
+            .supplierDeskPriceInputText().filterSupplierDeskPriceInput(),
+        minimum = existingPrice?.minOrderQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty(),
+        packageSize = existingPrice?.packageQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty(),
+        name = offer.supplierGoodsName,
+        barcode = offer.supplierBarcode,
+        currency = existingPrice?.supplyPrice?.currency?.takeIf { it.isNotBlank() }
+            ?: offer.expectedPrice?.currency?.takeIf { it.isNotBlank() } ?: "KZT",
+        minimumTemplate = latestMinOrderTemplate,
+        packageTemplate = latestPackageTemplate
+    )
+    var draft by remember(draftKey, sessionGeneration) {
+        mutableStateOf(decodeSupplierCatalogOfferDraft(draftHost.state.value[draftKey], draftKey)
+            ?: SupplierCatalogOfferDraft(draftKey, latestFields))
+    }
+    fun keepDraft(next: SupplierCatalogOfferDraft) {
+        if (userAccountState.payloadValue?.id != accountId ||
+            currentAuthenticatedSessionGeneration() != sessionGeneration) return
+        draft = next
+        if (next.edited) draftHost.setStateNow(draftKey to next.encoded())
+        else coroutineScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { draftHost.removeState(draftKey) }
+    }
+    LaunchedEffect(latestFields, draftKey) {
+        val next = draft.refreshed(latestFields)
+        if (next != draft) keepDraft(next)
+    }
+    val restoredStateRevision by AppStateWorkspace.restoreRevision.collectAsState()
+    LaunchedEffect(restoredStateRevision, draftKey) {
+        if (!draft.edited) {
+            decodeSupplierCatalogOfferDraft(draftHost.state.value[draftKey], draftKey)?.let { draft = it }
+        }
+    }
+    val priceText = draft.fields.price
+    val minOrderText = draft.fields.minimum
+    val packageText = draft.fields.packageSize
+    val supplierGoodsName = draft.fields.name
+    val supplierBarcode = draft.fields.barcode
+    val remoteOfferChanged = draft.edited && draft.baseline != latestFields
+    val minOrderTemplate = draft.fields.minimumTemplate ?: latestMinOrderTemplate
+    val packageTemplate = draft.fields.packageTemplate ?: latestPackageTemplate
     val minOrderAllowsFraction = minOrderTemplate.allowsFractionalStockQuantityInput()
     val packageAllowsFraction = packageTemplate.allowsFractionalStockQuantityInput()
-
-    var priceText by remember(
-        offer.offerKey,
-        existingPrice?.id,
-        existingPrice?.updatedAtMillis,
-        offer.expectedPrice?.price
-    ) {
-        mutableStateOf(
-            (existingPrice?.supplyPrice?.takeIf { offer.hasUsablePrice } ?: offer.expectedPrice)
-                .supplierDeskPriceInputText()
-                .filterSupplierDeskPriceInput()
-        )
-    }
-    var minOrderText by remember(
-        offer.offerKey,
-        existingPrice?.id,
-        existingPrice?.updatedAtMillis,
-        minOrderTemplate
-    ) {
-        mutableStateOf(
-            existingPrice?.minOrderQuantity?.let {
-                stockQuantityInputTextFromAmount(it.total, it)
-            }.orEmpty()
-        )
-    }
-    var packageText by remember(
-        offer.offerKey,
-        existingPrice?.id,
-        existingPrice?.updatedAtMillis,
-        packageTemplate
-    ) {
-        mutableStateOf(
-            existingPrice?.packageQuantity?.let {
-                stockQuantityInputTextFromAmount(it.total, it)
-            }.orEmpty()
-        )
-    }
-    var supplierGoodsName by remember(offer.offerKey, existingPrice?.id, existingPrice?.updatedAtMillis) {
-        mutableStateOf(offer.supplierGoodsName)
-    }
-    var supplierBarcode by remember(offer.offerKey, existingPrice?.id, existingPrice?.updatedAtMillis) {
-        mutableStateOf(offer.supplierBarcode)
-    }
-    var saving by remember(offer.offerKey) { mutableStateOf(false) }
-    var resultMessage by remember(offer.offerKey) { mutableStateOf("") }
-    var resultPositive by remember(offer.offerKey) { mutableStateOf(false) }
+    var saving by remember(draftKey, sessionGeneration) { mutableStateOf(false) }
+    var resultMessage by remember(draftKey, sessionGeneration) { mutableStateOf("") }
+    var resultPositive by remember(draftKey, sessionGeneration) { mutableStateOf(false) }
 
     val parsedPrice = priceText.filterSupplierDeskPriceInput().toDoubleOrNull()
     val parsedMinOrder = if (minOrderText.isBlank()) {
@@ -666,10 +669,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
     val optionalQuantitiesValid =
         (minOrderText.isBlank() || parsedMinOrder?.let { it.isFinite() && it > 0.0 } == true) &&
                 (packageText.isBlank() || parsedPackage?.let { it.isFinite() && it > 0.0 } == true)
-    val currency = existingPrice?.supplyPrice?.currency
-        ?.takeIf { it.isNotBlank() }
-        ?: offer.expectedPrice?.currency?.takeIf { it.isNotBlank() }
-        ?: "KZT"
+    val currency = draft.fields.currency
     val currentSignature = listOf(
         priceText.supplierCatalogPriceSignature(),
         currency.trim().uppercase(),
@@ -727,7 +727,9 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                     tintColor = stateValues.AccentColor
                 )
             }
-            val offerStateText = if (offer.hasUsablePrice) {
+            val offerStateText = if (draft.edited) {
+                supplierOfferDraftText("draft")
+            } else if (offer.hasUsablePrice) {
                 localizedStringResource(2338, "Offer ready")
             } else {
                 localizedStringResource(2337, "Price missing")
@@ -865,15 +867,38 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                         subTextSize = stateValues.smallTextSize
                     )
                 } else {
+                    if (remoteOfferChanged) {
+                        Text(
+                            text = supplierOfferDraftText("changed"),
+                            color = stateValues.AccentColor,
+                            fontSize = stateValues.smallTextSize,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (draft.edited) {
+                        actionButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = supplierOfferDraftText("reset"),
+                            iconPath = stateValues.drawablePathIconRefresh,
+                            iconRes = stateValues.drawableResIconRefresh.value,
+                            confirmationRequired = true,
+                            autoLoading = false,
+                            enabled = !saving,
+                            onClick = {
+                                keepDraft(SupplierCatalogOfferDraft(draftKey, latestFields))
+                                resultMessage = ""
+                            }
+                        )
+                    }
                     SimpleTextInput(
                         modifier = Modifier.fillMaxWidth(),
                         value = priceText,
-                        placeholder = stateValues.stringSupplyPrice,
+                        placeholder = "${stateValues.stringSupplyPrice} • $currency",
                         keyboardType = KeyboardType.Decimal,
                         leadingIconPath = stateValues.drawablePathIconFinances,
                         onTransformValue = { it.filterSupplierDeskPriceInput() },
                         onValueChange = {
-                            priceText = it.filterSupplierDeskPriceInput()
+                            keepDraft(draft.copy(fields = draft.fields.copy(price = it.filterSupplierDeskPriceInput().take(32))))
                             resultMessage = ""
                         }
                     )
@@ -889,7 +914,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                 placeholder = localizedStringResource(337, "Min order"),
                                 quantityAllowsFraction = minOrderAllowsFraction,
                                 onValueChange = {
-                                    minOrderText = it
+                                    keepDraft(draft.copy(fields = draft.fields.copy(minimum = it.take(32))))
                                     resultMessage = ""
                                 }
                             )
@@ -899,7 +924,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                 placeholder = localizedStringResource(338, "Package qty"),
                                 quantityAllowsFraction = packageAllowsFraction,
                                 onValueChange = {
-                                    packageText = it
+                                    keepDraft(draft.copy(fields = draft.fields.copy(packageSize = it.take(32))))
                                     resultMessage = ""
                                 }
                             )
@@ -915,7 +940,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                 placeholder = localizedStringResource(337, "Min order"),
                                 quantityAllowsFraction = minOrderAllowsFraction,
                                 onValueChange = {
-                                    minOrderText = it
+                                    keepDraft(draft.copy(fields = draft.fields.copy(minimum = it.take(32))))
                                     resultMessage = ""
                                 }
                             )
@@ -925,7 +950,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                 placeholder = localizedStringResource(338, "Package qty"),
                                 quantityAllowsFraction = packageAllowsFraction,
                                 onValueChange = {
-                                    packageText = it
+                                    keepDraft(draft.copy(fields = draft.fields.copy(packageSize = it.take(32))))
                                     resultMessage = ""
                                 }
                             )
@@ -938,7 +963,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                         placeholder = localizedStringResource(2327, "Your product name"),
                         leadingIconPath = stateValues.drawablePathIconSupplierCatalog,
                         onValueChange = {
-                            supplierGoodsName = it
+                            keepDraft(draft.copy(fields = draft.fields.copy(name = it.take(500))))
                             resultMessage = ""
                         }
                     )
@@ -949,7 +974,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                         keyboardType = KeyboardType.Text,
                         leadingIconPath = stateValues.drawablePathIconStock,
                         onValueChange = {
-                            supplierBarcode = it.trimStart()
+                            keepDraft(draft.copy(fields = draft.fields.copy(barcode = it.trimStart().take(128))))
                             resultMessage = ""
                         }
                     )
@@ -1007,7 +1032,17 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                         },
                         onClick = saveOffer@{
                             if (saving) return@saveOffer
-                            val cleanPrice = parsedPrice ?: return@saveOffer
+                            val submittedFields = draft.fields
+                            val cleanPrice = submittedFields.price.filterSupplierDeskPriceInput().toDoubleOrNull()
+                                ?.takeIf { it.isFinite() && it > 0.0 } ?: return@saveOffer
+                            val submittedMinTemplate = submittedFields.minimumTemplate ?: offer.quantityTemplate
+                            val submittedPackageTemplate = submittedFields.packageTemplate ?: offer.quantityTemplate
+                            val submittedMinimum = submittedFields.minimum.takeIf { it.isNotBlank() }
+                                ?.let { parseStockQuantityInputText(it, submittedMinTemplate) }
+                            val submittedPackage = submittedFields.packageSize.takeIf { it.isNotBlank() }
+                                ?.let { parseStockQuantityInputText(it, submittedPackageTemplate) }
+                            if ((submittedFields.minimum.isNotBlank() && submittedMinimum?.let { it.isFinite() && it > 0.0 } != true) ||
+                                (submittedFields.packageSize.isNotBlank() && submittedPackage?.let { it.isFinite() && it > 0.0 } != true)) return@saveOffer
                             saving = true
                             resultMessage = ""
                             resultPositive = false
@@ -1020,55 +1055,51 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                     goodsItemId = offer.goodsItemId,
                                     supplyPrice = PriceDataModel(
                                         price = cleanPrice.roundMoney().toStockMoneyText(),
-                                        currency = currency,
+                                        currency = submittedFields.currency,
                                         supplierId = offer.supplierId
                                     ),
-                                    minOrderQuantity = parsedMinOrder
+                                    minOrderQuantity = submittedMinimum
                                         ?.takeIf { it > 0.0 }
                                         ?.let {
-                                            minOrderTemplate
+                                            submittedMinTemplate
                                                 .withStockQuantityInputTotalValue(it)
                                         },
-                                    packageQuantity = parsedPackage
+                                    packageQuantity = submittedPackage
                                         ?.takeIf { it > 0.0 }
                                         ?.let {
-                                            packageTemplate
+                                            submittedPackageTemplate
                                                 .withStockQuantityInputTotalValue(it)
                                         },
-                                    supplierBarcode = supplierBarcode
+                                    supplierBarcode = submittedFields.barcode
                                         .trim()
                                         .takeIf { it.isNotBlank() },
-                                    supplierGoodsName = supplierGoodsName
+                                    supplierGoodsName = submittedFields.name
                                         .trim()
                                         .takeIf { it.isNotBlank() }
                                 )
                             ) { result ->
                                 coroutineScope.launch {
+                                    if (userAccountState.payloadValue?.id != accountId ||
+                                        currentAuthenticatedSessionGeneration() != sessionGeneration) return@launch
                                     saving = false
                                     when (result) {
                                         is DataState.Success -> {
                                             val saved = result.payload
-                                            priceText = saved.supplyPrice
-                                                .supplierDeskPriceInputText()
-                                            minOrderText = saved.minOrderQuantity?.let {
-                                                stockQuantityInputTextFromAmount(
-                                                    it.total,
-                                                    it
-                                                )
-                                            }.orEmpty()
-                                            packageText = saved.packageQuantity?.let {
-                                                stockQuantityInputTextFromAmount(
-                                                    it.total,
-                                                    it
-                                                )
-                                            }.orEmpty()
-                                            supplierGoodsName = saved.supplierGoodsName.orEmpty()
-                                            supplierBarcode = saved.supplierBarcode.orEmpty()
-                                            resultPositive = true
-                                            resultMessage = localizedStringResource(
-                                                2330,
-                                                "Offer saved for this store"
+                                            val savedFields = SupplierCatalogOfferFields(
+                                                price = saved.supplyPrice.supplierDeskPriceInputText(),
+                                                minimum = saved.minOrderQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty(),
+                                                packageSize = saved.packageQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty(),
+                                                name = saved.supplierGoodsName.orEmpty(),
+                                                barcode = saved.supplierBarcode.orEmpty(),
+                                                currency = saved.supplyPrice.currency,
+                                                minimumTemplate = saved.minOrderQuantity ?: offer.quantityTemplate,
+                                                packageTemplate = saved.packageQuantity ?: offer.quantityTemplate
                                             )
+                                            val acknowledged = draft.acknowledged(submittedFields, savedFields)
+                                            keepDraft(acknowledged)
+                                            resultPositive = true
+                                            resultMessage = if (acknowledged.edited) supplierOfferDraftText("kept")
+                                                else localizedStringResource(2330, "Offer saved for this store")
                                         }
 
                                         is DataState.Empty -> {
@@ -1113,55 +1144,73 @@ internal fun AppConfiguration.SupplierCatalogProductDetail(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
-        SupplierCatalogProductHeaderCard(item = item)
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = item.title,
+            color = stateValues.TextColor,
+            fontSize = stateValues.titleTextSize,
+            fontWeight = FontWeight.Bold
+        )
+        val section = sectionTabsWidget(
+            stateKey = "supplier-catalog-product:${item.catalogKey}",
+            tabs = listOf(
+                TabContent("offers", localizedStringResource(2325, "Store offers")),
+                TabContent("overview", supplierOfferDraftText("overview"))
+            )
+        )
+        if (section == "overview") {
+            SupplierCatalogProductHeaderCard(item = item)
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = localizedStringResource(2325, "Store offers"),
+                        color = stateValues.TextColor,
+                        fontSize = stateValues.titleTextSize,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = localizedStringResource(
+                            2326,
+                            "Set a separate price and order terms for each store."
+                        ),
+                        color = stateValues.PlaceholderTextColor,
+                        fontSize = stateValues.smallTextSize
+                    )
+                }
                 Text(
-                    text = localizedStringResource(2325, "Store offers"),
-                    color = stateValues.TextColor,
+                    text = item.offers.size.toString(),
+                    color = stateValues.AccentColor,
                     fontSize = stateValues.titleTextSize,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = localizedStringResource(
-                        2326,
-                        "Set a separate price and order terms for each store."
-                    ),
-                    color = stateValues.PlaceholderTextColor,
-                    fontSize = stateValues.smallTextSize
-                )
             }
-            Text(
-                text = item.offers.size.toString(),
-                color = stateValues.AccentColor,
-                fontSize = stateValues.titleTextSize,
-                fontWeight = FontWeight.Bold
-            )
-        }
 
-        if (item.offers.isEmpty()) {
-            MessageText(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(
-                    2332,
-                    "This product has no valid store link yet"
+            if (item.offers.isEmpty()) {
+                MessageText(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = localizedStringResource(
+                        2332,
+                        "This product has no valid store link yet"
+                    )
                 )
-            )
-        } else {
-            item.offers.forEach { offer ->
-                SupplierCatalogOfferEditor(
-                    offer = offer,
-                    expanded = expandedOfferKey == offer.offerKey,
-                    onExpandedChanged = { shouldExpand ->
-                        expandedOfferKey = offer.offerKey.takeIf { shouldExpand }
+            } else {
+                item.offers.forEach { offer ->
+                    key(offer.offerKey) {
+                        SupplierCatalogOfferEditor(
+                            offer = offer,
+                            expanded = expandedOfferKey == offer.offerKey,
+                            onExpandedChanged = { shouldExpand ->
+                                expandedOfferKey = offer.offerKey.takeIf { shouldExpand }
+                            }
+                        )
                     }
-                )
+                }
             }
+
         }
 
         if (stateValues.isNarrowScreen) {

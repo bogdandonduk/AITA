@@ -66,6 +66,27 @@ class DynamicCartPersistenceTest {
         assertEquals("legacy", getCartState(0, 4).value.single().id)
         assertEquals("supplier-old", currentTransactionSupplySupplierId(2, 4))
     }
+    @Test fun unreadableAccountCacheSkipsLegacyImportWithoutLosingRowsOrStoppingStartup() = fixture {
+        val originalBytes = "{broken account bytes"
+        var cachedBytes = originalBytes
+        val reader = DecodedStoredValue<UserAccountDataModel>(read = { cachedBytes }, write = { cachedBytes = it.orEmpty() },
+            decode = { jsonBase.decodeFromString<UserAccountDataModel>(it) }, encode = { jsonBase.encodeToString(UserAccountDataModel.serializer(), it) })
+        getStoredUserAccountDataModel = reader::get
+        appDatabase.app_databaseQueries.upsertCart("legacy-retained", 0L, 4L,
+            jsonBase.encodeToString(QuantityDataModel.serializer(), quantity(3.0)))
+        val before = appDatabase.app_databaseQueries.getAllCarts().executeAsList()
+        DynamicCarts.prepareLegacyImport()
+        assertEquals(originalBytes, cachedBytes)
+        assertEquals(before, appDatabase.app_databaseQueries.getAllCarts().executeAsList())
+        assertNull(getLocalKv("cart-book.legacy-owner.v2"), "Unreadable ownership must not be invented")
+        // Normal initialization can continue; after account recovery the same legacy rows import.
+        reader.set(account)
+        DynamicCarts.prepareLegacyImport()
+        publishActiveInventoryStoreId("cart-store-a")
+        assertEquals("legacy-retained", getCartState(0, 4).value.single().id)
+        assertEquals(before, appDatabase.app_databaseQueries.getAllCarts().executeAsList())
+    }
+
     @Test fun cartsSevenTwentyAndTwentyEightHaveIndependentDurableContents() = fixture {
         publishActiveInventoryStoreId("cart-store-a")
         for (slot in listOf(6, 19, 27)) {

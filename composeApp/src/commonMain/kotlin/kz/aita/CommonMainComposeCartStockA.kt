@@ -1683,9 +1683,9 @@ fun AppConfiguration.StoreWidget(
                 .weight(1f)
                 .padding(top = 8.dp, start = (if (isActiveWidget) 8 else 16).dp, end = 16.dp, bottom = 12.dp),
         ) {
-            if (store.isBranchStore()) {
+            if (store.isBranchStore() || store.isManagementStore()) {
                 Text(
-                    text = localizedStringResource(530, "Branch"),
+                    text = store.architectureLabel(stateValues.appLanguage),
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
                     color = stateValues.AccentColor,

@@ -444,6 +444,8 @@ fun AppConfiguration.MenuDevicesScreen() {
     val labelPrinters by labelPrinterDevicesState.collectAsState()
     val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
     val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
+    val receiptPaperWidthMm by receiptPaperWidthMmState.collectAsState()
+    LaunchedEffect(Unit) { loadReceiptPaperWidth() }
     var refreshingReceiptPrinters by remember { mutableStateOf(false) }
     var authorizingBluetooth by remember { mutableStateOf(false) }
     var printingReceipt by remember { mutableStateOf(false) }
@@ -502,12 +504,12 @@ fun AppConfiguration.MenuDevicesScreen() {
         receiptPrinterError = ""
         devicesScope.launch {
             try {
-                val result = if (preferHtmlDocumentPrinting) {
-                    printHtmlDocument(testReceiptTitle, AitaPdfDocument(listOf(
+                val result = if (receiptUsesSystemDocumentPrinting()) {
+                    printReceiptDocument(testReceiptTitle, AitaPdfDocument(listOf(
                         AitaPdfBlock("AITA", AitaPdfRole.Store), AitaPdfBlock(testReceiptTitle, AitaPdfRole.Title),
                         AitaPdfBlock(receiptUiDateTime(getCurrentTimeMillis())), AitaPdfBlock("100 ₸"),
                         AitaPdfBlock("", barcodePayload = transactionReceiptBarcodePayload("00000000-0000-0000-0000-000000000001"))
-                    )).toPrintHtml(testReceiptTitle))
+                    )))
                 } else withContext(Dispatchers.Default) {
                     printReceiptEscPos(
                         buildReceiptPrinterTestEscPosBytes(title = testReceiptTitle, dateText = receiptUiDateTime(getCurrentTimeMillis())),
@@ -630,10 +632,25 @@ fun AppConfiguration.MenuDevicesScreen() {
                 item(key = "MenuDevicesScreen:$section:2") {
                     DeviceSettingsCard(
                         title = localizedStringResource(1254, "Thermal receipt printer"),
-                        subtitle = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+                        subtitle = if (preferHtmlDocumentPrinting) deviceWorkflowText("receipt_system_help") else deviceWorkflowText("receipt_driver_help"),
                         iconPath = stateValues.drawablePathIconReceipt,
                         iconRes = stateValues.drawableResIconReceipt.value
                     ) {
+                        if (receiptUsesSystemDocumentPrinting()) {
+                            Text(deviceWorkflowText("receipt_paper"), color = stateValues.TextColor,
+                                fontSize = stateValues.accentTextSize)
+                            tabRowWidget(modifier = Modifier.fillMaxWidth(),
+                                tabs = listOf(58, 80).map { width ->
+                                    TabContent(width.toString(), "$width mm") {
+                                        devicesScope.launch {
+                                            try { saveReceiptPaperWidth(width) }
+                                            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                                            catch (_: Exception) { receiptPrinterError = deviceWorkflowText("paper_save_failed") }
+                                        }
+                                    }
+                                }, selectedIndexInitial = receiptPaperWidthMm.toString(), textSize = stateValues.smallTextSize)
+                            Spacer(Modifier.height(stateValues.marginTextField))
+                        }
                         if (stateValues.isNarrowScreen) {
                             Column(verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
                                 actionButton(
@@ -727,7 +744,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                             color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                         if (refreshingReceiptPrinters) Text(authUiText("Finding printers…", "Ищем принтеры…", "Принтерлер ізделуде…", "Принтерлер изделүүдө…"),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                        Text(if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else printerConnectionText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        Text(if (preferHtmlDocumentPrinting) deviceWorkflowText("receipt_system_help") else printerConnectionText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         if (authorizeBluetoothReceiptPrintersAction != null) {
                             AuthQuietAction(printerConnectionText("bluetooth_access"),
                                 !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !authorizingBluetooth,
@@ -779,7 +796,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                 item(key = "MenuDevicesScreen:$section:3") {
                     DeviceSettingsCard(
                         title = localizedStringResource(1276, "Sticky label printer"),
-                        subtitle = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
+                        subtitle = if (labelUsesSystemDocumentPrinting()) deviceWorkflowText("label_system_help") else localizedStringResource(1277, "Sticky item tags use TSPL, ZPL or CPCL label printers. They print barcode, item name and price onto small adhesive labels."),
                         iconPath = stateValues.drawablePathIconLabelPrinter,
                         iconRes = stateValues.drawableResIconLabelPrinter.value
                     ) {
@@ -897,7 +914,7 @@ fun AppConfiguration.MenuDevicesScreen() {
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                        if (!preferHtmlDocumentPrinting) {
+                        if (!labelUsesSystemDocumentPrinting()) {
                             Text(
                                 text = localizedStringResource(1287, "Label printer protocol"),
                                 color = stateValues.TextColor,
@@ -4474,12 +4491,6 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
             )
         }
     ) {
-        val editedLocationHasAccess = rememberStoreSubscriptionAccess(editedStore?.id)
-        if (editedStore != null && !editedLocationHasAccess) {
-            SubscriptionRequiredPane(Modifier.weight(1f))
-            return@AitaScreenColumn
-        }
-
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.AddEditStore),
             modifier = Modifier
@@ -4501,6 +4512,25 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
                 }
+
+                val branchTypeContent = if (isBranchEditor) {
+                    dropdownListWidget(
+                        titleText = eventMessage("store.branch_type").visibleLocalizedString(stateValues.appLanguage, ""),
+                        domains = StoreBranchType.entries.map { type ->
+                            val title = eventMessage(if (type == StoreBranchType.INTERNET) "store.branch.internet" else "store.branch.physical")
+                                .visibleLocalizedString(stateValues.appLanguage, "")
+                            SelectableDomain(id = type.name, displayId = listOf(LocalizedStringDataModel("main", title)),
+                                name = listOf(LocalizedStringDataModel("main", title)), iconPath = null, iconRes = null)
+                        },
+                        selectedInitial = editedStore?.effectiveBranchType()?.name ?: StoreBranchType.PHYSICAL.name
+                    )
+                } else null
+                Text(
+                    text = eventMessage(if (isBranchEditor) "store.branch_help" else "store.management_help")
+                        .visibleLocalizedString(stateValues.appLanguage, ""),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = stateValues.marginTextFieldGroup)
+                )
 
                 val nameData = domainSelectionTextFieldGroupWidget(
                     titleText = if (isBranchEditor) localizedStringResource(531, "Branch name") else stateValues.stringName,
@@ -4711,7 +4741,8 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             contactEmailProofs = storeEmailConfirmation.proofs,
                             countryLocales = listOf(selectedCountry.locale),
                             createdAt = editedStore?.createdAt ?: 0L,
-                            branches = editedStore?.branches.orEmpty()
+                            branches = editedStore?.branches.orEmpty(),
+                            architectureVersion = 2
                         )
                     }
 
@@ -4800,7 +4831,9 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             contactEmailProofs = storeEmailConfirmation.proofs,
                             countryLocales = listOf(selectedCountry.locale),
                             createdAt = editedStore?.createdAt ?: 0L,
-                            branches = emptyList()
+                            branches = emptyList(),
+                            branchType = branchTypeContent?.selectedId?.let { StoreBranchType.valueOf(it) } ?: StoreBranchType.PHYSICAL,
+                            architectureVersion = 2
                         )
                     }
 
@@ -5222,7 +5255,7 @@ fun AppConfiguration.MainScreen() {
         return
     }
     AppUpdateEffects()
-    val subscriptionGate = rememberStoreSubscriptionGate()
+    val subscriptionGate = rememberStoreWorkspaceGate()
     val subscriptionAccess = subscriptionGate == StoreSubscriptionGate.Active
     val accountForSubscription = stateValues.userAccount?.id
     val storeForSubscription = stateValues.activeStoreId
@@ -5242,6 +5275,10 @@ fun AppConfiguration.MainScreen() {
             stateValues.userAccount?.id != accountForSubscription || stateValues.activeStoreId != storeForSubscription) return@LaunchedEffect
         if (subscriptionAccess) {
             denialOpened = false
+            if (currentStoreModel(storeForSubscription)?.isManagementStore() == true &&
+                Navigation.Main.value.last() is NavigationScreenModel.Transaction) {
+                Navigation.goMain(NavigationScreenModel.Stock.Main)
+            }
         } else if (subscriptionGate == StoreSubscriptionGate.Required) {
             val route = Navigation.Main.value.last()
             if (route is NavigationScreenModel.UserAuth || route is NavigationScreenModel.Splash) return@LaunchedEffect
@@ -5369,6 +5406,9 @@ fun AppConfiguration.MainScreen() {
                     if (stateValues.appModeId == APP_MODE_STORE && !subscriptionAccess &&
                         (mainDestination is NavigationScreenModel.Stock || mainDestination is NavigationScreenModel.Transaction)) {
                         SubscriptionRequiredPane()
+                    } else if (stateValues.appModeId == APP_MODE_STORE && mainDestination is NavigationScreenModel.Transaction &&
+                        !currentStoreSupportsTransactions(stateValues.activeStoreId)) {
+                        StockScreen()
                     } else when (mainDestination) {
                         is NavigationScreenModel.Splash -> SplashScreen()
                         is NavigationScreenModel.UserAuth -> UserAuthScreen()

@@ -28,7 +28,9 @@ class SubscriptionRepositoryDatabaseTest {
     private data class Fixture(val url: String, val props: Properties, val schema: String,
         val owner: UUID = UUID.randomUUID(), val anotherOwner: UUID = UUID.randomUUID(),
         val root: UUID = UUID.randomUUID(), val branch: UUID = UUID.randomUUID(), val secondBranch: UUID = UUID.randomUUID(),
-        val anotherRoot: UUID = UUID.randomUUID(), val anotherOwnersRoot: UUID = UUID.randomUUID())
+        val anotherRoot: UUID = UUID.randomUUID(), val anotherOwnersRoot: UUID = UUID.randomUUID(),
+        val management: UUID = UUID.randomUUID(), val anotherManagement: UUID = UUID.randomUUID(),
+        val anotherOwnersManagement: UUID = UUID.randomUUID())
     private fun resource(name: String) = requireNotNull(javaClass.getResourceAsStream("/db/migration/$name"))
         .bufferedReader().use { it.readText() }
     private fun fixture(legacyRoot: Boolean = false, block: (Fixture, Connection) -> Unit) {
@@ -53,8 +55,8 @@ class SubscriptionRepositoryDatabaseTest {
                 exec(c, "CREATE TABLE stock_items (store_id UUID, created_at_millis BIGINT)")
                 exec(c, "CREATE TABLE stock_batches (store_id UUID, goods_item_id UUID, created_at_millis BIGINT)")
                 exec(c, "INSERT INTO users(id) VALUES ('${f.owner}'), ('${f.anotherOwner}')")
-                exec(c, "INSERT INTO stores(id, owner_user_ids) VALUES ('${f.root}', '[\"${f.owner}\"]'), ('${f.anotherRoot}', '[\"${f.owner}\"]'), ('${f.anotherOwnersRoot}', '[\"${f.anotherOwner}\"]')")
-                exec(c, "INSERT INTO stores(id,parent_store_id,owner_user_ids) VALUES ('${f.branch}','${f.root}','[]'), ('${f.secondBranch}','${f.root}','[]')")
+                exec(c, "INSERT INTO stores(id, owner_user_ids) VALUES ('${f.management}', '[\"${f.owner}\"]'), ('${f.anotherManagement}', '[\"${f.owner}\"]'), ('${f.anotherOwnersManagement}', '[\"${f.anotherOwner}\"]')")
+                exec(c, "INSERT INTO stores(id,parent_store_id,owner_user_ids) VALUES ('${f.root}','${f.management}','[]'), ('${f.branch}','${f.management}','[]'), ('${f.secondBranch}','${f.management}','[]'), ('${f.anotherRoot}','${f.anotherManagement}','[]'), ('${f.anotherOwnersRoot}','${f.anotherOwnersManagement}','[]')")
                 exec(c, resource("V46__paging_user_finances_and_store_subscriptions.sql"))
                 exec(c, "UPDATE user_wallets SET balance_minor=3000000")
                 if (legacyRoot) exec(c, "INSERT INTO store_subscription_states(store_id,owner_user_id,plan_id,status,current_period_start_millis,current_period_end_millis,auto_renew,next_charge_at_millis) VALUES ('${f.root}','${f.owner}','standard_monthly_kzt','active',$now,${now + 99_000},TRUE,${now + 99_000})")
@@ -105,13 +107,24 @@ class SubscriptionRepositoryDatabaseTest {
         } finally { pool.shutdownNow(); check(pool.awaitTermination(16, TimeUnit.SECONDS)) }
     }
 
-    @Test fun migrationPreservesAnExistingParentPeriodWithoutGrantingAnyBranch() = fixture(legacyRoot = true) { f, _ ->
+    @Test fun migrationPreservesAnExistingOperatingPeriodWithoutGrantingSiblingBranches() = fixture(legacyRoot = true) { f, _ ->
         tx(f) { repo ->
             val root = requireNotNull(repo.state(f.root))
             assertEquals("basic", root.planId); assertEquals(now + 99_000, root.currentPeriodEndMillis)
             assertTrue(repo.hasAccess(f.root, now)); assertFalse(repo.hasAccess(f.branch, now)); assertFalse(repo.hasAccess(f.secondBranch, now))
         }
     }
+    @Test fun managementParentsCannotOpenBillingOrProduceQuotes() = fixture { f, c ->
+        tx(f) { repository ->
+            assertNull(repository.lockLocation(f.management))
+            assertNull(repository.lockLocation(f.anotherManagement))
+            assertNull(repository.lockLocation(f.anotherOwnersManagement))
+        }
+        assertFailsWith<IllegalArgumentException> { quote(f, f.management) }
+        assertEquals(0L, number(c, "SELECT count(*) FROM store_subscription_states"))
+        assertEquals(0L, number(c, "SELECT count(*) FROM store_subscription_charge_events"))
+    }
+
     @Test fun basicBillsOnlyTheBranchAndUsesItsBillingOwnersWallet() = fixture { f, c ->
         val state = purchase(f, command(quote(f, f.branch)))
         assertTrue(state.grantsStoreAccess(f.branch.toString(), now)); assertEquals(2_201_000L, balance(c, f.owner))
@@ -261,7 +274,7 @@ class SubscriptionRepositoryDatabaseTest {
     }
     @Test fun changingBillingOwnerPreservesPaidTimeButRemovesOldRenewalConsent() = fixture { f, c ->
         val state = purchase(f, command(quote(f, f.branch), renew = true))
-        exec(c, "UPDATE stores SET owner_user_ids='[\"${f.anotherOwner}\"]' WHERE id='${f.root}'")
+        exec(c, "UPDATE stores SET owner_user_ids='[\"${f.anotherOwner}\"]' WHERE id='${f.management}'")
         val next = tx(f) { it.dashboard(requireNotNull(it.lockLocation(f.branch)), true, now).subscription }
         assertEquals(f.anotherOwner.toString(), next.ownerUserId); assertFalse(next.autoRenew)
         assertEquals(state.currentPeriodEndMillis, next.currentPeriodEndMillis)

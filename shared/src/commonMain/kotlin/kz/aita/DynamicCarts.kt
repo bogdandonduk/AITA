@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 
 @Serializable
 private data class LegacyCartOwner(val accountId: String, val storeId: String, val imported: Boolean = false)
@@ -50,7 +51,10 @@ object DynamicCarts {
     }
     internal suspend fun prepareLegacyImport() = legacyMutex.withLock {
         if (getLocalKv(LEGACY_OWNER_KEY) != null) return@withLock
-        val account = getStoredUserAccountDataModel?.invoke()?.id?.takeIf { it.isNotBlank() } ?: return@withLock
+        // A corrupt optional account cache cannot prove who owns legacy rows. Leave every old
+        // row/key untouched and let authoritative sign-in recover the account before retrying.
+        val account = try { getStoredUserAccountDataModel?.invoke()?.id?.takeIf { it.isNotBlank() } }
+        catch (_: SerializationException) { null } ?: return@withLock
         val storeId = getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() } ?: return@withLock
         putLocalKv(LEGACY_OWNER_KEY, jsonBase.encodeToString(LegacyCartOwner.serializer(), LegacyCartOwner(account, storeId)))
     }

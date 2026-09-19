@@ -193,7 +193,14 @@ internal fun AppConfiguration.SupplierCatalogScreen() {
             )
         }
     ) {
-        val emptySpaceListState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val emptySpaceListState = if (selectedCatalogKey == null) {
+            rememberPersistentLazyListState(
+                NavigationScreenModel.Supplier.Catalog.Main,
+                "catalog:${focusedSupplierId.orEmpty()}:list"
+            )
+        } else key(selectedCatalogKey) {
+            androidx.compose.foundation.lazy.rememberLazyListState()
+        }
         LazyColumn(
             state = emptySpaceListState,
             modifier = Modifier

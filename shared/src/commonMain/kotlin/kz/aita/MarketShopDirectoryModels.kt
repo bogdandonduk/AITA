@@ -35,7 +35,8 @@ fun MarketShopDirectoryRequest.normalizedShopDirectoryRequest(): MarketShopDirec
 
 fun MarketStorefront.isValidPublicMarketShop(): Boolean = marketDiscoveryId(storeId) == storeId && published && revision > 0 &&
     displayName.isNotBlank() && displayName.length <= 120 && city.isNotBlank() && city.length <= 100 &&
-    publicAddress.isNotBlank() && publicAddress.length <= 400 && pickupNote.length <= 1000
+    publicAddress.isNotBlank() && publicAddress.length <= 400 && pickupNote.length <= 1000 &&
+    (branchStoreId == null || marketDiscoveryId(branchStoreId) == branchStoreId)
 
 fun MarketShopDirectoryResult.isValidShopDirectoryResult(account: String, wanted: MarketShopDirectoryRequest): Boolean {
     val normalized = wanted.normalizedShopDirectoryRequest() ?: return false

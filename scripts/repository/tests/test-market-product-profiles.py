@@ -53,14 +53,14 @@ class ProductContracts(unittest.TestCase):
         self.assertEqual(2,server.count('it[StockItems.marketplaceProfile] = requestedMarketProfile'))
         self.assertIn('it[StockItems.marketplaceProfile] = sourceItemRow[StockItems.marketplaceProfile]',server)
         self.assertIn('marketplaceProfile = this[StockItems.marketplaceProfile].fromCurrentStock',server)
-    def test_parent_guard_and_read_visibility_are_both_server_side(self):
+    def test_internet_guard_and_read_visibility_are_both_server_side(self):
         repository=read(SERVER,'marketplace/MarketplaceRepository.kt')
-        self.assertIn('SELECT parent_store_id FROM stores WHERE id=?',repository)
-        self.assertIn('marketFail("market.profile_parent_only", 403)',repository)
-        self.assertIn('s.parent_store_id IS NULL',read(SERVER,'marketplace/MarketplacePublicVisibility.kt'))
+        self.assertIn("parent_store_id IS NOT NULL AND branch_type='INTERNET'",repository)
+        self.assertIn('marketFail("market.profile_internet_only", 403)',repository)
+        self.assertIn("s.parent_store_id IS NOT NULL AND s.branch_type='INTERNET'",read(SERVER,'marketplace/MarketplacePublicVisibility.kt'))
         self.assertIn('subscriptions.lockLocation(store)',repository)
     def test_db_backstop_serializes_with_reparenting_and_withdraws_not_deletes(self):
-        sql=read(ROOT,'server/src/main/resources/db/migration/V112__marketplace_product_profiles_parent_storefronts.sql')
+        sql=read(ROOT,'server/src/main/resources/db/migration/V124__internet_branch_marketplace_locations.sql')
         for text in ('FOR SHARE','IF NOT FOUND','AFTER UPDATE OF parent_store_id','BEFORE INSERT OR UPDATE ON marketplace_listings','BEFORE INSERT OR UPDATE ON marketplace_storefronts'):
             self.assertIn(text,sql)
         self.assertNotRegex(sql,r'(?i)DELETE\s+FROM')
@@ -69,17 +69,17 @@ class ProductContracts(unittest.TestCase):
         self.assertIn('!request.replaceProduct && previous != null',repo)
         self.assertIn('previous.product else raw.product',repo)
         self.assertRegex(repo, r'product\s*=\s*listing\.product')
-        self.assertIn('MarketListingUpdate(value, replaceProduct=true)',read(SHARED,'MarketplaceClient.kt'))
+        self.assertIn('MarketListingUpdate(value, replaceProduct=true, branchStoreId=scope.storeId)',read(SHARED,'MarketplaceClient.kt'))
     def test_branch_availability_is_opt_in_bounded_and_unit_gtin_matched(self):
         repo=read(SERVER,'marketplace/MarketplaceRepository.kt')
         block=repo.split('private fun branchAvailability(',1)[1].split('private fun items(',1)[0]
-        for text in ('!offer.storefront.shareBranchAvailability','MARKET_BRANCH_MAX_LOCATIONS + 1','LIMIT 5001','marketSameBranchProduct','candidate.storeId==batch.storeId','batch.quantity.id==item.measurementUnitId','s.parent_store_id=?','e.store_id=s.id'):
+        for text in ('!offer.storefront.shareBranchAvailability','MARKET_BRANCH_MAX_LOCATIONS + 1','LIMIT 5001','marketSameBranchProduct','candidate.storeId==batch.storeId','batch.quantity.id==item.measurementUnitId','s.parent_store_id=owner.parent_store_id','e.store_id=s.id'):
             self.assertIn(text,block)
         self.assertNotIn('ILIKE',block);self.assertNotIn('name.lowercase()',block)
-    def test_branch_stock_changes_invalidate_parent_public_catalogue(self):
+    def test_selected_location_stock_changes_invalidate_public_catalogue(self):
         route=read(SERVER,'marketplace/MarketplaceRoutes.kt').split('internal suspend fun publishMarketplaceStockChange',1)[1]
         self.assertIn('f.share_branch_availability',route)
-        self.assertIn('changed.parent_store_id=f.store_id',route)
+        self.assertIn('f.location_store_ids @> jsonb_build_array(?::text)',route)
         self.assertIn('entity="market/catalog"',route)
     def test_branch_envelope_has_no_quantity_or_price_fields(self):
         source=read(SHARED,'MarketProductProfile.kt').split('data class MarketBranchAvailability(',1)[1].split('\n)',1)[0]

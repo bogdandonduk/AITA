@@ -657,12 +657,12 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
 
         val canSaveVisibleStockDraft = when (visibleSelectedTabId) {
-            "info", "conditions", "prices" -> canEditCoreStockItem
+            "info", "conditions", "prices", "marketplace" -> canEditCoreStockItem
             "promos" -> canManageStockPromotions
             else -> false
         }
 
-        if (visibleSelectedTabId == "info" || visibleSelectedTabId == "conditions" || visibleSelectedTabId == "prices" || visibleSelectedTabId == "promos") {
+        if (visibleSelectedTabId in setOf("info", "conditions", "prices", "promos", "marketplace")) {
             stockSaveError?.let { error ->
                 Text(
                     text = error,
@@ -3631,13 +3631,25 @@ object Navigation {
         // Recover above the normal menu roots. A back action must lead somewhere real.
         Menu.clearLeft()
         Menu.clearRight()
-        val recovery = if (activeStoreIdState.value.isNullOrBlank()) NavigationScreenModel.Menu.Stores
+        val recovery = if (activeStoreIdState.value.isNullOrBlank() || currentStoreModel(activeStoreIdState.value)?.isManagementStore() == true) NavigationScreenModel.Menu.Stores
             else NavigationScreenModel.Menu.StoreSubscriptionPlans
         Menu.go(recovery, isNarrowScreen = AppConfiguration.stateValues.isNarrowScreen)
         _Main.emit(listOf(NavigationScreenModel.Menu.Main))
     }
 
     suspend fun goMain(model: NavigationScreenModel) {
+        if (appModeState.value == APP_MODE_STORE &&
+            (model is NavigationScreenModel.Stock || model is NavigationScreenModel.Transaction) &&
+            currentStoreModel(activeStoreIdState.value)?.isManagementStore() == true) {
+            // Management warehouses have permission-scoped stock access and no billing gate.
+            // A restored checkout route must return to their warehouse, never a subscription screen.
+            if (!currentStoreHasWorkspaceAccess(activeStoreIdState.value)) showSubscriptionRecovery()
+            else {
+                val destination = if (model is NavigationScreenModel.Transaction) NavigationScreenModel.Stock.Main else model
+                if (destination.route != _Main.value.last().route) _Main.emit(listOf(destination))
+            }
+            return
+        }
         if (appModeState.value == APP_MODE_STORE &&
             (model is NavigationScreenModel.Stock || model is NavigationScreenModel.Transaction) &&
             currentStoreSubscriptionGate(activeStoreIdState.value) == StoreSubscriptionGate.Required) {

@@ -14,9 +14,7 @@ data class MarketStockPublicationSnapshot(
 ) {
     private val byId = status.entries.associateBy { it.goodsItemId }
     private val byCode = status.entries.filter { it.gtin != null }.groupBy { it.gtin to it.measurementUnitId }
-    fun published(item: GoodsItemDataModel): Boolean = if (status.storeId == status.parentStoreId)
-        byId[item.id]?.published == true
-    else byId[item.id]?.published == true || item.standardBarcodeValues().mapNotNull(::marketCanonicalGtin)
+    fun published(item: GoodsItemDataModel): Boolean = byId[item.id]?.published == true || item.standardBarcodeValues().mapNotNull(::marketCanonicalGtin)
         .any { code -> byCode[code to item.measurementUnitId].orEmpty().any { it.published } }
 }
 
@@ -30,7 +28,11 @@ object MarketStockPublicationWorkspace {
     fun start() {
         if (!started.compareAndSet(false,true)) return
         worker.launch {
-            val timer = flow { while(currentCoroutineContext().isActive) { emit(Unit); delay(30_000L) } }
+            val timer = flow { while(currentCoroutineContext().isActive) {
+                awaitClientBackgroundWork()
+                emit(Unit)
+                delay(30_000L)
+            } }
             merge(inventoryOwners.state.map { Unit }, userAccountState.payload.map { Unit },
                 MarketplaceSignals.revision.map { Unit },cloudTransportStatusState.map { Unit },
                 stockLoadStatusState.map { it.accessDenied }.distinctUntilChanged().map { Unit },timer).collectLatest {
@@ -43,6 +45,8 @@ object MarketStockPublicationWorkspace {
                     state.value=state.value?.copy(stale=true); return@collectLatest
                 }
                 delay(200L)
+                awaitClientBackgroundWork()
+                if (!owner.isCurrent()) return@collectLatest
                 try {
                     val response=networkRequest<MarketStockPublicationStatus,Unit>(HttpMethod.Get,
                         endpointUrl="market/seller/stock-status",headers=mapOf("store_id" to store),expectedSessionGeneration=owner.generation)

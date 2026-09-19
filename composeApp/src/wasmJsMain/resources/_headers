@@ -15,5 +15,7 @@
   Cache-Control: no-cache
 /aita-print.js
   Cache-Control: no-cache
+/aita-page-lifecycle.js
+  Cache-Control: no-cache
 /styles.css
   Cache-Control: no-cache

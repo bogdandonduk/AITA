@@ -6,7 +6,7 @@ const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke','ma
 fs.mkdirSync(output,{recursive:true});
 const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
 const account={id:id(99),publicId:'MARKET-TEST',phoneNumber:'',email:'market@example.test',firstName:'Aida',lastName:'',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:process.env.AITA_TEST_LANGUAGE||'en',appThemeId:Number(process.env.AITA_TEST_THEME||0),appModeId:1};
-const shops=[{storeId:id(80),displayName:'Green Basket',city:'Almaty',publicAddress:'Abay avenue, 42',pickupNote:'Collect your shopping at the front counter',published:true,revision:1},{storeId:id(81),displayName:'Everyday Market',city:'Almaty',publicAddress:'Dostyk avenue, 18',pickupNote:'Open every day',published:true,revision:1}];
+const shops=[{storeId:id(80),branchStoreId:id(180),shareBranchAvailability:true,displayName:'Green Basket',city:'Almaty',publicAddress:'Abay avenue, 42',pickupNote:'Collect your shopping at the front counter',published:true,revision:1},{storeId:id(81),branchStoreId:id(181),shareBranchAvailability:true,displayName:'Everyday Market',city:'Almaty',publicAddress:'Dostyk avenue, 18',pickupNote:'Open every day',published:true,revision:1}];
 const categories=['Pantry','Fresh food','Home & care'].map((s,i)=>({id:id(i+1),name:[{language:'en',value:s}],ancestorIds:[]}));
 function offers(now){return ['Mountain honey','Wholegrain bread','Garden tomatoes','Breakfast oats','Fresh milk','Everyday soap'].map((title,i)=>({id:id(101+i),storefront:shops[i%2],title,description:'A thoughtful everyday choice for your next shopping trip.',gtin:null,categoryIds:[categories[i%3].id],priceMinor:[285000,89000,125000,149000,75000,59000][i],currencyCode:'KZT',pricedAmount:1,unitId:'piece',unitName:[{language:'en',value:'pack'}],availability:'recorded_in_stock',checkedAtMillis:now,sourceUpdatedAtMillis:10,saved:i===2,product:{imageUrls:['https://media.example.com/product-'+i+'.svg','https://media.example.com/product-'+(i+1)+'.svg'],brand:'Everyday essentials',manufacturer:'Local producer',countryOfOrigin:'Kazakhstan',attributes:[{name:'Pack size',value:'1 pack'}]}}));}
 function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5d1','#92bda8'];return `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="400" viewBox="0 0 500 400"><rect width="500" height="400" fill="#f1eee7"/><ellipse cx="250" cy="337" rx="85" ry="15" fill="#222" opacity=".08"/><rect x="175" y="87" width="150" height="240" rx="28" fill="${colors[i%6]}"/><rect x="193" y="173" width="114" height="103" rx="10" fill="#fff9ec"/><path d="M228 220l15 16 30-34" fill="none" stroke="#47534a" stroke-width="7" stroke-linecap="round"/><rect x="185" y="78" width="130" height="29" rx="8" fill="#536258"/></svg>`;}
@@ -48,7 +48,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
    }
    payload={...records[command.commandId],snapshot:shopping(now)};
   }
-  else if(p.startsWith('/market/offers/') && p.endsWith('/detail')){payload={accountId:account.id,offer:offers(now).find(o=>o.id===p.split('/')[3]),branchAvailability:[],checkedAtMillis:now};}
+  else if(p.startsWith('/market/offers/') && p.endsWith('/detail')){payload={accountId:account.id,offer:offers(now).find(o=>o.id===p.split('/')[3]),branchAvailability:[{branchId:id(301),name:[{language:'en',value:'West pickup branch'}],publicAddress:'Tole bi street, 10',availability:'recorded_in_stock',checkedAtMillis:now},{branchId:id(302),name:[{language:'en',value:'Main warehouse'}],publicAddress:'Warehouse road, 2',availability:'confirm_with_store',checkedAtMillis:now}],checkedAtMillis:now};}
   else if(p==='/market/saved-shops'){
    if(route.request().method()==='PUT'){const ch=route.request().postDataJSON();savedShops=savedShops.filter(x=>x!==ch.storeId);if(ch.saved)savedShops.push(ch.storeId);savedRevision++;}
    payload={accountId:account.id,revision:savedRevision,storeIds:savedShops,checkedAtMillis:now};
@@ -72,7 +72,11 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(1200);await shot('market-phone');
   await page.setViewportSize({width:1440,height:1040});await page.waitForTimeout(1200);
   await click(150,645);await until(()=>calls.some(x=>x.path.endsWith('/detail')));await shot('product-detail');
-  await click(461,419);await shot('product-photo-two');
+  await click(460,483);await page.waitForTimeout(400);await shot('product-photo-two');
+  await click(610,142);
+  await shot('product-locations');
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);await shot('locations-phone');
+  await page.setViewportSize({width:1440,height:1040});await page.waitForTimeout(600);await click(445,142);
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(1200);await shot('detail-phone');
   await page.keyboard.press('Escape');await page.waitForTimeout(800);
   await page.setViewportSize({width:1440,height:1040});await page.waitForTimeout(1200);

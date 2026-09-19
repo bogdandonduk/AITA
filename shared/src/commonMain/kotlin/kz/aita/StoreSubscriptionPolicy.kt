@@ -79,7 +79,8 @@ fun storeSubscriptionRequiredForEndpoint(endpoint: String): Boolean {
     if (root == "market") return path == "market/seller" || path.startsWith("market/seller/")
     if (root == "workshifts") return path != "workshifts/end"
     if (root == "workers") return path !in setOf("workers/my/get", "workers/requests/my", "workers/my/password", "workers/removal/confirm", "workers/removal/decline", "workers/invitations/decline")
-    if (root == "stores") return path in setOf("stores/update", "stores/delete")
+    // Business identity and branch configuration stay manageable before/after paid operation.
+    if (root == "stores") return false
     if (root == "payments") return !path.startsWith("payments/balance") && !path.startsWith("payments/topups") && !path.startsWith("payments/webhooks")
     // Relationship routes choose Store or Supplier access using the authoritative database row.
     return false

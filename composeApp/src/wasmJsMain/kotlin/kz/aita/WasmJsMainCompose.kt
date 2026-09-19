@@ -72,9 +72,15 @@ private fun installWasmComposePlatformBridges() {
     }
 }
 
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun subscribeBrowserPageActivity(callback: (Boolean) -> Unit): Unit = js("""{
+    globalThis.aitaPageActivity.subscribe(callback);
+}""")
+
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     installWebRuntimeDiagnostics()
+    subscribeBrowserPageActivity(::setBrowserPageActive)
     installWasmCommonPlatformBridges()
     installWasmComposePlatformBridges()
 

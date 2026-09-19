@@ -97,7 +97,7 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
             } finally { loading = false }
         }
     }
-    LaunchedEffect(requests) { while (isActive) { delay(MARKET_OFFER_DETAIL_FRESH_MILLIS); requestRefresh() } }
+    LaunchedEffect(requests) { while (isActive) { delay(MARKET_OFFER_DETAIL_FRESH_MILLIS); awaitClientBackgroundWork(); requestRefresh() } }
     Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Column(Modifier.padding(12.dp).fillMaxWidth().aitaWidthCap(760.dp).heightIn(max=stateValues.screenHeight*.90f)
             .clip(RoundedCornerShape(stateValues.cornerRadius)).background(stateValues.BackgroundColor).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -108,12 +108,16 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                 actionButton(text="",iconPath=stateValues.drawablePathIconCancel,iconContentDescription=authUiText("Close","Закрыть","Жабу","Жабуу"),
                     autoLoading=false,confirmationRequired=false,enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick=onDismiss)
             }
+            val section=if(current!=null) sectionTabsWidget(stateKey="market-detail:$account:$offerId",tabs=listOf(
+                TabContent("product",marketProductText("market.profile_facts"),icon=AitaTabIcon.Info),
+                TabContent("locations",tabLabelWithCount(marketProductText("market.locations_tab"),branches.size+1),icon=AitaTabIcon.Branches)),modifier=Modifier.fillMaxWidth()) else "product"
             Column(Modifier.weight(1f,fill=false).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(18.dp)) {
                 if (current == null && loading) LoadingSkeleton(Modifier.fillMaxWidth(),layout=LoadingLayout.OfferDetail,rows=1)
                 else if(current==null) Text(if(unavailable) authUiText("This offer is no longer available","Предложение больше недоступно","Ұсыныс енді қолжетімсіз","Бул сунуш эми жеткиликсиз")
                     else authUiText("Connect to view this offer","Подключитесь, чтобы открыть предложение","Ұсынысты көру үшін қосылыңыз","Бул сунушту көрүү үчүн туташыңыз"),
                     color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
                 else {
+                    if(section=="product") {
                     MarketProductGallery(current.product,current.title)
                     SelectionContainer {
                         Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
@@ -122,9 +126,10 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                             Text(marketPriceLabel(current),color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
                             if(current.description.isNotBlank()) Text(current.description,color=stateValues.TextColor,fontSize=stateValues.textSize)
                             MarketProductFacts(current.product)
-                            MarketBranchAvailabilityContent(branches,branchesTruncated)
                         }
                     }
+                    } else {
+                    Text(current.title,color=stateValues.TextColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold)
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(stateValues.cornerRadius))
                         .background(stateValues.AccentColor.copy(alpha=.06f)).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         MarketShopIdentity(current.storefront)
@@ -134,6 +139,8 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                             enabled=detailReady,autoLoading=false,confirmationRequired=false,enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick={
                                 if(displayedOfferIsCurrent(current)) onVisitShop(current.storefront) else requestRefresh()
                             })
+                    }
+                    SelectionContainer { MarketBranchAvailabilityContent(branches,branchesTruncated) }
                     }
                     Text(marketBrowseText("market.availability_note")+"\n"+receiptUiDateTime(current.checkedAtMillis),color=stateValues.TextColor.copy(alpha=.65f),fontSize=stateValues.smallTextSize)
                     if(!detailReady) Text(eventMessage("market.detail_stale").visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)

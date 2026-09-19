@@ -70,7 +70,8 @@ fun AppConfiguration.StockBatchCard(
         ?: localizedStringResource(638, "No supplier selected")
     val goodsItem = stateValues.stock.orEmpty().find { it.id == batch.goodsItemId }
 
-    val isActiveShelf = batch.id == activeShelfBatchId
+    val shelfContext=currentStoreModel(batch.storeId)?.isManagementStore()!=true
+    val isActiveShelf = shelfContext && batch.id == activeShelfBatchId
     val isDragging = draggedBatchId == batch.id
     val currentIndex = shelfIndex ?: 0
     val density = LocalDensity.current
@@ -160,8 +161,9 @@ fun AppConfiguration.StockBatchCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = listOfNotNull(
-                            shelfIndex?.let { "#${it + 1}" },
-                            if (isActiveShelf) localizedStringResource(265, "Active batch") else localizedStringResource(128, "Shelf batch")
+                            shelfIndex?.takeIf { shelfContext }?.let { "#${it + 1}" },
+                            if (!shelfContext) eventMessage("inventory.warehouse_batch").visibleLocalizedString(stateValues.appLanguage,"")
+                            else if (isActiveShelf) localizedStringResource(265, "Active batch") else localizedStringResource(128, "Shelf batch")
                         ).joinToString(" • "),
                         color = if (isActiveShelf || isDragging) stateValues.AccentColor else stateValues.TextColor,
                         fontSize = stateValues.textSize,
@@ -261,7 +263,7 @@ fun AppConfiguration.StockBatchCard(
                 textColor = stateValues.TextColor
             )
 
-            batch.shelfPosition?.takeIf { it.isNotBlank() }?.let {
+            batch.shelfPosition?.takeIf { shelfContext && it.isNotBlank() }?.let {
                 StockCardInfoLine(
                     title = localizedStringResource(344, "Shelf position"),
                     value = it,
@@ -269,7 +271,7 @@ fun AppConfiguration.StockBatchCard(
                 )
             }
 
-            StockCardInfoLine(
+            if (shelfContext) StockCardInfoLine(
                 title = localizedStringResource(345, "Priority"),
                 value = batch.shelfPriority.toString(),
                 textColor = stateValues.TextColor
@@ -354,6 +356,7 @@ fun AppConfiguration.StockBatchEditor(
     onCancel: () -> Unit,
     onSaved: () -> Unit
 ) {
+    val batchStoreId=existingBatch?.storeId ?: stateValues.activeStoreId ?: goodsItem.storeId
     val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
         .find { it.id == goodsItem.measurementUnitId }
         ?: stateValues.globalAppConfiguration.goodsItemsQuantityUnits.first()
@@ -370,17 +373,17 @@ fun AppConfiguration.StockBatchEditor(
             goodsBatchDraftFromNavigationStateString(raw)
         }
         ?.takeIf {
-            it.goodsItemId == goodsItem.id &&
+            it.goodsItemId == goodsItem.id && it.storeId==batchStoreId &&
                     (existingBatch == null || it.id == existingBatch.id)
         }
 
-    var draft by remember(draftStateKey, existingBatch?.id, goodsItem.id) {
+    var draft by remember(draftStateKey, existingBatch?.id, goodsItem.id, batchStoreId) {
         mutableStateOf(
             restoredDraft
                 ?: existingBatch?.toDraft(defaultUnit.id)
                 ?: GoodsBatchDraft(
                     goodsItemId = goodsItem.id,
-                    storeId = goodsItem.storeId,
+                    storeId = batchStoreId,
                     supplierId = null,
                     quantityUnitId = defaultUnit.id,
                     supplyPrice = goodsItem.supplyPrices.firstOrNull()
@@ -762,7 +765,7 @@ fun AppConfiguration.StockBatchEditor(
                         id = draft.id,
                         goodsItemId = goodsItem.id,
                         userId = existingBatch?.userId.orEmpty(),
-                        storeId = goodsItem.storeId,
+                        storeId = batchStoreId,
                         supplierId = draft.supplierId?.takeIf { it.isNotBlank() },
                         supplierOrderId = existingBatch?.supplierOrderId,
                         quantity = quantityUnit.withStockQuantityInputTotalValue(
@@ -792,7 +795,7 @@ fun AppConfiguration.StockBatchEditor(
                     val sameSupplierPromoCopies = if (applyPromotionsToSameSupplier && !batch.supplierId.isNullOrBlank()) {
                         stateValues.stockBatches.orEmpty()
                             .filter { other ->
-                                other.goodsItemId == goodsItem.id &&
+                                other.goodsItemId == goodsItem.id && other.storeId==batchStoreId &&
                                         other.id != batch.id &&
                                         other.supplierId == batch.supplierId &&
                                         other.isActive
@@ -1711,29 +1714,41 @@ fun AppConfiguration.StockAddEditBatchesPage(
     }
 
     val addEditState by NavigationScreenModel.Stock.AddEditGoodsItem.state.collectAsState()
-    val modeKey = "stock_batches_mode_${goodsItem.id}"
-    val editIdKey = "stock_batches_edit_id_${goodsItem.id}"
-    val currentMode = addEditState[modeKey] ?: "list"
-    val currentEditId = addEditState[editIdKey]
     val activeStoreIdForBatches = stateValues.activeStoreId ?: goodsItem.storeId
+    val editorScope="${stateValues.userAccount?.id}:$activeStoreIdForBatches:${goodsItem.id}"
+    val modeKey = "stock_batches_mode_$editorScope"
+    val editIdKey = "stock_batches_edit_id_$editorScope"
+    val legacyEditId=addEditState["stock_batches_edit_id_${goodsItem.id}"]
+    val legacyDraftKey="stock_batches_draft_${goodsItem.id}_${legacyEditId ?: "add"}"
+    val legacyDraft=addEditState[legacyDraftKey]?.let(::goodsBatchDraftFromNavigationStateString)
+        ?.takeIf { it.goodsItemId==goodsItem.id && it.storeId==activeStoreIdForBatches }
+    val legacyBelongsHere=legacyDraft!=null || stateValues.stockBatches.orEmpty().any {
+        it.id==legacyEditId && it.goodsItemId==goodsItem.id && it.storeId==activeStoreIdForBatches
+    }
+    val currentMode = addEditState[modeKey]
+        ?: addEditState["stock_batches_mode_${goodsItem.id}"].takeIf { legacyBelongsHere } ?: "list"
+    val currentEditId = addEditState[editIdKey] ?: legacyEditId.takeIf { legacyBelongsHere && addEditState[modeKey]==null }
+    val managementStore=currentStoreModel(activeStoreIdForBatches)?.isManagementStore()==true
     val canCreateBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_CREATE)
     val canEditBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_EDIT)
     val canDeleteBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_DELETE)
     val canMoveBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_MOVE)
     val canDecideBatchTransfers = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE)
-    val canSetActiveShelfBatch = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF)
+    val canSetActiveShelfBatch = !managementStore && currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF)
 
     val batches = stateValues.stockBatches
         .orEmpty()
         .filter {
-            it.goodsItemId == goodsItem.id && it.isActive && it.status != StockBatchStatusDataModel.InTransit
+            it.goodsItemId == goodsItem.id && it.storeId==activeStoreIdForBatches && it.isActive && it.status != StockBatchStatusDataModel.InTransit
         }
-        .sortedForShelf(goodsItem)
+        .let { if(managementStore) it.sortedWith(compareBy<GoodsBatchDataModel> { batch -> batch.expirationDateMillis ?: Long.MAX_VALUE }.thenBy { batch -> batch.createdAtMillis }) else it.sortedForShelf(goodsItem) }
 
     val editingBatch = batches.find { it.id == currentEditId }
     val addingBatch = currentMode == "add"
     val editing = currentMode == "edit" && editingBatch != null
-    val draftStateKey = "stock_batches_draft_${goodsItem.id}_${editingBatch?.id ?: "add"}"
+    val scopedDraftKey="stock_batches_draft_${editorScope}_${editingBatch?.id ?: "add"}"
+    val draftStateKey=if(addEditState[scopedDraftKey]==null && legacyDraft!=null &&
+        (editingBatch==null || legacyDraft.id==editingBatch.id)) legacyDraftKey else scopedDraftKey
 
     fun closeBatchEditor(clearDraft: Boolean) {
         coroutineScope.launch {
@@ -1790,8 +1805,8 @@ fun AppConfiguration.StockAddEditBatchesPage(
         return
     }
 
-    var draggedBatchId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
-    var dragTargetIndex by remember(goodsItem.id) { mutableStateOf<Int?>(null) }
+    var draggedBatchId by remember(editorScope) { mutableStateOf<String?>(null) }
+    var dragTargetIndex by remember(editorScope) { mutableStateOf<Int?>(null) }
     val incomingBatches = stateValues.stockBatches
         .orEmpty()
         .filter {
@@ -1803,10 +1818,11 @@ fun AppConfiguration.StockAddEditBatchesPage(
         .sortedWith(compareBy<GoodsBatchDataModel> { it.deliveredAtMillis ?: it.createdAtMillis }.thenBy { it.id })
     val availabilityPayload by stockItemBranchAvailabilityState.payload.collectAsState()
     val branchAvailability = availabilityPayload?.takeIf { availability ->
-        availability.sourceGoodsItemId == goodsItem.id || availability.locations.any { it.goodsItemId == goodsItem.id }
+        availability.currentStoreId==activeStoreIdForBatches &&
+            (availability.sourceGoodsItemId == goodsItem.id || availability.locations.any { it.goodsItemId == goodsItem.id })
     }
-    var movingBatch by remember(goodsItem.id) { mutableStateOf<GoodsBatchDataModel?>(null) }
-    var preferredDestinationStoreId by remember(goodsItem.id) { mutableStateOf<String?>(null) }
+    var movingBatch by remember(editorScope) { mutableStateOf<GoodsBatchDataModel?>(null) }
+    var preferredDestinationStoreId by remember(editorScope) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(goodsItem.id, activeStoreIdForBatches) {
         getStockItemBranchAvailability(activeStoreIdForBatches, goodsItem.id)
@@ -1830,76 +1846,47 @@ fun AppConfiguration.StockAddEditBatchesPage(
     Column(
         modifier = modifier.fillMaxSize()
     ) {
+        val section=sectionTabsWidget(
+            stateKey="stock-batch-sections:${stateValues.userAccount?.id}:$activeStoreIdForBatches:${goodsItem.id}",
+            tabs=buildList {
+                if(managementStore) add(TabContent("warehouse",tabLabelWithCount(
+                    eventMessage("inventory.warehouse_batches").visibleLocalizedString(stateValues.appLanguage,""),batches.size),icon=AitaTabIcon.Stock))
+                else {
+                    add(TabContent("shelf",tabLabelWithCount(localizedStringResource(197,"Shelf order"),batches.size),icon=AitaTabIcon.Stock))
+                    add(TabContent("locations",localizedStringResource(546,"Branch stock"),icon=AitaTabIcon.Branches))
+                }
+                add(TabContent("incoming",tabLabelWithCount(localizedStringResource(1196,"Incoming batches"),incomingBatches.size),icon=AitaTabIcon.Truck))
+            },modifier=Modifier.fillMaxWidth().padding(horizontal=stateValues.marginTextField,vertical=2.dp))
+        LaunchedEffect(section,activeStoreIdForBatches) { draggedBatchId=null;dragTargetIndex=null }
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .padding(stateValues.marginTextField)
         ) {
-            item {
+            if(section=="locations" && !managementStore) item("locations") {
                 StockBranchAvailabilitySection(
-                    goodsItem = goodsItem,
-                    availability = branchAvailability,
-                    onMoveBatch = if (canMoveBatch) {
-                        { batch, preferredDestination ->
-                            movingBatch = batch
-                            preferredDestinationStoreId = preferredDestination
-                        }
-                    } else null
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-
-                if (incomingBatches.isNotEmpty()) {
-                    Text(
-                        text = localizedStringResource(1196, "Incoming batches"),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.titleTextSize,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                    incomingBatches.forEach { incomingBatch ->
-                        val movement = branchAvailability?.movements.orEmpty()
-                            .firstOrNull {
-                                it.destinationBatchId == incomingBatch.id &&
-                                        it.status == StockBatchMovementStatusDataModel.PendingAcceptance
-                            }
-
-                        IncomingStockBatchTransferCard(
-                            batch = incomingBatch,
-                            movement = movement,
-                            availability = branchAvailability,
-                            canDecide = canDecideBatchTransfers,
-                            onDecided = {
-                                getStockItemBranchAvailability(activeStoreIdForBatches, goodsItem.id)
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(stateValues.marginTextField))
-                    }
-
-                    Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-                }
-
-                Text(
-                    text = localizedStringResource(197, "Shelf order"),
-                    color = stateValues.TextColor,
-                    fontSize = stateValues.titleTextSize,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-                Text(
-                    text = localizedStringResource(198, "The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order."),
-                    color = stateValues.TextColor,
-                    fontSize = stateValues.smallTextSize
-                )
-
-                Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
+                    goodsItem=goodsItem,availability=branchAvailability,
+                    onMoveBatch=if(canMoveBatch) { { batch,destination -> movingBatch=batch;preferredDestinationStoreId=destination } } else null)
             }
-
+            if(section=="incoming") {
+                if(incomingBatches.isEmpty()) item("incoming_empty") {
+                    MessageText(modifier=Modifier.fillMaxWidth().padding(vertical=stateValues.marginTextFieldGroup),text=stateValues.stringListEmpty)
+                }
+                items(incomingBatches,key={ "incoming:${it.id}" }) { incomingBatch ->
+                    val movement=branchAvailability?.movements.orEmpty().firstOrNull {
+                        it.destinationBatchId==incomingBatch.id && it.status==StockBatchMovementStatusDataModel.PendingAcceptance
+                    }
+                    IncomingStockBatchTransferCard(batch=incomingBatch,movement=movement,availability=branchAvailability,
+                        canDecide=canDecideBatchTransfers,onDecided={ getStockItemBranchAvailability(activeStoreIdForBatches,goodsItem.id) })
+                    Spacer(Modifier.height(stateValues.marginTextField))
+                }
+            }
+            if(section=="shelf" || section=="warehouse") {
+                if(!managementStore) item("shelf_hint") {
+                    Text(localizedStringResource(198,"The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order."),
+                        color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
+                    Spacer(Modifier.height(stateValues.marginTextField))
+                }
             if (batches.isEmpty()) {
                 item {
                     MessageText(
@@ -1913,8 +1900,8 @@ fun AppConfiguration.StockAddEditBatchesPage(
                 itemsIndexed(batches, key = { _, batch -> batch.id }) { index, batch ->
                     StockBatchCard(
                         batch = batch,
-                        activeShelfBatchId = goodsItem.activeShelfBatchId,
-                        shelfIndex = index,
+                        activeShelfBatchId = goodsItem.activeShelfBatchId.takeUnless { managementStore },
+                        shelfIndex = index.takeUnless { managementStore },
                         compact = false,
                         draggedBatchId = draggedBatchId,
                         draggedBatchIndex = draggedBatchId?.let { id -> batches.indexOfFirst { it.id == id }.takeIf { it >= 0 } },
@@ -2000,6 +1987,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
                 }
             }
 
+            }
             item {
                 Spacer(modifier = Modifier.height(stateValues.screenHeight / 5))
             }
@@ -3893,6 +3881,7 @@ internal fun GoodsItemDataModel.toParentStoreStockTemplateDraft(
 internal fun AppConfiguration.ParentStoreStockPickerItemCard(
     item: GoodsItemDataModel,
     barcodeMatched: Boolean,
+    profileOnly: Boolean = false,
     onApply: () -> Unit
 ) {
     val name = item.visibleParentStoreStockName(stateValues.appLanguage)
@@ -3970,7 +3959,7 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
 
             actionButton(
                 autoLoading = false,
-                text = localizedStringResource(1218, "Use parent item"),
+                text = if (profileOnly) marketProductText("market.profile_parent") else localizedStringResource(1218, "Use parent item"),
                 iconPath = parentStoreStockIconPath(),
                 confirmationRequired = false,
                 onClick = onApply
@@ -4003,6 +3992,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
     activeStoreId: String,
     draft: StockAddEditDraft,
     existing: GoodsItemDataModel?,
+    profileOnly: Boolean = false,
     onDismiss: () -> Unit,
     onApply: (GoodsItemDataModel) -> Unit
 ) {
@@ -4032,7 +4022,8 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
         Text(
             text = listOfNotNull(
                 parentStoreName.takeIf { it.isNotBlank() },
-                localizedStringResource(1214, "Take a clean copy from the parent store stock, then adjust it for this branch.")
+                if (profileOnly) marketProductText("market.profile_parent_help") else
+                    localizedStringResource(1214, "Take a clean copy from the parent store stock, then adjust it for this branch.")
             ).joinToString(" • "),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize,
@@ -4193,6 +4184,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                         ParentStoreStockPickerItemCard(
                             item = item,
                             barcodeMatched = barcodeMatched,
+                            profileOnly = profileOnly,
                             onApply = { onApply(item) }
                         )
                     }

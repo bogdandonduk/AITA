@@ -29,6 +29,19 @@ window.aitaPrintDocument = function (title, html) {
                 await content.fonts.load('bold 12px AITAWebFont');
                 await content.fonts.ready;
                 if (finished) return;
+                // Browser print destinations are private to the print dialog. We provide
+                // the physical roll geometry, never infer a printer type from an A4 default.
+                const receiptPaper = content.querySelector('meta[name="aita-receipt-paper"]');
+                if (receiptPaper) {
+                    const [width, margin] = receiptPaper.content.split(',').map(Number);
+                    if (!Number.isFinite(width) || width < 150 || width > 240 ||
+                        !Number.isFinite(margin) || margin < 0 || margin > 24) return fail();
+                    const height = Math.min(14400, Math.max(72,
+                        Math.ceil(Math.max(content.body.scrollHeight, content.body.getBoundingClientRect().height) * 72 / 96 + margin * 2 + 2)));
+                    const paperStyle = content.createElement('style');
+                    paperStyle.textContent = '@page{size:'+width+'pt '+height+'pt;margin:'+margin+'pt}';
+                    content.head.appendChild(paperStyle);
+                }
                 target.addEventListener('afterprint', cleanup, {once: true});
                 target.focus();
                 target.print();

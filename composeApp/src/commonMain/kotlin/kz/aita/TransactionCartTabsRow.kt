@@ -1,5 +1,6 @@
 package kz.aita
 
+import aita.composeapp.generated.resources.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,7 +32,7 @@ import kotlinx.coroutines.launch
     val ready = hydrated && navigationReady
     val scope = rememberCoroutineScope()
     val scroll = rememberLazyListState()
-    val cartLabel = localizedStringResource(95, "Cart")
+    val cartLabel = localizedStringResource(134, "Cart")
     var adding by remember(bookState.owner) { mutableStateOf(false) }
     LaunchedEffect(selected, slots) { slots.indexOf(selected).takeIf { it >= 0 }?.let { scroll.animateScrollToItem(it) } }
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
@@ -78,7 +79,12 @@ import kotlinx.coroutines.launch
                         .clickable(enabled = ready, role = Role.Tab) { scope.launch { Navigation.transactionWorkspace(type).setClientId(index) } }
                         .padding(start = 10.dp, end = if (cart.isEmpty() && index < INITIAL_CART_SLOTS) 10.dp else 0.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CpImage(Modifier.size(20.dp), url = stateValues.drawablePathIconCart, fallbackRes = stateValues.drawableResIconCart.value,
+                        val emptyCart = cart.isEmpty()
+                        val darkIcon = isDarkAppTheme(stateValues.appThemeId)
+                        CpImage(Modifier.size(20.dp), url = marketIconPath(if (emptyCart) 225 else 226),
+                            fallbackRes = if (emptyCart) {
+                                if (darkIcon) Res.drawable._225_1 else Res.drawable._225_0
+                            } else if (darkIcon) Res.drawable._226_1 else Res.drawable._226_0,
                             contentDescription = null, tintColor = tint)
                         Text(labelNumber.toString(), fontWeight = FontWeight.Bold, color = tint, fontSize = stateValues.smallTextSize)
                         if (cart.isNotEmpty()) {

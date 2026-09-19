@@ -148,7 +148,7 @@ internal fun AppConfiguration.MarketComparisonDialog(
         }
     }
     LaunchedEffect(data) {
-        while (isActive) { delay(30_000); if (review == null && !shoppingBlocked()) queueRefresh() }
+        while (isActive) { delay(30_000); awaitClientBackgroundWork(); if (review == null && !shoppingBlocked()) queueRefresh() }
     }
     LaunchedEffect(review) {
         val frozen = review ?: return@LaunchedEffect

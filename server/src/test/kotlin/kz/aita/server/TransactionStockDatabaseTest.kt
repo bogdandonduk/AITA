@@ -103,6 +103,24 @@ class TransactionStockDatabaseTest {
         assertEquals(1.0, total(first)); assertEquals(5.0, total(second))
     } }
 
+    @Test fun familyVisibilityCannotConsumeOrRestockAnotherLocationsBatch() = fixture { db -> transaction(db) {
+        StockBatchesV2.update({ StockBatchesV2.id eq second }) { it[storeId] = otherStore }
+        val visible = listOf(store, otherStore)
+        val normalized = normalizeTransactionGoodsInsideTransaction(store, "purchase", listOf(line(3.0)), visible)
+        // Only two units belong to the operating branch, even though eight are visible elsewhere.
+        assertNull(applyTransactionStockMutationInsideTransaction(owner, store,
+            transactionModel("purchase", assertNotNull(normalized.lines)), 100L, visible))
+        assertEquals(2.0, total(first)); assertEquals(8.0, total(second))
+        val foreignReturn = normalizeTransactionGoodsInsideTransaction(store, "return",
+            listOf(line().copy(stockBatchId = second.toString())), visible)
+        assertEquals("return_batch_not_found", foreignReturn.errorCode)
+        val own = assertNotNull(normalizeTransactionGoodsInsideTransaction(store, "purchase", listOf(line(2.0)), visible).lines)
+        val completed = assertNotNull(applyTransactionStockMutationInsideTransaction(owner, store,
+            transactionModel("purchase", own), 100L, visible))
+        assertEquals(listOf(first.toString()), completed.single().sourceBatchAllocations.map { it.stockBatchId })
+        assertEquals(0.0, total(first)); assertEquals(8.0, total(second))
+    } }
+
     @Test fun receiptReferenceCannotCrossStoreOrOverReturnIncludingRepeatedRequestLines() = fixture { db -> transaction(db) {
         val sale = save("purchase", listOf(line(3.0)))
         assertNull(normalizeTransactionGoodsInsideTransaction(otherStore, "return", listOf(returnLine(sale)), listOf(otherStore)).lines)

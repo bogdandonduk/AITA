@@ -54,7 +54,7 @@ class MarketOfferDetailQueryTest {
         assertEquals(404, missing.status); assertEquals("market.unavailable", missing.key)
         val query = jdbc.queries.single()
         assertTrue("l.is_published" in query.sql); assertTrue("f.is_published" in query.sql)
-        assertTrue("e.store_id=l.store_id" in query.sql); assertTrue("l.id IN (?)" in query.sql)
+        assertTrue("e.store_id=s.id" in query.sql); assertTrue("l.id IN (?)" in query.sql)
         assertEquals(query.args[1], query.args[2]); assertTrue((query.args[1] as Long) > 0)
         assertEquals(offerId, query.args[3]); assertTrue(query.timeout in 1..5)
     }

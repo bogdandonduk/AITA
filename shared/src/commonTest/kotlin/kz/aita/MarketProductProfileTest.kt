@@ -38,6 +38,22 @@ class MarketProductProfileTest {
             MarketProductDetails(imageUrls = listOf("https://images.example.org/public.png"), brand = "Brand"))
         assertEquals(custom, item().copy(marketplaceProfile = custom).effectiveMarketplaceProfile())
     }
+    @Test fun parentProfileCopyKeepsResolvedTextAndPhotosIndependentOfBranchStockAndEdits() {
+        val parent = item().copy(marketplaceProfile = StockMarketplaceProfile(product = MarketProductDetails(brand = "Generic brand")))
+        val original = parent.effectiveMarketplaceProfile()
+        val copied = parent.marketplaceProfileForBranchCopy()
+        assertFalse(copied.automaticFromStock)
+        val branch = item().copy(storeId = id(7), name = text("Branch stock title"), imagePaths = emptyList(), marketplaceProfile = copied)
+        assertEquals(original.copy(automaticFromStock = false), branch.effectiveMarketplaceProfile())
+        val edited = branch.copy(marketplaceProfile = copied.copy(name = text("Internet special"), product = copied.product.copy(brand = "Branch brand")))
+        assertEquals(text("Internet special"), edited.effectiveMarketplaceProfile().name)
+        assertEquals(original, parent.effectiveMarketplaceProfile())
+    }
+    @Test fun parentProfileCopyAlsoPreservesAuthoredIndependentFields() {
+        val parent = item().copy(marketplaceProfile = StockMarketplaceProfile(false, text("Public title"), text("Public description"),
+            MarketProductDetails(imageUrls = listOf("https://images.example.org/public.png"), brand = "Parent brand")))
+        assertEquals(parent.marketplaceProfile, parent.marketplaceProfileForBranchCopy())
+    }
     @Test fun legacyEditCannotEraseIndependentProfile() {
         val custom = StockMarketplaceProfile(false, text("Reviewed draft"), product = MarketProductDetails(brand = "Brand"))
         assertEquals(custom, item().marketplaceProfileForSave(custom))

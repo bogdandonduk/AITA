@@ -877,6 +877,7 @@ object LabelPrinterPlatformJvmBridge {
     }
 
     fun configuredDeviceId(): String? = when {
+        labelPrinterServiceName == SYSTEM_DOCUMENT_PRINTER_ID -> SYSTEM_DOCUMENT_PRINTER_ID
         !labelPrinterServiceName.isNullOrBlank() -> "service:${labelPrinterServiceName!!.trim()}"
         !labelPrinterDevicePath.isNullOrBlank() -> "path:${labelPrinterDevicePath!!.trim()}"
         else -> null
@@ -927,6 +928,10 @@ object LabelPrinterPlatformJvmBridge {
             clean == null -> {
                 labelPrinterDevicePath = null
                 labelPrinterServiceName = null
+            }
+            clean == SYSTEM_DOCUMENT_PRINTER_ID -> {
+                labelPrinterServiceName = SYSTEM_DOCUMENT_PRINTER_ID
+                labelPrinterDevicePath = null
             }
             clean.startsWith("service:", ignoreCase = true) -> {
                 labelPrinterServiceName = clean.substringAfter(':').trim().takeIf { it.isNotBlank() }
@@ -1438,9 +1443,17 @@ private fun installDesktopPlatformActionsJvm() {
             }
         }
 
+    printReceiptDocumentPlatformAction = { title, document ->
+        withContext(Dispatchers.IO) { printSystemReceiptDocument(title, document) }
+    }
+
     listPlatformReceiptPrinterDevicesAction = {
         withContext(Dispatchers.IO) {
-            ReceiptPlatformJvmBridge.listConfiguredAndDetectedPrinters()
+            val detected = ReceiptPlatformJvmBridge.listConfiguredAndDetectedPrinters()
+            listOf(PlatformReceiptPrinterDataModel(SYSTEM_DOCUMENT_PRINTER_ID,
+                deviceWorkflowText("desktop_system_print"), deviceWorkflowText("receipt_driver_help"),
+                configured = ReceiptPlatformJvmBridge.escPosDevicePath == SYSTEM_DOCUMENT_PRINTER_ID)) +
+            detected.filterNot { it.id == SYSTEM_DOCUMENT_PRINTER_ID }
         }
     }
 
@@ -1462,7 +1475,12 @@ private fun installDesktopPlatformActionsJvm() {
 
     listPlatformLabelPrinterDevicesAction = {
         withContext(Dispatchers.IO) {
-            LabelPrinterPlatformJvmBridge.listLabelPrinterDevices()
+            val detected = LabelPrinterPlatformJvmBridge.listLabelPrinterDevices()
+            listOf(PlatformLabelPrinterDataModel(SYSTEM_DOCUMENT_PRINTER_ID,
+                deviceWorkflowText("desktop_system_print"), deviceWorkflowText("label_system_help"),
+                configured = LabelPrinterPlatformJvmBridge.configuredDeviceId() == SYSTEM_DOCUMENT_PRINTER_ID,
+                supportedProtocols = emptyList())) +
+            detected.filterNot { it.id == "service:$SYSTEM_DOCUMENT_PRINTER_ID" }
         }
     }
 

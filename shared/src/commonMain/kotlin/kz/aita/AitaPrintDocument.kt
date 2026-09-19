@@ -1,5 +1,47 @@
 package kz.aita
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CancellationException
+
+const val SYSTEM_DOCUMENT_PRINTER_ID = "desktop-system-print"
+private const val RECEIPT_PAPER_WIDTH_KEY = "receipt-paper-width-mm"
+val receiptPaperWidthMmState = MutableStateFlow(80)
+var printReceiptDocumentPlatformAction: (suspend (String, AitaPdfDocument) -> ReceiptPlatformActionResult)? = null
+
+fun receiptUsesSystemDocumentPrinting(): Boolean = preferHtmlDocumentPrinting ||
+    configuredReceiptPrinterDeviceIdState.value == SYSTEM_DOCUMENT_PRINTER_ID
+fun labelUsesSystemDocumentPrinting(): Boolean = preferHtmlDocumentPrinting ||
+    configuredLabelPrinterDeviceIdState.value == SYSTEM_DOCUMENT_PRINTER_ID
+
+fun normalizedReceiptPaperWidthMm(value: Int?): Int = if (value == 58) 58 else 80
+
+suspend fun loadReceiptPaperWidth(): Int {
+    val stored = try { getLocalKv(RECEIPT_PAPER_WIDTH_KEY)?.toIntOrNull() }
+    catch (cancelled: CancellationException) { throw cancelled }
+    catch (_: Exception) { receiptPaperWidthMmState.value }
+    return normalizedReceiptPaperWidthMm(stored).also { receiptPaperWidthMmState.value = it }
+}
+
+suspend fun saveReceiptPaperWidth(widthMm: Int) {
+    val width = normalizedReceiptPaperWidthMm(widthMm)
+    putLocalKv(RECEIPT_PAPER_WIDTH_KEY, width.toString())
+    receiptPaperWidthMmState.value = width
+}
+
+/** Only prepared print copies change size; downloaded receipts retain their original PDF layout. */
+fun AitaPdfDocument.forReceiptPaper(widthMm: Int): AitaPdfDocument = copy(
+    width = normalizedReceiptPaperWidthMm(widthMm) * 72f / 25.4f,
+    // Common printable areas: 48 mm on a 58 mm roll, 72 mm on an 80 mm roll.
+    margin = (if (normalizedReceiptPaperWidthMm(widthMm) == 58) 5f else 4f) * 72f / 25.4f,
+    minHeight = 0f
+)
+
+suspend fun printReceiptDocument(title: String, document: AitaPdfDocument): ReceiptPlatformActionResult {
+    val prepared = document.forReceiptPaper(loadReceiptPaperWidth())
+    return printReceiptDocumentPlatformAction?.invoke(title, prepared)
+        ?: printHtmlDocument(title, prepared.toPrintHtml(title))
+}
+
 /** Use a document in the system print dialog instead of trying to discover browser hardware. */
 var preferHtmlDocumentPrinting: Boolean = false
 
@@ -18,7 +60,11 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
     return buildString {
         append("<!doctype html><html><head><meta charset=\"UTF-8\"><title>")
         append(printHtmlEscape(title))
-        append("</title><style>@page{size:${width}pt ${maxHeight}pt;margin:${margin}pt}")
+        append("</title>")
+        if (minHeight == 0f && width < 250f) {
+            append("<meta name=\"aita-receipt-paper\" content=\"${width},${margin}\">")
+        }
+        append("<style>@page{size:${width}pt ${maxHeight}pt;margin:${margin}pt}")
         append("html,body{background:white;color:black}body{margin:0;width:${contentWidth}pt;font-family:Arial,'Noto Sans',sans-serif}")
         append(".line{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;min-height:1em}.barcode{break-inside:avoid;text-align:center}hr{border:0;border-top:1pt solid black;margin:6pt 0}</style></head><body>")
         blocks.forEach { block ->

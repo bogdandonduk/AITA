@@ -70,13 +70,10 @@ internal object LiveCollectionWorkspace {
                 if (previous?.stock === items && previous.batches === batches && previous.stores === stores) return@collectLatest
                 val batchSource = batches.orEmpty()
                 val storeId = activeStoreIdState.value
-                val storeById = stores.flattenStoresWithBranches().associateBy { it.id }
-                val rootId = storeById[storeId]?.rootStoreId() ?: storeId
-                fun belongsToStore(batchStoreId: String) = batchStoreId.isNotBlank() &&
-                    (batchStoreId == storeId || (storeById[batchStoreId]?.rootStoreId() ?: batchStoreId) == rootId)
-                val warehouseBatches = stockWarehouseBatchesByItemForUi(batchSource)
+                fun belongsToStore(batchStoreId: String) = batchStoreId.isNotBlank() && batchStoreId == storeId
+                val warehouseBatches = stockWarehouseBatchesByItemForUi(batchSource.filter { belongsToStore(it.storeId) })
                 val result = LiveStockCollections(owner, items, batchSource, stores, items.associateBy { it.id },
-                    batchSource.filter { it.isActive }.groupBy { it.goodsItemId },
+                    batchSource.filter { it.isActive && belongsToStore(it.storeId) }.groupBy { it.goodsItemId },
                     batchSource.filter { it.isSelectableActiveStockBatch() && belongsToStore(it.storeId) }.groupBy { it.goodsItemId },
                     warehouseBatches, warehouseBatches.mapValues { (_, rows) -> rows.sumOf { it.quantity.total } })
                 ensureActive()

@@ -902,7 +902,7 @@ internal fun AppConfiguration.weightQuantityFromBarcode(
 internal fun AppConfiguration.batchBelongsToInventoryStoreForUi(batchStoreId: String?, activeStoreId: String?): Boolean {
     val cleanActiveStoreId = activeStoreId?.takeIf { it.isNotBlank() } ?: return true
     val cleanBatchStoreId = batchStoreId?.takeIf { it.isNotBlank() } ?: return false
-    return cleanBatchStoreId == cleanActiveStoreId || sameInventoryStoreGroupForUi(cleanActiveStoreId, cleanBatchStoreId)
+    return cleanBatchStoreId == cleanActiveStoreId
 }
 
 internal fun AppConfiguration.availableSaleQuantityFor(goodsItem: GoodsItemDataModel): Double {
@@ -1004,14 +1004,14 @@ internal fun AppConfiguration.transactionStockCandidatesForUi(
                     batch.status != StockBatchStatusDataModel.WrittenOff &&
                     batch.status != StockBatchStatusDataModel.SoldOut &&
                     batch.status != StockBatchStatusDataModel.InTransit &&
-                    rootStoreIdFor(batch.storeId) == activeRootStoreId
+                    batch.storeId == activeStoreId
         }
         .map { it.goodsItemId }
         .filter { it.isNotBlank() }
         .toSet()
 
     val scopedStock = stock
-        .filter { item -> rootStoreIdFor(item.storeId) == activeRootStoreId || item.id in sellableItemIds }
+        .filter { item -> item.storeId == activeStoreId || item.id in sellableItemIds }
 
     if (!sortForDisplay) return scopedStock
 
@@ -3031,10 +3031,10 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
             activeReceiptAction = action // reserve synchronously, before launching
             receiptScope.launch {
                 try {
-                    if (action == "print" && preferHtmlDocumentPrinting) {
-                        val html = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels).toPrintHtml(fileName)
+                    if (action == "print" && receiptUsesSystemDocumentPrinting()) {
+                        val document = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels)
                         if (!actionOwner.isCurrent()) return@launch
-                        receiptActionNotification(printHtmlDocument(fileName, html), deviceWorkflowText("print_opened"), actionOwner)
+                        receiptActionNotification(printReceiptDocument(fileName, document), deviceWorkflowText("print_opened"), actionOwner)
                         return@launch
                     }
                     val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {

@@ -1879,6 +1879,7 @@ object Stores: Table("stores") {
   val id = uuid("id").uniqueIndex()
   val publicId = varchar("public_id", 16).uniqueIndex()
   val parentStoreId = uuid("parent_store_id").nullable()
+  val branchType = text("branch_type").nullable()
   val ownerUserIds = jsonb("owner_user_ids", Json, ListSerializer(String.serializer()))
   val storeTypeIds = jsonb("store_type_ids", Json, ListSerializer(String.serializer()))
 
@@ -4627,7 +4628,16 @@ private fun RoutingCall.matchesAnyInventoryContextStoreIdInsideTransaction(userI
   return activeStoreId == null || storeIds.any { storesShareInventoryRootInsideTransaction(activeStoreId, it) }
 }
 
+private fun isManagementStoreInsideTransaction(storeId: UUID): Boolean =
+  Stores.select(Stores.parentStoreId).where { (Stores.id eq storeId) and (Stores.isActive eq true) }
+    .singleOrNull()?.let { it[Stores.parentStoreId] == null } == true
+
+private fun requireOperatingBranchInsideTransaction(storeId: UUID) {
+  if (isManagementStoreInsideTransaction(storeId)) throw SubscriptionFailure("store.operating_branch_required", 403)
+}
+
 private fun requireStoreSubscriptionInsideTransaction(storeId: UUID) {
+  if (isManagementStoreInsideTransaction(storeId)) return
   if (!subscriptionRepositoryInsideTransaction().hasAccess(storeId, System.currentTimeMillis()))
     throw SubscriptionFailure("subscription.required", 402)
 }
@@ -4643,6 +4653,7 @@ private suspend fun RoutingCall.enforceRequestSubscription(userId: UUID) {
   newSuspendedTransaction(aitaServerIoContext) {
     if (!userHasStoreAccessInsideTransaction(userId, storeId))
       throw SubscriptionFailure("subscription.required", 403)
+    if (storeEndpointRequiresOperatingBranch(path)) requireOperatingBranchInsideTransaction(storeId)
     requireStoreSubscriptionInsideTransaction(storeId)
   }
 }
@@ -4680,7 +4691,10 @@ internal suspend fun RoutingCall.enforceSubscriptionBody(body: JsonElement) {
         }
       }
     }
-    targets.forEach(::requireStoreSubscriptionInsideTransaction)
+    targets.forEach { target ->
+      if (storeEndpointRequiresOperatingBranch(path)) requireOperatingBranchInsideTransaction(target)
+      requireStoreSubscriptionInsideTransaction(target)
+    }
   }
 }
 
@@ -4925,7 +4939,7 @@ private fun stockVisibleStoreIdsForUserInsideTransaction(userId: UUID, storeId: 
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
   val now = System.currentTimeMillis()
   val repository = subscriptionRepositoryInsideTransaction()
-  fun paid(ids: List<UUID>): List<UUID> = ids.filter { repository.hasAccess(it, now) }
+  fun paid(ids: List<UUID>): List<UUID> = ids.filter { it == rootStoreId || repository.hasAccess(it, now) }
   if (userHasRootInventoryScopeInsideTransaction(userId, rootStoreId)) {
     return paid(stockVisibleStoreIdsInsideTransaction(rootStoreId))
   }
@@ -5181,11 +5195,13 @@ private fun userHasRequiredActiveWorkshiftInsideTransaction(userId: UUID, storeI
 
 private fun userCanUseStoreActionInsideTransaction(userId: UUID, storeId: UUID, permission: String, requireWorkshift: Boolean = true): Boolean {
   if (!userHasStorePermissionInsideTransaction(userId, storeId, permission)) return false
+  val management = isManagementStoreInsideTransaction(storeId)
+  if (management && permission in BRANCH_ONLY_STORE_PERMISSIONS) return false
   // Permission anchors used to edit a branch may be its parent. Its OWN body/header entitlement
   // is enforced above; do not charge the parent a second time just to prove management authority.
-  if (permission !in setOf(STORE_PERMISSION_STORE_MANAGE, STORE_PERMISSION_BRANCHES_MANAGE, STORE_PERMISSION_SUBSCRIPTION_MANAGE) &&
+  if (!management && permission !in setOf(STORE_PERMISSION_STORE_MANAGE, STORE_PERMISSION_BRANCHES_MANAGE, STORE_PERMISSION_SUBSCRIPTION_MANAGE) &&
       !subscriptionRepositoryInsideTransaction().hasAccess(storeId, System.currentTimeMillis())) return false
-  if (requireWorkshift && !userHasRequiredActiveWorkshiftInsideTransaction(userId, storeId)) return false
+  if (!management && requireWorkshift && !userHasRequiredActiveWorkshiftInsideTransaction(userId, storeId)) return false
   return true
 }
 
@@ -6280,6 +6296,8 @@ private fun ResultRow.toStoreDataModel(branches: List<StoreDataModel> = emptyLis
     id = this[Stores.id].toString(),
     publicId = this[Stores.publicId],
     parentStoreId = this[Stores.parentStoreId]?.toString(),
+    branchType = this[Stores.branchType]?.let { StoreBranchType.valueOf(it) },
+    architectureVersion = 2,
     userIds = this[Stores.ownerUserIds],
     storeTypeIds = this[Stores.storeTypeIds],
     name = this[Stores.name],
@@ -16186,7 +16204,8 @@ private fun findMatchingParentMirrorStockItemInsideTransaction(
 private fun UpdateBuilder<*>.setParentStockMirrorFieldsFromBranchRow(
   sourceItemRow: ResultRow,
   parentStoreId: UUID,
-  now: Long
+  now: Long,
+  preservedPublicProfileSource: ResultRow? = null
 ) {
   val cleanBarcodeModels = sourceItemRow.stockBarcodeModels().normalizedGoodsItemBarcodesForStore(
     storeId = parentStoreId.toString(),
@@ -16194,8 +16213,8 @@ private fun UpdateBuilder<*>.setParentStockMirrorFieldsFromBranchRow(
   )
   this[StockItems.barcodes] = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { sourceItemRow[StockItems.barcodes].cleanBarcodes() }
   this[StockItems.barcodeModels] = cleanBarcodeModels
-  this[StockItems.name] = sourceItemRow[StockItems.name]
-  this[StockItems.description] = sourceItemRow[StockItems.description]
+  this[StockItems.name] = (preservedPublicProfileSource ?: sourceItemRow)[StockItems.name]
+  this[StockItems.description] = (preservedPublicProfileSource ?: sourceItemRow)[StockItems.description]
   this[StockItems.measurementUnitId] = sourceItemRow[StockItems.measurementUnitId]
   this[StockItems.categoryIds] = sourceItemRow[StockItems.categoryIds]
   this[StockItems.salePrices] = sourceItemRow[StockItems.salePrices]
@@ -16205,7 +16224,7 @@ private fun UpdateBuilder<*>.setParentStockMirrorFieldsFromBranchRow(
   this[StockItems.wholesaleMinQuantity] = sourceItemRow[StockItems.wholesaleMinQuantity]
   this[StockItems.genericExpirationPeriod] = sourceItemRow[StockItems.genericExpirationPeriod]
   this[StockItems.isQuickItem] = sourceItemRow[StockItems.isQuickItem]
-  this[StockItems.imagePaths] = sourceItemRow[StockItems.imagePaths]
+  this[StockItems.imagePaths] = (preservedPublicProfileSource ?: sourceItemRow)[StockItems.imagePaths]
   this[StockItems.activeShelfBatchId] = null
   this[StockItems.promotions] = sourceItemRow[StockItems.promotions]
   this[StockItems.note] = sourceItemRow[StockItems.note]
@@ -16215,19 +16234,16 @@ private fun UpdateBuilder<*>.setParentStockMirrorFieldsFromBranchRow(
   this[StockItems.isActive] = sourceItemRow[StockItems.isActive]
 }
 
-private fun mirrorBranchStockItemToParentInsideTransaction(
+internal fun mirrorBranchStockItemToParentInsideTransaction(
   branchItemRow: ResultRow,
   previousBranchItemRow: ResultRow? = null,
   userId: UUID,
   now: Long
 ): ResultRow? {
   val branchStoreId = branchItemRow[StockItems.storeId]
-  val parentStoreId = Stores
-    .select(Stores.parentStoreId)
-    .where { Stores.id eq branchStoreId }
-    .singleOrNull()
-    ?.get(Stores.parentStoreId)
-    ?: return null
+  val branchStore = Stores.select(Stores.parentStoreId, Stores.branchType)
+    .where { Stores.id eq branchStoreId }.singleOrNull() ?: return null
+  val parentStoreId = branchStore[Stores.parentStoreId] ?: return null
 
   val existingParentMirror = previousBranchItemRow
     ?.let { findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, it) }
@@ -16246,7 +16262,12 @@ private fun mirrorBranchStockItemToParentInsideTransaction(
   } else {
     val mirrorId = existingParentMirror[StockItems.id]
     StockItems.update({ StockItems.id eq mirrorId }) {
-      it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now)
+      // Automatic parent profiles resolve public text/photos from the parent's stock fields.
+      // Internet-specific edits must not indirectly replace that generic profile.
+      it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now,
+        preservedPublicProfileSource = existingParentMirror.takeIf {
+          branchStore[Stores.branchType] == StoreBranchType.INTERNET.name
+        })
     }
     StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
   }
@@ -16705,6 +16726,18 @@ private fun defaultServerQuantityForGoodsItem(
   }
 }
 
+/** Existing branch batches may refer to a historical family catalogue card. Keep those exact
+ * titles readable without granting stock visibility or entitlement to the owning sibling. */
+private fun legacyLocalBatchCatalogueStoreIdsInsideTransaction(storeId: UUID): List<UUID> {
+  val localIds = StockBatchesV2.select(StockBatchesV2.goodsItemId)
+    .where { (StockBatchesV2.storeId eq storeId) and (StockBatchesV2.isActive eq true) }
+    .map { it[StockBatchesV2.goodsItemId] }.distinct()
+  if (localIds.isEmpty()) return emptyList()
+  val root = rootStoreIdForAccessInsideTransaction(storeId)
+  return StockItems.select(StockItems.storeId).where { StockItems.id inList localIds }
+    .map { it[StockItems.storeId] }.distinct().filter { rootStoreIdForAccessInsideTransaction(it) == root }
+}
+
 private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   storeId: UUID,
   barcode: String,
@@ -16714,8 +16747,8 @@ private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   val cleanBarcode = barcode.trim()
   if (cleanBarcode.isBlank()) return null
 
-  val visibleStoreIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
-    ?: stockVisibleStoreIdsInsideTransaction(storeId)
+  val visibleStoreIds = ((visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
+    ?: stockVisibleStoreIdsInsideTransaction(storeId)) + legacyLocalBatchCatalogueStoreIdsInsideTransaction(storeId)).distinct()
   if (visibleStoreIds.isEmpty()) return null
 
   val matchingRows = StockItems
@@ -16733,7 +16766,7 @@ private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   val goodsItemIdsWithBatchesInStore = StockBatchesV2
     .select(StockBatchesV2.goodsItemId, StockBatchesV2.status)
     .where {
-      (StockBatchesV2.storeId inList visibleStoreIds) and
+      (StockBatchesV2.storeId eq storeId) and
          (StockBatchesV2.goodsItemId inList matchingRows.map { it[StockItems.id] }) and
          (StockBatchesV2.isActive eq true)
     }
@@ -16768,8 +16801,8 @@ private fun findStockItemRowForTransactionLineInsideTransaction(
   preferAvailableBatches: Boolean = false,
   visibleStoreIdsOverride: List<UUID>? = null
 ): ResultRow? {
-  val visibleStoreIds = visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
-    ?: stockVisibleStoreIdsInsideTransaction(storeId)
+  val visibleStoreIds = ((visibleStoreIdsOverride?.takeIf { it.isNotEmpty() }
+    ?: stockVisibleStoreIdsInsideTransaction(storeId)) + legacyLocalBatchCatalogueStoreIdsInsideTransaction(storeId)).distinct()
   if (visibleStoreIds.isEmpty()) return null
   val requestedGoodsItemId = line.goodsItemId
     ?.trim()
@@ -16803,11 +16836,9 @@ private fun activeStockBatchesForGoodsItemInsideTransaction(
   visibleStoreGroup: Boolean = false,
   visibleStoreIdsOverride: List<UUID>? = null
 ): List<ResultRow> {
-  val storeIds = if (visibleStoreGroup) {
-    visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: stockVisibleStoreIdsInsideTransaction(storeId)
-  } else {
-    listOf(storeId)
-  }
+  // Permission to view a family catalogue never permits consuming another location's stock.
+  // Goods arrive here only after the explicit batch transfer/acceptance workflow.
+  val storeIds = listOf(storeId)
   if (storeIds.isEmpty()) return emptyList()
 
   return StockBatchesV2
@@ -17217,11 +17248,9 @@ private fun updateGoodsItemActiveShelfBatchInsideTransaction(
   visibleStoreGroup: Boolean = false,
   visibleStoreIdsOverride: List<UUID>? = null
 ) {
-  val storeIds = if (visibleStoreGroup) {
-    visibleStoreIdsOverride?.takeIf { it.isNotEmpty() } ?: stockVisibleStoreIdsInsideTransaction(storeId)
-  } else {
-    listOf(storeId)
-  }
+  // Permission to view a family catalogue never permits consuming another location's stock.
+  // Goods arrive here only after the explicit batch transfer/acceptance workflow.
+  val storeIds = listOf(storeId)
   if (storeIds.isEmpty()) return
   val currentActiveBatchId = StockItems
     .selectAll()
@@ -17285,7 +17314,7 @@ private fun updateGoodsItemActiveShelfBatchInsideTransaction(
   }
 
   if (nextBatchId != currentActiveBatchId) {
-    StockItems.update({ StockItems.id eq goodsItemId }) {
+    StockItems.update({ (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) }) {
       it[StockItems.activeShelfBatchId] = nextBatchId
       it[StockItems.updatedAtMillis] = now
     }
@@ -19218,13 +19247,18 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
               return@newSuspendedTransaction null
 
-            val visibleStoreIds = stockVisibleStoreIdsForUserInsideTransaction(userId, storeId)
+            val visibleStoreIds = (stockVisibleStoreIdsForUserInsideTransaction(userId, storeId) +
+              legacyLocalBatchCatalogueStoreIdsInsideTransaction(storeId)).distinct()
             if (visibleStoreIds.isEmpty()) return@newSuspendedTransaction null
 
+            val localItemIds = StockBatchesV2.select(StockBatchesV2.goodsItemId)
+              .where { (StockBatchesV2.storeId eq storeId) and (StockBatchesV2.isActive eq true) }
+              .map { it[StockBatchesV2.goodsItemId] }.distinct()
             StockItems
               .selectAll()
               .where {
                 (StockItems.storeId inList visibleStoreIds) and
+                   ((StockItems.storeId eq storeId) or (StockItems.id inList localItemIds)) and
                    (StockItems.isActive eq true)
               }
               .orderBy(StockItems.updatedAtMillis, SortOrder.DESC)
@@ -21394,6 +21428,7 @@ fun Application.module() {
                   it[Stores.id] = id
                   it[Stores.publicId] = publicId
                   it[Stores.parentStoreId] = parentStoreIdForBranch
+                  it[Stores.branchType] = if (parentStoreIdForBranch == null) null else (body.branchType ?: StoreBranchType.PHYSICAL).name
                   it[Stores.ownerUserIds] = parentOwnerUserIds ?: listOf(userId.toString())
                   it[Stores.storeTypeIds] = body.storeTypeIds
                   it[Stores.name] = body.name
@@ -21451,7 +21486,7 @@ fun Application.module() {
             }
             call.genericResponse(
               HttpStatusCode.Created,
-              payload = body.copy(id = createdStoreId.toString(), publicId = publicId, createdAt = instant.toEpochMilli(), parentStoreId = parentStoreIdForBranch?.toString()).withoutContactVerification(),
+              payload = body.copy(id = createdStoreId.toString(), publicId = publicId, createdAt = instant.toEpochMilli(), parentStoreId = parentStoreIdForBranch?.toString(), branchType = if (parentStoreIdForBranch == null) null else body.branchType ?: StoreBranchType.PHYSICAL, architectureVersion = 2).withoutContactVerification(),
               message = getResponse("10").message
             )
           } ?: call.genericResponseNoPayload(
@@ -21562,6 +21597,7 @@ fun Application.module() {
               kz.aita.auth.AitaContactTarget(kz.aita.auth.AitaContactPurpose.STORE_CONTACT, id.toString()),
               body.emails, currentStore[Stores.emails], body.contactEmailProofs)
             Stores.update({ Stores.id eq id }) {
+              it[Stores.branchType] = if (currentParentStoreId == null) null else body.branchType?.name ?: currentStore[Stores.branchType] ?: StoreBranchType.PHYSICAL.name
               it[Stores.storeTypeIds] = body.storeTypeIds
               it[Stores.name] = body.name
               it[Stores.alias] = body.alias
@@ -21586,7 +21622,7 @@ fun Application.module() {
           return@put when (updated) {
             0 -> call.genericResponse(
               HttpStatusCode.OK,
-              payload = body.withoutContactVerification(),
+              payload = newSuspendedTransaction(aitaServerIoContext) { Stores.selectAll().where { Stores.id eq UUID.fromString(body.id) }.single().toStoreDataModel() },
               getResponse("11").message
             )
 
@@ -21623,6 +21659,11 @@ fun Application.module() {
                 .map { it[Stores.id] }
               val storeIdsToDelete = listOf(id) + branchIds
 
+              val ownedItemIds = StockItems.select(StockItems.id)
+                .where { StockItems.storeId inList storeIdsToDelete }.map { it[StockItems.id] }
+              if (ownedItemIds.isNotEmpty() && !StockBatchesV2.select(StockBatchesV2.id).where {
+                  (StockBatchesV2.goodsItemId inList ownedItemIds) and (StockBatchesV2.storeId notInList storeIdsToDelete)
+                }.empty()) return@newSuspendedTransaction 3
               hardDeleteStoreOwnedDataInsideTransaction(storeIdsToDelete)
 
               if (branchIds.isNotEmpty()) {
@@ -21638,6 +21679,7 @@ fun Application.module() {
               message = getResponse("12").message
             )
 
+            3 -> call.genericResponseNoPayload(HttpStatusCode.Conflict, eventMessage("store.shared_catalogue_in_use"))
             1, 2 -> call.respondAitaUnauthorized()
             else -> call.genericResponseNoPayload(
               status = HttpStatusCode.InternalServerError,

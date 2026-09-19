@@ -2,6 +2,9 @@ package kz.aita
 
 import kotlinx.serialization.Serializable
 
+/** Matches the persistent storefront selection bound; public availability pages have their own limit. */
+const val MARKET_STOREFRONT_MAX_LOCATIONS = 12
+
 /** Public shop-window data only. Never reuse a stock/store DTO as an Internet listing. */
 @Serializable
 data class MarketStorefront(
@@ -12,9 +15,13 @@ data class MarketStorefront(
     val pickupNote: String = "",
     val published: Boolean = false,
     val revision: Long = 0L,
-    // Explicit parent consent to publish branch business names/addresses with availability.
-    val shareBranchAvailability: Boolean = false
-)
+    // Explicit consent to publish selected goods locations, never every sibling automatically.
+    val shareBranchAvailability: Boolean = false,
+    // The public shop identity remains stable when its operating branch changes during migration.
+    val branchStoreId: String? = null
+) {
+    val operatingBranchId: String get() = branchStoreId ?: storeId
+}
 
 @Serializable
 data class MarketListing(
@@ -60,13 +67,22 @@ data class MarketPage(val offers: List<MarketOffer> = emptyList(), val nextId: S
     val savedMutation: MarketSavedUpdate? = null, val unavailableSavedCleared: Boolean = false)
 
 @Serializable
-data class MarketPublicationDashboard(val storefront: MarketStorefront, val listings: List<MarketListing> = emptyList())
+data class MarketPublicationDashboard(val storefront: MarketStorefront, val listings: List<MarketListing> = emptyList(),
+    val locationStoreIds: List<String> = emptyList(), val availableLocations: List<MarketPublicationLocation> = emptyList())
+
+/** Owner-only location choices. Public buyers receive only explicitly selected, currently eligible locations. */
+@Serializable
+data class MarketPublicationLocation(val storeId: String, val name: List<LocalizedStringDataModel>,
+    val address: String, val warehouse: Boolean = false)
 
 @Serializable
-data class MarketStorefrontUpdate(val storefront: MarketStorefront)
+data class MarketStorefrontUpdate(val storefront: MarketStorefront,
+    // null preserves a saved selection for older clients; [] explicitly clears it.
+    val locationStoreIds: List<String>? = null)
 
 @Serializable
-data class MarketListingUpdate(val listing: MarketListing, val replaceProduct: Boolean = false)
+data class MarketListingUpdate(val listing: MarketListing, val replaceProduct: Boolean = false,
+    val branchStoreId: String? = null)
 
 @Serializable
 data class MarketSavedUpdate(val offerId: String, val saved: Boolean)
@@ -100,4 +116,5 @@ fun GoodsBatchDataModel.isMarketSellableAt(storeId: String, nowMillis: Long): Bo
 /** Small editor journal only; no catalogue arrays, secrets, or pending purchases in navigation state. */
 @Serializable
 data class MarketEditorDraft(val storefront: MarketStorefront? = null, val listing: MarketListing? = null,
-    val storefrontDirty: Boolean = false, val listingDirty: Boolean = false)
+    val storefrontDirty: Boolean = false, val listingDirty: Boolean = false,
+    val locationStoreIds: List<String>? = null)

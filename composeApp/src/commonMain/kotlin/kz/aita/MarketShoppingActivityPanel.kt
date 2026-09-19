@@ -158,7 +158,7 @@ internal fun AppConfiguration.MarketShoppingActivityPanel(
         }
     }
     LaunchedEffect(data) {
-        while (isActive) { delay(30_000); if (wanted.boundary == null && !detailOpen) refreshPage() }
+        while (isActive) { delay(30_000); awaitClientBackgroundWork(); if (wanted.boundary == null && !detailOpen) refreshPage() }
     }
     val page = data.page
     val canNavigate = canUsePage(page)

@@ -383,7 +383,7 @@ internal fun Route.marketplaceRoutes() {
                 val body = call.receiveAita<MarketStorefrontUpdate>()
                 call.marketResult(after = {
                     RealtimeServerBus.publish(entity="market/catalog",reason="shop_window_changed")
-                    RealtimeServerBus.publish(entity="market/seller",storeId=it.storefront.storeId,reason="shop_window_changed")
+                    RealtimeServerBus.publish(entity="market/seller",storeId=it.storefront.operatingBranchId,reason="shop_window_changed")
                 }) { updateStorefront(user,call.currentJwtSessionId(),body) }
             }
             put("/seller/listing") {
@@ -391,7 +391,7 @@ internal fun Route.marketplaceRoutes() {
                 val body = call.receiveAita<MarketListingUpdate>()
                 call.marketResult(after = {
                     RealtimeServerBus.publish(entity="market/catalog",reason="shop_window_changed")
-                    RealtimeServerBus.publish(entity="market/seller",storeId=it.storefront.storeId,reason="shop_window_changed")
+                    RealtimeServerBus.publish(entity="market/seller",storeId=it.storefront.operatingBranchId,reason="shop_window_changed")
                 }) { updateListing(user,call.currentJwtSessionId(),body) }
             }
         }
@@ -405,9 +405,8 @@ internal suspend fun publishMarketplaceStockChange(storeText: String?) {
         val published = newSuspendedTransaction(aitaServerIoContext) {
         val connection = TransactionManager.current().connection.connection as Connection
         connection.prepareStatement("""SELECT EXISTS(SELECT 1 FROM marketplace_storefronts f
-            JOIN stores s ON s.id=f.store_id WHERE f.is_published AND s.parent_store_id IS NULL
-            AND (f.store_id=? OR (f.share_branch_availability AND EXISTS(
-                SELECT 1 FROM stores changed WHERE changed.id=? AND changed.parent_store_id=f.store_id)))
+            JOIN stores s ON s.id=f.branch_store_id WHERE f.is_published AND s.branch_type='INTERNET'
+            AND (f.branch_store_id=? OR (f.share_branch_availability AND f.location_store_ids @> jsonb_build_array(?::text)))
             AND EXISTS(SELECT 1 FROM marketplace_listings l WHERE l.store_id=f.store_id AND l.is_published))""").use { statement ->
             statement.setObject(1,store); statement.setObject(2,store)
             statement.executeQuery().use { rows -> rows.next(); rows.getBoolean(1) }

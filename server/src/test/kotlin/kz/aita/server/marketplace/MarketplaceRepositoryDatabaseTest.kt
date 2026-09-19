@@ -17,11 +17,12 @@ import kotlin.test.*
 class MarketplaceRepositoryDatabaseTest {
     private data class Fixture(val url:String,val props:Properties,val schema:String,
         val owner:UUID=UUID.randomUUID(),val buyer:UUID=UUID.randomUUID(),val branch:UUID=UUID.randomUUID(),
-        val parent:UUID=UUID.randomUUID(),val otherParent:UUID=UUID.randomUUID(),val item:UUID=UUID.randomUUID())
+        val parent:UUID=UUID.randomUUID(),val otherParent:UUID=UUID.randomUUID(),val item:UUID=UUID.randomUUID(),
+        val management:UUID=UUID.randomUUID(),val otherManagement:UUID=UUID.randomUUID())
     private fun exec(c:Connection,sql:String)=c.createStatement().use{it.execute(sql)}
     private fun scalar(c:Connection,sql:String)=c.createStatement().use{s->s.executeQuery(sql).use{r->r.next();r.getString(1)}}
     private fun resource(name:String)=requireNotNull(javaClass.getResourceAsStream("/db/migration/$name")).bufferedReader().use{it.readText()}
-    private fun fixture(block:(Fixture,Connection)->Unit) {
+    private fun fixture(beforeBranchMigration:((Fixture,Connection)->Unit)?=null,block:(Fixture,Connection)->Unit) {
         val url=System.getenv("AITA_MARKET_TEST_DB_URL").orEmpty()
         assumeTrue("Set AITA_MARKET_TEST_DB_URL to a separately provisioned aita_test_* database",url.isNotBlank())
         require(url.startsWith("jdbc:postgresql:"))
@@ -37,10 +38,11 @@ class MarketplaceRepositoryDatabaseTest {
             try {
                 exec(c,"SET search_path TO ${f.schema},public")
                 exec(c,"""CREATE TABLE users(id UUID PRIMARY KEY,is_active BOOLEAN NOT NULL DEFAULT TRUE,country_locale TEXT NOT NULL DEFAULT 'kz');
-                    CREATE TABLE stores(id UUID PRIMARY KEY,parent_store_id UUID REFERENCES stores(id),owner_user_ids JSONB NOT NULL,
+                    CREATE TABLE stores(id UUID PRIMARY KEY,parent_store_id UUID REFERENCES stores(id),branch_type TEXT,owner_user_ids JSONB NOT NULL,
                         name JSONB NOT NULL DEFAULT '[{"language":"en","value":"Branch"}]',address TEXT NOT NULL DEFAULT 'Public branch door',
                         country_locales JSONB NOT NULL DEFAULT '["kz"]',is_active BOOLEAN NOT NULL DEFAULT TRUE);
                     CREATE TABLE transactions(store_id UUID,time_millis BIGINT);
+                    CREATE TABLE store_management_parent_migrations(original_store_id UUID PRIMARY KEY,management_store_id UUID NOT NULL);
                     CREATE TABLE stock_items(id UUID PRIMARY KEY,store_id UUID NOT NULL,created_at_millis BIGINT NOT NULL DEFAULT 0,
                         updated_at_millis BIGINT NOT NULL DEFAULT 0,name JSONB NOT NULL DEFAULT '[]',description JSONB NOT NULL DEFAULT '[]',
                         image_paths JSONB NOT NULL DEFAULT '[]',measurement_unit_id TEXT NOT NULL DEFAULT 'piece',barcodes JSONB NOT NULL DEFAULT '[]',barcode_models JSONB NOT NULL DEFAULT '[]',
@@ -52,14 +54,21 @@ class MarketplaceRepositoryDatabaseTest {
                         sale_price_override JSONB,expiration_date_millis BIGINT,discounts JSONB NOT NULL DEFAULT '[]',promotions JSONB NOT NULL DEFAULT '[]',
                         shelf_priority INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'Delivered',is_active BOOLEAN NOT NULL DEFAULT TRUE);
                     INSERT INTO users(id) VALUES ('${f.owner}'),('${f.buyer}');
-                    INSERT INTO stores(id,owner_user_ids) VALUES ('${f.parent}','["${f.owner}"]'),('${f.otherParent}','["${f.owner}"]');
-                    INSERT INTO stores(id,parent_store_id,owner_user_ids) VALUES ('${f.branch}','${f.parent}','[]');
+                    INSERT INTO stores(id,owner_user_ids) VALUES ('${f.management}','["${f.owner}"]'),('${f.otherManagement}','["${f.owner}"]');
+                    INSERT INTO stores(id,parent_store_id,branch_type,owner_user_ids) VALUES
+                        ('${f.parent}','${f.management}','INTERNET','["${f.owner}"]'),
+                        ('${f.otherParent}','${f.otherManagement}','INTERNET','["${f.owner}"]'),
+                        ('${f.branch}','${f.management}','PHYSICAL','[]');
+                    INSERT INTO store_management_parent_migrations VALUES ('${f.parent}','${f.management}'),('${f.otherParent}','${f.otherManagement}');
                     INSERT INTO stock_items(id,store_id,barcodes,sale_prices,note,supply_prices) VALUES
                         ('${f.item}','${f.parent}','["4006381333931"]','[{"price":"199.99","currency":"KZT","supplierId":""}]',
                             'NEVER-PUBLIC-NOTE','[{"price":"77.77","currency":"KZT","supplierId":"NEVER-PUBLIC-SUPPLIER"}]');
                 """)
                 listOf("V46__paging_user_finances_and_store_subscriptions.sql","V101__per_location_subscriptions_and_promocodes.sql",
-                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql").forEach{exec(c,resource(it))}
+                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql","V124__internet_branch_marketplace_locations.sql").forEach {
+                    if(it=="V124__internet_branch_marketplace_locations.sql") beforeBranchMigration?.invoke(f,c)
+                    exec(c,resource(it))
+                }
                 listOf(f.branch,f.parent,f.otherParent).forEach{store->exec(c,"""INSERT INTO store_subscription_states
                     (store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
                     VALUES ('$store','${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0)""")}
@@ -71,7 +80,7 @@ class MarketplaceRepositoryDatabaseTest {
         c.autoCommit=false;c.transactionIsolation=Connection.TRANSACTION_REPEATABLE_READ
         try {
             exec(c,"SET LOCAL search_path TO ${f.schema},public");exec(c,"SET LOCAL statement_timeout='8s'");exec(c,"SET LOCAL lock_timeout='5s'")
-            block(MarketplaceRepository(c){user,store->user==f.owner && store in setOf(f.branch,f.parent,f.otherParent)}).also{c.commit()}
+            block(MarketplaceRepository(c){user,store->user==f.owner && store in setOf(f.branch,f.parent,f.otherParent,f.management,f.otherManagement)}).also{c.commit()}
         } catch(failure:Throwable) {c.rollback();throw failure}
     }
     private fun <T> shoppingTx(f:Fixture, block:(MarketShoppingRepository)->T):T {
@@ -80,7 +89,7 @@ class MarketplaceRepositoryDatabaseTest {
                 c.autoCommit=false; c.transactionIsolation=Connection.TRANSACTION_REPEATABLE_READ
                 try {
                     exec(c,"SET LOCAL search_path TO ${f.schema},public");exec(c,"SET LOCAL statement_timeout='8s'");exec(c,"SET LOCAL lock_timeout='5s'")
-                    val market=MarketplaceRepository(c) { user,store -> user==f.owner && store in setOf(f.branch,f.parent,f.otherParent) }
+                    val market=MarketplaceRepository(c) { user,store -> user==f.owner && store in setOf(f.branch,f.parent,f.otherParent,f.management,f.otherManagement) }
                     block(MarketShoppingRepository(c,market)).also { c.commit() }
                 } catch(failure:Throwable) { c.rollback(); throw failure }
             } } catch(failure:SQLException) {
@@ -1350,11 +1359,11 @@ class MarketplaceRepositoryDatabaseTest {
     }
     @Test fun directoryWindowAndTotalAreDeterministicAndNeverLeakPrivateFields()=fixture { f,c ->
         storefront(f)
-        exec(c,"""INSERT INTO stores(id,owner_user_ids) SELECT (md5('directory-store-'||n::text))::uuid,'["${f.owner}"]'::jsonb FROM generate_series(1,24) n;
+        exec(c,"""INSERT INTO stores(id,parent_store_id,branch_type,owner_user_ids) SELECT (md5('directory-store-'||n::text))::uuid,'${f.management}','INTERNET','["${f.owner}"]'::jsonb FROM generate_series(1,24) n;
             INSERT INTO store_subscription_states(store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
                 SELECT (md5('directory-store-'||n::text))::uuid,'${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0 FROM generate_series(1,24) n;
-            INSERT INTO marketplace_storefronts(store_id,display_name,city,public_address,is_published,revision,updated_by,updated_at_millis)
-                SELECT (md5('directory-store-'||n::text))::uuid,'Same name','Astana','Public address',TRUE,1,'${f.owner}',1 FROM generate_series(1,24) n;""")
+            INSERT INTO marketplace_storefronts(store_id,branch_store_id,display_name,city,public_address,is_published,revision,updated_by,updated_at_millis)
+                SELECT (md5('directory-store-'||n::text))::uuid,(md5('directory-store-'||n::text))::uuid,'Same name','Astana','Public address',TRUE,1,'${f.owner}',1 FROM generate_series(1,24) n;""")
         val first=directory(f);val second=directory(f)
         assertEquals(25L,first.totalShops);assertEquals(20,first.shops.size);assertEquals(first.shops,second.shops)
         val expanded=directory(f,MarketShopDirectoryRequest(limit=40));assertEquals(25,expanded.shops.size)
@@ -1676,20 +1685,20 @@ class MarketplaceRepositoryDatabaseTest {
     }
 
 
-    @Test fun branchCannotCreateAnIndependentStorefrontEvenWithSubscription() = fixture { f, _ ->
+    @Test fun physicalBranchCannotPublishEvenWithSubscription() = fixture { f, _ ->
         val failure = assertFailsWith<MarketFailure> { tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(
             MarketStorefront(f.branch.toString(), "Branch", "Astana", "Branch door", published = true))) } }
-        assertEquals(403, failure.status); assertEquals("market.profile_parent_only", failure.key)
+        assertEquals(403, failure.status); assertEquals("market.profile_internet_only", failure.key)
     }
-    @Test fun databaseTriggerAlsoRejectsBypassingParentPublicationRule() = fixture { f, c ->
+    @Test fun databaseTriggerAlsoRejectsBypassingInternetPublicationRule() = fixture { f, c ->
         val failure = assertFailsWith<SQLException> { exec(c, """INSERT INTO marketplace_storefronts
-            (store_id,display_name,city,public_address,is_published,revision,updated_by,updated_at_millis)
-            VALUES ('${f.branch}','Branch','Astana','Door',TRUE,1,'${f.owner}',1)""") }
+            (store_id,branch_store_id,display_name,city,public_address,is_published,revision,updated_by,updated_at_millis)
+            VALUES ('${f.branch}','${f.branch}','Branch','Astana','Door',TRUE,1,'${f.owner}',1)""") }
         assertEquals("23514", failure.sqlState)
     }
     @Test fun reparentingWithdrawsExistingPublicationsWithoutDeletingTheirHistory() = fixture { f, c ->
         published(f)
-        exec(c, "UPDATE stores SET parent_store_id='${f.otherParent}' WHERE id='${f.parent}'")
+        exec(c, "UPDATE stores SET parent_store_id='${f.otherManagement}' WHERE id='${f.parent}'")
         assertTrue(browse(f).offers.isEmpty())
         assertEquals("false", scalar(c, "SELECT is_published::text FROM marketplace_listings WHERE store_id='${f.parent}'"))
         assertEquals("false", scalar(c, "SELECT is_published::text FROM marketplace_storefronts WHERE store_id='${f.parent}'"))
@@ -1728,11 +1737,11 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals("market.profile_invalid", failure.key)
         assertEquals(MarketProductDetails(), tx(f) { it.offer(f.buyer, initial.id) }.product)
     }
-    @Test fun branchAvailabilityRequiresExplicitParentConsent() = fixture { f, c ->
+    @Test fun locationAvailabilityRequiresExplicitSelection() = fixture { f, c ->
         val listing = published(f); batch(f, c, f.branch)
         assertTrue(tx(f) { it.offerDetail(f.buyer, listing.id) }.branchAvailability.isEmpty())
         val current = tx(f) { it.dashboard(f.owner, f.parent) }.storefront
-        tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(current.copy(shareBranchAvailability = true))) }
+        tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(current.copy(shareBranchAvailability = true),listOf(f.branch.toString()))) }
         val detail = tx(f) { it.offerDetail(f.buyer, listing.id) }
         assertEquals(f.branch.toString(), detail.branchAvailability.single().branchId)
         assertEquals(MARKET_AVAILABILITY_RECORDED, detail.branchAvailability.single().availability)
@@ -1743,7 +1752,7 @@ class MarketplaceRepositoryDatabaseTest {
     @Test fun branchAvailabilityCannotExposeExactCountsOrPrivateContacts() = fixture { f, c ->
         val listing = published(f); batch(f, c, f.branch, total = 1234.0)
         val shop = tx(f) { it.dashboard(f.owner, f.parent) }.storefront
-        tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(shop.copy(shareBranchAvailability = true))) }
+        tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(shop.copy(shareBranchAvailability = true),listOf(f.branch.toString()))) }
         val hint = tx(f) { it.offerDetail(f.buyer, listing.id) }.branchAvailability.single()
         val encoded = jsonBase.encodeToString(hint)
         listOf("1234", "quantity", "price", "supply", "owner", "phone", "token", "goodsItemId").forEach { assertFalse(encoded.contains(it), it) }
@@ -1751,7 +1760,7 @@ class MarketplaceRepositoryDatabaseTest {
     @Test fun inactiveOrUnsubscribedBranchIsAbsentFromPublicAvailability() = fixture { f, c ->
         val listing = published(f); batch(f, c, f.branch)
         val shop = tx(f) { it.dashboard(f.owner, f.parent) }.storefront
-        tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(shop.copy(shareBranchAvailability = true))) }
+        tx(f) { it.updateStorefront(f.owner, null, MarketStorefrontUpdate(shop.copy(shareBranchAvailability = true),listOf(f.branch.toString()))) }
         exec(c, "UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.branch}'")
         assertTrue(tx(f) { it.offerDetail(f.buyer, listing.id) }.branchAvailability.isEmpty())
         exec(c, "UPDATE store_subscription_states SET status='active' WHERE store_id='${f.branch}'")
@@ -1762,7 +1771,7 @@ class MarketplaceRepositoryDatabaseTest {
         published(f)
         assertEquals(403, assertFailsWith<MarketFailure> { tx(f) { it.stockPublicationStatus(f.buyer, f.parent) } }.status)
         val status = tx(f) { it.stockPublicationStatus(f.owner, f.branch) }
-        assertEquals(f.parent.toString(), status.parentStoreId); assertEquals(f.branch.toString(), status.storeId)
+        assertEquals(f.management.toString(), status.parentStoreId); assertEquals(f.branch.toString(), status.storeId)
         assertTrue(status.isValidStockPublicationStatus(f.owner.toString(), f.branch.toString()))
         assertTrue(status.entries.single().published)
     }
@@ -1939,6 +1948,135 @@ class MarketplaceRepositoryDatabaseTest {
         assertFailsWith<IllegalStateException> { savedShopsTx(f){it.change(f.buyer,MarketSavedShopChange(f.parent.toString(),true,0));error("rollback")} }
         assertTrue(savedShopsTx(f){it.snapshot(f.buyer)}.storeIds.isEmpty())
         assertEquals(0L,savedShopsTx(f){it.snapshot(f.buyer)}.revision)
+    }
+
+    @Test fun managementParentCannotOwnMarketplacePublication()=fixture { f,_ ->
+        val failure=assertFailsWith<MarketFailure> { tx(f) { it.dashboard(f.owner,f.management) } }
+        assertEquals(404,failure.status)
+    }
+    @Test fun selectedLocationsNeverBorrowAnotherFamilyOrInternetBranch()=fixture { f,_ ->
+        storefront(f)
+        val shop=tx(f) { it.dashboard(f.owner,f.parent) }.storefront
+        for(id in listOf(f.otherManagement,f.otherParent,f.parent)) {
+            val failure=assertFailsWith<MarketFailure> { tx(f) { it.updateStorefront(f.owner,null,
+                MarketStorefrontUpdate(shop.copy(shareBranchAvailability=true),listOf(id.toString()))) } }
+            assertEquals("market.locations_invalid",failure.key)
+        }
+    }
+    @Test fun locationSelectionIsExplicitBoundedAndPreservedByOlderClientEdits()=fixture { f,c ->
+        val listing=published(f)
+        val shop=tx(f) { it.dashboard(f.owner,f.parent) }.storefront
+        val noSelection=tx(f) { it.updateStorefront(f.owner,null,MarketStorefrontUpdate(shop.copy(shareBranchAvailability=true))) }
+        assertFalse(noSelection.storefront.shareBranchAvailability)
+        assertTrue(tx(f) { it.offerDetail(f.buyer,listing.id) }.branchAvailability.isEmpty())
+        val selected=tx(f) { it.updateStorefront(f.owner,null,MarketStorefrontUpdate(noSelection.storefront.copy(shareBranchAvailability=true),listOf(f.branch.toString()))) }
+        val renamed=tx(f) { it.updateStorefront(f.owner,null,MarketStorefrontUpdate(selected.storefront.copy(displayName="Updated"))) }
+        assertEquals(listOf(f.branch.toString()),renamed.locationStoreIds)
+        assertEquals(listOf(f.branch.toString()),tx(f) { it.offerDetail(f.buyer,listing.id) }.branchAvailability.map { it.branchId })
+        val duplicate=assertFailsWith<MarketFailure> { tx(f) { it.updateStorefront(f.owner,null,
+            MarketStorefrontUpdate(renamed.storefront,listOf(f.branch.toString(),f.branch.toString()))) } }
+        assertEquals("market.locations_invalid",duplicate.key)
+        // All thirteen are eligible: the input limit must reject the extra location before SQL does.
+        val eligible=(1..13).map { UUID.randomUUID().toString() }
+        eligible.forEach { id -> exec(c,"""INSERT INTO stores(id,parent_store_id,branch_type,owner_user_ids)
+            VALUES ('$id','${f.management}','PHYSICAL','[]')""") }
+        val full=tx(f) { it.updateStorefront(f.owner,null,
+            MarketStorefrontUpdate(renamed.storefront,eligible.take(12))) }
+        assertEquals(eligible.take(12),full.locationStoreIds)
+        val excessive=assertFailsWith<MarketFailure> { tx(f) { it.updateStorefront(f.owner,null,
+            MarketStorefrontUpdate(full.storefront,eligible)) } }
+        assertEquals("market.locations_invalid",excessive.key)
+    }
+    @Test fun warehouseLocationNeedsNoSubscriptionAndNeverLendsPriceOrAccess()=fixture { f,c ->
+        val listing=published(f)
+        val warehouseItem=copyItemInto(f,c,f.management)
+        val quantity=jsonBase.encodeToString(QuantityDataModel("piece",listOf(LocalizedStringDataModel("en","piece")),7.0,1.0,true))
+        c.prepareStatement("INSERT INTO stock_batches(id,store_id,goods_item_id,quantity) VALUES (?,?,?,?::jsonb)").use { st ->
+            listOf(UUID.randomUUID(),f.management,warehouseItem,quantity).forEachIndexed { i,v -> st.setObject(i+1,v) };st.executeUpdate()
+        }
+        val dashboard=tx(f) { it.dashboard(f.owner,f.parent) }
+        assertTrue(dashboard.availableLocations.single { it.storeId==f.management.toString() }.warehouse)
+        tx(f) { it.updateStorefront(f.owner,null,MarketStorefrontUpdate(dashboard.storefront.copy(shareBranchAvailability=true),listOf(f.management.toString()))) }
+        val detail=tx(f) { it.offerDetail(f.buyer,listing.id) }
+        assertEquals(MARKET_AVAILABILITY_RECORDED,detail.branchAvailability.single().availability)
+        assertNull(detail.offer.priceMinor)
+        assertEquals("0",scalar(c,"SELECT count(*) FROM store_subscription_states WHERE store_id='${f.management}'"))
+        exec(c,"UPDATE store_subscription_states SET status='inactive' WHERE store_id='${f.parent}'")
+        assertEquals(404,assertFailsWith<MarketFailure> { tx(f) { it.offerDetail(f.buyer,listing.id) } }.status)
+    }
+    @Test fun movedOrRetypedLocationDisappearsWithoutLeakingNewFamily()=fixture { f,c ->
+        val listing=published(f)
+        val shop=tx(f) { it.dashboard(f.owner,f.parent) }.storefront
+        tx(f) { it.updateStorefront(f.owner,null,MarketStorefrontUpdate(shop.copy(shareBranchAvailability=true),listOf(f.branch.toString()))) }
+        assertEquals(1,tx(f) { it.offerDetail(f.buyer,listing.id) }.branchAvailability.size)
+        exec(c,"UPDATE stores SET parent_store_id='${f.otherManagement}' WHERE id='${f.branch}'")
+        assertTrue(tx(f) { it.offerDetail(f.buyer,listing.id) }.branchAvailability.isEmpty())
+    }
+    @Test fun legacySharedCatalogueRemainsInItsCurrentFamilyOnly()=fixture { f,c ->
+        exec(c,"UPDATE stores SET branch_type='INTERNET' WHERE id='${f.branch}'")
+        val child=f.copy(parent=f.branch)
+        val listing=published(child)
+        batch(f,c,f.branch)
+        assertEquals(MARKET_AVAILABILITY_RECORDED,tx(f) { it.offer(f.buyer,listing.id) }.availability)
+        exec(c,"UPDATE stores SET parent_store_id='${f.otherManagement}' WHERE id='${f.parent}'")
+        assertEquals(404,assertFailsWith<MarketFailure> { tx(f) { it.offer(f.buyer,listing.id) } }.status)
+        assertEquals(403,assertFailsWith<MarketFailure> { tx(f) { it.updateListing(f.owner,null,
+            MarketListingUpdate(listing.copy(title="Cannot borrow moved catalogue"))) } }.status)
+    }
+    @Test fun publicIdentityMayDifferFromOperatingBranchWithoutChangingBookmarksOrPricing()=fixture { f,c ->
+        val publicId=UUID.randomUUID()
+        exec(c,"""INSERT INTO marketplace_storefronts(store_id,branch_store_id,display_name,city,public_address,is_published,revision,updated_by,updated_at_millis)
+            VALUES ('$publicId','${f.parent}','Stable shop','Astana','Public door',TRUE,1,'${f.owner}',1)""")
+        val dashboard=tx(f) { it.dashboard(f.owner,f.parent) }
+        assertEquals(publicId.toString(),dashboard.storefront.storeId)
+        assertEquals(f.parent.toString(),dashboard.storefront.operatingBranchId)
+        val listing=tx(f) { it.updateListing(f.owner,null,MarketListingUpdate(
+            MarketListing("",publicId.toString(),f.item.toString(),"Product",gtin="4006381333931",published=true),branchStoreId=f.parent.toString())) }.listings.single()
+        batch(f,c,total=20.0)
+        val offer=tx(f) { it.offer(f.buyer,listing.id) }
+        assertEquals(publicId.toString(),offer.storefront.storeId);assertEquals(19999L,offer.priceMinor)
+        val detail=tx(f) { it.offerDetail(f.buyer,listing.id) };assertTrue(detail.isValidOfferDetailResult(f.buyer.toString(),listing.id))
+        val cart=shoppingTx(f) { it.apply(f.buyer,null,listCommand(f,listing)) }
+        assertTrue(cart.accepted);assertEquals(publicId.toString(),cart.snapshot.lines.single().line.storeId)
+        val saved=tx(f) { it.updateSaved(f.buyer,MarketSavedUpdate(listing.id,true)) }
+        assertEquals(listing.id,saved.offers.single().id)
+        assertEquals(publicId.toString(),tx(f) { it.publicShop(publicId.toString()) }.storeId)
+        val savedShop=savedShopsTx(f) { it.change(f.buyer,MarketSavedShopChange(publicId.toString(),true,0)) }
+        assertEquals(listOf(publicId.toString()),savedShop.storeIds)
+        assertEquals(publicId.toString(),directory(f,MarketShopDirectoryRequest(savedOnly=true)).shops.single().storefront.storeId)
+        assertEquals("true",scalar(c,"SELECT convalidated::text FROM pg_constraint WHERE conrelid='buyer_saved_shops'::regclass AND conname='buyer_saved_shops_public_storefront_fkey'"))
+    }
+
+    @Test fun migrationPreservesHistoricalUnavailableShopBookmarks()=fixture(beforeBranchMigration={f,c ->
+        exec(c,"INSERT INTO buyer_saved_shop_states(user_id,revision) VALUES ('${f.buyer}',7)")
+        exec(c,"INSERT INTO buyer_saved_shops(user_id,store_id,created_at_millis) VALUES ('${f.buyer}','${f.branch}',1)")
+    }) { f,c ->
+        val saved=savedShopsTx(f) { it.snapshot(f.buyer) }
+        assertEquals(7L,saved.revision);assertEquals(listOf(f.branch.toString()),saved.storeIds)
+        assertEquals(0L,directory(f,MarketShopDirectoryRequest(savedOnly=true)).totalShops)
+        assertEquals("false",scalar(c,"SELECT convalidated::text FROM pg_constraint WHERE conrelid='buyer_saved_shops'::regclass AND conname='buyer_saved_shops_public_storefront_fkey'"))
+        val removed=savedShopsTx(f) { it.change(f.buyer,MarketSavedShopChange(f.branch.toString(),false,7)) }
+        assertTrue(removed.storeIds.isEmpty());assertEquals(8L,removed.revision)
+    }
+
+    @Test fun branchStockReaderCannotReadSiblingUnpublishedProductIdentity()=fixture { f,c ->
+        val listing=published(f)
+        tx(f) { it.updateListing(f.owner,null,MarketListingUpdate(listing.copy(published=false))) }
+        c.autoCommit=false
+        try {
+            val reader=MarketplaceRepository(c,{_,_->false},{user,store->user==f.buyer && store==f.branch})
+            val status=reader.stockPublicationStatus(f.buyer,f.branch)
+            assertTrue(status.marketplaceEnabled);assertTrue(status.entries.isEmpty())
+            assertEquals(403,assertFailsWith<MarketFailure> { reader.stockPublicationStatus(f.buyer,f.parent) }.status)
+            c.commit()
+        } finally {c.rollback();c.autoCommit=true}
+        tx(f) { it.updateListing(f.owner,null,MarketListingUpdate(listing.copy(published=true,revision=listing.revision+1))) }
+        c.autoCommit=false
+        try {
+            val reader=MarketplaceRepository(c,{_,_->false},{user,store->user==f.buyer && store==f.branch})
+            assertEquals(listing.goodsItemId,reader.stockPublicationStatus(f.buyer,f.branch).entries.single().goodsItemId)
+            c.commit()
+        } finally {c.rollback();c.autoCommit=true}
     }
 
 }

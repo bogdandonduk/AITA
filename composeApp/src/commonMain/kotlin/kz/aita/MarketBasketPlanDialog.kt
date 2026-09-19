@@ -142,7 +142,7 @@ internal fun AppConfiguration.MarketBasketPlanDialog(
         }
     }
     LaunchedEffect(data) {
-        while (isActive) { delay(MARKET_BASKET_PLAN_FRESH_MILLIS); if (!shoppingBlocked() && review == null) queueRefresh() }
+        while (isActive) { delay(MARKET_BASKET_PLAN_FRESH_MILLIS); awaitClientBackgroundWork(); if (!shoppingBlocked() && review == null) queueRefresh() }
     }
     LaunchedEffect(shopping.acknowledgedCommandId, submittedId, shopping.changing, shopping.pending) {
         val submitted = submittedId

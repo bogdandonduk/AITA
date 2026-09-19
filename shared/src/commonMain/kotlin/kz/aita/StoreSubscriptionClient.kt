@@ -32,6 +32,7 @@ private fun currentSubscriptionAccountId(): String? = userAccountState.payloadVa
     ?.takeIf { it.isNotBlank() && getStoredUserAuthTokens?.invoke() != null }
 
 fun currentStoreSubscriptionGate(storeId: String?, now: Long = getCurrentTimeMillis()): StoreSubscriptionGate {
+    if (currentStoreModel(storeId)?.isManagementStore() == true) return StoreSubscriptionGate.Required
     val account = currentSubscriptionAccountId()
     val key = if (account != null && !storeId.isNullOrBlank()) subscriptionCacheKey(account, storeId) else null
     return resolveStoreSubscriptionGate(account, storeId, key?.let { verifiedSubscriptions.value[it] },
@@ -58,11 +59,12 @@ internal fun selectStoreSubscriptionScope(storeId: String?) {
     subscriptionPlansState.emit(DataState.Empty())
     subscriptionLoadFailureState.value = null
     pendingSubscriptionCommandIdState.value = null
-    subscriptionLoadingStoreIdState.value = storeId
+    subscriptionLoadingStoreIdState.value = storeId?.takeUnless { currentStoreModel(it)?.isManagementStore() == true }
     subscriptionAccessRevision.update { it + 1L }
 }
 
 internal suspend fun restoreStoreSubscriptionCache(storeId: String) {
+    if (currentStoreModel(storeId)?.isManagementStore() == true) return
     val account = currentSubscriptionAccountId() ?: return
     val generation = currentAuthenticatedSessionGeneration()
     val key = subscriptionCacheKey(account, storeId)
@@ -134,6 +136,7 @@ suspend fun invalidateStoreSubscriptionAccess(storeId: String, observedBeforeMil
 
 suspend fun refreshStoreSubscriptionNow(storeId: String, onlyIfUnknown: Boolean = false): ResponseDataModel<SubscriptionDashboardDataModel> {
     val account = currentSubscriptionAccountId() ?: return cloudSessionExpiredResponse()
+    if (currentStoreModel(storeId)?.isManagementStore() == true) return ResponseDataModel(null, null, false)
     val generation = currentAuthenticatedSessionGeneration()
     val owner = inventoryOwners.current
     return subscriptionReadMutex.withLock {
@@ -228,6 +231,10 @@ suspend fun checkStoreSubscriptionForNetwork(endpoint: String, storeId: String?)
     // The joining user's current location is not the target of these relationship commands.
     if (path in setOf("workers/request", "workers/invitations/accept")) return null
     val store = storeId ?: return eventMessage("subscription.verify")
+    if (currentStoreModel(store)?.isManagementStore() == true) {
+        if (storeEndpointRequiresOperatingBranch(path)) return eventMessage("store.operating_branch_required")
+        return if (currentStoreHasWorkspaceAccess(store)) null else eventMessage("subscription.verify")
+    }
     if (currentStoreHasSubscriptionAccess(store)) return null
     val account = currentSubscriptionAccountId() ?: return eventMessage("subscription.verify")
     restoreStoreSubscriptionCache(store)

@@ -17,10 +17,10 @@ internal fun installBrowserPrinting() {
         ReceiptPlatformActionResult(opened, deviceWorkflowText(if (opened) "print_opened" else "print_failed"))
     }
     fun systemPrinter() = PlatformReceiptPrinterDataModel("browser-system-print", deviceWorkflowText("system_print"),
-        deviceWorkflowText("system_print_help"), configured = true)
+        deviceWorkflowText("receipt_system_help"), configured = true)
     listPlatformReceiptPrinterDevicesAction = { listOf(systemPrinter()) }
     listPlatformLabelPrinterDevicesAction = { listOf(PlatformLabelPrinterDataModel("browser-system-print",
-        deviceWorkflowText("system_print"), deviceWorkflowText("system_print_help"), configured = true,
+        deviceWorkflowText("system_print"), deviceWorkflowText("label_system_help"), configured = true,
         supportedProtocols = emptyList())) }
     configurePlatformReceiptPrinterDeviceAction = {
         ReceiptPlatformActionResult(true, deviceWorkflowText("system_print_help"), selectedDeviceId = "browser-system-print")
