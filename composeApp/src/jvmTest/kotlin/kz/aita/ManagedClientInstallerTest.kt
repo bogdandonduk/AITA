@@ -84,4 +84,17 @@ class ManagedClientInstallerTest {
         val sig=Signature.getInstance("SHA256withRSA").run{initSign(pair.private);update(bytes);sign()}
         assertTrue(verifyRsaClientRelease(bytes,sig,pair.public.encoded));assertFalse(verifyRsaClientRelease("changed".toByteArray(),sig,pair.public.encoded))
     }
+    @Test fun importedDownloadIsReverifiedAndCleanupPreservesUsersCopy() = withRoot { root, cache -> runBlocking {
+        val (_, artifact) = fixture(root)
+        val source = java.io.File(root, "user-copy.pkg").apply { writeBytes(cache.verifiedFile(fixture(root).first, artifact).readBytes()) }
+        val release = ClientRelease(channel = ReleaseChannel.RELEASE, sequence = 5, id = "r5", version = "1.0.1", build = 5,
+            publishedAtMillis = 1, expiresAtMillis = 2)
+        val prepared = cache.importVerified(release, artifact, source)
+        assertEquals(source.readBytes().toList(), cache.verifiedFile(prepared, artifact).readBytes().toList())
+        cache.clean(installed(5)); assertTrue(source.exists()); assertNull(cache.restore(release, artifact))
+        source.writeBytes(ByteArray(artifact.bytes.toInt()))
+        assertFailsWith<ClientUpdateFailure> { cache.importVerified(release, artifact, source) }
+        assertNull(cache.restore(release, artifact))
+    } }
+
 }

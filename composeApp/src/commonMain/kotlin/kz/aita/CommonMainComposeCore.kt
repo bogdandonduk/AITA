@@ -102,7 +102,9 @@ var forceHidePlatformSoftKeyboard: (() -> Unit)? = null
 internal const val AITA_MOTION_FAST_MILLIS = 125
 internal const val AITA_MOTION_NORMAL_MILLIS = 205
 internal const val AITA_PRESS_SCALE = 0.972f
-internal const val AITA_HOVER_SCALE = 1.006f
+// Scroll viewports clip drawing outside a child's measured bounds, especially the first row.
+// Keep tactile feedback inward so outlines remain whole at every screen and UI scale.
+internal const val AITA_HOVER_SCALE = 0.996f
 
 internal fun Modifier.aitaContentMotion(): Modifier =
     animateContentSize(animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS))
@@ -116,7 +118,7 @@ internal fun Modifier.aitaInteractiveMotion(
     val pressed by interactionSource.collectIsPressedAsState()
     val hovered by interactionSource.collectIsHoveredAsState()
     val targetScale = when {
-        enabled && pressed -> pressScale
+        enabled && pressed -> pressScale.coerceIn(0.9f, 1f)
         enabled && hovered -> AITA_HOVER_SCALE
         else -> 1f
     }
@@ -136,8 +138,8 @@ internal fun Modifier.aitaInteractiveMotion(
 
     return Modifier
         .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            scaleX = scale.coerceAtMost(1f)
+            scaleY = scale.coerceAtMost(1f)
             this.alpha = alpha
         }
         .then(this)
@@ -174,7 +176,7 @@ internal fun Modifier.aitaSelectionMotion(
     selectedScale: Float = 1.045f
 ): Modifier {
     val scale by animateFloatAsState(
-        targetValue = if (selected) selectedScale else 1f,
+        targetValue = if (selected) 1f else 1f / selectedScale.coerceAtLeast(1f),
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -183,8 +185,8 @@ internal fun Modifier.aitaSelectionMotion(
     )
     return Modifier
         .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            scaleX = scale.coerceAtMost(1f)
+            scaleY = scale.coerceAtMost(1f)
         }
         .then(this)
 }

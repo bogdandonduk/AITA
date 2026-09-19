@@ -132,13 +132,18 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                         if (downloads.loading) Text(updateText("checking"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         if (downloads.savingId != null) {
                             val fraction = downloads.progress?.coerceIn(0f, 1f)
-                            Text(updateText("downloading") + (fraction?.let { " ${(it * 100).toInt()}%" } ?: ""),
+                            Text(updateText(if (downloads.installing) "installing" else "downloading") + (fraction?.takeUnless { downloads.installing }?.let { " ${(it * 100).toInt()}%" } ?: ""),
                                 color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
-                            if (fraction != null) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(), color = stateValues.AccentColor)
+                            if (downloads.installing) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = stateValues.AccentColor)
+                            else if (fraction != null) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(), color = stateValues.AccentColor)
                         }
                         Text(if(downloads.canChooseFolder) downloads.destinationLabel ?: downloadsText("default_folder") else downloadsText("browser_folder"),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         DownloadSavedLocation(downloads)
+                        downloads.handoff?.let { result ->
+                            Text(updateText(if (result == UpdateHandoff.PERMISSION_REQUIRED) "permission" else "opened"),
+                                color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+                        }
                         actionButton(text = downloadsText("folder"), iconPath = folderIconPath(), iconRes = folderIconResource(),
                             autoLoading = false, confirmationRequired = false, onClick = {
                                 if (onOpenFolderSettings != null) onOpenFolderSettings() else {
@@ -208,7 +213,7 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                                 Text("${entry.fileName} · ${downloadFileSize(entry.sizeBytes)}", color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                                 if (entry.kind == "APK" || entry.kind == "AAB") Text(downloadsText(entry.kind.lowercase()), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                                actionButton(text = downloadsText("file", "kind" to entry.kind), iconPath = downloadsIconPath(), iconRes = downloadsIconResource(),
+                                                actionButton(text = updateText(entry.action.name.lowercase()), iconPath = downloadsIconPath(), iconRes = downloadsIconResource(),
                                                     autoLoading = false, confirmationRequired = false,
                                                     enabled = downloads.savingId == null && downloads.folderReady && !downloads.loading && !downloads.folderChanging,
                                                     onClick = { DownloadsWorkspace.save(entry.id) })

@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
 private data class ActiveStoreSelectionJournal(
     val storeId: String? = null,
     val explicitNone: Boolean = false,
-    val pendingSync: Boolean = false
+    val pendingSync: Boolean = false,
+    val parentStoreId: String? = null
 )
 
 internal object ActiveStores {
@@ -36,7 +37,7 @@ internal object ActiveStores {
                 runCatching { jsonBase.decodeFromString(ActiveStoreSelectionJournal.serializer(), it) }.getOrNull()
             }
             if (saved != null) {
-                SavedActiveStoreChoice(ActiveStoreChoice(saved.storeId, saved.explicitNone), saved.pendingSync)
+                SavedActiveStoreChoice(ActiveStoreChoice(saved.storeId, saved.explicitNone, saved.parentStoreId), saved.pendingSync)
             } else {
                 // One-time legacy import only when the cached account proves whose old global key it is.
                 val legacyOwner = getLocalKv(LEGACY_OWNER_KEY)
@@ -51,7 +52,8 @@ internal object ActiveStores {
         persist = { selected ->
             selected.owner?.let { expected ->
                 putLocalKv(key(expected), jsonBase.encodeToString(ActiveStoreSelectionJournal.serializer(),
-                    ActiveStoreSelectionJournal(selected.choice.storeId, selected.choice.explicitNone, selected.pendingSync)))
+                    ActiveStoreSelectionJournal(selected.choice.storeId, selected.choice.explicitNone, selected.pendingSync,
+                        selected.choice.parentStoreId ?: storesState.payloadValue.orEmpty().findStoreOrBranch(selected.choice.storeId)?.parentStoreId)))
             }
             DynamicCarts.prepareLegacyImport()
             // Retain compatibility keys, but never observe them as commands.
@@ -91,14 +93,20 @@ internal object ActiveStores {
     val revision: Long get() = coordinator.snapshot.revision
     val explicitNone: Boolean get() = coordinator.snapshot.let { it.hydrated && it.owner == owner() && it.choice.explicitNone }
     val hydrated: Boolean get() = coordinator.snapshot.let { it.hydrated && it.owner == owner() }
+    val parentStoreHint: String? get() = coordinator.snapshot.takeIf { it.owner == owner() }?.choice?.parentStoreId
 
-    fun select(id: String?, syncServer: Boolean) { coordinator.select(owner(), id, syncServer) }
+    fun select(id: String?, syncServer: Boolean) {
+        coordinator.select(owner(), id, syncServer, storesState.payloadValue.orEmpty().findStoreOrBranch(id)?.parentStoreId)
+    }
     fun retryPending() { coordinator.retryPending() }
 
-    suspend fun acceptAccount(account: UserAccountDataModel, applyServerSelection: Boolean = true) {
+    suspend fun acceptAccount(account: UserAccountDataModel, applyServerSelection: Boolean = true,
+        authoritative: Boolean = false, revisionAtRequest: Long? = null) {
         val expected = owner()?.takeIf { it.accountId == account.id } ?: return
         try {
-            coordinator.adopt(expected, account.activeStoreId, applyServerSelection)
+            coordinator.adopt(expected, account.activeStoreId, applyServerSelection, preferServerSelection = authoritative)
+            if (authoritative && applyServerSelection && revisionAtRequest != null)
+                coordinator.acceptRemote(expected, account.activeStoreId, revisionAtRequest)
             failedRestoreOwner.compareAndSet(expected, null)
         }
         catch (cancelled: CancellationException) { throw cancelled }

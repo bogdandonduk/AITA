@@ -16,14 +16,15 @@ internal fun installBrowserPrinting() {
         }
         ReceiptPlatformActionResult(opened, deviceWorkflowText(if (opened) "print_opened" else "print_failed"))
     }
-    fun systemPrinter() = PlatformReceiptPrinterDataModel("browser-system-print", deviceWorkflowText("system_print"),
-        deviceWorkflowText("receipt_system_help"), configured = true)
-    listPlatformReceiptPrinterDevicesAction = { listOf(systemPrinter()) }
+    fun systemPrinter() = PlatformReceiptPrinterDataModel("browser-system-print", browserReceiptPrinterNameState.value ?: deviceWorkflowText("system_print"),
+        deviceWorkflowText("receipt_system_help"), configured = browserReceiptPrinterEnabledState.value)
+    listPlatformReceiptPrinterDevicesAction = { loadBrowserReceiptPrinterName(); listOf(systemPrinter()) }
     listPlatformLabelPrinterDevicesAction = { listOf(PlatformLabelPrinterDataModel("browser-system-print",
         deviceWorkflowText("system_print"), deviceWorkflowText("label_system_help"), configured = true,
         supportedProtocols = emptyList())) }
-    configurePlatformReceiptPrinterDeviceAction = {
-        ReceiptPlatformActionResult(true, deviceWorkflowText("system_print_help"), selectedDeviceId = "browser-system-print")
+    configurePlatformReceiptPrinterDeviceAction = { id ->
+        setBrowserReceiptPrinterEnabled(id != null)
+        ReceiptPlatformActionResult(true, deviceWorkflowText(if (id == null) "clear_help" else "system_print_help"), selectedDeviceId = id)
     }
     configurePlatformLabelPrinterDeviceAction = {
         ReceiptPlatformActionResult(true, deviceWorkflowText("system_print_help"), selectedDeviceId = "browser-system-print")

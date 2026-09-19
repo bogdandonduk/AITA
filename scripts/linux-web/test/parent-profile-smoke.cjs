@@ -63,6 +63,8 @@ try {
   checks.push('Management parent retains editable generic Marketplace profile and Save action');
  } else {
   await click('Use parent profile');await until(()=>calls.some(c=>c.path==='/stock/parent/get'),'Parent catalogue was not requested');await page.waitForTimeout(1000);await shot('parent-picker');
+  const firstItem=page.getByRole('button').filter({hasText:/^Generic mountain honey/}).first();
+  await firstItem.hover({force:true});await page.waitForTimeout(250);await shot('parent-picker-first-hover');
   await page.getByRole('button',{name:'Use parent profile',exact:true}).last().click({force:true});await page.waitForTimeout(1000);
   await until(async()=>((await localDraft())?.profile?.automaticFromStock===false),'Resolved parent profile was not written to draft');
   copiedDraft=await localDraft();

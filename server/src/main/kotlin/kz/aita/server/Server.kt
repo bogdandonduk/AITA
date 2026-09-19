@@ -18078,6 +18078,7 @@ fun Application.module() {
       // relationship/recipient identity lives in the body/database rather than necessarily in request
       // headers, so a generic event here would duplicate refreshes and wake unrelated clients.
       if (
+        path.trimEnd('/').lowercase() !in setOf("/stores/delete", "/stores/active") &&
         !path.startsWith("/support/", ignoreCase = true) &&
         !path.startsWith("/company/", ignoreCase = true) &&
         !path.startsWith("/supplierContracts/", ignoreCase = true) &&
@@ -21317,10 +21318,10 @@ fun Application.module() {
           }
 
           when (activeResult) {
-            0 -> call.genericResponseNoPayload(
-              HttpStatusCode.OK,
-              message = eventMessage("message.active_store_saved")
-            )
+            0 -> {
+              RealtimeServerBus.publish(entity = "user/active-store", userId = userId.toString(), reason = "active_store_changed")
+              call.genericResponseNoPayload(HttpStatusCode.OK, message = eventMessage("message.active_store_saved"))
+            }
 
             else -> call.genericResponseNoPayload(HttpStatusCode.Forbidden,
               message = eventMessage("message.this_store_is_no_longer_available_to_your_account")
@@ -21634,12 +21635,8 @@ fun Application.module() {
           }
         }
 
-        delete("/delete") {
-          val userId = call.checkPrincipal() ?: return@delete
-
-          val body = call.receiveAita<String>()
-
-          val deleted = newSuspendedTransaction(aitaServerIoContext) {
+        storeDeletionActions { userId, body ->
+          newSuspendedTransaction(aitaServerIoContext) {
 
             val id = runCatching { UUID.fromString(body) }.getOrNull() ?: return@newSuspendedTransaction 2
 
@@ -21664,6 +21661,15 @@ fun Application.module() {
               if (ownedItemIds.isNotEmpty() && !StockBatchesV2.select(StockBatchesV2.id).where {
                   (StockBatchesV2.goodsItemId inList ownedItemIds) and (StockBatchesV2.storeId notInList storeIdsToDelete)
                 }.empty()) return@newSuspendedTransaction 3
+              val parentId = Stores.select(Stores.parentStoreId).where { Stores.id eq id }
+                .single()[Stores.parentStoreId]?.takeUnless { it in storeIdsToDelete }
+              // Preserve a useful account default for devices returning after the deletion.
+              // Each affected account is checked separately; branch-only workers gain no parent access.
+              Users.select(Users.id).where { Users.activeStoreId inList storeIdsToDelete }
+                .map { it[Users.id] }.forEach { affectedUser ->
+                  val replacement = parentId?.takeIf { userHasStoreAccessInsideTransaction(affectedUser, it) }
+                  Users.update({ Users.id eq affectedUser }) { it[Users.activeStoreId] = replacement }
+                }
               hardDeleteStoreOwnedDataInsideTransaction(storeIdsToDelete)
 
               if (branchIds.isNotEmpty()) {
@@ -21671,20 +21677,6 @@ fun Application.module() {
               }
               if (Stores.deleteWhere { Stores.id eq id } > 0) 0 else 1
             }
-          }
-
-          return@delete when (deleted) {
-            0 -> call.genericResponseNoPayload(
-              HttpStatusCode.OK,
-              message = getResponse("12").message
-            )
-
-            3 -> call.genericResponseNoPayload(HttpStatusCode.Conflict, eventMessage("store.shared_catalogue_in_use"))
-            1, 2 -> call.respondAitaUnauthorized()
-            else -> call.genericResponseNoPayload(
-              status = HttpStatusCode.InternalServerError,
-              message = getResponse("3").message
-            )
           }
         }
       }

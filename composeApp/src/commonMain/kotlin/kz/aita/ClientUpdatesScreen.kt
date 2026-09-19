@@ -148,16 +148,18 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
                         LinearProgressIndicator(progress={fraction},modifier=Modifier.fillMaxWidth(),color=stateValues.AccentColor)
                         Text("${updateText("downloading")} ${(fraction*100).toInt()}%",color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
                         actionButton(text=updateText("cancel"),autoLoading=false,confirmationRequired=false,onClick=AppUpdateWorkspace::cancelDownload)
-                    } else if(current.prepared!=null) {
-                        Text(updateText("ready"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
-                        actionButton(text=updateText("install"),iconPath=updateIconPath(),iconRes=updateIconResource(),autoLoading=false,
-                            confirmationRequired=true,enabled=!current.busy,onClick=AppUpdateWorkspace::installUpdate)
-                    } else actionButton(text=updateText("download"),iconPath=updateIconPath(),iconRes=updateIconResource(),autoLoading=false,
-                        enabled=!current.busy,confirmationRequired=false,onClick=AppUpdateWorkspace::downloadUpdate)
+                    } else {
+                        if (current.phase == ClientUpdatePhase.INSTALLING) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = stateValues.AccentColor)
+                            Text(updateText("installing"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+                        }
+                        actionButton(text = updateText("update"), iconPath = updateIconPath(), iconRes = updateIconResource(),
+                            autoLoading = false, enabled = !current.busy, confirmationRequired = false, onClick = AppUpdateWorkspace::update)
+                    }
                 } else {
                     val web=artifact.kind==InstallerKind.WEB_RELOAD
                     Text(updateText(if(web) "web_help" else "store_help"),color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
-                    actionButton(text=updateText(if(web) "reload" else "open_store"),iconPath=updateIconPath(),iconRes=updateIconResource(),
+                    actionButton(text=updateText(if(web) "update" else "open_store"),iconPath=updateIconPath(),iconRes=updateIconResource(),
                         autoLoading=false,confirmationRequired=web,enabled=!current.busy,onClick=AppUpdateWorkspace::installUpdate)
                 }
                 current.handoff?.let { state -> Text(updateText(when(state) {

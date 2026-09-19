@@ -6,7 +6,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 internal data class ActiveStoreOwner(val accountId: String, val sessionGeneration: Long)
-internal data class ActiveStoreChoice(val storeId: String? = null, val explicitNone: Boolean = false)
+internal data class ActiveStoreChoice(val storeId: String? = null, val explicitNone: Boolean = false,
+    val parentStoreId: String? = null)
 internal data class SavedActiveStoreChoice(val choice: ActiveStoreChoice, val pendingSync: Boolean)
 internal data class ActiveStoreSelectionSnapshot(
     val owner: ActiveStoreOwner? = null,
@@ -53,11 +54,13 @@ internal class ActiveStoreSelectionCoordinator(
         }
     }
 
-    fun select(owner: ActiveStoreOwner?, storeId: String?, syncServer: Boolean): Job {
+    fun select(owner: ActiveStoreOwner?, storeId: String?, syncServer: Boolean, parentStoreId: String? = null): Job {
         val id = storeId?.trim()?.takeIf { it.isNotEmpty() }
         // Reserve synchronously before launching. Comparing only the displayed ID loses a fast B -> A.
         update { old ->
-            val choice = ActiveStoreChoice(id, explicitNone = id == null && syncServer)
+            val parent = parentStoreId?.takeIf { id != null && it.isNotBlank() && it != id }
+                ?: old.choice.parentStoreId.takeIf { old.owner == owner && old.choice.storeId == id && id != null }
+            val choice = ActiveStoreChoice(id, explicitNone = id == null && syncServer, parentStoreId = parent)
             if (old.owner == owner && old.hydrated && old.choice == choice) old
             else ActiveStoreSelectionSnapshot(owner, choice, old.revision + 1L, hydrated = true,
                 pendingSync = syncServer && owner != null)
@@ -68,7 +71,7 @@ internal class ActiveStoreSelectionCoordinator(
         }
     }
 
-    suspend fun adopt(owner: ActiveStoreOwner, serverStoreId: String?, applyServerSelection: Boolean = true) {
+    suspend fun adopt(owner: ActiveStoreOwner, serverStoreId: String?, applyServerSelection: Boolean = true, preferServerSelection: Boolean = false) {
         storageMutex.withLock {
             if (!ownerIsCurrent(owner)) return@withLock
             val before = state.value
@@ -80,13 +83,28 @@ internal class ActiveStoreSelectionCoordinator(
             if (!isCurrent(reserved)) return@withLock
             val serverId = serverStoreId?.trim()?.takeIf { it.isNotEmpty() && applyServerSelection }
             val adopted = reserved.copy(
-                choice = saved?.choice ?: ActiveStoreChoice(serverId),
+                choice = if (preferServerSelection && applyServerSelection && saved?.pendingSync != true) ActiveStoreChoice(serverId)
+                    else saved?.choice ?: ActiveStoreChoice(serverId),
                 hydrated = true,
                 pendingSync = saved?.pendingSync == true
             )
             if (state.compareAndSet(reserved, adopted)) flushLocked()
         }
         retryPending()
+    }
+
+    /** An authoritative response may change another device's selection, but cannot undo a
+     * local click made while that response was in flight or an unsynchronized offline choice. */
+    suspend fun acceptRemote(owner: ActiveStoreOwner, serverStoreId: String?, revisionAtRequest: Long) {
+        storageMutex.withLock {
+            val current = state.value
+            if (!isCurrent(current) || current.owner != owner || !current.hydrated || current.pendingSync ||
+                current.revision != revisionAtRequest) return@withLock
+            val id = serverStoreId?.trim()?.takeIf(String::isNotEmpty)
+            if (current.choice.storeId == id && !current.choice.explicitNone) return@withLock
+            val next = current.copy(choice = ActiveStoreChoice(id), revision = current.revision + 1L)
+            if (state.compareAndSet(current, next)) flushLocked()
+        }
     }
 
     fun retryPending(): Job = scope.launch {

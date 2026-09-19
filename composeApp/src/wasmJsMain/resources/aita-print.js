@@ -33,11 +33,22 @@ window.aitaPrintDocument = function (title, html) {
                 // the physical roll geometry, never infer a printer type from an A4 default.
                 const receiptPaper = content.querySelector('meta[name="aita-receipt-paper"]');
                 if (receiptPaper) {
-                    const [width, margin] = receiptPaper.content.split(',').map(Number);
+                    const [width, margin, requestedLimit = 842] = receiptPaper.content.split(',').map(Number);
                     if (!Number.isFinite(width) || width < 150 || width > 240 ||
-                        !Number.isFinite(margin) || margin < 0 || margin > 24) return fail();
-                    const height = Math.min(14400, Math.max(72,
-                        Math.ceil(Math.max(content.body.scrollHeight, content.body.getBoundingClientRect().height) * 72 / 96 + margin * 2 + 2)));
+                        !Number.isFinite(margin) || margin < 0 || margin > 24 ||
+                        !Number.isFinite(requestedLimit) || requestedLimit < 72 || requestedLimit > 842) return fail();
+                    // Measure content, never scrollHeight: it can include the iframe viewport.
+                    // Long receipts paginate at the cap; they never request metres of blank paper.
+                    let printable = content.getElementById('aita-print-content');
+                    if (!printable) {
+                        printable = content.createElement('main');
+                        printable.style.display = 'flow-root';
+                        while (content.body.firstChild) printable.appendChild(content.body.firstChild);
+                        content.body.appendChild(printable);
+                    }
+                    const measured = printable.getBoundingClientRect().height * 72 / 96;
+                    if (!Number.isFinite(measured) || measured <= 0) return fail();
+                    const height = Math.min(requestedLimit, Math.max(72, Math.ceil(measured + margin * 2 + 2)));
                     const paperStyle = content.createElement('style');
                     paperStyle.textContent = '@page{size:'+width+'pt '+height+'pt;margin:'+margin+'pt}';
                     content.head.appendChild(paperStyle);
@@ -54,6 +65,8 @@ window.aitaPrintDocument = function (title, html) {
             } catch (_) { fail(); }
         };
         frame.srcdoc = html;
-        document.body.appendChild(frame);
+        // ComposeViewport renders the body through a shadow root. Unslotted light-DOM
+        // children still load, but have no rendered geometry and can print blank pages.
+        (document.body.shadowRoot || document.body).appendChild(frame);
     });
 };

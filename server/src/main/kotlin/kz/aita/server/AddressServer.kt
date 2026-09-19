@@ -122,6 +122,7 @@ internal object YandexAddressService {
       .timeout(Duration.ofSeconds(18))
       .header("Accept", accept)
       .header("User-Agent", "AITA-Server/1.0")
+      .header("Referer", "https://aita.kz/")
       .GET()
       .build()
 
@@ -137,7 +138,7 @@ internal object YandexAddressService {
     } catch (throwable: Throwable) {
         if (throwable is kotlinx.coroutines.CancellationException) throw throwable
       throw AddressProviderException(
-        message = "Could not reach Yandex Maps: ${throwable.message.orEmpty()}",
+        message = "Could not reach Yandex Maps (${throwable::class.simpleName})",
         cause = throwable
       )
     }
@@ -148,7 +149,7 @@ internal object YandexAddressService {
     val text = bytes.toString(StandardCharsets.UTF_8)
     if (status !in 200..299) {
       throw AddressProviderException(
-        "Yandex Maps returned HTTP $status${text.take(240).trim().takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()}",
+        "Yandex Maps returned HTTP $status",
         retryable = status == 429 || status >= 500
       )
     }

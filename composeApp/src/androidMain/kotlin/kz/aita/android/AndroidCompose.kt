@@ -1423,6 +1423,8 @@ class MainActivity: ComponentActivity() {
     override fun onResume() {
         super.onResume()
         instance = this
+        kz.aita.AppUpdateWorkspace.onForeground()
+        kz.aita.DownloadsWorkspace.onForeground()
         updatePhoneOrientationPolicy()
         installAndroidSoftKeyboardHider(this)
         installReceiptPlatformAndroid(this)

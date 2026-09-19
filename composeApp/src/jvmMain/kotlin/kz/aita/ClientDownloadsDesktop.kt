@@ -33,11 +33,15 @@ internal actual suspend fun clientDownloadsFolderLabel(folder: String?): String?
         }
     }
 }
-internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, progress: (Long, Long) -> Unit): ClientDownloadResult = withContext(Dispatchers.IO) {
+internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, installRequest: ClientDownloadInstallRequest?, progress: (Long, Long) -> Unit): ClientDownloadResult = withContext(Dispatchers.IO) {
     require(Regex("[A-Za-z0-9._-]{1,160}").matches(fileName))
     val directory = downloadsDirectory(folder)
     val temporary = fetchVerifiedClientDownload(directory, file, progress)
     try {
+        val prepared = installRequest?.let {
+            val release = it.release(System.currentTimeMillis(), clientUpdatePlatform(), installedClientBuild())
+            desktopDownloadInstallers().importVerified(release, release.artifacts.single(), temporary)
+        }
         // Never overwrite a user's existing file, even if it has our suggested name.
         var attempt = 0
         while (true) {
@@ -45,7 +49,7 @@ internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileNam
             val destination = File(directory, name)
             try {
                 Files.move(temporary.toPath(), destination.toPath())
-                return@withContext ClientDownloadResult(destination.canonicalPath)
+                return@withContext ClientDownloadResult(destination.canonicalPath, prepared = prepared)
             } catch (_: java.nio.file.FileAlreadyExistsException) { attempt++; if (attempt > 9999) throw ClientUpdateFailure("storage") }
         }
         @Suppress("UNREACHABLE_CODE") ClientDownloadResult()

@@ -145,6 +145,35 @@ internal class ManagedClientInstaller(
             if (it.name.endsWith(".part") || now - it.lastModified() > 14L*86_400_000L) runCatching { child(it.name).delete() }
         }
     }
+    /** Copy a verified public download into private installer storage, rechecking the exact bytes.
+     * The user's chosen download remains theirs; only this private copy is cleaned on next launch. */
+    suspend fun importVerified(release: ClientRelease, artifact: ClientArtifact, source: File): PreparedClientInstaller = withContext(Dispatchers.IO) {
+        if (!artifact.isFile || artifact.bytes !in 1..CLIENT_INSTALLER_MAX_BYTES || source.length() != artifact.bytes)
+            throw ClientUpdateFailure("integrity")
+        val name = fileName(release, artifact)
+        val part = child("$name.part")
+        try {
+            if (root.usableSpace < artifact.bytes + 16L * 1024 * 1024) throw ClientUpdateFailure("space")
+            var count = 0L
+            val digest = MessageDigest.getInstance("SHA-256")
+            source.inputStream().use { input -> FileOutputStream(part).use { out ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val n = input.read(buffer); if (n < 0) break
+                    count += n
+                    if (count > artifact.bytes) throw ClientUpdateFailure("integrity")
+                    digest.update(buffer, 0, n); out.write(buffer, 0, n)
+                }
+                out.fd.sync()
+            } }
+            val hash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+            if (count != artifact.bytes || hash != artifact.sha256) throw ClientUpdateFailure("integrity")
+            replace(part, child(name))
+            PreparedClientInstaller(release.id, release.build, release.channel, name, hash, count, System.currentTimeMillis())
+                .also(::save)
+        } finally { part.delete() }
+    }
     fun readPreference(key: String): String? = child("pref-$key").takeIf { it.isFile && it.length() < CLIENT_RELEASE_MAX_BYTES*2 }?.readText()
     fun writePreference(key: String, value: String?) {
         val f = child("pref-$key")

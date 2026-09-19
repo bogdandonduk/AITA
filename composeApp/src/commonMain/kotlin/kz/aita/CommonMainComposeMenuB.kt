@@ -445,7 +445,10 @@ fun AppConfiguration.MenuDevicesScreen() {
     val configuredLabelPrinterId by configuredLabelPrinterDeviceIdState.collectAsState()
     val configuredLabelPrinterProtocol by configuredLabelPrinterProtocolState.collectAsState()
     val receiptPaperWidthMm by receiptPaperWidthMmState.collectAsState()
-    LaunchedEffect(Unit) { loadReceiptPaperWidth() }
+    LaunchedEffect(Unit) { loadReceiptPaperWidth(); if (preferHtmlDocumentPrinting) loadBrowserReceiptPrinterName() }
+    val confirmedPrinterName by browserReceiptPrinterNameState.collectAsState()
+    var confirmBrowserPrinter by remember { mutableStateOf(false) }
+    var showStopPrintingHelp by remember { mutableStateOf(false) }
     var refreshingReceiptPrinters by remember { mutableStateOf(false) }
     var authorizingBluetooth by remember { mutableStateOf(false) }
     var printingReceipt by remember { mutableStateOf(false) }
@@ -505,17 +508,14 @@ fun AppConfiguration.MenuDevicesScreen() {
         devicesScope.launch {
             try {
                 val result = if (receiptUsesSystemDocumentPrinting()) {
-                    printReceiptDocument(testReceiptTitle, AitaPdfDocument(listOf(
-                        AitaPdfBlock("AITA", AitaPdfRole.Store), AitaPdfBlock(testReceiptTitle, AitaPdfRole.Title),
-                        AitaPdfBlock(receiptUiDateTime(getCurrentTimeMillis())), AitaPdfBlock("100 ₸"),
-                        AitaPdfBlock("", barcodePayload = transactionReceiptBarcodePayload("00000000-0000-0000-0000-000000000001"))
-                    )))
+                    printReceiptDocument(testReceiptTitle, receiptPrinterTestDocument(testReceiptTitle, receiptUiDateTime(getCurrentTimeMillis())))
                 } else withContext(Dispatchers.Default) {
                     printReceiptEscPos(
                         buildReceiptPrinterTestEscPosBytes(title = testReceiptTitle, dateText = receiptUiDateTime(getCurrentTimeMillis())),
                         ReceiptTextLabelsDataModel(printerNotConfigured = receiptPrinterNotConfiguredText)
                     )
                 }
+                if (result.success && preferHtmlDocumentPrinting) confirmBrowserPrinter = true
                 if (!result.success) receiptPrinterError = result.message
                 receiptActionNotification(result, result.message.ifBlank { testReceiptSentText })
             } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
@@ -560,6 +560,11 @@ fun AppConfiguration.MenuDevicesScreen() {
             refreshReceiptPrinters(showNotification = false)
         }
     }
+
+    if (confirmBrowserPrinter) BrowserPrinterSetupDialog { confirmBrowserPrinter = false }
+    if (showStopPrintingHelp) ModalDialogWidget(title = deviceWorkflowText("stop_printing"),
+        subTitle = deviceWorkflowText("stop_help"), onDismiss = { showStopPrintingHelp = false },
+        negativeAction = { showStopPrintingHelp = false }, positiveAction = { showStopPrintingHelp = false })
 
     AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
@@ -636,6 +641,11 @@ fun AppConfiguration.MenuDevicesScreen() {
                         iconPath = stateValues.drawablePathIconReceipt,
                         iconRes = stateValues.drawableResIconReceipt.value
                     ) {
+                        if (preferHtmlDocumentPrinting && confirmedPrinterName != null) {
+                            Text("${deviceWorkflowText("saved_setup")}: $confirmedPrinterName", color = stateValues.TextColor,
+                                fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
+                            Text(deviceWorkflowText("saved_setup_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        }
                         if (receiptUsesSystemDocumentPrinting()) {
                             Text(deviceWorkflowText("receipt_paper"), color = stateValues.TextColor,
                                 fontSize = stateValues.accentTextSize)
@@ -678,7 +688,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 )
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
-                                    text = localizedStringResource(1265, "Clear receipt printer"),
+                                    text = deviceWorkflowText("clear_selection"),
                                     iconPath = stateValues.drawablePathIconCancel,
                                     iconRes = stateValues.drawableResIconCancel.value,
                                     enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
@@ -718,7 +728,7 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 )
                                 actionButton(
                                     modifier = Modifier.fillMaxWidth(),
-                                    text = localizedStringResource(1265, "Clear receipt printer"),
+                                    text = deviceWorkflowText("clear_selection"),
                                     iconPath = stateValues.drawablePathIconCancel,
                                     iconRes = stateValues.drawableResIconCancel.value,
                                     enabled = !printingReceipt && !savingReceiptPrinter && !refreshingReceiptPrinters && !configuredReceiptPrinterId.isNullOrBlank(),
@@ -729,6 +739,9 @@ fun AppConfiguration.MenuDevicesScreen() {
                             }
                         }
 
+                        Text(deviceWorkflowText("clear_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                        actionButton(text = deviceWorkflowText("stop_printing"), autoLoading = false, confirmationRequired = false,
+                            onClick = { showStopPrintingHelp = true })
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
                         Text(

@@ -7,7 +7,7 @@ import kotlin.test.assertFalse
 class MenuNavigationPolicyTest {
     private val list = NavigationScreenModel.Menu.List
     private val account = NavigationScreenModel.Menu.UserAccount
-    private val subscription = NavigationScreenModel.Menu.StoreSubscriptionPlans
+    private val subscription = NavigationScreenModel.Menu.StoreSubscription
     private val workers = NavigationScreenModel.Menu.Workers
 
     @Test fun recoveryHasRealNarrowBase() {
@@ -47,5 +47,25 @@ class MenuNavigationPolicyTest {
     @Test fun obsoleteWorkRouteOpensExistingWorkersPage() {
         assertEquals(workers, persistentAppRouteToScreen("MenuWorkNavigationScreenModelRoute"))
         assertFalse(menuDestinationRequiresStoreSubscription(workers))
+    }
+    @Test fun activationRecoveryAndMenuEntryShareOneSubscriptionDestination() {
+        val recovery = NavigationScreenModel.Menu.StoreSubscriptionPlans
+        val opened = pushMenuDestination(listOf(list), recovery, list, false, false)
+        val afterActivation = pushMenuDestination(opened, subscription, list, false, false)
+        assertEquals(listOf(list, subscription), afterActivation)
+        assertEquals(listOf(list), afterActivation.dropLast(1))
+    }
+    @Test fun savedAliasAndRepeatedRecoveryAreCollapsedOnResize() {
+        val legacy = listOf(account, subscription, NavigationScreenModel.Menu.StoreSubscriptionPlans)
+        val narrow = adaptMenuStacks(listOf(list), legacy, true)
+        assertEquals(listOf(list, subscription), narrow.first)
+        assertEquals(listOf(account, subscription), adaptMenuStacks(narrow.first, narrow.second, false).second)
+    }
+    @Test fun forcedSubscriptionRecoveryDoesNotPushTheSameScreenTwice() {
+        assertEquals(listOf(list, subscription), pushMenuDestination(listOf(list, subscription),
+            NavigationScreenModel.Menu.StoreSubscriptionPlans, list, false, true))
+    }
+    @Test fun historicalSubscriptionRouteRestoresToTheCurrentDestination() {
+        assertEquals(listOf(list, subscription), listOf(NavigationScreenModel.Menu.StoreSubscriptionPlans.route).toPersistentMenuStack(list))
     }
 }

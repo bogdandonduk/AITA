@@ -50,3 +50,7 @@ internal actual suspend fun handoffClientUpdate(release: ClientRelease,artifact:
     if (!UIApplication.sharedApplication.openURL(url)) throw ClientUpdateFailure("unavailable")
     UpdateHandoff.STORE_OPENED
 }
+
+internal actual fun clientInstallerPermissionGranted() = false
+internal actual suspend fun handoffClientDownload(request: ClientDownloadInstallRequest, prepared: PreparedClientInstaller): UpdateHandoff =
+    throw ClientUpdateFailure("unsupported")

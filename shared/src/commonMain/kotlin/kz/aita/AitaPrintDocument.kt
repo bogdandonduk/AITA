@@ -37,6 +37,8 @@ fun AitaPdfDocument.forReceiptPaper(widthMm: Int): AitaPdfDocument = copy(
 )
 
 suspend fun printReceiptDocument(title: String, document: AitaPdfDocument): ReceiptPlatformActionResult {
+    if (preferHtmlDocumentPrinting) loadBrowserReceiptPrinterName()
+    if (preferHtmlDocumentPrinting && !browserReceiptPrinterEnabledState.value) return ReceiptPlatformActionResult(false, deviceWorkflowText("clear_help"))
     val prepared = document.forReceiptPaper(loadReceiptPaperWidth())
     return printReceiptDocumentPlatformAction?.invoke(title, prepared)
         ?: printHtmlDocument(title, prepared.toPrintHtml(title))
@@ -62,11 +64,11 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
         append(printHtmlEscape(title))
         append("</title>")
         if (minHeight == 0f && width < 250f) {
-            append("<meta name=\"aita-receipt-paper\" content=\"${width},${margin}\">")
+            append("<meta name=\"aita-receipt-paper\" content=\"${width},${margin},${maxHeight}\">")
         }
         append("<style>@page{size:${width}pt ${maxHeight}pt;margin:${margin}pt}")
-        append("html,body{background:white;color:black}body{margin:0;width:${contentWidth}pt;font-family:Arial,'Noto Sans',sans-serif}")
-        append(".line{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;min-height:1em}.barcode{break-inside:avoid;text-align:center}hr{border:0;border-top:1pt solid black;margin:6pt 0}</style></head><body>")
+        append("html,body{background:white;color:black;-webkit-text-fill-color:black;print-color-adjust:exact}body{margin:0;width:${contentWidth}pt;font-family:Arial,'Noto Sans',sans-serif}#aita-print-content{display:flow-root}")
+        append(".line{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;min-height:1em}.barcode{break-inside:avoid;text-align:center}svg{display:block;margin:0 auto}hr{border:0;border-top:1pt solid black;margin:6pt 0}</style></head><body><main id=\"aita-print-content\">")
         blocks.forEach { block ->
             val payload = block.barcodePayload
             when {
@@ -90,6 +92,6 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
                 }
             }
         }
-        append("</body></html>")
+        append("</main></body></html>")
     }
 }

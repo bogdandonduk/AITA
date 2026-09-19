@@ -94,3 +94,7 @@ internal actual suspend fun handoffClientUpdate(release: ClientRelease,artifact:
     if(!ok) throw ClientUpdateFailure("unavailable")
     return UpdateHandoff.RELOADING
 }
+
+internal actual fun clientInstallerPermissionGranted() = false
+internal actual suspend fun handoffClientDownload(request: ClientDownloadInstallRequest, prepared: PreparedClientInstaller): UpdateHandoff =
+    throw ClientUpdateFailure("unsupported")

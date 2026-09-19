@@ -16,7 +16,7 @@ import kz.aita.updates.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 
-internal enum class ClientUpdatePhase { IDLE, CHECKING, DOWNLOADING, READY, HANDOFF }
+internal enum class ClientUpdatePhase { IDLE, CHECKING, DOWNLOADING, INSTALLING, READY, HANDOFF }
 internal data class ClientUpdateState(
     val initialized: Boolean = false,
     val installed: ClientBuildIdentity = GeneratedClientBuild.identity,
@@ -34,7 +34,7 @@ internal data class ClientUpdateState(
     val configured: Boolean = false
 ) {
     val hasUpdate: Boolean get() = available != null && artifact != null
-    val busy: Boolean get() = phase == ClientUpdatePhase.DOWNLOADING || phase == ClientUpdatePhase.CHECKING
+    val busy: Boolean get() = phase == ClientUpdatePhase.DOWNLOADING || phase == ClientUpdatePhase.CHECKING || phase == ClientUpdatePhase.INSTALLING
 }
 
 /** One process-lifetime workspace, independent of the current account/store or an open update screen. */
@@ -138,7 +138,7 @@ internal class ClientUpdateCoordinator(
             messages.emit(release.version)
         }
     }
-    fun downloadUpdate() {
+    fun downloadUpdate(installWhenReady: Boolean = false) {
         if (download?.isActive == true) return
         download = scope.launch {
             if (!operation.tryLock()) return@launch
@@ -146,14 +146,15 @@ internal class ClientUpdateCoordinator(
                 val s = mutable.value; val release = s.available ?: return@launch; val artifact = s.artifact ?: return@launch
                 if (!artifact.isFile || clientReleaseProblem(release,now(),s.installed.channel) != null) throw ClientUpdateFailure("expired")
                 mutable.update { it.copy(phase = ClientUpdatePhase.DOWNLOADING, problem = null, handoff = null, completedBytes = 0, totalBytes = artifact.bytes) }
-                val prepared = backend.prepare(release, artifact) { done, total ->
+                val prepared = s.prepared ?: backend.prepare(release, artifact) { done, total ->
                     mutable.update { it.copy(completedBytes = done, totalBytes = total) }
                 }
                 mutable.update { it.copy(prepared = prepared, phase = ClientUpdatePhase.READY) }
+                if (installWhenReady) handoffLocked()
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { mutable.update { it.copy(problem = (failure as? ClientUpdateFailure)?.reason ?: "network") } }
             finally {
-                mutable.update { it.copy(phase = if (it.prepared == null) ClientUpdatePhase.IDLE else ClientUpdatePhase.READY) }
+                mutable.update { if (it.phase == ClientUpdatePhase.HANDOFF) it else it.copy(phase = if (it.prepared == null) ClientUpdatePhase.IDLE else ClientUpdatePhase.READY) }
                 operation.unlock()
             }
         }
@@ -163,21 +164,36 @@ internal class ClientUpdateCoordinator(
     fun installUpdate() { scope.launch {
         if (!operation.tryLock()) return@launch
         try {
-            val s = mutable.value; val release = s.available ?: return@launch; val artifact = s.artifact ?: return@launch
+            handoffLocked()
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (failure: Exception) { mutable.update { it.copy(problem = (failure as? ClientUpdateFailure)?.reason ?: "install") } }
+        finally {
+            mutable.update { if (it.phase == ClientUpdatePhase.INSTALLING) it.copy(phase = if (it.prepared != null) ClientUpdatePhase.READY else ClientUpdatePhase.IDLE) else it }
+            operation.unlock()
+        }
+    } }
+    private suspend fun handoffLocked() {
+            val s = mutable.value; val release = s.available ?: return; val artifact = s.artifact ?: return
             if (!s.configured || clientReleaseProblem(release,now(),s.installed.channel) != null) throw ClientUpdateFailure("expired")
             val actual = backend.installedBuild()
             if (!clientReleaseIsNewer(release, actual)) {
                 backend.clean(actual)
                 mutable.update { it.copy(installed = actual) }
-                expose(release,false); return@launch
+                expose(release,false); return
             }
             if (artifact.isFile && s.prepared == null) throw ClientUpdateFailure("install")
+            mutable.update { it.copy(phase = ClientUpdatePhase.INSTALLING, problem = null, handoff = null) }
             val result = backend.handoff(release,artifact,s.prepared)
             mutable.update { it.copy(handoff = result, problem = null, phase = ClientUpdatePhase.HANDOFF) }
-        } catch (cancel: CancellationException) { throw cancel }
-        catch (failure: Exception) { mutable.update { it.copy(problem = (failure as? ClientUpdateFailure)?.reason ?: "install") } }
-        finally { operation.unlock() }
-    } }
+    }
+    fun update() {
+        if (mutable.value.artifact?.isFile == true) downloadUpdate(installWhenReady = true) else installUpdate()
+    }
+    /** Resume only an action requested in this process, and only after the OS permission is granted. */
+    fun onForeground() {
+        if (mutable.value.handoff == UpdateHandoff.PERMISSION_REQUIRED && backend.installerPermissionGranted()) installUpdate()
+    }
+
 }
 
 /** Test seam covers the same coordinator used by the application without touching real app storage. */
@@ -196,6 +212,7 @@ internal interface ClientUpdateBackend {
     suspend fun prepare(release: ClientRelease, artifact: ClientArtifact, progress: (Long, Long) -> Unit): PreparedClientInstaller
     suspend fun handoff(release: ClientRelease, artifact: ClientArtifact, prepared: PreparedClientInstaller?): UpdateHandoff
     suspend fun clean(installed: ClientBuildIdentity)
+    fun installerPermissionGranted(): Boolean = true
 }
 
 internal class PlatformClientUpdateBackend : ClientUpdateBackend {
@@ -211,6 +228,7 @@ internal class PlatformClientUpdateBackend : ClientUpdateBackend {
     override suspend fun prepare(release: ClientRelease, artifact: ClientArtifact, progress: (Long, Long) -> Unit) = prepareClientInstaller(release, artifact, progress)
     override suspend fun handoff(release: ClientRelease, artifact: ClientArtifact, prepared: PreparedClientInstaller?) = handoffClientUpdate(release, artifact, prepared)
     override suspend fun clean(installed: ClientBuildIdentity) = cleanCompletedClientInstallers(installed)
+    override fun installerPermissionGranted() = clientInstallerPermissionGranted()
     private val http by lazy { HttpClient(getHttpClientEngine()) {
         followRedirects = false
         install(HttpTimeout) { requestTimeoutMillis = 20_000; connectTimeoutMillis = 10_000; socketTimeoutMillis = 15_000 }
@@ -246,6 +264,8 @@ internal object AppUpdateWorkspace {
     val state = coordinator.state
     val notifications = coordinator.notifications
     fun start() = coordinator.start()
+    fun update() = coordinator.update()
+    fun onForeground() = coordinator.onForeground()
     fun checkNow() = coordinator.checkNow()
     fun downloadUpdate() = coordinator.downloadUpdate()
     fun cancelDownload() = coordinator.cancelDownload()

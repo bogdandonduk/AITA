@@ -119,6 +119,23 @@ class StoreArchitectureMigrationDatabaseTest {
         """)
     }
 
+    @Test fun unselectedAccountRepairOnlyChoosesAnUnambiguousOwnedActiveParent() = fixture { f -> with(f) {
+        migration(c, "V123__management_parents_and_operating_branches.sql")
+        // The owner has two families; the worker owns just one parent; the branch-only worker owns none.
+        exec(c, "UPDATE stores SET owner_user_ids=owner_user_ids || jsonb_build_array('$worker'::text) WHERE id='${parent()}'")
+        exec(c, "UPDATE users SET active_store_id=NULL")
+        migration(c, "V125__recover_unselected_management_store.sql")
+        assertNull(scalar(c, "SELECT active_store_id FROM users WHERE id='$owner'"))
+        assertEquals(parent(), scalar(c, "SELECT active_store_id FROM users WHERE id='$worker'"))
+        assertNull(scalar(c, "SELECT active_store_id FROM users WHERE id='$branchWorker'"))
+        exec(c, "UPDATE users SET active_store_id='$branch' WHERE id='$worker'")
+        migration(c, "V125__recover_unselected_management_store.sql")
+        assertEquals(branch.toString(), scalar(c, "SELECT active_store_id FROM users WHERE id='$worker'"))
+        exec(c, "UPDATE users SET active_store_id=NULL WHERE id='$worker'; UPDATE stores SET is_active=FALSE WHERE id='${parent()}'")
+        migration(c, "V125__recover_unselected_management_store.sql")
+        assertNull(scalar(c, "SELECT active_store_id FROM users WHERE id='$worker'"))
+    } }
+
     @Test fun migrationPreservesEveryOperatingIdentityAndAllPaidOrLifetimeData() = fixture { f -> with(f) {
         val tables = listOf("store_subscription_states", "store_subscriptions", "store_subscription_charge_events", "stock_batches", "transactions", "workshifts", "marketplace_storefronts", "marketplace_listings")
         val before = tables.associateWith { snapshot(c, it) }

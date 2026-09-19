@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private fun desktopUpdates() = ManagedClientInstaller(File(System.getProperty("user.home"), ".aita/client-updates")) { from, to ->
+private fun desktopUpdates(path: String = ".aita/client-updates") = ManagedClientInstaller(File(System.getProperty("user.home"), path)) { from, to ->
     try { Files.move(from.toPath(),to.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
     catch (_: java.nio.file.AtomicMoveNotSupportedException) { Files.move(from.toPath(),to.toPath(), StandardCopyOption.REPLACE_EXISTING) }
     Unit
@@ -39,19 +39,29 @@ internal actual suspend fun readClientUpdatePreference(key: String) = withContex
 internal actual suspend fun writeClientUpdatePreference(key: String, value: String?) = withContext(Dispatchers.IO) { desktopUpdates().writePreference(key,value) }
 internal actual suspend fun prepareClientInstaller(release: ClientRelease, artifact: ClientArtifact, progress: (Long,Long)->Unit) = withContext(Dispatchers.IO) { desktopUpdates().prepare(release,artifact,progress) }
 internal actual suspend fun restoreClientInstaller(release: ClientRelease, artifact: ClientArtifact) = withContext(Dispatchers.IO) { desktopUpdates().restore(release,artifact) }
-internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) = withContext(Dispatchers.IO) { desktopUpdates().clean(installed) }
+internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) = withContext(Dispatchers.IO) { desktopUpdates().clean(installed); desktopDownloadInstallers().clean(installed) }
 internal actual suspend fun handoffClientUpdate(release: ClientRelease, artifact: ClientArtifact, prepared: PreparedClientInstaller?): UpdateHandoff = withContext(Dispatchers.IO) {
     if (artifact != selectClientArtifact(release,clientUpdatePlatform()) || !clientReleaseIsNewer(release,installedClientBuild())) throw ClientUpdateFailure("integrity")
     if (!artifact.isFile) {
         if (artifact.kind != InstallerKind.APP_STORE) throw ClientUpdateFailure("unsupported")
         Desktop.getDesktop().browse(URI(artifact.url)); return@withContext UpdateHandoff.STORE_OPENED
     }
+    openDesktopInstaller(release, artifact, prepared, desktopUpdates())
+}
+internal fun desktopDownloadInstallers() = desktopUpdates(".aita/download-installs")
+internal actual fun clientInstallerPermissionGranted() = true
+internal actual suspend fun handoffClientDownload(request: ClientDownloadInstallRequest, prepared: PreparedClientInstaller): UpdateHandoff = withContext(Dispatchers.IO) {
+    val release = request.release(System.currentTimeMillis(), clientUpdatePlatform(), installedClientBuild())
+    openDesktopInstaller(release, release.artifacts.single(), prepared, desktopDownloadInstallers())
+}
+private suspend fun openDesktopInstaller(release: ClientRelease, artifact: ClientArtifact,
+    prepared: PreparedClientInstaller?, storage: ManagedClientInstaller): UpdateHandoff {
     if (prepared == null || prepared.build != release.build || prepared.releaseId != release.id || prepared.channel != release.channel) throw ClientUpdateFailure("integrity")
-    val file = desktopUpdates().verifiedFile(prepared, artifact)
+    val file = storage.verifiedFile(prepared, artifact)
     when (clientUpdatePlatform().os) {
         ClientOs.WINDOWS -> {
             val launcher = windowsUpdateLauncher(System.getProperty("jpackage.app-path"))
-            if (artifact.kind == InstallerKind.MSI && launcher != null) {
+            if (artifact.kind == InstallerKind.MSI && launcher != null && clientReleaseIsNewer(release, installedClientBuild())) {
                 withContext(Dispatchers.Main) { AppStateWorkspace.flush() }
                 flushCartsBeforeClientUpdate()
                 if (!startWindowsUpdateHandoff(file, artifact.sha256, launcher)) throw ClientUpdateFailure("install")
@@ -66,5 +76,5 @@ internal actual suspend fun handoffClientUpdate(release: ClientRelease, artifact
         else -> throw ClientUpdateFailure("unsupported")
     }
     // Installer exit or wizard launch is not installation acknowledgement. Do not delete the file yet.
-    UpdateHandoff.INSTALLER_OPENED
+    return UpdateHandoff.INSTALLER_OPENED
 }

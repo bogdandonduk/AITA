@@ -3483,6 +3483,7 @@ internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
     val restoredCurrent = orEmpty()
         .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }
+        .map { it.canonicalMenuDestination() }
         .filterNot { it.isTemporarilyHiddenFromUi() }
         .lastOrNull()
         ?: defaultFirst
@@ -4021,18 +4022,8 @@ object Navigation {
             remove: Boolean = false,
             forceSecond: Boolean = false
         ) {
-            if (model.isTemporarilyHiddenFromUi()) return
-            if (model::class != _Left.value.last()::class || forceSecond)
-                _Left.emit(
-                    _Left
-                        .value.toMutableList()
-                        .apply {
-                            if (remove && size > 1)
-                                removeAt(lastIndex)
-
-                            add(model)
-                        }
-                )
+            _Left.emit(pushMenuDestination(_Left.value, model,
+                NavigationScreenModel.Menu.List, remove, forceSecond))
         }
 
         suspend fun popLeft(navigateAfterwards: NavigationScreenModel.Menu? = null) {
@@ -4067,18 +4058,8 @@ object Navigation {
             remove: Boolean = false,
             forceSecond: Boolean = false
         ) {
-            if (model.isTemporarilyHiddenFromUi()) return
-            if (model::class != _Right.value.last()::class || forceSecond)
-                _Right.emit(
-                    _Right
-                        .value.toMutableList()
-                        .apply {
-                            if (remove && size > 1)
-                                removeAt(lastIndex)
-
-                            add(model)
-                        }
-                )
+            _Right.emit(pushMenuDestination(_Right.value, model,
+                NavigationScreenModel.Menu.UserAccount, remove, forceSecond))
         }
 
         suspend fun popRight(navigateAfterwards: NavigationScreenModel.Menu? = null) {

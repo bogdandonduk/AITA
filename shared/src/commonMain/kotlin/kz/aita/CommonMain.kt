@@ -1745,28 +1745,22 @@ private fun MutableList<Byte>.finishReceiptEscPosDocument() {
 }
 
 fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
-    renderReceiptRaster(listOf(
-        title.ifBlank { "AITA printer test" }, dateText,
-        "--------------------------------",
-        "AITA / ESC-POS / 58 mm",
-        "Кириллица: чек готов, Ёё № 123",
-        "Қазақша: Әә Ғғ Ққ Ңң Өө Ұұ Үү Һһ Іі",
-        "Итого / Total: 1 234.50 ₸",
-        "Unicode raster / 384 dots"
-    ))?.let { return it }
+    val document = receiptPrinterTestDocument(title, dateText)
+    renderReceiptRaster(document.blocks.map { if (it.role == AitaPdfRole.Divider) "------------------------" else it.text })?.let { return it }
     val bytes = mutableListOf<Byte>()
     bytes.startReceiptEscPosDocument()
     bytes.addEscPosCommand(0x1B, 0x61, 0x01)
     bytes.addEscPosCommand(0x1B, 0x45, 0x01)
-    bytes.addEscPosWrappedLine(title.ifBlank { "AITA printer test" })
+    bytes.addEscPosWrappedLine("aita")
+    bytes.addEscPosWrappedLine(title.ifBlank { "AITA printer test" }.take(60))
     bytes.addEscPosCommand(0x1B, 0x45, 0x00)
-    if (dateText.isNotBlank()) bytes.addEscPosWrappedLine(dateText)
+    if (dateText.isNotBlank()) bytes.addEscPosWrappedLine(dateText.take(40))
     bytes.addEscPosCommand(0x1B, 0x61, 0x00)
     bytes.addEscPosWrappedLine(RECEIPT_ESC_POS_SEPARATOR)
-    bytes.addEscPosWrappedLine("AOKIA / XP-58 USB ESC/POS path")
-    bytes.addEscPosWrappedLine("58 mm receipt paper, 32-column layout")
+    bytes.addEscPosWrappedLine("aita.kz  /  0123456789")
+    bytes.addEscPosWrappedLine("100.00 KZT")
     bytes.addEscPosWrappedLine("Кириллица: чек готов")
-    bytes.addEscPosWrappedLine("If this printed, AITA can send receipts directly.")
+    bytes.addEscPosWrappedLine("TEST ONLY - NOT A SALE")
     bytes.finishReceiptEscPosDocument()
     return bytes.toByteArray()
 }
@@ -13581,7 +13575,7 @@ private suspend fun refreshEverythingFromServerAfterRealtimeUpdate() {
     lastRealtimeBroadRefreshAtMillis = getCurrentTimeMillis()
 
     getGlobalAppConfiguration(loadAll = false)
-    getUser(forceLogOut = false, applyServerActiveStore = false, refreshRelatedData = false)
+    getUser(forceLogOut = false, applyServerActiveStore = true, refreshRelatedData = false)
     getStores()
     getSuppliers()
     getGenericGoodsCategories()
@@ -13634,8 +13628,8 @@ private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
     }
 
     if (anyEntityMatches("config")) getGlobalAppConfiguration(loadAll = false)
-    if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false, applyServerActiveStore = false, refreshRelatedData = false)
-    if (anyEntityMatches("stores")) getStores()
+    if (anyEntityMatches("user", "auth")) getUser(forceLogOut = false, applyServerActiveStore = anyEntityMatches("user/active-store"), refreshRelatedData = false)
+    if (anyEntityMatches("stores")) { getStores(); getUser(forceLogOut = false, applyServerActiveStore = true, refreshRelatedData = false) }
 
     // Profile mutations and dashboard invalidations share the `suppliers/...` namespace, but they
     // are different resources. A dashboard-only event must not trigger an unnecessary supplier-list
@@ -16668,6 +16662,7 @@ internal suspend fun refreshUserAccountNow(
     }
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
     val preferenceRevisionAtRequest = AppPreferences.revision
+    val storeRevisionAtRequest = ActiveStores.revision
     val response = networkRequest<UserAccountDataModel, Unit>(
         HttpMethod.Get,
         endpointUrl = globalAppConfigurationState.payloadValue.getUserPath.first,
@@ -16686,10 +16681,11 @@ internal suspend fun refreshUserAccountNow(
     clearTransientOrNeutralInAppNotifications()
     val account = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(payload))
     userAccountState.emit(DataState.Success(account, response.message))
-    ActiveStores.acceptAccount(payload, applyServerActiveStore)
+    ActiveStores.acceptAccount(payload, applyServerActiveStore, authoritative = true, revisionAtRequest = storeRevisionAtRequest)
     AccountAppModes.acceptAccount(payload, authoritative = true)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
     val currentAccount = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(account))
+    userAccountState.emit(DataState.Success(currentAccount, response.message))
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(currentAccount) }
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
@@ -17441,6 +17437,7 @@ fun getStores() {
 
                 if (!response.negative && response.payload != null) {
                     val stores = response.payload
+                    val previousStores = storesState.payloadValue.orEmpty()
                     storesState.emit(DataState.Success(stores, response.message))
                     refreshStoreAddressLocalizations(
                         storeIds = stores.flattenStoresWithBranches()
@@ -17453,7 +17450,8 @@ fun getStores() {
                         val activeStore = stores.findStoreOrBranch(activeStoreIdState.value)
                         when {
                             activeStoreIdState.value != null && activeStore == null ->
-                                setActiveStoreId(null)
+                                setActiveStoreId(replacementForRemovedStore(activeStoreIdState.value,
+                                    previousStores, stores, ActiveStores.parentStoreHint))
 
                             activeStoreIdState.value == null -> {
                                 val settableStores = stores.settableActiveStores()
@@ -17547,30 +17545,40 @@ fun updateStore(store: StoreDataModel, onCompleted: ((DataState<StoreDataModel>)
 }
 
 fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)? = null) {
+    val requestGeneration = currentAuthenticatedSessionGeneration()
+    val requestOwner = userAccountState.payloadValue?.id ?: return
+    fun requestStillCurrent() = authenticatedSessionGenerationIsCurrent(requestGeneration) &&
+        userAccountState.payloadValue?.id == requestOwner
     GlobalScope.launch(Dispatchers.ourIo) {
         deleteStoreMutex.withLock {
+            if (!requestStillCurrent()) return@withLock
             val response = networkRequest<Unit, String>(
                 HttpMethod.Delete,
                 endpointUrl = globalAppConfigurationState.payloadValue.deleteStoresPath.first,
-                body = store.id
+                body = store.id,
+                expectedSessionGeneration = requestGeneration
             )
 
+            if (!requestStillCurrent()) return@withLock
             if (response.negative) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty())
             } else {
                 postInAppNotification(response.message, NotificationType.Positive)
 
-                val removedIds = listOf(store).flattenStoresWithBranches().map { it.id }.toSet()
+                val previousStores = storesState.payloadValue.orEmpty()
+                val removedIds = listOf(previousStores.findStoreOrBranch(store.id) ?: store).flattenStoresWithBranches().map { it.id }.toSet()
+                val remainingStores = previousStores.withoutStoreOrBranch(store.id)
 
                 storesState.emit(
                     DataState.Success(
-                        storesState.payloadValue.orEmpty().withoutStoreOrBranch(store.id)
+                        remainingStores
                     )
                 )
 
                 if (activeStoreIdState.value in removedIds) {
-                    setActiveStoreId(null)
+                    setActiveStoreId(replacementForRemovedStore(activeStoreIdState.value,
+                        previousStores + store, remainingStores, ActiveStores.parentStoreHint))
                 }
 
                 getStores()

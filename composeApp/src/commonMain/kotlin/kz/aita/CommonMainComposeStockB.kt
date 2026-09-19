@@ -106,8 +106,7 @@ fun AppConfiguration.StockBatchCard(
             .zIndex(if (isDragging) 2f else 0f)
             .graphicsLayer {
                 translationY = if (isDragging) dragOffsetPx else animatedPushedOffsetPx
-                scaleX = if (isDragging) 1.025f else 1f
-                scaleY = if (isDragging) 1.025f else 1f
+                // Accent outline, elevation and movement communicate dragging within the layout.
                 alpha = if (isDragging) 0.97f else 1f
             }
             .foregroundTactileShadow(stateValues.cornerRadius, elevated = isDragging)
@@ -133,7 +132,10 @@ fun AppConfiguration.StockBatchCard(
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        dragOffsetPx += dragAmount.y
+                        dragOffsetPx = (dragOffsetPx + dragAmount.y).coerceIn(
+                            -currentIndex * itemStepPx,
+                            (allBatchesCount - 1 - currentIndex).coerceAtLeast(0) * itemStepPx
+                        )
                         onDragTargetChanged?.invoke(currentTargetIndex())
                     },
                     onDragEnd = {

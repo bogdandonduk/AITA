@@ -64,7 +64,7 @@ private fun saveDownloadWeb(url: String, expected: Double, hash: String, fileNam
 internal actual fun clientDownloadsCanChooseFolder() = false
 internal actual suspend fun clientDownloadsFolderLabel(folder: String?): String? = null
 @Composable internal actual fun rememberDownloadsFolderPicker(onChosen: (String?) -> Unit): () -> Unit = {}
-internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, progress: (Long, Long) -> Unit): ClientDownloadResult =
+internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, installRequest: ClientDownloadInstallRequest?, progress: (Long, Long) -> Unit): ClientDownloadResult =
     suspendCancellableCoroutine { continuation ->
         saveDownloadWeb(file.url, file.bytes.toDouble(), file.sha256, fileName, { count, total -> progress(count.toLong(), total.toLong()) }) { result ->
             if (continuation.isActive) when (result) {

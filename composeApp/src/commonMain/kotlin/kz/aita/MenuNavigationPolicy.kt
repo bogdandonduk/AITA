@@ -1,10 +1,27 @@
 package kz.aita
 
+/** Both historical subscription routes now render the same screen. */
+internal fun NavigationScreenModel.Menu.canonicalMenuDestination(): NavigationScreenModel.Menu =
+    if (this == NavigationScreenModel.Menu.StoreSubscriptionPlans) NavigationScreenModel.Menu.StoreSubscription else this
+
 /** One permanent base per pane; detail destinations are never mistaken for a base. */
 internal fun normalizeMenuStack(
     stack: List<NavigationScreenModel.Menu>, base: NavigationScreenModel.Menu
-): List<NavigationScreenModel.Menu> = listOf(base) + stack.filterNot {
+): List<NavigationScreenModel.Menu> = listOf(base) + stack.map { it.canonicalMenuDestination() }.filterNot {
     it == base || it == NavigationScreenModel.Menu.List || it.isTemporarilyHiddenFromUi()
+}.fold(emptyList()) { result, next ->
+    if (next == NavigationScreenModel.Menu.StoreSubscription && result.lastOrNull() == next) result else result + next
+}
+
+internal fun pushMenuDestination(
+    stack: List<NavigationScreenModel.Menu>, requested: NavigationScreenModel.Menu,
+    base: NavigationScreenModel.Menu, remove: Boolean, forceSecond: Boolean
+): List<NavigationScreenModel.Menu> {
+    val normalized = normalizeMenuStack(stack, base)
+    val destination = requested.canonicalMenuDestination()
+    if (destination.isTemporarilyHiddenFromUi()) return normalized
+    if (normalized.last() == destination && (!forceSecond || destination == NavigationScreenModel.Menu.StoreSubscription)) return normalized
+    return (if (remove && normalized.size > 1) normalized.dropLast(1) else normalized) + destination
 }
 
 /** Transfer the detail trail on a resize, keeping List (narrow) / Account (wide) as the base. */

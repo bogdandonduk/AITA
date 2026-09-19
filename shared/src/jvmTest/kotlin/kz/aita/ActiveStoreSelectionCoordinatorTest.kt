@@ -33,6 +33,54 @@ class ActiveStoreSelectionCoordinatorTest {
         try { withTimeout(5_000L) { f.block() } } finally { f.scope.cancel() }
     }
 
+    @Test fun anotherDevicesSelectionIsPublishedAndSavedWithoutEchoingItBack() = fixture {
+        adopt("A")
+        controller.acceptRemote(owner, "B", controller.snapshot.revision)
+        assertEquals("B", shown.last())
+        assertEquals("B", disk.getValue(owner.accountId).choice.storeId)
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun profileThatStartedBeforeLocalClickCannotUndoTheClickEvenAfterItsAcknowledgement() = fixture {
+        adopt("A")
+        val revision = controller.snapshot.revision
+        select("B").join()
+        controller.acceptRemote(owner, "A", revision)
+        assertEquals("B", shown.last())
+    }
+
+    @Test fun remoteSnapshotCannotDiscardAnOfflineSelection() = fixture {
+        adopt("A")
+        sendAction = { ActiveStoreSyncOutcome.RETRY_LATER }
+        select("B").join()
+        controller.acceptRemote(owner, "C", controller.snapshot.revision)
+        assertEquals("B", shown.last())
+        assertTrue(controller.snapshot.pendingSync)
+    }
+
+    @Test fun authoritativeStartupUsesServerSelectionButKeepsOfflinePendingIntent() = fixture {
+        disk[owner.accountId] = SavedActiveStoreChoice(ActiveStoreChoice("deleted"), false)
+        controller.adopt(owner, "parent", preferServerSelection = true)
+        assertEquals("parent", shown.last())
+        owner = owner.copy(sessionGeneration = 2L)
+        disk[owner.accountId] = SavedActiveStoreChoice(ActiveStoreChoice("offline-branch"), true)
+        sendAction = { ActiveStoreSyncOutcome.RETRY_LATER }
+        controller.adopt(owner, "parent", preferServerSelection = true)
+        assertEquals("offline-branch", shown.last())
+        assertTrue(controller.snapshot.pendingSync)
+    }
+
+    @Test fun remoteRepairReplacesAnAlreadyLoadedEmptySelectionWithoutRelogin() = fixture {
+        adopt(null)
+        controller.acceptRemote(owner, "parent", controller.snapshot.revision)
+        assertEquals("parent", shown.last())
+        val oldOwner = owner
+        owner = ActiveStoreOwner("account-b", 2L)
+        adopt("other")
+        controller.acceptRemote(oldOwner, "private", controller.snapshot.revision)
+        assertEquals("other", shown.last())
+    }
+
     @Test fun delayedProfileRefreshCannotReapplyOldStore() = fixture {
         adopt("A")
         select("B").join()

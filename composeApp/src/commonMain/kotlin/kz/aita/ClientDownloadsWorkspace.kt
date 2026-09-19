@@ -10,19 +10,21 @@ import kotlin.io.encoding.Base64
 
 internal data class DownloadEntry(val id: String, val version: String, val build: Long,
     val platform: String, val kind: String, val fileName: String, val sizeBytes: Long, val notes: Map<String, String>,
-    val publisherSigned: Boolean? = null)
+    val publisherSigned: Boolean? = null, val action: ClientDownloadAction = ClientDownloadAction.DOWNLOAD)
 internal data class DownloadsState(val entries: List<DownloadEntry> = emptyList(), val loaded: Boolean = false,
     val loading: Boolean = false, val error: String? = null, val progress: Float? = null, val savingId: String? = null,
     val destinationLabel: String? = null, val canChooseFolder: Boolean = false,
     val folderReady: Boolean = false, val folderChanging: Boolean = false, val folderError: String? = null,
     val savedId: String? = null, val savedDestination: String? = null,
+    val installing: Boolean = false, val handoff: UpdateHandoff? = null,
     val webVersion: String? = null, val webBuild: Long? = null, val webNotes: Map<String, String> = emptyMap())
-internal data class ClientDownloadResult(val destination: String? = null, val cancelled: Boolean = false)
+internal data class ClientDownloadResult(val destination: String? = null, val cancelled: Boolean = false,
+    val prepared: PreparedClientInstaller? = null)
 
 internal expect fun clientDownloadsCanChooseFolder(): Boolean
 internal expect suspend fun clientDownloadsFolderLabel(folder: String?): String?
 @Composable internal expect fun rememberDownloadsFolderPicker(onChosen: (String?) -> Unit): () -> Unit
-internal expect suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?,
+internal expect suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, installRequest: ClientDownloadInstallRequest? = null,
     progress: (Long, Long) -> Unit): ClientDownloadResult
 
 internal data class DownloadFolderInspection(val folder: String?, val loaded: Boolean,
@@ -43,7 +45,7 @@ internal suspend fun inspectDownloadFolder(current: String?, loaded: Boolean,
     catch (_: Exception) { DownloadFolderInspection(folder, preferenceLoaded, error = "storage") }
 }
 
-/** Public signed binaries only. No account token, installer launch, or GitHub credential is used. */
+/** Public signed binaries; compatible installers launch only after a deliberate action. */
 internal object DownloadsWorkspace {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val backend = PlatformClientUpdateBackend()
@@ -52,6 +54,8 @@ internal object DownloadsWorkspace {
     private var accepted: VerifiedClientRelease? = null
     private var release: ClientRelease? = null
     private var files = emptyMap<String, ClientDownloadFile>()
+    private var pendingInstall: Pair<ClientDownloadInstallRequest, PreparedClientInstaller>? = null
+    private var versions = emptyMap<String, ClientDownloadVersion>()
     private var folder: String? = null
     private var folderLoaded = false
     private val channel get() = GeneratedClientBuild.identity.channel
@@ -99,13 +103,16 @@ internal object DownloadsWorkspace {
     private fun expose(value: ClientRelease) {
         val versions = verifiedDownloadVersions(value) ?: throw ClientUpdateFailure("integrity")
         val nextFiles = mutableMapOf<String, ClientDownloadFile>()
+        val nextVersions = mutableMapOf<String, ClientDownloadVersion>()
+        val platform = backend.platform(); val installed = backend.installedBuild()
         val entries = versions.flatMap { version -> version.files.map { file ->
             val id = "${version.build}:${file.os}:${file.arch}:${file.kind}"
             nextFiles[id] = file
+            nextVersions[id] = version
             DownloadEntry(id, version.version, version.build, file.os, file.kind,
-                clientDownloadFileName(version, file), file.bytes, version.notes, file.publisherSigned)
+                clientDownloadFileName(version, file), file.bytes, version.notes, file.publisherSigned, clientDownloadAction(version, file, platform, installed))
         } }
-        release = value; files = nextFiles
+        release = value; files = nextFiles; this.versions = nextVersions
         val web = value.artifacts.any { it.os == ClientOs.WEB && it.kind == InstallerKind.WEB_RELOAD }
         mutable.update { it.copy(entries = entries, webVersion = value.version.takeIf { web }, webBuild = value.build.takeIf { web },
             webNotes = if (web) value.notes else emptyMap()) }
@@ -136,17 +143,47 @@ internal object DownloadsWorkspace {
         if (release?.let { clientReleaseProblem(it, backend.nowMillis(), channel) == null } != true) {
             mutable.update { it.copy(error = "expired") }; return
         }
-        mutable.update { it.copy(savingId = entryId, progress = 0f, error = null, savedId = null, savedDestination = null) }
+        val request = if (entry.action == ClientDownloadAction.DOWNLOAD) null else
+            ClientDownloadInstallRequest(release ?: return, versions[entryId] ?: return, file)
+        pendingInstall = null
+        mutable.update { it.copy(savingId = entryId, progress = 0f, error = null, savedId = null, savedDestination = null, handoff = null) }
         // On the web, showSaveFilePicker must run in the original button gesture before suspension.
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                val result = saveClientDownload(file, entry.fileName, folder) { count, total ->
+                val result = saveClientDownload(file, entry.fileName, folder, request) { count, total ->
                     mutable.update { it.copy(progress = if (total > 0) (count.toDouble() / total).toFloat().coerceIn(0f, 1f) else null) }
                 }
-                if (!result.cancelled) mutable.update { it.copy(savedId = entryId, savedDestination = result.destination) }
+                if (!result.cancelled) {
+                    mutable.update { it.copy(savedId = entryId, savedDestination = result.destination) }
+                    if (request != null) {
+                        val prepared = result.prepared ?: throw ClientUpdateFailure("integrity")
+                        pendingInstall = request to prepared
+                        openPendingInstaller()
+                    }
+                }
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { mutable.update { it.copy(error = (failure as? ClientUpdateFailure)?.reason ?: "storage") } }
-            finally { mutable.update { it.copy(savingId = null, progress = null) } }
+            finally { mutable.update { it.copy(savingId = null, progress = null, installing = false) } }
         }
     }
+    private suspend fun openPendingInstaller() {
+        val pending = pendingInstall ?: return
+        mutable.update { it.copy(installing = true, handoff = null) }
+        val result = handoffClientDownload(pending.first, pending.second)
+        if (result != UpdateHandoff.PERMISSION_REQUIRED) pendingInstall = null
+        mutable.update { it.copy(handoff = result) }
+    }
+    fun onForeground() {
+        if (mutable.value.handoff != UpdateHandoff.PERMISSION_REQUIRED || mutable.value.savingId != null ||
+            !clientInstallerPermissionGranted()) return
+        val pending = pendingInstall ?: return
+        mutable.update { it.copy(savingId = "${pending.first.version.build}:${pending.first.file.os}:${pending.first.file.arch}:${pending.first.file.kind}") }
+        scope.launch {
+            try { openPendingInstaller() }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) { mutable.update { it.copy(error = (failure as? ClientUpdateFailure)?.reason ?: "install") } }
+            finally { mutable.update { it.copy(savingId = null, progress = null, installing = false) } }
+        }
+    }
+
 }

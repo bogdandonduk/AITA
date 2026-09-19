@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
 import kz.aita.android.MainActivity
 import kz.aita.updates.ClientDownloadFile
 
-private fun downloadContext() = MainActivity.getOrNull()?.applicationContext ?: throw ClientUpdateFailure("unavailable")
+private fun downloadContext() = kz.aita.android.AITA.get()
 internal actual fun clientDownloadsCanChooseFolder() = true
 private fun treeDirectory(tree: Uri) = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
 private fun documentName(uri: Uri): String? = downloadContext().contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
@@ -46,11 +46,15 @@ internal actual suspend fun clientDownloadsFolderLabel(folder: String?): String?
     }
     return { try { picker.launch(null) } catch (_: Exception) { DownloadsWorkspace.reportProblem("unavailable") } }
 }
-internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, progress: (Long, Long) -> Unit): ClientDownloadResult = withContext(Dispatchers.IO) {
+internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileName: String, folder: String?, installRequest: ClientDownloadInstallRequest?, progress: (Long, Long) -> Unit): ClientDownloadResult = withContext(Dispatchers.IO) {
     require(Regex("[A-Za-z0-9._-]{1,160}").matches(fileName))
     val context = downloadContext()
     val temporary = fetchVerifiedClientDownload(File(context.cacheDir, "release-downloads"), file, progress)
     try {
+        val prepared = installRequest?.let {
+            val release = it.release(System.currentTimeMillis(), clientUpdatePlatform(), installedClientBuild())
+            androidDownloadInstallers().importVerified(release, release.artifacts.single(), temporary)
+        }
         val resolver = context.contentResolver
         if (folder != null || Build.VERSION.SDK_INT >= 29) {
             val uri = if (folder != null) DocumentsContract.createDocument(resolver, treeDirectory(Uri.parse(folder)), "application/octet-stream", fileName)
@@ -69,7 +73,7 @@ internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileNam
                         throw ClientUpdateFailure("storage")
                 }
                 val name = documentName(uri) ?: fileName
-                ClientDownloadResult("${clientDownloadsFolderLabel(folder)}/$name")
+                ClientDownloadResult("${clientDownloadsFolderLabel(folder)}/$name", prepared = prepared)
             } catch (failure: Exception) {
                 runCatching { if (folder != null) DocumentsContract.deleteDocument(resolver, uri) else resolver.delete(uri, null, null) }
                 throw failure
@@ -87,7 +91,7 @@ internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileNam
             } while (!destination.createNewFile())
             try {
                 FileOutputStream(destination).use { output -> temporary.inputStream().use { it.copyTo(output) }; output.fd.sync() }
-                ClientDownloadResult(destination.canonicalPath)
+                ClientDownloadResult(destination.canonicalPath, prepared = prepared)
             } catch (failure: Exception) { destination.delete(); throw failure }
         }
     } finally { temporary.delete() }
