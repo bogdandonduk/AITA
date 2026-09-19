@@ -658,6 +658,23 @@ fun AppConfiguration.MenuDevicesScreen() {
                                 fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
                             Text(deviceWorkflowText("saved_setup_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
+                        if (!preferHtmlDocumentPrinting && chooseSystemReceiptPrinterAction != null) {
+                            val savedSystemPrinter by systemReceiptPrinterNameState.collectAsState()
+                            savedSystemPrinter?.let { Text(it, color = stateValues.TextColor, fontSize = stateValues.smallTextSize) }
+                            actionButton(text = deviceWorkflowText("choose_printer"),
+                                iconPath = stateValues.drawablePathIconReceipt, iconRes = stateValues.drawableResIconReceipt.value,
+                                loading = savingReceiptPrinter, autoLoading = false, confirmationRequired = false,
+                                enabled = !savingReceiptPrinter && !printingReceipt && !refreshingReceiptPrinters,
+                                onClick = {
+                                    savingReceiptPrinter = true
+                                    devicesScope.launch {
+                                        val result = try { chooseSystemReceiptPrinterAction!!.invoke() }
+                                        finally { savingReceiptPrinter = false }
+                                        if (result.success) selectReceiptPrinter(SYSTEM_DOCUMENT_PRINTER_ID)
+                                        else { receiptPrinterError = result.message }
+                                    }
+                                })
+                        }
                         if (receiptUsesSystemDocumentPrinting()) {
                             Text(deviceWorkflowText("receipt_paper"), color = stateValues.TextColor,
                                 fontSize = stateValues.accentTextSize)

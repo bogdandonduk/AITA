@@ -1148,11 +1148,13 @@ suspend fun loadSecuritySessionsForUser(userId: UUID, currentSessionId: UUID?): 
   newSuspendedTransaction(aitaServerIoContext) {
     RefreshSessions
       .selectAll()
-      .where { RefreshSessions.userId eq userId }
+      // Filter live sessions BEFORE applying the display limit. Rotated token history can
+      // otherwise push every device except the most recently refreshed one out of the list.
+      .where { (RefreshSessions.userId eq userId) and RefreshSessions.revokedAt.isNull() and
+        (RefreshSessions.securityInvalidated eq false) and (RefreshSessions.expiresAt greater Instant.now()) }
       .orderBy(RefreshSessions.createdAt, SortOrder.DESC)
-      .limit(50)
+      .limit(200)
       .map { it.toSecuritySessionDataModel(currentSessionId) }
-      .filter { it.active }
   }
 
 fun ResultRow.toSecuritySessionHistoryDataModel(): SecuritySessionHistoryDataModel {
@@ -1352,7 +1354,9 @@ private fun sameDeviceSessionIdsInsideTransaction(
         val rowPlatformName = meta["platformName"]?.takeIf { it.isNotBlank() }
         val rowOsName = meta["osName"]?.takeIf { it.isNotBlank() }
         val sameInstallation = installationId != null && rowInstallationId == installationId
-        val sameVisibleDevice = deviceName != null &&
+        // Two Windows/browser installations may have identical visible names. Their stable
+        // installation IDs take precedence; legacy names apply only when neither has an ID.
+        val sameVisibleDevice = installationId == null && rowInstallationId == null && deviceName != null &&
            rowDeviceName == deviceName &&
            rowPlatformName == platformName &&
            rowOsName == osName

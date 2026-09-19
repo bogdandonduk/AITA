@@ -14,6 +14,13 @@ import java.awt.print.Printable
 import java.awt.print.PrinterJob
 import javax.swing.SwingUtilities
 import kotlinx.coroutines.sync.Mutex
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import javax.print.PrintService
+import javax.print.PrintServiceLookup
+import javax.print.attribute.HashPrintRequestAttributeSet
+import javax.print.attribute.standard.DialogTypeSelection
 
 /** A real driver-rendered route: USB, network and virtual queues are chosen by the OS. */
 class SystemReceiptPages(document: AitaPdfDocument) : Pageable {
@@ -62,21 +69,71 @@ class SystemReceiptPages(document: AitaPdfDocument) : Pageable {
 }
 
 private val systemReceiptPrintMutex = Mutex()
+private var chosenSystemReceiptService: PrintService? = null
+private fun systemReceiptPreference() = File(jvmPersistentDataRoot(), "system-receipt-printer.txt")
+private fun rememberedSystemReceiptService(): PrintService? {
+    chosenSystemReceiptService?.let { return it }
+    val file = systemReceiptPreference()
+    if (!file.isFile) return null
+    require(file.length() <= 4096)
+    val name = file.readText().trim()
+    if (name.isEmpty()) return null
+    return PrintServiceLookup.lookupPrintServices(null, null).firstOrNull { it.name == name }
+        ?.also { chosenSystemReceiptService = it }
+        ?: error("Saved system printer is unavailable; select its current queue")
+}
+private fun rememberSystemReceiptService(service: PrintService) {
+    val file = systemReceiptPreference()
+    file.parentFile.mkdirs()
+    val staged = File.createTempFile("system-receipt-", ".tmp", file.parentFile)
+    try {
+        staged.writeText(service.name)
+        try { Files.move(staged.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
+        catch (_: java.nio.file.AtomicMoveNotSupportedException) { Files.move(staged.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+        chosenSystemReceiptService = service
+        systemReceiptPrinterNameState.value = service.name
+    } finally { staged.delete() }
+}
+private fun showNativePrinterDialog(job: PrinterJob): Boolean {
+    var accepted = false
+    val attributes = HashPrintRequestAttributeSet().apply { add(DialogTypeSelection.NATIVE) }
+    val show = Runnable { accepted = job.printDialog(attributes) }
+    if (SwingUtilities.isEventDispatchThread()) show.run() else SwingUtilities.invokeAndWait(show)
+    return accepted
+}
 
-/** Caller uses a worker dispatcher. Dialog alone is on AWT; layout and spool submission are not. */
+/** Selection alone never sends a test page. The OS dialog owns driver properties. */
+fun chooseSystemReceiptPrinter(): ReceiptPlatformActionResult {
+    if (!systemReceiptPrintMutex.tryLock()) return ReceiptPlatformActionResult(false, deviceWorkflowText("print_busy"))
+    return try {
+        val job = PrinterJob.getPrinterJob()
+        runCatching { rememberedSystemReceiptService() }.getOrNull()?.let { job.printService = it }
+        if (!showNativePrinterDialog(job)) ReceiptPlatformActionResult(false, deviceWorkflowText("print_cancelled"))
+        else {
+            rememberSystemReceiptService(job.printService)
+            ReceiptPlatformActionResult(true, deviceWorkflowText("saved_setup"))
+        }
+    } catch (_: Exception) { ReceiptPlatformActionResult(false, deviceWorkflowText("driver_print_failed")) }
+    finally { systemReceiptPrintMutex.unlock() }
+}
+
+/** Caller uses a worker dispatcher. Only initial/reselection dialogs run on AWT; subsequent
+ * receipts use the explicitly saved queue. Success means queued, never verified on paper. */
 fun printSystemReceiptDocument(title: String, document: AitaPdfDocument): ReceiptPlatformActionResult {
     if (!systemReceiptPrintMutex.tryLock()) return ReceiptPlatformActionResult(false, deviceWorkflowText("print_busy"))
     try {
         val pages = SystemReceiptPages(document)
         val job = PrinterJob.getPrinterJob()
+        val saved = rememberedSystemReceiptService()
+        saved?.let { job.printService = it }
         job.jobName = title
         job.setPageable(pages)
-        var accepted = false
-        val showDialog = Runnable { accepted = job.printDialog() }
-        if (SwingUtilities.isEventDispatchThread()) showDialog.run() else SwingUtilities.invokeAndWait(showDialog)
-        if (!accepted) return ReceiptPlatformActionResult(false, deviceWorkflowText("print_cancelled"))
-        // Never fall back to RAW on failure: the job may already be in the queue.
+        if (saved == null && !showNativePrinterDialog(job))
+            return ReceiptPlatformActionResult(false, deviceWorkflowText("print_cancelled"))
+        job.setPageable(pages)
+        // Never fall back to RAW or another queue after an uncertain driver submission.
         job.print()
+        if (saved == null) runCatching { rememberSystemReceiptService(job.printService) }
         return ReceiptPlatformActionResult(true, deviceWorkflowText("print_queued"))
     } catch (error: Exception) {
         System.err.println("AITA system receipt printing failed: ${error.javaClass.simpleName}: ${error.message}")

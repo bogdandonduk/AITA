@@ -7,11 +7,20 @@ import kotlin.test.assertNull
 class RemovedStoreSelectionTest {
     private fun store(id: String) = StoreDataModel(id = id, userIds = emptyList(), storeTypeIds = emptyList(),
         name = emptyList(), alias = emptyList(), description = emptyList(), companyForms = emptyList(), location = LocationDataModel(),
-        phoneNumbers = emptyList(), emails = emptyList(), countryLocales = emptyList(), createdAt = 0)
+        phoneNumbers = emptyList(), emails = emptyList(), countryLocales = emptyList(), createdAt = 0, architectureVersion = 2)
 
     private val branch = store("branch").copy(parentStoreId = "parent")
     private val parent = store("parent").copy(branches = listOf(branch))
 
+    @Test fun emptySelectionRecoversTheOnlyManagementFamilyEvenWithSeveralBranches() {
+        val family = parent.copy(branches = listOf(branch, branch.copy(id = "second")))
+        assertEquals("parent", recoverUnselectedStore(listOf(family)))
+        assertEquals("parent", recoverUnselectedStore(listOf(family), "parent"))
+    }
+    @Test fun emptySelectionDoesNotGuessBetweenUnrelatedFamilies() {
+        assertNull(recoverUnselectedStore(listOf(parent, store("other-parent"))))
+        assertNull(recoverUnselectedStore(emptyList()))
+    }
     @Test fun deletedBranchSelectsItsSurvivingParent() {
         assertEquals("parent", replacementForRemovedStore("branch", listOf(parent), listOf(parent.copy(branches = emptyList()))))
     }

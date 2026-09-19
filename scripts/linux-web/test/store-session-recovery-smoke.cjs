@@ -93,6 +93,22 @@ try {
  const report=await b.evaluate(()=>window.testPrintHtml);assert.match(report,/595.28pt/);assert.match(report,/841.89pt/);assert.doesNotMatch(report,/aita-receipt-paper/);
  fs.writeFileSync(out+'/a4-dialog-document.html',report);
  assert.deepEqual(errors,[]);console.log('PASS: active-store deletion, stable printer refresh and A4 print-dialog action');
+ // A legacy session has no selection even though one parent family remains.
+ account={...account,activeStoreId:null};publish('user/active-store');
+ await waitFor(()=>account.activeStoreId===parent.id,'missing selection repaired on server');
+ await waitFor(async()=>await preference(b,'key_activeStoreId')===parent.id,'missing selection repaired on the other client');
+ assert.ok(await b.getByText('Send test receipt',{exact:true}).count(),'missing-selection repair preserves Devices');
+ // Miss an event while the page is frozen; foreground must refresh without a socket hint.
+ await b.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+ await b.waitForTimeout(500);
+ account={...account,activeStoreId:internet.id};
+ const foregroundCalls=calls.length;
+ await b.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+ await waitFor(()=>calls.slice(foregroundCalls).some(c=>c.device==='second'&&c.path==='/user/get'),'foreground account reconciliation');
+ await waitFor(async()=>await preference(b,'key_activeStoreId')===internet.id,'missed selection recovered on foreground');
+ assert.ok(await b.getByText('Send test receipt',{exact:true}).count(),'foreground recovery preserves Devices');
+ assert.deepEqual(errors,[]);console.log('PASS: missing selection and missed foreground event recover without navigation loss');
+
 }catch(error){for(let i=0;i<clients.length;i++){const p=clients[i].page;await p.screenshot({path:out+'/failure-'+i+'.png'}).catch(()=>{});fs.writeFileSync(out+'/semantics-'+i+'.txt',await p.locator('body').evaluate(x=>x.outerHTML).catch(()=>''));}throw error;}
 finally{fs.writeFileSync(out+'/result.json',JSON.stringify({calls,errors},null,2));await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

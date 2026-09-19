@@ -49,13 +49,13 @@ try {
     Write-Output 'Installer and local work are retained. Review the installer log or retry from AITA.'
 } finally {
     # On cancellation/failure, reopen the installed version if Windows Installer retained it.
-    if (${'$'}parentExited -and (Test-Path -LiteralPath ${'$'}launcher -PathType Leaf)) { Start-Process -FilePath ${'$'}launcher }
+    if (${'$'}parentExited -and ${'$'}env:AITA_UPDATE_RELAUNCH -ne 'false' -and (Test-Path -LiteralPath ${'$'}launcher -PathType Leaf)) { Start-Process -FilePath ${'$'}launcher }
     Remove-Item -LiteralPath ${'$'}ready -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath ${'$'}PSCommandPath -ErrorAction SilentlyContinue
 }
 """.trimIndent()
 
-internal suspend fun startWindowsUpdateHandoff(installer: File, hash: String, launcher: File): Boolean {
+internal suspend fun startWindowsUpdateHandoff(installer: File, hash: String, launcher: File, relaunch: Boolean = true): Boolean {
     require(Regex("[a-f0-9]{64}").matches(hash))
     require(installer.extension.equals("msi", true) && installer.absolutePath.none { it.code < 32 || it == '"' })
     val folder = installer.parentFile
@@ -66,11 +66,12 @@ internal suspend fun startWindowsUpdateHandoff(installer: File, hash: String, la
     val powershell = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe")
     script.writeText(windowsUpdateScript)
     val process = try {
-        ProcessBuilder(powershell.absolutePath, "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script.absolutePath)
+        ProcessBuilder(powershell.absolutePath, "-NoLogo", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", script.absolutePath)
             .apply {
                 environment().putAll(mapOf("AITA_UPDATE_READY" to ready.absolutePath, "AITA_UPDATE_LAUNCHER" to launcher.absolutePath,
                     "AITA_UPDATE_INSTALLER" to installer.absolutePath, "AITA_UPDATE_PARENT" to ProcessHandle.current().pid().toString(),
-                    "AITA_UPDATE_LOG" to log.absolutePath, "AITA_UPDATE_SHA256" to hash))
+                    "AITA_UPDATE_LOG" to log.absolutePath, "AITA_UPDATE_SHA256" to hash,
+                    "AITA_UPDATE_RELAUNCH" to relaunch.toString()))
                 redirectErrorStream(true); redirectOutput(File(folder, "handoff-$identity.log"))
             }.start()
     } catch (error: Exception) { script.delete(); throw error }

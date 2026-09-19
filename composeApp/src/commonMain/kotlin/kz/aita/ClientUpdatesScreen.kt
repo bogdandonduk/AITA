@@ -141,6 +141,15 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
                     if (current.platform?.os == ClientOs.ANDROID) {
                         Text(updateText("android_install_help"), color=stateValues.PlaceholderTextColor, fontSize=stateValues.smallTextSize)
                     }
+                    if (current.platform?.os == ClientOs.WINDOWS) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Checkbox(checked = current.backgroundDownloads,
+                                onCheckedChange = AppUpdateWorkspace::setBackgroundDownloads,
+                                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = stateValues.AccentColor))
+                            Text(updateText("background_downloads"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+                        }
+                        Text(updateText("windows_update_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    }
                     Text(updateText("cleanup"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                     Text("${artifact.kind.name} · ${updateSize(artifact.bytes)}",color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                     if(current.phase==ClientUpdatePhase.DOWNLOADING) {
@@ -153,7 +162,7 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = stateValues.AccentColor)
                             Text(updateText("installing"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
                         }
-                        actionButton(text = updateText("update"), iconPath = updateIconPath(), iconRes = updateIconResource(),
+                        actionButton(text = updateText(if (current.platform?.os == ClientOs.WINDOWS && current.prepared != null) "restart_update" else "update"), iconPath = updateIconPath(), iconRes = updateIconResource(),
                             autoLoading = false, enabled = !current.busy, confirmationRequired = false, onClick = AppUpdateWorkspace::update)
                     }
                 } else {

@@ -8135,25 +8135,29 @@ fun init() {
     }
 
     GlobalScope.launch(Dispatchers.ourIo) {
-        // Load persisted configuration before starting collectors. Otherwise the initial bundled
-        // server URL can overwrite the last working local server URL before the app has a chance
-        // to use it, making the client appear to never reach the backend.
+        var opened = false
+        fun openWorkspace() {
+            if (opened) return
+            opened = true
+            localApplicationHydratedState.value = true
+            // Only identity/mode/store/access must precede this request. Optional historical
+            // caches cannot delay session recovery or keep an offline workspace on the splash.
+            getUser()
+            startCloudConnectionHealthMonitor()
+            if (getStoredUserAuthTokens?.invoke() != null) startRealtimeUpdates()
+        }
         try {
             DynamicCarts.prepareLegacyImport()
-            loadCachedApplicationData()
+            loadCachedApplicationData(::openWorkspace)
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { logCloudConnectionDiagnostic("Local startup cache unavailable; credentials retained") }
-        finally { localApplicationHydratedState.value = true }
-        // An older cache must never overwrite a freshly fetched account/store snapshot.
-        getUser()
+        finally { openWorkspace() }
         startSupplierIdentityFocus()
         startAppCacheCollectors()
         AnalyticsWorkspace.start()
         DynamicCarts.adoptCurrent()
         initializeLocalBranchNetwork()
-        startCloudConnectionHealthMonitor()
         syncPendingSessionCleanupsToServer()
-        if (getStoredUserAuthTokens?.invoke() != null) startRealtimeUpdates()
     }
 
     GlobalScope.launch(Dispatchers.ourIo) { AppPreferences.hydrate() }
@@ -13060,7 +13064,11 @@ fun notifyCloudConnectionMayBeAvailable(networkChanged: Boolean = false) {
 internal fun reconnectVisibleBrowserPage() {
     if (!appInitializationStartedState.value) return
     notifyCloudConnectionMayBeAvailable(networkChanged = true)
-    if (runCatching { getStoredUserAuthTokens?.invoke() != null }.getOrDefault(false)) startRealtimeUpdates()
+    if (runCatching { getStoredUserAuthTokens?.invoke() != null }.getOrDefault(false)) {
+        getUser(forceLogOut = false, applyServerActiveStore = true, refreshRelatedData = false)
+        getStores()
+        startRealtimeUpdates()
+    }
 }
 
 private val cloudConnectionHealthMonitorJob = OwnedConnectionJob()
@@ -13241,7 +13249,7 @@ private suspend fun loadCachedStoreScopedData(storeId: String, owner: InventoryO
     }
 }
 
-private suspend fun loadCachedApplicationData() {
+internal suspend fun loadCachedApplicationData(onWorkspaceReady: () -> Unit = {}) {
     getJsonCache<GlobalAppConfigurationDataModel>(CACHE_GLOBAL_CONFIG)?.let {
         val currentConfiguration = globalAppConfigurationState.payloadValue
         val cachedLastKnownGoodServerUrl = cachedLastKnownGoodServerUrlOrNull()
@@ -13275,24 +13283,49 @@ private suspend fun loadCachedApplicationData() {
     // Account data may be shown offline only while a durable authenticated session still exists.
     // Older builds left JSON account caches behind on logout; hydrating those without tokens made
     // desktop relaunch appear logged in even after Keychain credentials had been removed.
+    val sessionGeneration = currentAuthenticatedSessionGeneration()
     val hasAuthenticatedSession = hasStoredAuthenticatedSession()
     if (hasAuthenticatedSession) {
-        getJsonCache<UserAccountDataModel>(CACHE_USER)?.let {
+        // The durable account is enough to open the saved workspace even when the optional JSON
+        // cache is missing. Do not leave a token-bearing offline launch waiting for /user/get.
+        val storedAccount = try { getStoredUserAccountDataModel?.invoke() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { null }
+        (storedAccount ?: getJsonCache<UserAccountDataModel>(CACHE_USER))?.let {
+            if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return
             userAccountState.emit(DataState.Success(it, cacheMessage()))
             ActiveStores.acceptAccount(it)
             AccountAppModes.acceptAccount(it, authoritative = false)
         }
         getJsonCache<List<StoreDataModel>>(CACHE_STORES)?.let {
+            if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return
             storesState.emit(DataState.Success(it, cacheMessage()))
         }
+        getJsonCache<List<StoreWorkerDataModel>>(CACHE_MY_WORKER_MEMBERSHIPS)?.let {
+            if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return
+            myWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+        }
+        activeStoreIdState.value?.let { restoreStoreSubscriptionCache(it) }
+    } else {
+        clearAuthenticatedAccountCaches()
+    }
+
+    // Navigation needs identity, mode, store and access metadata, not catalogue/history rows.
+    // Keep restoring optional caches before starting their collectors/network refreshes, while
+    // allowing the saved workspace to render and its individual lists to finish loading.
+    val accountId = userAccountState.payloadValue?.id
+    onWorkspaceReady()
+    fun ownsAccountCache() = hasAuthenticatedSession &&
+        authenticatedSessionGenerationIsCurrent(sessionGeneration) && userAccountState.payloadValue?.id == accountId
+    if (ownsAccountCache()) {
         getJsonCache<List<SupplierDataModel>>(CACHE_SUPPLIERS)?.let {
-            suppliersState.emit(DataState.Success(it, cacheMessage()))
+            if (ownsAccountCache() && suppliersState.payloadValue == null) suppliersState.emit(DataState.Success(it, cacheMessage()))
         }
         val notificationOwner = userAccountState.payloadValue?.id
         val notificationGeneration = currentAuthenticatedSessionGeneration()
         getJsonCache<List<NotificationDataModel>>(CACHE_NOTIFICATIONS)?.let { cached ->
             notificationHistoryMutex.withLock {
-                if (userAccountState.payloadValue?.id == notificationOwner && authenticatedSessionGenerationIsCurrent(notificationGeneration)) {
+                if (ownsAccountCache() && userAccountState.payloadValue?.id == notificationOwner && authenticatedSessionGenerationIsCurrent(notificationGeneration)) {
                     val live = notificationsState.payloadValue.orEmpty()
                     val merged = mergeNotificationSnapshot(emptyList(), live, cached.filter { it.userId == null || it.userId == notificationOwner })
                     notificationsState.emit(DataState.Success(merged, cacheMessage()))
@@ -13300,33 +13333,30 @@ private suspend fun loadCachedApplicationData() {
             }
         }
         getJsonCache<List<SecuritySessionDataModel>>(CACHE_SECURITY_SESSIONS)?.let {
-            securitySessionsState.emit(DataState.Success(it, cacheMessage()))
+            if (ownsAccountCache() && securitySessionsState.payloadValue == null) securitySessionsState.emit(DataState.Success(it, cacheMessage()))
         }
         getJsonCache<List<SecuritySessionHistoryDataModel>>(CACHE_SECURITY_SESSION_HISTORY)?.let {
-            securitySessionHistoryState.emit(DataState.Success(it, cacheMessage()))
-        }
-        getJsonCache<List<StoreWorkerDataModel>>(CACHE_MY_WORKER_MEMBERSHIPS)?.let {
-            myWorkerMembershipsState.emit(DataState.Success(it, cacheMessage()))
+            if (ownsAccountCache() && securitySessionHistoryState.payloadValue == null) securitySessionHistoryState.emit(DataState.Success(it, cacheMessage()))
         }
         getJsonCache<List<StoreWorkerRequestDataModel>>(CACHE_MY_WORKER_REQUESTS)?.let {
-            myWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
+            if (ownsAccountCache() && myWorkerRequestsState.payloadValue == null) myWorkerRequestsState.emit(DataState.Success(it, cacheMessage()))
         }
         getJsonCache<UserFinanceDashboardDataModel>(CACHE_USER_FINANCE_DASHBOARD)?.let {
-            userFinanceDashboardState.emit(DataState.Success(it, cacheMessage()))
-            userWalletState.emit(DataState.Success(it.wallet, cacheMessage()))
-            userWalletLedgerState.emit(DataState.Success(it.ledger, cacheMessage()))
-            paymentIntentsState.emit(DataState.Success(it.paymentIntents, cacheMessage()))
+            if (ownsAccountCache() && userFinanceDashboardState.payloadValue == null) {
+                userFinanceDashboardState.emit(DataState.Success(it, cacheMessage()))
+                userWalletState.emit(DataState.Success(it.wallet, cacheMessage()))
+                userWalletLedgerState.emit(DataState.Success(it.ledger, cacheMessage()))
+                paymentIntentsState.emit(DataState.Success(it.paymentIntents, cacheMessage()))
+            }
         }
-    } else {
-        clearAuthenticatedAccountCaches()
     }
 
     getJsonCache<List<GenericGoodsCategoryDataModel>>(CACHE_GENERIC_GOODS_CATEGORIES)?.let {
-        genericGoodsCategoriesState.emit(DataState.Success(it, cacheMessage()))
-        categoriesState.emit(DataState.Success(it, cacheMessage()))
+        if (genericGoodsCategoriesState.payloadValue == null) genericGoodsCategoriesState.emit(DataState.Success(it, cacheMessage()))
+        if (categoriesState.payloadValue == null) categoriesState.emit(DataState.Success(it, cacheMessage()))
     }
     getJsonCache<List<GenericGoodsItemDataModel>>(CACHE_GENERIC_GOODS_ITEMS)?.let {
-        genericGoodsItemsState.emit(DataState.Success(it, cacheMessage()))
+        if (genericGoodsItemsState.payloadValue == null) genericGoodsItemsState.emit(DataState.Success(it, cacheMessage()))
     }
     getJsonCache<List<StoreSubscriptionPlanDataModel>>(CACHE_SUBSCRIPTION_PLANS)?.let { cachedPlans ->
         val allowedPlanIds = defaultStoreSubscriptionPlans().map { it.id }.toSet()
@@ -13334,9 +13364,8 @@ private suspend fun loadCachedApplicationData() {
         subscriptionPlansState.emit(DataState.Success(visiblePlans, cacheMessage()))
     }
 
-    if (hasAuthenticatedSession) {
-        activeStoreIdState.value?.let { loadCachedStoreScopedData(it) }
-    }
+    // observeActiveInventoryData owns store cache hydration and cancels it on account/store
+    // changes. Loading the same inventory here doubled disk work and held the splash open.
 }
 
 private fun startAppCacheCollectors() {
@@ -16663,7 +16692,7 @@ internal suspend fun refreshUserAccountNow(
                 userAccountState.emit(DataState.Success(this))
                 ActiveStores.acceptAccount(this, applyServerActiveStore)
                 AccountAppModes.acceptAccount(this, authoritative = false)
-                activeStoreIdState.value?.let { loadCachedInventory(it) }
+                // The scoped inventory observer restores stock independently of account reads.
             }
         }
     }
@@ -16696,6 +16725,9 @@ internal suspend fun refreshUserAccountNow(
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(currentAccount) }
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
+    // An earlier stores read may have skipped reconciliation while this account adoption
+    // changed the selection revision. Recheck a missing selection using a fresh store list.
+    if (applyServerActiveStore && activeStoreIdState.value == null && !ActiveStores.explicitNone) getStores()
 
     activeStoreIdState.value?.takeIf { currentStoreHasWorkspaceAccess(it) }?.let { storeId ->
         if (stockState.payloadValue == null || stockLoadStatusState.value.failure != null) getStock(storeId)
@@ -17456,15 +17488,17 @@ fun getStores() {
                     if (ActiveStores.revision == selectionRevision && ActiveStores.hydrated) {
                         val activeStore = stores.findStoreOrBranch(activeStoreIdState.value)
                         when {
-                            activeStoreIdState.value != null && activeStore == null ->
-                                setActiveStoreId(replacementForRemovedStore(activeStoreIdState.value,
-                                    previousStores, stores, ActiveStores.parentStoreHint))
-
-                            activeStoreIdState.value == null -> {
-                                val settableStores = stores.settableActiveStores()
-                                if (!activeStoreExplicitNoneIsSet() && settableStores.size == 1) {
-                                    setActiveStoreId(settableStores.first().id)
-                                }
+                            activeStoreIdState.value != null && activeStore == null -> {
+                                val replacement = replacementForRemovedStore(activeStoreIdState.value,
+                                    previousStores, stores, ActiveStores.parentStoreHint)
+                                    ?: recoverUnselectedStore(stores, ActiveStores.parentStoreHint)
+                                // A stale list is never an instruction to erase another device's
+                                // account selection. Ask the account when no parent can be inferred.
+                                setActiveStoreId(replacement, syncServer = replacement != null)
+                                if (replacement == null) getUser(forceLogOut = false, refreshRelatedData = false)
+                            }
+                            activeStoreIdState.value == null && !activeStoreExplicitNoneIsSet() -> {
+                                recoverUnselectedStore(stores, ActiveStores.parentStoreHint)?.let { setActiveStoreId(it) }
                             }
                         }
                     }
@@ -17584,8 +17618,11 @@ fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)?
                 )
 
                 if (activeStoreIdState.value in removedIds) {
-                    setActiveStoreId(replacementForRemovedStore(activeStoreIdState.value,
-                        previousStores + store, remainingStores, ActiveStores.parentStoreHint))
+                    val replacement = replacementForRemovedStore(activeStoreIdState.value,
+                        previousStores + store, remainingStores, ActiveStores.parentStoreHint)
+                        ?: recoverUnselectedStore(remainingStores, ActiveStores.parentStoreHint)
+                    setActiveStoreId(replacement, syncServer = replacement != null)
+                    if (replacement == null) getUser(forceLogOut = false, refreshRelatedData = false)
                 }
 
                 getStores()

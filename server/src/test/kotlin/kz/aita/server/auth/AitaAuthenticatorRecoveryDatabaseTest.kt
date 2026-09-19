@@ -116,12 +116,13 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                     SchemaUtils.create(Users, RefreshSessions, SecuritySessionEvents, Notifications)
                     // Reproduce pre-V98 session shape, then execute the actual additive migrations.
                     exec("ALTER TABLE refresh_sessions DROP COLUMN security_invalidated")
-                    listOf("V93__email_password_recovery_and_authenticator_security.sql",
+                    listOf("V63__security_session_history_63918.sql", "V64__refresh_session_same_device_uniqueness_58264.sql",
+                        "V93__email_password_recovery_and_authenticator_security.sql",
                         "V94__authenticated_phone_login_alias_challenges.sql", "V95__authentication_email_delivery_snapshots.sql",
                         "V96__verified_additional_login_emails.sql", "V97__authenticator_login_requirement.sql",
                         "V98__authenticator_sign_in_and_email_recovery.sql",
                         "V99__email_second_factor_and_single_extra_email.sql",
-                        "V111__scoped_contact_email_confirmation.sql", "V119__new_device_sign_in_notices.sql").forEach { name ->
+                        "V111__scoped_contact_email_confirmation.sql", "V119__new_device_sign_in_notices.sql", "V127__distinct_device_security_sessions.sql").forEach { name ->
                         val sql = requireNotNull(javaClass.getResourceAsStream("/db/migration/$name")).bufferedReader().use { it.readText() }
                         exec(sql)
                     }
@@ -141,6 +142,49 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                 DriverManager.getConnection(url, props).use { it.createStatement().use { st -> st.execute("DROP SCHEMA $schema CASCADE") } }
             }
         }
+    }
+
+    @Test fun identicalBrowserNamesKeepDistinctInstallationsSignedIn() = fixture {
+        val id = user()
+        val firstMeta = device + mapOf("deviceName" to "Windows Chrome", "platformName" to "Web", "osName" to "Windows")
+        val secondMeta = firstMeta + ("installationId" to "second-computer")
+        val first = tokens.newPair(id, firstMeta)
+        val second = tokens.newPair(id, secondMeta)
+        assertEquals(2, loadSecuritySessionsForUser(id, null).size)
+        tokens.rotate(first.refreshToken, firstMeta)
+        tokens.rotate(second.refreshToken, secondMeta)
+        assertEquals(2, loadSecuritySessionsForUser(id, null).size)
+        tokens.newPair(id, secondMeta)
+        assertEquals(2, loadSecuritySessionsForUser(id, null).size, "A new login replaces only the same installation")
+    }
+
+    @Test fun rotatedHistoryCannotHideOtherActiveSessions() = fixture {
+        val id = user()
+        val first = tokens.newPair(id, device)
+        val other = device + ("installationId" to "second-computer")
+        var rotating = tokens.newPair(id, other)
+        repeat(55) { rotating = tokens.rotate(rotating.refreshToken, other) }
+        val currentId = UUID.fromString(com.auth0.jwt.JWT.decode(first.accessToken).getClaim("sessionId").asString())
+        val sessions = loadSecuritySessionsForUser(id, currentId)
+        assertEquals(2, sessions.size)
+        assertTrue(sessions.single { it.id == currentId.toString() }.current)
+        assertTrue(sessions.all { it.active })
+    }
+
+    @Test fun securityListExcludesExpiredAndInvalidatedTokensBeforeLimit() = fixture {
+        val id = user()
+        tokens.newPair(id, device)
+        tokens.newPair(id, device + ("installationId" to "expired"))
+        tokens.newPair(id, device + ("installationId" to "invalidated"))
+        sql {
+            RefreshSessions.selectAll().where { RefreshSessions.userId eq id }.toList().forEach { row ->
+                when (row[RefreshSessions.meta]?.get("installationId")) {
+                    "expired" -> RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) { it[expiresAt] = Instant.now().minusSeconds(1) }
+                    "invalidated" -> RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) { it[securityInvalidated] = true }
+                }
+            }
+        }
+        assertEquals(1, loadSecuritySessionsForUser(id, null).size)
     }
 
     @Test fun otherDeviceLoginPersistsOneAlertAndOneEncryptedEmailWithoutRepeatingOnRefresh() = fixture {

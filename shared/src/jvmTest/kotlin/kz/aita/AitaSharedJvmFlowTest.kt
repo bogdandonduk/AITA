@@ -606,6 +606,36 @@ class AitaSharedJvmFlowTest {
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "stockBatches/decideMove" && it.storeIdHeader == AITA_FLOW_SOURCE_STORE_ID })
     }
 
+    @Test fun localWorkspaceOpensBeforeOptionalHistoryWithoutJsonAccountOrInventoryHydration() = runBlocking {
+        environment.storedAccount = environment.serverAccount
+        userAccountState.emit(DataState.Empty())
+        securitySessionsState.emit(DataState.Empty())
+        stockState.emit(DataState.Empty())
+        putLocalKv("cache_json:security_sessions", "[]")
+        putLocalKv("cache_json:stock:$AITA_FLOW_SOURCE_STORE_ID", "[]")
+        var opened = false
+        loadCachedApplicationData {
+            opened = true
+            assertEquals(AITA_FLOW_TEST_USER_ID, userAccountState.payloadValue?.id)
+            assertEquals(AITA_FLOW_SOURCE_STORE_ID, activeStoreIdState.value)
+            assertNull(securitySessionsState.payloadValue, "Optional history is not a splash prerequisite")
+            assertNull(stockState.payloadValue, "Stock has a separate scoped loader")
+        }
+        assertTrue(opened)
+        assertEquals(emptyList(), securitySessionsState.payloadValue)
+        assertNull(stockState.payloadValue, "Bootstrap must not load inventory a second time")
+    }
+
+    @Test fun optionalStartupCacheCannotPublishIntoAChangedAccountAfterWorkspaceOpens() = runBlocking {
+        environment.storedAccount = environment.serverAccount
+        securitySessionsState.emit(DataState.Empty())
+        putLocalKv("cache_json:security_sessions", "[]")
+        loadCachedApplicationData {
+            userAccountState.emit(DataState.Success(environment.serverAccount.copy(id = "another-account")))
+        }
+        assertNull(securitySessionsState.payloadValue)
+    }
+
     @Test
     fun persistsStockBatchAndCartSnapshotsLocally() = runBlocking {
         val item = aitaTestGoodsItem(id = "cached-item", name = "Cached oats")

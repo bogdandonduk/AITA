@@ -79,7 +79,10 @@ internal object ActiveStores {
             }
             outcome
         },
-        rejected = { getUser(forceLogOut = false, applyServerActiveStore = true) },
+        rejected = {
+            getUser(forceLogOut = false, applyServerActiveStore = true)
+            getStores() // Repairs a retained parent hint even while the account read reconnects.
+        },
         persistenceFailed = { logCloudConnectionDiagnostic("Local active-store save failed; account synchronization continues and device save will retry") },
         acknowledged = { selected ->
             if (coordinator.isCurrent(selected)) {

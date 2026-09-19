@@ -47,7 +47,7 @@ actual var setStoredUserAccountDataModel: ((UserAccountDataModel?) -> Unit)? = n
 @Volatile
 var jvmPersistentDataDirPath: String = ""
 
-private fun jvmPersistentDataRoot(): File {
+internal fun jvmPersistentDataRoot(): File {
     val configured = jvmPersistentDataDirPath.trim().ifBlank { cacheDirPath.trim() }
     val fallback = File(System.getProperty("java.io.tmpdir"), "aita-jvm-data").absolutePath
     return File(configured.ifBlank { fallback }).apply {
@@ -329,45 +329,14 @@ object ReceiptPlatformJvmBridge {
 
 
     private fun throwWindowsRawPrintFailure(output: String, fallbackMessage: String, timedOut: Boolean = false): Nothing {
-        val markerIndex = output.indexOf(WINDOWS_PRINTER_NOT_READY_MARKER)
-        if (markerIndex >= 0) {
-            val cleanMessage = output
-                .substring(markerIndex + WINDOWS_PRINTER_NOT_READY_MARKER.length)
-                .lineSequence()
-                .firstOrNull()
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?: "Windows reports the receipt printer is not ready"
-            throw WindowsPrinterNotReadyException(cleanMessage)
-        }
-
-        val cleanFailure = output
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { line ->
-                line.startsWith(WINDOWS_RAW_PRINT_JOB_STARTED_MARKER) ||
-                        line.startsWith(WINDOWS_RAW_PRINT_SUCCESS_MARKER)
-            }
-            .joinToString("\n")
-            .take(2_000)
-            .ifBlank { fallbackMessage }
-
-        if (windowsRawFallbackIsSafe(output, timedOut)) {
-            // PowerShell/Add-Type/policy failures that happen before StartDocPrinter are safe to hand
-            // to Java's raw PrintService fallback: Windows has not accepted a spool job yet, so the
-            // fallback cannot duplicate a partially submitted receipt.
-            throw WindowsRawSpoolerUnavailableException(cleanFailure)
-        }
-
-        val startedJobId = Regex(
-            Regex.escape(WINDOWS_RAW_PRINT_JOB_STARTED_MARKER) + "job=(\\d+)"
-        ).find(output)?.groupValues?.getOrNull(1)
-        val acceptedJobText = startedJobId?.let { "Windows RAW job $it" } ?: "A Windows RAW print job"
-        error(
-            "$cleanFailure $acceptedJobText may already have reached the spooler. " +
-                    "Check the printer and Windows queue before retrying so the receipt is not printed twice."
-        )
+        // Technical details remain in the local process log, not in notification text.
+        System.err.println("AITA native receipt submission failed: " + output.take(2_000).ifBlank { fallbackMessage })
+        if (windowsRawFallbackIsSafe(output, timedOut))
+            throw WindowsRawSpoolerUnavailableException(deviceWorkflowText("raw_failed"))
+        val code = Regex("Win32=(\\d+)").find(output)?.groupValues?.getOrNull(1)
+        val submitted = output.contains(WINDOWS_RAW_PRINT_SUBMITTING_MARKER)
+        val message = deviceWorkflowText(if (submitted) "raw_uncertain" else "raw_failed")
+        error(message + if (code != null) " (Windows: $code)" else "")
     }
 
     fun loadPersistedEscPosDevicePath() {
@@ -880,174 +849,6 @@ object ReceiptPlatformJvmBridge {
         add("pwsh")
     }.distinctBy { it.lowercase(Locale.ROOT) }
 
-    private fun windowsRawPrinterPowerShellScript(): String {
-        val d = '$'
-        return """
-param(
-    [Parameter(Mandatory=${d}true)][string]${d}PrinterName,
-    [Parameter(Mandatory=${d}true)][string]${d}DataPath
-)
-${d}ErrorActionPreference = "Stop"
-${d}script:aitaSubmitting = ${d}false
-trap {
-    if (-not ${d}script:aitaSubmitting) {
-        [Console]::Out.WriteLine("${WINDOWS_RAW_PRINT_SAFE_FAILURE_MARKER}")
-        [Console]::Out.Flush()
-    }
-    throw
-}
-${d}utf8 = New-Object System.Text.UTF8Encoding(${d}false)
-[Console]::OutputEncoding = ${d}utf8
-${d}OutputEncoding = ${d}utf8
-function Fail-AitaPrinterNotReady([string]${d}Message) {
-    throw "${WINDOWS_PRINTER_NOT_READY_MARKER} ${d}Message"
-}
-${d}spoolerService = Get-Service -Name "Spooler" -ErrorAction SilentlyContinue
-if (${d}null -eq ${d}spoolerService -or ${d}spoolerService.Status -ne "Running") {
-    Fail-AitaPrinterNotReady "Windows Print Spooler is not running. Start the Print Spooler service, then retry from AITA."
-}
-
-# Get-Printer is a useful preflight when PrintManagement is installed, but OpenPrinter below is
-# authoritative. Avoid slow/stale CIM and WMI status queries used by many low-cost USB drivers.
-${d}getPrinterCommand = Get-Command -Name "Get-Printer" -ErrorAction SilentlyContinue
-if (${d}null -ne ${d}getPrinterCommand) {
-    try {
-        ${d}printer = Get-Printer -Name ${d}PrinterName -ErrorAction Stop
-        ${d}statusText = "" + ${d}printer.PrinterStatus
-        ${d}statusText = ${d}statusText.ToLowerInvariant()
-        if (${d}statusText -match "paused|stopped") {
-            Fail-AitaPrinterNotReady "Windows shows printer '${d}PrinterName' as paused or stopped. Open its queue and choose Resume printing."
-        }
-        if (${d}statusText -match "offline|not\s*available|server\s*unknown") {
-            [Console]::Out.WriteLine("AITA printer status is advisory: offline/unavailable; checking the exact RAW queue.")
-        }
-        if (${d}statusText -match "paper\s*(out|problem)|paperout|paperjam|jam|door\s*open|cover\s*open|output\s*bin\s*full") {
-            Fail-AitaPrinterNotReady "Windows reports a paper, jam, output-bin, or cover problem on printer '${d}PrinterName'. Check the roll and close the cover."
-        }
-        if (${d}statusText -match "error|user\s*intervention|out\s*of\s*memory") {
-            Fail-AitaPrinterNotReady "Windows reports printer '${d}PrinterName' needs attention. Check its queue, cable, paper, and cover."
-        }
-    } catch {
-        if (${d}_.Exception.Message -like "${WINDOWS_PRINTER_NOT_READY_MARKER}*") { throw }
-        # Some minimal/legacy drivers do not cooperate with Get-Printer. OpenPrinter below remains
-        # the authoritative exact-name check, so a status-query failure alone must not block them.
-    }
-}
-
-${d}source = @"
-using System;
-using System.Runtime.InteropServices;
-
-public class AitaRawPrinter {
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    public class DOC_INFO_1 {
-        [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
-        [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
-        [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
-    }
-
-    [DllImport("winspool.Drv", EntryPoint="OpenPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
-    public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);
-
-    [DllImport("winspool.Drv", EntryPoint="ClosePrinter", SetLastError=true)]
-    public static extern bool ClosePrinter(IntPtr hPrinter);
-
-    [DllImport("winspool.Drv", EntryPoint="StartDocPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
-    public static extern int StartDocPrinter(IntPtr hPrinter, int level, [In] DOC_INFO_1 di);
-
-    [DllImport("winspool.Drv", EntryPoint="EndDocPrinter", SetLastError=true)]
-    public static extern bool EndDocPrinter(IntPtr hPrinter);
-
-    [DllImport("winspool.Drv", EntryPoint="StartPagePrinter", SetLastError=true)]
-    public static extern bool StartPagePrinter(IntPtr hPrinter);
-
-    [DllImport("winspool.Drv", EntryPoint="EndPagePrinter", SetLastError=true)]
-    public static extern bool EndPagePrinter(IntPtr hPrinter);
-
-    [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true)]
-    public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
-}
-"@
-Add-Type -TypeDefinition ${d}source
-${d}bytes = [System.IO.File]::ReadAllBytes(${d}DataPath)
-if (${d}bytes.Length -le 0) { throw "No bytes to print" }
-${d}hPrinter = [IntPtr]::Zero
-${d}buffer = [IntPtr]::Zero
-${d}docStarted = ${d}false
-${d}pageStarted = ${d}false
-[int]${d}jobId = 0
-try {
-    if (-not [AitaRawPrinter]::OpenPrinter(${d}PrinterName, [ref]${d}hPrinter, [IntPtr]::Zero)) {
-        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        if (${d}lastError -eq 1801) {
-            Fail-AitaPrinterNotReady "Windows cannot find printer '${d}PrinterName'. Reconnect or reinstall it, then refresh printers in AITA."
-        }
-        if (${d}lastError -eq 5) {
-            Fail-AitaPrinterNotReady "Windows denied access to printer '${d}PrinterName'. Run AITA as the signed-in store user and check printer permissions."
-        }
-        if (${d}lastError -eq 1722) {
-            Fail-AitaPrinterNotReady "Windows Print Spooler did not answer. Restart the Print Spooler service, then retry from AITA."
-        }
-        throw "OpenPrinter failed for '${d}PrinterName' (Win32=${d}lastError)"
-    }
-    ${d}doc = New-Object AitaRawPrinter+DOC_INFO_1
-    ${d}doc.pDocName = "AITA ESC/POS receipt"
-    ${d}doc.pOutputFile = ${d}null
-    ${d}doc.pDataType = "RAW"
-    ${d}script:aitaSubmitting = ${d}true
-    [Console]::Out.WriteLine("${WINDOWS_RAW_PRINT_SUBMITTING_MARKER}")
-    [Console]::Out.Flush()
-    ${d}jobId = [AitaRawPrinter]::StartDocPrinter(${d}hPrinter, 1, ${d}doc)
-    if (${d}jobId -eq 0) {
-        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        throw "StartDocPrinter failed (Win32=${d}lastError)"
-    }
-    ${d}docStarted = ${d}true
-    [Console]::Out.WriteLine("${WINDOWS_RAW_PRINT_JOB_STARTED_MARKER}job={0}" -f ${d}jobId)
-    [Console]::Out.Flush()
-    if (-not [AitaRawPrinter]::StartPagePrinter(${d}hPrinter)) {
-        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        throw "StartPagePrinter failed (Win32=${d}lastError)"
-    }
-    ${d}pageStarted = ${d}true
-    ${d}buffer = [Runtime.InteropServices.Marshal]::AllocHGlobal(${d}bytes.Length)
-    [Runtime.InteropServices.Marshal]::Copy(${d}bytes, 0, ${d}buffer, ${d}bytes.Length)
-    [int]${d}totalWritten = 0
-    while (${d}totalWritten -lt ${d}bytes.Length) {
-        [int]${d}writtenNow = 0
-        ${d}remaining = ${d}bytes.Length - ${d}totalWritten
-        ${d}currentPointer = [IntPtr]::Add(${d}buffer, ${d}totalWritten)
-        if (-not [AitaRawPrinter]::WritePrinter(${d}hPrinter, ${d}currentPointer, ${d}remaining, [ref]${d}writtenNow)) {
-            ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            throw "WritePrinter failed after ${d}totalWritten bytes (Win32=${d}lastError)"
-        }
-        if (${d}writtenNow -le 0) {
-            throw "WritePrinter made no progress after ${d}totalWritten of ${d}(${d}bytes.Length) bytes"
-        }
-        ${d}totalWritten += ${d}writtenNow
-    }
-    if (-not [AitaRawPrinter]::EndPagePrinter(${d}hPrinter)) {
-        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        throw "EndPagePrinter failed (Win32=${d}lastError)"
-    }
-    ${d}pageStarted = ${d}false
-    if (-not [AitaRawPrinter]::EndDocPrinter(${d}hPrinter)) {
-        ${d}lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-        throw "EndDocPrinter failed (Win32=${d}lastError)"
-    }
-    ${d}docStarted = ${d}false
-    [Console]::Out.WriteLine("${WINDOWS_RAW_PRINT_SUCCESS_MARKER}job={0};bytes={1}" -f ${d}jobId, ${d}totalWritten)
-    [Console]::Out.Flush()
-}
-finally {
-    if (${d}buffer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::FreeHGlobal(${d}buffer) }
-    if (${d}pageStarted) { [void][AitaRawPrinter]::EndPagePrinter(${d}hPrinter) }
-    if (${d}docStarted) { [void][AitaRawPrinter]::EndDocPrinter(${d}hPrinter) }
-    if (${d}hPrinter -ne [IntPtr]::Zero) { [void][AitaRawPrinter]::ClosePrinter(${d}hPrinter) }
-}
-""".trimIndent()
-    }
-
     private fun receiptPrinterSpoolDirectory(): File =
         File(cacheDirPath.ifBlank { System.getProperty("java.io.tmpdir") }, "receipt_printer_spool")
 
@@ -1093,40 +894,25 @@ finally {
     }
 
     private fun startWindowsRawPrintProcess(
-        scriptFile: File,
-        outputFile: File,
-        serviceName: String,
-        dataFile: File
+        argumentFile: File, outputFile: File, serviceName: String, dataFile: File
     ): Process {
-        var lastFailure: IOException? = null
-        for (executable in windowsPowerShellExecutableCandidates()) {
-            try {
-                return ProcessBuilder(
-                    executable,
-                    "-NoLogo",
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    scriptFile.absolutePath,
-                    "-PrinterName",
-                    serviceName,
-                    "-DataPath",
-                    dataFile.absolutePath
-                )
-                    .redirectErrorStream(true)
-                    .redirectOutput(outputFile)
-                    .start()
-            } catch (throwable: IOException) {
-                lastFailure = throwable
-            }
+        val installedLauncher = System.getProperty("jpackage.app-path")?.let(::File)
+            ?.takeIf { it.isAbsolute && it.isFile && it.name.equals("AITA.exe", true) }
+        if (installedLauncher != null) {
+            return ProcessBuilder(installedLauncher.absolutePath, "--aita-native-print", serviceName, dataFile.absolutePath)
+                .redirectErrorStream(true).redirectOutput(outputFile).start()
         }
-        throw WindowsRawSpoolerUnavailableException(
-            "Could not start Windows PowerShell for RAW receipt printing. " +
-                    "Install Windows PowerShell or PowerShell 7, or set AITA_POWERSHELL_EXECUTABLE.",
-            lastFailure
-        )
+        val java = File(System.getProperty("java.home"), "bin/javaw.exe")
+        val executable = java.takeIf { it.isFile } ?: File(System.getProperty("java.home"), "bin/java.exe")
+        argumentFile.writeText(listOf("-cp", System.getProperty("java.class.path"),
+            "kz.aita.WindowsRawPrintProcess", serviceName, dataFile.absolutePath)
+            .joinToString("\n", transform = ::javaLauncherArgument), Charsets.UTF_8)
+        return try {
+            ProcessBuilder(executable.absolutePath, "@" + argumentFile.absolutePath)
+                .redirectErrorStream(true).redirectOutput(outputFile).start()
+        } catch (failure: IOException) {
+            throw WindowsRawSpoolerUnavailableException("Native receipt helper could not start", failure)
+        }
     }
 
     private fun printWithWindowsRawSpooler(serviceName: String, printerBytes: ByteArray) {
@@ -1134,7 +920,7 @@ finally {
         cleanupStaleWindowsRawPrintFiles(spoolDir)
 
         val dataFile = File.createTempFile("aita_receipt_", ".bin", spoolDir)
-        val scriptFile = File.createTempFile("aita_raw_print_", ".ps1", spoolDir)
+        val scriptFile = File.createTempFile("aita_raw_print_", ".args", spoolDir)
         val outputFile = File.createTempFile("aita_raw_print_", ".log", spoolDir)
         var process: Process? = null
         try {
@@ -1142,7 +928,6 @@ finally {
             if (dataFile.length() != printerBytes.size.toLong()) {
                 error("Could not stage all receipt bytes for the Windows print spooler")
             }
-            scriptFile.writeText(windowsRawPrinterPowerShellScript(), Charsets.UTF_8)
             process = startWindowsRawPrintProcess(scriptFile, outputFile, serviceName, dataFile)
 
             val completed = process.waitFor(WINDOWS_RAW_PRINT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -1694,4 +1479,3 @@ actual object LocalAitaLanTransport {
         }.getOrDefault("127.0.0.1")
     }
 }
-

@@ -78,3 +78,22 @@ private suspend fun openDesktopInstaller(release: ClientRelease, artifact: Clien
     // Installer exit or wizard launch is not installation acknowledgement. Do not delete the file yet.
     return UpdateHandoff.INSTALLER_OPENED
 }
+
+/** A normal window close is a safe opportunity to apply an already verified download.
+ * Keep the app closed afterward. Nothing is downloaded here, and failed handoff retains files. */
+internal suspend fun installPreparedWindowsUpdateOnExit(): Boolean = withContext(Dispatchers.IO) {
+    val state = AppUpdateWorkspace.state.value
+    val platform = state.platform ?: return@withContext false
+    val release = state.available ?: return@withContext false
+    val artifact = state.artifact ?: return@withContext false
+    val prepared = state.prepared ?: return@withContext false
+    if (!state.backgroundDownloads || !state.configured || platform.os != ClientOs.WINDOWS ||
+        state.busy || artifact.kind != InstallerKind.MSI || artifact != selectClientArtifact(release, platform) ||
+        clientReleaseProblem(release, System.currentTimeMillis(), installedClientBuild().channel) != null ||
+        !clientReleaseIsNewer(release, installedClientBuild())) return@withContext false
+    val launcher = windowsUpdateLauncher(System.getProperty("jpackage.app-path")) ?: return@withContext false
+    if (prepared.build != release.build || prepared.releaseId != release.id || prepared.channel != release.channel)
+        throw ClientUpdateFailure("integrity")
+    val file = desktopUpdates().verifiedFile(prepared, artifact)
+    startWindowsUpdateHandoff(file, artifact.sha256, launcher, relaunch = false)
+}

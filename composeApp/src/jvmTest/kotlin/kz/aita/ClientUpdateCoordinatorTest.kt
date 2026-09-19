@@ -58,6 +58,36 @@ class ClientUpdateCoordinatorTest {
         scope.launch(start = CoroutineStart.UNDISPATCHED) { coordinator.notifications.collect { notes.add(it) } }
         try { test(backend, coordinator, notes) } finally { scope.cancel() }
     }
+    private fun Backend.windowsRelease(): ClientRelease {
+        clientPlatform = ClientPlatform(ClientOs.WINDOWS, ClientArch.X64, 10)
+        return release().copy(artifacts = listOf(ClientArtifact(ClientOs.WINDOWS, ClientArch.X64,
+            InstallerKind.MSI, "https://updates.example.org/update.msi", 20, "a".repeat(64))))
+    }
+    @Test fun windowsPreparesInBackgroundButNeverClosesWorkingApplication() = scenario { b, c, _ ->
+        b.announce(b.windowsRelease()); c.start()
+        assertTrue(c.state.value.backgroundDownloads)
+        assertEquals(1, b.preparations); assertNotNull(c.state.value.prepared); assertEquals(0, b.installs)
+        repeat(3) { c.checkNow() }
+        assertEquals(1, b.preparations)
+        c.update(); assertEquals(1, b.installs)
+    }
+    @Test fun disabledAutomaticWindowsUpdatesKeepTheManualAction() = scenario { b, c, _ ->
+        b.values["release-background-downloads"] = "false"
+        b.announce(b.windowsRelease()); c.start()
+        assertFalse(c.state.value.backgroundDownloads); assertEquals(0, b.preparations)
+        c.update(); assertEquals(1, b.preparations); assertEquals(1, b.installs)
+    }
+    @Test fun cancellingBackgroundDownloadIsRespectedByLaterPolls() = scenario { b, c, _ ->
+        b.preparationGate = CompletableDeferred()
+        b.announce(b.windowsRelease()); c.start()
+        assertEquals(ClientUpdatePhase.DOWNLOADING, c.state.value.phase)
+        c.cancelDownload(); yield(); repeat(3) { c.checkNow() }
+        assertEquals(1, b.preparations); assertEquals(0, b.installs)
+        b.preparationGate = null; c.update(); assertEquals(2, b.preparations); assertEquals(1, b.installs)
+    }
+    @Test fun macAndAndroidNeverEnableWindowsAutomaticDownloads() = scenario { b, c, _ ->
+        b.announce(); c.start(); assertFalse(c.state.value.backgroundDownloads); assertEquals(0, b.preparations)
+    }
     @Test fun newSignedReleaseShowsMarkerAndNotifiesOnce() = scenario { b, c, notes ->
         b.announce(); c.start(); assertTrue(c.state.value.hasUpdate); assertEquals(listOf("1.0.0"), notes)
         repeat(3) { c.checkNow() }; assertEquals(1, notes.size); assertEquals(2L, c.state.value.available?.build)

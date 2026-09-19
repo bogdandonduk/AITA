@@ -186,6 +186,7 @@ kotlin {
 
             getByName("jvmMain").dependencies {
                 implementation(libs.jserialcomm)
+                implementation("net.java.dev.jna:jna:5.17.0")
                 implementation(libs.sqlDelightJvmDriver)
                 implementation("io.ktor:ktor-client-okhttp:${property("ktor.version")}")
                 implementation("io.ktor:ktor-server-core:${property("ktor.version")}")

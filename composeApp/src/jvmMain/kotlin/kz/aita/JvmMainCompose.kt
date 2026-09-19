@@ -9,6 +9,9 @@ import com.github.javakeyring.Keyring
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import java.awt.Desktop
 import java.awt.GraphicsEnvironment
 import java.awt.Taskbar
@@ -1433,7 +1436,7 @@ private fun installDesktopPlatformActionsJvm() {
         withContext(Dispatchers.IO) {
             try {
                 if (ReceiptPlatformJvmBridge.writeEscPosBytesToConfiguredPrinter(printerBytes)) {
-                    ReceiptPlatformActionResult(true, "Receipt queued for printer")
+                    ReceiptPlatformActionResult(true, deviceWorkflowText("print_queued"))
                 } else {
                     ReceiptPlatformActionResult(false, "Desktop ESC/POS receipt printer is not configured")
                 }
@@ -1443,6 +1446,7 @@ private fun installDesktopPlatformActionsJvm() {
             }
         }
 
+    chooseSystemReceiptPrinterAction = { withContext(Dispatchers.IO) { chooseSystemReceiptPrinter() } }
     printReceiptDocumentPlatformAction = { title, document ->
         withContext(Dispatchers.IO) { printSystemReceiptDocument(title, document) }
     }
@@ -1604,14 +1608,14 @@ fun main() {
 
     val accountDataFile = File(dataRoot, "ua.bin")
 
-    getStoredUserAuthTokens = {
+    val readAuthTokens = {
         runCatching {
             readJvmSecret("auth_tokens")?.let { raw -> jsonBase.decodeFromString<TokenPair>(raw) }
         }.onFailure { throwable ->
             System.err.println("AITA desktop stored auth tokens could not be read: ${throwable.message}")
-        }.getOrNull()
+        }.getOrThrow()
     }
-    setStoredUserAuthTokens = { tokenPair ->
+    val writeAuthTokens: (TokenPair?) -> Unit = { tokenPair ->
         if (tokenPair == null) {
             deleteJvmSecret("auth_tokens")
         } else {
@@ -1622,11 +1626,11 @@ fun main() {
                 }
             }.onFailure { throwable ->
                 System.err.println("AITA desktop stored auth tokens could not be written: ${throwable.message}")
-            }
+            }.getOrThrow()
         }
     }
 
-    getStoredUserAccountDataModel = accountReader@{
+    val readAccount = accountReader@{
         if (!accountDataFile.isFile) return@accountReader null
         runCatching {
             val blob = accountDataFile.readBytes()
@@ -1642,10 +1646,10 @@ fun main() {
             jsonBase.decodeFromString<UserAccountDataModel>(plain.toString(Charsets.UTF_8))
         }.onFailure { throwable ->
             System.err.println("AITA desktop account cache could not be decrypted: ${throwable.message}")
-        }.getOrNull()
+        }.getOrThrow()
     }
 
-    setStoredUserAccountDataModel = { value ->
+    val writeAccount: (UserAccountDataModel?) -> Unit = { value ->
         runCatching {
             if (value == null) {
                 if (accountDataFile.exists() && !accountDataFile.delete()) {
@@ -1668,8 +1672,19 @@ fun main() {
             }
         }.onFailure { throwable ->
             System.err.println("AITA desktop account cache could not be updated: ${throwable.message}")
-        }
+        }.getOrThrow()
     }
+
+    // Ownership checks run on the UI thread and throughout navigation/cache restoration.
+    // Match Android's process cache instead of doing a keyring round-trip on every check.
+    val authCache = PersistentCredentialCache(readAuthTokens, writeAuthTokens)
+    val accountCache = PersistentCredentialCache(readAccount, writeAccount)
+    runCatching { authCache.get() }
+    runCatching { accountCache.get() }
+    getStoredUserAuthTokens = { runCatching { authCache.get() }.getOrNull() }
+    setStoredUserAuthTokens = { value -> authCache.set(value) }
+    getStoredUserAccountDataModel = { runCatching { accountCache.get() }.getOrNull() }
+    setStoredUserAccountDataModel = { value -> accountCache.set(value) }
 
     setClipboardText = { text ->
         if (!copyTextToDesktopClipboard(text)) {
@@ -1707,13 +1722,12 @@ fun main() {
         }
     }
 
-    getClientDeviceInfo = {
-        val hostName = sequenceOf(
-            System.getenv("COMPUTERNAME"),
-            System.getenv("HOSTNAME"),
-            desktopCommandOutput(1, "hostname"),
-            runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull()
-        )
+    val desktopDeviceInfo = run {
+        val hostName = sequence {
+            yield(System.getenv("COMPUTERNAME"))
+            yield(System.getenv("HOSTNAME"))
+            yield(desktopCommandOutput(1, "hostname"))
+        }
             .mapNotNull { it?.trim()?.takeIf { it.isNotBlank() } }
             .firstOrNull()
         val userName = System.getProperty("user.name").orEmpty()
@@ -1735,11 +1749,35 @@ fun main() {
         )
     }
 
+    // Device identity is process-stable. Never run hostname/DNS and read its file per request.
+    getClientDeviceInfo = { desktopDeviceInfo }
+
     init()
 
     application {
+        val closingScope = androidx.compose.runtime.rememberCoroutineScope()
+        var closing by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
         Window(
-            onCloseRequest = ::exitApplication,
+            onCloseRequest = {
+                if (!closing) {
+                    closing = true
+                    closingScope.launch {
+                        try {
+                            AppStateWorkspace.flush()
+                            flushCartsBeforeClientUpdate()
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) {
+                            closing = false
+                            postInAppNotification(eventMessage("updates.error.storage"), NotificationType.Negative, transient = true)
+                            return@launch
+                        }
+                        try { installPreparedWindowsUpdateOnExit() }
+                        catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { System.err.println("AITA update-on-exit was deferred; verified files retained") }
+                        exitApplication()
+                    }
+                }
+            },
             title = "AITA",
             icon = painterResource("drawable/app_icon.png")
         ) {
@@ -1747,4 +1785,3 @@ fun main() {
         }
     }
 }
-

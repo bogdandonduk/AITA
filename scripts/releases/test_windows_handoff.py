@@ -10,7 +10,7 @@ import unittest
 
 @unittest.skipUnless(os.name == 'nt', 'PowerShell handoff is executed by Windows CI')
 class WindowsHandoffTests(unittest.TestCase):
-    def simulate(self, matching=True, exit_code=0):
+    def simulate(self, matching=True, exit_code=0, relaunch=True):
         source = (Path(__file__).resolve().parents[2] / 'composeApp/src/jvmMain/kotlin/kz/aita/WindowsUpdateHandoff.kt').read_text()
         script = source.split('internal val windowsUpdateScript = """', 1)[1].split('""".trimIndent()', 1)[0].replace("${'$'}", '$')
         with TemporaryDirectory(prefix="AITA pilot ' ") as name:
@@ -34,19 +34,20 @@ function Start-Process {
             env = dict(os.environ, AITA_UPDATE_READY=str(folder / 'ready'), AITA_UPDATE_LAUNCHER=str(launcher),
                 AITA_UPDATE_INSTALLER=str(installer), AITA_UPDATE_PARENT='99999999', AITA_UPDATE_LOG=str(folder / 'install.log'),
                 AITA_UPDATE_SHA256=hashlib.sha256(installer.read_bytes()).hexdigest() if matching else '0'*64,
-                AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output), AITA_TEST_INSTALL_ARGS=str(folder / 'args.txt'))
+                AITA_UPDATE_RELAUNCH=str(relaunch).lower(), AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output), AITA_TEST_INSTALL_ARGS=str(folder / 'args.txt'))
             execution = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
                            env=env, check=True, capture_output=True, text=True, timeout=30)
             calls = json.loads(output.read_text(encoding='utf-8-sig'))
             self.assertEqual(user_data.read_bytes(), b'keep this work')
             self.assertTrue(installer.exists(), 'New app acknowledges installation before installer cleanup')
             self.assertFalse(helper.exists())
-            self.assertEqual(len(calls), 2 if matching else 0, execution.stdout + execution.stderr)
-            if matching: self.assertEqual(calls[-1], str(launcher))
+            self.assertEqual(len(calls), (2 if relaunch else 1) if matching else 0, execution.stdout + execution.stderr)
+            if matching and relaunch: self.assertEqual(calls[-1], str(launcher))
             if matching: self.assertIn('INSTALLDIR="' + str(folder) + '"', (folder / 'args.txt').read_text(encoding='utf-8-sig'))
             if not matching: self.assertIn('Installer checksum mismatch', execution.stdout)
             if matching and exit_code == 1602: self.assertIn('Windows Installer returned 1602', execution.stdout)
 
+    def test_normal_close_installs_without_reopening_the_application(self): self.simulate(relaunch=False)
     def test_installs_and_relaunches_without_deleting_local_work(self): self.simulate()
     def test_hash_mismatch_never_launches_installer_or_exits_app(self): self.simulate(False)
     def test_cancelled_install_reopens_existing_version(self): self.simulate(exit_code=1602)

@@ -31,7 +31,8 @@ internal data class ClientUpdateState(
     val offline: Boolean = false,
     val problem: String? = null,
     val handoff: UpdateHandoff? = null,
-    val configured: Boolean = false
+    val configured: Boolean = false,
+    val backgroundDownloads: Boolean = false
 ) {
     val hasUpdate: Boolean get() = available != null && artifact != null
     val busy: Boolean get() = phase == ClientUpdatePhase.DOWNLOADING || phase == ClientUpdatePhase.CHECKING || phase == ClientUpdatePhase.INSTALLING
@@ -48,6 +49,7 @@ internal class ClientUpdateCoordinator(
     private var accepted: VerifiedClientRelease? = null
     private var key = byteArrayOf()
     private var download: Job? = null
+    private var automaticAttempt: String? = null
     private val mutable = MutableStateFlow(ClientUpdateState())
     val state = mutable.asStateFlow()
     private val messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
@@ -65,6 +67,8 @@ internal class ClientUpdateCoordinator(
             key = runCatching { Base64.decode(backend.publicKey) }.getOrDefault(byteArrayOf())
             mutable.update { it.copy(installed = installed, platform = platform,
                 configured = key.size in 256..2048 && isPublicClientReleaseUrl(backend.feedBase)) }
+            val background = platform.os == ClientOs.WINDOWS && backend.readPreference(pref("background-downloads")) != "false"
+            mutable.update { it.copy(backgroundDownloads = background) }
             runCatching { backend.clean(installed) }
             operation.withLock {
                 if (mutable.value.configured) {
@@ -116,8 +120,30 @@ internal class ClientUpdateCoordinator(
         } finally {
             mutable.update { it.copy(phase = if (it.prepared != null) ClientUpdatePhase.READY else ClientUpdatePhase.IDLE) }
             operation.unlock()
+            prepareInBackgroundIfNeeded()
         }
     }
+    private fun prepareInBackgroundIfNeeded() {
+        val s = mutable.value
+        val release = s.available ?: return
+        val artifact = s.artifact ?: return
+        if (!s.backgroundDownloads || s.platform?.os != ClientOs.WINDOWS || artifact.kind != InstallerKind.MSI ||
+            s.prepared != null || s.offline || s.problem != null || s.busy || s.handoff != null) return
+        val identity = release.identity + ":" + artifact.sha256
+        // Cancellation/errors pause automatic retries for this artifact in this process.
+        // Manual Update remains available; a 60-second poll must not restart a cancelled download.
+        if (automaticAttempt == identity) return
+        automaticAttempt = identity
+        downloadUpdate(installWhenReady = false)
+    }
+    fun setBackgroundDownloads(enabled: Boolean) { scope.launch {
+        try {
+            backend.writePreference(pref("background-downloads"), enabled.toString())
+            mutable.update { it.copy(backgroundDownloads = enabled) }
+            if (enabled) { automaticAttempt = null; prepareInBackgroundIfNeeded() }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { mutable.update { it.copy(problem = "storage") } }
+    } }
     private fun expireOffer() {
         if (mutable.value.available?.expiresAtMillis?.let { it <= now() } == true)
             mutable.update { it.copy(available = null, artifact = null, prepared = null) }
@@ -270,4 +296,5 @@ internal object AppUpdateWorkspace {
     fun downloadUpdate() = coordinator.downloadUpdate()
     fun cancelDownload() = coordinator.cancelDownload()
     fun installUpdate() = coordinator.installUpdate()
+    fun setBackgroundDownloads(enabled: Boolean) = coordinator.setBackgroundDownloads(enabled)
 }

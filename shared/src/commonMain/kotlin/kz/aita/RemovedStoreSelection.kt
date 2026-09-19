@@ -11,3 +11,14 @@ internal fun replacementForRemovedStore(
     val parent = previous.findStoreOrBranch(selectedId)?.parentStoreId ?: parentHint
     return parent?.takeIf { it != selectedId && available.findStoreOrBranch(it)?.canBeSelectedAsActiveStore() == true }
 }
+
+/** A missing selection can be repaired inside one unambiguous family. Never choose a random
+ * branch or an unrelated family, and callers preserve an explicit user deselection. */
+internal fun recoverUnselectedStore(available: List<StoreDataModel>, parentHint: String? = null): String? {
+    val choices = available.settableActiveStores()
+    choices.firstOrNull { it.id == parentHint }?.let { return it.id }
+    val parents = choices.filter { it.isManagementStore() }
+    if (parents.size == 1 && choices.all { it.id == parents.single().id || it.parentStoreId == parents.single().id })
+        return parents.single().id
+    return choices.singleOrNull()?.id
+}

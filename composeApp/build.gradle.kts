@@ -341,7 +341,7 @@ tasks.configureEach {
 if (!aitaWebOnlyBuild) {
     compose.desktop {
         application {
-            mainClass = "kz.aita.JvmMainComposeKt"
+            mainClass = "kz.aita.AitaDesktopLauncher"
 
             nativeDistributions {
                 targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Dmg, TargetFormat.Pkg)

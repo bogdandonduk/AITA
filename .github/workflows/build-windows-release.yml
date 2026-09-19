@@ -118,6 +118,11 @@ jobs:
         run: |
           ./gradlew.bat :shared:jvmTest :composeApp:jvmTest :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
           if ($LASTEXITCODE -ne 0) { throw 'Windows build/tests failed' }
+      - name: Exercise packaged native printer bridge without sending paper
+        shell: pwsh
+        run: |
+          python scripts/releases/verify-native-printer.py --app-dir composeApp/build/compose/binaries/main/app/AITA
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged native printer bridge failed' }
       - name: Sign application launcher before packaging
         if: ${{ inputs.production }}
         uses: SSLcom/esigner-codesign@cf5f6c1d38ad10f47e3ed9aca873f429b1a8d85b # v1.3.2
