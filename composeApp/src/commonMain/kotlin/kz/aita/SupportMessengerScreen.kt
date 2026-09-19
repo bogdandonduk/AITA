@@ -191,7 +191,8 @@ private fun AppConfiguration.SupportHelpPane(modifier: Modifier) {
 @Composable
 private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,capabilities: Set<String>,modifier: Modifier,
     onOpen: (SupportTicketDataModel)->Unit, onNew: ()->Unit) {
-    var tickets by remember { mutableStateOf<List<SupportTicketDataModel>>(emptyList()) }
+    var tickets by remember(account, agent) { mutableStateOf<List<SupportTicketDataModel>>(emptyList()) }
+    var offline by remember(account, agent) { mutableStateOf(false) }
     var page by remember { mutableStateOf<SupportTicketPage?>(null) }
     var loading by remember { mutableStateOf(true) }
     var loadingMore by remember { mutableStateOf(false) }
@@ -213,6 +214,12 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
         }
         loading=tickets.isEmpty(); feedback=null
         try {
+            if (!agent && tickets.isEmpty()) {
+                val cached = SupportHistoryCache.read(account)
+                if (userAccountState.payloadValue?.id != account || !authenticatedSessionGenerationIsCurrent(generation)) return@LaunchedEffect
+                tickets = cached.tickets
+                if (tickets.isNotEmpty()) loading = false
+            }
             val response=networkRequest<SupportTicketPage,Unit>(HttpMethod.Get,endpointUrl="support/workspace/tickets",
                 query=mapOf("agent" to agent,"filter" to filter),expectedSessionGeneration=generation)
             if(userAccountState.payloadValue?.id!=account || !authenticatedSessionGenerationIsCurrent(generation)) return@LaunchedEffect
@@ -223,9 +230,11 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                     tickets.filter { it.updatedAtMillis<oldest.updatedAtMillis ||
                         (it.updatedAtMillis==oldest.updatedAtMillis && it.id<oldest.id) } else emptyList()
                 tickets=(loaded.tickets+tail).distinctBy { it.id }
+                offline=false
                 if(!expandedHistory || loaded.nextBeforeId==null) page=loaded
+                if (!agent && !SupportHistoryCache.tickets(account,tickets)) feedback=eventMessage("support.save_failed")
             }
-            else { feedback=response.message; if(agent && response.httpStatusCode==403) CompanyEmployment.clear() }
+            else { offline=response.transportFailure; feedback=response.message.takeUnless { offline }; if(agent && response.httpStatusCode==403) CompanyEmployment.clear() }
         } finally { loading=false }
     }
     LaunchedEffect(window.isWindowFocused) {
@@ -252,6 +261,7 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                         iconContentDescription=authUiText("New conversation","Новый диалог","Жаңа диалог", "Жаңы маек"),autoLoading=false,
                         onClick=onNew)
                 }
+                if (offline) SupportOfflineNotice(tickets.isNotEmpty())
                 feedback?.let { SupportInlineError(it) }
                 if(loading && tickets.isEmpty()) LoadingSkeleton(layout = LoadingLayout.Conversation, modifier = Modifier.fillMaxWidth(), rows =4)
                 else LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -290,7 +300,8 @@ private fun AppConfiguration.SupportInboxPane(account: String,agent: Boolean,cap
                                             expectedSessionGeneration=generation)
                                         val loaded=result.payload
                                         if(userAccountState.payloadValue?.id==account && authenticatedSessionGenerationIsCurrent(generation) && filter==requestedFilter && pageEpoch==requestedEpoch) {
-                                            if(!result.negative && loaded!=null) { tickets=(tickets+loaded.tickets).distinctBy { it.id }; page=loaded; expandedHistory=true }
+                                            if(!result.negative && loaded!=null) { tickets=(tickets+loaded.tickets).distinctBy { it.id }; page=loaded; expandedHistory=true
+                                                if (!agent) SupportHistoryCache.tickets(account,tickets) }
                                             else feedback=result.message
                                         }
                                     } finally { loadingMore=false }
@@ -319,11 +330,13 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
     val window=LocalWindowInfo.current
     val ownerGeneration=remember(account,agent,ticketId) {currentAuthenticatedSessionGeneration()}
     fun owned()=userAccountState.payloadValue?.id==account && authenticatedSessionGenerationIsCurrent(ownerGeneration)
+    var offline by remember(account,agent,ticketId) { mutableStateOf(false) }
     val latestMessages by rememberUpdatedState(messages)
     val latestTicket by rememberUpdatedState(ticket)
     LaunchedEffect(account,agent,ticketId) {
         try {
             val saved=SupportDelivery.journal(account,agent,ticketId)
+            if (!owned()) return@LaunchedEffect
             if(!edited) { draft=saved.draft; draftRevision=saved.draftRevision.ifBlank { newClientSideUuidString() } }
             pending=saved.pending
         } catch(cancelled: CancellationException) { throw cancelled }
@@ -356,6 +369,16 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
         val generation=ownerGeneration
         val wasNearEnd=list.firstVisibleItemIndex<=1
         try {
+            if (!agent && messages.isEmpty()) {
+                val cached = SupportHistoryCache.read(account).conversations.firstOrNull { it.ticket.id == ticketId }
+                if (!owned()) return@LaunchedEffect
+                if (cached != null) {
+                    ticket = newestSupportTabTicket(ticket,cached.ticket,ticketId)
+                    messages = cached.messages
+                    before = cached.nextBeforeSequence
+                    loading = false
+                }
+            }
             val result=networkRequest<SupportMessagePage,Unit>(HttpMethod.Get,endpointUrl="support/workspace/messages",
                 query=mapOf("ticket_id" to ticketId,"agent" to agent),expectedSessionGeneration=generation)
             val data=result.payload
@@ -367,7 +390,10 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                 messages=(data.messages.filter {it.ticketId==ticketId}+messages).distinctBy { it.id }.sortedBy { it.sequence }
                 if(before==null && messages.size<=100) before=data.nextBeforeSequence
                 if(newLast>oldLast) { if(wasNearEnd) list.scrollToItem(0) else hasNew=true }
-            } else { feedback=result.message; if(agent && result.httpStatusCode==403) CompanyEmployment.clear() }
+                offline=false; feedback=null
+                if (!agent && !SupportHistoryCache.conversation(account, SupportMessagePage(ticket ?: data.ticket,messages,before)))
+                    feedback=eventMessage("support.save_failed")
+            } else { offline=result.transportFailure; feedback=result.message.takeUnless { offline }; if(agent && result.httpStatusCode==403) CompanyEmployment.clear() }
         } catch(cancel:CancellationException){throw cancel}
         catch(_:Exception){feedback=eventMessage("support.send_unknown")}
         finally { loading=false }
@@ -446,6 +472,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                 if(canResolve && current.status=="closed") AuthQuietAction(authUiText("Reopen","Открыть снова","Қайта ашу","Кайра ачуу"),!acting) { act("reopen") }
             }
         }
+        if (offline) SupportOfflineNotice(messages.isNotEmpty())
         feedback?.let { SupportInlineError(it) }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if(loading && messages.isEmpty() && pending == null) LoadingSkeleton(layout = LoadingLayout.Message, modifier = Modifier.fillMaxWidth().padding(16.dp), rows =4)
@@ -490,6 +517,7 @@ private fun AppConfiguration.SupportConversationPane(account: String,agent: Bool
                                     if(!result.negative && data != null && data.ticket.id==ticketId) {
                                         messages=(messages+data.messages.filter {it.ticketId==ticketId}).distinctBy { it.id }.sortedBy { it.sequence }
                                         before=data.nextBeforeSequence
+                                        if (!agent) SupportHistoryCache.conversation(account, SupportMessagePage(ticket ?: data.ticket,messages,before))
                                     }
                                     else feedback=result.message
                                 }
@@ -619,4 +647,10 @@ private fun AppConfiguration.SupportMetricsPane(modifier: Modifier,account: Stri
             Text(authUiText("Only recorded agent activity is counted. Historical work is not estimated.","Учитываются только записанные действия специалистов. Старые показатели не выдумываются.","Тек жазылған маман әрекеттері есептеледі. Бұрынғы көрсеткіштер болжанбайды.", "Агенттин катталган аракеттери гана эсептелет. Мурунку иш болжол менен эсептелбейт."),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
         }
     }
+}
+
+@Composable
+private fun AppConfiguration.SupportOfflineNotice(cached: Boolean) {
+    Text(eventMessage(if(cached) "support.offline.cached" else "support.offline.empty").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+        Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=6.dp), color=stateValues.PlaceholderTextColor, fontSize=stateValues.smallTextSize)
 }

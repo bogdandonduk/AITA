@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,7 +72,7 @@ internal fun AppConfiguration.DownloadFolderSettings() {
             if (downloads.destinationLabel != null || downloads.folderError == null) SelectionContainer {
                 Text(downloads.destinationLabel ?: downloadsText("default_folder"), color = stateValues.TextColor, fontSize = stateValues.textSize)
             }
-            actionButton(text = downloadsText("choose_folder"), autoLoading = false, confirmationRequired = false,
+            actionButton(text = downloadsText("choose_folder"), iconPath = folderIconPath(), iconRes = folderIconResource(), autoLoading = false, confirmationRequired = false,
                 enabled = downloads.savingId == null && !downloads.loading && !downloads.folderChanging, onClick = chooseFolder)
             actionButton(text = downloadsText("reset_folder"), autoLoading = false,
                 confirmationRequired = false, enabled = downloads.savingId == null && !downloads.loading && !downloads.folderChanging,
@@ -100,6 +101,13 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
     val downloads by DownloadsWorkspace.state.collectAsState()
     val scope = rememberCoroutineScope()
     var webOpenFailed by remember { mutableStateOf(false) }
+    val platforms = listOf("android" to "Android", "windows" to "Windows", "web" to "Web", "macos" to "macOS", "ios" to "iOS")
+    var selectedPlatform by rememberSaveable { mutableStateOf(when {
+        getPlatformName().contains("wasm",ignoreCase=true) -> "web"
+        getPlatformName().contains("android",ignoreCase=true) -> "android"
+        else -> "windows"
+    }) }
+    var releaseTab by rememberSaveable { mutableStateOf("current_release") }
     LaunchedEffect(Unit) { DownloadsWorkspace.refresh() }
     AitaScreenColumn(Modifier.fillMaxSize(), appBar = {
         ScreenAppBarWidget(title = downloadsText("title"), iconPath = downloadsIconPath(),
@@ -128,21 +136,35 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                 color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
                             if (fraction != null) LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(), color = stateValues.AccentColor)
                         }
+                        Text(if(downloads.canChooseFolder) downloads.destinationLabel ?: downloadsText("default_folder") else downloadsText("browser_folder"),
+                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         DownloadSavedLocation(downloads)
-                        actionButton(text = downloadsText("folder"), iconPath = stateValues.drawablePathIconSettings,
+                        actionButton(text = downloadsText("folder"), iconPath = folderIconPath(), iconRes = folderIconResource(),
                             autoLoading = false, confirmationRequired = false, onClick = {
                                 if (onOpenFolderSettings != null) onOpenFolderSettings() else {
                                     NavigationScreenModel.Menu.Settings.setStateNow("settings_section" to "downloads")
                                     scope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.Settings) }
                                 }
                             })
-                        actionButton(text = updateText("check"), autoLoading = false, confirmationRequired = false,
+                        actionButton(text = updateText("check"), iconPath = stateValues.drawablePathIconRefresh, iconRes = stateValues.drawableResIconRefresh.value, autoLoading = false, confirmationRequired = false,
                             enabled = !downloads.loading && !downloads.folderChanging && downloads.savingId == null, onClick = DownloadsWorkspace::refresh)
                     }
                 }
-                listOf("android" to "Android", "windows" to "Windows", "web" to "Web", "macos" to "macOS", "ios" to "iOS").forEach { (platform, title) ->
+                item("platform_tabs") {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        sectionTabsWidget("download_platform", platforms.map { (id, title) -> TabContent(id, title, aitaTabIconForId(id)) },
+                            selectedId = selectedPlatform, onSelected = { selectedPlatform = it })
+                        sectionTabsWidget("download_release", listOf(
+                            TabContent("current_release", downloadsText("latest"), AitaTabIcon.Fresh),
+                            TabContent("previous_releases", downloadsText("previous"), AitaTabIcon.Recent)
+                        ), selectedId = releaseTab, onSelected = { releaseTab = it })
+                    }
+                }
+                platforms.filter { it.first == selectedPlatform }.forEach { (platform, title) ->
                     item(platform) {
-                        val entries = downloads.entries.filter { it.platform.equals(platform, ignoreCase = true) }.sortedByDescending { it.build }
+                        val releases = downloads.entries.filter { it.platform.equals(platform, ignoreCase = true) && !it.kind.equals("AAB", ignoreCase = true) }.sortedByDescending { it.build }
+                        val newestBuild = releases.firstOrNull()?.build
+                        val entries = releases.filter { (it.build == newestBuild) == (releaseTab == "current_release") }
                         DownloadCard {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                                 Box(Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(stateValues.AccentColor.copy(alpha = .13f)),
@@ -156,7 +178,9 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                 }
                             }
                             when (platform) {
-                                "web" -> {
+                                "web" -> if (releaseTab == "previous_releases") {
+                                    Text(visualText("downloads.older_empty"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                } else {
                                     downloads.webVersion?.let { version ->
                                         Text("${downloadsText("latest")}: $version · ${updateText("build")} ${downloads.webBuild}", color = stateValues.TextColor,
                                             fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
@@ -172,10 +196,10 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                 }
                                 "macos", "ios" -> Text(downloadsText("deferred"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                 else -> {
-                                    if (entries.isEmpty()) Text(if (downloads.loading) updateText("checking") else downloadsText("unavailable"),
+                                    if (entries.isEmpty()) Text(if (downloads.loading) updateText("checking") else if (releaseTab == "previous_releases") visualText("downloads.older_empty") else downloadsText("unavailable"),
                                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                    entries.groupBy { it.version to it.build }.entries.forEachIndexed { releaseIndex, (identity, releaseEntries) ->
-                                        Text("${downloadsText(if (releaseIndex == 0) "latest" else "previous")}: ${identity.first} · ${updateText("build")} ${identity.second}",
+                                    entries.groupBy { it.version to it.build }.entries.forEach { (identity, releaseEntries) ->
+                                        Text("${downloadsText(if (releaseTab == "current_release") "latest" else "previous")}: ${identity.first} · ${updateText("build")} ${identity.second}",
                                             color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
                                         val notes = releaseEntries.first().notes.let { it[stateValues.appLanguage] ?: it["en"] ?: it["main"] }.orEmpty()
                                         Text(notes.ifBlank { updateText("notes_empty") }, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)

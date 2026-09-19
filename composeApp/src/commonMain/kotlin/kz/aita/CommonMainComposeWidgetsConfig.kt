@@ -1325,7 +1325,7 @@ internal fun AppConfiguration.StockCardInfoLine(
         fontSize = stateValues.textSize,
         color = displayedColor,
         fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
-        style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
+        style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(textColor, stateValues.AccentColor)),
         maxLines = 2,
         overflow = TextOverflow.Ellipsis
     )
@@ -2114,7 +2114,7 @@ fun AppConfiguration.genericTextField(
                 modifier = Modifier
                     .padding(bottom = 4.dp),
                 text = titleText,
-                style = TextStyle(
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                     color = titleTextColor,
                     fontSize = titleTextSize,
                     fontWeight = FontWeight.Bold
@@ -2269,7 +2269,7 @@ fun AppConfiguration.genericTextField(
                     imeAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).ime
                 ),
                 onKeyboardAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).getKeyboardActionHandler(),
-                textStyle = TextStyle(
+                textStyle = TextStyle(fontFamily = LocalAitaFontFamily.current,
                     fontSize = textSize,
                     lineHeight = (textSize.value * 1.28f).sp,
                     color = textColor
@@ -2570,7 +2570,7 @@ fun AppConfiguration.genericTextField(
                     .fillMaxWidth()
                     .padding(top = 2.dp),
                 text = contentInvalidText,
-                style = TextStyle(
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                     color = stateValues.ErrorColor,
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
@@ -2819,7 +2819,7 @@ fun AppConfiguration.responseText(
                 .fillMaxWidth()
                 .padding(top = 4.dp),
             text = invalidText,
-            style = TextStyle(
+            style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                 color = color,
                 fontSize = stateValues.textSize,
                 fontWeight = FontWeight.Bold,
@@ -2947,7 +2947,7 @@ fun AppConfiguration.dropdownListWidget(
                 modifier = Modifier
                     .padding(bottom = 4.dp),
                 text = titleText,
-                style = TextStyle(
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                     color = titleTextColor,
                     fontSize = titleTextSize,
                     fontWeight = FontWeight.Bold
@@ -3570,7 +3570,7 @@ fun AppConfiguration.domainSelectionTextField(
                         modifier = Modifier
                             .padding(bottom = 4.dp),
                         text = titleText,
-                        style = TextStyle(
+                        style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                             color = stateValues.TextColor,
                             fontSize = stateValues.accentTextSize,
                             fontWeight = FontWeight.Bold
@@ -4541,7 +4541,12 @@ object AppConfiguration {
     lateinit var coroutineScope: CoroutineScope
 
     @Composable
-    operator fun invoke(
+    operator fun invoke(content: @Composable AppConfiguration.() -> Unit, vararg keys: Any) {
+        AitaTypography { Render(content, *keys) }
+    }
+
+    @Composable
+    private fun Render(
         content: @Composable AppConfiguration.() -> Unit,
         vararg keys: Any
     ) {
@@ -6014,62 +6019,15 @@ fun AppConfiguration.actionButton(
     onClick: () -> Unit
 ): ActionButtonContent {
     val isEnabled = enabled
-    val actionButtonScope = rememberCoroutineScope()
-    val latestLoading by rememberUpdatedState(loading)
-    var autoLoadingGeneration by remember { mutableStateOf(0L) }
-    var autoLoadingActive by remember {
-        mutableStateOf(false)
-    }
-    var autoLoadingStartNetworkOperations by remember {
-        mutableStateOf<Int?>(null)
-    }
-    var autoLoadingNetworkObserved by remember {
-        mutableStateOf(false)
-    }
-
-    LaunchedEffect(loading) {
-        if (!loading) {
-            autoLoadingActive = false
-            autoLoadingStartNetworkOperations = null
-            autoLoadingNetworkObserved = false
-        }
-    }
-
-    LaunchedEffect(autoLoadingStartNetworkOperations) {
-        val startedAt = autoLoadingStartNetworkOperations ?: return@LaunchedEffect
-        // Only a clicked auto-loading button observes this global counter. Idle stock-row buttons
-        // no longer recompose twice for every request in a reconnect/realtime refresh burst.
-        activeNetworkOperationsState.collect { operations ->
-            if (operations > startedAt) autoLoadingNetworkObserved = true
-            if (autoLoadingNetworkObserved && operations <= startedAt && !latestLoading) {
-                autoLoadingActive = false
-                autoLoadingStartNetworkOperations = null
-                autoLoadingNetworkObserved = false
-            }
-        }
-    }
-
-    fun startAutoLoadingPulse() {
-        if (!autoLoading || text.isBlank()) return
-        val startedAt = activeNetworkOperationsState.value
-        val generation = ++autoLoadingGeneration
-        autoLoadingActive = true
-        autoLoadingStartNetworkOperations = startedAt
-        autoLoadingNetworkObserved = false
-        actionButtonScope.launch {
-            delay(1_400)
-            if (autoLoadingGeneration == generation && autoLoadingStartNetworkOperations == startedAt && !autoLoadingNetworkObserved && !latestLoading) {
-                autoLoadingActive = false
-                autoLoadingStartNetworkOperations = null
-            }
-        }
-    }
+    val (networkFeedback, startNetworkFeedback) = rememberActionNetworkFeedback()
+    fun startAutoLoadingPulse() { if (autoLoading) startNetworkFeedback() }
 
     var confirmationDialogShown by rememberSaveable {
         mutableStateOf(false)
     }
 
-    val effectiveLoading = loading || autoLoadingActive
+    val effectiveLoading = loading
+    val actionFeedback = loading || networkFeedback
     val originalTextPresent = text.isNotEmpty() && text.isNotBlank()
     val genericLoadingText = localizedStringResource(1141, "Please wait…")
     val displayedText = if (effectiveLoading && originalTextPresent) loadingText?.takeUnless { it == genericLoadingText } ?: text else text
@@ -6145,6 +6103,7 @@ fun AppConfiguration.actionButton(
                     height(animatedButtonHeight)
             }
             .aitaContentMotion()
+            .actionLoadingShadow(actionFeedback, enabledColor)
             .foregroundTactileShadow(cornerRadius = cornerRadius, elevated = false)
             .clip(RoundedCornerShape(cornerRadius))
             .background(backgroundColor)
@@ -6259,7 +6218,7 @@ fun AppConfiguration.actionButton(
                         color = textColor,
                         fontWeight = accentTextWeight(textColor, stateValues.AccentColor, FontWeight.Bold),
                         fontSize = textSize,
-                        style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor)),
+                        style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(textColor, stateValues.AccentColor)),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -6276,7 +6235,7 @@ fun AppConfiguration.actionButton(
                         color = subTextColor,
                         fontSize = subTextSize,
                         fontWeight = accentTextWeight(subTextColor, stateValues.AccentColor),
-                        style = TextStyle(shadow = accentTextShadow(subTextColor, stateValues.AccentColor)),
+                        style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(subTextColor, stateValues.AccentColor)),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

@@ -1750,11 +1750,13 @@ fun AppConfiguration.MenuWorkersScreen() {
             )
         }
     ) {
+        WorkerIdentityCard(Modifier.fillMaxWidth().aitaWidthCap(960.dp)
+            .align(Alignment.CenterHorizontally).padding(horizontal=stateValues.marginTextField, vertical=6.dp))
         val selectedTab = tabRowWidget(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.Start)
-                .padding(stateValues.marginTextField),
+                .padding(horizontal = stateValues.marginTextField, vertical = 2.dp),
             tabs = listOf(
                 TabContent("my_work", tabLabelWithCount(localizedStringResource(472, "My work"), myMembershipsCount + myPendingEmploymentRequestsCount)),
                 TabContent("invites", tabLabelWithCount(localizedStringResource(651, "Invites"), myInvitesCount)),
@@ -1796,10 +1798,6 @@ fun AppConfiguration.MenuWorkersScreen() {
                 .padding(horizontal = stateValues.marginTextField)
         )
 
-        if (selectedTab.id == "my_work") {
-            WorkerIdentityCard(Modifier.fillMaxWidth().aitaWidthCap(960.dp)
-                .align(Alignment.CenterHorizontally).padding(stateValues.marginTextField))
-        }
 
         val workerListState = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, "${selectedTab.id}_$section")
         LazyColumn(
@@ -3406,7 +3404,7 @@ internal fun AppConfiguration.TransactionHistoryCard(
                 color = stateValues.AccentColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold,
-                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                 textAlign = TextAlign.End
             )
         }
@@ -4880,6 +4878,7 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.AppLanguage -> {
                         MenuAppLanguageScreen()
                     }
+                    is NavigationScreenModel.Menu.AppFont -> { MenuAppFontScreen() }
                     is NavigationScreenModel.Menu.AppTheme -> {
                         MenuAppThemeScreen()
                     }
@@ -4989,7 +4988,8 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppLanguage -> {
                             MenuAppLanguageScreen()
                         }
-                        is NavigationScreenModel.Menu.AppTheme -> {
+                        is NavigationScreenModel.Menu.AppFont -> { MenuAppFontScreen() }
+                    is NavigationScreenModel.Menu.AppTheme -> {
                             MenuAppThemeScreen()
                         }
                         is NavigationScreenModel.Menu.AppState -> { MenuSettingsScreen(legacyAppState = true) }
@@ -5093,7 +5093,8 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AppLanguage -> {
                             MenuAppLanguageScreen()
                         }
-                        is NavigationScreenModel.Menu.AppTheme -> {
+                        is NavigationScreenModel.Menu.AppFont -> { MenuAppFontScreen() }
+                    is NavigationScreenModel.Menu.AppTheme -> {
                             MenuAppThemeScreen()
                         }
                         is NavigationScreenModel.Menu.AppState -> { MenuSettingsScreen(legacyAppState = true) }
@@ -5186,6 +5187,7 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
         NavigationScreenModel.Menu.AppScale,
+        NavigationScreenModel.Menu.AppFont,
         NavigationScreenModel.Menu.Settings,
         NavigationScreenModel.Menu.Downloads,
         NavigationScreenModel.Menu.ClientUpdate,
@@ -5203,6 +5205,7 @@ internal fun menuDestinationsForAppMode(modeId: Int): List<NavigationScreenModel
         NavigationScreenModel.Menu.AppLanguage,
         NavigationScreenModel.Menu.AppTheme,
         NavigationScreenModel.Menu.AppScale,
+        NavigationScreenModel.Menu.AppFont,
         NavigationScreenModel.Menu.Settings,
         NavigationScreenModel.Menu.Downloads,
         NavigationScreenModel.Menu.ClientUpdate,
@@ -5757,8 +5760,16 @@ fun AppConfiguration.MenuListScreen() {
             modifier = Modifier
                 .weight(1f)
         ) {
+            val groups = orderedMenuDestinations(filteredMenuDestinations(), clientUpdate.hasUpdate).groupBy(::menuSection)
+            menuSectionOrder.forEach { section ->
+                val destinations = groups[section].orEmpty()
+                if (destinations.isNotEmpty() && section.isNotEmpty()) item("heading:$section") {
+                    Text(visualText(section), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth()
+                            .padding(start = stateValues.marginTextField, end = stateValues.marginTextField, top = 18.dp, bottom = 6.dp))
+                }
             items(
-                items = orderedMenuDestinations(filteredMenuDestinations(), clientUpdate.hasUpdate),
+                items = destinations,
                 key = { model -> model.route }
             ) { model ->
                 val updateItem = model == NavigationScreenModel.Menu.ClientUpdate
@@ -5818,7 +5829,7 @@ fun AppConfiguration.MenuListScreen() {
                             stateValues.AccentColor
                         else
                             stateValues.TextColor,
-                        style = androidx.compose.ui.text.TextStyle(shadow = if (updateItem) androidx.compose.ui.graphics.Shadow(Color.White.copy(alpha = updateGlow), blurRadius = 10f * updateGlow) else null),
+                        style = androidx.compose.ui.text.TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = if (updateItem) androidx.compose.ui.graphics.Shadow(Color.White.copy(alpha = updateGlow), blurRadius = 10f * updateGlow) else null),
                         fontWeight = if (isActive || updateItem || unreadItem)
                             FontWeight.Bold
                         else
@@ -5828,6 +5839,7 @@ fun AppConfiguration.MenuListScreen() {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
             }
         }
     }
@@ -6051,7 +6063,7 @@ internal fun AppConfiguration.FinanceBalanceCard(wallet: UserWalletDataModel?) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(stateValues.cornerRadius))
-            .background(stateValues.AccentColor.copy(alpha = 0.12f))
+            .background(stateValues.BackgroundColor)
             .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
             .padding(stateValues.marginTextFieldGroup)
     ) {

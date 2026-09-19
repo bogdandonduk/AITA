@@ -53,7 +53,7 @@ class AppearanceLiveSupportTest(unittest.TestCase):
     def test_tabs_have_one_horizontal_rail_and_compact_sort_spacing(self):
         rail = (UI / "AitaTabChips.kt").read_text()
         self.assertIn("LazyRow(", rail); self.assertNotIn("FlowRow(", rail)
-        self.assertIn("if(compact)0.dp else 4.dp", rail)
+        self.assertIn("if(compact)0.dp else 2.dp", rail)
         self.assertIn("fullyVisible", rail)
         for filename in ['CommonMainComposeCartStockA.kt','CommonMainComposeMenuA.kt','CommonMainComposeMenuB.kt']:
             self.assertGreaterEqual((UI / filename).read_text().count("compact = true, textSize = stateValues.smallTextSize"), 2)

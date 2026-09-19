@@ -11,7 +11,7 @@ internal data class AppPreferenceDecision(val value: UserPreferencesDataModel, v
 
 private fun UserPreferencesDataModel.normalized() = UserPreferencesDataModel(
     normalizeAppLanguagePreference(appLanguage), normalizeAppThemePreference(appThemeId),
-    normalizeAppSizeModePreference(appSizeModeId)
+    normalizeAppSizeModePreference(appSizeModeId), appFontId?.let(::normalizeAppFontPreference)
 )
 
 /** Apply account defaults once; pending/local choices outrank a late account response. */
@@ -28,7 +28,8 @@ internal fun resolveAppPreferenceChoice(
     val chosen = if (changedDuringRequest) base else base.copy(
         appLanguage = if (override.languageTouched) normalizeAppLanguagePreference(override.appLanguage) else base.appLanguage,
         appThemeId = if (override.themeTouched) normalizeAppThemePreference(override.appThemeId) else base.appThemeId,
-        appSizeModeId = if (override.sizeModeTouched) normalizeAppSizeModePreference(override.appSizeModeId) else base.appSizeModeId
+        appSizeModeId = if (override.sizeModeTouched) normalizeAppSizeModePreference(override.appSizeModeId) else base.appSizeModeId,
+        appFontId = if (override.fontTouched) normalizeAppFontPreference(override.appFontId) else base.appFontId
     )
     return AppPreferenceDecision(chosen, pending != null || override.touched || base != server)
 }
@@ -38,5 +39,6 @@ internal fun appPreferenceAcknowledges(expected: UserPreferencesDataModel, recei
     val language = canonicalLanguageCode(received.appLanguage)
     if (language != "system" && language !in SUPPORTED_APP_LANGUAGES) return false
     return normalizeAppLanguagePreference(expected.appLanguage) == language &&
-        expected.appThemeId == received.appThemeId && expected.appSizeModeId == received.appSizeModeId
+        expected.appThemeId == received.appThemeId && expected.appSizeModeId == received.appSizeModeId &&
+        normalizeAppFontPreference(expected.appFontId) == normalizeAppFontPreference(received.appFontId)
 }

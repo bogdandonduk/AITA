@@ -1490,6 +1490,7 @@ private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
     appLanguage = this[Users.appLanguage],
     appThemeId = this[Users.appThemeId],
     appSizeModeId = this[Users.appSizeModeId],
+    appFontId = this[Users.appFontId],
     appModeId = this[Users.appModeId],
     createdAt = this[Users.createdAt].toEpochMilli(),
     isActive = this[Users.isActive]
@@ -1596,6 +1597,7 @@ object Users: Table("users") {
   val appLanguage = varchar("app_language", 16).default(DEFAULT_APP_LANGUAGE)
   val appThemeId = long("app_theme_id").default(DEFAULT_APP_THEME_ID)
   val appSizeModeId = long("app_size_mode_id").default(DEFAULT_APP_SIZE_MODE_ID)
+  val appFontId = varchar("app_font_id", 40).default(DEFAULT_APP_FONT_ID)
   val appModeId = integer("app_mode_id").nullable().default(DEFAULT_NEW_ACCOUNT_APP_MODE)
   val passwordHash = varchar("password_hash", 100) // BCrypt ~60 chars, give some headroom
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
@@ -23464,6 +23466,7 @@ fun Application.module() {
               it[Users.appLanguage] = language
               it[Users.appThemeId] = themeId
               it[Users.appSizeModeId] = sizeModeId
+              it[Users.appFontId] = body.appFontId?.let(::normalizeAppFontPreference) ?: existing[Users.appFontId]
             }
 
             Users
@@ -23567,6 +23570,7 @@ fun Application.module() {
               it[Users.appLanguage] = appLanguage
               it[Users.appThemeId] = appThemeId
               it[Users.appSizeModeId] = appSizeModeId
+              newAccount.appFontId?.let { font -> it[Users.appFontId] = normalizeAppFontPreference(font) }
               it[Users.isActive] = isActive
 
               newHash?.run {

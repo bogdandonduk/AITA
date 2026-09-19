@@ -34,8 +34,8 @@ class HorizontalAitaTabsRenderTest {
         }
         try {
             repeat(16){scene.render(it*16_000_000L).close()}
-            assertEquals(56f,assertNotNull(rail).height,1f)
-            assertTrue(bounds.values.all {kotlin.math.abs(it.top-4f)<1f})
+            assertEquals(52f,assertNotNull(rail).height,1f)
+            assertTrue(bounds.values.all {kotlin.math.abs(it.top-2f)<1f})
         } finally {scene.close()}
     }
     @Test fun compactSortRailRemovesOnlyExternalVerticalPadding()=onUiThread {

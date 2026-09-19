@@ -31,8 +31,8 @@ const {chromium}=require('playwright'),fs=require('fs'),http=require('http'),pat
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));
  try{
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:90000});await page.waitForTimeout(10000);
- await page.mouse.click(90,100);await page.waitForTimeout(2000);
- await page.keyboard.press('Tab');await page.waitForTimeout(1000);
+ await page.keyboard.press('Tab');await page.waitForTimeout(500);
+ await page.getByRole('button',{name:'User account',exact:true}).click({force:true});await page.waitForTimeout(2000);
  console.log('ERRORS',JSON.stringify(errors));require('assert').deepEqual(errors,[]);
  require('assert').ok(await page.evaluate(()=>localStorage.getItem('aita.runtime-diagnostics')), 'Browser diagnostic journal must initialize');
  await page.screenshot({path:path.join(artifacts,'photo-ui-initial.png')});
@@ -42,6 +42,7 @@ const {chromium}=require('playwright'),fs=require('fs'),http=require('http'),pat
  let chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),page.mouse.click(750,185,{delay:100})]).then(x=>x[0]);
  await chooser.setFiles({name:'test.jpg',mimeType:'image/jpeg',buffer:Buffer.from(jpeg,'base64')});
  await page.waitForTimeout(1500);require('assert').equal(previews,1);
+ // The browser accessibility bridge retains the old Reload label on this reused anchor.
  await page.mouse.click(814,249,{delay:100});await page.waitForTimeout(1500);require('assert').equal(saves,1);
  await page.screenshot({path:path.join(artifacts,'photo-ui-saved.png')});
  chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),page.mouse.click(750,185,{delay:100})]).then(x=>x[0]);

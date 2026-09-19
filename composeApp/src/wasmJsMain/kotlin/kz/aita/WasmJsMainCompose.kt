@@ -84,7 +84,7 @@ fun main() {
             init()
             document.getElementById("aita-startup")?.remove()
             ComposeViewport(document.body!!) {
-                BrowserTypography { AppConfiguration({ MainScreen() }) }
+                AppConfiguration({ MainScreen() })
             }
         } catch (failure: Throwable) {
             val alreadyOpen = failure.message.orEmpty().contains("already open in another tab")

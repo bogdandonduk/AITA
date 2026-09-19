@@ -2900,6 +2900,32 @@
           "path": "svg/222_1.svg"
         }
       ]
+    },
+    {
+      "id": 223,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/223_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/223_1.svg"
+        }
+      ]
+    },
+    {
+      "id": 224,
+      "values": [
+        {
+          "themeId": 0,
+          "path": "svg/224_0.svg"
+        },
+        {
+          "themeId": 1,
+          "path": "svg/224_1.svg"
+        }
+      ]
     }
   ]
 }

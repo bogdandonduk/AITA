@@ -182,8 +182,6 @@ internal class PhotoEditor(private val owner:String,private val current:()->Bool
             )
             if(state.preview!=null) Text(storePeopleText("photo_unsaved"),color=stateValues.AccentColor,
                 fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
-            Text(storePeopleText(if(mode==ProfilePhotoMode.STORE)"photo_store_visibility" else "photo_separate"),
-                color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)
             state.error?.let {code->Text(accountPresentationText("photo.error.${code.takeIf {it in setOf("size","format","conflict","busy","unavailable")} ?: "network"}"),
                 color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize,textAlign=TextAlign.Center)}
             state.notice?.let {Text(accountPresentationText("photo.$it"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)}

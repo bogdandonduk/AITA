@@ -7110,9 +7110,11 @@ data class AuthScreenPreferenceOverrideDataModel(
     val appSizeModeId: Long? = null,
     val languageTouched: Boolean = false,
     val themeTouched: Boolean = false,
-    val sizeModeTouched: Boolean = false
+    val sizeModeTouched: Boolean = false,
+    val appFontId: String? = null,
+    val fontTouched: Boolean = false
 ) {
-    val touched: Boolean get() = languageTouched || themeTouched || sizeModeTouched
+    val touched: Boolean get() = languageTouched || themeTouched || sizeModeTouched || fontTouched
 }
 
 val authScreenPreferenceOverrideState = MutableStateFlow(AuthScreenPreferenceOverrideDataModel())
@@ -16715,7 +16717,9 @@ fun updateUser(
 data class UserPreferencesDataModel(
     val appLanguage: String = DEFAULT_APP_LANGUAGE,
     val appThemeId: Long = DEFAULT_APP_THEME_ID,
-    val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID
+    val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID,
+    // Null preserves the stored font for requests made by older clients.
+    val appFontId: String? = null
 )
 
 fun syncUserPreferencesToServer(postFailure: Boolean = true) = AppPreferences.retryPending(postFailure)
@@ -16758,6 +16762,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
 ): ResponseDataModel<Response> {
     val diagnosticRequestContext = captureNetworkDiagnosticContext(endpointUrl, expectedSessionGeneration)
     activeNetworkOperationsState.update { it + 1 }
+    val actionRequestId = NetworkActionActivity.begin()
     val requestStartedAtMillis = getCurrentTimeMillis()
     val requestAccountId = userAccountState.payloadValue?.id
     val requestSessionGeneration = currentAuthenticatedSessionGeneration()
@@ -17058,6 +17063,7 @@ suspend inline fun <reified Response, reified Body> networkRequest(
             transportFailure = true
         )
     } finally {
+        NetworkActionActivity.finish(actionRequestId)
         activeNetworkOperationsState.update { (it - 1).coerceAtLeast(0) }
     }
 }
@@ -17070,6 +17076,17 @@ internal inline fun <reified Response> decodeNetworkResponseDataModel(
 ): ResponseDataModel<Response> {
     if (!status.isSuccess() && (rawBody.isBlank() || (!rawBodyLooksLikeAitaServerResponse(rawBody) && (status.value >= 500 || !rawBodyLooksLikeJson(rawBody))))) {
         return genericHttpErrorNetworkResponseDataModel(status)
+    }
+
+    val encoded = runCatching { jsonBase.decodeFromString<EncodedNetworkEnvelope>(rawBody) }.getOrNull()
+    if (encoded != null) {
+        val message = encoded.message?.let { runCatching { jsonBase.decodeFromString<List<LocalizedStringDataModel>>(it) }.getOrNull() }
+        val payload = encoded.payload?.let { runCatching { jsonBase.decodeFromString<Response>(it) }.getOrNull() }
+        val unreadable = encoded.payload != null && payload == null
+        return ResponseDataModel(
+            message = if (unreadable && message == null) unreadableNetworkResponseDataModel<Response>(status, rawBody).message else message,
+            payload = payload, negative = encoded.negative || unreadable || !status.isSuccess(), httpStatusCode = status.value,
+            transportFailure = encoded.transportFailure || status.isAitaServerUnhealthyForClientBanner())
     }
 
     val lenientEnvelopeObject = runCatching { jsonBase.decodeFromString<kotlinx.serialization.json.JsonElement>(rawBody).jsonObject }.getOrNull()
@@ -21414,7 +21431,8 @@ data class UserAccountDataModel(
     val appSizeModeId: Long = DEFAULT_APP_SIZE_MODE_ID,
     val createdAt: Long,
     val isActive: Boolean,
-    val appModeId: Int? = null
+    val appModeId: Int? = null,
+    val appFontId: String? = null
 )
 
 @kotlinx.serialization.Serializable

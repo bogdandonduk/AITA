@@ -47,3 +47,16 @@ internal fun orderedMenuDestinations(destinations: List<NavigationScreenModel.Me
             contentDescription = "${localizedStringResource(178, "Unread")}: $unread"
         })
 }
+
+internal fun menuSection(destination: NavigationScreenModel.Menu): String = when (destination) {
+    NavigationScreenModel.Menu.ClientUpdate -> ""
+    NavigationScreenModel.Menu.UserAccount, NavigationScreenModel.Menu.Security,
+    NavigationScreenModel.Menu.Notifications, NavigationScreenModel.Menu.Finances -> "menu.account"
+    NavigationScreenModel.Menu.Workers -> "menu.work"
+    NavigationScreenModel.Menu.AppMode, NavigationScreenModel.Menu.AppLanguage, NavigationScreenModel.Menu.AppTheme,
+    NavigationScreenModel.Menu.AppScale, NavigationScreenModel.Menu.AppFont, NavigationScreenModel.Menu.Settings -> "menu.preferences"
+    NavigationScreenModel.Menu.Support, NavigationScreenModel.Menu.Tutorials, NavigationScreenModel.Menu.Downloads,
+    NavigationScreenModel.Menu.About -> "menu.application"
+    else -> "menu.business"
+}
+internal val menuSectionOrder = listOf("", "menu.account", "menu.business", "menu.work", "menu.preferences", "menu.application")

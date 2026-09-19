@@ -4241,7 +4241,7 @@ internal fun AppConfiguration.StockPromotionPriceInfoLine(
             fontSize = stateValues.textSize,
             color = textColor,
             fontWeight = accentTextWeight(textColor, stateValues.AccentColor),
-            style = TextStyle(shadow = accentTextShadow(textColor, stateValues.AccentColor))
+            style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(textColor, stateValues.AccentColor))
         )
 
         Text(

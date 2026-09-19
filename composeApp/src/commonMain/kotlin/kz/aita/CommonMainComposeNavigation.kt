@@ -544,8 +544,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
         }
     ) {
         StockAddEditTabs(
-            modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.92f),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField),
             selectedId = visibleSelectedTabId,
             tabs = tabs,
             onSelected = {
@@ -1849,7 +1848,7 @@ fun AppConfiguration.SimpleDropdownField(
                     color = stateValues.AccentColor,
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
-                    style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
+                    style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
                 )
             }
         }
@@ -2237,7 +2236,7 @@ fun AppConfiguration.ScreenAppBarWidget(
                     fontWeight = FontWeight.Bold,
                     fontSize = stateValues.accentTextSize,
                     color = textColor,
-                    style = TextStyle(shadow = null)
+                    style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = null)
                 )
             }
 
@@ -3244,6 +3243,11 @@ sealed class NavigationScreenModel(
             override val iconRes: DrawableResource get() = AppConfiguration.appStateIconResource()
             override val name: String get() = AppConfiguration.appStateText("title")
         }
+        data object AppFont: Menu("MenuAppFontNavigationScreenModelRoute") {
+            override val iconPath: String get() = AppConfiguration.fontIconPath()
+            override val iconRes: DrawableResource get() = AppConfiguration.fontIconResource()
+            override val name: String get() = AppConfiguration.visualText("font.title")
+        }
         data object AppScale: Menu("MenuAppScaleNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconAppScale
@@ -3372,6 +3376,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.AppLanguage,
     NavigationScreenModel.Menu.AppTheme,
     NavigationScreenModel.Menu.AppScale,
+            NavigationScreenModel.Menu.AppFont,
     NavigationScreenModel.Menu.AppState,
     NavigationScreenModel.Menu.Settings,
     NavigationScreenModel.Menu.Downloads,
@@ -3924,6 +3929,7 @@ object Navigation {
             NavigationScreenModel.Menu.AppLanguage,
             NavigationScreenModel.Menu.AppTheme,
             NavigationScreenModel.Menu.AppScale,
+            NavigationScreenModel.Menu.AppFont,
             NavigationScreenModel.Menu.Settings,
             NavigationScreenModel.Menu.Downloads,
             NavigationScreenModel.Menu.Tutorials,

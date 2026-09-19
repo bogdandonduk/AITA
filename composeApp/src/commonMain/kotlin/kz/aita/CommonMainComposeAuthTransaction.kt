@@ -399,6 +399,7 @@ internal fun AppConfiguration.AuthPreferencesChooser(
                 }
             }
         }
+        AuthFontChoice()
     }
 }
 
@@ -448,7 +449,7 @@ fun AppConfiguration.UserAuthSignUpScreen(
             if (!stateValues.isNarrowScreen)
                 Text(
                     text = stateValues.stringSignUp,
-                    style = TextStyle(
+                    style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                         color = stateValues.TextColor,
                         fontSize = stateValues.titleTextSize,
                         fontWeight = FontWeight.Bold
@@ -2808,7 +2809,7 @@ internal fun AppConfiguration.StockQuantityQuickFillButtons(
                     color = stateValues.AccentColor,
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
-                    style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                    style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -3496,7 +3497,7 @@ internal fun AppConfiguration.TransactionAmountField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = TextStyle(
+            textStyle = TextStyle(fontFamily = LocalAitaFontFamily.current,
                 color = stateValues.TextColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold
@@ -3777,7 +3778,7 @@ internal fun AppConfiguration.TransactionQuickAmountButtons(
                     color = stateValues.AccentColor,
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
-                    style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                    style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -3896,7 +3897,7 @@ internal fun AppConfiguration.StoreContactQuickFillButtons(
                     color = stateValues.AccentColor,
                     fontSize = stateValues.smallTextSize,
                     fontWeight = FontWeight.Bold,
-                    style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                    style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -4159,7 +4160,7 @@ internal fun AppConfiguration.CartQuantityBottomSheet(
                 color = if (amountValid) stateValues.AccentColor else stateValues.ErrorColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold,
-                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -4455,7 +4456,7 @@ internal fun AppConfiguration.CartReturnPriceBatchBottomSheet(
                 color = stateValues.AccentColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold,
-                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -4745,7 +4746,7 @@ internal fun AppConfiguration.DebtorInfoLine(
         color = if (accent) stateValues.AccentColor else stateValues.TextColor,
         fontSize = stateValues.textSize,
         fontWeight = if (accent) FontWeight.Bold else FontWeight.Normal,
-        style = TextStyle(shadow = if (accent) accentTextShadow(stateValues.AccentColor, stateValues.AccentColor) else null),
+        style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = if (accent) accentTextShadow(stateValues.AccentColor, stateValues.AccentColor) else null),
         maxLines = 2,
         overflow = TextOverflow.Ellipsis
     )
@@ -4784,7 +4785,7 @@ internal fun AppConfiguration.DebtPercentQuickButtons(
                         color = stateValues.AccentColor,
                         fontSize = stateValues.smallTextSize,
                         fontWeight = FontWeight.Bold,
-                        style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                        style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -4932,7 +4933,7 @@ internal fun AppConfiguration.DebtorPaymentCard(
                 color = if (selected) stateValues.AccentTextColor else if (overdue) stateValues.ErrorColor else stateValues.AccentColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold,
-                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
             )
         }
 

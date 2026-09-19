@@ -55,8 +55,8 @@ internal fun AppConfiguration.AitaTabChips(
                     .selectable(selected = selected, enabled = enabled, role = Role.Tab,
                         interactionSource = remember { MutableInteractionSource() }, indication = ripple(color = ink),
                         onClick = { onSelected(tab) })
-                    .padding(horizontal = 12.dp, vertical = if (tab.actions.isEmpty()) 10.dp else 2.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    .padding(horizontal = 10.dp, vertical = if (tab.actions.isEmpty()) 7.dp else 2.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 CpImage(Modifier.size(19.dp), url = marketIconPath(tab.icon.family), fallbackRes = tabIconResource(tab.icon),
                     contentDescription = null, tintColor = ink)
@@ -95,7 +95,7 @@ internal fun AppConfiguration.AitaTabChips(
         }
         LazyRow(Modifier.fillMaxWidth().selectableGroup(),state=state,
             horizontalArrangement=Arrangement.spacedBy(6.dp,Alignment.Start),
-            contentPadding=PaddingValues(vertical=if(compact)0.dp else 4.dp)) {
+            contentPadding=PaddingValues(vertical=if(compact)0.dp else 2.dp)) {
             items(ids,key={it}) {id->content(id)}
         }
     }

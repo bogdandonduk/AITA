@@ -2455,7 +2455,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 color = stateValues.AccentColor,
                                 fontSize = stateValues.accentTextSize,
                                 fontWeight = FontWeight.Bold,
-                                style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
+                                style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
                             )
                         }
 
@@ -2741,7 +2741,7 @@ fun AppConfiguration.StockSinglePriceEditor(
                             color = stateValues.AccentColor,
                             fontSize = stateValues.smallTextSize,
                             fontWeight = FontWeight.Bold,
-                            style = TextStyle(shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
+                            style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor)),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3286,13 +3286,9 @@ internal fun AppConfiguration.StockAddEditTabs(
     tabs: List<StockAddEditTabContent>,
     onSelected: (String) -> Unit
 ) {
-    LazyRow(
-        modifier = modifier
-            .fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-    ) {
-        items(tabs) { tab ->
+    Box(modifier.fillMaxWidth()) {
+        HorizontalAitaTabRail(tabs.map { it.id }, selectedId) { id ->
+            val tab = tabs.first { it.id == id }
             val selected = selectedId == tab.id
             val visibleTitle = tab.count?.let { tabLabelWithCount(tab.title, it) } ?: tab.title
 
@@ -3300,7 +3296,7 @@ internal fun AppConfiguration.StockAddEditTabs(
 
             Row(
                 modifier = Modifier
-                    .height(stateValues.textFieldHeight)
+                    .heightIn(min = 48.dp)
                     .padding(2.dp)
                     .foregroundTactileShadow(stateValues.cornerRadius, elevated = selected)
                     .clip(shape)
@@ -3309,7 +3305,7 @@ internal fun AppConfiguration.StockAddEditTabs(
                         width = if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
                         color = when {
                             selected -> stateValues.AccentColor
-                            tab.enabled -> stateValues.PlaceholderTextColor
+                            tab.enabled -> stateValues.PlaceholderTextColor.copy(alpha = .65f)
                             else -> stateValues.DisabledColor
                         },
                         shape = shape
@@ -3321,14 +3317,14 @@ internal fun AppConfiguration.StockAddEditTabs(
                         indication = ripple(color = if (selected) stateValues.AccentTextColor else stateValues.TextColor),
                         onClick = { onSelected(tab.id) }
                     )
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 tab.iconPath?.let {
                     CpImage(
                         modifier = Modifier
-                            .size(18.dp),
+                            .size(19.dp),
                         url = it,
                         fallbackRes = tab.iconRes ?: Res.drawable._0_0,
                         contentDescription = visibleTitle,

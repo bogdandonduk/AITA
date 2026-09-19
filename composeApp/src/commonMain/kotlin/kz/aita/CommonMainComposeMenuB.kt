@@ -1974,7 +1974,7 @@ internal fun AppConfiguration.AppModeSelectionCard(
     Row(modifier
         .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
         .clip(RoundedCornerShape(stateValues.cornerRadius))
-        .background(if (selected) stateValues.AccentColor.copy(alpha = .12f) else stateValues.BackgroundColor)
+        .background(stateValues.BackgroundColor)
         .border(if (selected) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
             if (selected) stateValues.AccentColor else stateValues.PlaceholderTextColor.copy(alpha = .55f),
             RoundedCornerShape(stateValues.cornerRadius))
@@ -1983,10 +1983,11 @@ internal fun AppConfiguration.AppModeSelectionCard(
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         CpImage(Modifier.size(36.dp), url = option.iconPath, fallbackRes = option.iconRes,
-            contentDescription = null, tintColor = if (selected) stateValues.AccentColor else stateValues.TextColor)
+            contentDescription = null, tintColor = null)
         Text(accountPresentationText(when(option.modeId) {
             APP_MODE_STORE -> "store"; APP_MODE_BUYER -> "marketplace"; else -> "supplier"
         }), Modifier.weight(1f), color = if(selected) stateValues.AccentColor else stateValues.TextColor,
+            style = androidx.compose.ui.text.TextStyle(fontFamily = LocalAitaFontFamily.current, background = Color.Transparent),
             fontSize = stateValues.accentTextSize, fontWeight = FontWeight.SemiBold)
     }
 }
@@ -2622,7 +2623,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         val selectedTabContent = tabRowWidget(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(stateValues.marginTextField),
+                .padding(horizontal = stateValues.marginTextField, vertical = 2.dp),
             tabs = listOf(
                 TabContent(MenuAnalyticsTab.Sales.id, stateValues.stringSale),
                 TabContent(MenuAnalyticsTab.Returns.id, stateValues.stringReturn),
@@ -5999,6 +6000,7 @@ internal fun AppConfiguration.localizedNotificationCategory(category: String, ty
     val lower = clean.lowercase()
     return when (lower) {
         "device_file" -> null
+        "security" -> localizedStringResource(226, "Account security")
         "positive", "положительные", "положительное", "жағымды" -> notificationTypeLabel(NotificationType.Positive)
         "negative", "отрицательные", "отрицательное", "жағымсыз" -> notificationTypeLabel(NotificationType.Negative)
         "neutral", "нейтральные", "нейтральное", "бейтарап" -> notificationTypeLabel(NotificationType.Neutral)
@@ -6162,7 +6164,7 @@ fun AppConfiguration.LargeIconWithTitleWidget(
 
             Text(
                 text = title,
-                style = TextStyle(
+                style = TextStyle(fontFamily = LocalAitaFontFamily.current,
                     color = titleTextColor,
                     fontSize = titleTextSize,
                     fontWeight = FontWeight.Bold

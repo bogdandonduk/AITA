@@ -67,19 +67,29 @@ enum class AitaTabIcon(val family: Int) {
     Barcode(208),
     CashRegister(209),
     AppState(216),
-    Downloads(217)
+    Downloads(217),
+    Android(218),
+    Windows(219),
+    Web(220),
+    MacOS(221),
+    Ios(222)
 }
 
 internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
+    "android" -> AitaTabIcon.Android
+    "windows" -> AitaTabIcon.Windows
+    "web" -> AitaTabIcon.Web
+    "macos" -> AitaTabIcon.MacOS
+    "ios" -> AitaTabIcon.Ios
     "app_state" -> AitaTabIcon.AppState
     "downloads" -> AitaTabIcon.Downloads
     "diagnostics" -> AitaTabIcon.Security
     "all", "generic", "overview", "category" -> AitaTabIcon.All
     "quick" -> AitaTabIcon.Quick
-    "in_stock", "stock", "allocation", "products", "goods_item" -> AitaTabIcon.Stock
-    "fresh" -> AitaTabIcon.Fresh
+    "items", "in_stock", "stock", "allocation", "products", "goods_item" -> AitaTabIcon.Stock
+    "fresh", "current_release" -> AitaTabIcon.Fresh
     "popular", "rankings" -> AitaTabIcon.Popular
-    "recent", "history", "activity", "audit", "added", "created" -> AitaTabIcon.Recent
+    "previous_releases", "recent", "history", "activity", "audit", "added", "created" -> AitaTabIcon.Recent
     "restock" -> AitaTabIcon.Restock
     "low_stock" -> AitaTabIcon.LowStock
     "expiring" -> AitaTabIcon.Expiring
@@ -120,7 +130,7 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
     "chat", "agent" -> AitaTabIcon.Chat
     "faq", "script" -> AitaTabIcon.Help
     "revenue", "metrics", "performance", "demand" -> AitaTabIcon.Metrics
-    "checklist", "closeout", "closure", "closed", "close", "kept" -> AitaTabIcon.Checklist
+    "left", "checklist", "closeout", "closure", "closed", "close", "kept" -> AitaTabIcon.Checklist
     "desk" -> AitaTabIcon.Search
     "edit", "changes", "custom_period" -> AitaTabIcon.Edit
     "positive", "applied" -> AitaTabIcon.Check
@@ -131,7 +141,7 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
     "plans", "promise", "promises", "wave", "waves", "next_moves", "flow" -> AitaTabIcon.Plan
     "recovery", "return", "returns" -> AitaTabIcon.Recover
     "replace", "comparison" -> AitaTabIcon.Compare
-    "basket" -> AitaTabIcon.Basket
+    "trip", "basket" -> AitaTabIcon.Basket
     "info" -> AitaTabIcon.Info
     "auto", "tspl", "zpl", "cpcl" -> AitaTabIcon.Barcode
     "cashregister", "cashRegister", "cash_register" -> AitaTabIcon.CashRegister
@@ -141,6 +151,11 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
 internal fun AppConfiguration.tabIconResource(icon: AitaTabIcon): DrawableResource {
     val dark = isDarkAppTheme(stateValues.appThemeId)
     return when(icon) {
+        AitaTabIcon.Android -> if (dark) Res.drawable._218_1 else Res.drawable._218_0
+AitaTabIcon.Windows -> if (dark) Res.drawable._219_1 else Res.drawable._219_0
+AitaTabIcon.Web -> if (dark) Res.drawable._220_1 else Res.drawable._220_0
+AitaTabIcon.MacOS -> if (dark) Res.drawable._221_1 else Res.drawable._221_0
+AitaTabIcon.Ios -> if (dark) Res.drawable._222_1 else Res.drawable._222_0
         AitaTabIcon.AppState -> if (dark) Res.drawable._216_1 else Res.drawable._216_0
         AitaTabIcon.Downloads -> if (dark) Res.drawable._217_1 else Res.drawable._217_0
         AitaTabIcon.All -> if (dark) Res.drawable._149_1 else Res.drawable._149_0

@@ -79,7 +79,7 @@ class UiLayoutContractsTest(unittest.TestCase):
         self.assertNotIn("AppModeQuickSwitchMenuTile", menu)
         self.assertNotIn("app-mode-quick-switch", menu)
         listing = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuListScreen")
-        self.assertIn("items = filteredMenuDestinations()", listing)
+        self.assertIn("orderedMenuDestinations(filteredMenuDestinations(), clientUpdate.hasUpdate).groupBy(::menuSection)", listing)
         self.assertIn("key = { model -> model.route }", listing)
         self.assertIn("contentDescription = model.name", listing)
 
@@ -94,7 +94,7 @@ class UiLayoutContractsTest(unittest.TestCase):
         self.assertEqual(3, len(re.findall(r"is NavigationScreenModel\.Menu\.Workers ->\s*\{\s*MenuWorkersScreen\(\)", menu)))
         self.assertFalse((KOTLIN / "MenuWorkScreen.kt").exists())
 
-    def test_worker_identity_lives_only_in_my_work(self):
+    def test_worker_identity_lives_once_above_all_work_tabs(self):
         account = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuUserAccountScreen")
         identity = source("WorkerIdentityCard.kt")
         workers = function("CommonMainComposeMenuA.kt", "AppConfiguration.MenuWorkersScreen")
@@ -103,7 +103,7 @@ class UiLayoutContractsTest(unittest.TestCase):
             self.assertIn(text, identity)
         self.assertIn("ClipboardCopyButton(textToCopy = account.visibleWorkerInviteId())", identity)
         self.assertIn("val account = stateValues.userAccount ?: return", identity)
-        self.assertRegex(workers, r'if \(selectedTab.id == "my_work"\) \{\s*WorkerIdentityCard')
+        self.assertLess(workers.index("WorkerIdentityCard("), workers.index("val selectedTab = tabRowWidget("))
         self.assertEqual(1, workers.count("WorkerIdentityCard("))
 
     def test_personal_identity_does_not_unlock_management(self):

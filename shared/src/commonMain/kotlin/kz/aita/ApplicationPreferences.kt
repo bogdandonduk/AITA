@@ -42,12 +42,13 @@ internal object AppPreferences {
         } while (intent.value != current)
     }
 
-    fun select(language: String? = null, theme: Long? = null, scale: Long? = null, sync: Boolean = true) {
+    fun select(language: String? = null, theme: Long? = null, scale: Long? = null, font: String? = null, sync: Boolean = true) {
         val selected = intent.updateAndGet { current ->
             AppPreferenceIntent(current.value.copy(
                 appLanguage = language?.let(::normalizeAppLanguagePreference) ?: current.value.appLanguage,
                 appThemeId = theme?.let(::normalizeAppThemePreference) ?: current.value.appThemeId,
-                appSizeModeId = scale?.let(::normalizeAppSizeModePreference) ?: current.value.appSizeModeId
+                appSizeModeId = scale?.let(::normalizeAppSizeModePreference) ?: current.value.appSizeModeId,
+                appFontId = font?.let(::normalizeAppFontPreference) ?: current.value.appFontId
             ), current.revision + 1, isLocalSelection = true)
         }
         publish() // No launch/IO/delay before the visible choice.
@@ -72,7 +73,8 @@ internal object AppPreferences {
         val local = UserPreferencesDataModel(
             normalizeAppLanguagePreference(getLocalKv(KEY_APP_LOCALE)),
             normalizeAppThemePreference(getLocalKv(KEY_APP_THEME)?.toLongOrNull()),
-            normalizeAppSizeModePreference(getLocalKv(KEY_APP_SIZE_MODE)?.toLongOrNull())
+            normalizeAppSizeModePreference(getLocalKv(KEY_APP_SIZE_MODE)?.toLongOrNull()),
+            normalizeAppFontPreference(getLocalKv(KEY_APP_FONT))
         )
         withContext(Dispatchers.Main) {
             if (expected.revision == 0L && intent.compareAndSet(expected, AppPreferenceIntent(local, 1L))) publish()
@@ -84,6 +86,7 @@ internal object AppPreferences {
         putLocalKv(KEY_APP_LOCALE, current.value.appLanguage)
         putLocalKv(KEY_APP_THEME, current.value.appThemeId.toString())
         putLocalKv(KEY_APP_SIZE_MODE, current.value.appSizeModeId.toString())
+        putLocalKv(KEY_APP_FONT, normalizeAppFontPreference(current.value.appFontId))
         // Account-scoped journal survives reconnect/relaunch, without leaking another user's choices.
         dirty.value.forEach { (id, pending) -> putLocalKv(journalKey(id), jsonBase.encodeToString(UserPreferencesDataModel.serializer(), pending.value)) }
     }
@@ -107,7 +110,7 @@ internal object AppPreferences {
             val override = authScreenPreferenceOverrideState.value
             val decision = resolveAppPreferenceChoice(
                 current = intent.value,
-                account = UserPreferencesDataModel(account.appLanguage, account.appThemeId, account.appSizeModeId),
+                account = UserPreferencesDataModel(account.appLanguage, account.appThemeId, account.appSizeModeId, account.appFontId),
                 requestRevision = requestRevision,
                 pending = dirty.value[account.id]?.value ?: saved,
                 override = override
@@ -144,7 +147,7 @@ internal object AppPreferences {
         }
         val acknowledged = requireNotNull(response.payload)
         if (acknowledged.id != id || !appPreferenceAcknowledges(selected.value,
-                UserPreferencesDataModel(acknowledged.appLanguage, acknowledged.appThemeId, acknowledged.appSizeModeId))) {
+                UserPreferencesDataModel(acknowledged.appLanguage, acknowledged.appThemeId, acknowledged.appSizeModeId, acknowledged.appFontId))) {
             // An older server may accept the request but coerce a new language to its old default.
             // Keep the local choice and its account-scoped journal for a compatible reconnect.
             logCloudConnectionDiagnostic("Preference response did not acknowledge the selected appearance; pending choice retained")
@@ -155,7 +158,7 @@ internal object AppPreferences {
             val account = userAccountState.payloadValue?.takeIf { it.id == id } ?: return@persistAck
             // Merge only preferences. A preference response must not roll back newer store/profile data.
             val merged = account.copy(appLanguage = selected.value.appLanguage,
-                appThemeId = selected.value.appThemeId, appSizeModeId = selected.value.appSizeModeId)
+                appThemeId = selected.value.appThemeId, appSizeModeId = selected.value.appSizeModeId, appFontId = selected.value.appFontId)
             userAccountState.emit(DataState.Success(merged))
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(merged) }
             putLocalKv(journalKey(id), null)

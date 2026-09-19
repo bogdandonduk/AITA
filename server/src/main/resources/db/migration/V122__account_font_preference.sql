@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS app_font_id VARCHAR(40) NOT NULL DEFAULT 'noto_sans';
