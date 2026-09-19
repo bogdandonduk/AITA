@@ -104,7 +104,9 @@ internal class ActiveStoreSelectionCoordinator(
             if (!isCurrent(current) || current.owner != owner || !current.hydrated || current.pendingSync ||
                 current.revision != revisionAtRequest) return@withLock
             val id = serverStoreId?.trim()?.takeIf(String::isNotEmpty)
-            if (current.choice.storeId == id && !current.choice.explicitNone) return@withLock
+            // An echo of an intentional deselection acknowledges it; it must not turn it into
+            // a missing selection that the store-list recovery immediately fills again.
+            if (current.choice.storeId == id) return@withLock
             val next = current.copy(choice = ActiveStoreChoice(id), revision = current.revision + 1L)
             if (state.compareAndSet(current, next)) flushLocked()
         }

@@ -71,15 +71,20 @@ class SystemReceiptPages(document: AitaPdfDocument) : Pageable {
 private val systemReceiptPrintMutex = Mutex()
 private var chosenSystemReceiptService: PrintService? = null
 private fun systemReceiptPreference() = File(jvmPersistentDataRoot(), "system-receipt-printer.txt")
-private fun rememberedSystemReceiptService(): PrintService? {
-    chosenSystemReceiptService?.let { return it }
+fun restoreSystemReceiptPrinterName() {
+    systemReceiptPrinterNameState.value = runCatching { savedSystemReceiptPrinterName() }.getOrNull()
+}
+private fun savedSystemReceiptPrinterName(): String? {
     val file = systemReceiptPreference()
     if (!file.isFile) return null
     require(file.length() <= 4096)
-    val name = file.readText().trim()
-    if (name.isEmpty()) return null
+    return file.readText().trim().takeIf { it.isNotEmpty() }
+}
+private fun rememberedSystemReceiptService(): PrintService? {
+    chosenSystemReceiptService?.let { return it }
+    val name = savedSystemReceiptPrinterName() ?: return null
     return PrintServiceLookup.lookupPrintServices(null, null).firstOrNull { it.name == name }
-        ?.also { chosenSystemReceiptService = it }
+        ?.also { chosenSystemReceiptService = it; systemReceiptPrinterNameState.value = name }
         ?: error("Saved system printer is unavailable; select its current queue")
 }
 private fun rememberSystemReceiptService(service: PrintService) {

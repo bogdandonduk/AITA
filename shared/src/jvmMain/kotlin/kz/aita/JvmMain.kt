@@ -896,16 +896,19 @@ object ReceiptPlatformJvmBridge {
     private fun startWindowsRawPrintProcess(
         argumentFile: File, outputFile: File, serviceName: String, dataFile: File
     ): Process {
+        // jpackage 21 converts app arguments through the Windows ANSI code page. Keep the
+        // transport ASCII and decode UTF-8 in the helper so every queue/path survives intact.
+        val encoded = encodeWindowsRawPrintArguments(serviceName, dataFile.absolutePath)
         val installedLauncher = System.getProperty("jpackage.app-path")?.let(::File)
             ?.takeIf { it.isAbsolute && it.isFile && it.name.equals("AITA.exe", true) }
         if (installedLauncher != null) {
-            return ProcessBuilder(installedLauncher.absolutePath, "--aita-native-print", serviceName, dataFile.absolutePath)
+            return ProcessBuilder(listOf(installedLauncher.absolutePath, "--aita-native-print") + encoded)
                 .redirectErrorStream(true).redirectOutput(outputFile).start()
         }
         val java = File(System.getProperty("java.home"), "bin/javaw.exe")
         val executable = java.takeIf { it.isFile } ?: File(System.getProperty("java.home"), "bin/java.exe")
-        argumentFile.writeText(listOf("-cp", System.getProperty("java.class.path"),
-            "kz.aita.WindowsRawPrintProcess", serviceName, dataFile.absolutePath)
+        argumentFile.writeText((listOf("-cp", System.getProperty("java.class.path"),
+            "kz.aita.WindowsRawPrintProcess") + encoded)
             .joinToString("\n", transform = ::javaLauncherArgument), Charsets.UTF_8)
         return try {
             ProcessBuilder(executable.absolutePath, "@" + argumentFile.absolutePath)

@@ -238,9 +238,26 @@ class ActiveStoreSelectionCoordinatorTest {
         adopt("A")
         select(null).join()
         adopt("A")
+        controller.acceptRemote(owner, null, controller.snapshot.revision)
         assertNull(shown.last())
         assertTrue(controller.snapshot.choice.explicitNone)
         assertTrue(disk.getValue(owner.accountId).choice.explicitNone)
+        controller.acceptRemote(owner, "B", controller.snapshot.revision)
+        assertEquals("B", shown.last(), "A real choice from another device still applies")
+    }
+
+    @Test fun olderAutomaticEmptyJournalCannotEraseTheServerSelection() {
+        val saved = requireNotNull(decodeSavedActiveStoreSelection("""{"storeId":null,"explicitNone":true,"pendingSync":true,"parentStoreId":"parent"}"""))
+        assertFalse(saved.choice.explicitNone)
+        assertFalse(saved.pendingSync)
+        assertEquals("parent", saved.choice.parentStoreId)
+    }
+
+    @Test fun newIntentionalDeselectAndOlderNonemptyOfflineChoicesArePreserved() {
+        val empty = requireNotNull(decodeSavedActiveStoreSelection("""{"schemaVersion":3,"storeId":null,"explicitNone":true,"pendingSync":true}"""))
+        assertTrue(empty.choice.explicitNone); assertTrue(empty.pendingSync)
+        val branch = requireNotNull(decodeSavedActiveStoreSelection("""{"storeId":"branch","pendingSync":true}"""))
+        assertEquals("branch", branch.choice.storeId); assertTrue(branch.pendingSync)
     }
 
     @Test fun permissionDenialNeverClearsTheOtherDevicesServerChoice() = fixture {

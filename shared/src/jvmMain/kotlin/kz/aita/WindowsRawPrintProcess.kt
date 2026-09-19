@@ -9,6 +9,7 @@ import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
 import com.sun.jna.win32.StdCallLibrary
 import java.io.File
+import java.util.Base64
 
 internal class WindowsSpoolFailure(val operation: String, val code: Int) :
     IllegalStateException("$operation failed (Win32=$code)")
@@ -103,24 +104,46 @@ private class NativeWindowsReceiptSpool : WindowsRawSpoolApi {
     override fun close() { lib.ClosePrinter(handle) }
 }
 
+internal fun encodeWindowsRawPrintArguments(printer: String, path: String): List<String> = listOf(printer, path).map {
+    require('\u0000' !in it) { "Invalid printer handoff argument" }
+    Base64.getEncoder().encodeToString(it.toByteArray(Charsets.UTF_8)).also { encoded ->
+        require(encoded.length in 1..12000) { "Printer handoff argument is too long or empty" }
+    }
+}
+
+internal fun decodeWindowsRawPrintArguments(args: Array<String>): Pair<String, String> {
+    require(args.size == 2) { "Expected two encoded printer handoff arguments" }
+    val values = args.map {
+        require(it.length in 1..12000) { "Invalid encoded printer handoff argument" }
+        String(Base64.getDecoder().decode(it), Charsets.UTF_8)
+    }
+    return values[0] to values[1]
+}
+
+internal fun executeWindowsRawPrintRequest(args: Array<String>, emit: (String) -> Unit) {
+    require(System.getProperty("os.name").contains("Windows", true)) { "Windows printer helper requires Windows" }
+    val (printer, path) = decodeWindowsRawPrintArguments(args)
+    val data = File(path)
+    require(data.isFile && data.length() in 1..8L * 1024 * 1024) { "Staged receipt file is unavailable or invalid" }
+    submitWindowsRawReceipt(NativeWindowsReceiptSpool(), printer, data.readBytes(), emit)
+}
+
 /** Only the installed JVM and packaged code run. No PowerShell, generated script or management
  * module is needed per receipt. Arguments are passed as data, never interpreted by a shell. */
 object WindowsRawPrintProcess {
     @JvmStatic fun main(args: Array<String>) {
         var submitting = false
         try {
-            require(System.getProperty("os.name").contains("Windows", true))
-            require(args.size == 2)
-            val data = File(args[1])
-            require(data.isFile && data.length() in 1..8L * 1024 * 1024)
-            submitWindowsRawReceipt(NativeWindowsReceiptSpool(), args[0], data.readBytes()) { message ->
+            executeWindowsRawPrintRequest(args) { message ->
                 if (message == "AITA_PRINT_SUBMITTING:") submitting = true
                 println(message); System.out.flush()
             }
         } catch (failure: Throwable) {
-            val message = if (failure is WindowsSpoolFailure) failure.message else failure.javaClass.simpleName
+            val message = if (failure is WindowsSpoolFailure) failure.message else
+                failure.javaClass.simpleName + ": " + failure.message.orEmpty().replace('\n', ' ').replace('\r', ' ').take(300)
             println("AITA_PRINT_ERROR:$message")
             if (!submitting && failure !is WindowsSpoolFailure) println("AITA_PRINT_SAFE_FAILURE:")
+            if (failure !is WindowsSpoolFailure) failure.printStackTrace(System.err)
             System.out.flush()
             kotlin.system.exitProcess(1)
         }

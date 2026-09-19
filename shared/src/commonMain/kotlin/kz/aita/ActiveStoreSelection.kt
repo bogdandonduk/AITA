@@ -9,8 +9,19 @@ private data class ActiveStoreSelectionJournal(
     val storeId: String? = null,
     val explicitNone: Boolean = false,
     val pendingSync: Boolean = false,
-    val parentStoreId: String? = null
+    val parentStoreId: String? = null,
+    val schemaVersion: Int = 2
 )
+
+internal fun decodeSavedActiveStoreSelection(raw: String): SavedActiveStoreChoice? {
+    val saved = runCatching { jsonBase.decodeFromString(ActiveStoreSelectionJournal.serializer(), raw) }.getOrNull() ?: return null
+    // Older automatic recovery also wrote "explicit none" and queued empty account updates.
+    // Repair those ambiguous empty journals once. Keep every nonempty offline choice intact.
+    val id = saved.storeId?.trim()?.takeIf { it.isNotEmpty() }
+    val legacyEmpty = saved.schemaVersion < 3 && id == null
+    return SavedActiveStoreChoice(ActiveStoreChoice(id,
+        saved.explicitNone && !legacyEmpty, saved.parentStoreId), saved.pendingSync && !legacyEmpty)
+}
 
 internal object ActiveStores {
     private val failedRestoreOwner = kotlinx.coroutines.flow.MutableStateFlow<ActiveStoreOwner?>(null)
@@ -33,11 +44,9 @@ internal object ActiveStores {
         ownerIsCurrent = { it == owner() },
         load = { expected ->
             val raw = getLocalKv(key(expected))
-            val saved = raw?.let {
-                runCatching { jsonBase.decodeFromString(ActiveStoreSelectionJournal.serializer(), it) }.getOrNull()
-            }
+            val saved = raw?.let(::decodeSavedActiveStoreSelection)
             if (saved != null) {
-                SavedActiveStoreChoice(ActiveStoreChoice(saved.storeId, saved.explicitNone, saved.parentStoreId), saved.pendingSync)
+                saved
             } else {
                 // One-time legacy import only when the cached account proves whose old global key it is.
                 val legacyOwner = getLocalKv(LEGACY_OWNER_KEY)
@@ -45,7 +54,7 @@ internal object ActiveStores {
                 if (legacyOwner == expected.accountId || (legacyOwner == null && cachedOwner == expected.accountId)) {
                     val id = getLocalKv(KEY_ACTIVE_STORE_ID)?.trim()?.takeIf { it.isNotEmpty() }
                     val cleared = getLocalKv(KEY_ACTIVE_STORE_EXPLICIT_NONE) == "1"
-                    if (id != null || cleared) SavedActiveStoreChoice(ActiveStoreChoice(id, cleared), false) else null
+                    if (id != null || cleared) SavedActiveStoreChoice(ActiveStoreChoice(id), false) else null
                 } else null
             }
         },
@@ -53,7 +62,8 @@ internal object ActiveStores {
             selected.owner?.let { expected ->
                 putLocalKv(key(expected), jsonBase.encodeToString(ActiveStoreSelectionJournal.serializer(),
                     ActiveStoreSelectionJournal(selected.choice.storeId, selected.choice.explicitNone, selected.pendingSync,
-                        selected.choice.parentStoreId ?: storesState.payloadValue.orEmpty().findStoreOrBranch(selected.choice.storeId)?.parentStoreId)))
+                        selected.choice.parentStoreId ?: storesState.payloadValue.orEmpty().findStoreOrBranch(selected.choice.storeId)?.parentStoreId,
+                        schemaVersion = 3)))
             }
             DynamicCarts.prepareLegacyImport()
             // Retain compatibility keys, but never observe them as commands.

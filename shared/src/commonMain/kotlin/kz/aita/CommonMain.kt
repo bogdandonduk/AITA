@@ -17452,6 +17452,11 @@ fun refreshStoreAddressLocalizations(
     }
 }
 
+// The server also returns parent metadata to branch-only workers for hierarchy display.
+// That metadata is not permission to make the management parent their active workspace.
+private fun canAutomaticallySelectStore(store: StoreDataModel): Boolean =
+    !store.isManagementStore() || currentStoreHasWorkspaceAccess(store.id)
+
 fun getStores() {
     val sessionGeneration = currentAuthenticatedSessionGeneration()
     val accountId = userAccountState.payloadValue?.id?.takeIf { it.isNotBlank() } ?: return
@@ -17490,15 +17495,15 @@ fun getStores() {
                         when {
                             activeStoreIdState.value != null && activeStore == null -> {
                                 val replacement = replacementForRemovedStore(activeStoreIdState.value,
-                                    previousStores, stores, ActiveStores.parentStoreHint)
-                                    ?: recoverUnselectedStore(stores, ActiveStores.parentStoreHint)
+                                    previousStores, stores, ActiveStores.parentStoreHint, ::canAutomaticallySelectStore)
+                                    ?: recoverUnselectedStore(stores, ActiveStores.parentStoreHint, ::canAutomaticallySelectStore)
                                 // A stale list is never an instruction to erase another device's
                                 // account selection. Ask the account when no parent can be inferred.
                                 setActiveStoreId(replacement, syncServer = replacement != null)
                                 if (replacement == null) getUser(forceLogOut = false, refreshRelatedData = false)
                             }
                             activeStoreIdState.value == null && !activeStoreExplicitNoneIsSet() -> {
-                                recoverUnselectedStore(stores, ActiveStores.parentStoreHint)?.let { setActiveStoreId(it) }
+                                recoverUnselectedStore(stores, ActiveStores.parentStoreHint, ::canAutomaticallySelectStore)?.let { setActiveStoreId(it) }
                             }
                         }
                     }
@@ -17619,8 +17624,8 @@ fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)?
 
                 if (activeStoreIdState.value in removedIds) {
                     val replacement = replacementForRemovedStore(activeStoreIdState.value,
-                        previousStores + store, remainingStores, ActiveStores.parentStoreHint)
-                        ?: recoverUnselectedStore(remainingStores, ActiveStores.parentStoreHint)
+                        previousStores + store, remainingStores, ActiveStores.parentStoreHint, ::canAutomaticallySelectStore)
+                        ?: recoverUnselectedStore(remainingStores, ActiveStores.parentStoreHint, ::canAutomaticallySelectStore)
                     setActiveStoreId(replacement, syncServer = replacement != null)
                     if (replacement == null) getUser(forceLogOut = false, refreshRelatedData = false)
                 }

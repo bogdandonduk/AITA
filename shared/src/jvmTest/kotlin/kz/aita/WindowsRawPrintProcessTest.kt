@@ -3,6 +3,28 @@ package kz.aita
 import kotlin.test.*
 
 class WindowsRawPrintProcessTest {
+    @Test fun launcherTransportPreservesUnicodeQuotesAndSpacesWithoutDependingOnWindowsCodePage() {
+        val name = "Чек ӘҚ & ' receipt printer"
+        val path = "C:\\Users\\Әлия\\AITA ' data\\receipt.bin"
+        val encoded = encodeWindowsRawPrintArguments(name, path)
+        assertTrue(encoded.all { arg -> arg.all { it.code < 128 && !it.isWhitespace() } })
+        assertEquals(name to path, decodeWindowsRawPrintArguments(encoded.toTypedArray()))
+        assertFailsWith<IllegalArgumentException> { decodeWindowsRawPrintArguments(arrayOf("bad")) }
+        assertFailsWith<IllegalArgumentException> { decodeWindowsRawPrintArguments(arrayOf("%", "%")) }
+    }
+    @Test fun actualWindowsApiRejectsAnUnknownQueueBeforeAnyPageIsSubmitted() {
+        org.junit.Assume.assumeTrue("Native spooler is exercised on Windows", System.getProperty("os.name").contains("Windows", true))
+        val folder = java.nio.file.Files.createTempDirectory("AITA printer Кириллица '").toFile()
+        try {
+            val file = java.io.File(folder, "receipt.raw").apply { writeBytes(byteArrayOf(27, 64)) }
+            val events = mutableListOf<String>()
+            val failure = assertFailsWith<WindowsSpoolFailure> {
+                executeWindowsRawPrintRequest(encodeWindowsRawPrintArguments("AITA-missing-ӘҚ-" + java.util.UUID.randomUUID(), file.absolutePath).toTypedArray(), events::add)
+            }
+            assertEquals("OpenPrinter", failure.operation); assertEquals(1801, failure.code)
+            assertTrue(events.isEmpty())
+        } finally { folder.deleteRecursively() }
+    }
     private class Spool : WindowsRawSpoolApi {
         val calls = mutableListOf<String>()
         val data = mutableListOf<Byte>()

@@ -21,6 +21,13 @@ class RemovedStoreSelectionTest {
         assertNull(recoverUnselectedStore(listOf(parent, store("other-parent"))))
         assertNull(recoverUnselectedStore(emptyList()))
     }
+    @Test fun branchWorkerCannotBeAutomaticallyMovedIntoAParentVisibleOnlyAsMetadata() {
+        val branchAccess: (StoreDataModel) -> Boolean = { it.isBranchStore() }
+        assertEquals("branch", recoverUnselectedStore(listOf(parent), "parent", branchAccess))
+        val remaining = parent.copy(branches = listOf(branch.copy(id = "other-branch")))
+        assertNull(replacementForRemovedStore("branch", listOf(parent), listOf(remaining), "parent", branchAccess))
+        assertEquals("other-branch", recoverUnselectedStore(listOf(remaining), "parent", branchAccess))
+    }
     @Test fun deletedBranchSelectsItsSurvivingParent() {
         assertEquals("parent", replacementForRemovedStore("branch", listOf(parent), listOf(parent.copy(branches = emptyList()))))
     }

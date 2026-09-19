@@ -17,15 +17,15 @@ const batchesFor=storeId=>[1,2].map(n=>({id:id(Number(storeId.slice(-2))*100+n),
 const browser=await chromium.launch({headless:true,channel:'chromium',args:['--enable-unsafe-swiftshader']});
 const sockets=new Set(),calls=[],errors=[];let sequence=0,deleted=false,rejectTarget=null;
 const publish=(entity)=>{const data=JSON.stringify({id:'event-'+(++sequence),entity,userId:entity==='user/active-store'?account.id:null,reason:'shared_state_changed',type:'changed',sequence,createdAtMillis:Date.now()});for(const socket of sockets)socket.send(data);};
-async function makeClient(device){
+async function makeClient(device,seedBytes=null){
  const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US'});
  await context.addInitScript(({account,device})=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-store-token',refreshToken:'isolated-store-refresh'}));if(!localStorage.getItem('aita.user_account'))localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-'+device);}, {account,device});
  await context.routeWebSocket('**',socket=>{sockets.add(socket);socket.onClose(()=>sockets.delete(socket));socket.send(JSON.stringify({type:'connected',entity:'all',reason:'websocket_connected',createdAtMillis:Date.now()}));});
  await context.route('**/*',async route=>{
-  const u=new URL(route.request().url());if(u.origin===origin)return route.continue();if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname+u.search});return route.fulfill({response});}
+  const u=new URL(route.request().url());if(u.origin===origin)return route.continue();if(u.hostname==='aita.kz'&&u.pathname==='/seed.html')return route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Local fixture</title>'});if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname+u.search});return route.fulfill({response});}
   const p=u.pathname.replace(/^\/api\//,'/'),req=route.request(),headers=req.headers(),storeId=headers.store_id||account.activeStoreId;calls.push({device,path:p,method:req.method(),storeId,body:req.postData()});let payload=[];
   if(p==='/user/get')payload=account;
-  else if(p==='/stores/active'){if(req.postData().replaceAll('"','')===rejectTarget)return route.fulfill({status:403,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({negative:true,payload:null})});account={...account,activeStoreId:req.postData().replaceAll('"','')||null};payload=null;setTimeout(()=>publish('user/active-store'),50);}
+  else if(p==='/stores/active'){if((req.postData()||'').replaceAll('"','')===rejectTarget)return route.fulfill({status:403,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({negative:true,payload:null})});account={...account,activeStoreId:(req.postData()||'').replaceAll('"','')||null};payload=null;setTimeout(()=>publish('user/active-store'),50);}
   else if(p==='/stores/delete'){deleted=true;account={...account,activeStoreId:parent.id};payload=null;setTimeout(()=>publish('stores'),50);}
   else if(p==='/user/update'){account={...account,...req.postDataJSON()};payload=account;}
   else if(p==='/user/app-mode')payload={accountId:account.id,appModeId:0};
@@ -42,6 +42,10 @@ async function makeClient(device){
  });
  await context.addInitScript(()=>{window.print=function(){top.testPrintHtml=document.documentElement.outerHTML;};});
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('crash',()=>errors.push(device+' crashed'));
+ if(seedBytes){
+  await page.goto('https://aita.kz/seed.html');
+  await page.evaluate(bytes=>new Promise((resolve,reject)=>{const open=indexedDB.open('aita.local.v1',1);open.onupgradeneeded=()=>open.result.createObjectStore('sqlite');open.onerror=()=>reject(open.error);open.onsuccess=()=>{const db=open.result,tx=db.transaction('sqlite','readwrite');tx.objectStore('sqlite').put(new Uint8Array(bytes),'main');tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{reject(tx.error);db.close()}}}),seedBytes);
+ }
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(6500);await page.keyboard.press('Tab');await page.waitForTimeout(500);
  return {page,context};
 }
@@ -62,7 +66,7 @@ try {
  await waitFor(()=>calls.slice(before).some(c=>c.device==='first'&&c.path==='/stores/active'),'rejected selection attempted');
  await a.waitForTimeout(2500);
  assert.equal(account.activeStoreId,physical.id,'a denied stale selection cannot clear the server account choice');
- assert.ok(!calls.slice(before).some(c=>c.path==='/stores/active'&&['','""'].includes(c.body)),'no synthetic empty selection PUT');
+ assert.ok(!calls.slice(before).some(c=>c.path==='/stores/active'&&[null,'','""'].includes(c.body)),'no synthetic empty selection PUT');
  assert.equal(await button(b,'Sale').count(),1,'other already-open client retained its branch');
  console.log('PASS: rejected selection leaves the server and the other client intact');
  rejectTarget=null;
@@ -97,7 +101,7 @@ try {
  account={...account,activeStoreId:null};publish('user/active-store');
  await waitFor(()=>account.activeStoreId===parent.id,'missing selection repaired on server');
  await waitFor(async()=>await preference(b,'key_activeStoreId')===parent.id,'missing selection repaired on the other client');
- assert.ok(await b.getByText('Send test receipt',{exact:true}).count(),'missing-selection repair preserves Devices');
+ await waitFor(async()=>await b.getByText('Send test receipt',{exact:true}).count()>0,'missing-selection repair preserves Devices');
  // Miss an event while the page is frozen; foreground must refresh without a socket hint.
  await b.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
  await b.waitForTimeout(500);
@@ -106,8 +110,19 @@ try {
  await b.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
  await waitFor(()=>calls.slice(foregroundCalls).some(c=>c.device==='second'&&c.path==='/user/get'),'foreground account reconciliation');
  await waitFor(async()=>await preference(b,'key_activeStoreId')===internet.id,'missed selection recovered on foreground');
- assert.ok(await b.getByText('Send test receipt',{exact:true}).count(),'foreground recovery preserves Devices');
+ await waitFor(async()=>await b.getByText('Send test receipt',{exact:true}).count()>0,'foreground recovery preserves Devices');
  assert.deepEqual(errors,[]);console.log('PASS: missing selection and missed foreground event recover without navigation loss');
+ // An older client saved an automatic clear as explicit and left it queued for synchronization.
+ const priorBytes=await b.evaluate(()=>new Promise((resolve,reject)=>{const open=indexedDB.open('aita.local.v1',1);open.onerror=()=>reject(open.error);open.onsuccess=()=>{const db=open.result,read=db.transaction('sqlite','readonly').objectStore('sqlite').get('main');read.onsuccess=()=>{resolve(Array.from(read.result));db.close()};read.onerror=()=>{reject(read.error);db.close()}}}));
+ const oldDb=new sql.Database(new Uint8Array(priorBytes));let seeded;
+ try{oldDb.run('INSERT OR REPLACE INTO key_value(key,value) VALUES (?,?)',['active-store.selection.v2:'+account.id,JSON.stringify({storeId:null,explicitNone:true,pendingSync:true,parentStoreId:parent.id})]);seeded=Array.from(oldDb.export())}finally{oldDb.close()}
+ account={...account,activeStoreId:parent.id};
+ const repairCalls=calls.length;const repaired=await makeClient('legacy-empty',seeded);clients.push(repaired);
+ await waitFor(async()=>await preference(repaired.page,'key_activeStoreId')===parent.id,'legacy empty journal repaired to parent');
+ assert.equal(account.activeStoreId,parent.id);
+ assert.ok(!calls.slice(repairCalls).some(c=>c.device==='legacy-empty'&&c.path==='/stores/active'&&[null,'','""'].includes(c.body)),'legacy empty journal cannot replay a destructive clear');
+ assert.deepEqual(errors,[]);console.log('PASS: legacy queued empty selection repairs without erasing the server choice');
+
 
 }catch(error){for(let i=0;i<clients.length;i++){const p=clients[i].page;await p.screenshot({path:out+'/failure-'+i+'.png'}).catch(()=>{});fs.writeFileSync(out+'/semantics-'+i+'.txt',await p.locator('body').evaluate(x=>x.outerHTML).catch(()=>''));}throw error;}
 finally{fs.writeFileSync(out+'/result.json',JSON.stringify({calls,errors},null,2));await browser.close();server.close();}
