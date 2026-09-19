@@ -104,7 +104,8 @@ async function backgroundPixel(page) {
   await page.setViewportSize({width:1280,height:900});
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-downloads-wide.png'});
-  await page.mouse.click(640, 232);
+  await page.keyboard.press('Tab');
+  await page.getByRole('button', {name:/^(Download folder|Папка загрузок)$/}).click({force:true});
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-download-folder.png'});
   await Promise.all([
