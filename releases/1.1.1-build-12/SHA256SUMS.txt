@@ -1,0 +1,9 @@
+5b02fece611074d9f85aed303d0d3591e25dc7efc07dd7050627f79e7627b121  AITA-1.1.1-12-android.apk
+8567be10aab0b28c7ee02ee68460408c8d6a38df9d3f37aae3765afd77e7e9e4  AITA-1.1.1-12-android.aab
+0fc5a0f3202b4037e6879d83a31b2d63abfeb4eff4e0297a5b5a05732ad917df  android-client-build.json
+7fff0f9e0d10d82b17ee43fb772f0fb2f6ebb5e4a108a793ebfdc0254d969c96  AITA-1.1.1-12-web.zip
+0fc5a0f3202b4037e6879d83a31b2d63abfeb4eff4e0297a5b5a05732ad917df  web-client-build.json
+e75c603106c2eb5da2cb632a48c153f6b6f6c66dfa3a5221da5bef9eeccd729a  AITA-1.1.1-12-windows.exe
+d7c5b84f4c7a07efabb875d23a630b96ab1f07b075bb6f287ee31eeb6cb4ed50  AITA-1.1.1-12-windows.msi
+fa0e5becfcb50e89bb3f26c9cd596c9d04d298239f246f2f83d51b99fc4da6ae  windows-verification.json
+1d19a8d213b1443338b4495a02a4cd8ee933520e785ccc68c09eb060d933d518  windows-client-build.json
