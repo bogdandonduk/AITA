@@ -37,6 +37,12 @@ window.aitaPrintDocument = function (title, html) {
                     if (!Number.isFinite(width) || width < 150 || width > 240 ||
                         !Number.isFinite(margin) || margin < 0 || margin > 24 ||
                         !Number.isFinite(requestedLimit) || requestedLimit < 72 || requestedLimit > 842) return fail();
+                    frame.style.width = (width * 96 / 72) + 'px';
+                    // Layout the child at the roll width BEFORE measuring, including percentage-based content.
+                    content.documentElement.style.width = (width - margin * 2) + 'pt';
+                    content.documentElement.style.minWidth = '0';
+                    content.body.style.width = (width - margin * 2) + 'pt';
+                    content.body.style.minWidth = '0';
                     // Measure content, never scrollHeight: it can include the iframe viewport.
                     // Long receipts paginate at the cap; they never request metres of blank paper.
                     let printable = content.getElementById('aita-print-content');
@@ -52,6 +58,9 @@ window.aitaPrintDocument = function (title, html) {
                     const paperStyle = content.createElement('style');
                     paperStyle.textContent = '@page{size:'+width+'pt '+height+'pt;margin:'+margin+'pt}';
                     content.head.appendChild(paperStyle);
+                    frame.style.height = (height * 96 / 72) + 'px';
+                    // Force layout before handing the frame to the browser/native print pipeline.
+                    printable.getBoundingClientRect();
                 }
                 target.addEventListener('afterprint', cleanup, {once: true});
                 target.focus();

@@ -1129,7 +1129,10 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 data class DropdownOption(
     val id: String,
     val title: String,
-    val subtitle: String? = null
+    val subtitle: String? = null,
+    val enabled: Boolean = true,
+    val iconPath: String? = null,
+    val iconRes: DrawableResource? = null
 )
 
 @Composable
@@ -1764,159 +1767,8 @@ fun AppConfiguration.SimpleDropdownField(
     options: List<DropdownOption>,
     placeholder: String,
     onSelected: (String) -> Unit
-) {
-    var expanded by rememberSaveable {
-        mutableStateOf(false)
-    }
-
-    val selected = options.find { it.id == selectedId }
-    val dropdownBorderWidth by animateDpAsState(
-        targetValue = if (expanded) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
-        animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
-        label = "dropdownBorderWidth"
-    )
-    val dropdownBorderColor by animateColorAsState(
-        targetValue = if (expanded) stateValues.AccentColor else stateValues.PlaceholderTextColor,
-        animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
-        label = "dropdownBorderColor"
-    )
-
-    Column(modifier = modifier.aitaContentMotion()) {
-        if (title.isNotBlank()) {
-            Text(
-                text = title,
-                color = stateValues.TextColor,
-                fontSize = stateValues.textSize,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(2.dp)
-                .height(stateValues.textFieldHeight)
-                .aitaContentMotion()
-                .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                .clip(RoundedCornerShape(stateValues.cornerRadius))
-                .background(stateValues.BackgroundColor)
-                .border(
-                    dropdownBorderWidth,
-                    dropdownBorderColor,
-                    RoundedCornerShape(stateValues.cornerRadius)
-                )
-                .aitaClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(color = stateValues.AccentColor)
-                ) {
-                    expanded = !expanded
-                }
-                .padding(horizontal = 14.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = selected?.title?.takeIf { it.isNotBlank() } ?: placeholder,
-                        color = if (selected == null) stateValues.PlaceholderTextColor else stateValues.TextColor,
-                        fontSize = stateValues.textSize,
-                        fontWeight = FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    selected?.subtitle?.takeIf { it.isNotBlank() }?.let {
-                        Text(
-                            text = it,
-                            color = stateValues.TextColor,
-                            fontSize = stateValues.smallTextSize,
-                            fontWeight = FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Text(
-                    text = if (expanded) "▲" else "▼",
-                    color = stateValues.AccentColor,
-                    fontSize = stateValues.smallTextSize,
-                    fontWeight = FontWeight.Bold,
-                    style = TextStyle(fontFamily = LocalAitaFontFamily.current, shadow = accentTextShadow(stateValues.AccentColor, stateValues.AccentColor))
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = expanded,
-            enter = aitaVisibilityEnter(),
-            exit = aitaVisibilityExit()
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().aitaContentMotion()) {
-                Spacer(modifier = Modifier.height(2.dp))
-
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(2.dp)
-                        .heightIn(max = stateValues.screenHeight / 4)
-                        .foregroundTactileShadow(stateValues.cornerRadius, elevated = false)
-                        .clip(RoundedCornerShape(stateValues.cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .border(
-                            stateValues.unfocusedBorderWidth,
-                            stateValues.AccentColor,
-                            RoundedCornerShape(stateValues.cornerRadius)
-                        )
-                ) {
-                    items(options) { option ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 38.dp)
-                                .aitaClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(color = stateValues.AccentColor)
-                                ) {
-                                    onSelected(option.id)
-                                    expanded = false
-                                }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = option.title,
-                                color = stateValues.TextColor,
-                                fontSize = stateValues.textSize,
-                                fontWeight = FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-
-                            option.subtitle?.takeIf { it.isNotBlank() }?.let {
-                                Text(
-                                    text = it,
-                                    color = stateValues.TextColor,
-                                    fontSize = stateValues.smallTextSize,
-                                    fontWeight = FontWeight.Normal,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
+) = AitaDropdownField(modifier = modifier, title = title, selectedId = selectedId,
+    options = options, placeholder = placeholder, onSelected = onSelected)
 
 
 @Composable
@@ -3993,8 +3845,12 @@ object Navigation {
             )
 
         internal suspend fun restorePersistentSnapshot(snapshot: PersistedSplitNavigationStackDataModel) {
-            _Left.emit(snapshot.left.toPersistentMenuStack(NavigationScreenModel.Menu.List))
-            _Right.emit(snapshot.right.toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount))
+            val adapted = adaptMenuStacks(
+                snapshot.left.toPersistentMenuStack(NavigationScreenModel.Menu.List),
+                snapshot.right.toPersistentMenuStack(NavigationScreenModel.Menu.UserAccount),
+                AppConfiguration.stateValues.isNarrowScreen)
+            _Left.emit(adapted.first)
+            _Right.emit(adapted.second)
         }
 
         suspend fun go(

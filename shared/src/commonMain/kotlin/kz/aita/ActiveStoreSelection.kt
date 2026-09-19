@@ -79,6 +79,8 @@ internal object ActiveStores {
             }
             outcome
         },
+        rejected = { getUser(forceLogOut = false, applyServerActiveStore = true) },
+        persistenceFailed = { logCloudConnectionDiagnostic("Local active-store save failed; account synchronization continues and device save will retry") },
         acknowledged = { selected ->
             if (coordinator.isCurrent(selected)) {
                 userAccountState.payloadValue?.takeIf { it.id == selected.owner?.accountId }?.let { account ->

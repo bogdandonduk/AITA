@@ -26,15 +26,45 @@
         // still have a fresh, long-lived HTTP cache entry from before no-cache was enabled.
         // These parameters only select the download; the signed feed is compared with the
         // build identity compiled into the running Wasm application.
-        const entry = new URL('composeApp.js', location.href);
-        const requested = new URL(location.href).searchParams;
-        for (const name of ['_aita_build', '_aita_refresh']) {
-            const value = requested.get(name);
-            if (value && /^[0-9]{1,20}$/.test(value)) entry.searchParams.set(name, value);
-        }
-        const script = document.createElement('script');
-        script.src = entry.href;
-        document.body.appendChild(script);
+        (() => {
+            const names = ['_aita_build', '_aita_refresh'];
+            const storageKey = 'aita.web-entry-refresh';
+            const entry = new URL('composeApp.js', location.href);
+            const requested = new URL(location.href).searchParams;
+            let saved = {};
+            try { saved = JSON.parse(localStorage.getItem(storageKey)) || {}; } catch (_) {}
+            const explicit = names.some(name => requested.has(name));
+            const refresh = {};
+            for (const name of names) {
+                const value = explicit ? requested.get(name) : saved[name];
+                if (typeof value === 'string' && /^[0-9]{1,20}$/.test(value)) {
+                    refresh[name] = value;
+                    entry.searchParams.set(name, value);
+                }
+            }
+            // Preserve the entry cache key across clean-URL reloads/new tabs. This is only a
+            // download hint; the installed version still comes from the compiled application.
+            if (explicit) {
+                try { localStorage.setItem(storageKey, JSON.stringify(refresh)); } catch (_) {}
+            }
+            globalThis.aitaWebEntry = Object.freeze({
+                ready() {
+                    const url = new URL(location.href);
+                    if (!names.some(name => url.searchParams.has(name))) return;
+                    // Keep unrelated query bytes (including signed links), the fragment and
+                    // the existing history state. Replace this entry; never navigate again.
+                    const query = url.search.slice(1).split('&').filter(part => {
+                        try { return !names.includes(decodeURIComponent(part.split('=')[0].replace(/\+/g, ' '))); }
+                        catch (_) { return true; }
+                    }).join('&');
+                    try { history.replaceState(history.state, '', url.pathname + (query ? '?' + query : '') + url.hash); }
+                    catch (_) { /* Optional address cleanup must not interrupt startup. */ }
+                }
+            });
+            const script = document.createElement('script');
+            script.src = entry.href;
+            document.body.appendChild(script);
+        })();
     </script>
 </body>
 </html>

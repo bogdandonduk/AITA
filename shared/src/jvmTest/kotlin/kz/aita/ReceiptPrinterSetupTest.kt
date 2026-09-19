@@ -16,8 +16,14 @@ class ReceiptPrinterSetupTest {
         setAppDatabaseForTests(AppDatabase(driver)); getSqlDelightDriver = { driver }
         try {
             putLocalKv("receipt-paper-width-mm", "58")
-            saveBrowserReceiptPrinterName("  AP58\n  ")
-            assertEquals("AP58", browserReceiptPrinterNameState.value)
+            saveBrowserReceiptPrinterName("  Front counter / Чеки\n  ")
+            browserReceiptPrinterNameState.value = null
+            loadBrowserReceiptPrinterName()
+            assertEquals("Front counter / Чеки", browserReceiptPrinterNameState.value)
+            saveBrowserReceiptPrinterName("Packing desk — labels")
+            browserReceiptPrinterNameState.value = null
+            loadBrowserReceiptPrinterName()
+            assertEquals("Packing desk — labels", browserReceiptPrinterNameState.value)
             setBrowserReceiptPrinterEnabled(false)
             browserReceiptPrinterEnabledState.value = true
             configuredReceiptPrinterDeviceIdState.value = "browser-system-print"

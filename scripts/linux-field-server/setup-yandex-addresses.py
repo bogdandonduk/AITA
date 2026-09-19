@@ -97,7 +97,8 @@ def main():
     text=ENV.read_text()
     print('AITA address setup · keys stay on this server, outside Git')
     print('Use Yandex Geosuggest, Geocoder and optional Static Maps keys with a plan allowing address-data storage.')
-    values={}
+    allowed=input('Does your plan explicitly permit permanent address/coordinate storage in this app? [yes/NO]: ').strip().lower() == 'yes'
+    values={'AITA_YANDEX_STORED_ADDRESS_LICENSE': 'permanent-storage-permitted' if allowed else ''}
     for key,(name,_,_) in SERVICES.items():
         old=existing_value(text,key) or existing_value(text,'AITA_YANDEX_MAPS_API_KEY')
         suffix=' [Enter keeps existing]' if usable(old) else (' [Enter skips map previews]' if 'STATIC_MAPS' in key else '')
@@ -105,14 +106,16 @@ def main():
         if not value and usable(old): value=old
         if not value and 'STATIC_MAPS' in key: continue
         values[key]=checked_key(value)
-    for key,value in values.items(): check_service(key,value)
+    for key,value in values.items():
+        if key in SERVICES: check_service(key,value)
     old_secret=existing_value(text,SIGNING)
     if 'AITA_YANDEX_STATIC_MAPS_API_KEY' in values and not (len(old_secret)>=32 and usable(old_secret)):
         values[SIGNING]=secrets.token_hex(64)
     backup=save_configuration(ENV,text,values)
     print('READY: Address keys verified and securely saved')
     print('Backup: '+str(backup))
-    print('No service restarted. Tell the assistant setup succeeded; the next managed AITA release will activate these settings.')
+    print('READY: Permanent-address integration '+('enabled for the next managed release' if allowed else 'held inactive; manual address entry remains available'))
+    print('No service restarted. Tell the assistant setup succeeded.')
 
 if __name__=='__main__':
     try: main()

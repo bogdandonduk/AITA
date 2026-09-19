@@ -526,9 +526,10 @@ fun AppConfiguration.MenuDevicesScreen() {
     }
 
     fun refreshLabelPrinters(showNotification: Boolean) {
+        if (refreshingLabelPrinters) return
         refreshingLabelPrinters = true
         refreshLabelPrinterDevices { result ->
-            coroutineScope.launch {
+            devicesScope.launch {
                 refreshingLabelPrinters = false
                 if (showNotification) receiptActionNotification(result, labelPrintersRefreshedText)
             }
@@ -555,10 +556,6 @@ fun AppConfiguration.MenuDevicesScreen() {
     LaunchedEffect(Unit) {
         refreshReceiptPrinters(showNotification = false)
         refreshLabelPrinters(showNotification = false)
-        while (true) {
-            kotlinx.coroutines.delay(5_000)
-            refreshReceiptPrinters(showNotification = false)
-        }
     }
 
     if (confirmBrowserPrinter) BrowserPrinterSetupDialog { confirmBrowserPrinter = false }
@@ -623,11 +620,26 @@ fun AppConfiguration.MenuDevicesScreen() {
                     ) {
                         actionButton(
                             modifier = Modifier.fillMaxWidth(),
-                            text = localizedStringResource(616, "Open system devices"),
-                            iconPath = stateValues.drawablePathIconDevices,
-                            iconRes = stateValues.drawableResIconDevices.value,
+                            text = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print") else localizedStringResource(616, "Open system devices"),
+                            iconPath = if (preferHtmlDocumentPrinting) stateValues.drawablePathIconAnalyticsReport else stateValues.drawablePathIconDevices,
+                            iconRes = if (preferHtmlDocumentPrinting) stateValues.drawableResIconAnalyticsReport.value else stateValues.drawableResIconDevices.value,
                             confirmationRequired = false,
-                            onClick = { openPlatformDevicesSettings() }
+                            loading = printingReceipt,
+                            autoLoading = false,
+                            enabled = !printingReceipt,
+                            onClick = {
+                                if (!preferHtmlDocumentPrinting) openPlatformDevicesSettings()
+                                else {
+                                    printingReceipt = true
+                                    devicesScope.launch {
+                                        try {
+                                            val title = localizedStringResource(1252, "A4 paper printer")
+                                            receiptActionNotification(printHtmlDocument(title,
+                                                systemPrinterTestDocument(title).toPrintHtml(title)), deviceWorkflowText("print_opened"))
+                                        } finally { printingReceipt = false }
+                                    }
+                                }
+                            }
                         )
                     }
                 }
@@ -5253,6 +5265,7 @@ internal fun List<NotificationDataModel>.compactForPopupDisplay(): List<Notifica
 
 @Composable
 fun AppConfiguration.MainScreen() {
+    val locallyHydrated by localApplicationHydratedState.collectAsState()
     val modeReady by accountAppModeReadyState.collectAsState()
     val navigationReady by AppStateWorkspace.readyScope.collectAsState()
     LaunchedEffect(Unit) { Navigation.startAppNavigationPersistence() }
@@ -5261,9 +5274,9 @@ fun AppConfiguration.MainScreen() {
     }
     // Keep the same splash until account mode, store and local navigation have been adopted.
     // A published account alone is not permission to render the default Marketplace workspace.
-    if (stateValues.userAccount != null &&
+    if (!locallyHydrated || (stateValues.userAccount != null &&
         (modeReady != (stateValues.userAccount!!.id to currentAuthenticatedSessionGeneration()) ||
-            navigationReady == null || !AppStateWorkspace.readyForCurrentScope())) {
+            navigationReady == null || !AppStateWorkspace.readyForCurrentScope()))) {
         SplashScreen()
         return
     }

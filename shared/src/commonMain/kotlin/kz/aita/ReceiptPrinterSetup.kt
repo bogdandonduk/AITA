@@ -21,6 +21,17 @@ suspend fun saveBrowserReceiptPrinterName(name: String?) {
     browserReceiptPrinterNameState.value = normalized
 }
 
+/** A compact, single-page A4 sample for selecting a report printer in the browser dialog. */
+fun systemPrinterTestDocument(title: String): AitaPdfDocument = AitaPdfDocument(listOf(
+    AitaPdfBlock("aita", AitaPdfRole.Store),
+    AitaPdfBlock("aita.kz", AitaPdfRole.Heading),
+    AitaPdfBlock("", AitaPdfRole.Divider),
+    AitaPdfBlock(title, AitaPdfRole.Title),
+    AitaPdfBlock("0123456789  ·  100.00 ₸", AitaPdfRole.Total),
+    AitaPdfBlock("Аа Бб Әә Ғғ Ққ Өө Ұұ Үү"),
+    AitaPdfBlock(deviceWorkflowText("test_only"), AitaPdfRole.Heading)
+), width = 595.28f, minHeight = 841.89f, maxHeight = 841.89f, margin = 36f)
+
 /** A short calibration slip, without a rotated full transaction barcode or an A4-sized page. */
 fun receiptPrinterTestDocument(title: String, dateText: String, language: String = appLanguageState.value): AitaPdfDocument =
     AitaPdfDocument(listOf(

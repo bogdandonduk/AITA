@@ -33,6 +33,36 @@ class ActiveStoreSelectionCoordinatorTest {
         try { withTimeout(5_000L) { f.block() } } finally { f.scope.cancel() }
     }
 
+    @Test fun storageFailureDoesNotBlockAccountSyncAndIsRetriedAfterAcknowledgement() = fixture {
+        adopt("A")
+        persistAction = { error("quota exceeded") }
+        select("B").join()
+        assertEquals(listOf("B"), calls.map { it.second })
+        assertEquals("B", shown.last())
+        assertFalse(controller.snapshot.pendingSync)
+        assertEquals("B", acknowledgements.last().choice.storeId)
+        persistAction = {}
+        controller.retryPending().join()
+        assertEquals("B", disk.getValue(owner.accountId).choice.storeId)
+        assertFalse(disk.getValue(owner.accountId).pendingSync)
+        assertEquals(1, calls.size, "retry local storage without echoing a saved selection")
+    }
+
+    @Test fun staleOfflineDeletedStoreCannotEraseParentSelectedOnAnotherDevice() = fixture {
+        var serverStore: String? = "parent"
+        disk[owner.accountId] = SavedActiveStoreChoice(ActiveStoreChoice("deleted", parentStoreId = "parent"), true)
+        sendAction = { selected ->
+            if (selected.choice.storeId == "deleted") ActiveStoreSyncOutcome.REJECTED
+            else { serverStore = selected.choice.storeId; ActiveStoreSyncOutcome.SAVED }
+        }
+        adopt("parent")
+        controller.retryPending().join()
+        assertEquals("parent", serverStore)
+        controller.acceptRemote(owner, serverStore, controller.snapshot.revision)
+        assertEquals("parent", shown.last())
+        assertEquals(listOf("deleted"), calls.map { it.second })
+    }
+
     @Test fun anotherDevicesSelectionIsPublishedAndSavedWithoutEchoingItBack() = fixture {
         adopt("A")
         controller.acceptRemote(owner, "B", controller.snapshot.revision)
@@ -213,13 +243,13 @@ class ActiveStoreSelectionCoordinatorTest {
         assertTrue(disk.getValue(owner.accountId).choice.explicitNone)
     }
 
-    @Test fun permissionDenialClearsOnlyRejectedChoiceInsteadOfRestoringOldStore() = fixture {
+    @Test fun permissionDenialNeverClearsTheOtherDevicesServerChoice() = fixture {
         adopt("A")
         sendAction = { if (it.choice.storeId == "B") ActiveStoreSyncOutcome.REJECTED else ActiveStoreSyncOutcome.SAVED }
         select("B").join()
         assertNull(shown.last())
-        assertTrue(controller.snapshot.choice.explicitNone)
-        assertEquals(listOf("B", null), calls.map { it.second })
+        assertFalse(controller.snapshot.choice.explicitNone)
+        assertEquals(listOf("B"), calls.map { it.second })
         assertFalse(controller.snapshot.pendingSync)
     }
 

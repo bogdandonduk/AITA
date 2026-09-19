@@ -36,11 +36,14 @@ internal class ActiveStoreSelectionCoordinator(
     private val publish: suspend (ActiveStoreSelectionSnapshot) -> Unit,
     private val sync: suspend (ActiveStoreSelectionSnapshot) -> ActiveStoreSyncOutcome,
     private val acknowledged: suspend (ActiveStoreSelectionSnapshot) -> Unit = {},
-    private val syncTimeoutMillis: Long = 60_000L
+    private val syncTimeoutMillis: Long = 60_000L,
+    private val rejected: (ActiveStoreSelectionSnapshot) -> Unit = {},
+    private val persistenceFailed: (Exception) -> Unit = {}
 ) {
     private val state = MutableStateFlow(ActiveStoreSelectionSnapshot())
     private val storageMutex = Mutex()
     private val syncMutex = Mutex()
+    private val storageRetryRequired = MutableStateFlow(false)
     val snapshot: ActiveStoreSelectionSnapshot get() = state.value
 
     fun isCurrent(candidate: ActiveStoreSelectionSnapshot): Boolean =
@@ -108,7 +111,7 @@ internal class ActiveStoreSelectionCoordinator(
     }
 
     fun retryPending(): Job = scope.launch {
-        if (state.value.pendingSync) { flush(); synchronize() }
+        if (state.value.pendingSync || storageRetryRequired.value) { flush(); synchronize() }
     }
 
     private suspend fun flush() = storageMutex.withLock { flushLocked() }
@@ -117,7 +120,16 @@ internal class ActiveStoreSelectionCoordinator(
         if (!selected.hydrated || !isCurrent(selected)) return
         publish(selected)
         // Account-scoped persistence cannot echo an older value into the live selection.
-        persist(selected)
+        persistBestEffort(selected)
+    }
+
+    private suspend fun persistBestEffort(selected: ActiveStoreSelectionSnapshot) {
+        try { persist(selected); storageRetryRequired.value = false }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            storageRetryRequired.value = true
+            persistenceFailed(failure)
+        }
     }
 
     private suspend fun synchronize() = syncMutex.withLock {
@@ -131,16 +143,19 @@ internal class ActiveStoreSelectionCoordinator(
                 ActiveStoreSyncOutcome.SAVED -> storageMutex.withLock {
                     val saved = selected.copy(pendingSync = false)
                     if (state.compareAndSet(selected, saved) && isCurrent(saved)) {
-                        persist(saved)
+                        persistBestEffort(saved)
                         if (isCurrent(saved)) acknowledged(saved)
                     }
                 }
                 ActiveStoreSyncOutcome.REJECTED -> storageMutex.withLock {
-                    // A real permission rejection is not a transport failure. Clear only this exact
-                    // selection; never resurrect a previous store or discard a newer user's choice.
-                    val cleared = selected.copy(choice = ActiveStoreChoice(explicitNone = true),
-                        revision = selected.revision + 1L, pendingSync = selected.choice.storeId != null)
-                    if (state.compareAndSet(selected, cleared)) flushLocked()
+                    // A removed store is not a command to clear the ACCOUNT's selection. Another
+                    // device/server deletion may already have selected its surviving parent.
+                    val cleared = selected.copy(choice = ActiveStoreChoice(parentStoreId = selected.choice.parentStoreId),
+                        revision = selected.revision + 1L, pendingSync = false)
+                    if (state.compareAndSet(selected, cleared)) {
+                        flushLocked()
+                        if (isCurrent(cleared)) rejected(cleared)
+                    }
                 }
             }
         }

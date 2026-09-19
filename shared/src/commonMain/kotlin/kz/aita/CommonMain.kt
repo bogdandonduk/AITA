@@ -8126,6 +8126,8 @@ fun List<CountryDataModel>.getFirstCurrencyByCountry(locale: String): CurrencyDa
     return getCurrenciesByCountry(locale)?.takeIf { it.isNotEmpty() }?.first()
 }
 
+val localApplicationHydratedState = MutableStateFlow(false)
+
 fun init() {
     if (!beginAitaInitializationOnce()) {
         logCloudConnectionDiagnostic("AITA init ignored: initialization is already active")
@@ -8136,8 +8138,14 @@ fun init() {
         // Load persisted configuration before starting collectors. Otherwise the initial bundled
         // server URL can overwrite the last working local server URL before the app has a chance
         // to use it, making the client appear to never reach the backend.
-        DynamicCarts.prepareLegacyImport()
-        loadCachedApplicationData()
+        try {
+            DynamicCarts.prepareLegacyImport()
+            loadCachedApplicationData()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { logCloudConnectionDiagnostic("Local startup cache unavailable; credentials retained") }
+        finally { localApplicationHydratedState.value = true }
+        // An older cache must never overwrite a freshly fetched account/store snapshot.
+        getUser()
         startSupplierIdentityFocus()
         startAppCacheCollectors()
         AnalyticsWorkspace.start()
@@ -8155,7 +8163,6 @@ fun init() {
     GlobalScope.launch(Dispatchers.ourIo) { observeActiveInventoryData() }
 
     getGlobalAppConfiguration(true)
-    getUser()
     getUserFinanceDashboard()
     getSubscriptionPlans()
     getSuppliers()

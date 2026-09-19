@@ -77,6 +77,11 @@ private fun subscribeBrowserPageActivity(callback: (Boolean) -> Unit): Unit = js
     globalThis.aitaPageActivity.subscribe(callback);
 }""")
 
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun completeBrowserEntryLoad(): Unit = js("""{
+    if (globalThis.aitaWebEntry) globalThis.aitaWebEntry.ready();
+}""")
+
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     installWebRuntimeDiagnostics()
@@ -92,6 +97,7 @@ fun main() {
             ComposeViewport(document.body!!) {
                 AppConfiguration({ MainScreen() })
             }
+            completeBrowserEntryLoad()
         } catch (failure: Throwable) {
             val alreadyOpen = failure.message.orEmpty().contains("already open in another tab")
             document.getElementById("aita-startup-message")?.textContent = browserStartupFailureText(alreadyOpen)

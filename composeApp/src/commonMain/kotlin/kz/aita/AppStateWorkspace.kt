@@ -21,6 +21,7 @@ internal data class AppStateUi(val device: Boolean = true, val cloud: Boolean = 
 internal object AppStateWorkspace {
     private data class Owner(val id: String, val scope: AppStateScope, val generation: Long) {
         val key get() = "app-state-v1:$id:${scope.key}"
+        val navigationKey get() = "navigation-place-v2:$id:${scope.mode}"
     }
     private val job = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mutex = Mutex()
@@ -83,6 +84,7 @@ internal object AppStateWorkspace {
         }
     }
     private suspend fun tick() {
+        if (!localApplicationHydratedState.value) return
         val expected = current()
         if (expected.id != "anonymous" && !localWorkspaceScopeReady()) return
         if (owner != expected || !loaded) {
@@ -91,7 +93,10 @@ internal object AppStateWorkspace {
             readyScope.value = null
             owner = expected; loaded = false; remote = null; firstRead = true; nextSync = 0; persisted = null; change++
             record.value = LocalAppState()
-            localNavigation = getLocalKv("${expected.key}:place")?.let {
+            val latestPlace = getLocalKv(expected.navigationKey)?.let {
+                runCatching { jsonBase.decodeFromString<DeviceNavigationPlace>(it) }.getOrNull()?.forStore(expected.scope.store)
+            }
+            localNavigation = latestPlace ?: getLocalKv("${expected.key}:place")?.let {
                 runCatching { jsonBase.decodeFromString<LocalNavigationPlace>(it) }.getOrNull()?.takeIf { it.valid() }
             }
             savedNavigation = localNavigation
@@ -138,6 +143,7 @@ internal object AppStateWorkspace {
         if (!belongs(expected)) return
         val place = Navigation.localNavigationSnapshot()
         if (!place.valid() || place == savedNavigation) return
+        putLocalKv(expected.navigationKey, jsonBase.encodeToString(DeviceNavigationPlace(expected.scope.store, place)))
         putLocalKv("${expected.key}:place", jsonBase.encodeToString(place))
         if (belongs(expected)) { localNavigation = place; savedNavigation = place }
     }

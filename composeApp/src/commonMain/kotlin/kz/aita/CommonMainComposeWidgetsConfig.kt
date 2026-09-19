@@ -2,6 +2,8 @@
 @file:OptIn(ExperimentalTime::class, ExperimentalFoundationApi::class)
 package kz.aita
 
+import androidx.compose.ui.graphics.luminance
+
 import aita.composeapp.generated.resources.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
@@ -2937,163 +2939,29 @@ fun AppConfiguration.dropdownListWidget(
         }
     }
 
-    val selected = remember(selectedId, domainsKey) {
+    val selected = remember(selectedId, domains) {
         domains.find { it.id.equals(selectedId, ignoreCase = true) }
             ?: domains.firstOrNull()
     }
 
-    val isDomainSelectionDropdownExpandedState = remember {
-        MutableTransitionState(false)
-            .apply {
-                targetState = false
-            }
-    }
-
-    Column(
-        modifier = modifier
-    ) {
-        val titleTextPresent = titleText.isNotEmpty() && titleText.isNotBlank()
-
-        if (titleTextPresent)
-            Text(
-                modifier = Modifier
-                    .padding(bottom = 4.dp),
-                text = titleText,
-                style = TextStyle(fontFamily = LocalAitaFontFamily.current,
-                    color = titleTextColor,
-                    fontSize = titleTextSize,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-
-        selected?.let { selectedDomain ->
-            selectableDomainWidget(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(2.dp)
-                    .foregroundTactileShadow(cornerRadius, elevated = false)
-                    .clip(RoundedCornerShape(cornerRadius))
-                    .height(stateValues.textFieldHeight)
-                    .background(stateValues.BackgroundColor)
-                    .border(
-                        width = if (isDomainSelectionDropdownExpandedState.targetState) stateValues.focusedBorderWidth else stateValues.unfocusedBorderWidth,
-                        color = if (isDomainSelectionDropdownExpandedState.targetState) stateValues.AccentColor else textColor,
-                        shape = RoundedCornerShape(cornerRadius)
-                    ),
-                textColor = textColor,
-                domain = selectedDomain,
-                showId = showId,
-                showName = showName,
-                showExpansion = true
-            ) {
-                isDomainSelectionDropdownExpandedState.targetState =
-                    !isDomainSelectionDropdownExpandedState.targetState
-            }
-        } ?: MessageText(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(stateValues.textFieldHeight),
-            text = stateValues.stringListEmpty,
-            textSize = stateValues.textSize
+    val byId = domains.associateBy { it.id }
+    val options = domains.map { domain ->
+        val idTitle = domain.displayId.extractLocalizedString(stateValues.appLanguage) ?: domain.id
+        val name = domain.name?.extractLocalizedString(stateValues.appLanguage).orEmpty()
+        DropdownOption(
+            id = domain.id,
+            title = if (showId || !showName || name.isBlank()) idTitle else name,
+            subtitle = name.takeIf { showId && showName && it.isNotBlank() && it != idTitle },
+            iconPath = domain.iconPath,
+            iconRes = domain.iconRes
         )
-
-        if (domains.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(1.dp))
-
-            AnimatedVisibility(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 0.dp, max = stateValues.screenHeight / 4),
-                visibleState = isDomainSelectionDropdownExpandedState,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(2.dp)
-                        .foregroundTactileShadow(cornerRadius, elevated = false)
-                        .clip(RoundedCornerShape(cornerRadius))
-                        .background(stateValues.BackgroundColor)
-                        .fillMaxWidth()
-                        .border(
-                            width = stateValues.focusedBorderWidth,
-                            color = stateValues.AccentColor,
-                            shape = RoundedCornerShape(cornerRadius)
-                        )
-                ) {
-                    val searchTextFieldContent: GenericTextFieldContent? = if (search != null) {
-                        Spacer(modifier = Modifier.height(1.dp))
-
-                        searchTextField(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            stateHost = search.second,
-                            stateKey = search.third,
-                            focusedBorderWidth = 0.dp,
-                            unfocusedBorderWidth = 0.dp,
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent
-                        )
-                    } else null
-
-                    if (search != null) {
-                        Spacer(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(textColor)
-                                .height(stateValues.unfocusedBorderWidth)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.height(1.dp))
-                    }
-
-                    val query = searchTextFieldContent?.value?.text.orEmpty()
-                    val visibleDomains = if (query.isNotBlank()) {
-                        domains.filter { it.searchContains(query) }
-                    } else {
-                        domains
-                    }
-
-                    if (visibleDomains.isEmpty()) {
-                        MessageText(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(stateValues.textFieldHeight),
-                            text = stateValues.stringNoMatches,
-                            textSize = stateValues.textSize
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = stateValues.screenHeight / 4)
-                        ) {
-                            items(
-                                items = visibleDomains,
-                                key = { it.id }
-                            ) { domain ->
-                                selectableDomainWidget(
-                                    modifier = Modifier
-                                        .fillParentMaxWidth(),
-                                    textColor = textColor,
-                                    domain = domain,
-                                    showId = showId,
-                                    showName = showName
-                                ) {
-                                    selectedId = domain.id
-                                    onSelected?.invoke(domain.id)
-
-                                    isDomainSelectionDropdownExpandedState.targetState =
-                                        !isDomainSelectionDropdownExpandedState.targetState
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
     }
+    AitaDropdownField(modifier = modifier, title = titleText, selectedId = selected?.id,
+        options = options, placeholder = stateValues.stringListEmpty,
+        textColor = textColor, titleTextSize = titleTextSize, titleTextColor = titleTextColor,
+        cornerRadius = cornerRadius, search = search,
+        matches = { option, query -> byId[option.id]?.searchContains(query) == true },
+        onSelected = { id -> selectedId = id; onSelected?.invoke(id) })
 
     return DropdownListWidgetContent(selectedId = selectedId)
 }
@@ -4878,7 +4746,7 @@ object AppConfiguration {
             override val OkayColor: Color get() = appearanceResources.color(8, appThemeId)
             override val BorderlineBadColor: Color get() = appearanceResources.color(9, appThemeId)
 
-            override val drawablePathAITALogo: String get() = appearanceResources.catalog.drawable(0L, appThemeId)
+            override val drawablePathAITALogo: String get() = "svg/0_${if (BackgroundColor.luminance() < 0.5f) 1 else 0}.svg"
             private val _drawableResAITALogo = remember { MutableStateFlow(Res.drawable._0_0) }
             override val drawableResAITALogo = _drawableResAITALogo.asStateFlow()
 

@@ -3176,7 +3176,8 @@ fun AppConfiguration.StockBatchWidget(
 fun AppConfiguration.SplashScreen() {
     Column(
         modifier = Modifier
-            .fillMaxSize(),
+            .fillMaxSize()
+            .background(stateValues.BackgroundColor.softAppBackgroundColor()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -3187,7 +3188,7 @@ fun AppConfiguration.SplashScreen() {
                 .width(stateValues.boundWidgetWidth),
             imageUrl = stateValues.drawablePathAITALogo,
             imageRes = imageRes,
-            title = stateValues.stringLogIn
+            contentDescription = "AITA"
         )
     }
 }

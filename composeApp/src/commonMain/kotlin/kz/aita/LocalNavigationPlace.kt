@@ -8,6 +8,15 @@ import kotlinx.serialization.Serializable
         .plus(Navigation.bottomNavBarScreensSupplier).map { it.route } &&
         AppStateDocument(navigation = navigation).valid()
 }
+@Serializable internal data class DeviceNavigationPlace(val store: String?, val place: LocalNavigationPlace) {
+    fun forStore(nextStore: String?): LocalNavigationPlace? = when {
+        !place.valid() -> null
+        store == nextStore -> place
+        place.main == NavigationScreenModel.Menu.Main.route -> place.copy(navigation = place.navigation.filterKeys { it.startsWith("menu") })
+        else -> null
+    }
+}
+
 internal fun Navigation.localNavigationSnapshot(): LocalNavigationPlace =
     LocalNavigationPlace(Main.value.last().route, accountUiStateSnapshot(emptyMap()).navigation - "main")
 

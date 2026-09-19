@@ -35,13 +35,15 @@ test('print failures reject instead of reporting success',async()=>{
 });
 test('58 and 80 mm receipts keep roll width and trim unused page length; labels keep their own size',async()=>{
  const context=await browser.newContext();
- await context.addInitScript(()=>{window.print=function(){top.printed={html:document.documentElement.outerHTML,rules:[...document.styleSheets].flatMap(s=>[...s.cssRules].map(r=>r.cssText))};};});
+ await context.addInitScript(()=>{window.print=function(){top.printed={viewportWidth:innerWidth,viewportHeight:innerHeight,html:document.documentElement.outerHTML,rules:[...document.styleSheets].flatMap(s=>[...s.cssRules].map(r=>r.cssText))};};});
  const p=await context.newPage();await p.goto(origin);
  for(const widthMm of [58,80]){
   const width=widthMm*72/25.4;
   await p.evaluate(({width})=>aitaPrintDocument('Receipt','<!doctype html><meta name="aita-receipt-paper" content="'+width+',8"><style>@page{size:'+width+'pt 842pt;margin:8pt}body{width:'+(width-16)+'pt;margin:0}.line{font-size:12pt}</style><body><div class="line">Receipt 125 ₸</div></body>'),{width});
   const printed=await p.evaluate(()=>window.printed);
   const pageRule=printed.rules.filter(r=>r.startsWith('@page')).at(-1);
+  assert.ok(Math.abs(printed.viewportWidth-width*96/72)<2,'the real print frame must have roll width, without an 800px shrink-to-fit viewport');
+  assert.ok(printed.viewportHeight<150,'short receipt frame has no oversized 600px viewport');
   assert.match(pageRule,/size:/);assert.ok(!pageRule.includes('842pt'),'receipt should not waste an A4 length');
   const pdfPage=await context.newPage();await pdfPage.setContent(printed.html);await pdfPage.evaluate(()=>document.fonts.ready);
   const pdf=await pdfPage.pdf({preferCSSPageSize:true});
@@ -56,7 +58,7 @@ test('58 and 80 mm receipts keep roll width and trim unused page length; labels 
 
 test('large viewport never lengthens a short receipt; long receipts paginate within the height cap',async()=>{
  const context=await browser.newContext();
- await context.addInitScript(()=>{window.print=function(){top.printed={html:document.documentElement.outerHTML,rules:[...document.styleSheets].flatMap(s=>[...s.cssRules].map(r=>r.cssText))};};});
+ await context.addInitScript(()=>{window.print=function(){top.printed={viewportWidth:innerWidth,viewportHeight:innerHeight,html:document.documentElement.outerHTML,rules:[...document.styleSheets].flatMap(s=>[...s.cssRules].map(r=>r.cssText))};};});
  const p=await context.newPage();await p.goto(origin);
  for(const lines of [1,250]){
   await p.evaluate(({lines})=>aitaPrintDocument('AITA receipt','<!doctype html><meta name="aita-receipt-paper" content="164.4,8,396"><style>@page{size:164.4pt 396pt;margin:8pt}body{margin:0;width:148.4pt;min-height:10000px}main{display:flow-root}.line{font-size:10pt}</style><body><main id="aita-print-content"><div>aita.kz</div>'+Array.from({length:lines},(_,i)=>'<div class="line">Item '+i+' · 125 ₸</div>').join('')+'</main></body>'),{lines});

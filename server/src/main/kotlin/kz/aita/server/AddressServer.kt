@@ -34,6 +34,9 @@ internal data class SignedAddressMapRequest(
   val signature: String
 )
 
+/** This application persists store addresses, translations and coordinates beyond a temporary cache. */
+internal fun yandexStoredAddressUseAllowed(value: String?): Boolean = value?.trim() == "permanent-storage-permitted"
+
 internal object YandexAddressService {
   private const val GEOSUGGEST_URL = "https://suggest-maps.yandex.ru/v1/suggest"
   private const val GEOCODER_URL = "https://geocode-maps.yandex.ru/v1/"
@@ -60,17 +63,22 @@ internal object YandexAddressService {
     return clean
   }
 
+  private val storageLicensed: Boolean
+    get() = yandexStoredAddressUseAllowed(env("AITA_YANDEX_STORED_ADDRESS_LICENSE"))
+
+  private fun licensedKey(name: String): String? = if (storageLicensed) usableCredential(env(name)) else null
+
   private val sharedMapsKey: String?
-    get() = usableCredential(env("AITA_YANDEX_MAPS_API_KEY"))
+    get() = licensedKey("AITA_YANDEX_MAPS_API_KEY")
 
   private val geosuggestKey: String?
-    get() = usableCredential(env("AITA_YANDEX_GEOSUGGEST_API_KEY")) ?: sharedMapsKey
+    get() = licensedKey("AITA_YANDEX_GEOSUGGEST_API_KEY") ?: sharedMapsKey
 
   private val geocoderKey: String?
-    get() = usableCredential(env("AITA_YANDEX_GEOCODER_API_KEY")) ?: sharedMapsKey
+    get() = licensedKey("AITA_YANDEX_GEOCODER_API_KEY") ?: sharedMapsKey
 
   private val staticMapsKey: String?
-    get() = usableCredential(env("AITA_YANDEX_STATIC_MAPS_API_KEY")) ?: sharedMapsKey
+    get() = licensedKey("AITA_YANDEX_STATIC_MAPS_API_KEY") ?: sharedMapsKey
 
   private val mapSigningSecret: String?
     get() = usableCredential(env("AITA_ADDRESS_MAP_SIGNING_SECRET"), minimumLength = 32)
@@ -85,7 +93,7 @@ internal object YandexAddressService {
     get() = !staticMapsKey.isNullOrBlank() && !mapSigningSecret.isNullOrBlank()
 
   fun configurationSummary(): String =
-    "suggestions=$suggestionsConfigured geocoder=$geocoderConfigured staticMaps=$staticMapsConfigured"
+    "storedAddressLicense=$storageLicensed suggestions=$suggestionsConfigured geocoder=$geocoderConfigured staticMaps=$staticMapsConfigured"
 
   private fun normalizedLanguage(language: String?): String = when (language?.trim()?.lowercase(Locale.ROOT)) {
     "en" -> "en"
