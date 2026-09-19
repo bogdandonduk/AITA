@@ -44,6 +44,7 @@ private data class RecordedAitaRequest(
 private class AitaFlowTestEnvironment {
     var storedTokens: TokenPair? = aitaTestTokenPair("initial")
     var storedAccount: UserAccountDataModel? = null
+    @Volatile var serverAccount: UserAccountDataModel = aitaTestUserAccount().copy(activeStoreId = AITA_FLOW_SOURCE_STORE_ID)
     var stores: List<StoreDataModel> = emptyList()
     var workerMemberships: List<StoreWorkerDataModel> = emptyList()
     var myWorkerMemberships: List<StoreWorkerDataModel> = emptyList()
@@ -132,9 +133,10 @@ class AitaSharedJvmFlowTest {
         // test must not own this fixture merely because it uses the same account ID.
         installAuthenticatedSession(requireNotNull(environment.storedTokens))
         globalAppConfigurationState.emit(DataState.Success(globalAppConfigurationState.payloadValue.copy(serverUrl = AITA_FLOW_TEST_SERVER_URL to "test")))
-        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
-        // Initialize the selection coordinator as login does, not only its inventory view.
-        ActiveStores.acceptAccount(aitaTestUserAccount().copy(activeStoreId = AITA_FLOW_SOURCE_STORE_ID))
+        userAccountState.emit(DataState.Success(environment.serverAccount))
+        userAccountState.payload.first { it?.id == environment.serverAccount.id }
+        // The fake server and local login must agree, including during a health refresh.
+        ActiveStores.acceptAccount(environment.serverAccount)
         assertEquals(AITA_FLOW_SOURCE_STORE_ID, activeStoreIdState.value)
     }
 
@@ -456,6 +458,11 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun addsUpdatesDeletesGoodsItemAndKeepsLocalStockStateInSync() = runBlocking {
+        // Exercise the recovery request that previously raced the mutation on Windows.
+        environment.stores = listOf(aitaTestStore(id = AITA_FLOW_SOURCE_STORE_ID))
+        val refreshed = refreshUserAccountNow(currentAuthenticatedSessionGeneration(), refreshRelatedData = false)
+        assertFalse(refreshed.negative)
+        assertEquals(AITA_FLOW_SOURCE_STORE_ID, activeStoreIdState.value)
         stockState.emit(DataState.Success(emptyList()))
         waitUntilAitaFlowCondition { stockState.payloadValue?.isEmpty() == true }
 
@@ -1807,7 +1814,7 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             "auth/signUp" -> aitaTestSuccessEnvelope(aitaTestTokenPair("signup"))
             "auth/logOut" -> aitaTestSuccessNullEnvelope()
             "auth/refresh" -> aitaTestSuccessEnvelope(aitaTestTokenPair("refresh"))
-            "user/get" -> aitaTestSuccessEnvelope(aitaTestUserAccount())
+            "user/get" -> aitaTestSuccessEnvelope(environment.serverAccount)
             "config/global" -> aitaTestSuccessEnvelope(globalAppConfigurationState.payloadValue.copy(serverUrl = AITA_FLOW_TEST_SERVER_URL to "test"))
             "stores/get" -> aitaTestSuccessEnvelope(environment.stores)
             "stores/add" -> {
@@ -1822,10 +1829,20 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             }
             "stores/delete" -> {
                 val id = environment.nextDeletedStoreId.orEmpty()
+                val removed = environment.stores.findAitaTestStoreOrBranch(id)
+                val active = environment.serverAccount.activeStoreId
                 environment.stores = environment.stores.removeAitaTestStore(id)
+                if (active == id || (active != null && removed?.branches?.findAitaTestStoreOrBranch(active) != null))
+                    environment.serverAccount = environment.serverAccount.copy(activeStoreId = removed?.parentStoreId)
                 aitaTestSuccessNullEnvelope()
             }
-            "stores/active" -> aitaTestSuccessNullEnvelope()
+            "stores/active" -> {
+                val raw = (request.body as io.ktor.http.content.TextContent).text
+                val selected = runCatching { jsonBase.decodeFromString<String>(raw) }.getOrDefault(raw)
+                    .trim().takeIf { it.isNotEmpty() }
+                environment.serverAccount = environment.serverAccount.copy(activeStoreId = selected)
+                aitaTestSuccessNullEnvelope()
+            }
             "suppliers/get" -> aitaTestSuccessEnvelope(environment.suppliers)
             "suppliers/add" -> {
                 val supplier = environment.nextSupplierResponse ?: aitaTestSupplier(id = "server-added-supplier")
