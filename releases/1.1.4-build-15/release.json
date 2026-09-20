@@ -1,0 +1,134 @@
+{
+  "version": "1.1.4",
+  "build": 15,
+  "revision": "95c3b236a5cd1a1d539801e235f80329aa1b43ef",
+  "tag": "v1.1.4-b15",
+  "createdAt": "2026-09-20T06:53:50Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.1.4-15-android.apk",
+      "sha256": "cde0aeb5e0ecaa3f6c19e222d761765119b5a570645bd0f7ea13f6a7474e0af0",
+      "bytes": 71988046,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/AITA-1.1.4-15-android.apk"
+    },
+    {
+      "name": "AITA-1.1.4-15-android.aab",
+      "sha256": "abbecbeffae964236ec869da90022d8866496406f00b0533c68290b32b2b131e",
+      "bytes": 46653149,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/AITA-1.1.4-15-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "357f84d4517c77ff336da301fd7caab6717b9908f37f02a7748567cb98a43f18",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.4-15-web.zip",
+      "sha256": "d0984ebb2e41e52b37efcbfd02e04eb53f7f4308f2d13470905c8b531405d0c2",
+      "bytes": 12812593,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/AITA-1.1.4-15-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "357f84d4517c77ff336da301fd7caab6717b9908f37f02a7748567cb98a43f18",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/web-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.4-15-windows.exe",
+      "sha256": "e5c1cfe0ae52ec329dd43c9c64467da5ab3050e4c8da3da2da4a2d4830cfd5e9",
+      "bytes": 136451584,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/AITA-1.1.4-15-windows.exe"
+    },
+    {
+      "name": "AITA-1.1.4-15-windows.msi",
+      "sha256": "bc7d8a1022dc7c2030e481bb15b01bdd5edf6e42d9c4526fcb1a887d035e24d0",
+      "bytes": 135852484,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/AITA-1.1.4-15-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "70f0926d5308a98b32f934dbec0daf25c076c44de8c531269efea837f4e720e9",
+      "bytes": 1626,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "5aafc271857776227e288a1ee13d654a49a7900027ab971f77bb753f6b205251",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.4-b15/windows-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Revoked sessions now close the affected account workspace. Manual addresses can be saved without coordinates. Added 12 themes (30 total), refreshed 103 handbook guides, simplified web Downloads, aligned date controls and corrected sign-in/subscription wording. Added attributed public supplier leads and barcode-checked open product templates. Saved app-mode recovery and startup work were improved.",
+    "ru": "\u041e\u0442\u043e\u0437\u0432\u0430\u043d\u043d\u044b\u0435 \u0441\u0435\u0430\u043d\u0441\u044b \u0442\u0435\u043f\u0435\u0440\u044c \u0437\u0430\u043a\u0440\u044b\u0432\u0430\u044e\u0442 \u0440\u0430\u0431\u043e\u0447\u0435\u0435 \u043f\u0440\u043e\u0441\u0442\u0440\u0430\u043d\u0441\u0442\u0432\u043e \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430 \u043d\u0430 \u0441\u043e\u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u044e\u0449\u0438\u0445 \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0430\u0445. \u0410\u0434\u0440\u0435\u0441 \u043c\u043e\u0436\u043d\u043e \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432\u0440\u0443\u0447\u043d\u0443\u044e \u0431\u0435\u0437 \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442. \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b 12 \u0442\u0435\u043c (\u0432\u0441\u0435\u0433\u043e 30), \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u044b 103 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0441\u0442\u0432\u0430, \u0443\u043f\u0440\u043e\u0449\u0435\u043d\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435, \u0432\u044b\u0440\u043e\u0432\u043d\u0435\u043d\u044b \u043f\u043e\u043b\u044f \u0434\u0430\u0442 \u0438 \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u044b \u0442\u0435\u043a\u0441\u0442\u044b \u0432\u0445\u043e\u0434\u0430 \u0438 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438. \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b \u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0439 \u0441\u043f\u0440\u0430\u0432\u043e\u0447\u043d\u0438\u043a \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0439 \u0438 \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u043d\u044b\u0435 \u043f\u043e \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0443 \u0448\u0430\u0431\u043b\u043e\u043d\u044b \u0442\u043e\u0432\u0430\u0440\u043e\u0432 \u0441 \u0443\u043a\u0430\u0437\u0430\u043d\u0438\u0435\u043c \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u043e\u0432. \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u044b \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0440\u0435\u0436\u0438\u043c\u0430 \u0438 \u0437\u0430\u043f\u0443\u0441\u043a.",
+    "kk": "\u049a\u0430\u0439\u0442\u0430\u0440\u044b\u043f \u0430\u043b\u044b\u043d\u0493\u0430\u043d \u0441\u0435\u0430\u043d\u0441\u0442\u0430\u0440 \u0442\u0438\u0456\u0441\u0442\u0456 \u049b\u04b1\u0440\u044b\u043b\u0493\u044b\u043b\u0430\u0440\u0434\u0430\u0493\u044b \u0430\u043a\u043a\u0430\u0443\u043d\u0442 \u0436\u04b1\u043c\u044b\u0441 \u043a\u0435\u04a3\u0456\u0441\u0442\u0456\u0433\u0456\u043d \u0436\u0430\u0431\u0430\u0434\u044b. \u041c\u0435\u043a\u0435\u043d\u0436\u0430\u0439\u0434\u044b \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u0430\u0441\u044b\u0437 \u049b\u043e\u043b\u043c\u0435\u043d \u0441\u0430\u049b\u0442\u0430\u0443\u0493\u0430 \u0431\u043e\u043b\u0430\u0434\u044b. 12 \u0442\u0430\u049b\u044b\u0440\u044b\u043f \u049b\u043e\u0441\u044b\u043b\u0434\u044b (\u0431\u0430\u0440\u043b\u044b\u0493\u044b 30), 103 \u043d\u04b1\u0441\u049b\u0430\u0443\u043b\u044b\u049b \u0436\u0430\u04a3\u0430\u0440\u0442\u044b\u043b\u0434\u044b, \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0434\u0435\u0433\u0456 \u0436\u04af\u043a\u0442\u0435\u0443\u043b\u0435\u0440 \u043c\u0435\u043d \u043a\u04af\u043d \u04e9\u0440\u0456\u0441\u0442\u0435\u0440\u0456 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b. \u0414\u0435\u0440\u0435\u043a\u043a\u04e9\u0437\u0434\u0435\u0440\u0456 \u043a\u04e9\u0440\u0441\u0435\u0442\u0456\u043b\u0433\u0435\u043d \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f\u043b\u0430\u0440 \u0430\u043d\u044b\u049b\u0442\u0430\u043c\u0430\u043b\u044b\u0493\u044b \u043c\u0435\u043d \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u044b \u0442\u0435\u043a\u0441\u0435\u0440\u0456\u043b\u0433\u0435\u043d \u0442\u0430\u0443\u0430\u0440 \u04af\u043b\u0433\u0456\u043b\u0435\u0440\u0456 \u049b\u043e\u0441\u044b\u043b\u0434\u044b. \u0420\u0435\u0436\u0438\u043c\u0434\u0456 \u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0456\u0440\u0443 \u0436\u04d9\u043d\u0435 \u0456\u0441\u043a\u0435 \u049b\u043e\u0441\u0443 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b.",
+    "ky": "\u041a\u0430\u0439\u0442\u0430\u0440\u044b\u043b\u044b\u043f \u0430\u043b\u044b\u043d\u0433\u0430\u043d \u0441\u0435\u0430\u043d\u0441\u0442\u0430\u0440 \u0442\u0438\u0435\u0448\u0435\u043b\u04af\u04af \u0442\u04af\u0437\u043c\u04e9\u043a\u0442\u04e9\u0440\u0434\u04e9\u0433\u04af \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u0443\u043d \u0438\u0448 \u043c\u0435\u0439\u043a\u0438\u043d\u0434\u0438\u0433\u0438\u043d \u0436\u0430\u0431\u0430\u0442. \u0414\u0430\u0440\u0435\u043a\u0442\u0438 \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u0430\u0441\u044b\u0437 \u043a\u043e\u043b \u043c\u0435\u043d\u0435\u043d \u0441\u0430\u043a\u0442\u043e\u043e\u0433\u043e \u0431\u043e\u043b\u043e\u0442. 12 \u0442\u0435\u043c\u0430 \u043a\u043e\u0448\u0443\u043b\u0434\u0443 (\u0431\u0430\u0440\u0434\u044b\u0433\u044b 30), 103 \u043a\u043e\u043b\u0434\u043e\u043d\u043c\u043e \u0436\u0430\u04a3\u044b\u0440\u0442\u044b\u043b\u0434\u044b, \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0434\u0435\u0433\u0438 \u0436\u04af\u043a\u0442\u04e9\u04e9\u043b\u04e9\u0440 \u0436\u0430\u043d\u0430 \u043a\u04af\u043d \u0442\u0430\u043b\u0430\u0430\u043b\u0430\u0440\u044b \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b. \u0411\u0443\u043b\u0430\u043a\u0442\u0430\u0440\u044b \u043a\u04e9\u0440\u0441\u04e9\u0442\u04af\u043b\u0433\u04e9\u043d \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f\u043b\u0430\u0440 \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u0443 \u0436\u0430\u043d\u0430 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0443 \u0442\u0435\u043a\u0448\u0435\u0440\u0438\u043b\u0433\u0435\u043d \u0442\u043e\u0432\u0430\u0440 \u04af\u043b\u0433\u04af\u043b\u04e9\u0440\u04af \u043a\u043e\u0448\u0443\u043b\u0434\u0443. \u0420\u0435\u0436\u0438\u043c\u0434\u0438 \u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0438\u0440\u04af\u04af \u0436\u0430\u043d\u0430 \u0438\u0448\u043a\u0435 \u043a\u0438\u0440\u0433\u0438\u0437\u04af\u04af \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b.",
+    "tg": "\u041d\u0438\u0448\u0430\u0441\u0442\u04b3\u043e\u0438 \u0431\u0435\u043a\u043e\u0440\u0448\u0443\u0434\u0430 \u043c\u0443\u04b3\u0438\u0442\u0438 \u04b3\u0438\u0441\u043e\u0431\u0438 \u043a\u043e\u0440\u0431\u0430\u0440\u0440\u043e \u0434\u0430\u0440 \u0434\u0430\u0441\u0442\u0433\u043e\u04b3\u04b3\u043e\u0438 \u0434\u0430\u0445\u043b\u0434\u043e\u0440 \u043c\u0435\u0431\u0430\u043d\u0434\u0430\u043d\u0434. \u0421\u0443\u0440\u043e\u0493\u0430\u0440\u043e \u0431\u0435 \u043a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u0430 \u0434\u0430\u0441\u0442\u04e3 \u0437\u0430\u0445\u0438\u0440\u0430 \u043a\u0430\u0440\u0434\u0430\u043d \u043c\u0443\u043c\u043a\u0438\u043d \u0430\u0441\u0442. 12 \u043c\u0430\u0432\u0437\u04ef\u044a \u0438\u043b\u043e\u0432\u0430 \u0448\u0443\u0434 (\u04b3\u0430\u043c\u0430\u0433\u04e3 30), 103 \u0440\u043e\u04b3\u043d\u0430\u043c\u043e \u043d\u0430\u0432 \u0448\u0443\u0434, \u0431\u043e\u0440\u0433\u0438\u0440\u0438\u04b3\u043e\u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0432\u0430 \u043c\u0430\u0439\u0434\u043e\u043d\u04b3\u043e\u0438 \u0441\u0430\u043d\u0430 \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434\u0430\u043d\u0434. \u0424\u0435\u04b3\u0440\u0438\u0441\u0442\u0438 \u0448\u0438\u0440\u043a\u0430\u0442\u04b3\u043e \u0432\u0430 \u049b\u043e\u043b\u0430\u0431\u04b3\u043e\u0438 \u043c\u043e\u043b \u0431\u043e \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0438 \u0441\u0430\u043d\u04b7\u0438\u0434\u0430\u0448\u0443\u0434\u0430 \u0432\u0430 \u043c\u0430\u043d\u0431\u0430\u044a\u04b3\u043e \u0438\u043b\u043e\u0432\u0430 \u0448\u0443\u0434\u0430\u043d\u0434. \u0411\u0430\u0440\u049b\u0430\u0440\u043e\u0440\u0441\u043e\u0437\u0438\u0438 \u0440\u0435\u04b7\u0430 \u0432\u0430 \u043e\u0493\u043e\u0437 \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434\u0430\u043d\u0434.",
+    "uz": "Bekor qilingan seanslar tegishli qurilmalardagi hisob ish muhitini yopadi. Manzilni koordinatalarsiz qo\u2018lda saqlash mumkin. 12 mavzu qo\u2018shildi (jami 30), 103 qo\u2018llanma yangilandi, brauzerdagi yuklamalar va sana maydonlari yaxshilandi. Manbalari ko\u2018rsatilgan kompaniyalar katalogi va shtrixkodi tekshirilgan mahsulot andozalari qo\u2018shildi. Rejimni tiklash va ishga tushirish yaxshilandi."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:29:05Z",
+      "finishedAt": "2026-09-20T06:29:06Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:29:06Z",
+      "finishedAt": "2026-09-20T06:34:14Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:34:14Z",
+      "finishedAt": "2026-09-20T06:34:15Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:34:15Z",
+      "finishedAt": "2026-09-20T06:38:08Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:38:08Z",
+      "finishedAt": "2026-09-20T06:43:45Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:43:45Z",
+      "finishedAt": "2026-09-20T06:50:34Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:50:34Z",
+      "finishedAt": "2026-09-20T06:51:58Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-20T06:51:58Z",
+      "finishedAt": "2026-09-20T06:53:50Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
