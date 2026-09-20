@@ -1,0 +1,27 @@
+{
+  "retrievedOn": "2026-09-20",
+  "source": "https://huggingface.co/datasets/openfoodfacts/product-database",
+  "revision": "8d21fede46923f55d91b034b9674beacb564c06a",
+  "license": "ODbL-1.0",
+  "contentsLicense": "Database Contents License 1.0",
+  "attribution": "© Open Food Facts contributors; © Open Beauty Facts contributors",
+  "rows": 21377,
+  "sha256": "79210f8560e7028af429f22bcb3b411f81c5c654ad6ed7d8e5a846cff9ac6a12",
+  "inputSha256": {
+    "beauty-products.json": "3d71992a83f8e81263fa2242bbfdeefce9ae993b7c202145e6a096539aabf132",
+    "food-products.json": "db2c0160846501c3194abbefff636ef9d67916a8b3dfea4d284434fcff45f85c"
+  },
+  "filters": {
+    "food": 20975,
+    "invalid_gtin": 22,
+    "missing_name": 17,
+    "beauty": 402
+  },
+  "countryCounts": {
+    "RU": 1230,
+    "KZ": 31,
+    "UZ": 15,
+    "TJ": 2,
+    "KG": 5
+  }
+}

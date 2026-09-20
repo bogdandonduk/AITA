@@ -2727,6 +2727,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         Row(
             modifier = Modifier
                 .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField),
             horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             verticalAlignment = Alignment.Top
@@ -4809,7 +4810,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                         val verifiedLocation = addressPickerContent.locationForSave(stateValues.appLanguage)
                         if (verifiedLocation == null) {
-                            addressPickerContent.state.requireSuggestionSelection(addressSelectionRequiredText)
+                            addressPickerContent.state.requireSuggestionSelection(eventMessage("address.entry_required").extractLocalizedString(stateValues.appLanguage).orEmpty())
                             addressTextFieldContent.checkContentValidity()
                             return@actionButton
                         }
@@ -4899,7 +4900,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                         val verifiedLocation = addressPickerContent.locationForSave(stateValues.appLanguage)
                         if (verifiedLocation == null) {
-                            addressPickerContent.state.requireSuggestionSelection(addressSelectionRequiredText)
+                            addressPickerContent.state.requireSuggestionSelection(eventMessage("address.entry_required").extractLocalizedString(stateValues.appLanguage).orEmpty())
                             addressTextFieldContent.checkContentValidity()
                             return@actionButton
                         }

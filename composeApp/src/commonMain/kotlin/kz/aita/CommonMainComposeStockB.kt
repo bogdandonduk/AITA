@@ -3812,6 +3812,18 @@ internal fun AppConfiguration.GlobalGoodsPickerItemCard(
             )
         }
 
+        item.catalogueSource?.let { source ->
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Text(source.name + " · " + source.license,
+                modifier = Modifier.aitaClickable { uriHandler.openUri(source.url) },
+                color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
+            Text(source.licenseUrl, modifier = Modifier.aitaClickable { uriHandler.openUri(source.licenseUrl) },
+                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+            Text(eventMessage("catalogue.open_data").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                modifier = Modifier.aitaClickable { uriHandler.openUri(stateValues.globalAppConfiguration.serverUrl.first.trimEnd('/') + "/catalogue/open-goods.jsonl.gz") },
+                color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
+        }
+
         val detailLines = listOfNotNull(
             barcodeText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringBarcode}: $it" },
             categoryText.takeIf { it.isNotBlank() }?.let { "${stateValues.stringCategory}: $it" },

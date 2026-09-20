@@ -44,7 +44,7 @@ internal class StoreAddressPickerState(
     fun locationForSave(rawText: String, language: String): LocationDataModel? =
         selectedLocation?.takeIf { location ->
             location.isResolvedAddress() && location.matchesDisplayedAddress(rawText, language)
-        }
+        } ?: manualStoreAddress(rawText, language)
 
     fun requireSuggestionSelection(message: String) {
         validationMessage = message
@@ -226,7 +226,7 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
 
     val textField = genericTextField(
         titleText = localizedStringResource(520, "Address"),
-        placeholderText = localizedStringResource(2304, "Start typing and select a verified address"),
+        placeholderText = eventMessage("address.entry_hint").extractLocalizedString(stateValues.appLanguage).orEmpty(),
         valueInitial = initialLocation
             ?.takeIf { it.isResolvedAddress() }
             ?.displayAddress(stateValues.appLanguage)
@@ -235,7 +235,7 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
         stateHost = NavigationScreenModel.Menu.AddEditStore,
         stateKey = NavigationScreenModel.Menu.AddEditStore.KEY_STATE_ADDRESS,
         leadingIconPath = "svg/135_${appDrawableThemeId(stateValues.appThemeId)}.svg",
-        contentInvalidText = localizedStringResource(2305, "Select an address from suggestions"),
+        contentInvalidText = eventMessage("address.entry_required").extractLocalizedString(stateValues.appLanguage).orEmpty(),
         onContentValidityCheck = { raw -> state.locationForSave(raw, stateValues.appLanguage) != null },
         trailingIcon = trailingContent,
         onValueChange = { value, apply ->
@@ -288,10 +288,9 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
             if (query == textField.value.text.trim().replace(Regex("\\s+"), " ")) {
                 if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.suggestions = response.payload.orEmpty()
                 state.providerMessage = if (response.negative) {
-                    response.message?.extractLocalizedString(stateValues.appLanguage)
-                        ?: localizedStringResource(2306, "Could not load address suggestions")
+                    eventMessage("address.manual_hint").extractLocalizedString(stateValues.appLanguage)
                 } else if (response.payload.orEmpty().isEmpty()) {
-                    localizedStringResource(2307, "No matching addresses found")
+                    eventMessage("address.manual_hint").extractLocalizedString(stateValues.appLanguage)
                 } else null
                 if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.isSuggesting = false
             }
@@ -300,7 +299,7 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
         } catch (_: Throwable) {
             if (query == textField.value.text.trim().replace(Regex("\\s+"), " ")) {
                 if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.suggestions = emptyList()
-                state.providerMessage = localizedStringResource(2306, "Could not load address suggestions")
+                state.providerMessage = eventMessage("address.manual_hint").extractLocalizedString(stateValues.appLanguage)
                 if (aitaLatestAddressOwner0.owns(aitaLatestAddressTicket0)) state.isSuggesting = false
             }
         }

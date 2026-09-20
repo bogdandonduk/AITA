@@ -200,9 +200,9 @@ fun AppConfiguration.MenuStoreSubscriptionPlansScreen() {
                         Text(if (hasAccess) localizedStringResource(812, "active") else
                             authUiText("Not active for this location", "Для этой точки не активна", "Бұл нүктеде белсенді емес", "Бул жай үчүн активдүү эмес"),
                             color = if (hasAccess) stateValues.AccentColor else stateValues.PlaceholderTextColor, fontSize = stateValues.accentTextSize)
-                        Text(authUiText("Access belongs to this location only. Branches subscribe separately.",
-                            "Доступ действует только для этой точки. У каждого филиала своя подписка.",
-                            "Қолжетімділік тек осы нүктеге арналған. Әр филиалға бөлек жазылым қажет.", "Мүмкүнчүлүк ушул жайга гана таандык. Филиалдар өзүнчө жазылат."),
+                        Text(authUiText("Access belongs to this location only.",
+                            "Доступ действует только для этой точки.",
+                            "Қолжетімділік тек осы нүктеге арналған.", "Мүмкүнчүлүк ушул жайга гана таандык."),
                             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         current.currentPeriodEndMillis?.let { end ->
                             Text(authUiText("Access until", "Доступ до", "Қолжетімділік мерзімі", "Мүмкүнчүлүк аяктайт") + ": " + securitySessionDateTimeText(end),

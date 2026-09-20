@@ -53,7 +53,7 @@ class AppThemePaletteTest {
             }
             return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722
         }
-        assertEquals(18, SUPPORTED_APP_THEME_IDS.size)
+        assertEquals(30, SUPPORTED_APP_THEME_IDS.size)
         assertEquals(SUPPORTED_APP_THEME_IDS.size, SUPPORTED_APP_THEME_IDS.distinct().size)
         for (theme in SUPPORTED_APP_THEME_IDS) {
             assertEquals(theme, normalizeAppThemePreference(theme))

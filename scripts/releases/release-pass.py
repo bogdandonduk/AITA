@@ -314,6 +314,8 @@ class Run:
                              ['node', 'scripts/linux-web/test/marketplace-smoke.cjs'])
                 self.command('Font preferences, download layout and offline support history in the browser',
                              ['node', 'scripts/linux-web/test/appearance-offline-smoke.cjs'])
+                self.command('Saved workspace restoration and remote session revocation in the browser',
+                             ['node', 'scripts/linux-web/test/session-revocation-smoke.cjs'])
         finally:
             self.env.pop('AITA_WEB_LOCAL_ORIGIN', None)
             self.env.pop('AITA_WEB_DIST', None)

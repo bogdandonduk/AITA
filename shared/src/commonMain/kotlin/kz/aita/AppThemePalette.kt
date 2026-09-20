@@ -26,7 +26,19 @@ private val appThemeShades = listOf(
     AppThemeShade(14L, "ff2b1e19", true, listOf("Espresso Brown", "Кофейный эспрессо", "Эспрессо қоңыр", "Эспрессо күрөң", "Қаҳваранги эспрессо", "Espresso jigarrangi")),
     AppThemeShade(15L, "ff24272c", true, listOf("Graphite Charcoal", "Графитовый уголь", "Графит көмір", "Графит көмүр", "Ангиштии графитӣ", "Grafit ko‘mir")),
     AppThemeShade(16L, "fffff2bf", false, listOf("Pale Butter Yellow", "Нежный сливочно-жёлтый", "Ақшыл сары май", "Ачык сары май", "Зарди равғании равшан", "Och sariyog‘ sariq")),
-    AppThemeShade(17L, "fff6edda", false, listOf("Warm Ivory", "Тёплая слоновая кость", "Жылы піл сүйегі", "Жылуу пил сөөгү", "Устухонии гарм", "Iliq fil suyagi"))
+    AppThemeShade(17L, "fff6edda", false, listOf("Warm Ivory", "Тёплая слоновая кость", "Жылы піл сүйегі", "Жылуу пил сөөгү", "Устухонии гарм", "Iliq fil suyagi")),
+    AppThemeShade(18L, "ff102b31", true, listOf("Deep Petrol Blue", "Глубокий нефтяной синий", "Қанық мұнай көк", "Кочкул мунай көк", "Кабуди нафтии амиқ", "To‘q neft ko‘ki")),
+    AppThemeShade(19L, "ff1d2c35", true, listOf("Stormy Atlantic Blue", "Штормовой атлантический синий", "Дауылды Атлантика көгі", "Бороондуу Атлантика көгү", "Кабуди Атлантикаи тӯфонӣ", "Bo‘ronli Atlantika ko‘ki")),
+    AppThemeShade(20L, "ff281b38", true, listOf("Blackberry Velvet", "Ежевичный бархат", "Қаражидек барқыты", "Кара бүлдүркөн баркыты", "Махмали тамашки сиёҳ", "Maymunjon baxmali")),
+    AppThemeShade(21L, "ff35172b", true, listOf("Black Plum Wine", "Вино чёрной сливы", "Қара өрік шарабы", "Кара өрүк шарабы", "Шароби олуи сиёҳ", "Qora olxo‘ri sharobi")),
+    AppThemeShade(22L, "ff30201f", true, listOf("Smoked Rosewood", "Дымчатое розовое дерево", "Түтінді раушан ағашы", "Түтүндүү роза жыгачы", "Чӯби садбарги дудӣ", "Tutunsimon atirgul yog‘ochi")),
+    AppThemeShade(23L, "ff342019", true, listOf("Burnished Copper Brown", "Тёмный медно-коричневый", "Қою мыс қоңыр", "Кочкул жез күрөң", "Қаҳваранги мисии тира", "To‘q mis jigarrangi")),
+    AppThemeShade(24L, "ff243024", true, listOf("Ancient Moss Green", "Зелёный древнего мха", "Көне мүк жасылы", "Байыркы мох жашылы", "Сабзи ушнаи қадим", "Qadimiy yo‘sin yashili")),
+    AppThemeShade(25L, "ff17312d", true, listOf("Deep Jade Stone", "Глубокий нефритовый", "Қанық нефрит", "Кочкул нефрит", "Нефрити амиқ", "To‘q nefrit")),
+    AppThemeShade(26L, "fff1e5e9", false, listOf("Pale Rose Quartz", "Светлый розовый кварц", "Ақшыл раушан кварцы", "Ачык кызгылт кварц", "Кварси гулобии равшан", "Och pushti kvars")),
+    AppThemeShade(27L, "ffe6eee7", false, listOf("Soft Sage Mist", "Нежный шалфейный туман", "Нәзік шалфей тұманы", "Назик шалфей туманы", "Тумани нарми мармарак", "Mayin marmarak tumani")),
+    AppThemeShade(28L, "ffe8edf4", false, listOf("Frosted Glacier Blue", "Ледниковый светло-голубой", "Ақшыл мұздық көк", "Ачык мөңгү көк", "Кабуди равшани пирях", "Och muzlik ko‘ki")),
+    AppThemeShade(29L, "fff0eaf6", false, listOf("Pale Wisteria Silk", "Светлый глициниевый шёлк", "Ақшыл глициния жібегі", "Ачык глициния жибеги", "Абрешими равшани глициния", "Och glitsiniya ipagi"))
 )
 val SUPPORTED_APP_THEME_IDS: List<Long> = appThemeShades.map { it.id }
 fun isDarkAppTheme(theme: Long?): Boolean = appThemeShades.first { it.id == normalizeAppThemePreference(theme) }.dark

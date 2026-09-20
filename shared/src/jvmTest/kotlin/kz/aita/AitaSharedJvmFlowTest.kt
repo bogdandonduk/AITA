@@ -42,6 +42,8 @@ private data class RecordedAitaRequest(
 )
 
 private class AitaFlowTestEnvironment {
+    var refreshFailure: ResponseDataModel<TokenPair>? = null
+    var beforeRefreshReply: (suspend () -> Unit)? = null
     var storedTokens: TokenPair? = aitaTestTokenPair("initial")
     var storedAccount: UserAccountDataModel? = null
     @Volatile var serverAccount: UserAccountDataModel = aitaTestUserAccount().copy(activeStoreId = AITA_FLOW_SOURCE_STORE_ID)
@@ -378,6 +380,59 @@ class AitaSharedJvmFlowTest {
     }
 
     @Test
+    fun explicitRemoteRevocationClosesLocalAccountWorkspace() = runBlocking {
+        val tokens = aitaTestTokenPair("revoked-device")
+        installAuthenticatedSession(tokens)
+        environment.refreshFailure = ResponseDataModel(eventMessage("auth.session_revoked"), null, true, 401)
+        assertFalse(refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false))
+        assertNull(environment.storedTokens)
+        assertNull(environment.storedAccount)
+        assertNull(userAccountState.payloadValue)
+        assertNull(stockState.payloadValue)
+    }
+
+    @Test
+    fun delayedRevocationCannotLogOutReplacementLogin(): Unit = runBlocking {
+        val old = aitaTestTokenPair("old-revoked-device")
+        val replacement = aitaTestTokenPair("replacement-login")
+        installAuthenticatedSession(old)
+        val reached = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        environment.refreshFailure = ResponseDataModel(eventMessage("auth.session_revoked"), null, true, 401)
+        environment.beforeRefreshReply = { reached.complete(Unit); release.await() }
+        val request = async { refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false) }
+        reached.await()
+        installAuthenticatedSession(replacement)
+        release.complete(Unit)
+        assertFalse(request.await())
+        assertEquals(replacement, environment.storedTokens)
+        assertNotNull(userAccountState.payloadValue)
+    }
+
+    @Test
+    fun revocationClosesWorkspaceEvenWhenCredentialStorageCannotBeCleared(): Unit = runBlocking {
+        installAuthenticatedSession(aitaTestTokenPair("storage-failed-revocation"))
+        environment.refreshFailure = ResponseDataModel(eventMessage("auth.session_revoked"), null, true, 401)
+        val previous = setStoredUserAuthTokens
+        try {
+            setStoredUserAuthTokens = { error("simulated device storage failure") }
+            assertFalse(refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false))
+            assertNull(userAccountState.payloadValue)
+            assertNull(stockState.payloadValue)
+        } finally { setStoredUserAuthTokens = previous }
+    }
+
+    @Test
+    fun ordinaryExpiredCloudSessionDoesNotDestroyOfflineWorkspace(): Unit = runBlocking {
+        val tokens = aitaTestTokenPair("expired-cloud")
+        installAuthenticatedSession(tokens)
+        environment.refreshFailure = ResponseDataModel(cloudSessionExpiredMessage(), null, true, 401)
+        assertFalse(refreshStoredAuthTokensOnceForNetworkRetry(postNotification = false))
+        assertEquals(tokens, environment.storedTokens)
+        assertNotNull(userAccountState.payloadValue)
+    }
+
+    @Test
     fun currentRefreshCanRotateTokensInsideTheSameLogicalSession() = runBlocking {
         val originalTokens = aitaTestTokenPair("rotate-original")
         val refreshedTokens = aitaTestTokenPair("rotate-refreshed")
@@ -610,7 +665,9 @@ class AitaSharedJvmFlowTest {
         environment.storedAccount = environment.serverAccount
         userAccountState.emit(DataState.Empty())
         securitySessionsState.emit(DataState.Empty())
+        stringsState.emit(DataState.Empty())
         stockState.emit(DataState.Empty())
+        putLocalKv("cache_json:strings", "[]")
         putLocalKv("cache_json:security_sessions", "[]")
         putLocalKv("cache_json:stock:$AITA_FLOW_SOURCE_STORE_ID", "[]")
         var opened = false
@@ -618,6 +675,7 @@ class AitaSharedJvmFlowTest {
             opened = true
             assertEquals(AITA_FLOW_TEST_USER_ID, userAccountState.payloadValue?.id)
             assertEquals(AITA_FLOW_SOURCE_STORE_ID, activeStoreIdState.value)
+            assertNull(stringsState.payloadValue, "Bundled text renders before optional translation hydration")
             assertNull(securitySessionsState.payloadValue, "Optional history is not a splash prerequisite")
             assertNull(stockState.payloadValue, "Stock has a separate scoped loader")
         }
@@ -1827,6 +1885,12 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
                 status = status,
                 headers = aitaFlowResponseHeaders()
             )
+        }
+
+        if (path == "auth/refresh") environment.refreshFailure?.let { failure ->
+            environment.beforeRefreshReply?.invoke()
+            return@MockEngine respond(jsonBase.encodeToString(ResponseDataModel.serializer(TokenPair.serializer()), failure),
+                HttpStatusCode.fromValue(failure.httpStatusCode ?: 401), aitaFlowResponseHeaders())
         }
 
         val body: String = when (path) {

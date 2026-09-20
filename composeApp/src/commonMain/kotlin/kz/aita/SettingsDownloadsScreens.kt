@@ -193,7 +193,7 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                         if (!notes.isNullOrBlank()) Text(notes, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                     }
                                     Text("aita.kz", color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
-                                    actionButton(text = downloadsText("open_web"), autoLoading = false, confirmationRequired = false,
+                                    if (!getPlatformName().contains("wasm", ignoreCase = true)) actionButton(text = downloadsText("open_web"), autoLoading = false, confirmationRequired = false,
                                         onClick = { scope.launch {
                                             webOpenFailed = openExternalUrlPlatformAction?.invoke("https://aita.kz/")?.success != true
                                         } })

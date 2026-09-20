@@ -11095,7 +11095,9 @@ private suspend fun performAuthTokenRefreshNetworkRequest(
             }
 
             if (httpResponse.status == HttpStatusCode.Unauthorized) {
-                return cloudSessionExpiredResponse()
+                return if (decodedRefreshResponse.message?.eventMessageReferenceOrNull()?.key == "auth.session_revoked")
+                    decodedRefreshResponse.copy(payload = null, negative = true)
+                else cloudSessionExpiredResponse()
             }
 
             decodedRefreshResponse
@@ -11166,7 +11168,28 @@ internal suspend fun refreshAuthTokensWithServerFallback(
                 // Validation/readiness is published only by installRefreshedAuthenticatedSession.
                 if (ownsCurrentSession) clearAuthRefreshNonAuthFailure()
             } else if (ownsCurrentSession) {
-                if (response.httpStatusCode == HttpStatusCode.Unauthorized.value) {
+                if (response.httpStatusCode == HttpStatusCode.Unauthorized.value &&
+                    response.message?.eventMessageReferenceOrNull()?.key == "auth.session_revoked") {
+                    // We still own authSessionMutationMutex: a delayed rejection cannot log out
+                    // a replacement login. Finish cleanup even when cancelling our own socket.
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        advanceAuthenticatedSessionGenerationLocked()
+                        kotlinx.coroutines.withContext(Dispatchers.ourIo) {
+                            try { setStoredUserAuthTokens?.invoke(null) }
+                            catch (_: Exception) { logCloudConnectionDiagnostic("Revoked credentials could not be removed from device storage") }
+                            try { setStoredUserAccountDataModel?.invoke(null) }
+                            catch (_: Exception) { logCloudConnectionDiagnostic("Revoked account cache could not be removed from device storage") }
+                        }
+                        clearCloudAuthRequestMemory()
+                        clearCloudSessionRefreshRequirementForNotifications(CLOUD_TRANSPORT_STATUS_UNKNOWN)
+                        httpClient.authProvider<BearerAuthProvider>()?.clearToken()
+                        invalidateSupplierNetworkSessionScope()
+                        setActiveStoreId(null, syncServer = false)
+                        clearAuthenticatedAccountRuntimeState()
+                        stopRealtimeUpdates()
+                        postInAppNotification(eventMessage("auth.session_revoked"), NotificationType.Negative, transient = true)
+                    }
+                } else if (response.httpStatusCode == HttpStatusCode.Unauthorized.value) {
                     rememberRejectedAuthRefreshToken(refreshToken, response.message)
                 } else {
                     rememberAuthRefreshNonAuthFailure(response.message, response.transportFailure)
@@ -13267,18 +13290,6 @@ internal suspend fun loadCachedApplicationData(onWorkspaceReady: () -> Unit = {}
             )
         )
     }
-    getJsonCache<List<LocalizedStringGroupDataModel>>(CACHE_STRINGS)?.let {
-        stringsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<StylizedDimensionGroupDataModel>>(CACHE_DIMENSIONS)?.let {
-        dimensionsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<StylizedColorGroupDataModel>>(CACHE_COLORS)?.let {
-        colorsState.emit(DataState.Success(it, cacheMessage()))
-    }
-    getJsonCache<List<StylizedDrawablePathsGroupDataModel>>(CACHE_DRAWABLES)?.let {
-        drawablesState.emit(DataState.Success(it, cacheMessage()))
-    }
 
     // Account data may be shown offline only while a durable authenticated session still exists.
     // Older builds left JSON account caches behind on logout; hydrating those without tokens made
@@ -13315,6 +13326,25 @@ internal suspend fun loadCachedApplicationData(onWorkspaceReady: () -> Unit = {}
     // allowing the saved workspace to render and its individual lists to finish loading.
     val accountId = userAccountState.payloadValue?.id
     onWorkspaceReady()
+    // Bundled resources already render the initial frame. Large optional translated/resource
+    // lists must not precede account adoption or monopolize the browser before it can paint.
+    kotlinx.coroutines.yield()
+    getJsonCache<List<LocalizedStringGroupDataModel>>(CACHE_STRINGS)?.let {
+        stringsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    kotlinx.coroutines.yield()
+    getJsonCache<List<StylizedDimensionGroupDataModel>>(CACHE_DIMENSIONS)?.let {
+        dimensionsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    kotlinx.coroutines.yield()
+    getJsonCache<List<StylizedColorGroupDataModel>>(CACHE_COLORS)?.let {
+        colorsState.emit(DataState.Success(it, cacheMessage()))
+    }
+    kotlinx.coroutines.yield()
+    getJsonCache<List<StylizedDrawablePathsGroupDataModel>>(CACHE_DRAWABLES)?.let {
+        drawablesState.emit(DataState.Success(it, cacheMessage()))
+    }
+
     fun ownsAccountCache() = hasAuthenticatedSession &&
         authenticatedSessionGenerationIsCurrent(sessionGeneration) && userAccountState.payloadValue?.id == accountId
     if (ownsAccountCache()) {
@@ -16467,7 +16497,9 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
 }
 
 private suspend fun clearAuthenticatedAccountRuntimeState() {
-    clearAuthenticatedAccountCaches()
+    try { clearAuthenticatedAccountCaches() }
+    catch (cancelled: CancellationException) { throw cancelled }
+    catch (_: Exception) { logCloudConnectionDiagnostic("Account cache cleanup failed; closing the in-memory workspace") }
     userAccountState.emit(DataState.Empty())
     storesState.emit(DataState.Empty())
     publishActiveInventoryStoreId(null)
@@ -19333,7 +19365,8 @@ data class GenericGoodsItemDataModel(
     val typeIds: List<String>?,
     val categoryIds: List<String>?,
     val supplierIds: List<String>?,
-    val manufacturerIds: List<String>?
+    val manufacturerIds: List<String>?,
+    val catalogueSource: CatalogueSource? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -20586,7 +20619,8 @@ data class SupplierDataModel(
     val addedAt: Long = 0L,
     val isActive: Boolean = true,
     val contactVerificationId: String = "",
-    val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList()
+    val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList(),
+    val catalogueSource: CatalogueSource? = null
 ) {
     fun isMineForUser(userId: String?): Boolean = !userId.isNullOrBlank() && userIds.contains(userId)
     fun isGenericSupplier(): Boolean = userIds.isEmpty()

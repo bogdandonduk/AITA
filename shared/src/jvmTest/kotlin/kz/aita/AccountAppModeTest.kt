@@ -100,6 +100,20 @@ class AccountAppModeTest {
         assertEquals(APP_MODE_SUPPLIER,f.visible)
         assertEquals(APP_MODE_SUPPLIER,f.c.snapshot.mode)
     }
+    @Test fun storageFailureCannotReplaceAlreadyRestoredModeWithServerBuyer()=scenario { f->
+        f.c.adopt(f.owner,APP_MODE_STORE,false)
+        f.c.retainModeAfterStorageFailure(f.owner,APP_MODE_BUYER)
+        assertEquals(APP_MODE_STORE,f.visible)
+        f.c.select(f.owner,APP_MODE_SUPPLIER)
+        f.c.retainModeAfterStorageFailure(f.owner,APP_MODE_BUYER)
+        assertEquals(APP_MODE_SUPPLIER,f.visible)
+    }
+    @Test fun storageFailureRecoveryNeverUsesAnotherAccountsMode()=scenario { f->
+        f.c.adopt(f.owner,APP_MODE_STORE,false)
+        f.owner=AppModeOwner("account-b",2)
+        f.c.retainModeAfterStorageFailure(f.owner,APP_MODE_BUYER)
+        assertEquals(APP_MODE_BUYER,f.visible)
+    }
     @Test fun oldAppearancePreferencesHaveNoAppModeField() {
         val encoded=jsonBase.encodeToString(UserPreferencesDataModel.serializer(),UserPreferencesDataModel())
         assertFalse(encoded.contains("appMode"))

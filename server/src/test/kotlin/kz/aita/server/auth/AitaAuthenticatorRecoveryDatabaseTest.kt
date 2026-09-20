@@ -158,6 +158,25 @@ class AitaAuthenticatorRecoveryDatabaseTest {
         assertEquals(2, loadSecuritySessionsForUser(id, null).size, "A new login replaces only the same installation")
     }
 
+    @Test fun explicitRevocationIsDistinguishedFromNormalRotationAcrossLineage() = fixture {
+        val owner = user()
+        val original = tokens.newPair(owner, device)
+        val rotated = tokens.rotate(original.refreshToken, device)
+        val originalId = UUID.fromString(com.auth0.jwt.JWT.decode(original.accessToken).getClaim("sessionId").asString())
+        val rotatedId = UUID.fromString(com.auth0.jwt.JWT.decode(rotated.accessToken).getClaim("sessionId").asString())
+        sql {
+            assertEquals(setOf(originalId, rotatedId), securitySessionLineageInsideTransaction(owner, originalId))
+            assertFalse(refreshSessionWasSecurityRevokedInsideTransaction(original.refreshToken))
+            assertFalse(refreshSessionWasSecurityRevokedInsideTransaction("unknown-token"))
+            RefreshSessions.update({ RefreshSessions.id eq rotatedId }) { it[RefreshSessions.securityInvalidated] = true; it[RefreshSessions.revokedAt] = Instant.now() }
+            assertTrue(refreshSessionWasSecurityRevokedInsideTransaction(original.refreshToken))
+            assertTrue(refreshSessionWasSecurityRevokedInsideTransaction(rotated.refreshToken))
+            assertTrue(securitySessionLineageInsideTransaction(UUID.randomUUID(), originalId).isEmpty())
+        }
+        val replacement = tokens.newPair(owner, device)
+        sql { assertFalse(refreshSessionWasSecurityRevokedInsideTransaction(replacement.refreshToken)) }
+    }
+
     @Test fun rotatedHistoryCannotHideOtherActiveSessions() = fixture {
         val id = user()
         val first = tokens.newPair(id, device)
@@ -180,7 +199,7 @@ class AitaAuthenticatorRecoveryDatabaseTest {
             RefreshSessions.selectAll().where { RefreshSessions.userId eq id }.toList().forEach { row ->
                 when (row[RefreshSessions.meta]?.get("installationId")) {
                     "expired" -> RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) { it[expiresAt] = Instant.now().minusSeconds(1) }
-                    "invalidated" -> RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) { it[securityInvalidated] = true }
+                    "invalidated" -> RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) { it[RefreshSessions.securityInvalidated] = true }
                 }
             }
         }
@@ -203,7 +222,8 @@ class AitaAuthenticatorRecoveryDatabaseTest {
         val flowId = sql { AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.purpose eq AUTH_PURPOSE_SIGN_IN_NOTICE }.single()[AuthOneTimeChallenges.publicId].toString() }
         val mail = email(flowId)
         assertEquals(mainEmail, mail["to"]!!.jsonArray.single().jsonPrimitive.content)
-        assertTrue(mail["text"]!!.jsonPrimitive.content.contains("another device"))
+        assertTrue(mail["text"]!!.jsonPrimitive.content.contains("Your AITA account was signed in."))
+        assertFalse(mail["text"]!!.jsonPrimitive.content.contains("another device"))
         assertFalse(mail["text"]!!.jsonPrimitive.content.contains(signedIn.refreshToken))
         tokens.rotate(signedIn.refreshToken, nextDevice)
         assertEquals(1, sql { Notifications.selectAll().count().toInt() })

@@ -58,10 +58,10 @@ internal fun AppConfiguration.LifetimeSubscriptionCard() {
             Text(authUiText("Unlocked by promo code · no renewal charges", "Активирован промокодом · без списаний за продление",
                 "Промокодпен қосылған · ұзарту төлемі жоқ", "Промокод менен ачылды · узартуу акысы алынбайт"),
                 color = ice, fontSize = stateValues.textSize, fontWeight = FontWeight.Medium)
-            Text(authUiText("Access belongs to this location only. Branches subscribe separately.",
-                "Доступ действует только для этой точки. У каждого филиала своя подписка.",
-                "Қолжетімділік тек осы нүктеге арналған. Әр филиалға бөлек жазылым қажет.",
-                "Мүмкүнчүлүк ушул жайга гана таандык. Филиалдар өзүнчө жазылат."),
+            Text(authUiText("Access belongs to this location only.",
+                "Доступ действует только для этой точки.",
+                "Қолжетімділік тек осы нүктеге арналған.",
+                "Мүмкүнчүлүк ушул жайга гана таандык."),
                 color = secondary, fontSize = stateValues.smallTextSize)
         }
     }

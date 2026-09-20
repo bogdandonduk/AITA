@@ -4034,6 +4034,21 @@ internal fun AppConfiguration.SupplierCard(
             }
         }
 
+        supplier.catalogueSource?.let { source ->
+            Spacer(Modifier.height(6.dp))
+            Text(source.countryCodes.joinToString(" · ") + " · " + source.sectors.extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+            Text(eventMessage("catalogue.directory_notice").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            actionButton(text = source.name + " · " + source.license, confirmationRequired = false,
+                onClick = { uriHandler.openUri(source.url) })
+            source.websites.firstOrNull()?.let { website ->
+                actionButton(text = eventMessage("catalogue.website").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                    confirmationRequired = false, onClick = { uriHandler.openUri(website) })
+            }
+        }
+
         supplier.phoneNumbers.orEmpty().takeIf { it.isNotEmpty() }?.let {
             Spacer(modifier = Modifier.height(6.dp))
             StockCardInfoLine(localizedStringResource(620, "Supplier phone number"), it.asDisplayPhoneNumbers().joinToString(", "), stateValues.TextColor)
@@ -4451,7 +4466,10 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 supplier.id,
                 supplier.visibleSupplierName(stateValues.appLanguage),
                 supplier.phoneNumbers.orEmpty().asDisplayPhoneNumbers().joinToString(" "),
-                supplier.emails.orEmpty().joinToString(" ")
+                supplier.emails.orEmpty().joinToString(" "),
+                supplier.catalogueSource?.countryCodes.orEmpty().joinToString(" "),
+                supplier.catalogueSource?.sectors.orEmpty().joinToString(" ") { it.value },
+                supplier.catalogueSource?.websites.orEmpty().joinToString(" ")
             ).any { it.contains(q, ignoreCase = true) }
 
         Column(

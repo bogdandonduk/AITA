@@ -69,6 +69,17 @@ internal class AccountAppModeCoordinator(
         retryPending()
     }
 
+    /** Storage errors must not replace a choice already restored or clicked in this session. */
+    fun retainModeAfterStorageFailure(owner: AppModeOwner, serverMode: Int?) {
+        if (!isOwnerCurrent(owner)) return
+        val existing = value.value
+        if (existing.owner == owner && existing.hydrated) {
+            publishLatest()
+            return
+        }
+        select(owner, serverMode?.takeIf(::isSelectableAppMode) ?: APP_MODE_STORE)
+    }
+
     suspend fun adopt(owner: AppModeOwner, mode: Int?, authoritative: Boolean, legacy: Int? = null) = adoption.withLock {
         if (!isOwnerCurrent(owner)) return@withLock
         val before = value.value
@@ -162,7 +173,7 @@ internal object AccountAppModes {
         } catch(cancel: CancellationException) { throw cancel }
         catch(_: Exception) {
             if (expected == owner()) {
-                coordinator.select(expected, account.appModeId?.takeIf(::isSelectableAppMode) ?: APP_MODE_STORE)
+                coordinator.retainModeAfterStorageFailure(expected, account.appModeId)
                 accountAppModeReadyState.value = expected.accountId to expected.generation
             }
             logCloudConnectionDiagnostic("App-mode restore interrupted; current choice retained")

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 5,
+  "revision": 6,
   "tutorials": [
     {
       "id": "account.register",
@@ -562,43 +562,43 @@
       ],
       "category": "ACCOUNT",
       "title": {
-        "en": "Review and revoke signed-in devices",
-        "ru": "Проверить устройства и завершить чужие сеансы"
+        "en": "Review devices and end their access",
+        "ru": "Проверить устройства и завершить их сеансы"
       },
       "introduction": {
-        "en": "You do not need to copy session tokens or internal IDs.",
-        "ru": "Копировать токены сеансов и внутренние ID не требуется."
+        "en": "Manage the current account’s sessions without confusing a connection outage with a deliberate sign-out.",
+        "ru": "Управляйте сеансами текущего аккаунта: потеря связи и принудительный выход — разные события."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Sign in and security, then the sessions section.",
-            "ru": "Откройте Меню → Вход и безопасность, затем раздел сеансов."
+            "en": "Open Menu → Sign in and security → Sessions. Identify your current device and compare the other device names and activity times.",
+            "ru": "Откройте Меню → Вход и безопасность → Сеансы. Найдите текущее устройство и сравните названия и время активности остальных."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Compare device names, platforms and activity with your own devices. Use session history for context.",
-            "ru": "Сопоставьте названия устройств, платформы и активность со своими. Для уточнения посмотрите историю сеансов."
+            "en": "Revoke one selected session to sign out that device. Use Log out other devices to end every other session while keeping this device signed in.",
+            "ru": "Завершите выбранный сеанс, чтобы выйти на том устройстве. Действие выхода на остальных устройствах завершает все другие сеансы, сохраняя текущий."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Select a session you do not recognize and confirm revocation. Read the current-device warning before ending your own session.",
-            "ru": "Выберите незнакомый сеанс и подтвердите завершение. Перед завершением собственного сеанса прочитайте предупреждение о текущем устройстве."
+            "en": "A connected affected client returns to sign-in when it receives the revocation. An offline device learns about it when it reconnects; cached information cannot be remotely erased while it is offline.",
+            "ru": "Затронутый клиент с подключением возвращается ко входу после получения отзыва. Устройство без связи узнает об этом при подключении; дистанционно стереть его кэш без связи невозможно."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Change your password and review your second factor if access was unexpected. Check that a trusted session still works.",
-            "ru": "При неожиданном доступе смените пароль и проверьте второй фактор. Убедитесь, что доверенный сеанс продолжает работать."
+            "en": "Review session history and sign-in notifications. If access was unexpected, change your password and check two-factor protection from your trusted device.",
+            "ru": "Проверьте историю сеансов и уведомления о входе. При незнакомом входе смените пароль и проверьте двухфакторную защиту на доверенном устройстве."
           },
           "screenshots": []
         }
@@ -671,43 +671,43 @@
       ],
       "category": "SETTINGS",
       "title": {
-        "en": "Change language, theme and interface size",
-        "ru": "Изменить язык, тему и масштаб"
+        "en": "Choose language, shade, font and interface size",
+        "ru": "Выбрать язык, оттенок, шрифт и масштаб"
       },
       "introduction": {
-        "en": "These settings change presentation, not the underlying business records.",
-        "ru": "Эти настройки меняют отображение, а не сами рабочие записи."
+        "en": "Appearance changes apply while the app is open; choose a readable combination for your screen.",
+        "ru": "Внешний вид меняется без перезапуска; подберите удобное сочетание для своего экрана."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Language and select a language, or choose the system-language option.",
-            "ru": "Откройте Меню → Язык и выберите язык либо вариант языка системы."
+            "en": "Open the Preferences section in Menu. Choose Language, including the system option when you want to follow the device language.",
+            "ru": "В разделе настроек Меню откройте Язык. Выберите системный вариант, если язык должен соответствовать устройству."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Open Theme and choose from 18 named shades, including Porcelain White, Midnight Amethyst, Black Cherry Crimson and Pale Butter Yellow. Dark shades use white text; light shades use dark text and icons.",
-            "ru": "Откройте «Тема» и выберите один из 18 оттенков, например «Фарфоровый белый», «Полуночный аметист», «Черешневый багряный» или «Нежный сливочно-жёлтый». В тёмных темах текст белый, в светлых — тёмные текст и значки."
+            "en": "Open Theme and compare 30 named shades. New options include Deep Petrol Blue, Blackberry Velvet, Ancient Moss Green and Pale Rose Quartz. Dark shades use white text; light shades use dark text.",
+            "ru": "В Теме сравните 30 именованных оттенков: среди новых — глубокий петрольный синий, ежевичный бархат, древний мох и бледный розовый кварц. На светлых оттенках текст тёмный, на глубоких — светлый."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Open Scale and choose Default, Big or Large. Large makes text moderately larger than Big without inflating every icon and gap. Your selection is saved with the account preferences.",
-            "ru": "Откройте «Масштаб» и выберите обычный, большой или крупный. Крупный режим умеренно увеличивает текст относительно большого, не раздувая все значки и отступы. Выбор сохраняется в настройках аккаунта."
+            "en": "Open Font and preview the available families with real text. The selected family applies across the app; unsupported characters can use a readable fallback.",
+            "ru": "Откройте Шрифт и сравните семейства на образце текста. Выбор применяется во всём приложении; для отсутствующих символов возможен запасной шрифт."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Return to your work. The selected account preferences are saved and synchronized when available; do not clear app data to change appearance.",
-            "ru": "Вернитесь к работе. Настройки аккаунта сохраняются и синхронизируются при доступной связи; для смены оформления не очищайте данные приложения."
+            "en": "Choose Default, Big or Large in Scale. Check a stock card, search field and menu on your device; change the choice again whenever needed. Preferences synchronize with your account when connected.",
+            "ru": "В Масштабе выберите обычный, большой или крупный. Проверьте карточку товара, поиск и меню; выбор можно изменить. При подключении настройки синхронизируются с аккаунтом."
           },
           "screenshots": []
         }
@@ -844,8 +844,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Notifications.",
-            "ru": "Откройте Меню → Уведомления."
+            "en": "Open Notifications from Menu. A navigation dot and an unread count highlight missed events; the missed-notifications notice opens unread messages.",
+            "ru": "Откройте Уведомления в Меню. Точка в навигации и счётчик выделяют пропущенные события; уведомление о пропущенных сообщениях открывает непрочитанные."
           },
           "screenshots": []
         },
@@ -886,43 +886,43 @@
       ],
       "category": "SETTINGS",
       "title": {
-        "en": "Update AITA without losing work",
-        "ru": "Обновить AITA, сохранив работу"
+        "en": "Update safely on your platform",
+        "ru": "Обновить приложение на своей платформе"
       },
       "introduction": {
-        "en": "The update badge is a reminder, not a command to stop immediately.",
-        "ru": "Значок обновления — напоминание, а не требование немедленно остановиться."
+        "en": "AITA verifies downloaded installers and keeps work intact across supported updates.",
+        "ru": "AITA проверяет установщики и сохраняет работу при поддерживаемом обновлении."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Finish and save the current work. When a compatible update is available, open Menu → Update available. About is only for build and project information; it is not the update screen.",
-            "ru": "Завершите и сохраните текущую работу. Когда доступно совместимое обновление, откройте Меню → Доступно обновление. Раздел «О приложении» содержит сведения о сборке и проекте, а не управление обновлением."
+            "en": "Open the highlighted Update available item at the top of Menu, or Downloads to check versions. Read the release notes and save unfinished work.",
+            "ru": "Откройте выделенный пункт Доступно обновление вверху Меню или Загрузки для проверки версий. Прочитайте изменения и сохраните работу."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Read What’s new and check the target version. On a direct installation, tap Download and wait for Downloaded and verified.",
-            "ru": "Прочитайте изменения и проверьте версию. При прямой установке скачайте файл и дождитесь состояния «Загружено и проверено»."
+            "en": "On Windows, background downloading can prepare a compatible MSI. A prepared update can install when AITA closes normally; Restart and update applies it now. Follow a system prompt if Windows requires one.",
+            "ru": "В Windows фоновая загрузка может подготовить совместимый MSI. Подготовленное обновление устанавливается при обычном закрытии AITA; перезапуск с обновлением применяет его сразу. При запросе Windows подтвердите действие."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Open the installer and follow your operating system’s steps. Store versions open their store; the browser offers an explicit reload.",
-            "ru": "Откройте установщик и выполните шаги системы. Магазинная версия открывает магазин приложений, браузерная предлагает перезагрузку."
+            "en": "On Android, Update downloads and verifies the APK, then opens installation. Allow installation from AITA only if Android asks. Android still requires its own installation confirmation.",
+            "ru": "В Android Обновить загружает и проверяет APK, затем открывает установку. Разрешите установку из AITA, если Android запросит это. Системное подтверждение установки остаётся обязательным."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Start the newer AITA build. The old update marker disappears, and AITA cleans its own downloaded installer after confirming the newer build.",
-            "ru": "Запустите новую сборку AITA. Прежний значок обновления исчезнет, а AITA очистит свой установщик после подтверждения новой сборки."
+            "en": "In a browser, use reload to update after saving work. For another platform choose Download; for a previous compatible release choose Install. Check the new version in About after launch.",
+            "ru": "В браузере после сохранения работы используйте перезагрузку для обновления. Для другой платформы выберите Скачать, для прежней совместимой версии — Установить. После запуска проверьте версию в О приложении."
           },
           "screenshots": []
         }
@@ -1006,8 +1006,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Workers and select My work.",
-            "ru": "Откройте Меню → Работники и вкладку «Моя работа»."
+            "en": "Open Menu → Workers. Your public worker-ID tile is above the tabs, so it is available without opening each section.",
+            "ru": "Откройте Меню → Сотрудники. Плитка вашего публичного ID находится над вкладками и доступна без перехода в каждый раздел."
           },
           "screenshots": []
         },
@@ -1098,43 +1098,43 @@
       ],
       "category": "START",
       "title": {
-        "en": "Create the parent store",
-        "ru": "Создать головной магазин"
+        "en": "Create a management parent store",
+        "ru": "Создать управляющий головной магазин"
       },
       "introduction": {
-        "en": "Create the parent first; branches can be attached afterward.",
-        "ru": "Сначала создайте головной магазин, затем добавляйте филиалы."
+        "en": "A parent manages the business structure and stock. Retail operations belong to its branches.",
+        "ru": "Головной магазин управляет структурой и запасами. Торговые операции выполняются в филиалах."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Choose Store mode, then open Menu → Stores and Add store.",
-            "ru": "Выберите режим магазина, затем Меню → Магазины → Добавить магазин."
+            "en": "Choose Store mode, then Menu → Stores → Add store. Create the management parent and enter its real business name, identifier, currency and contacts.",
+            "ru": "Выберите режим магазина, затем Меню → Магазины → Добавить магазин. Создайте головной магазин и укажите настоящие название, реквизиты, валюту и контакты."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Enter the store name and requested business details. Check the business identifier, currency and contact information.",
-            "ru": "Введите название и запрошенные реквизиты. Проверьте бизнес-идентификатор, валюту и контакты."
+            "en": "Enter the address as ordinary text. If verified suggestions are available, you may select one; manual text can be saved without map coordinates. Confirm a newly added email when requested.",
+            "ru": "Введите адрес обычным текстом. Если доступны проверенные подсказки, можно выбрать одну; ручной адрес сохраняется без определённых координат. Подтвердите новую почту, если это требуется."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Select an address suggestion when available and inspect the resolved address/map. Confirm any newly added email through its code step.",
-            "ru": "При доступных подсказках выберите адрес и проверьте результат на карте. Новую почту подтвердите отдельным кодом."
+            "en": "Save the parent and select it to manage stock, workers and branches. The parent has no subscription or sale, supply and return checkout workspace.",
+            "ru": "Сохраните и выберите головной магазин для управления запасами, сотрудниками и филиалами. У него нет подписки и рабочих экранов продажи, поставки и возврата."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Save, select the store as active, and open Subscription if access is needed. Creating a store does not automatically publish a buyer storefront.",
-            "ru": "Сохраните, сделайте магазин активным и при необходимости откройте подписку. Создание магазина не публикует витрину покупателям автоматически."
+            "en": "Create a Physical or Internet branch beneath it for trading. Existing migrated operating stores keep their original identity, receipts, inventory and access as branches.",
+            "ru": "Для торговли создайте под ним физический или интернет-филиал. Ранее работавшие магазины после миграции сохраняют свои идентификаторы, чеки, запасы и доступ как филиалы."
           },
           "screenshots": []
         }
@@ -1148,43 +1148,43 @@
       ],
       "category": "START",
       "title": {
-        "en": "Add a branch beneath its parent",
-        "ru": "Добавить филиал головного магазина"
+        "en": "Create a physical or internet branch",
+        "ru": "Создать физический или интернет-филиал"
       },
       "introduction": {
-        "en": "A branch is its own operational location with its own access.",
-        "ru": "Филиал — отдельная рабочая точка со своим доступом."
+        "en": "Choose the branch type for how this location operates.",
+        "ru": "Выберите тип филиала по его назначению."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Stores and find the parent store.",
-            "ru": "Откройте Меню → Магазины и найдите головной магазин."
+            "en": "Open Menu → Stores and the intended parent. Use Add branch so the new location belongs to that management parent.",
+            "ru": "В Меню → Магазины найдите нужный головной магазин. Используйте Добавить филиал, чтобы новая точка принадлежала ему."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Use its branch-creation action rather than creating an unrelated parent.",
-            "ru": "Используйте добавление филиала у него, а не создавайте отдельный несвязанный головной магазин."
+            "en": "Choose Physical for a shop location or Internet for a marketplace store. Enter its own name, address and contacts; manual address text is accepted.",
+            "ru": "Выберите физический тип для торговой точки или интернет-тип для магазина маркетплейса. Укажите его название, адрес и контакты; адрес можно ввести вручную."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Enter the branch name, address and contacts; confirm a newly added email when requested.",
-            "ru": "Введите название, адрес и контакты филиала; при необходимости подтвердите новую почту."
+            "en": "Save and activate the branch. Review its subscription, worker permissions and stock before completing transactions.",
+            "ru": "Сохраните и активируйте филиал. Перед операциями проверьте подписку, права сотрудников и запасы."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Save and select the branch to check its stock and access. Arrange its own subscription before live operations.",
-            "ru": "Сохраните и выберите филиал, чтобы проверить склад и доступ. До реальной работы оформите его подписку."
+            "en": "For an Internet branch, configure its public storefront and locations separately. Review inherited parent item profiles and any branch-only overrides before publication.",
+            "ru": "Для интернет-филиала отдельно настройте витрину и места расположения товаров. До публикации проверьте унаследованные профили товаров и собственные изменения филиала."
           },
           "screenshots": []
         }
@@ -1251,43 +1251,43 @@
       ],
       "category": "START",
       "title": {
-        "en": "Edit store details and confirm an address",
-        "ru": "Изменить сведения магазина и подтвердить адрес"
+        "en": "Edit details and enter an address",
+        "ru": "Изменить данные и ввести адрес"
       },
       "introduction": {
-        "en": "Check the entity being edited before saving.",
-        "ru": "Перед сохранением проверьте, какую организацию редактируете."
+        "en": "A typed address does not need a map suggestion to be saved.",
+        "ru": "Для сохранения текстового адреса не обязательно выбирать подсказку на карте."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "In Menu → Stores, open Edit for the exact store or branch.",
-            "ru": "В Меню → Магазины откройте редактирование нужного магазина или филиала."
+            "en": "Open Edit on the exact parent or branch in Menu → Stores. Check its name and type before changing it.",
+            "ru": "Откройте изменение нужного головного магазина или филиала в Меню → Магазины. Проверьте название и тип."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Change the intended name, business details or contacts. An unchanged legacy email is not automatically a newly verified address.",
-            "ru": "Измените нужные реквизиты или контакты. Старая неизменённая почта не становится автоматически подтверждённой новой почтой."
+            "en": "Update the intended business fields and contacts. Confirm a new email using the code sent to that address.",
+            "ru": "Измените нужные реквизиты и контакты. Подтвердите новую почту кодом, отправленным на этот адрес."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "For a new email, request the code and finish confirmation. For an address, choose a suggestion and inspect the resolved point when this service is configured.",
-            "ru": "Новый адрес почты подтвердите кодом. Для адреса магазина выберите подсказку и проверьте точку, если этот сервис настроен."
+            "en": "Type a complete address, up to 500 characters. When suggestions are unavailable, save the text normally: AITA does not invent a map point for it.",
+            "ru": "Введите полный адрес до 500 символов. Если подсказок нет, сохраните текст: AITA не придумывает для него точку на карте."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Save and reopen the same entity to check the result.",
-            "ru": "Сохраните и снова откройте ту же организацию, чтобы проверить результат."
+            "en": "If you select a verified suggestion, check its address and map point. Save and reopen the same store; editing the text afterwards requires resolving the new address again before using a verified point.",
+            "ru": "Если выбрали проверенную подсказку, проверьте адрес и точку. Сохраните и откройте магазин снова; после изменения текста для проверенной точки потребуется повторное определение адреса."
           },
           "screenshots": []
         }
@@ -1312,7 +1312,7 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Select the intended store, then open Menu → Subscription. A missing-access redirect opens this above the normal menu base.",
+            "en": "Select the intended branch, then open Menu → Subscription. A missing-access redirect opens this above the normal menu base.",
             "ru": "Выберите нужную точку и откройте Меню → Подписка. При отсутствии доступа этот экран открывается поверх обычной основы меню."
           },
           "screenshots": []
@@ -1362,8 +1362,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Select the intended store and open its subscription screen.",
-            "ru": "Выберите нужный магазин и откройте его подписку."
+            "en": "Select the intended branch and open its subscription screen.",
+            "ru": "Выберите нужный филиал и откройте его подписку."
           },
           "screenshots": []
         },
@@ -1684,8 +1684,8 @@
         {
           "id": "step-3",
           "text": {
-            "en": "Enter the real delivery/expiry dates and status. Check which store will own the batch.",
-            "ru": "Введите реальные даты поставки и годности, а также статус. Проверьте магазин-владелец партии."
+            "en": "Choose the batch type. Universal is for keeping goods without separating deliveries; Returned identifies returned goods. Use ordinary batches when delivery/expiry tracking matters.",
+            "ru": "Выберите тип партии. Универсальная подходит для хранения без разделения поставок, Возвращённая — для возвратов. Обычные партии используйте для учёта поставок и сроков."
           },
           "screenshots": []
         },
@@ -2084,8 +2084,8 @@
         {
           "id": "step-3",
           "text": {
-            "en": "Scan the barcode and check the resulting item, quantity and price. If no item matches, search by name before creating a new one.",
-            "ru": "Отсканируйте код, проверьте товар, количество и цену. Если совпадения нет, сначала поищите по названию."
+            "en": "Scan and verify the exact item, quantity and price. After a successful scanner add, the search clears and the prior transaction view returns. A failed or ambiguous scan needs review.",
+            "ru": "Отсканируйте и проверьте товар, количество и цену. После успешного добавления сканером поиск очищается и возвращается прежний экран операции. Неудачное или неоднозначное сканирование требует проверки."
           },
           "screenshots": []
         },
@@ -2107,43 +2107,43 @@
       ],
       "category": "SALES",
       "title": {
-        "en": "Keep several customer carts separate",
-        "ru": "Вести несколько корзин покупателей"
+        "en": "Keep and remove separate customer carts",
+        "ru": "Вести и удалять отдельные корзины покупателей"
       },
       "introduction": {
-        "en": "The numbered carts help pause one customer and serve another.",
-        "ru": "Нумерованные корзины позволяют отложить одного покупателя и обслужить другого."
+        "en": "Each numbered cart has its own goods; the icon shows whether it is empty.",
+        "ru": "У каждой корзины свои товары; значок показывает, пуста ли она."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "In Sale, select an unused numbered cart for the next customer.",
-            "ru": "В продаже выберите свободную нумерованную корзину для следующего покупателя."
+            "en": "Select the customer’s cart before scanning. Use the add-cart control when two carts are not enough.",
+            "ru": "Перед сканированием выберите корзину покупателя. Если двух корзин недостаточно, используйте добавление корзины."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Add that customer’s goods and review quantities.",
-            "ru": "Добавьте его товары и проверьте количество."
+            "en": "Switch between carts without mixing their goods. Check the selected number, quantities and total before payment.",
+            "ru": "Переключайтесь между корзинами, не смешивая товары. Перед оплатой проверьте номер, количество и сумму."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Switch to another numbered cart when needed; check its contents before scanning more goods.",
-            "ru": "При необходимости переключитесь на другой номер; перед новыми сканированиями проверьте содержимое."
+            "en": "Carts 1 and 2 always remain. Their clear control appears when they contain goods and clears only their contents.",
+            "ru": "Корзины 1 и 2 остаются всегда. Действие очистки появляется при наличии товаров и очищает только содержимое."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Return to the correct customer’s cart for payment. Finish or deliberately clear only that cart.",
-            "ru": "Для оплаты вернитесь в корзину нужного покупателя. Завершайте или осознанно очищайте только её."
+            "en": "Cart 3 and later have a remove control even when empty. Confirm removal carefully: it removes that extra cart, not merely its goods.",
+            "ru": "У корзины 3 и следующих есть удаление даже в пустом состоянии. Подтверждайте внимательно: удаляется сама дополнительная корзина, а не только товары."
           },
           "screenshots": []
         }
@@ -2313,43 +2313,51 @@
       ],
       "category": "SALES",
       "title": {
-        "en": "Record a goods return",
-        "ru": "Оформить возврат товара"
+        "en": "Return goods using the original receipt",
+        "ru": "Вернуть товары по исходному чеку"
       },
       "introduction": {
-        "en": "A refund should match the goods and payment actually returned.",
-        "ru": "Возврат должен соответствовать фактически возвращённым товарам и деньгам."
+        "en": "Find the sale, select its goods and decide where the returned quantity belongs before refunding.",
+        "ru": "Найдите продажу, выберите товары и место возврата количества до выплаты денег."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Choose Return for the correct store and identify the returned goods or original transaction where supported.",
-            "ru": "Выберите возврат в нужном магазине и укажите товары либо исходную операцию, где это поддерживается."
+            "en": "Open Return in the operating branch. Enter the transaction ID in the search field and choose a matching history suggestion, or scan the transaction barcode at the bottom of the receipt.",
+            "ru": "Откройте Возврат в рабочем филиале. Введите ID операции и выберите подсказку из истории либо отсканируйте штрихкод операции внизу чека."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Enter the returned quantity and check the unit and intended batch information.",
-            "ru": "Введите количество возврата, проверьте единицу и сведения о партии."
+            "en": "The receipt opens in a bottom sheet. Switch to its Items tab and tap the returned items to add them to the current return cart.",
+            "ru": "Чек откроется в нижнем окне. Перейдите на вкладку товаров и нажмите нужные позиции для добавления в текущую корзину возврата."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Choose the actual refund payment method and review its effect on cash and stock.",
-            "ru": "Выберите реальный способ возврата денег и проверьте влияние на кассу и склад."
+            "en": "Check quantities: receipt-linked returns cannot exceed the returnable quantity from that sale. An ordinary product barcode follows the product path instead of opening a transaction receipt.",
+            "ru": "Проверьте количество: возврат по чеку не может превышать доступное к возврату количество продажи. Обычный штрихкод товара добавляет товар, а не открывает чек операции."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Confirm once and inspect the return receipt/history. Keep the original sale record for reference.",
-            "ru": "Подтвердите один раз и проверьте чек или историю возврата. Сохраните исходную продажу для сверки."
+            "en": "Before payment, choose the destination batch for each item. Review the highlighted shelf batch from the receipt date, or create a Returned batch when appropriate.",
+            "ru": "Перед оплатой выберите партию назначения для каждого товара. Проверьте выделенную полочную партию на дату чека либо создайте партию Возвращённая."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-5",
+          "text": {
+            "en": "Review the refund method and total, confirm once, and inspect the resulting return receipt and stock. For an uncertain result, check history before repeating.",
+            "ru": "Проверьте способ и сумму возврата, подтвердите один раз и проверьте чек возврата и запасы. При неясном результате сначала откройте историю."
           },
           "screenshots": []
         }
@@ -3016,43 +3024,43 @@
       ],
       "category": "MARKETPLACE",
       "title": {
-        "en": "Create and enable the parent’s buyer storefront",
-        "ru": "Создать и включить витрину головного магазина"
+        "en": "Publish an internet branch’s storefront",
+        "ru": "Опубликовать витрину интернет-филиала"
       },
       "introduction": {
-        "en": "Public publication is deliberate and available only to a parent store.",
-        "ru": "Публикация выполняется осознанно и доступна только головному магазину."
+        "en": "The parent holds reusable item information; an Internet branch owns its public store.",
+        "ru": "Головной магазин хранит общие сведения о товарах; публичный магазин принадлежит интернет-филиалу."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Select the parent store, then open Menu → Shop window/marketplace publication.",
-            "ru": "Выберите головной магазин и откройте Меню → Витрина или публикацию маркетплейса."
+            "en": "Select an Internet branch in Menu → Stores. Open its marketplace publication/storefront screen. A management parent does not publish its own storefront.",
+            "ru": "Выберите интернет-филиал в Меню → Магазины. Откройте его публикацию на маркетплейсе/витрину. У головного магазина своей витрины нет."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Fill the buyer-facing store name, city, public address and pickup note.",
-            "ru": "Заполните публичные название, город, адрес и условия самовывоза."
+            "en": "Fill the buyer-facing name, description, address and pickup information. Check which details will be public.",
+            "ru": "Укажите название для покупателей, описание, адрес и сведения о получении. Проверьте, какие данные станут публичными."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Review the public details and enable publication using the supported control.",
-            "ru": "Проверьте сведения для покупателей и включите публикацию доступным переключателем."
+            "en": "Configure the branch’s locations and review its access and publication settings. A text-only address is not a verified map location.",
+            "ru": "Настройте места расположения товаров филиала и проверьте доступ и публикацию. Текстовый адрес сам по себе не является проверенной точкой карты."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Save and inspect the public result. Add/review item listings separately; publishing the storefront does not make every stock draft public.",
-            "ru": "Сохраните и проверьте публичный результат. Товары публикуются после отдельной проверки; включение витрины не публикует все складские черновики."
+            "en": "Save and enable the storefront when ready. Review and publish item listings separately, then inspect them in Buyer mode.",
+            "ru": "Когда всё готово, сохраните и включите витрину. Отдельно проверьте и опубликуйте товары, затем откройте их в режиме покупателя."
           },
           "screenshots": []
         }
@@ -3066,43 +3074,43 @@
       ],
       "category": "MARKETPLACE",
       "title": {
-        "en": "Prepare the private marketplace profile of an item",
-        "ru": "Подготовить личный черновик товара для маркетплейса"
+        "en": "Prepare parent information and branch overrides",
+        "ru": "Подготовить общие сведения и изменения филиала"
       },
       "introduction": {
-        "en": "The private draft and the buyer-facing listing are separate records.",
-        "ru": "Личный черновик и объявление для покупателей — разные записи."
+        "en": "Keep reusable product facts in the parent and tailor an Internet branch’s offer independently.",
+        "ru": "Храните общие факты в головном магазине, а предложение интернет-филиала настраивайте отдельно."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Open the stock item editor and its Marketplace profile tab.",
-            "ru": "Откройте редактор товара на складе и вкладку профиля маркетплейса."
+            "en": "Open the parent stock item → Marketplace profile. Fill accurate public title, description, usable photo links and product facts.",
+            "ru": "Откройте товар головного магазина → Профиль маркетплейса. Укажите точные название, описание, ссылки на фото и характеристики."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Review the automatically copied stock text and usable photo links. Turn off automatic following only when you need independent public wording.",
-            "ru": "Проверьте автоматически скопированный текст и допустимые фото. Отключайте автоматическое следование только для самостоятельного публичного описания."
+            "en": "Save this generic profile so Internet branches can pull it with the item template. Saving the parent profile does not publish an offer.",
+            "ru": "Сохраните общий профиль, чтобы интернет-филиалы могли получить его с шаблоном товара. Сохранение не публикует предложение."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Fill facts you actually know: brand, manufacturer, origin, article, ingredients/materials, allergens, storage and characteristics.",
-            "ru": "Заполните известные факты: бренд, производителя, происхождение, артикул, состав, аллергены, хранение и характеристики."
+            "en": "In the Internet branch’s item editor, review the inherited profile. Set branch-only wording or characteristics where overrides are needed; the parent’s generic information stays separate.",
+            "ru": "В редакторе товара интернет-филиала проверьте унаследованный профиль. При необходимости задайте собственные тексты или характеристики: общие данные головного магазина остаются отдельными."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Save the stock item. Review and publish this proposal from the parent’s publication screen in a separate step.",
-            "ru": "Сохраните товар. Отдельно проверьте и опубликуйте предложение через витрину головного магазина."
+            "en": "Open that branch’s publication screen, import the stock profile for review and publish only after checking price, unit, availability and public details.",
+            "ru": "Откройте публикацию этого филиала, импортируйте профиль для проверки и публикуйте после проверки цены, единицы, наличия и публичных данных."
           },
           "screenshots": []
         }
@@ -3130,8 +3138,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "In the parent’s publication screen, select the stock item/listing.",
-            "ru": "В публикации головного магазина выберите товар или объявление."
+            "en": "In the Internet branch’s publication screen, select the stock item/listing.",
+            "ru": "В публикации интернет-филиала выберите товар или объявление."
           },
           "screenshots": []
         },
@@ -3183,8 +3191,8 @@
         {
           "id": "step-1",
           "text": {
-            "en": "Open the parent’s publication screen and the intended listing.",
-            "ru": "Откройте публикацию головного магазина и нужное объявление."
+            "en": "Open the Internet branch’s publication screen and the intended listing.",
+            "ru": "Откройте публикацию интернет-филиала и нужное объявление."
           },
           "screenshots": []
         },
@@ -3222,43 +3230,43 @@
       ],
       "category": "MARKETPLACE",
       "title": {
-        "en": "Share branch availability under a parent offer",
-        "ru": "Показать наличие по филиалам у предложения головного магазина"
+        "en": "Configure internet-store locations",
+        "ru": "Настроить места интернет-магазина"
       },
       "introduction": {
-        "en": "Branches report availability rather than owning independent storefronts.",
-        "ru": "Филиалы сообщают о наличии, а не создают независимые витрины."
+        "en": "Help buyers understand where an Internet branch’s goods are located.",
+        "ru": "Помогите покупателю понять, где находятся товары интернет-филиала."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Select the parent store and open its public storefront settings.",
-            "ru": "Выберите головной магазин и откройте настройки публичной витрины."
+            "en": "Select the Internet branch and open its storefront/location settings. Check the branch identity before editing.",
+            "ru": "Выберите интернет-филиал и откройте настройки витрины и мест. Перед изменением проверьте филиал."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Enable Share branch availability only when you intend to show those public location hints.",
-            "ru": "Включите показ наличия филиалов, только если хотите публиковать эти сведения о точках."
+            "en": "Add the supported location details and addresses. Use real pickup or stock-location information; do not invent coordinates for a manually entered address.",
+            "ru": "Добавьте сведения о местах и адреса. Укажите реальные места получения или хранения; не придумывайте координаты ручного адреса."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Check the relevant branch subscriptions and stock. Product matching requires a shared identity or a suitable standard barcode and matching unit.",
-            "ru": "Проверьте подписки и склад филиалов. Для сопоставления нужны общая идентичность либо подходящий стандартный код и совпадающая единица."
+            "en": "Review which location and availability information is public. Check stock and matching product identity before relying on a quantity hint.",
+            "ru": "Проверьте публичные сведения о местах и наличии. Сверьте запасы и идентичность товара, прежде чем полагаться на подсказку количества."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "Inspect a public item’s branch section. Confirm uncertain availability directly; it is not a reservation or a branch price quote.",
-            "ru": "Посмотрите филиалы у публичного товара. Неясное наличие уточняйте напрямую: это не бронь и не отдельная цена филиала."
+            "en": "Save and inspect the buyer-facing offer. Availability hints are not reservations; confirm uncertain details before a visit.",
+            "ru": "Сохраните и проверьте предложение для покупателя. Подсказка наличия не означает резервирование; перед поездкой уточните спорные сведения."
           },
           "screenshots": []
         }
@@ -3272,43 +3280,43 @@
       ],
       "category": "DEVICES",
       "title": {
-        "en": "Set up and test a receipt printer",
-        "ru": "Настроить и проверить принтер чеков"
+        "en": "Select, save and test a printer",
+        "ru": "Выбрать, сохранить и проверить принтер"
       },
       "introduction": {
-        "en": "Printer availability depends on the device and platform.",
-        "ru": "Доступность печати зависит от устройства и платформы."
+        "en": "Use the connection method supported by your platform and the printer’s real paper size.",
+        "ru": "Используйте способ подключения своей платформы и настоящий размер бумаги принтера."
       },
       "steps": [
         {
           "id": "step-1",
           "text": {
-            "en": "Open Menu → Devices and choose the intended printer or supported connection method.",
-            "ru": "Откройте Меню → Устройства и выберите нужный принтер или поддерживаемое подключение."
+            "en": "Open Menu → Devices. On desktop, refresh printers and select the actual system queue. Match the printer’s paper width: 58 mm, 80 mm or A4.",
+            "ru": "Откройте Меню → Устройства. На компьютере обновите список и выберите настоящую системную очередь. Укажите ширину бумаги: 58 мм, 80 мм или A4."
           },
           "screenshots": []
         },
         {
           "id": "step-2",
           "text": {
-            "en": "Set the available paper width, target and encoding-related options carefully.",
-            "ru": "Внимательно задайте доступные ширину бумаги, цель печати и параметры кодировки."
+            "en": "Save the selected printer and settings. In a browser, the system/browser print dialog chooses the physical printer; a saved AITA print profile does not bypass that dialog.",
+            "ru": "Сохраните принтер и настройки. В браузере физический принтер выбирается в системном/браузерном диалоге; сохранённый профиль AITA не обходит этот диалог."
           },
           "screenshots": []
         },
         {
           "id": "step-3",
           "text": {
-            "en": "Print one controlled test and compare it with the preview.",
-            "ru": "Выполните одну контролируемую пробную печать и сравните с предпросмотром."
+            "en": "Print one short test. Check paper size, scale, margins and orientation in the driver or print dialog before confirming. Verify that text and the barcode are visible on the real paper.",
+            "ru": "Напечатайте один короткий тест. До подтверждения проверьте размер бумаги, масштаб, поля и ориентацию в драйвере или диалоге. Проверьте текст и штрихкод на бумаге."
           },
           "screenshots": []
         },
         {
           "id": "step-4",
           "text": {
-            "en": "If text or layout is wrong, note the printer model, platform and chosen settings for support before retrying large jobs.",
-            "ru": "При ошибках текста или макета запишите модель, платформу и настройки для поддержки до повторных крупных заданий."
+            "en": "If paper feeds incorrectly, cancel the job in the operating system’s print queue. Clearing the saved printer setting is not proof that the physical printer stopped. Check the queue and settings before retrying.",
+            "ru": "При неправильной подаче отмените задание в очереди печати ОС. Сброс сохранённой настройки не доказывает остановку принтера. Перед повтором проверьте очередь и настройки."
           },
           "screenshots": []
         }
@@ -3349,8 +3357,8 @@
         {
           "id": "step-3",
           "text": {
-            "en": "Review the recognized text, especially numbers, product names and barcodes.",
-            "ru": "Проверьте распознанный текст, особенно числа, названия и штрихкоды."
+            "en": "Spoken numbers are converted to digits where supported: for example, “one hundred twenty-five” becomes “125”. This is number recognition, not translation between languages. Review the result and decimal separator.",
+            "ru": "Произнесённые числа преобразуются в цифры там, где это поддерживается: например, «сто двадцать пять» — в «125». Это распознавание чисел, не перевод между языками. Проверьте результат и десятичный разделитель."
           },
           "screenshots": []
         },
@@ -5191,6 +5199,112 @@
         "en": "Colleagues see basic identity and the Store picture. Detailed activity is for the employee and authorized managers. Unrelated stores, login contacts, security settings and salaries are not exposed.",
         "ru": "Коллеги видят основные данные и рабочее фото. Подробная активность доступна сотруднику и уполномоченным руководителям. Данные других магазинов, контакты для входа, настройки безопасности и зарплаты не раскрываются."
       }
+    },
+    {
+      "id": "settings.downloads",
+      "modes": [
+        "STORE",
+        "BUYER",
+        "SUPPLIER",
+        "MANUFACTURER"
+      ],
+      "category": "SETTINGS",
+      "caution": {},
+      "title": {
+        "en": "Download AITA for another device",
+        "ru": "Скачать AITA для другого устройства"
+      },
+      "introduction": {
+        "en": "Find the platform, version and installer in one Downloads screen.",
+        "ru": "Выберите платформу, версию и установщик на одном экране Загрузки."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Menu → Downloads. Before signing in, the Downloads text button at the bottom of the authentication screen opens the same catalogue.",
+            "ru": "Откройте Меню → Загрузки. До входа текстовая кнопка Загрузки внизу экрана авторизации открывает тот же каталог."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Review the download-folder tile at the top. Where the platform permits it, use the folder button to change the destination. A browser controls its own download location.",
+            "ru": "Проверьте папку загрузок вверху. Если платформа позволяет, измените её кнопкой папки. В браузере местом сохранения управляют его настройки."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Choose the platform tab, then Current version or Previous releases. Read the version, notes and file type before downloading. Android installation uses APK; AAB is not an installer for this screen.",
+            "ru": "Выберите платформу, затем текущую версию или предыдущие выпуски. Перед загрузкой проверьте версию, изменения и тип файла. Android устанавливается из APK; AAB не является установщиком этого экрана."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Use the refresh button to check releases. On a supported local platform, Update or Install continues into installation; another platform offers Download. Browser users are already in the web app.",
+            "ru": "Кнопкой обновления проверьте выпуски. Для поддерживаемой текущей платформы Обновить или Установить продолжает процесс установки, для другой — Скачать. Пользователь браузера уже находится в веб-приложении."
+          },
+          "screenshots": []
+        }
+      ]
+    },
+    {
+      "id": "settings.app-state",
+      "modes": [
+        "STORE",
+        "BUYER",
+        "SUPPLIER",
+        "MANUFACTURER"
+      ],
+      "category": "SETTINGS",
+      "caution": {},
+      "title": {
+        "en": "Choose where app state is saved",
+        "ru": "Выбрать место сохранения состояния приложения"
+      },
+      "introduction": {
+        "en": "App state stores supported navigation and form drafts; it is not a backup of the store database.",
+        "ru": "Состояние приложения сохраняет поддерживаемую навигацию и черновики форм; это не резервная копия базы магазина."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Menu → Settings → App state. Check the current account and workspace before changing its storage options.",
+            "ru": "Откройте Меню → Настройки → Состояние приложения. Перед изменениями проверьте аккаунт и рабочее пространство."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Enable device saving when you want supported drafts retained on this device. Navigation keeps its local last-place record so reopening does not start in an unrelated screen.",
+            "ru": "Включите сохранение на устройстве, если нужны местные черновики. Последнее место навигации сохраняется локально, чтобы открытие не переносило на посторонний экран."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Enable account/cloud saving when you want supported state available after signing in elsewhere. Wait for synchronization and review any conflict before choosing which copy to keep.",
+            "ru": "Включите сохранение в аккаунте/облаке, чтобы поддерживаемое состояние было доступно после входа в другом месте. Дождитесь синхронизации и проверьте конфликт перед выбором копии."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Do not treat a restored form as a completed transaction. Confirm the active store, current records and any unsent edits before continuing.",
+            "ru": "Восстановленная форма не означает завершённую операцию. Перед продолжением проверьте активный магазин, актуальные записи и неотправленные изменения."
+          },
+          "screenshots": []
+        }
+      ]
     }
   ],
   "faqs": [

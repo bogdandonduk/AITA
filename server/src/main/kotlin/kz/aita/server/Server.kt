@@ -5601,13 +5601,16 @@ private fun validateStoreLegalId(body: StoreDataModel): Boolean {
   return body.legalId.matchesLegalIdFormat(format)
 }
 
-private fun validateStoreAddress(body: StoreDataModel): Boolean = body.location.isResolvedAddress()
+private fun validateStoreAddress(body: StoreDataModel): Boolean = body.location.isResolvedAddress() || body.location.isManualStoreAddress()
 
 private suspend fun canonicalizeStoreAddress(
   body: StoreDataModel,
   existingLocation: LocationDataModel? = null
 ): Result<LocationDataModel> = runCatching {
   val incoming = body.location
+  if (incoming.isManualStoreAddress()) return@runCatching requireNotNull(manualStoreAddress(
+    incoming.displayAddress(incoming.primaryLanguage), incoming.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE },
+    body.countryLocales.firstOrNull().orEmpty()))
   require(incoming.isResolvedAddress()) {
     "Select an address suggestion before saving"
   }
@@ -6773,7 +6776,9 @@ private fun ResultRow.toSupplierDataModel(): SupplierDataModel {
     phoneNumbers = decodeSupplierStringList(this[Suppliers.phoneNumbers]),
     emails = decodeSupplierStringList(this[Suppliers.emails]),
     addedAt = this[Suppliers.addedAt].toEpochMilli(),
-    isActive = this[Suppliers.isActive]
+    isActive = this[Suppliers.isActive],
+    catalogueSource = if (decodeSupplierStringList(this[Suppliers.userIds]).isEmpty())
+      PublicSupplierCatalogue.byId[this[Suppliers.id].toString()]?.catalogueSource else null
   )
 }
 
@@ -18043,6 +18048,8 @@ fun Application.module() {
     }
     sanitizeGenericGoodsCategoryPrefixesInsideTransaction()
     seedGenericGoodsCategoriesInsideTransaction()
+    seedPublicSuppliersInsideTransaction()
+    seedOpenGoodsInsideTransaction()
     preserveExistingGoodsItemNamesInTransactionHistoryInsideTransaction()
     cleanupNotificationsInsideTransaction()
   }
@@ -18739,7 +18746,9 @@ fun Application.module() {
           if (throwable is IllegalAccessException) {
             call.genericResponseNoPayload(
               status = HttpStatusCode.Unauthorized,
-              message = eventMessage("message.cloud_sign_in_expired_sign_in_again_to_sync_your_local")
+              message = eventMessage(if (newSuspendedTransaction(aitaServerIoContext) {
+                refreshSessionWasSecurityRevokedInsideTransaction(body)
+              }) "auth.session_revoked" else "message.cloud_sign_in_expired_sign_in_again_to_sync_your_local")
             )
           } else {
             call.safeGenericResponseNoPayload(
@@ -18809,20 +18818,25 @@ fun Application.module() {
             )
           }
 
-          newSuspendedTransaction(aitaServerIoContext) {
-            Users.selectAll().where { Users.id eq userId }.forUpdate().singleOrNull() ?: return@newSuspendedTransaction
+          val allowed = newSuspendedTransaction(aitaServerIoContext) {
+            Users.selectAll().where { Users.id eq userId }.forUpdate().singleOrNull() ?: return@newSuspendedTransaction false
+            val targets = securitySessionLineageInsideTransaction(userId, targetSessionId)
+            if (currentSessionId in targets) return@newSuspendedTransaction false
             val now = Instant.now()
             val nowMillis = now.toEpochMilli()
             val rows = RefreshSessions
               .selectAll()
               .where {
-                (RefreshSessions.id eq targetSessionId) and
+                (RefreshSessions.id inList targets.toList()) and
                    (RefreshSessions.userId eq userId) and
                    RefreshSessions.revokedAt.isNull()
               }
               .forUpdate()
               .toList()
 
+            RefreshSessions.update({ (RefreshSessions.userId eq userId) and (RefreshSessions.id inList targets.toList()) }) {
+              it[RefreshSessions.securityInvalidated] = true
+            }
             rows.forEach { row ->
               RefreshSessions.update({ RefreshSessions.id eq row[RefreshSessions.id] }) {
                 it[RefreshSessions.revokedAt] = now
@@ -18837,7 +18851,9 @@ fun Application.module() {
                 now = nowMillis
               )
             }
+            true
           }
+          if (!allowed) return@post call.genericResponseNoPayload(HttpStatusCode.BadRequest, getResponse("48").message)
 
           call.genericResponse(
             status = HttpStatusCode.OK,
@@ -18853,6 +18869,7 @@ fun Application.module() {
 
           newSuspendedTransaction(aitaServerIoContext) {
             Users.selectAll().where { Users.id eq userId }.forUpdate().singleOrNull() ?: return@newSuspendedTransaction
+            val keptLineage = securitySessionLineageInsideTransaction(userId, sessionToKeep) + sessionToKeep
             val now = Instant.now()
             val nowMillis = now.toEpochMilli()
             val rows = RefreshSessions
@@ -18860,7 +18877,7 @@ fun Application.module() {
               .where {
                 (RefreshSessions.userId eq userId) and
                    RefreshSessions.revokedAt.isNull() and
-                   (RefreshSessions.id neq sessionToKeep)
+                   (RefreshSessions.id notInList keptLineage.toList())
               }
               .forUpdate()
               .toList()
@@ -19065,6 +19082,12 @@ fun Application.module() {
       }
     }
 
+    get("/catalogue/open-goods.jsonl.gz") {
+      call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=aita-open-goods-20260920.jsonl.gz")
+      call.response.header(HttpHeaders.CacheControl, "public, max-age=3600")
+      call.respondBytes(openGoodsCatalogueBytes(), ContentType("application", "gzip"))
+    }
+
     route("/generic") {
       authenticate("auth-jwt") {
         route("/goodsCategories") {
@@ -19132,7 +19155,7 @@ fun Application.module() {
               ?: if (barcodeCandidates.isNotEmpty()) 40 else 80
             val offset = call.request.queryParameters["offset"]
               ?.toIntOrNull()
-              ?.coerceAtLeast(0)
+              ?.coerceIn(0, 10_000)
               ?: 0
 
             val genericGoodsItems: Pair<Int, List<GenericGoodsItemDataModel>?> =
@@ -19142,7 +19165,7 @@ fun Application.module() {
                 if (noUser)
                   return@newSuspendedTransaction 1 to null
 
-                val matches = GenericGoodsItems
+                val localMatches = GenericGoodsItems
                   .selectAll()
                   .toList()
                   .map { it.toGenericGoodsItemDataModel() }
@@ -19153,6 +19176,11 @@ fun Application.module() {
                        item.categoryIds.orEmpty().any { it in categoryFilterIds }
                     barcodeMatches && categoryMatches && item.matchesGenericGoodsSearchQuery(queryText)
                   }
+                val openMatches = if (categoryFilterIds.isEmpty())
+                  searchOpenGoodsInsideTransaction(barcodeCandidates, genericGoodsSearchTokens(queryText), offset + limit + localMatches.size)
+                else emptyList()
+                val localBarcodes = localMatches.flatMap { it.barcode.orEmpty() }.toSet()
+                val matches = (localMatches + openMatches.filter { item -> item.barcode.orEmpty().none { it in localBarcodes } })
                   .sortedWith(
                     compareByDescending<GenericGoodsItemDataModel> { it.genericGoodsBarcodeMatchScore(barcodeCandidates) }
                       .thenBy { item -> item.name.firstOrNull()?.value.orEmpty().lowercase(Locale.ROOT) }
