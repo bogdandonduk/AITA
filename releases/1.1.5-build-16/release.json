@@ -1,0 +1,134 @@
+{
+  "version": "1.1.5",
+  "build": 16,
+  "revision": "4a2356a9b90a02f725036fcd6cc2afc4d7891dbd",
+  "tag": "v1.1.5-b16",
+  "createdAt": "2026-09-21T18:56:03Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.1.5-16-android.apk",
+      "sha256": "1cba7e490c5f59299c7ce96b9509573aeea53a61460c943c9e702e1c5fd8d2ca",
+      "bytes": 71988042,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/AITA-1.1.5-16-android.apk"
+    },
+    {
+      "name": "AITA-1.1.5-16-android.aab",
+      "sha256": "4d4c8fec8aeacf8d73484ce22b17d6ad75eb26537295f01c842c51cc1f275248",
+      "bytes": 46654581,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/AITA-1.1.5-16-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "61e347d1b44dd671d219dcdc2b21bdad6111f0c5ae95a52004a96e04912c6729",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.5-16-web.zip",
+      "sha256": "17417d47babda54e997e4ed1114192f8a9a8042c94cbc2b59035d3bcedd7ac23",
+      "bytes": 12814857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/AITA-1.1.5-16-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "61e347d1b44dd671d219dcdc2b21bdad6111f0c5ae95a52004a96e04912c6729",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/web-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.5-16-windows.exe",
+      "sha256": "65040deb7994cf2d5d3c70afa799da58e0311e37e8077ff241d1103f5d251ac5",
+      "bytes": 136463872,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/AITA-1.1.5-16-windows.exe"
+    },
+    {
+      "name": "AITA-1.1.5-16-windows.msi",
+      "sha256": "7d99bf6237b9d427451a17a85819f3dbae3d993d9fc9b55948caf553d99166ff",
+      "bytes": 135864772,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/AITA-1.1.5-16-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "97db78ebe9cdbb581c28e70853fb777d5ad5a3f316121117d5166803717fdadf",
+      "bytes": 1626,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "3889d413a82e29144f8422b5f84e81c309dc8045ea5f67e8babb142ecfadd749",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.5-b16/windows-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "- Fixed the Android crash immediately after sign-in and when restoring an account.\n- Restored live store selection, deletion updates and remote session logout in the browser.\n- Kept loaded stores visible when a refresh fails, with a clear retry action; improved branch visibility.\n- Added consistent spacing between adjacent actions.",
+    "ru": "- \u0418\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u0441\u0431\u043e\u0439 Android \u0441\u0440\u0430\u0437\u0443 \u043f\u043e\u0441\u043b\u0435 \u0432\u0445\u043e\u0434\u0430 \u0438 \u043f\u0440\u0438 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0438 \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430.\n- \u0412 \u0432\u0435\u0431-\u0432\u0435\u0440\u0441\u0438\u0438 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u044b \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e \u043c\u0430\u0433\u0430\u0437\u0438\u043d\u0430, \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u043e\u0441\u043b\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u044f \u0438 \u0432\u044b\u0445\u043e\u0434 \u043f\u0440\u0438 \u043e\u0442\u0437\u044b\u0432\u0435 \u0441\u0435\u0430\u043d\u0441\u0430.\n- \u041f\u0440\u0438 \u043e\u0448\u0438\u0431\u043a\u0435 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u043d\u044b\u0435 \u043c\u0430\u0433\u0430\u0437\u0438\u043d\u044b \u043e\u0441\u0442\u0430\u044e\u0442\u0441\u044f \u0432\u0438\u0434\u0438\u043c\u044b\u043c\u0438; \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d \u043f\u043e\u0432\u0442\u043e\u0440 \u0437\u0430\u043f\u0440\u043e\u0441\u0430 \u0438 \u0443\u043b\u0443\u0447\u0448\u0435\u043d\u043e \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435 \u0444\u0438\u043b\u0438\u0430\u043b\u043e\u0432.\n- \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b \u0435\u0434\u0438\u043d\u043e\u043e\u0431\u0440\u0430\u0437\u043d\u044b\u0435 \u043e\u0442\u0441\u0442\u0443\u043f\u044b \u043c\u0435\u0436\u0434\u0443 \u0441\u043e\u0441\u0435\u0434\u043d\u0438\u043c\u0438 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f\u043c\u0438.",
+    "kk": "- Android \u0436\u04af\u0439\u0435\u0441\u0456\u043d\u0434\u0435 \u043a\u0456\u0440\u0433\u0435\u043d\u043d\u0435\u043d \u043a\u0435\u0439\u0456\u043d \u0436\u04d9\u043d\u0435 \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u044b \u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0456\u0440\u0433\u0435\u043d\u0434\u0435 \u0431\u043e\u043b\u0430\u0442\u044b\u043d \u0430\u049b\u0430\u0443 \u0442\u04af\u0437\u0435\u0442\u0456\u043b\u0434\u0456.\n- \u0412\u0435\u0431-\u043d\u04b1\u0441\u049b\u0430\u0434\u0430 \u0434\u04af\u043a\u0435\u043d \u0442\u0430\u04a3\u0434\u0430\u0443\u044b\u043d \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0434\u0430\u0443, \u0436\u043e\u0439\u044b\u043b\u0493\u0430\u043d\u043d\u0430\u043d \u043a\u0435\u0439\u0456\u043d \u0436\u0430\u04a3\u0430\u0440\u0442\u0443 \u0436\u04d9\u043d\u0435 \u0441\u0435\u0430\u043d\u0441 \u0442\u043e\u049b\u0442\u0430\u0442\u044b\u043b\u0493\u0430\u043d\u0434\u0430 \u0448\u044b\u0493\u0443 \u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0456\u0440\u0456\u043b\u0434\u0456.\n- \u0416\u0430\u04a3\u0430\u0440\u0442\u0443 \u0441\u04d9\u0442\u0441\u0456\u0437 \u0431\u043e\u043b\u0441\u0430, \u0436\u04af\u043a\u0442\u0435\u043b\u0433\u0435\u043d \u0434\u04af\u043a\u0435\u043d\u0434\u0435\u0440 \u043a\u04e9\u0440\u0456\u043d\u0456\u043f \u0442\u04b1\u0440\u0430\u0434\u044b; \u049b\u0430\u0439\u0442\u0430 \u0436\u04af\u043a\u0442\u0435\u0443 \u04d9\u0440\u0435\u043a\u0435\u0442\u0456 \u049b\u043e\u0441\u044b\u043b\u044b\u043f, \u0444\u0438\u043b\u0438\u0430\u043b\u0434\u0430\u0440 \u043a\u04e9\u0440\u0456\u043d\u0456\u0441\u0456 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b.\n- \u049a\u0430\u0442\u0430\u0440 \u043e\u0440\u043d\u0430\u043b\u0430\u0441\u049b\u0430\u043d \u04d9\u0440\u0435\u043a\u0435\u0442\u0442\u0435\u0440\u0434\u0456\u04a3 \u0430\u0440\u0430\u043b\u044b\u0493\u044b \u0431\u0456\u0440\u0456\u0437\u0434\u0435\u043d\u0434\u0456\u0440\u0456\u043b\u0434\u0456.",
+    "ky": "- Android \u0441\u0438\u0441\u0442\u0435\u043c\u0430\u0441\u044b\u043d\u0434\u0430 \u043a\u0438\u0440\u0433\u0435\u043d\u0434\u0435\u043d \u043a\u0438\u0439\u0438\u043d \u0436\u0430\u043d\u0430 \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u0443 \u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0438\u0440\u04af\u04af\u0434\u04e9 \u0447\u044b\u043a\u043a\u0430\u043d \u043a\u0430\u0442\u0430 \u043e\u04a3\u0434\u043e\u043b\u0434\u0443.\n- \u0412\u0435\u0431-\u043d\u0443\u0441\u043a\u0430\u0434\u0430 \u0442\u0430\u043d\u0434\u0430\u043b\u0433\u0430\u043d \u0434\u04af\u043a\u04e9\u043d\u0434\u04af \u0448\u0430\u0439\u043a\u0435\u0448\u0442\u0435\u0448\u0442\u0438\u0440\u04af\u04af, \u04e9\u0447\u04af\u0440\u04af\u04af\u0434\u04e9\u043d \u043a\u0438\u0439\u0438\u043d\u043a\u0438 \u0436\u0430\u04a3\u044b\u0440\u0442\u0443\u0443 \u0436\u0430\u043d\u0430 \u0441\u0435\u0430\u043d\u0441 \u0442\u043e\u043a\u0442\u043e\u0442\u0443\u043b\u0433\u0430\u043d\u0434\u0430 \u0447\u044b\u0433\u0443\u0443 \u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0438\u0440\u0438\u043b\u0434\u0438.\n- \u0416\u0430\u04a3\u044b\u0440\u0442\u0443\u0443 \u0438\u0448\u043a\u0435 \u0430\u0448\u043f\u0430\u0441\u0430, \u0436\u04af\u043a\u0442\u04e9\u043b\u0433\u04e9\u043d \u0434\u04af\u043a\u04e9\u043d\u0434\u04e9\u0440 \u043a\u04e9\u0440\u04af\u043d\u04af\u043f \u0442\u0443\u0440\u0430\u0442; \u043a\u0430\u0439\u0440\u0430 \u0430\u0440\u0430\u043a\u0435\u0442 \u043a\u044b\u043b\u0443\u0443 \u043a\u043e\u0448\u0443\u043b\u0443\u043f, \u0444\u0438\u043b\u0438\u0430\u043b\u0434\u0430\u0440\u0434\u044b\u043d \u043a\u04e9\u0440\u04af\u043d\u04af\u0448\u04af \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b.\n- \u0416\u0430\u043d\u0430\u0448\u0430 \u0430\u0440\u0430\u043a\u0435\u0442\u0442\u0435\u0440\u0434\u0438\u043d \u0430\u0440\u0430\u043b\u044b\u0433\u044b \u0431\u0438\u0440\u0434\u0435\u0439 \u043a\u044b\u043b\u044b\u043d\u0434\u044b.",
+    "tg": "- \u0425\u0430\u0442\u043e\u0438 Android \u0431\u0430\u044a\u0434\u0438 \u0432\u043e\u0440\u0438\u0434\u0448\u0430\u0432\u04e3 \u0432\u0430 \u04b3\u0430\u043d\u0433\u043e\u043c\u0438 \u0431\u0430\u0440\u049b\u0430\u0440\u043e\u0440 \u043a\u0430\u0440\u0434\u0430\u043d\u0438 \u04b3\u0438\u0441\u043e\u0431 \u0438\u0441\u043b\u043e\u04b3 \u0448\u0443\u0434.\n- \u0414\u0430\u0440 \u0432\u0435\u0440\u0441\u0438\u044f\u0438 \u0432\u0435\u0431 \u04b3\u0430\u043c\u043e\u04b3\u0430\u043d\u0433\u0441\u043e\u0437\u0438\u0438 \u043c\u0430\u0493\u043e\u0437\u0430\u0438 \u0438\u043d\u0442\u0438\u0445\u043e\u0431\u0448\u0443\u0434\u0430, \u043d\u0430\u0432\u0441\u043e\u0437\u04e3 \u0431\u0430\u044a\u0434\u0438 \u04b3\u0430\u0437\u0444 \u0432\u0430 \u0431\u0430\u0440\u043e\u043c\u0430\u0434\u0430\u043d \u04b3\u0430\u043d\u0433\u043e\u043c\u0438 \u0431\u0435\u043a\u043e\u0440 \u043a\u0430\u0440\u0434\u0430\u043d\u0438 \u0441\u0435\u0430\u043d\u0441 \u0431\u0430\u0440\u049b\u0430\u0440\u043e\u0440 \u0448\u0443\u0434.\n- \u04b2\u0430\u043d\u0433\u043e\u043c\u0438 \u0445\u0430\u0442\u043e\u0438 \u043d\u0430\u0432\u0441\u043e\u0437\u04e3 \u043c\u0430\u0493\u043e\u0437\u0430\u04b3\u043e\u0438 \u0431\u043e\u0440\u0448\u0443\u0434\u0430 \u043d\u0430\u043c\u043e\u0451\u043d \u043c\u0435\u043c\u043e\u043d\u0430\u043d\u0434; \u043a\u04ef\u0448\u0438\u0448\u0438 \u0434\u0443\u0431\u043e\u0440\u0430 \u0438\u043b\u043e\u0432\u0430 \u0432\u0430 \u043d\u0430\u043c\u043e\u0438\u0448\u0438 \u0444\u0438\u043b\u0438\u0430\u043b\u04b3\u043e \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434.\n- \u0424\u043e\u0441\u0438\u043b\u0430\u0438 \u0431\u0430\u0439\u043d\u0438 \u0430\u043c\u0430\u043b\u04b3\u043e\u0438 \u04b3\u0430\u043c\u0441\u043e\u044f \u044f\u043a\u0441\u043e\u043d \u043a\u0430\u0440\u0434\u0430 \u0448\u0443\u0434.",
+    "uz": "- Android tizimida kirishdan keyin va hisobni tiklashda yuz beradigan xato tuzatildi.\n- Veb-versiyada tanlangan do\u2018konni sinxronlash, o\u2018chirishdan keyingi yangilanish va seans bekor qilinganda chiqish tiklandi.\n- Yangilash muvaffaqiyatsiz bo\u2018lsa, yuklangan do\u2018konlar ko\u2018rinib turadi; qayta urinish qo\u2018shildi va filiallar ko\u2018rinishi yaxshilandi.\n- Yonma-yon amallar orasidagi masofa birxillashtirildi."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:28:33Z",
+      "finishedAt": "2026-09-21T18:28:33Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:28:33Z",
+      "finishedAt": "2026-09-21T18:33:29Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:33:29Z",
+      "finishedAt": "2026-09-21T18:33:34Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:33:34Z",
+      "finishedAt": "2026-09-21T18:37:24Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:37:24Z",
+      "finishedAt": "2026-09-21T18:46:01Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:46:01Z",
+      "finishedAt": "2026-09-21T18:52:37Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:52:37Z",
+      "finishedAt": "2026-09-21T18:54:08Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-21T18:54:08Z",
+      "finishedAt": "2026-09-21T18:56:03Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
