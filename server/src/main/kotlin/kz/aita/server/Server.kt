@@ -857,11 +857,26 @@ private fun aitaManualJsonString(value: String): String = buildString {
   append('"')
 }
 
+private fun aitaManualEventReference(reference: EventMessageReference): String = buildString {
+  append("{\"key\":${aitaManualJsonString(reference.key)},\"arguments\":{")
+  append(reference.arguments.entries.joinToString(",") { (key, value) ->
+    "${aitaManualJsonString(key)}:${aitaManualJsonString(value)}"
+  })
+  append("},\"children\":{")
+  append(reference.children.entries.joinToString(",") { (key, children) ->
+    "${aitaManualJsonString(key)}:" + children.joinToString(prefix = "[", postfix = "]", transform = ::aitaManualEventReference)
+  })
+  append("}}")
+}
+
 private fun aitaManualLocalizedMessageArray(values: List<LocalizedStringDataModel>): String = values.joinToString(
   prefix = "[",
   postfix = "]"
 ) { value ->
-  "{\"language\":${aitaManualJsonString(value.language)},\"value\":${aitaManualJsonString(value.value)}}"
+  // Clients use the stable reference to distinguish revocation from an ordinary expired
+  // session. Translated text alone is ambiguous and previously left revoked clients offline.
+  "{\"language\":${aitaManualJsonString(value.language)},\"value\":${aitaManualJsonString(value.value)}," +
+    "\"messageTemplate\":${value.messageTemplate?.let(::aitaManualEventReference) ?: "null"}}"
 }
 
 @PublishedApi
@@ -3034,6 +3049,16 @@ fun Application.configureJwtAuth() {
   install(Authentication) {
     jwt("auth-jwt") {                                 // Named auth provider
       realm = cfg.realm
+      authHeader { call ->
+        // Subprotocol credentials are accepted only by the realtime upgrade route.
+        // Ordinary REST requests still require their normal Authorization header.
+        call.request.parseAuthorizationHeader() ?: if (
+          call.request.path() == "/rt/updates" &&
+          call.request.headers[HttpHeaders.Upgrade]?.equals("websocket", ignoreCase = true) == true
+        ) realtimeProtocolAccessToken(call.request.headers.getAll(HttpHeaders.SecWebSocketProtocol).orEmpty())
+          ?.let { io.ktor.http.auth.HttpAuthHeader.Single("Bearer", it) }
+        else null
+      }
 
       verifier(                                       // Defines how to verify incoming JWTs
         JWT.require(Algorithm.HMAC256(cfg.secret))    // HS256 with our secret
@@ -18327,14 +18352,14 @@ fun Application.module() {
     }
 
     authenticate("auth-jwt") {
-      webSocket("/rt/updates") {
+      val realtimeHandler: suspend io.ktor.server.websocket.DefaultWebSocketServerSession.() -> Unit = realtime@ {
         val principal = call.principal<JWTPrincipal>()
         val userId = runCatching { principal?.subject?.let { UUID.fromString(it) } }.getOrNull()
         val sessionId = runCatching { principal?.payload?.getClaim("sessionId")?.asString()?.let(UUID::fromString) }.getOrNull()
 
         if (userId == null || sessionId == null) {
           close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
-          return@webSocket
+          return@realtime
         }
 
         suspend fun sendRealtimeUpdate(update: RealtimeUpdateDataModel) {
@@ -18420,6 +18445,8 @@ fun Application.module() {
           }
         }
       }
+      webSocket("/rt/updates", protocol = AITA_REALTIME_PROTOCOL, handler = realtimeHandler)
+      webSocket("/rt/updates", handler = realtimeHandler) // Existing native clients use bearer headers.
     }
 
     route("/auth") {

@@ -41,7 +41,7 @@ internal class AccountAppModeCoordinator(
     private val persist: suspend (AppModeOwner, SavedAppMode) -> Unit,
     private val publish: (Int) -> Unit,
     private val sync: suspend (AppModeOwner, Int) -> Boolean,
-    private val acknowledged: (AppModeOwner, Int) -> Unit = { _, _ -> }
+    private val acknowledged: suspend (AppModeOwner, Int) -> Unit = { _, _ -> }
 ) {
     private val value = MutableStateFlow(AppModeChoice())
     val snapshot: AppModeChoice get() = value.value
@@ -150,7 +150,7 @@ internal object AccountAppModes {
         acknowledged={ expected, mode ->
             userAccountState.payloadValue?.takeIf { it.id==expected.accountId }?.let { account ->
                 val merged=account.copy(appModeId=mode)
-                userAccountState.emit(DataState.Success(merged));setStoredUserAccountDataModel?.invoke(merged)
+                userAccountState.emit(DataState.Success(merged));persistAuthenticatedAccountCache(merged)
             }
         })
     fun select(mode: Int) {

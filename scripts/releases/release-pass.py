@@ -262,6 +262,12 @@ class Run:
         self.command('Verify AAB against production signing identity', ['jarsigner', '-verify', '-strict', '-keystore', keys['AITA_ANDROID_KEYSTORE_PATH'],
             '-storepass:env', 'AITA_ANDROID_KEYSTORE_PASSWORD', str(aabs[0]), keys['AITA_ANDROID_KEY_ALIAS']])
         self.unchanged()
+        if self.env.get('AITA_ANDROID_TEST_SERIAL'):
+            self.command('Verify signed APK login and saved-account restart on the isolated emulator', [
+                sys.executable, 'scripts/releases/verify-android-login.py', '--apk', str(apks[0]),
+                '--serial', self.env['AITA_ANDROID_TEST_SERIAL'],
+                '--server-port', self.env.get('AITA_ANDROID_TEST_SERVER_PORT', ''),
+                '--output', str(self.folder / 'android-runtime')])
         for path in [apks[0], aabs[0]]:
             self.collect(path, f'AITA-{self.args.version}-{self.args.build}-android{path.suffix}', 'android', fingerprint)
         self.collect(ROOT / 'shared/build/generated/aitaClientBuild/client-build.json', 'android-client-build.json', 'android', None)

@@ -49,8 +49,10 @@ object CompanyEmployment {
             val recent=leases.value
             if(recent!=null && recent.generation==generation && recent.access.userId==user &&
                 recent.received.elapsedNow().inWholeMilliseconds<1_000) return@withLock
-            val started = TimeSource.Monotonic.markNow()
-            val response=networkRequest<CompanyAccessDataModel,Unit>(HttpMethod.Get,endpointUrl="company/me",expectedSessionGeneration=generation)
+            // Keep the monotonic mark boxed across suspension. Inlining the full request
+            // beside an unboxed ValueTimeMark produced invalid DEX registers on Android 15.
+            val started: TimeMark = TimeSource.Monotonic.markNow()
+            val response = requestCompanyAccess(generation)
             if(userAccountState.payloadValue?.id!=user || !authenticatedSessionGenerationIsCurrent(generation)) return@withLock
             val data=response.payload
             if(response.negative || data?.userId!=user || data.serverTimeMillis<=0) { clear(); return@withLock }
@@ -59,6 +61,10 @@ object CompanyEmployment {
         }
     }
 }
+
+// Keep the reified network machinery outside the lease's coroutine state machine.
+private suspend fun requestCompanyAccess(generation: Long): ResponseDataModel<CompanyAccessDataModel> =
+    networkRequest<CompanyAccessDataModel, Unit>(HttpMethod.Get, endpointUrl = "company/me", expectedSessionGeneration = generation)
 
 object SupportWorkspaceSignals {
     private val mutableRevision=MutableStateFlow(0L)

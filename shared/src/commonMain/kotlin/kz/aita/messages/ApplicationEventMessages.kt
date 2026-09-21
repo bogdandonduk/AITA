@@ -2,6 +2,8 @@ package kz.aita
 
 /** Canonical application messages. Keep keys stable when improving wording or translations. */
 internal fun applicationEventMessageTemplates(): List<EventMessageTemplate> = listOf(
+    EventMessageTemplate("stores.loading", "Loading stores…", "Загрузка магазинов…", "Дүкендер жүктелуде…", ky = "Дүкөндөр жүктөлүүдө…", tg = "Боркунии мағозаҳо…", uz = "Do‘konlar yuklanmoqda…"),
+    EventMessageTemplate("stores.load_failed", "Could not refresh stores. Your saved stores are kept; try again when connected.", "Не удалось обновить магазины. Сохранённые магазины доступны; повторите при подключении.", "Дүкендерді жаңарту мүмкін болмады. Сақталған дүкендер қолжетімді; қосылғанда қайталаңыз.", ky = "Дүкөндөрдү жаңыртуу мүмкүн болгон жок. Сакталган дүкөндөр сакталат; туташканда кайталаңыз.", tg = "Навсозии мағозаҳо имконнопазир шуд. Мағозаҳои захирашуда нигоҳ дошта мешаванд; пас аз пайвастшавӣ такрор кунед.", uz = "Do‘konlarni yangilab bo‘lmadi. Saqlangan do‘konlar saqlanadi; ulanganda qayta urinib ko‘ring."),
     EventMessageTemplate("message.internal_server_error", "Internal server error", "Внутренняя ошибка сервера", "Сервердің ішкі қатесі", ky = "Сервердин ички катасы"),
     EventMessageTemplate("message.authentication_or_permission_is_required", "Authentication or permission is required", "Требуется вход или разрешение", "Кіру немесе рұқсат қажет", ky = "Кирүү же тиешелүү укук талап кылынат"),
     EventMessageTemplate("message.session_created", "Session created", "Сеанс создан", "Сеанс жасалды", ky = "Сеанс түзүлдү"),

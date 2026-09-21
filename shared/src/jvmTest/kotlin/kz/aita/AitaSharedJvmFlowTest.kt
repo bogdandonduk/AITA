@@ -48,6 +48,8 @@ private class AitaFlowTestEnvironment {
     var storedAccount: UserAccountDataModel? = null
     @Volatile var serverAccount: UserAccountDataModel = aitaTestUserAccount().copy(activeStoreId = AITA_FLOW_SOURCE_STORE_ID)
     var stores: List<StoreDataModel> = emptyList()
+    var storesFailureStatus: HttpStatusCode? = null
+    var beforeStoresReply: (suspend () -> Unit)? = null
     var workerMemberships: List<StoreWorkerDataModel> = emptyList()
     var myWorkerMemberships: List<StoreWorkerDataModel> = emptyList()
     var incomingWorkerRequests: List<StoreWorkerRequestDataModel> = emptyList()
@@ -898,6 +900,45 @@ class AitaSharedJvmFlowTest {
             assertEquals(expectedTokens, environment.storedTokens, "A damaged account cache must not erase authentication")
             assertEquals(1, environment.requests.count { it.path == "user/get" })
         } finally { getStoredUserAccountDataModel = { environment.storedAccount } }
+    }
+
+    @Test
+    fun accountCacheWriteFailureDoesNotAbortLoginOrStoreRefresh() = runBlocking {
+        val accepted = environment.storedTokens
+        val store = aitaTestStore(id = AITA_FLOW_SOURCE_STORE_ID)
+        environment.stores = listOf(store)
+        setStoredUserAccountDataModel = { throw IllegalStateException("Simulated unavailable account cache") }
+        try {
+            val response = refreshUserAccountNow(currentAuthenticatedSessionGeneration(), restoreCachedAccount = false)
+            assertFalse(response.negative)
+            waitUntilAitaFlowCondition { storesState.payloadValue?.any { it.id == store.id } == true && !getStoresMutex.isLocked }
+            assertEquals(accepted, environment.storedTokens)
+            assertEquals(AITA_FLOW_TEST_USER_ID, userAccountState.payloadValue?.id)
+        } finally { setStoredUserAccountDataModel = { environment.storedAccount = it } }
+    }
+
+    @Test
+    fun failedStoresLoadIsNotAnEmptyDirectoryAndRetryRetainsThenRefreshesSavedStores() = runBlocking {
+        val saved = aitaTestStore(id = AITA_FLOW_SOURCE_STORE_ID)
+        storesState.emit(DataState.Success(listOf(saved)))
+        val pending = CompletableDeferred<Unit>()
+        environment.beforeStoresReply = { pending.await() }
+        environment.storesFailureStatus = HttpStatusCode.ServiceUnavailable
+        getStores()
+        assertTrue(storesLoadingState.value)
+        assertEquals(listOf(saved), storesState.payloadValue)
+        pending.complete(Unit)
+        waitUntilAitaFlowCondition { !getStoresMutex.isLocked }
+        assertFalse(storesLoadingState.value)
+        assertNotNull(storesLoadFailureState.value)
+        assertEquals(listOf(saved), storesState.payloadValue)
+        environment.storesFailureStatus = null
+        environment.beforeStoresReply = null
+        environment.stores = listOf(saved.copy(publicId = "REFRESHED"))
+        getStores()
+        waitUntilAitaFlowCondition { !getStoresMutex.isLocked }
+        assertNull(storesLoadFailureState.value)
+        assertEquals("REFRESHED", storesState.payloadValue?.single()?.publicId)
     }
 
     @Test
@@ -1887,6 +1928,11 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             )
         }
 
+        if (path == "stores/get") {
+            environment.beforeStoresReply?.invoke()
+            environment.storesFailureStatus?.let { status -> return@MockEngine respond(
+                aitaTestNegativeEnvelope("Store request rejected"), status, aitaFlowResponseHeaders()) }
+        }
         if (path == "auth/refresh") environment.refreshFailure?.let { failure ->
             environment.beforeRefreshReply?.invoke()
             return@MockEngine respond(jsonBase.encodeToString(ResponseDataModel.serializer(TokenPair.serializer()), failure),

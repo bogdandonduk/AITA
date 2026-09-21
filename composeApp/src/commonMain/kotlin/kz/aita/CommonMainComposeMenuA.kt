@@ -4044,6 +4044,7 @@ internal fun AppConfiguration.SupplierCard(
             actionButton(text = source.name + " · " + source.license, confirmationRequired = false,
                 onClick = { uriHandler.openUri(source.url) })
             source.websites.firstOrNull()?.let { website ->
+                Spacer(Modifier.height(stateValues.marginTextField))
                 actionButton(text = eventMessage("catalogue.website").extractLocalizedString(stateValues.appLanguage).orEmpty(),
                     confirmationRequired = false, onClick = { uriHandler.openUri(website) })
             }
@@ -4577,6 +4578,9 @@ internal fun AppConfiguration.subscriptionStatusText(status: String): String {
 
 @Composable
 fun AppConfiguration.MenuStoresScreen() {
+    val storesLoading by storesLoadingState.collectAsState()
+    val storesFailure by storesLoadFailureState.collectAsState()
+    LaunchedEffect(stateValues.userAccount?.id) { getStores() }
     val selectedLocationHasAccess = rememberStoreWorkspaceAccess()
     AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
@@ -4621,6 +4625,14 @@ fun AppConfiguration.MenuStoresScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
+            if (storesFailure != null) item("stores-load-failure") {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                    MessageText(text = storesFailure.orEmpty().visibleLocalizedString(stateValues.appLanguage, ""))
+                    actionButton(text = localizedStringResource(237, "Refresh"),
+                        iconPath = stateValues.drawablePathIconRefresh, loading = storesLoading,
+                        autoLoading = false, confirmationRequired = false, onClick = ::getStores)
+                }
+            }
             when (storesStateValue) {
                 is DataState.Success -> {
                     if (storesStateValue.payload.isEmpty()) {
@@ -4649,16 +4661,14 @@ fun AppConfiguration.MenuStoresScreen() {
                             .takeIf { it.isNotBlank() }
                             ?.let { storesStateValue.payload.search<StoreDataModel>(it).first.flattenStoresWithBranches() }
                             ?: allStores
-                        val topLevelStores = searchedItems
-                            .filter { it.parentStoreId.isNullOrBlank() }
-                            .distinctBy { it.id }
+                        val topLevelStores = searchedItems.storeDirectoryRoots()
 
                         item {
                             tabRowWidget(
                                 modifier = Modifier.fillMaxWidth(),
                                 tabs = listOf(
-                                    TabContent("owned", tabLabelWithCount(localizedStringResource(489, "My stores"), topLevelStores.count { currentUserId in it.userIds })) { storeTabId = it },
-                                    TabContent("managed", tabLabelWithCount(localizedStringResource(478, "Managed stores"), topLevelStores.count { currentUserId !in it.userIds })) { storeTabId = it }
+                                    TabContent("owned", tabLabelWithCount(localizedStringResource(489, "My stores"), topLevelStores.count { it.storeDirectoryFamilyOwnedBy(currentUserId) })) { storeTabId = it },
+                                    TabContent("managed", tabLabelWithCount(localizedStringResource(478, "Managed stores"), topLevelStores.count { !it.storeDirectoryFamilyOwnedBy(currentUserId) })) { storeTabId = it }
                                 ),
                                 selectedIndexInitial = storeTabId
                             )
@@ -4667,9 +4677,9 @@ fun AppConfiguration.MenuStoresScreen() {
                         val selectedTabId = storeTabId
 
                         val filteredTopLevelStores = if (selectedTabId == "managed") {
-                            topLevelStores.filter { currentUserId !in it.userIds }
+                            topLevelStores.filter { !it.storeDirectoryFamilyOwnedBy(currentUserId) }
                         } else {
-                            topLevelStores.filter { currentUserId in it.userIds }
+                            topLevelStores.filter { it.storeDirectoryFamilyOwnedBy(currentUserId) }
                         }
 
                         if (searchedItems.isEmpty()) {
@@ -4788,7 +4798,7 @@ fun AppConfiguration.MenuStoresScreen() {
                     item(key = "stores-empty-0") {
                         MessageText(
                             modifier = Modifier.fillMaxWidth().remainingListSpace(storesListState, "stores-empty-0"),
-                            stateValues.stringListEmpty
+                            if (storesFailure == null) eventMessage("stores.loading").visibleLocalizedString(stateValues.appLanguage, "") else ""
                         )
                     }
                 }

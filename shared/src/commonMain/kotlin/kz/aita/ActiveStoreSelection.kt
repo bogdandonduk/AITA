@@ -99,7 +99,7 @@ internal object ActiveStores {
                 userAccountState.payloadValue?.takeIf { it.id == selected.owner?.accountId }?.let { account ->
                     val merged = account.copy(activeStoreId = selected.choice.storeId)
                     userAccountState.emit(DataState.Success(merged))
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(merged) }
+                    persistAuthenticatedAccountCache(merged)
                 }
             }
         }

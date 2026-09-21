@@ -3197,7 +3197,8 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
                 addDomainActionButtonText,
                 true
             ) && availableSecondaryDomains?.isNotEmpty() == true
-        )
+        ) {
+            if (availableDomains.isNotEmpty()) Spacer(Modifier.height(stateValues.marginTextField))
             actionButton(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -3215,6 +3216,7 @@ fun AppConfiguration.domainSelectionTextFieldGroupWidget(
                     )
                 }
             }
+        }
     }
 
     return DomainSelectionTextFieldGroupWidgetContent(data)

@@ -7669,6 +7669,8 @@ val userAccountState = MutableDataStateFlow<UserAccountDataModel>(GlobalScope)
 val storesState = MutableDataStateFlow<List<StoreDataModel>>(GlobalScope)
 val activeStoreIdState = MutableStateFlow<String?>(null)
 
+val storesLoadingState = MutableStateFlow(false)
+val storesLoadFailureState = MutableStateFlow<List<LocalizedStringDataModel>?>(null)
 val getStoresMutex = Mutex()
 private val storesRefreshPendingState = MutableStateFlow(false)
 val addStoreMutex = Mutex()
@@ -14398,6 +14400,10 @@ fun startRealtimeUpdates() {
                                     httpClient.webSocket(request = {
                                         url(realtimeUrl)
                                         pinSessionAuthorization(requireNotNull(accessToken))
+                                        if (getPlatformName().equals("wasmJs", ignoreCase = true)) {
+                                            headers.append(HttpHeaders.SecWebSocketProtocol, AITA_REALTIME_PROTOCOL)
+                                            headers.append(HttpHeaders.SecWebSocketProtocol, AITA_REALTIME_AUTH_PROTOCOL_PREFIX + accessToken)
+                                        }
                                         timeout {
                                             connectTimeoutMillis = 10_000L
                                             requestTimeoutMillis = Long.MAX_VALUE
@@ -14506,6 +14512,7 @@ fun startRealtimeUpdates() {
                                             // Do not leave a closed socket published as connected while its
                                             // close handshake is waiting. Ktor also closes its incoming side.
                                             realtimeUpdatesJob.setConnected(thisJob, false)
+                                            invalidateCloudAccessTokenValidation(accessToken)
                                             session.cancel()
                                         }
                                     }
@@ -14519,8 +14526,8 @@ fun startRealtimeUpdates() {
                                         networkFailureSummary(throwable)
                                 )
 
+                                invalidateCloudAccessTokenValidation(accessToken)
                                 if (throwable.isRealtimeUnauthorizedFailure()) {
-                                    invalidateCloudAccessTokenValidation(accessToken)
                                     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) break@candidateLoop
                                     if (!retriedAfterAuthRecovery) {
                                         retriedAfterAuthRecovery = true
@@ -16502,6 +16509,7 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
     catch (_: Exception) { logCloudConnectionDiagnostic("Account cache cleanup failed; closing the in-memory workspace") }
     userAccountState.emit(DataState.Empty())
     storesState.emit(DataState.Empty())
+    storesLoadFailureState.value = null
     publishActiveInventoryStoreId(null)
 
     stockState.emit(DataState.Empty())
@@ -16696,7 +16704,13 @@ fun logOutUser() {
 fun getUser(forceLogOut: Boolean = true, applyServerActiveStore: Boolean = true, refreshRelatedData: Boolean = true) {
     val sessionGeneration = currentAuthenticatedSessionGeneration()
     GlobalScope.launch(Dispatchers.ourIo) {
-        refreshUserAccountNow(sessionGeneration, forceLogOut, applyServerActiveStore, refreshRelatedData = refreshRelatedData)
+        try {
+            refreshUserAccountNow(sessionGeneration, forceLogOut, applyServerActiveStore, refreshRelatedData = refreshRelatedData)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            RuntimeDiagnostics.capture(failure, "account.refresh")
+            logCloudConnectionDiagnostic("Account refresh interrupted; authenticated session retained")
+        }
     }
 }
 
@@ -16754,7 +16768,7 @@ internal suspend fun refreshUserAccountNow(
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
     val currentAccount = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(account))
     userAccountState.emit(DataState.Success(currentAccount, response.message))
-    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.ourIo) { setStoredUserAccountDataModel?.invoke(currentAccount) }
+    persistAuthenticatedAccountCache(currentAccount, sessionGeneration)
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
     // An earlier stores read may have skipped reconciliation while this account adoption
@@ -17498,6 +17512,7 @@ fun getStores() {
     storesRefreshPendingState.value = true
     if (!getStoresMutex.tryLock()) return
 
+    storesLoadingState.value = true
     GlobalScope.launch(Dispatchers.ourIo) {
         try {
             do {
@@ -17512,6 +17527,7 @@ fun getStores() {
                 if (!ownsAccount()) return@launch
 
                 if (!response.negative && response.payload != null) {
+                    storesLoadFailureState.value = null
                     val stores = response.payload
                     val previousStores = storesState.payloadValue.orEmpty()
                     storesState.emit(DataState.Success(stores, response.message))
@@ -17539,9 +17555,16 @@ fun getStores() {
                             }
                         }
                     }
+                } else {
+                    storesLoadFailureState.value = response.message ?: eventMessage("stores.load_failed")
                 }
             } while (storesRefreshPendingState.value)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            RuntimeDiagnostics.capture(failure, "stores.refresh")
+            if (ownsAccount()) storesLoadFailureState.value = eventMessage("stores.load_failed")
         } finally {
+            storesLoadingState.value = false
             getStoresMutex.unlock()
             if (storesRefreshPendingState.value && getStoredUserAuthTokens?.invoke() != null) getStores()
         }
