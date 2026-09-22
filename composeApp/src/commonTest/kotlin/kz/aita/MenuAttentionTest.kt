@@ -17,6 +17,7 @@ class MenuAttentionTest {
         assertTrue(place.valid())
         assertEquals(place, jsonBase.decodeFromString(LocalNavigationPlace.serializer(), jsonBase.encodeToString(LocalNavigationPlace.serializer(), place)))
         assertFalse(LocalNavigationPlace(NavigationScreenModel.Transaction.Payment.route).valid())
-        assertFalse(place.copy(navigation = mapOf("menuRight" to listOf(NavigationScreenModel.Menu.UserAccount.route))).valid())
+        assertTrue(place.copy(navigation = mapOf("menuRight" to listOf(NavigationScreenModel.Menu.UserAccount.route))).valid())
+        assertFalse(place.copy(hosts = mapOf(NavigationScreenModel.Menu.UserAccount.route to mapOf("password" to "private"))).valid())
     }
 }

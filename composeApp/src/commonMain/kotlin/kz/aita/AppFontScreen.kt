@@ -57,10 +57,10 @@ internal fun AppConfiguration.folderIconResource() = if (isDarkAppTheme(stateVal
     }) { AppFontChoices(Modifier.weight(1f)) }
 }
 
-@Composable internal fun AppConfiguration.AuthFontChoice() {
+@Composable internal fun AppConfiguration.AuthFontChoice(compact: Boolean = false) {
     val preferences by appAppearancePreferencesState.collectAsState()
     var show by remember { mutableStateOf(false) }
-    AuthTinyChoiceChip(selected=false,label=visualText("font.title")+": "+APP_FONTS.first { it.id==normalizeAppFontPreference(preferences.appFontId) }.name,
+    AuthTinyChoiceChip(selected=false,label=if (compact) "" else visualText("font.title") + ": " + APP_FONTS.first { it.id==normalizeAppFontPreference(preferences.appFontId) }.name,
         iconPath=fontIconPath(),iconRes=fontIconResource(),contentDescription=visualText("font.title")) { show=true }
     if(show) AitaBottomSheet(title=visualText("font.title"),iconPath=fontIconPath(),iconRes=fontIconResource(),onDismiss={show=false}) {
         AppFontChoices(Modifier.fillMaxWidth().weight(1f),auth=true)

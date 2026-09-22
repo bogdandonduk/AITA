@@ -7,7 +7,7 @@ internal fun AppConfiguration.returnFlowText(key: String): String {
 }
 private val returnFlowWords = mapOf(
     "items" to listOf("Items", "Товары", "Тауарлар", "Товарлар", "Молҳо", "Tovarlar"),
-    "search" to listOf("Enter transaction id", "Введите ID транзакции", "Транзакция ID енгізіңіз", "Транзакция ID киргизиңиз", "ID-и амалиётро ворид кунед", "Tranzaksiya ID sini kiriting"),
+    "search" to listOf("Enter receipt number or transaction id", "Введите номер чека или ID транзакции", "Чек нөмірін немесе транзакция ID енгізіңіз", "Чектин номерин же транзакция ID киргизиңиз", "Рақами расид ё ID-и амалиётро ворид кунед", "Chek raqami yoki tranzaksiya ID sini kiriting"),
     "batches" to listOf("Return destination", "Куда вернуть товар", "Тауарды қайда қайтару", "Товарды кайда кайтаруу", "Ҷойи баргардонидани мол", "Tovarni qaytarish joyi"),
     "batch_kind" to listOf("Batch type", "Тип партии", "Партия түрі", "Партиянын түрү", "Навъи партия", "Partiya turi"),
     "normal" to listOf("Standard", "Обычная", "Қалыпты", "Кадимки", "Одатӣ", "Oddiy"),

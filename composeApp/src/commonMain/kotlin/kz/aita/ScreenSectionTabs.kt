@@ -23,7 +23,7 @@ internal fun AppConfiguration.sectionTabsWidget(
     selectedId: String? = null,
     onSelected: ((String) -> Unit)? = null
 ): String = key(stateKey) {
-    var rememberedId by rememberSaveable { mutableStateOf(defaultId) }
+    var rememberedId by rememberNavigationSection("section:$stateKey", defaultId)
     val resolvedId = resolveScreenSectionId(selectedId ?: rememberedId, tabs.map { it.id }, defaultId)
     tabRowWidget(
         modifier = modifier,

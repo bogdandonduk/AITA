@@ -32,7 +32,17 @@ internal class TransactionSearchCompletion {
         active = reset
         return { if (active === reset) active = null }
     }
-    fun handled() { active?.invoke() }
+    private var captureActive: (() -> (() -> Unit))? = null
+    fun attachSnapshot(capture: () -> (() -> Unit)): () -> Unit {
+        captureActive = capture
+        return { if (captureActive === capture) captureActive = null }
+    }
+    fun capture(): () -> Unit {
+        val source = captureActive
+        val completion = source?.invoke() ?: active ?: {}
+        return { if (source === captureActive) completion() }
+    }
+    fun handled() { capture().invoke() }
 }
 
 internal val transactionSearchCompletion = TransactionSearchCompletion()

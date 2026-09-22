@@ -2613,6 +2613,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     mutableStateOf(STOCK_WAREHOUSE_FILTER_TOTAL)
                 }
 
+                var warehouseSearchField by remember(warehouseOwner) { mutableStateOf<GenericTextFieldContent?>(null) }
                 var scannedBarcodeMatches by remember(warehouseOwner) { mutableStateOf<Pair<String, Set<String>>?>(null) }
                 if (searchQuery == null) {
                     var cameraSearchField: GenericTextFieldContent? = null
@@ -2635,6 +2636,7 @@ fun AppConfiguration.StockWarehouseScreenContent(
                         )
 
                     cameraSearchField = searchTextFieldContent
+                    SideEffect { warehouseSearchField = searchTextFieldContent }
 
                     LaunchedEffect(autoFocusSearch) {
                         if (autoFocusSearch) {
@@ -2679,9 +2681,14 @@ fun AppConfiguration.StockWarehouseScreenContent(
                     if (key == lastExactSearchHandledKey)
                         return
 
+                    val action: (GoodsItemDataModel) -> Unit = onExactSearchHitWithQuery?.let { callback -> { item -> callback(item, query) } }
+                        ?: onExactSearchHit ?: onClick?.takeIf { transactionTypeIndex == null } ?: return
                     lastExactSearchHandledKey = key
-                    onExactSearchHitWithQuery?.invoke(item, query)
-                        ?: onExactSearchHit?.invoke(item)
+                    action(item)
+                    if (searchQuery == null && warehouseSearchField?.value?.text?.trim() == query) {
+                        warehouseSearchField?.reset()
+                        lSearchQuery = ""; appliedSearchQuery = ""; scannedBarcodeMatches = null
+                    }
                 }
 
                 val baseItems = remember(stockPayload, onFilter, transactionTypeIndex, activeStoreId, sellableItemIdsForActiveStore, stockPayloadAlreadyScopedForTransaction, scannedBarcodeMatches, appliedSearchQuery) {
@@ -2756,7 +2763,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 }
                 LaunchedEffect(projectionCurrent, lSearchQuery, searchResult.exactHit?.id, searchResult.exactQuery) {
                     val exactHit = searchResult.exactHit
-                    if (projectionCurrent && lSearchQuery == appliedSearchQuery && exactHit != null && searchResult.exactQuery.isNotBlank()) {
+                    if (warehouseSearchField?.editedSinceCreation == true && projectionCurrent && lSearchQuery == appliedSearchQuery && exactHit != null && searchResult.exactQuery.isNotBlank()) {
+                        delay(500)
                         handleExactSearchHit(exactHit, searchResult.exactQuery)
                     }
                 }

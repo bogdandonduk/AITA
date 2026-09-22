@@ -18,4 +18,15 @@ class AppStateNavigationTest {
         assertFalse(ownsDraftKey("aita-ui-draft-v1:owner:store:Security:password:value", "owner", "store"))
         assertTrue(ownsDraftKey("stock-add-edit-last-category:owner:store:root", "owner", "store"))
     }
+    @Test fun entireMenuTrailSurvivesSaveRestoreAndResize() {
+        val trail = listOf(NavigationScreenModel.Menu.List, NavigationScreenModel.Menu.Settings,
+            NavigationScreenModel.Menu.AppState, NavigationScreenModel.Menu.Security, NavigationScreenModel.Menu.Devices)
+        val routes = trail.toCompactPersistentRoutes(NavigationScreenModel.Menu.List)
+        assertEquals(trail.map { it.route }, routes)
+        assertTrue(AppStateDocument(navigation = mapOf("menuLeft" to routes)).valid())
+        assertEquals(trail, routes.toPersistentMenuStack(NavigationScreenModel.Menu.List))
+        val wide = adaptMenuStacks(trail, listOf(NavigationScreenModel.Menu.UserAccount), false)
+        assertEquals(trail, adaptMenuStacks(wide.first, wide.second, true).first)
+        assertFalse(AppStateDocument(hosts = mapOf(NavigationScreenModel.Menu.Security.route to mapOf("password" to "secret"))).valid())
+    }
 }

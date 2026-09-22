@@ -68,7 +68,10 @@ async function backgroundPixel(page) {
   await page.waitForLoadState('networkidle');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow.png'});
   const lightPixel = await backgroundPixel(page);
-  await page.mouse.click(280, 292);
+  await page.keyboard.press('Tab');
+  await page.getByRole('button', {name: 'App theme', exact: true}).click({force:true});
+  await page.getByRole('button', {name: /Obsidian Black/}).click({force:true});
+  await page.getByRole('button', {name: /Close|Cancel/}).last().click({force:true});
   await page.waitForTimeout(1000);
   await page.waitForLoadState('networkidle');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow-theme.png'});

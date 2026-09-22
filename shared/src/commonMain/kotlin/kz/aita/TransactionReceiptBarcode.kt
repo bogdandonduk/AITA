@@ -23,7 +23,34 @@ fun transactionReceiptBarcodePayload(transactionId: String): String? {
     return RECEIPT_BARCODE_PREFIX + decimal.joinToString("")
 }
 
-data class TransactionReceiptBarcodeIdentity(val transactionId: String? = null, val clientOperationId: String? = null)
+data class TransactionReceiptBarcodeIdentity(val transactionId: String? = null, val clientOperationId: String? = null, val receiptNumber: String? = null) {
+    val lookup: String get() = transactionId ?: clientOperationId ?: receiptNumber.orEmpty()
+}
+
+/** Compact receipt numbers are lookup hints within the authorized store, never transaction IDs.
+ * Format 3/4: five-digit type + ten-digit unsigned UUID prefix + one checksum digit.
+ * Both old UUID payloads and short-number collisions remain resolvable without changing history.
+ */
+fun compactReceiptBarcodePayload(number: String): String? {
+    val operation = number.startsWith("O", ignoreCase = true)
+    val hex = if (operation) number.drop(1) else number
+    if (!Regex("[0-9a-fA-F]{8}").matches(hex)) return null
+    val body = (if (operation) "99104" else "99103") + hex.toLong(16).toString().padStart(10, '0')
+    return body + (body.sumOf { it - '0' } % 10)
+}
+
+fun TransactionDataModel.visibleReceiptNumber(): String =
+    serverReceiptIdOrNull()?.take(8)?.uppercase()
+        ?: clientOperationId.takeIf { id.startsWith("local_", true) && transactionOperationReceiptBarcodePayload(it) != null }
+            ?.removePrefix("txn-")?.take(8)?.uppercase()?.let { "O$it" }.orEmpty()
+
+fun TransactionDataModel.matchesReceiptLookup(query: String, exact: Boolean): Boolean {
+    val number = visibleReceiptNumber()
+    return if (exact) id.equals(query, true) || clientOperationId.equals(query, true) || number.equals(query, true) ||
+        (query.startsWith("O", true) && query.length == 9 && clientOperationId.startsWith("txn-" + query.drop(1), true))
+    else id.startsWith(query, true) || clientOperationId.startsWith(query, true) || number.startsWith(query, true) ||
+        (query.startsWith("O", true) && clientOperationId.startsWith("txn-" + query.drop(1), true))
+}
 
 /** Operation format2 retains the original lookup identity after an offline sale reaches the server. */
 fun transactionOperationReceiptBarcodePayload(clientOperationId: String): String? {
@@ -38,6 +65,11 @@ fun transactionOperationReceiptBarcodePayload(clientOperationId: String): String
 fun parseTransactionReceiptBarcodeIdentity(raw: String): TransactionReceiptBarcodeIdentity? {
     if (raw.length > 64) return null
     val value = raw.trim().removePrefix("]C0")
+    if (value.length == 16 && value.all { it in '0'..'9' } && value.take(5) in setOf("99103", "99104")) {
+        if (value.dropLast(1).sumOf { it - '0' } % 10 != value.last() - '0') return null
+        val number = value.substring(5, 15).toLongOrNull()?.takeIf { it <= 0xffffffffL } ?: return null
+        return TransactionReceiptBarcodeIdentity(receiptNumber = (if (value.startsWith("99104")) "O" else "") + number.toString(16).padStart(8, '0').uppercase())
+    }
     if (value.length != 44 || value.any { it !in '0'..'9' }) return null
     val prefix = value.take(RECEIPT_BARCODE_PREFIX.length)
     if (prefix != RECEIPT_BARCODE_PREFIX && prefix != RECEIPT_OPERATION_BARCODE_PREFIX) return null
@@ -63,9 +95,7 @@ fun parseTransactionReceiptBarcode(raw: String): String? = parseTransactionRecei
  * a server acknowledgement later allows UUID lookup without invalidating the already-printed code.
  */
 fun TransactionDataModel.receiptBarcodePayload(): String? {
-    serverReceiptIdOrNull()?.let(::transactionReceiptBarcodePayload)?.let { return it }
-    if (!id.startsWith("local_", ignoreCase = true)) return null
-    return transactionOperationReceiptBarcodePayload(clientOperationId)
+    return compactReceiptBarcodePayload(visibleReceiptNumber())
 }
 
 // ISO/IEC 15417 Code 128 element widths, indexed by symbol value. These fixed standard
@@ -86,7 +116,7 @@ private val RECEIPT_CODE_128_WIDTHS = listOf(
 
 /** Ten white modules on both ends are part of the symbol and must never be cropped. */
 fun transactionReceiptBarcodeModules(payload: String): BooleanArray {
-    require(parseTransactionReceiptBarcodeIdentity(payload) != null && payload.length == 44) { "Invalid transaction receipt barcode" }
+    require(parseTransactionReceiptBarcodeIdentity(payload) != null && payload.length in setOf(16, 44)) { "Invalid transaction receipt barcode" }
     val symbols = mutableListOf(105) // Start C: every subsequent symbol is a pair of digits.
     payload.chunked(2).forEach { symbols += it.toInt() }
     var checksum = symbols.first()

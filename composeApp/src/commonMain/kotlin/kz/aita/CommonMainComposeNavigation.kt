@@ -697,9 +697,13 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                     stockSaveError = null
                     isSavingStockItem = true
 
+                    val saveOwner = captureReceiptActionOwner()
+                    val saveStore = stateValues.activeStoreId
                     val onSaved: (DataState<GoodsItemDataModel>) -> Unit = { state ->
                         coroutineScope.launch {
+                            if (!saveOwner.isCurrent() || stateValues.activeStoreId != saveStore) return@launch
                             if (state is DataState.Success) {
+                                persistentDraftLoaded = false
                                 clearPersistentStockAddEditDraft()
                                 isSavingStockItem = false
                                 stockSaveError = null
@@ -3312,16 +3316,8 @@ internal fun List<String>?.toPersistentMainStack(): List<NavigationScreenModel> 
 }
 
 internal fun List<String>?.toPersistentStockStack(defaultFirst: NavigationScreenModel.Stock): List<NavigationScreenModel.Stock> {
-    val restoredCurrent = orEmpty()
-        .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Stock }
-        .lastOrNull()
-        ?: defaultFirst
-
-    return if (restoredCurrent.route == defaultFirst.route) {
-        listOf(defaultFirst)
-    } else {
-        listOf(defaultFirst, restoredCurrent)
-    }
+    val restored = orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Stock }
+    return listOf(defaultFirst) + (if (restored.firstOrNull()?.route == defaultFirst.route) restored.drop(1) else restored).takeLast(63)
 }
 
 /**
@@ -3333,18 +3329,7 @@ internal fun NavigationScreenModel.Menu.isTemporarilyHiddenFromUi(): Boolean =
         (this == NavigationScreenModel.Menu.ClientUpdate && AppUpdateWorkspace.state.value.let { it.initialized && !it.hasUpdate })
 
 internal fun List<String>?.toPersistentMenuStack(defaultFirst: NavigationScreenModel.Menu): List<NavigationScreenModel.Menu> {
-    val restoredCurrent = orEmpty()
-        .mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }
-        .map { it.canonicalMenuDestination() }
-        .filterNot { it.isTemporarilyHiddenFromUi() }
-        .lastOrNull()
-        ?: defaultFirst
-
-    return if (restoredCurrent.route == defaultFirst.route) {
-        listOf(defaultFirst)
-    } else {
-        listOf(defaultFirst, restoredCurrent)
-    }
+    return normalizeMenuStack(orEmpty().mapNotNull { persistentAppRouteToScreen(it) as? NavigationScreenModel.Menu }, defaultFirst).take(64)
 }
 
 internal fun List<String>?.toPersistentUserAuthStack(defaultFirst: NavigationScreenModel.UserAuth): List<NavigationScreenModel.UserAuth> {
@@ -3375,12 +3360,7 @@ internal fun List<NavigationScreenModel.Transaction>.toPersistentTransactionRout
     map { it.toPersistentTransactionRoute() }
 
 internal fun <T : NavigationScreenModel> List<T>.toCompactPersistentRoutes(defaultFirst: T): List<String> {
-    val current = lastOrNull()
-    return when {
-        current == null -> listOf(defaultFirst.route)
-        current.route == defaultFirst.route -> listOf(defaultFirst.route)
-        else -> listOf(defaultFirst.route, current.route)
-    }
+    return listOf(defaultFirst.route) + (if (firstOrNull()?.route == defaultFirst.route) drop(1) else this).takeLast(63).map { it.route }
 }
 
 internal fun List<NavigationScreenModel>.toCompactPersistentMainRoutes(): List<String> =
@@ -3392,16 +3372,8 @@ internal fun List<NavigationScreenModel>.toCompactPersistentMainRoutes(): List<S
 internal fun List<String>?.toPersistentTransactionStack(
     defaultFirst: NavigationScreenModel.Transaction
 ): List<NavigationScreenModel.Transaction> {
-    val restoredCurrent = orEmpty()
-        .mapNotNull { persistentTransactionRouteToScreen(it) }
-        .lastOrNull()
-        ?: defaultFirst
-
-    return if (restoredCurrent.route == defaultFirst.route) {
-        listOf(defaultFirst)
-    } else {
-        listOf(defaultFirst, restoredCurrent)
-    }
+    val restored = orEmpty().mapNotNull { persistentTransactionRouteToScreen(it) }
+    return listOf(defaultFirst) + (if (restored.firstOrNull()?.route == defaultFirst.route) restored.drop(1) else restored).takeLast(63)
 }
 
 internal const val TRANSACTION_NAVIGATION_CACHE_KEY = "cache_json:transaction_navigation_state_v1"
@@ -3441,7 +3413,7 @@ object Navigation {
     val Main = _Main.asStateFlow()
 
     internal fun accountUiStateSnapshot(drafts: Map<String, String>): AppStateDocument {
-        fun safe(routes: List<String>) = routes.filter(::appStateSafeRoute).takeLast(2)
+        fun safe(routes: List<String>) = routes.filter(::appStateNavigationRoute).takeLast(64)
         val stock = Stock.persistentSnapshot()
         val menu = Menu.persistentSnapshot()
         return AppStateDocument(navigation = mapOf(
@@ -3467,11 +3439,9 @@ object Navigation {
         restorePersistentAppStateHosts(document.hosts)
         Stock.restorePersistentSnapshot(PersistedSplitNavigationStackDataModel(document.navigation["stockLeft"].orEmpty(), document.navigation["stockRight"].orEmpty()))
         val menu = PersistedSplitNavigationStackDataModel(document.navigation["menuLeft"].orEmpty(), document.navigation["menuRight"].orEmpty())
-        Menu.restorePersistentSnapshot(menu.copy(left = menu.left.filter { route ->
-            (persistentAppRouteToScreen(route) as? NavigationScreenModel.Menu)?.let { AppConfiguration.canOpenMenuDestination(it) } == true
-        }, right = menu.right.filter { route ->
-            (persistentAppRouteToScreen(route) as? NavigationScreenModel.Menu)?.let { AppConfiguration.canOpenMenuDestination(it) } == true
-        }))
+        // Permission/subscription loading must not erase the saved destination. Rendering and
+        // every operation still enforce current access; a denied pane can recover in place.
+        Menu.restorePersistentSnapshot(menu)
         document.navigation["main"]?.lastOrNull()?.let(::persistentAppRouteToScreen)?.takeIf {
             it.isMainScreenCompatibleWithAppMode(appModeState.value)
         }?.let { goMain(it) }

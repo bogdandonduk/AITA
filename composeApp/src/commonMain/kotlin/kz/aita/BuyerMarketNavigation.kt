@@ -3,12 +3,13 @@ package kz.aita
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.*
 
+@kotlinx.serialization.Serializable
 internal data class BuyerReturnPoint(
     val query: MarketDiscoveryQuery, val search: String, val city: String,
     val limit: Int, val index: Int, val offset: Int
 )
 
-/** Session-local presentation only. No offer, price, read fence or pending command is retained.
+/** Account-scoped presentation only. No offer, price, read fence or pending command is retained.
  * Screens recreate their read owners and revalidate prices whenever the buyer returns.
  */
 @Stable
@@ -73,15 +74,16 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
 }
 
 /** Owned above the route switch, but below the authenticated account/session identity. A new
- * login (even for the same account) starts a new workspace; nothing enters persisted routes.
+ * login recreates read owners while restoring only the same account’s saved presentation.
  */
 @Stable
 internal class BuyerMarketNavigation(private val owner: MarketAccountScope?) {
     val market = BuyerBrowseNavigation(false)
     val saved = BuyerBrowseNavigation(true)
     val shoppingList = MarketShoppingListView()
-    var lastSavedOnly = false
+    var lastSavedOnly by mutableStateOf(false)
         private set
+    internal fun restoreLastSaved(value: Boolean) { lastSavedOnly = value }
     fun browse(savedOnly: Boolean) = if (savedOnly) saved else market
     fun entered(savedOnly: Boolean) { if (owner?.isCurrent() == true) lastSavedOnly = savedOnly }
     fun continueDestination(): NavigationScreenModel.Buyer.Main? = if (owner?.isCurrent() != true) null

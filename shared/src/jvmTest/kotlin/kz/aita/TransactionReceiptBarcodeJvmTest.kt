@@ -39,7 +39,8 @@ class TransactionReceiptBarcodeJvmTest {
     @Test fun imageDecoderRecoversBothReceiptIdentityKindsFromCameraStyleFrames() {
         val id = "bf2fb02a-d7bd-411a-80fc-c7298bcbb449"
         val payloads = listOf(assertNotNull(transactionReceiptBarcodePayload(id)),
-            assertNotNull(transactionOperationReceiptBarcodePayload("txn-$id")))
+            assertNotNull(transactionOperationReceiptBarcodePayload("txn-$id")),
+            assertNotNull(compactReceiptBarcodePayload("BF2FB02A")), assertNotNull(compactReceiptBarcodePayload("OBF2FB02A")))
         for (payload in payloads) {
             val geometry = transactionReceiptBarcodeGeometry(payload, 3f, 110f)
             val width = geometry.width.toInt() + 80

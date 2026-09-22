@@ -253,7 +253,7 @@ private fun AppConfiguration.MenuSecurityContent() {
     val history = (historyState as? DataState.Success<List<SecuritySessionHistoryDataModel>>)?.payload.orEmpty()
     val currentSession = sessions.firstOrNull { it.current }
     val securityOwnerId = stateValues.userAccount?.id.orEmpty()
-    var selectedSecurityTab by rememberSaveable(securityOwnerId) { mutableStateOf("signin") }
+    var selectedSecurityTab by rememberNavigationSection("account:access", "signin")
 
     LaunchedEffect(selectedSecurityTab, securityOwnerId) {
         if (securityOwnerId.isBlank()) return@LaunchedEffect
@@ -1137,8 +1137,8 @@ internal fun AppConfiguration.ThermalReceiptPrinterCard(
         actionButton(
             autoLoading = false,
             text = if (selected) localizedStringResource(1258, "Selected printer") else localizedStringResource(1257, "Use this printer"),
-            iconPath = if (selected) stateValues.drawablePathIconCheck else stateValues.drawablePathIconDevices,
-            iconRes = if (selected) stateValues.drawableResIconCheck.value else stateValues.drawableResIconDevices.value,
+            iconPath = if (selected) stateValues.drawablePathIconCheck else null,
+            iconRes = if (selected) stateValues.drawableResIconCheck.value else null,
             enabled = enabled && !selected && printer.available,
             confirmationRequired = false,
             onClick = onSelect
@@ -1352,7 +1352,7 @@ fun AppConfiguration.MenuDebtorsScreen() {
 
         var search by rememberSaveable { mutableStateOf("") }
         var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
-        var selectedTab by rememberSaveable { mutableStateOf("open") }
+        var selectedTab by rememberNavigationSection("debtors:section", "open")
         var sortId by rememberSaveable { mutableStateOf("amount") }
         var sortAscending by rememberSaveable { mutableStateOf(false) }
 
@@ -1536,7 +1536,7 @@ fun AppConfiguration.MenuCloseDebtScreen() {
         }
 
         var receiptDialog by rememberSaveable(debtor.id) { mutableStateOf<String?>(null) }
-        var selectedTab by rememberSaveable(debtor.id) { mutableStateOf("pay") }
+        var selectedTab by rememberNavigationSection("debtor:${debtor.id}:section", "pay")
         var debtorType by rememberSaveable(debtor.id) { mutableStateOf(debtor.debtorType) }
         var firstName by rememberSaveable(debtor.id) { mutableStateOf(debtor.firstName) }
         var lastName by rememberSaveable(debtor.id) { mutableStateOf(debtor.lastName) }
@@ -2679,7 +2679,9 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             AnalyticsWorkspace.select(analyticsSelection)
         }
 
+        var analyticsSection by rememberNavigationSection("analytics:section", MenuAnalyticsTab.Sales.id)
         val selectedTabContent = tabRowWidget(
+            selectedIndexInitial = analyticsSection,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = stateValues.marginTextField, vertical = 2.dp),
@@ -2694,6 +2696,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             )
         )
 
+        LaunchedEffect(selectedTabContent.id) { analyticsSection = selectedTabContent.id }
         val periodOptions = listOf(
             "today" to localizedStringResource(260, "Today"),
             "7" to localizedStringResource(261, "7 days"),
@@ -5307,6 +5310,7 @@ fun AppConfiguration.MainScreen() {
     val buyerNavigation = remember(accountForSubscription, sessionForSubscription) {
         BuyerMarketNavigation(captureMarketRequestScope())
     }
+    BuyerNavigationPersistence(buyerNavigation)
     var denialOpened by remember(accountForSubscription, storeForSubscription, sessionForSubscription) {
         mutableStateOf(false)
     }
@@ -5897,7 +5901,7 @@ fun AppConfiguration.NotificationsScreen(
 ) {
     var search by rememberSaveable { mutableStateOf("") }
     val unreadRequest by unreadNotificationsOpenRequest.collectAsState()
-    var selectedCategory by rememberSaveable { mutableStateOf(if (unreadRequest > 0) "unread" else "all") }
+    var selectedCategory by rememberNavigationSection("notifications:section", if (unreadRequest > 0) "unread" else "all")
     LaunchedEffect(unreadRequest) {
         if (unreadRequest > 0) { selectedCategory = "unread"; unreadNotificationsOpenRequest.value = 0 }
     }

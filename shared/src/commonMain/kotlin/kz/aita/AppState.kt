@@ -37,8 +37,15 @@ fun appStateSafeRoute(route: String): Boolean = route.endsWith("NavigationScreen
     appStateSafeKey(route) && "Splash" !in route && "Transaction" !in route && "UserAccount" !in route &&
     "AddEditWorker" !in route && "AddEditStore" !in route
 
+/** A destination name is not a form or credential. Sensitive fields retain the stricter policy.
+ * Transaction step history lives with its scoped cart; auth challenges are never restored.
+ */
+fun appStateNavigationRoute(route: String): Boolean = route.length <= 160 &&
+    Regex("(Menu|Stock|Buyer|Supplier)[A-Za-z0-9]*NavigationScreenModelRoute").matches(route) ||
+    route in setOf("TransactionMainSaleNavigationScreenModelRoute", "TransactionMainReturnNavigationScreenModelRoute", "TransactionMainSupplyNavigationScreenModelRoute")
+
 fun AppStateDocument.valid(maxBytes: Int = APP_STATE_MAX_BYTES): Boolean = schema == 1 && navigation.keys.all { it in setOf("main", "stockLeft", "stockRight", "menuLeft", "menuRight") } &&
-    navigation.values.all { it.size <= 2 && it.all(::appStateSafeRoute) } &&
+    navigation.values.all { it.size <= 64 && it.all(::appStateNavigationRoute) } &&
     hosts.size <= 64 && hosts.all { (route, fields) -> appStateSafeRoute(route) && fields.size <= 128 &&
         fields.all { (key, value) -> appStateSafeKey(key) && value.length <= 32768 } } &&
     drafts.size <= 256 && drafts.all { (key, value) -> appStateSafeKey(key) && value.length <= 65536 } &&

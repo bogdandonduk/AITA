@@ -23,7 +23,7 @@ import kz.aita.auth.*
 private enum class AitaLoginMode { PASSWORD, EMAIL_CODE, RECOVERY }
 private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, EMAIL_DESTINATION, EMAIL_SECOND_FACTOR, TOTP, PASSWORD_CONFIRMATION, NEW_PASSWORD, FINISHING, COMPLETE, AUTHENTICATOR_RECOVERY }
 private enum class AitaCodeLoginMethod { EMAIL, AUTHENTICATOR }
-private enum class AitaLoginIdentifierType { PHONE, EMAIL }
+private enum class AitaLoginIdentifierType { PHONE, EMAIL, SAVED }
 
 internal enum class AitaAuthFeatureAvailability { CHECKING, AVAILABLE, UNAVAILABLE, UNKNOWN }
 
@@ -75,6 +75,10 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var codeMethod by remember { mutableStateOf(AitaCodeLoginMethod.EMAIL) }
     var step by remember { mutableStateOf(AitaLoginStep.PRIMARY) }
     var identifierType by remember { mutableStateOf(AitaLoginIdentifierType.PHONE) }
+    var savedUsers by remember { mutableStateOf<List<SavedLoginUser>>(emptyList()) }
+    // Intentionally not rememberSaveable: the user must choose, even with a single identity.
+    var selectedSavedUserId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { savedUsers = SavedLoginUsers.list() }
     // The parent owns the submitted identifier. A second StateHost could restore visible text
     // after the parent had cleared it, causing valid-looking input to submit an empty login.
     var formGeneration by remember { mutableLongStateOf(0L) }
@@ -124,6 +128,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     val countdown = rememberAuthFlowCountdown(flow)
 
     fun identifier(): String {
+        if (identifierType == AitaLoginIdentifierType.SAVED) return savedUsers.firstOrNull { it.id == selectedSavedUserId }?.login.orEmpty()
         if (identifierType == AitaLoginIdentifierType.EMAIL) return normalizeAitaEmail(email).orEmpty()
         val country = countries.firstOrNull { "+${it.phoneNumberCode}" == phoneCountry } ?: return ""
         // Use the same normalizer as the phone editor, then require the whole national number.
@@ -227,7 +232,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         val selectedCodeMethod = codeMethod
         val factor = code
         if (busy) return
-        val kind = if (identifierType == AitaLoginIdentifierType.EMAIL) AitaAuthIdentifierKind.EMAIL else AitaAuthIdentifierKind.PHONE
+        val kind = if (who.contains("@")) AitaAuthIdentifierKind.EMAIL else AitaAuthIdentifierKind.PHONE
         if (!aitaPrimarySignInIsWellFormed(who, kind, pass, selectedMode == AitaLoginMode.PASSWORD)) {
             error = if (selectedMode == AitaLoginMode.PASSWORD) {
                 authUiText("Invalid login or password", "Неверный логин или пароль", "Логин немесе құпиясөз қате", "Логин же сырсөз туура эмес")
@@ -277,11 +282,13 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
 
             if (step == AitaLoginStep.PRIMARY) {
                 tabRowWidget(modifier = Modifier.fillMaxWidth(), enabled = !busy, persistSelection = false,
-                    selectedIndexInitial = if (identifierType == AitaLoginIdentifierType.PHONE) "phone" else "email",
+                    selectedIndexInitial = identifierType.name.lowercase(),
                     tabs = listOf(
                         TabContent("phone", stateValues.stringPhoneNumber) { identifierType = AitaLoginIdentifierType.PHONE; error = "" },
                         TabContent("email", stateValues.stringEmail) { identifierType = AitaLoginIdentifierType.EMAIL; error = "" }
-                    ))
+                    ) + if (savedUsers.isNotEmpty()) listOf(TabContent("saved", savedLoginText("tab")) {
+                        identifierType = AitaLoginIdentifierType.SAVED; selectedSavedUserId = null; reset(mode)
+                    }) else emptyList())
                 if (mode != AitaLoginMode.RECOVERY) tabRowWidget(modifier = Modifier.fillMaxWidth(), enabled = !busy, persistSelection = false,
                     selectedIndexInitial = if (mode == AitaLoginMode.PASSWORD) "password" else "code",
                     tabs = listOf(
@@ -302,6 +309,22 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                             AitaLoginStep.PRIMARY -> {
                                 val ime = if (mode == AitaLoginMode.PASSWORD || (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR)) ImeWithAction(ImeAction.Next) else ImeWithAction(ImeAction.Go, ::submitPrimary)
                                 when (identifierType) {
+                                    AitaLoginIdentifierType.SAVED -> Column(Modifier.fillMaxWidth()) {
+                                        AitaDropdownField(Modifier.fillMaxWidth(), title = "", selectedId = selectedSavedUserId,
+                                            options = savedUsers.map { DropdownOption(it.id, it.name, subtitle = it.login) },
+                                            placeholder = savedLoginText("select"), enabled = !busy) {
+                                            selectedSavedUserId = it; password = ""; code = ""; error = ""
+                                        }
+                                        if (selectedSavedUserId != null) AuthQuietAction(savedLoginText("forget"), !busy) {
+                                            val forgotten = selectedSavedUserId
+                                            runAction {
+                                                forgotten?.let { SavedLoginUsers.forget(it) }
+                                                savedUsers = SavedLoginUsers.list(); selectedSavedUserId = null
+                                                password = ""; code = ""
+                                                if (savedUsers.isEmpty()) identifierType = AitaLoginIdentifierType.PHONE
+                                            }
+                                        }
+                                    }
                                     AitaLoginIdentifierType.PHONE -> countrySelectionPhoneNumberTextField(
                                         modifier = Modifier.fillMaxWidth(), countries = countries, valueInitial = phone,
                                         valueIsNationalNumber = true, selectedCountryCodeInitial = phoneCountry,
@@ -349,7 +372,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                                     }
                                 }
                                 if (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.EMAIL &&
-                                    identifierType == AitaLoginIdentifierType.PHONE && capabilities?.emailSecondFactorEnabled == true) {
+                                    !identifier().contains("@") && capabilities?.emailSecondFactorEnabled == true) {
                                     AuthEmailDestinationPicker(emailDestination, !busy, onSelected = { emailDestination = it })
                                 }
                                 actionButton(modifier = Modifier.fillMaxWidth(), text = if (mode == AitaLoginMode.PASSWORD || (mode == AitaLoginMode.EMAIL_CODE && codeMethod == AitaCodeLoginMethod.AUTHENTICATOR)) stateValues.stringLogIn else authUiText("Get code", "Получить код", "Код алу", "Код алуу"),
@@ -489,7 +512,7 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
                     scope.launch { Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp) }
                 }
             }
-            if (step == AitaLoginStep.PRIMARY && mode != AitaLoginMode.RECOVERY) {
+            if (step == AitaLoginStep.PRIMARY && mode == AitaLoginMode.PASSWORD) {
                 AuthQuietAction(authUiText("Forgot password?", "Забыли пароль?", "Құпия сөзді ұмыттыңыз ба?", "Сырсөздү унуттуңузбу?"), !busy) {
                     reset(AitaLoginMode.RECOVERY)
                 }

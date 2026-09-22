@@ -118,20 +118,19 @@ internal class ReceiptRasterEncoder(private val documentCommands: Boolean = true
     }
 
     fun barcode(payload: String) {
-        // A full UUID cannot fit across 58 mm with reliable two-dot bars. Rotate the same
-        // Code 128 symbol, preserving both ten-module quiet zones and integer printer dots.
-        val modules = transactionReceiptBarcodeModules(payload)
-        val moduleDots = 2
-        val barWidth = 96
-        val left = (RECEIPT_RASTER_WIDTH - barWidth) / 2
-        val rows = modules.size * moduleDots
+        val geometry = transactionReceiptBarcodeGeometry(payload, 2f, 96f,
+            vertical = transactionReceiptBarcodeModules(payload).size * 2 > RECEIPT_RASTER_WIDTH)
+        val offset = (RECEIPT_RASTER_WIDTH - geometry.width.toInt()) / 2
+        val rows = geometry.height.toInt()
         var top = 0
         while (top < rows) {
             val height = minOf(32, rows - top)
             val pixels = IntArray(RECEIPT_RASTER_WIDTH * height) { 0xffffffff.toInt() }
-            repeat(height) { y ->
-                if (modules[(top + y) / moduleDots]) {
-                    for (x in left until left + barWidth) pixels[y * RECEIPT_RASTER_WIDTH + x] = 0xff000000.toInt()
+            geometry.bars.forEach { bar ->
+                for (y in maxOf(top, bar.y.toInt()) until minOf(top + height, (bar.y + bar.height).toInt())) {
+                    for (x in offset + bar.x.toInt() until offset + (bar.x + bar.width).toInt()) {
+                        pixels[(y - top) * RECEIPT_RASTER_WIDTH + x] = 0xff000000.toInt()
+                    }
                 }
             }
             strip(RECEIPT_RASTER_WIDTH, height, pixels)

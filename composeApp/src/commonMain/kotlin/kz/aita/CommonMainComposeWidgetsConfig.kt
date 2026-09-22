@@ -1823,8 +1823,12 @@ fun AppConfiguration.genericTextField(
     val scannerInventoryOwner = if (captureTransactionBarcodeInput) inventoryViewScopeKey() else null
     DisposableEffect(captureTransactionBarcodeInput, textFieldIdentityKey, scannerInventoryOwner) {
         val owner = captureReceiptActionOwner()
-        val detach = if (captureTransactionBarcodeInput) transactionSearchCompletion.attach {
-            if (owner.isCurrent() && scannerInventoryOwner == inventoryViewScopeKey()) latestClearScannedSearch()
+        val detach = if (captureTransactionBarcodeInput) transactionSearchCompletion.attachSnapshot {
+            val submittedText = textFieldValue.text
+            val clear: () -> Unit = {
+                if (owner.isCurrent() && scannerInventoryOwner == inventoryViewScopeKey() && textFieldValue.text == submittedText) latestClearScannedSearch()
+            }
+            clear
         } else null
         onDispose { detach?.invoke() }
     }
@@ -1834,7 +1838,7 @@ fun AppConfiguration.genericTextField(
         if (captureTransactionBarcodeInput && isFocused && textFieldValue.text == request.text &&
             request.handler === activeTransactionBarcodeHandler && request.owner.isCurrent() &&
             request.inventoryOwner == inventoryViewScopeKey() &&
-            request.handler(request.text + "\n") && textFieldValue.text == request.text) clearScannedSearch()
+            textFieldValue.text == request.text) request.handler(request.text + "\n")
     }
 
     var focusRequester by remember(textFieldIdentityKey) {
@@ -2274,8 +2278,9 @@ fun AppConfiguration.genericTextField(
                         updateIsFocusedAction?.invoke(it)
                     },
                 onSubmitText = if (captureTransactionBarcodeInput) { text ->
+                    pendingBarcodeScan = null
+                    barcodeBurst.reset()
                     val handled = text.isNotBlank() && activeTransactionBarcodeHandler?.invoke(text + "\n") == true
-                    if (handled && textFieldValue.text.isNotEmpty()) clearScannedSearch()
                     handled
                 } else null,
                 keyboardOptions = KeyboardOptions.Default.copy(
@@ -2637,6 +2642,12 @@ fun AppConfiguration.genericTextField(
 
     val content = GenericTextFieldContent(
         value = displayedTextFieldValue,
+        editedSinceCreation = draftRestoreGuard.revision > 0,
+        onCaptureCompletion = {
+            val submitted = textFieldValue.text
+            val complete: () -> Unit = { if (textFieldValue.text == submitted) clearScannedSearch() }
+            complete
+        },
         isFocused = isFocused,
         focusRequester = focusRequester,
         isContentValid = isContentValid,
@@ -2774,14 +2785,19 @@ class GenericTextFieldContent(
     var isContentValid: Boolean,
     val onContentValidityCheck: ((String) -> Boolean)? = null,
     val onReset: (() -> Unit)? = null,
-    val onReplaceText: ((String, Boolean) -> Unit)? = null
+    val onReplaceText: ((String, Boolean) -> Unit)? = null,
+    val editedSinceCreation: Boolean = false,
+    val onCaptureCompletion: (() -> (() -> Unit))? = null
 ) {
+
+    fun captureCompletion(): () -> Unit = onCaptureCompletion?.invoke() ?: {}
 
     fun checkContentValidity() {
         isContentValid = onContentValidityCheck?.invoke(value.text) ?: true
     }
 
     fun reset() {
+        value = TextFieldValue()
         onReset?.invoke()
     }
 

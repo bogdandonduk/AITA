@@ -24,7 +24,7 @@ private val returnReceiptScan = MutableStateFlow<ReturnReceiptScan?>(null)
 internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): Boolean {
     val identity = parseTransactionReceiptBarcodeIdentity(raw) ?: return false
     val owner = DynamicCarts.captureScope() ?: return true
-    returnReceiptScan.value = ReturnReceiptScan(owner, slot, identity.transactionId ?: identity.clientOperationId.orEmpty(), getCurrentTimeMillis())
+    returnReceiptScan.value = ReturnReceiptScan(owner, slot, identity.lookup, getCurrentTimeMillis())
     coroutineScope.launch {
         if (DynamicCarts.isCurrent(owner) && stateValues.navigationTransactionReturnClientId == slot) Navigation.TransactionReturn.go(NavigationScreenModel.Transaction.Cart)
     }
@@ -50,10 +50,9 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
             onBarcodeScanned = { raw ->
                 val identity = parseTransactionReceiptBarcodeIdentity(raw)
                 if (identity == null) {
-                    if (tryHandleTransactionBarcodeInput(raw + "\n", 1, slot, getCartState(1, slot).value)) {
-                        lookupField?.reset(); exactQuery = null; matches = emptyList(); status = null
-                    }
-                } else { exactQuery = identity.transactionId ?: identity.clientOperationId; retry++ }
+                    tryHandleTransactionBarcodeInput(raw + "\n", 1, slot, getCartState(1, slot).value,
+                        lookupField?.captureCompletion())
+                } else { exactQuery = identity.lookup; retry++ }
             })
     }
     SideEffect { lookupField = field }
@@ -68,11 +67,11 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
     }
     LaunchedEffect(typed) {
         val identity = parseTransactionReceiptBarcodeIdentity(typed)
-        if (typed.isNotBlank()) exactQuery = identity?.let { it.transactionId ?: it.clientOperationId }
-        if (identity == null && typed.length in 4..32 && typed.looksLikeCompleteRetailBarcodeInput() &&
-            transactionStockCandidatesForUi(false).any { it.matchesScannedBarcode(typed) } &&
-            tryHandleTransactionBarcodeInput(typed, 1, slot, getCartState(1, slot).value)) {
-            field.reset(); exactQuery = null; matches = emptyList()
+        if (typed.isNotBlank()) exactQuery = identity?.let { it.lookup }
+        if (identity == null && field.editedSinceCreation && uniqueExactBarcode(transactionStockCandidatesForUi(false), typed) { it.allBarcodeValues() } != null) {
+            delay(500)
+            if (field.value.text.trim() == typed && !transactionBarcodeAddPending(typed, 1, slot))
+                tryHandleTransactionBarcodeInput(typed + "\n", 1, slot, getCartState(1, slot).value, field.captureCompletion())
         }
     }
     val query = exactQuery ?: typed
@@ -96,11 +95,10 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
             val receipts = if (!result.negative) result.payload.orEmpty() else if (result.transportFailure && currentUserCanViewTransactionHistory(captured.storeId)) {
                 status = returnFlowText("offline")
                 transactionsState.payloadValue.orEmpty().filter { it.storeId == captured.storeId && it.type == "purchase" &&
-                    if (isExact) it.id.equals(query, true) || it.clientOperationId.equals(query, true)
-                    else it.id.startsWith(query, true) || it.clientOperationId.startsWith(query, true) }.take(20)
+                    it.matchesReceiptLookup(query, isExact) }.take(20)
             } else { status = returnFlowText("lookup_error"); emptyList() }
             matches = receipts
-            if (isExact && receipts.size == 1) {
+            if (receipts.size == 1 && (isExact || receipts.single().matchesReceiptLookup(query, true))) {
                 selected = receipts.single(); field.reset(); exactQuery = null; matches = emptyList()
             } else if (receipts.isEmpty() && status == null) status = returnFlowText("not_found")
         } catch (cancel: CancellationException) { throw cancel }

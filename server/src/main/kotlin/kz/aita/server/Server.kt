@@ -25551,10 +25551,12 @@ fun Application.module() {
               (Transactions.storeId inList visibleStoreIds) and (Transactions.type eq "purchase") and
                 (if (exact) {
                   if (exactId != null) (Transactions.id eq exactId) or (Transactions.clientOperationId eq query)
+                  else if (Regex("[0-9a-fA-F]{8}").matches(query)) Transactions.id.castTo<String>(TextColumnType()) like (query.lowercase() + "%")
+                  else if (Regex("[oO][0-9a-fA-F]{8}").matches(query)) Transactions.clientOperationId like ("txn-" + query.drop(1).lowercase() + "%")
                   else Transactions.clientOperationId eq query
                 } else {
                   (Transactions.id.castTo<String>(TextColumnType()) like escapedPrefix.lowercase()) or
-                    (Transactions.clientOperationId like escapedPrefix)
+                    (Transactions.clientOperationId like (if (query.startsWith("O", true)) "txn-" + escapedPrefix.drop(1).lowercase() else escapedPrefix))
                 })
             }.orderBy(Transactions.timeMillis, SortOrder.DESC).limit(20).map { it.toTransactionDataModel() }
           }

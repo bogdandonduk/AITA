@@ -4061,7 +4061,8 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
             stateKey = "stock_parent_store_sheet_search",
             isFocusedInitial = autoFocusSearch,
             autoFocus = autoFocusSearch,
-            barcodeCamScanner = false
+            barcodeCamScanner = true,
+            persistTextDraft = false, retainTextAcrossRecreation = false
         )
         val cleanQuery = searchTextFieldContent.value.text.trim()
 
@@ -4136,6 +4137,10 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                 }.thenBy { it.visibleParentStoreStockName(stateValues.appLanguage).lowercase() }
                     .thenBy { it.id }
             )
+        AutomaticBarcodeChoice(cleanQuery, filteredItems, searchTextFieldContent.editedSinceCreation && !loading && serverEndReached, activeStoreId, { it.allBarcodeValues() }) { item ->
+            onApply(item)
+            searchTextFieldContent.reset()
+        }
         val displayItems = filteredItems.clientPaged(pickerPage, pickerPageSize)
         val pageWaitingForServer = !serverEndReached && pickerPage * pickerPageSize >= serverLoadedItems.size
         val totalItemsForPaging = if (serverEndReached) {
@@ -4199,7 +4204,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                             item = item,
                             barcodeMatched = barcodeMatched,
                             profileOnly = profileOnly,
-                            onApply = { onApply(item) }
+                            onApply = { onApply(item); searchTextFieldContent.reset() }
                         )
                     }
 
@@ -4271,7 +4276,8 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
             stateKey = "stock_global_goods_sheet_search",
             isFocusedInitial = autoFocusSearch,
             autoFocus = autoFocusSearch,
-            barcodeCamScanner = false
+            barcodeCamScanner = true,
+            persistTextDraft = false, retainTextAcrossRecreation = false
         )
         val cleanQuery = searchTextFieldContent.value.text.trim()
 
@@ -4391,6 +4397,10 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
                 }.thenBy { it.visibleGlobalGoodsName(stateValues.appLanguage).lowercase() }
                     .thenBy { it.id }
             )
+        AutomaticBarcodeChoice(cleanQuery, filteredItems, searchTextFieldContent.editedSinceCreation && !loading && serverEndReached, stateValues.activeStoreId, { it.barcode.orEmpty() }) { item ->
+            onApply(item)
+            searchTextFieldContent.reset()
+        }
         val displayItems = filteredItems.clientPaged(pickerPage, pickerPageSize)
         val pageWaitingForServer = !serverEndReached && pickerPage * pickerPageSize >= serverLoadedItems.size
         val totalItemsForPaging = if (serverEndReached) {
@@ -4429,7 +4439,7 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
                         GlobalGoodsPickerItemCard(
                             item = item,
                             selectedCategoryIds = selectedCategoryIds,
-                            onApply = { onApply(item) }
+                            onApply = { onApply(item); searchTextFieldContent.reset() }
                         )
                     }
 

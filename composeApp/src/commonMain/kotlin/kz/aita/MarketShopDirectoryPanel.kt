@@ -31,6 +31,7 @@ internal class MarketShopDirectoryNavigation(val savedOnly: Boolean = false) {
     var request by mutableStateOf(MarketShopDirectoryRequest(savedOnly=savedOnly))
     var result by mutableStateOf<MarketShopDirectoryResult?>(null)
     val scroll = LazyGridState()
+    var restorePosition by mutableStateOf<Pair<Int, Int>?>(null)
 }
 
 private class ShopDirectoryRead {
@@ -56,6 +57,13 @@ internal fun AppConfiguration.MarketShopDirectoryPanel(
     val generation = currentAuthenticatedSessionGeneration()
     val owner = remember(account, generation) { captureMarketRequestScope() }
     val wanted = navigation.request
+    LaunchedEffect(navigation, navigation.result, navigation.restorePosition) {
+        val point = navigation.restorePosition ?: return@LaunchedEffect
+        if (navigation.result?.request == navigation.request && navigation.result?.shops?.isNotEmpty() == true) {
+            navigation.scroll.scrollToItem(point.first, point.second)
+            navigation.restorePosition = null
+        }
+    }
     val data = remember(account, generation, wanted) { ShopDirectoryRead() }
     val requests = remember(data) { Channel<Unit>(Channel.CONFLATED) }
     val signal by MarketplaceSignals.revision.collectAsState()

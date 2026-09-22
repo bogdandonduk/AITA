@@ -105,6 +105,34 @@ object DynamicCarts {
         require(validCartSlot(type, slot))
         return owner?.let { captured -> work.run { store.change(captured) { book -> book.withoutCart(type, slot) } } } ?: false
     }
+    /** Add against the latest durable cart, so successive scans cannot overwrite one another. */
+    internal fun addQuantity(id: String, type: Int, slot: Int, delta: QuantityDataModel, onCompleted: ((Boolean) -> Unit)?) {
+        val owner = captureScope()
+        if (owner == null) { onCompleted?.invoke(false); return }
+        val queued = work.post {
+            var accepted = false
+            val saved = try { store.change(owner) { book ->
+                if (!book.contains(type, slot)) return@change book
+                val old = book.lines.firstOrNull { it.id == id && it.type == type && it.slot == slot }
+                val quantity = old?.quantity?.let { it.copy(total = it.total + delta.total) } ?: delta
+                val maximum = if (type == 1) book.ui.batches[cartReturnBatchSelectionKey(type, slot, id)]?.originalReceiptQuantity else null
+                if (!validReceiptCartQuantity(quantity, maximum)) {
+                    postInAppNotification(eventMessage("return.quantity_limit"), NotificationType.Negative, transient = true)
+                    return@change book
+                }
+                accepted = true
+                val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis())
+                book.copy(lines = (book.lines.filterNot { it.id == id && it.type == type && it.slot == slot } + row)
+                    .sortedWith(compareBy<StoredCartLine> { it.addedAt }.thenBy { it.id }))
+            } } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) {
+                if (isCurrent(owner)) postInAppNotification(eventMessage("checkout.ui.save_error"), NotificationType.Negative, transient = true)
+                false
+            }
+            onCompleted?.invoke(saved && accepted && isCurrent(owner))
+        }
+        if (!queued) onCompleted?.invoke(false)
+    }
+
     internal fun upsert(id: String, type: Int, slot: Int, quantity: QuantityDataModel) {
         require(id.isNotBlank() && validCartSlot(type, slot))
         changeAsync { book ->

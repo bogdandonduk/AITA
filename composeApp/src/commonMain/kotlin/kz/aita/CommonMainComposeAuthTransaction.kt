@@ -19,6 +19,8 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -259,6 +261,7 @@ internal fun AppConfiguration.AuthTinyChoiceChip(
 
     Row(
         modifier = Modifier
+            .semantics { this.contentDescription = contentDescription }
             .heightIn(min = stateValues.textFieldHeight * 0.86f)
             .clip(RoundedCornerShape(stateValues.cornerRadius))
             .background(backgroundColor)
@@ -266,7 +269,8 @@ internal fun AppConfiguration.AuthTinyChoiceChip(
             .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
-                onClick = onClick
+                onClick = onClick,
+                role = androidx.compose.ui.semantics.Role.Button
             )
             .padding(horizontal = stateValues.textFieldIconPadding),
         verticalAlignment = Alignment.CenterVertically,
@@ -277,7 +281,7 @@ internal fun AppConfiguration.AuthTinyChoiceChip(
                 modifier = Modifier.size(stateValues.iconSize * 0.72f),
                 url = it,
                 fallbackRes = iconRes,
-                contentDescription = contentDescription,
+                contentDescription = null,
                 tintColor = null
             )
         }
@@ -297,109 +301,47 @@ internal fun AppConfiguration.AuthTinyChoiceChip(
 internal fun AppConfiguration.AuthPreferencesChooser(
     modifier: Modifier = Modifier
 ) {
-    val languages = stateValues.globalAppConfiguration.languages.withBundledAppLanguages().sortedBy {
-        when (it.language.lowercase()) {
-            "ru" -> 0
-            "kk" -> 1
-            "en" -> 2
-            else -> 3
-        }
+    var open by remember { mutableStateOf<String?>(null) }
+    val languageTitle = stateValues.stringAppLanguage
+    val themeTitle = stateValues.stringAppTheme
+    val scaleTitle = localizedStringResource(910, "UI scale")
+    Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        AuthTinyChoiceChip(false, stateValues.appLanguage.uppercase(), contentDescription = languageTitle) { open = "language" }
+        AuthTinyChoiceChip(false, "", contentDescription = themeTitle, iconPath = stateValues.drawablePathIconThemeDark,
+            iconRes = stateValues.drawableResIconThemeDark.value) { open = "theme" }
+        AuthTinyChoiceChip(false, "", contentDescription = scaleTitle, iconPath = stateValues.drawablePathIconAppScale,
+            iconRes = stateValues.drawableResIconAppScale.value) { open = "scale" }
+        AuthFontChoice(compact = true)
     }
-
-    val themes = availableAppThemes(stateValues.globalAppConfiguration.themes)
-
-    val sizeModeChoices = listOf(
-        0L to localizedStringResource(911, "Default"),
-        1L to localizedStringResource(912, "Big"),
-        2L to storePeopleText("large")
-    )
-
-    if (languages.isEmpty() && themes.isEmpty() && sizeModeChoices.isEmpty()) return
-
-    val languageScrollState = rememberScrollState()
-    val themeScrollState = rememberScrollState()
-    val sizeScrollState = rememberScrollState()
-    val rowWidth = stateValues.boundWidgetWidth * (if (stateValues.isNarrowScreen) 1f else 1.85f)
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        if (languages.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .widthIn(max = rowWidth)
-                    .horizontalScroll(languageScrollState)
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                AuthTinyChoiceChip(
-                    selected = stateValues.appLanguagePreference == "system",
-                    label = stateValues.stringSystemLanguage,
-                    contentDescription = stateValues.stringSystemLanguage
-                ) { setAuthScreenAppLocale("system") }
-                languages.forEach { language ->
-                    AuthTinyChoiceChip(
-                        selected = stateValues.appLanguagePreference == language.language,
-                        label = language.language.uppercase(),
-                        iconPath = language.flagDrawablePath,
-                        iconRes = language.mapIconRes(),
-                        contentDescription = language.name.visibleLocalizedString(stateValues.appLanguage, language.language.uppercase())
-                    ) {
-                        setAuthScreenAppLocale(language.language)
+    open?.let { choice ->
+        val title = when (choice) { "language" -> languageTitle; "theme" -> themeTitle; else -> scaleTitle }
+        AitaBottomSheet(title = title, onDismiss = { open = null }) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                when (choice) {
+                    "language" -> {
+                        item { AuthTinyChoiceChip(stateValues.appLanguagePreference == "system", stateValues.stringSystemLanguage) { setAuthScreenAppLocale("system") } }
+                        items(stateValues.globalAppConfiguration.languages.withBundledAppLanguages()) { language ->
+                            AuthTinyChoiceChip(stateValues.appLanguagePreference == language.language,
+                                language.name.visibleLocalizedString(stateValues.appLanguage, language.language.uppercase()),
+                                language.flagDrawablePath, language.mapIconRes()) { setAuthScreenAppLocale(language.language) }
+                        }
+                    }
+                    "theme" -> items(availableAppThemes(stateValues.globalAppConfiguration.themes)) { theme ->
+                        AuthTinyChoiceChip(stateValues.appThemeId == theme.id,
+                            theme.name.visibleLocalizedString(stateValues.appLanguage, theme.id.toString()),
+                            if (isDarkAppTheme(theme.id)) stateValues.drawablePathIconThemeDark else stateValues.drawablePathIconThemeLight,
+                            if (isDarkAppTheme(theme.id)) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value
+                        ) { setAuthScreenAppTheme(theme.id) }
+                    }
+                    else -> items(listOf(0L to localizedStringResource(911, "Default"),
+                        1L to localizedStringResource(912, "Big"), 2L to storePeopleText("large"))) { (id, label) ->
+                        AuthTinyChoiceChip(stateValues.appSizeModeId == id, label) { setAuthScreenAppSizeMode(id) }
                     }
                 }
             }
         }
-
-        if (themes.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .widthIn(max = rowWidth)
-                    .horizontalScroll(themeScrollState)
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                themes.forEach { theme ->
-                    val selected = stateValues.appThemeId == theme.id
-                    val darkThemeChoice = isDarkAppTheme(theme.id)
-                    AuthTinyChoiceChip(
-                        selected = selected,
-                        label = theme.name.visibleLocalizedString(stateValues.appLanguage, theme.id.toString()),
-                        iconPath = if (darkThemeChoice) stateValues.drawablePathIconThemeDark else stateValues.drawablePathIconThemeLight,
-                        iconRes = if (darkThemeChoice) stateValues.drawableResIconThemeDark.value else stateValues.drawableResIconThemeLight.value,
-                        contentDescription = theme.name.visibleLocalizedString(stateValues.appLanguage, theme.id.toString())
-                    ) {
-                        setAuthScreenAppTheme(theme.id)
-                    }
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .widthIn(max = rowWidth)
-                .horizontalScroll(sizeScrollState)
-                .padding(horizontal = 4.dp, vertical = 1.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            sizeModeChoices.forEach { (id, label) ->
-                AuthTinyChoiceChip(
-                    selected = stateValues.appSizeModeId == id,
-                    label = label,
-                    iconPath = stateValues.drawablePathIconAppScale,
-                    iconRes = stateValues.drawableResIconAppScale.value,
-                    contentDescription = label
-                ) {
-                    setAuthScreenAppSizeMode(id)
-                }
-            }
-        }
-        AuthFontChoice()
     }
 }
 
@@ -790,6 +732,9 @@ internal fun closeQuickStockAddSheet() {
     }
 }
 
+private val pendingTransactionBarcodeAdds = mutableMapOf<String, Int>()
+private fun pendingBarcodeKey(raw: String, type: Int, slot: Int) = "${inventoryViewScopeKey()}:$type:$slot:${raw.trim()}"
+internal fun transactionBarcodeAddPending(raw: String, type: Int, slot: Int) = (pendingTransactionBarcodeAdds[pendingBarcodeKey(raw, type, slot)] ?: 0) > 0
 internal var activeTransactionBarcodeHandler: ((String) -> Boolean)? = null
 
 internal fun String.transactionBarcodeCandidate(): String? {
@@ -1040,23 +985,25 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
     rawInput: String,
     transactionTypeIndex: Int,
     clientId: Int,
-    currentCart: List<GoodsItemInCartDataModel>
+    currentCart: List<GoodsItemInCartDataModel>,
+    onCompleted: (() -> Unit)? = null
 ): Boolean {
     if (transactionTypeIndex == 1 && requestReturnReceiptScan(rawInput, clientId)) return true
     val receiptInput = rawInput.trim().removePrefix("]C0")
     if (transactionTypeIndex == 1 && receiptInput.startsWith("9910") && receiptInput.length <= 44 &&
         rawInput.none { it == '\n' || it == '\r' || it == '\t' }) return false
-    val candidate = rawInput.transactionBarcodeCandidate() ?: return false
+    val stock = transactionStockCandidatesForUi(sortForDisplay = false)
+    val literal = rawInput.trim().removePrefix("]C0")
+    val literalIsExact = uniqueExactBarcode(stock, literal) { it.allBarcodeValues() } != null
+    val candidate = if (literalIsExact) literal else rawInput.transactionBarcodeCandidate() ?: return false
 
     if (candidate.length > 32) return false
 
     val compactInput = rawInput.compactTransactionBarcodeInput()
     val numericBarcodeTypedAlone = candidate.length >= 4 && candidate.all { it.isDigit() } && compactInput == candidate
-    if (!rawInput.looksLikeCompleteRetailBarcodeInput() && !numericBarcodeTypedAlone) return false
+    if (!literalIsExact && !rawInput.looksLikeCompleteRetailBarcodeInput() && !numericBarcodeTypedAlone) return false
 
     val embeddedWeightBarcodes = candidate.parseEmbeddedWeightBarcodeFormats()
-    val stock = transactionStockCandidatesForUi(sortForDisplay = false)
-
     val weightedMatch = embeddedWeightBarcodes.firstNotNullOfOrNull { barcode ->
         stock.firstOrNull { item ->
             item.isWeightMeasurementUnit(stateValues.globalAppConfiguration) && item.matchesEmbeddedWeightBarcode(barcode)
@@ -1065,7 +1012,10 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
 
     val weightedGoodsItem = weightedMatch?.first
     val embeddedWeightBarcode = weightedMatch?.second ?: embeddedWeightBarcodes.firstOrNull()
-    val exactGoodsItem = stock.firstOrNull { it.matchesScannedBarcode(candidate) }
+    val exactMatches = stock.filter { it.matchesScannedBarcode(candidate) }
+    val weightMatches = stock.filter { item -> embeddedWeightBarcodes.any { item.isWeightMeasurementUnit(stateValues.globalAppConfiguration) && item.matchesEmbeddedWeightBarcode(it) } }
+    if ((exactMatches + weightMatches).distinctBy { it.id }.size > 1) return false
+    val exactGoodsItem = exactMatches.singleOrNull()
     val goodsItem = weightedGoodsItem ?: exactGoodsItem
 
     if (goodsItem != null) {
@@ -1107,27 +1057,17 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
             return true
         }
 
+        val completeSearch = onCompleted ?: transactionSearchCompletion.capture()
+        val pendingKey = pendingBarcodeKey(candidate, transactionTypeIndex, clientId)
+        pendingTransactionBarcodeAdds[pendingKey] = (pendingTransactionBarcodeAdds[pendingKey] ?: 0) + 1
         addGoodsItemToTransactionCart(
-            goodsItem = goodsItem,
-            transactionTypeIndex = transactionTypeIndex,
-            clientId = clientId,
-            configuration = stateValues.globalAppConfiguration,
-            currentCart = currentCart,
-            quantityToAdd = quantityFromBarcode
-        )
-
-        val addedQuantityText = quantityFromBarcode?.quantityText(stateValues.appLanguage)
-        postInAppNotification(
-            buildString {
-                append("Added ")
-                append(goodsItem.name.visibleLocalizedString(stateValues.appLanguage, candidate))
-                if (!addedQuantityText.isNullOrBlank()) {
-                    append(" • ")
-                    append(addedQuantityText)
-                }
-            },
-            NotificationType.Positive,
-            transient = true
+            goodsItem = goodsItem, transactionTypeIndex = transactionTypeIndex, clientId = clientId,
+            configuration = stateValues.globalAppConfiguration, currentCart = currentCart, quantityToAdd = quantityFromBarcode,
+            onCompleted = { saved -> coroutineScope.launch {
+                val pending = (pendingTransactionBarcodeAdds[pendingKey] ?: 1) - 1
+                if (pending > 0) pendingTransactionBarcodeAdds[pendingKey] = pending else pendingTransactionBarcodeAdds.remove(pendingKey)
+                if (saved) completeSearch()
+            } }
         )
         requestTransactionBarcodeFocus()
         return true
@@ -1191,7 +1131,6 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
                 clientId = clientId,
                 currentCart = latestCart
             )
-            if (handled) transactionSearchCompletion.handled()
             handled
         }
     }
@@ -1785,7 +1724,8 @@ fun AppConfiguration.TransactionSelectionScreen(
                     transactionTypeIndex = context.transactionTypeIndex,
                     clientId = context.clientId,
                     configuration = stateValues.globalAppConfiguration,
-                    currentCart = goodsInCart
+                    currentCart = goodsInCart,
+                    onCompleted = searchTextFieldContent.captureCompletion().let { completed -> { saved -> if (saved) coroutineScope.launch { completed() } } }
                 )
             }
             onBarcodeCaptureFocusRequested?.invoke()
@@ -1793,6 +1733,16 @@ fun AppConfiguration.TransactionSelectionScreen(
 
         val selectedTransactionFilterId = scopeRowContent.id
         val transactionSearchQuery = searchTextFieldContent.value.text.trim()
+        LaunchedEffect(transactionSearchQuery, context.transactionTypeIndex, context.clientId) {
+            if (transactionSearchQuery.isBlank() || !searchTextFieldContent.editedSinceCreation) return@LaunchedEffect
+            delay(500)
+            val result = typedStockSearch(transactionScopedStock, transactionSearchQuery)
+            if (result.exactHit != null && searchTextFieldContent.value.text.trim() == transactionSearchQuery &&
+                !transactionBarcodeAddPending(transactionSearchQuery, context.transactionTypeIndex, context.clientId)) {
+                tryHandleTransactionBarcodeInput(transactionSearchQuery + "\n", context.transactionTypeIndex, context.clientId,
+                    goodsInCart, searchTextFieldContent.captureCompletion())
+            }
+        }
         val transactionSearchAcrossAllStock = transactionSearchQuery.isNotBlank()
         val selectedPreferredOrderIds = if (transactionSearchAcrossAllStock) {
             emptyList()

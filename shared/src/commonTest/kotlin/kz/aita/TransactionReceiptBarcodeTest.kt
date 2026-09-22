@@ -52,12 +52,12 @@ class TransactionReceiptBarcodeTest {
         val operation = "txn-$id"
         val queued = snapshot("local_$operation").transaction.copy(clientOperationId = operation)
         val printed = assertNotNull(queued.receiptBarcodePayload())
-        assertTrue(printed.startsWith("99102"))
-        assertEquals(operation, parseTransactionReceiptBarcodeIdentity("]C0$printed\r\n")?.clientOperationId)
+        assertTrue(printed.startsWith("99104"))
+        assertEquals("O9A765ABC", parseTransactionReceiptBarcodeIdentity("]C0$printed\r\n")?.receiptNumber)
         assertNull(parseTransactionReceiptBarcode(printed))
         val synced = queued.copy(id = "0c22f80d-ace5-4b17-bff9-ad69048f45ec")
-        assertEquals(synced.clientOperationId, parseTransactionReceiptBarcodeIdentity(printed)?.clientOperationId)
-        assertEquals(synced.id, parseTransactionReceiptBarcode(assertNotNull(synced.receiptBarcodePayload())))
+        assertTrue(synced.matchesReceiptLookup(parseTransactionReceiptBarcodeIdentity(printed)!!.lookup, true))
+        assertEquals("0C22F80D", parseTransactionReceiptBarcodeIdentity(assertNotNull(synced.receiptBarcodePayload()))?.receiptNumber)
         assertNull(queued.copy(id = "").receiptBarcodePayload()) // operation allocated before Complete is still a draft
         assertNull(transactionOperationReceiptBarcodePayload("txn-device-user-installation-1726700000000-abc123"))
     }
@@ -67,7 +67,7 @@ class TransactionReceiptBarcodeTest {
         val labels = ReceiptTextLabelsDataModel()
         val blocks = receipt.buildReceiptPdfDocument("en", labels).blocks
         assertEquals(1, blocks.count { it.barcodePayload != null })
-        assertEquals(transactionReceiptBarcodePayload(id), blocks.last().barcodePayload)
+        assertEquals(compactReceiptBarcodePayload("9A765ABC"), blocks.last().barcodePayload)
         assertEquals(labels.thankYou, blocks[blocks.lastIndex - 1].text)
         assertTrue(receipt.buildReceiptPlainText("en", labels).endsWith(labels.thankYou + "\n"))
     }
@@ -83,5 +83,25 @@ class TransactionReceiptBarcodeTest {
         assertTrue(footer.x + barcode.width <= document.width - document.margin)
         assertTrue(footer.baseline + barcode.height <= pages.last().height - document.margin + .001f)
         assertTrue(barcode.bars.all { it.x >= 0 && it.y >= 0 && it.x + it.width <= barcode.width && it.y + it.height <= barcode.height })
+    }
+    @Test fun shortNumberFitsHorizontallyAndDetectsChangedDigit() {
+        for (number in listOf("00000000", "FFFFFFFF", "9A765ABC", "O9A765ABC")) {
+            val payload = assertNotNull(compactReceiptBarcodePayload(number))
+            assertEquals(16, payload.length)
+            assertEquals(number, parseTransactionReceiptBarcodeIdentity(payload)?.receiptNumber)
+            val geometry = transactionReceiptBarcodeGeometry(payload, 2f, 96f)
+            assertTrue(geometry.width <= 384)
+            assertTrue(geometry.width > geometry.height)
+            assertNull(parseTransactionReceiptBarcodeIdentity(payload.dropLast(1) + ((payload.last() - '0' + 1) % 10)))
+        }
+    }
+    @Test fun sameNumberNeverChangesTheUnderlyingTransactionIdentity() {
+        val first = snapshot(id).transaction
+        val second = first.copy(id = "9a765abc-ffff-ffff-ffff-ffffffffffff")
+        assertNotEquals(first.id, second.id)
+        assertEquals(first.receiptBarcodePayload(), second.receiptBarcodePayload())
+        assertEquals(2, listOf(first, second).count { it.matchesReceiptLookup("9A765ABC", true) })
+        assertTrue(first.matchesReceiptLookup(id, true))
+        assertFalse(second.matchesReceiptLookup(id, true))
     }
 }

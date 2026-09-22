@@ -102,12 +102,12 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
     val scope = rememberCoroutineScope()
     var webOpenFailed by remember { mutableStateOf(false) }
     val platforms = listOf("android" to "Android", "windows" to "Windows", "web" to "Web", "macos" to "macOS", "ios" to "iOS")
-    var selectedPlatform by rememberSaveable { mutableStateOf(when {
+    var selectedPlatform by rememberNavigationSection("downloads:platform", when {
         getPlatformName().contains("wasm",ignoreCase=true) -> "web"
         getPlatformName().contains("android",ignoreCase=true) -> "android"
         else -> "windows"
-    }) }
-    var releaseTab by rememberSaveable { mutableStateOf("current_release") }
+    })
+    var releaseTab by rememberNavigationSection("downloads:release", "current_release")
     LaunchedEffect(Unit) { DownloadsWorkspace.refresh() }
     AitaScreenColumn(Modifier.fillMaxSize(), appBar = {
         ScreenAppBarWidget(title = downloadsText("title"), iconPath = downloadsIconPath(),

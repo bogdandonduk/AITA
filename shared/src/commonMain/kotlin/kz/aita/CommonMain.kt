@@ -1829,7 +1829,7 @@ fun TransactionReceiptSnapshotDataModel.receiptTitle(labels: ReceiptTextLabelsDa
 
 @Suppress("UNUSED_PARAMETER") // retain the public signature; drafts no longer have a display number
 fun TransactionReceiptSnapshotDataModel.receiptNumberText(labels: ReceiptTextLabelsDataModel = ReceiptTextLabelsDataModel()): String {
-    return transaction.serverReceiptIdOrNull()?.take(8)?.uppercase().orEmpty()
+    return transaction.visibleReceiptNumber()
 }
 
 fun TransactionReceiptSnapshotDataModel.totalAmount(): Double {
@@ -2804,9 +2804,9 @@ fun addGoodsItemToTransactionCart(
     clientId: Int,
     configuration: GlobalAppConfigurationDataModel,
     currentCart: List<GoodsItemInCartDataModel>,
-    quantityToAdd: QuantityDataModel? = null
+    quantityToAdd: QuantityDataModel? = null,
+    onCompleted: ((Boolean) -> Unit)? = null
 ) {
-    val existing = currentCart.find { it.id == goodsItem.id }
     val defaultQuantity = goodsItem.defaultCartQuantity(configuration)
     val deltaQuantity = quantityToAdd ?: defaultQuantity
     val normalizedDeltaQuantity = defaultQuantity.copy(
@@ -2815,24 +2815,11 @@ fun addGoodsItemToTransactionCart(
         roundTotal = deltaQuantity.roundTotal
     )
 
-    if (!normalizedDeltaQuantity.total.isFinite() || normalizedDeltaQuantity.total <= 0.0)
+    if (!normalizedDeltaQuantity.total.isFinite() || normalizedDeltaQuantity.total <= 0.0) {
+        onCompleted?.invoke(false)
         return
-
-    if (existing == null) {
-        upsertCart(
-            id = goodsItem.id,
-            transactionTypeIndex = transactionTypeIndex,
-            clientId = clientId,
-            quantity = normalizedDeltaQuantity
-        )
-    } else {
-        upsertCart(
-            id = goodsItem.id,
-            transactionTypeIndex = transactionTypeIndex,
-            clientId = clientId,
-            quantity = existing.quantity.copy(total = existing.quantity.total + normalizedDeltaQuantity.total)
-        )
     }
+    DynamicCarts.addQuantity(goodsItem.id, transactionTypeIndex, clientId, normalizedDeltaQuantity, onCompleted)
 }
 
 fun getTransactions(storeId: String) {
@@ -16769,6 +16756,7 @@ internal suspend fun refreshUserAccountNow(
     val currentAccount = AccountAppModes.mergeAccount(ActiveStores.mergeAccount(account))
     userAccountState.emit(DataState.Success(currentAccount, response.message))
     persistAuthenticatedAccountCache(currentAccount, sessionGeneration)
+    SavedLoginUsers.remember(currentAccount, sessionGeneration)
     AppPreferences.acceptAccount(currentAccount, preferenceRevisionAtRequest)
     if (!authenticatedSessionGenerationIsCurrent(sessionGeneration)) return@withLock cloudSessionExpiredResponse()
     // An earlier stores read may have skipped reconciliation while this account adoption

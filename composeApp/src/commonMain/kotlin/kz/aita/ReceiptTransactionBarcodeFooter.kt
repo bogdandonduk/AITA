@@ -29,7 +29,7 @@ internal fun AppConfiguration.ReceiptTransactionBarcodeFooter(snapshot: Transact
         val density = LocalDensity.current.density
         val modulePixels = density.roundToInt().coerceAtLeast(1).toFloat()
         val moduleDp = modulePixels / density
-        val vertical = maxWidth.value < 297f * moduleDp
+        val vertical = maxWidth.value < transactionReceiptBarcodeModules(payload).size * moduleDp
         val geometry = remember(payload, vertical) { transactionReceiptBarcodeGeometry(payload, 1f, 56f, vertical) }
         val description = "${stateValues.stringBarcode}: ${snapshot.transaction.id}"
         Canvas(Modifier.fillMaxWidth().height((geometry.height * moduleDp).dp).semantics { contentDescription = description }) {
