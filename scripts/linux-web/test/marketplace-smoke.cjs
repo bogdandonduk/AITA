@@ -98,7 +98,10 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await shot('trip-removed');await page.setViewportSize({width:390,height:844});await page.waitForTimeout(1200);await shot('trip-phone');
   await page.reload();await page.waitForTimeout(10000);await shot('restored');
   await page.setViewportSize({width:1440,height:1040});await page.waitForTimeout(1200);
-  await click(450,1005);await page.waitForTimeout(1200);await click(1000,931);
+  await click(450,1005);await page.waitForTimeout(1200);await page.keyboard.press('Tab');
+  assert.match(await page.locator('body').ariaSnapshot(), /Find your next favourite shop/, 'The marketplace Shops section must survive reload');
+  await page.getByRole('button',{name:'Products',exact:true}).click({force:true});await page.waitForTimeout(1200);
+  await page.getByRole('button',{name:'Add to list',exact:true}).nth(1).click({force:true});
   await until(()=>lines.some(l=>l.offerId===id(104)));assert.equal(shoppingRevision,6);await shot('offer-added');
   assert.deepEqual(errors,[]);
   assert.equal(lines.length,3);assert.deepEqual(savedShops,[id(80)]);

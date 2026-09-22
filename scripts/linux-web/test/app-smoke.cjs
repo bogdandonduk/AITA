@@ -69,9 +69,9 @@ async function backgroundPixel(page) {
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow.png'});
   const lightPixel = await backgroundPixel(page);
   await page.keyboard.press('Tab');
-  await page.getByRole('button', {name: 'App theme', exact: true}).click({force:true});
-  await page.getByRole('button', {name: /Obsidian Black/}).click({force:true});
-  await page.getByRole('button', {name: /Close|Cancel/}).last().click({force:true});
+  await page.getByRole('button', {name: /^(App theme|Тема приложения|Қолданба тақырыбы|Мавзӯи барнома|Колдонмонун темасы|Ilova mavzusi)$/}).click({force:true});
+  await page.getByRole('button', {name: /Obsidian Black|Обсидиановый чёрный|Обсидиан қара|Обсидиан кара|Сиёҳи обсидианӣ|Obsidian qora/}).click({force:true});
+  await page.getByRole('button', {name: /^(Close|Cancel|Отменить|Болдырмау|Бекор кардан|Жокко чыгаруу|Bekor qilish)$/}).last().click({force:true});
   await page.waitForTimeout(1000);
   await page.waitForLoadState('networkidle');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow-theme.png'});
