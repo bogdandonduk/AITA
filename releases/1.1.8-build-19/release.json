@@ -1,0 +1,134 @@
+{
+  "version": "1.1.8",
+  "build": 19,
+  "revision": "910a2593967baa1a12b2d56586b0c49dcfe5fa31",
+  "tag": "v1.1.8-b19",
+  "createdAt": "2026-09-23T16:59:45Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.1.8-19-android.apk",
+      "sha256": "3d0fe8206662e3b168e1e5e8fb73a796eaba91b06c45d1a5c0561e928c1ef456",
+      "bytes": 72037198,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/AITA-1.1.8-19-android.apk"
+    },
+    {
+      "name": "AITA-1.1.8-19-android.aab",
+      "sha256": "3f5e51f116efb0c8a5fef6b93923a28100ca951b05beff027459aa260c2aab3a",
+      "bytes": 46696824,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/AITA-1.1.8-19-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "a0e187e09c6c6b59fd11afe451c9827a6be6743ec81305e86213e30d5732fab3",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.8-19-windows.exe",
+      "sha256": "e9f442f344a4d1c7604daca2e11bc235f67b0967c8be61af79e78b4eed961287",
+      "bytes": 136644096,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/AITA-1.1.8-19-windows.exe"
+    },
+    {
+      "name": "AITA-1.1.8-19-windows.msi",
+      "sha256": "714c8186a83daae6d9881759777d1f3ca573d4c0dcacedadef4ffa46be24d93c",
+      "bytes": 136044996,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/AITA-1.1.8-19-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "dcf3352ad5b7448e65c5185479b077d8db295d925950261583173222429fb071",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "0d0ff6061114d48ab235cd6d281c95f605a40f10bdf19befa582d89eeb86da1a",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/windows-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.8-19-web.zip",
+      "sha256": "22001e0c41beae04de6a91bb5a16c4e26d660cb242a9e188ec14c7b69d5f15ad",
+      "bytes": 12840806,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/AITA-1.1.8-19-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "446c0db8e4d7ea3edb8546bae90e3647160cec084439ff1169e57070444c12bc",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.8-b19/web-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Centered the sign-in appearance preferences. Reduced redundant browser database saves during startup. Added recovery for interrupted registration and made new account creation and its first session atomic.",
+    "ru": "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u043e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u044f \u043d\u0430 \u044d\u043a\u0440\u0430\u043d\u0435 \u0432\u0445\u043e\u0434\u0430 \u0442\u0435\u043f\u0435\u0440\u044c \u043f\u043e \u0446\u0435\u043d\u0442\u0440\u0443. \u0423\u0431\u0440\u0430\u043d\u044b \u043b\u0438\u0448\u043d\u0438\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0431\u0430\u0437\u044b \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430 \u043f\u0440\u0438 \u0437\u0430\u043f\u0443\u0441\u043a\u0435. \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u043e \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u043e\u0441\u043b\u0435 \u043f\u0440\u0435\u0440\u0432\u0430\u043d\u043d\u043e\u0439 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438; \u0430\u043a\u043a\u0430\u0443\u043d\u0442 \u0438 \u043f\u0435\u0440\u0432\u044b\u0439 \u0441\u0435\u0430\u043d\u0441 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u044e\u0442\u0441\u044f \u043e\u0434\u043d\u043e\u0439 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0435\u0439.",
+    "kk": "\u041a\u0456\u0440\u0443 \u044d\u043a\u0440\u0430\u043d\u044b\u043d\u0434\u0430\u0493\u044b \u043a\u04e9\u0440\u0456\u043d\u0456\u0441 \u0431\u0430\u043f\u0442\u0430\u0443\u043b\u0430\u0440\u044b \u043e\u0440\u0442\u0430\u0493\u0430 \u0442\u0443\u0440\u0430\u043b\u0430\u043d\u0434\u044b. \u0406\u0441\u043a\u0435 \u049b\u043e\u0441\u044b\u043b\u0493\u0430\u043d\u0434\u0430 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0434\u0435\u0440\u0435\u043a\u049b\u043e\u0440\u044b\u043d \u0430\u0440\u0442\u044b\u049b \u0441\u0430\u049b\u0442\u0430\u0443 \u0430\u0437\u0430\u0439\u0442\u044b\u043b\u0434\u044b. \u04ae\u0437\u0456\u043b\u0433\u0435\u043d \u0442\u0456\u0440\u043a\u0435\u043b\u0443\u0434\u0435\u043d \u043a\u0435\u0439\u0456\u043d \u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0456\u0440\u0443 \u049b\u043e\u0441\u044b\u043b\u0434\u044b; \u0430\u043a\u043a\u0430\u0443\u043d\u0442 \u043f\u0435\u043d \u0430\u043b\u0493\u0430\u0448\u049b\u044b \u0441\u0435\u0430\u043d\u0441 \u0431\u0456\u0440\u0433\u0435 \u0441\u0430\u049b\u0442\u0430\u043b\u0430\u0434\u044b.",
+    "ky": "\u041a\u0438\u0440\u04af\u04af \u044d\u043a\u0440\u0430\u043d\u044b\u043d\u0434\u0430\u0433\u044b \u043a\u04e9\u0440\u04af\u043d\u04af\u0448 \u0436\u04e9\u043d\u0434\u04e9\u04e9\u043b\u04e9\u0440\u04af \u043e\u0440\u0442\u043e\u0433\u043e \u0436\u0430\u0439\u0433\u0430\u0448\u0442\u044b\u0440\u044b\u043b\u0434\u044b. \u0418\u0448\u043a\u0435 \u043a\u0438\u0440\u0433\u0435\u043d\u0434\u0435 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0434\u0438\u043d \u0431\u0430\u0437\u0430\u0441\u044b\u043d \u0430\u0448\u044b\u043a\u0447\u0430 \u0441\u0430\u043a\u0442\u043e\u043e \u0430\u0437\u0430\u0439\u0442\u044b\u043b\u0434\u044b. \u04ae\u0437\u04af\u043b\u0433\u04e9\u043d \u043a\u0430\u0442\u0442\u043e\u043e\u0434\u043e\u043d \u043a\u0438\u0439\u0438\u043d \u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0438\u0440\u04af\u04af \u043a\u043e\u0448\u0443\u043b\u0434\u0443; \u0430\u043a\u043a\u0430\u0443\u043d\u0442 \u043c\u0435\u043d\u0435\u043d \u0431\u0438\u0440\u0438\u043d\u0447\u0438 \u0441\u0435\u0430\u043d\u0441 \u0447\u043e\u0433\u0443\u0443 \u0441\u0430\u043a\u0442\u0430\u043b\u0430\u0442.",
+    "tg": "\u0422\u0430\u043d\u0437\u0438\u043c\u043e\u0442\u0438 \u043d\u0430\u043c\u0443\u0434\u0438 \u044d\u043a\u0440\u0430\u043d\u0438 \u0432\u0443\u0440\u0443\u0434 \u0431\u0430 \u043c\u0430\u0440\u043a\u0430\u0437 \u0433\u0443\u0437\u043e\u0448\u0442\u0430 \u0448\u0443\u0434\u0430\u043d\u0434. \u0421\u0430\u0431\u0442\u04b3\u043e\u0438 \u0437\u0438\u0451\u0434\u0430\u0442\u0438\u0438 \u043f\u043e\u0439\u0433\u043e\u04b3\u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u04b3\u0430\u043d\u0433\u043e\u043c\u0438 \u043e\u0493\u043e\u0437 \u043a\u0430\u043c \u0448\u0443\u0434\u0430\u043d\u0434. \u0411\u0430\u0440\u049b\u0430\u0440\u043e\u0440\u0441\u043e\u0437\u0438\u0438 \u0431\u0430\u049b\u0430\u0439\u0434\u0433\u0438\u0440\u0438\u0438 \u049b\u0430\u0442\u044a\u0448\u0443\u0434\u0430 \u0438\u043b\u043e\u0432\u0430 \u0448\u0443\u0434; \u04b3\u0438\u0441\u043e\u0431 \u0432\u0430 \u04b7\u0430\u043b\u0430\u0441\u0430\u0438 \u0430\u0432\u0432\u0430\u043b \u044f\u043a\u04b7\u043e\u044f \u0441\u0430\u0431\u0442 \u043c\u0435\u0448\u0430\u0432\u0430\u043d\u0434.",
+    "uz": "Kirish ekranidagi ko\u2018rinish sozlamalari markazga joylashtirildi. Ishga tushishda brauzer bazasini ortiqcha saqlash kamaytirildi. Uzilgan ro\u2018yxatdan o\u2018tishni tiklash qo\u2018shildi; hisob va birinchi seans birgalikda saqlanadi."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:50:51Z",
+      "finishedAt": "2026-09-23T16:50:57Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:24:52Z",
+      "finishedAt": "2026-09-23T16:30:08Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:30:08Z",
+      "finishedAt": "2026-09-23T16:30:21Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:30:21Z",
+      "finishedAt": "2026-09-23T16:34:12Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:34:12Z",
+      "finishedAt": "2026-09-23T16:44:11Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:47:20Z",
+      "finishedAt": "2026-09-23T16:50:51Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:50:58Z",
+      "finishedAt": "2026-09-23T16:57:45Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-23T16:57:45Z",
+      "finishedAt": "2026-09-23T16:59:44Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
