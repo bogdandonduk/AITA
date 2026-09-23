@@ -100,6 +100,7 @@ object AuthOneTimeChallenges : Table("auth_one_time_challenges") {
     val identifierHash = char("identifier_hash", 64).index()
     val requestIpHash = char("request_ip_hash", 64).index()
     val locale = varchar("locale", 16).default("en")
+    val replacedByPublicId = uuid("replaced_by_public_id").nullable()
     val codeHash = char("code_hash", 64)
     val codeCiphertext = text("code_ciphertext")
     val deliveryEmailHash = char("delivery_email_hash", 64).nullable()
@@ -512,6 +513,23 @@ internal class AitaAdvancedAuthService(
         return flow.copy(maskedDestination = normalized.takeIf { it.kind == AitaAuthIdentifierKind.EMAIL }?.value?.let(::maskEmail).orEmpty())
     }
 
+    /** A lost resend response can recover only its explicit, still-pending replacement.
+     * Never recover a consumed/verified code or mint a new lifetime/attempt budget on retry. */
+    private fun resendReplacementInside(old: ResultRow, now: Long): ResultRow? {
+        val replacementId = old[AuthOneTimeChallenges.replacedByPublicId] ?: return null
+        if (old[AuthOneTimeChallenges.expiresAtMillis] <= now) return null
+        val next = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq replacementId }
+            .forUpdate().singleOrNull() ?: return null
+        if (next[AuthOneTimeChallenges.userId] != old[AuthOneTimeChallenges.userId] ||
+            next[AuthOneTimeChallenges.purpose] != old[AuthOneTimeChallenges.purpose] ||
+            next[AuthOneTimeChallenges.identifierHash] != old[AuthOneTimeChallenges.identifierHash] ||
+            next[AuthOneTimeChallenges.deliveryEmailHash] != old[AuthOneTimeChallenges.deliveryEmailHash] ||
+            next[AuthOneTimeChallenges.consumedAtMillis] != null || next[AuthOneTimeChallenges.verifiedAtMillis] != null ||
+            next[AuthOneTimeChallenges.expiresAtMillis] <= now || next[AuthOneTimeChallenges.resendAfterMillis] <= now ||
+            next[AuthOneTimeChallenges.attempts] >= next[AuthOneTimeChallenges.maxAttempts]) return null
+        return next
+    }
+
     suspend fun resend(
         flowId: String, locale: String, ip: String, expectedPurpose: String, ownerUserId: UUID? = null
     ): AitaAuthFlowDataModel? {
@@ -529,7 +547,12 @@ internal class AitaAdvancedAuthService(
             lockEmailBucketsInside(peek[AuthOneTimeChallenges.identifierHash], ipHash, peek[AuthOneTimeChallenges.userId])
             val old = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq publicId }.forUpdate().singleOrNull()
                 ?: return@newSuspendedTransaction null
-            if (old[AuthOneTimeChallenges.consumedAtMillis] != null || old[AuthOneTimeChallenges.verifiedAtMillis] != null) return@newSuspendedTransaction null
+            if (old[AuthOneTimeChallenges.consumedAtMillis] != null) {
+                val replacement = resendReplacementInside(old, System.currentTimeMillis()) ?: return@newSuspendedTransaction null
+                if (lockedUser != null && challengeDestinationInside(replacement, lockedUser) == null) return@newSuspendedTransaction null
+                return@newSuspendedTransaction emailFlow(replacement, System.currentTimeMillis())
+            }
+            if (old[AuthOneTimeChallenges.verifiedAtMillis] != null || old[AuthOneTimeChallenges.expiresAtMillis] <= System.currentTimeMillis()) return@newSuspendedTransaction null
             if (old[AuthOneTimeChallenges.resendAfterMillis] > now) return@newSuspendedTransaction emailFlow(old, now)
             checkEmailQuotaInside(old[AuthOneTimeChallenges.identifierHash], ipHash, now)
             val phoneChange = if (expectedPurpose == AUTH_PURPOSE_PHONE) {
@@ -559,6 +582,9 @@ internal class AitaAdvancedAuthService(
                     ?: emailChange?.get(AuthEmailAliasChallenges.createdAtMillis)?.plus(config.codeTtlMillis)
                     ?: (now + config.codeTtlMillis)
             )
+            AuthOneTimeChallenges.update({ AuthOneTimeChallenges.id eq old[AuthOneTimeChallenges.id] }) {
+                it[replacedByPublicId] = UUID.fromString(flow.flowId)
+            }
             if (authenticatorRecovery != null) AuthTotpRecoveryChallenges.insert {
                 it[challengePublicId] = UUID.fromString(flow.flowId)
                 it[userId] = authenticatorRecovery[AuthTotpRecoveryChallenges.userId]
@@ -1728,6 +1754,14 @@ internal class AitaAdvancedAuthService(
                 !contactAuthorizationValidInside(binding))) return@newSuspendedTransaction null
             val old = binding?.let { b -> AuthOneTimeChallenges.selectAll()
                 .where { AuthOneTimeChallenges.publicId eq b[AuthContactVerifications.challengePublicId] }.forUpdate().singleOrNull() }
+            if (previousFlowId != null && old != null && old[AuthOneTimeChallenges.consumedAtMillis] != null) {
+                val replacement = resendReplacementInside(old, now) ?: return@newSuspendedTransaction null
+                val nextBinding = AuthContactVerifications.selectAll().where {
+                    AuthContactVerifications.challengePublicId eq replacement[AuthOneTimeChallenges.publicId]
+                }.singleOrNull() ?: return@newSuspendedTransaction null
+                if (nextBinding[AuthContactVerifications.scopeHash] != scopeHash || !contactAuthorizationValidInside(nextBinding)) return@newSuspendedTransaction null
+                return@newSuspendedTransaction emailFlow(replacement, now).copy(maskedDestination = maskEmail(address))
+            }
             if (previousFlowId != null && (old == null || old[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_CONTACT ||
                 old[AuthOneTimeChallenges.consumedAtMillis] != null || old[AuthOneTimeChallenges.verifiedAtMillis] != null ||
                 old[AuthOneTimeChallenges.expiresAtMillis] <= now)) return@newSuspendedTransaction null
@@ -1752,6 +1786,9 @@ internal class AitaAdvancedAuthService(
             }
             val deadline = if (previousFlowId == null) now + config.codeTtlMillis else requireNotNull(old)[AuthOneTimeChallenges.expiresAtMillis]
             val flow = createEmailChallengeInside(actor, address, AUTH_PURPOSE_CONTACT, locale, emailHash, ipHash, now, deadline)
+            if (old != null) AuthOneTimeChallenges.update({ AuthOneTimeChallenges.id eq old[AuthOneTimeChallenges.id] }) {
+                it[replacedByPublicId] = UUID.fromString(flow.flowId)
+            }
             AuthContactVerifications.insert {
                 it[challengePublicId] = UUID.fromString(flow.flowId); it[actorUserId] = actor
                 it[channel] = AitaContactChannel.EMAIL.name; it[contactPurpose] = target.purpose.name

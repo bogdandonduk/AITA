@@ -46,6 +46,7 @@ dependencies {
     // Useful server plugins (optional but nice)
     implementation("io.ktor:ktor-server-cors:${property("ktor.version")}")
     implementation("io.ktor:ktor-server-compression:${property("ktor.version")}")
+    implementation("io.ktor:ktor-server-partial-content:${property("ktor.version")}")
     implementation("io.ktor:ktor-server-auto-head-response:${property("ktor.version")}")
 
     implementation("io.ktor:ktor-server-call-logging:${property("ktor.version")}")

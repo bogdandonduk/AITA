@@ -8,7 +8,8 @@ import android.bluetooth.BluetoothSocket
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
-import kz.aita.receiptPrinterWriteTimeoutMillis
+import kz.aita.bluetoothPrinterWriteTimeoutMillis
+import kz.aita.writePacedBluetoothPrint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -79,16 +80,9 @@ internal object BluetoothPrinterTransport {
             val connected = checkNotNull(socket)
             // From here onward the outcome can be partial. Never reconnect and resend automatically.
             try {
-                operate(connected, receiptPrinterWriteTimeoutMillis(stable.size), "Printing timed out. Some data may have reached the printer; check the receipt before retrying") {
+                operate(connected, bluetoothPrinterWriteTimeoutMillis(stable.size), "Printing timed out. Some data may have reached the printer; check the receipt before retrying") {
                     val output = connected.outputStream
-                    var offset = 0
-                    while (offset < stable.size) {
-                        val count = minOf(512, stable.size - offset)
-                        output.write(stable, offset, count)
-                        offset += count
-                    }
-                    output.flush()
-                    Thread.sleep(150L) // allow the inexpensive adapter's final transmit buffer to drain
+                    writePacedBluetoothPrint(stable, output::write, output::flush, Thread::sleep)
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: IOException) { throw IOException("Printer connection interrupted. A receipt may be partial; check it before retrying.", error) }

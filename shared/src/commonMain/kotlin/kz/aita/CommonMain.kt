@@ -1740,7 +1740,7 @@ private fun MutableList<Byte>.startReceiptEscPosDocument() {
 }
 
 private fun MutableList<Byte>.finishReceiptEscPosDocument() {
-    addEscPosText("\n\n")
+    addEscPosCommand(0x1B, 0x4A, 200) // Same bounded tear-bar clearance as raster receipts.
     addEscPosCommand(0x1D, 0x56, 0x42, 0x00) // partial cut when supported; ignored by many tear-bar 58mm devices
 }
 

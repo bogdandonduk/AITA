@@ -59,7 +59,7 @@ class ReceiptRasterTest {
     }
     @Test fun feedAndCutOccurAfterImageData() {
         val encoder=ReceiptRasterEncoder(); encoder.strip(8,1,IntArray(8))
-        assertEquals(listOf(0x1b,0x64,3,0x1d,0x56,0x42,0),encoder.finish().takeLast(7).map { it.toInt() and 255 })
+        assertEquals(listOf(0x1b,0x4a,200,0x1d,0x56,0x42,0),encoder.finish().takeLast(7).map { it.toInt() and 255 })
     }
     @Test fun largerJobsHaveABoundedDeadlineWithoutRetries() {
         assertTrue(receiptPrinterWriteTimeoutMillis(100000) > receiptPrinterWriteTimeoutMillis(1000))

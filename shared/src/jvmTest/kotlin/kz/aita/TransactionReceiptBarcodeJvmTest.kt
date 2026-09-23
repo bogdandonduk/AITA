@@ -83,7 +83,31 @@ class TransactionReceiptBarcodeJvmTest {
         assertEquals(594, barcodeScanLine.size)
         assertTrue(barcodeScanLine.chunked(2).all { it[0] == it[1] })
         assertEquals(payload, decode(barcodeScanLine.toBooleanArray()))
-        assertEquals(listOf(0x1b, 0x64, 3, 0x1d, 0x56, 0x42, 0), bytes.drop(offset).map { it.toInt() and 255 })
+        assertEquals(listOf(0x1b, 0x4a, 200, 0x1d, 0x56, 0x42, 0), bytes.drop(offset).map { it.toInt() and 255 })
+    }
+
+    @Test fun completeHorizontalFooterDecodesFromTheActualThermalByteStream() {
+        for (number in listOf("00000000", "FFFFFFFF", "9A765ABC", "O9A765ABC")) {
+            val payload = assertNotNull(compactReceiptBarcodePayload(number))
+            val bytes = assertNotNull(renderReceiptRaster(listOf("AITA", "Thank you"), payload))
+            val rows = ArrayList<BooleanArray>()
+            var offset = 7
+            while (offset + 8 <= bytes.size && bytes[offset] == 0x1d.toByte() && bytes[offset + 1] == 0x76.toByte()) {
+                val stride = (bytes[offset + 4].toInt() and 255) + ((bytes[offset + 5].toInt() and 255) shl 8)
+                val height = (bytes[offset + 6].toInt() and 255) + ((bytes[offset + 7].toInt() and 255) shl 8)
+                assertEquals(48, stride)
+                repeat(height) { y -> rows += BooleanArray(384) { x ->
+                    (bytes[offset + 8 + y * stride + x / 8].toInt() and (0x80 ushr (x % 8))) != 0
+                } }
+                offset += 8 + stride * height
+            }
+            val footer = rows.drop(64)
+            assertEquals(112, footer.size)
+            assertTrue(footer.take(8).all { row -> row.none { it } })
+            assertTrue(footer.takeLast(8).all { row -> row.none { it } })
+            for (row in footer.drop(8).take(96)) assertEquals(payload, decode(row))
+            assertEquals(listOf(0x1b, 0x4a, 200, 0x1d, 0x56, 0x42, 0), bytes.drop(offset).map { it.toInt() and 255 })
+        }
     }
 
     @Test fun rotatedAndHorizontalVectorBarsDecodeWithoutFontOrThemeDependencies() {

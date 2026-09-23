@@ -107,6 +107,9 @@ function Query($sql) {
 @{upgradeCode=(Query "SELECT ``Value`` FROM ``Property`` WHERE ``Property``='UpgradeCode'");
   version=(Query "SELECT ``Value`` FROM ``Property`` WHERE ``Property``='ProductVersion'");
   removeExisting=(Query "SELECT ``Sequence`` FROM ``InstallExecuteSequence`` WHERE ``Action``='RemoveExistingProducts'");
+  initialize=(Query "SELECT ``Sequence`` FROM ``InstallExecuteSequence`` WHERE ``Action``='InstallInitialize'");
+  installFiles=(Query "SELECT ``Sequence`` FROM ``InstallExecuteSequence`` WHERE ``Action``='InstallFiles'");
+  filesInUseDialog=(Query "SELECT ``Dialog`` FROM ``Dialog`` WHERE ``Dialog``='MsiRMFilesInUse'");
   relatedProducts=(Query 'SELECT `UpgradeCode` FROM `Upgrade`') } | ConvertTo-Json -Compress
 '''
     output = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
@@ -117,6 +120,8 @@ function Query($sql) {
     if (identity['upgradeCode'].strip('{}').upper() != UPGRADE_CODE or identity['version'] != version or
             not identity['removeExisting'] or identity['relatedProducts'].strip('{}').upper() != UPGRADE_CODE):
         raise RuntimeError('MSI must preserve AITA identity and remove related older versions during an upgrade')
+    if not (int(identity['initialize']) < int(identity['removeExisting']) < int(identity['installFiles'])) or identity['filesInUseDialog'] != 'MsiRMFilesInUse':
+        raise RuntimeError('MSI must support rollback and a Restart Manager files-in-use dialog')
     return identity
 
 

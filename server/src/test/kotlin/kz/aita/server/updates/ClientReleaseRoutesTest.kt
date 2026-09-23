@@ -53,6 +53,21 @@ class ClientReleaseRoutesTest {
             assertEquals(HttpStatusCode.NotFound,client.get("/client-updates/artifacts/secret.txt").status)
         }
     }
+    @Test fun interruptedInstallerCanResumeWithAnExactBoundedRange() = temporary { root ->
+        val directory = Files.createDirectory(root.resolve("artifacts"))
+        val name = "c".repeat(64) + ".exe"
+        Files.writeString(directory.resolve(name), "0123456789")
+        testApplication {
+            application { routing { installClientUpdateRoutes(ClientReleaseCatalog(root, pair.public.encoded) { now }) } }
+            val response = client.get("/client-updates/artifacts/$name") { header(HttpHeaders.Range, "bytes=4-") }
+            assertEquals(HttpStatusCode.PartialContent, response.status)
+            assertEquals("bytes 4-9/10", response.headers[HttpHeaders.ContentRange])
+            assertEquals("6", response.headers[HttpHeaders.ContentLength])
+            assertEquals("456789", response.bodyAsText())
+            assertEquals(HttpStatusCode.RequestedRangeNotSatisfiable,
+                client.get("/client-updates/artifacts/$name") { header(HttpHeaders.Range, "bytes=20-") }.status)
+        }
+    }
     @Test fun symlinkedInstallerIsNotServed()=temporary{root->
         val directory=Files.createDirectory(root.resolve("artifacts"));val outside=Files.createTempFile("aita-external-",".pkg").toRealPath();val name="b".repeat(64)+".pkg"
         try {Files.writeString(outside,"abc");Files.createSymbolicLink(directory.resolve(name),outside)

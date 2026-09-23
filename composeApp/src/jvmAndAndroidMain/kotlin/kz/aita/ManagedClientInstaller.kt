@@ -4,8 +4,6 @@ import kz.aita.updates.*
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
-import java.net.InetAddress
-import java.net.URL
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
@@ -75,59 +73,18 @@ internal class ManagedClientInstaller(
         if (j.releaseId != release.id || j.build != release.build || j.fileName != fileName(release, artifact)) return@withContext null
         runCatching { verifiedFile(j,artifact); j }.getOrNull()
     }
-    private fun openDownload(url: String): HttpURLConnection {
-        var next = url
-        repeat(6) {
-            if (!isPublicClientReleaseUrl(next)) throw ClientUpdateFailure("integrity")
-            val parsed = URL(next)
-            val addresses = InetAddress.getAllByName(parsed.host)
-            if (addresses.isEmpty() || addresses.any { it.isAnyLocalAddress || it.isLoopbackAddress || it.isLinkLocalAddress ||
-                    it.isSiteLocalAddress || it.isMulticastAddress || (it.address.size == 4 && (it.address[0].toInt() and 255) == 100 && (it.address[1].toInt() and 192) == 64) }) throw ClientUpdateFailure("integrity")
-            val connection = parsed.openConnection() as HttpURLConnection
-            connection.instanceFollowRedirects = false
-            connection.connectTimeout = 15_000; connection.readTimeout = 30_000
-            connection.setRequestProperty("Accept-Encoding", "identity")
-            connection.setRequestProperty("Cache-Control", "no-cache")
-            // This is NOT the application's authenticated HTTP client. Never attach account headers/cookies.
-            val code = try { connection.responseCode } catch (e: Exception) { connection.disconnect(); throw e }
-            if (code in setOf(301,302,303,307,308)) {
-                val location = connection.getHeaderField("Location") ?: run { connection.disconnect(); throw ClientUpdateFailure("network") }
-                next = URL(parsed,location).toExternalForm(); connection.disconnect()
-            } else {
-                if (code != 200) { connection.disconnect(); throw ClientUpdateFailure("network") }
-                return connection
-            }
-        }
-        throw ClientUpdateFailure("network")
-    }
     suspend fun prepare(release: ClientRelease, artifact: ClientArtifact, progress: (Long,Long)->Unit): PreparedClientInstaller = withContext(Dispatchers.IO) {
         if (!artifact.isFile || artifact.bytes !in 1..CLIENT_INSTALLER_MAX_BYTES) throw ClientUpdateFailure("integrity")
         restore(release, artifact)?.let { return@withContext it }
         val name = fileName(release, artifact); val part = child("$name.part"); val complete = child(name)
-        val connection = testConnection?.invoke(artifact.url) ?: openDownload(artifact.url)
         try {
-            val declared = connection.getHeaderField("Content-Length")?.toLongOrNull()
-            if (declared != null && declared != artifact.bytes) throw ClientUpdateFailure("integrity")
-            if (root.usableSpace < artifact.bytes + 16L*1024*1024) throw ClientUpdateFailure("space")
-            val digest = MessageDigest.getInstance("SHA-256"); var count = 0L; var reported = 0L
-            connection.inputStream.use { input -> FileOutputStream(part).use { out ->
-                val buffer = ByteArray(64*1024)
-                while (true) {
-                    currentCoroutineContext().ensureActive()
-                    val n = input.read(buffer); if (n < 0) break
-                    count += n
-                    if (count > artifact.bytes) throw ClientUpdateFailure("integrity")
-                    digest.update(buffer,0,n); out.write(buffer,0,n)
-                    if (count - reported >= 256*1024L) { progress(count, artifact.bytes); reported = count }
-                }
-                out.fd.sync()
-            } }
-            val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
-            if (count != artifact.bytes || actual != artifact.sha256) throw ClientUpdateFailure("integrity")
+            if (root.usableSpace < artifact.bytes + 16L * 1024 * 1024) throw ClientUpdateFailure("space")
+            transferVerifiedClientFile(part, artifact.url, artifact.bytes, artifact.sha256, progress,
+                connectionFactory = { url, offset -> testConnection?.invoke(url) ?: publicDownloadConnection(url, offset) })
             replace(part, complete)
-            val record = PreparedClientInstaller(release.id,release.build,release.channel,name,actual,count,System.currentTimeMillis())
-            save(record); progress(count,count); record
-        } finally { connection.disconnect(); if(part.exists()) part.delete() }
+            val record = PreparedClientInstaller(release.id, release.build, release.channel, name, artifact.sha256, artifact.bytes, System.currentTimeMillis())
+            save(record); record
+        } finally { if (part.exists()) part.delete() }
     }
     suspend fun clean(installed: ClientBuildIdentity) = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()

@@ -57,8 +57,10 @@ internal class ContactEmailConfirmationState(
     var error by mutableStateOf("")
     var disposed = false
     val registration: Boolean get() = target.purpose == AitaContactPurpose.REGISTRATION
-    fun ownsCurrentSession(): Boolean = !disposed && authenticatedSessionGenerationIsCurrent(generation) &&
-        userAccountState.payloadValue?.id == owner && (registration || owner != null)
+    fun ownsCurrentSession(): Boolean = !disposed && generation == currentAuthenticatedSessionGeneration() &&
+        userAccountState.payloadValue?.id == owner &&
+        if (registration) owner == null && getStoredUserAuthTokens?.invoke() == null
+        else owner != null && authenticatedSessionGenerationIsCurrent(generation)
     private fun fresh(): List<Accepted> {
         // Observe the ticker for rendering; re-read the monotonic clock at the actual Save click too.
         @Suppress("UNUSED_VARIABLE") val tick = clockTick
@@ -196,7 +198,7 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
                     placeholderText = "000000", identityKey = "contact-code-${state.flow?.flowId}",
                     enabled = allowed, keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go,
                     onImeAction = verify, leadingIconPath = stateValues.drawablePathIconEmail,
-                    sensitive = true, parentOwnsValue = true, onTransformValue = { it.filter { c -> c in '0'..'9' }.take(6) })
+                    sensitive = true, parentOwnsValue = true, onTransformValue = { aitaAuthCodeDigits(it).take(6) })
                 actionButton(Modifier.fillMaxWidth(), text = contactText("confirm"), enabled = allowed && state.code.length == 6,
                     loading = state.busy, autoLoading = false, onClick = verify)
                 Text(contactText("expires", mapOf("seconds" to countdown.expiresSeconds.toString())),

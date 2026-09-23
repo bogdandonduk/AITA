@@ -224,6 +224,7 @@ class Run:
     def verify(self):
         self.command('Shared, UI and server regression checks', ['bash', './gradlew', ':shared:jvmTest', ':composeApp:jvmTest', ':server:test',
             '--no-daemon', '--no-watch-fs', '--max-workers=4', '--console=plain'])
+        self.command('Browser interrupted-download recovery', ['node', '--test', 'scripts/linux-web/test/download-recovery.test.cjs'])
         self.command('Release automation tests', [sys.executable, '-m', 'unittest', 'discover', '-s', 'scripts/releases', '-p', 'test_*.py'])
 
     def unchanged(self):
@@ -314,6 +315,8 @@ class Run:
                          ['node', 'scripts/linux-web/test/app-smoke.cjs'])
             if dist:
                 self.env['AITA_WEB_DIST'] = str(dist)
+                self.command('Guest registration email confirmation in the browser',
+                             ['node', 'scripts/linux-web/test/registration-confirmation-smoke.cjs'])
                 self.command('Profile photo chooser, save and cancellation in the browser',
                              ['node', 'scripts/linux-web/test/profile-photo-smoke.cjs'])
                 self.command('Marketplace browsing, saved shops and shopping trip in the browser',

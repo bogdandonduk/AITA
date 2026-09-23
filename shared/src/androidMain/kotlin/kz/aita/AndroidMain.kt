@@ -158,8 +158,7 @@ object ReceiptPlatformAndroidBridge {
             val socket = device.createRfcommSocketToServiceRecord(bluetoothSerialPortProfileUuid)
             try {
                 socket.connect()
-                socket.outputStream.write(printerBytes)
-                socket.outputStream.flush()
+                writePacedBluetoothPrint(printerBytes, socket.outputStream::write, socket.outputStream::flush, Thread::sleep)
                 true
             } finally {
                 runCatching { socket.close() }

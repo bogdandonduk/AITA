@@ -24,6 +24,11 @@ tasks.withType<AbstractJPackageTask>().configureEach {
         val installerIcon = layout.projectDirectory.file("src/jvmMain/resources/drawable/app_icon.ico")
         inputs.file(installerIcon)
         freeArgs.addAll("--icon", installerIcon.asFile.absolutePath)
+        val installerResources = rootProject.layout.projectDirectory.dir("build/windows-installer-resources")
+        if (installerResources.file("main.wxs").asFile.isFile) {
+            inputs.dir(installerResources)
+            freeArgs.addAll("--resource-dir", installerResources.asFile.absolutePath)
+        }
     }
 }
 

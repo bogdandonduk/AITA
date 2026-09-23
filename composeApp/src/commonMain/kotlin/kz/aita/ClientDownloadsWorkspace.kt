@@ -83,8 +83,9 @@ internal object DownloadsWorkspace {
                 if (response.status in setOf(204, 404)) return@launch
                 if (response.status != 200) throw ClientUpdateFailure("network")
                 val verified = verifyClientReleaseEnvelope(response.text, key, backend::verify) ?: throw ClientUpdateFailure("integrity")
-                if (clientReleaseProblem(verified.release, backend.nowMillis(), channel) != null ||
-                    isClientReleaseRollback(verified, accepted) || verifiedDownloadVersions(verified.release) == null) throw ClientUpdateFailure("integrity")
+                val releaseProblem = clientReleaseProblem(verified.release, backend.nowMillis(), channel)
+                if (releaseProblem != null) throw ClientUpdateFailure(if (releaseProblem == "expired") "expired" else "integrity")
+                if (isClientReleaseRollback(verified, accepted) || verifiedDownloadVersions(verified.release) == null) throw ClientUpdateFailure("integrity")
                 writeClientUpdatePreference(preference, verified.envelope)
                 accepted = verified
                 expose(verified.release)

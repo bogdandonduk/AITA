@@ -61,10 +61,10 @@ private suspend fun openDesktopInstaller(release: ClientRelease, artifact: Clien
     when (clientUpdatePlatform().os) {
         ClientOs.WINDOWS -> {
             val launcher = windowsUpdateLauncher(System.getProperty("jpackage.app-path"))
-            if (artifact.kind == InstallerKind.MSI && launcher != null && clientReleaseIsNewer(release, installedClientBuild())) {
+            if (artifact.kind in setOf(InstallerKind.MSI, InstallerKind.EXE) && launcher != null) {
                 withContext(Dispatchers.Main) { AppStateWorkspace.flush() }
                 flushCartsBeforeClientUpdate()
-                if (!startWindowsUpdateHandoff(file, artifact.sha256, launcher)) throw ClientUpdateFailure("install")
+                if (!startWindowsUpdateHandoff(file, artifact.sha256, launcher, unattended = clientReleaseIsNewer(release, installedClientBuild()))) throw ClientUpdateFailure("install")
                 // Helper has verified the file and is waiting for this exact process to exit.
                 // The new process acknowledges the build before ManagedClientInstaller cleans up.
                 kotlin.system.exitProcess(0)

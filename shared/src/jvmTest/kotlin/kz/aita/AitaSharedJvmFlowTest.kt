@@ -57,6 +57,7 @@ private class AitaFlowTestEnvironment {
     var activeWorkshift: WorkshiftDataModel? = null
     var stock: List<GoodsItemDataModel> = emptyList()
     var stockReadFailureStatus: HttpStatusCode? = null
+    var subscriptionReadFailureStatus: HttpStatusCode? = null
     var batches: List<GoodsBatchDataModel> = emptyList()
     var availability: StockItemBranchAvailabilityDataModel = aitaTestAvailability()
     var transactions: List<TransactionDataModel> = emptyList()
@@ -176,6 +177,26 @@ class AitaSharedJvmFlowTest {
         runCatching { testSqlDriver?.close() }
         testSqlDriver = null
         
+    }
+
+    @Test fun deniedSubscriptionCanRefreshAfterAccessIsRestoredOnServer() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        refreshStoreSubscriptionNow(AITA_FLOW_SOURCE_STORE_ID)
+        assertTrue(currentStoreHasSubscriptionAccess(AITA_FLOW_SOURCE_STORE_ID))
+        invalidateStoreSubscriptionAccess(AITA_FLOW_SOURCE_STORE_ID)
+        assertFalse(currentStoreHasSubscriptionAccess(AITA_FLOW_SOURCE_STORE_ID))
+        assertNull(checkStoreSubscriptionForNetwork("stock/get", AITA_FLOW_SOURCE_STORE_ID))
+        assertTrue(currentStoreHasSubscriptionAccess(AITA_FLOW_SOURCE_STORE_ID))
+    }
+
+    @Test fun unavailableProofReadDoesNotInventSubscriptionDenialOrGrantOfflineAccess() = runBlocking {
+        userAccountState.emit(DataState.Success(aitaTestUserAccount()))
+        environment.subscriptionReadFailureStatus = HttpStatusCode.ServiceUnavailable
+        assertNull(checkStoreSubscriptionForNetwork("stock/get", AITA_FLOW_SOURCE_STORE_ID))
+        assertFalse(currentStoreHasSubscriptionAccess(AITA_FLOW_SOURCE_STORE_ID))
+        environment.subscriptionReadFailureStatus = null
+        assertNull(checkStoreSubscriptionForNetwork("stock/get", AITA_FLOW_SOURCE_STORE_ID))
+        assertTrue(currentStoreHasSubscriptionAccess(AITA_FLOW_SOURCE_STORE_ID))
     }
 
     @Test
@@ -1928,6 +1949,10 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             )
         }
 
+        environment.subscriptionReadFailureStatus?.let { status ->
+            if (path == globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first.trim('/'))
+                return@MockEngine respond(aitaTestNegativeEnvelope("Temporary subscription read failure"), status, aitaFlowResponseHeaders())
+        }
         if (path == "stores/get") {
             environment.beforeStoresReply?.invoke()
             environment.storesFailureStatus?.let { status -> return@MockEngine respond(

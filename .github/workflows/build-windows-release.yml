@@ -145,6 +145,8 @@ jobs:
             $signature = Get-AuthenticodeSignature 'composeApp/build/compose/binaries/main/app/AITA/AITA.exe'
             if ($signature.Status -ne 'Valid' -or -not $signature.TimeStamperCertificate) { throw 'Application launcher lacks valid timestamped signature' }
           }
+          python scripts/releases/prepare-windows-installer.py
+          if ($LASTEXITCODE -ne 0) { throw 'Safe Windows installer preparation failed' }
           ./gradlew.bat :composeApp:packageMsi :composeApp:packageExe -x :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
           if ($LASTEXITCODE -ne 0) { throw 'Installer packaging failed' }
           New-Item -ItemType Directory -Force build/windows-signing | Out-Null

@@ -7,7 +7,7 @@ import kotlinx.coroutines.delay
 internal fun windowsUpdateLauncher(path: String?): File? = path?.takeIf { it.none { c -> c.code < 32 || c == '"' } }
     ?.let(::File)?.takeIf { it.isAbsolute && it.isFile && it.name.equals("AITA.exe", true) }
 
-/** The signed feed authenticates the MSI even during the explicitly unsigned Windows pilot.
+/** The signed feed authenticates the installer even during the explicitly unsigned Windows pilot.
  * Windows Installer owns major upgrades and removal of superseded program files. This helper
  * never deletes an installation directory, app data, database, credential or pending transaction.
  */
@@ -29,19 +29,37 @@ function Get-AitaInstallerHash([string]${'$'}path) {
 }
 try {
     if (-not (Test-Path -LiteralPath ${'$'}launcher -PathType Leaf)) { throw 'Installed AITA launcher is missing' }
-    if ([IO.Path]::GetExtension(${'$'}installer) -ne '.msi') { throw 'Automatic update requires MSI' }
+    ${'$'}kind = [IO.Path]::GetExtension(${'$'}installer).ToLowerInvariant()
+    if (${'$'}kind -notin @('.msi', '.exe')) { throw 'Unsupported Windows installer' }
     if ((Get-AitaInstallerHash ${'$'}installer) -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer checksum mismatch' }
     [IO.File]::WriteAllText(${'$'}ready, 'ready')
     ${'$'}parent = Get-Process -Id ${'$'}parentId -ErrorAction SilentlyContinue
     if (${'$'}parent -and -not ${'$'}parent.WaitForExit(120000)) { throw 'AITA did not finish saving; installation was cancelled' }
     ${'$'}parentExited = ${'$'}true
     if ((Get-AitaInstallerHash ${'$'}installer) -ne ${'$'}env:AITA_UPDATE_SHA256) { throw 'Installer changed after handoff' }
+    # Another AITA window or native printer child may still hold runtime DLLs.
+    # Wait for only the exact installed launcher; never kill a process or discard drafts.
+    ${'$'}deadline = [DateTime]::UtcNow.AddSeconds(120)
+    do {
+        ${'$'}holders = @(Get-Process -Name AITA -ErrorAction SilentlyContinue | Where-Object {
+            try { ${'$'}_.Path -eq ${'$'}launcher } catch { ${'$'}false }
+        })
+        if (${'$'}holders.Count -eq 0) { break }
+        if ([DateTime]::UtcNow -ge ${'$'}deadline) { throw 'Close all AITA windows and retry the update' }
+        Start-Sleep -Milliseconds 500
+    } while (${'$'}true)
     # jpackage's MSI exposes INSTALLDIR. Preserve a user's chosen installation folder
     # so the verified existing launcher path remains the relaunch path after the upgrade.
     ${'$'}installDirectory = [IO.Path]::GetDirectoryName(${'$'}launcher)
     ${'$'}installArgument = if (${'$'}installDirectory -match '\s') { 'INSTALLDIR="' + ${'$'}installDirectory.TrimEnd('\') + '"' } else { 'INSTALLDIR=' + ${'$'}installDirectory }
-    ${'$'}arguments = '/i "' + ${'$'}installer + '" ' + ${'$'}installArgument + ' /passive /norestart /L*V "' + ${'$'}log + '"'
-    ${'$'}result = Start-Process -FilePath (Join-Path ${'$'}env:SystemRoot 'System32\msiexec.exe') -ArgumentList ${'$'}arguments -Verb RunAs -Wait -PassThru
+    if (${'$'}kind -eq '.msi') {
+        ${'$'}ui = if (${'$'}env:AITA_UPDATE_UNATTENDED -eq 'true') { ' /passive' } else { '' }
+        ${'$'}arguments = '/i "' + ${'$'}installer + '" ' + ${'$'}installArgument + ${'$'}ui + ' /norestart /L*V "' + ${'$'}log + '"'
+        ${'$'}result = Start-Process -FilePath (Join-Path ${'$'}env:SystemRoot 'System32\msiexec.exe') -ArgumentList ${'$'}arguments -Verb RunAs -Wait -PassThru
+    } else {
+        # EXE wrapper owns its wizard/UAC. It must also start only after AITA releases its DLLs.
+        ${'$'}result = Start-Process -FilePath ${'$'}installer -Verb RunAs -Wait -PassThru
+    }
     if (${'$'}result.ExitCode -notin @(0, 3010)) { throw ('Windows Installer returned ' + ${'$'}result.ExitCode) }
     Write-Output 'AITA update installed. Starting the updated app.'
 } catch {
@@ -55,9 +73,9 @@ try {
 }
 """.trimIndent()
 
-internal suspend fun startWindowsUpdateHandoff(installer: File, hash: String, launcher: File, relaunch: Boolean = true): Boolean {
+internal suspend fun startWindowsUpdateHandoff(installer: File, hash: String, launcher: File, relaunch: Boolean = true, unattended: Boolean = true): Boolean {
     require(Regex("[a-f0-9]{64}").matches(hash))
-    require(installer.extension.equals("msi", true) && installer.absolutePath.none { it.code < 32 || it == '"' })
+    require(installer.extension.lowercase() in setOf("msi", "exe") && installer.absolutePath.none { it.code < 32 || it == '"' })
     val folder = installer.parentFile
     val identity = UUID.randomUUID().toString()
     val script = File(folder, "handoff-$identity.ps1")
@@ -71,7 +89,7 @@ internal suspend fun startWindowsUpdateHandoff(installer: File, hash: String, la
                 environment().putAll(mapOf("AITA_UPDATE_READY" to ready.absolutePath, "AITA_UPDATE_LAUNCHER" to launcher.absolutePath,
                     "AITA_UPDATE_INSTALLER" to installer.absolutePath, "AITA_UPDATE_PARENT" to ProcessHandle.current().pid().toString(),
                     "AITA_UPDATE_LOG" to log.absolutePath, "AITA_UPDATE_SHA256" to hash,
-                    "AITA_UPDATE_RELAUNCH" to relaunch.toString()))
+                    "AITA_UPDATE_RELAUNCH" to relaunch.toString(), "AITA_UPDATE_UNATTENDED" to unattended.toString()))
                 redirectErrorStream(true); redirectOutput(File(folder, "handoff-$identity.log"))
             }.start()
     } catch (error: Exception) { script.delete(); throw error }

@@ -140,7 +140,7 @@ internal class ReceiptRasterEncoder(private val documentCommands: Boolean = true
 
     fun finish(): ByteArray {
         if (documentCommands) {
-            command(0x1b, 0x64, 3) // feed three lines only after all raster strips
+            command(0x1b, 0x4a, 200) // ~25 mm: expose the footer beyond a manual tear bar, independently of line spacing
             command(0x1d, 0x56, 0x42, 0) // optional cutter, as in the existing receipt path
         }
         return buffer.copyOf(size)

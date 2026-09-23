@@ -64,7 +64,7 @@ internal fun AppConfiguration.AuthEmailCodeEntry(
         aitaFormTextField(
             modifier = Modifier.fillMaxWidth(), value = value, onValueChange = onValueChange,
             titleText = authUiText("Email code", "Код из письма", "Email коды", "Электрондук почтадагы код"), placeholderText = "000000",
-            identityKey = identity, enabled = !busy, sensitive = true,
+            identityKey = identity, enabled = !busy, sensitive = true, parentOwnsValue = true,
             keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go,
             onImeAction = { if (!busy && !countdown.expired && value.length == 6) onSubmit() },
             leadingIconPath = stateValues.drawablePathIconEmail,
@@ -136,7 +136,7 @@ internal fun AppConfiguration.AuthenticatorCodeEntryField(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp), value = value, onValueChange = onValueChange,
         titleText = authUiText("Authenticator / recovery code", "Аутентификатор / резервный код", "Аутентификатор / резервтік код", "Аутентификатор / калыбына келтирүү коду"),
         placeholderText = "000000", placeholderContent = { AuthenticatorCodePlaceholder(!busy) },
-        identityKey = identity, enabled = !busy, sensitive = true,
+        identityKey = identity, enabled = !busy, sensitive = true, parentOwnsValue = true,
         keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Go, onImeAction = onSubmit,
         leadingIconPath = stateValues.drawablePathIconSecurity, onTransformValue = { it.take(32) }
     )

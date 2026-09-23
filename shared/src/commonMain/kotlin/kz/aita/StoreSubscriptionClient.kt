@@ -142,7 +142,7 @@ suspend fun refreshStoreSubscriptionNow(storeId: String, onlyIfUnknown: Boolean 
     return subscriptionReadMutex.withLock {
         if (!authenticatedSessionGenerationIsCurrent(generation) || currentSubscriptionAccountId() != account)
             return@withLock cloudSessionExpiredResponse()
-        if (onlyIfUnknown && subscriptionCacheKey(account, storeId) in verifiedSubscriptions.value)
+        if (onlyIfUnknown && currentStoreHasSubscriptionAccess(storeId))
             return@withLock ResponseDataModel(null, null, false)
         if (inventoryOwnerIsCurrent(owner) && activeStoreIdState.value == storeId) subscriptionLoadingStoreIdState.value = storeId
         try {
@@ -236,16 +236,19 @@ suspend fun checkStoreSubscriptionForNetwork(endpoint: String, storeId: String?)
         return if (currentStoreHasWorkspaceAccess(store)) null else eventMessage("subscription.verify")
     }
     if (currentStoreHasSubscriptionAccess(store)) return null
-    val account = currentSubscriptionAccountId() ?: return eventMessage("subscription.verify")
+    currentSubscriptionAccountId() ?: return null // Network authentication returns the actual session failure.
     restoreStoreSubscriptionCache(store)
     if (currentStoreHasSubscriptionAccess(store)) return null
-    val known = verifiedSubscriptions.value[subscriptionCacheKey(account, store)]
-    if (known == null && subscriptionCacheKey(account, store) !in deniedSubscriptionKeys.value)
-        refreshStoreSubscriptionNow(store, onlyIfUnknown = true)
+    // A previous denial, expired proof or clock adjustment must recover after reconnect/renewal.
+    // The read mutex coalesces concurrent successful refreshes for the same store.
+    refreshStoreSubscriptionNow(store, onlyIfUnknown = true)
     return when (currentStoreSubscriptionGate(store)) {
         StoreSubscriptionGate.Active -> null
         StoreSubscriptionGate.Required -> eventMessage("subscription.required")
-        StoreSubscriptionGate.Checking -> eventMessage("subscription.verify")
+        // Absence of a local proof is not an authoritative 402. Let this network request
+        // reach the server, which verifies the store subscription itself. Offline writes
+        // still require a valid cached proof; a failed network call never grants one.
+        StoreSubscriptionGate.Checking -> null
     }
 }
 

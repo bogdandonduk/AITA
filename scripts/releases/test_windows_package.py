@@ -48,7 +48,7 @@ class WindowsPackageTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'EXE must display the AITA icon'):
                 verifier.verify_icon(Path(sys.executable), aita_icon)
 
-    def inspect(self, version='1.0.2', upgrade=verifier.UPGRADE_CODE, remove=True):
+    def inspect(self, version='1.0.2', upgrade=verifier.UPGRADE_CODE, remove=True, transactional=True, dialog=True):
         with TemporaryDirectory(prefix="AITA MSI ' ") as name:
             path = Path(name) / 'identity.msi'
             script = r'''$ErrorActionPreference='Stop'
@@ -59,18 +59,23 @@ function Execute($sql) {
 }
 Execute 'CREATE TABLE `Property` (`Property` CHAR(72) NOT NULL, `Value` CHAR(0) LOCALIZABLE PRIMARY KEY `Property`)'
 Execute 'CREATE TABLE `Upgrade` (`UpgradeCode` CHAR(38) NOT NULL PRIMARY KEY `UpgradeCode`)'
+Execute 'CREATE TABLE `Dialog` (`Dialog` CHAR(72) NOT NULL PRIMARY KEY `Dialog`)'
 Execute 'CREATE TABLE `InstallExecuteSequence` (`Action` CHAR(72) NOT NULL, `Sequence` SHORT PRIMARY KEY `Action`)'
 Execute "INSERT INTO ``Property`` (``Property``, ``Value``) VALUES ('UpgradeCode', '{$env:AITA_TEST_UPGRADE}')"
 Execute "INSERT INTO ``Property`` (``Property``, ``Value``) VALUES ('ProductVersion', '$env:AITA_TEST_VERSION')"
 Execute "INSERT INTO ``Upgrade`` (``UpgradeCode``) VALUES ('{$env:AITA_TEST_UPGRADE}')"
+Execute "INSERT INTO ``InstallExecuteSequence`` (``Action``, ``Sequence``) VALUES ('InstallInitialize', 1500)"
+Execute "INSERT INTO ``InstallExecuteSequence`` (``Action``, ``Sequence``) VALUES ('InstallFiles', 4000)"
+if ($env:AITA_TEST_DIALOG -eq 'true') { Execute "INSERT INTO ``Dialog`` (``Dialog``) VALUES ('MsiRMFilesInUse')" }
+$removeSequence = if ($env:AITA_TEST_TRANSACTIONAL -eq 'true') { 1501 } else { 801 }
 if ($env:AITA_TEST_REMOVE -eq 'true') {
-  Execute "INSERT INTO ``InstallExecuteSequence`` (``Action``, ``Sequence``) VALUES ('RemoveExistingProducts', 1401)"
+  Execute "INSERT INTO ``InstallExecuteSequence`` (``Action``, ``Sequence``) VALUES ('RemoveExistingProducts', $removeSequence)"
 }
 [void]$db.Commit()
 '''
             result = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script],
                 env=dict(os.environ, AITA_TEST_MSI=str(path), AITA_TEST_VERSION=version,
-                         AITA_TEST_UPGRADE=upgrade, AITA_TEST_REMOVE=str(remove).lower()),
+                         AITA_TEST_UPGRADE=upgrade, AITA_TEST_REMOVE=str(remove).lower(), AITA_TEST_TRANSACTIONAL=str(transactional).lower(), AITA_TEST_DIALOG=str(dialog).lower()),
                 text=True, capture_output=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             return verifier.verify_upgrade_identity(path, '1.0.2')
@@ -78,8 +83,14 @@ if ($env:AITA_TEST_REMOVE -eq 'true') {
     def test_com_returns_scalar_identity_and_upgrade_action(self):
         identity = self.inspect()
         self.assertTrue(all(isinstance(value, str) for value in identity.values()), identity)
-        self.assertEqual(identity['removeExisting'], '1401')
+        self.assertEqual(identity['removeExisting'], '1501')
         self.assertEqual(identity['version'], '1.0.2')
+
+    def test_removal_before_rollback_or_missing_close_apps_dialog_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, 'rollback'):
+            self.inspect(transactional=False)
+        with self.assertRaisesRegex(RuntimeError, 'Restart Manager'):
+            self.inspect(dialog=False)
 
     def test_wrong_product_version_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'preserve AITA identity'):

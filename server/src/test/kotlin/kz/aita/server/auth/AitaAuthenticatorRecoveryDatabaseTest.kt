@@ -122,7 +122,7 @@ class AitaAuthenticatorRecoveryDatabaseTest {
                         "V96__verified_additional_login_emails.sql", "V97__authenticator_login_requirement.sql",
                         "V98__authenticator_sign_in_and_email_recovery.sql",
                         "V99__email_second_factor_and_single_extra_email.sql",
-                        "V111__scoped_contact_email_confirmation.sql", "V119__new_device_sign_in_notices.sql", "V127__distinct_device_security_sessions.sql").forEach { name ->
+                        "V111__scoped_contact_email_confirmation.sql", "V119__new_device_sign_in_notices.sql", "V127__distinct_device_security_sessions.sql", "V130__email_resend_response_recovery.sql").forEach { name ->
                         val sql = requireNotNull(javaClass.getResourceAsStream("/db/migration/$name")).bufferedReader().use { it.readText() }
                         exec(sql)
                     }
@@ -616,6 +616,36 @@ class AitaAuthenticatorRecoveryDatabaseTest {
         assertEquals(flow.expiresAtMillis, replacement.expiresAtMillis)
         assertNull(service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(flow.flowId, correct), "192.0.2.43"))
         assertNotNull(service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(replacement.flowId, code(replacement.flowId)), "192.0.2.43"))
+    }
+
+    @Test fun lostContactResendResponseRecoversTheSameChallengeWithoutSendingAgain() = fixture {
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(registrationTarget(), extraEmail), "192.0.2.80"))
+        sql { AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId eq UUID.fromString(flow.flowId) }) { it[resendAfterMillis] = 1L } }
+        val resend = AitaEmailCodeResendRequestDataModel(flow.flowId)
+        val replacement = assertNotNull(service.resendContactCode(null, resend, "192.0.2.80"))
+        val recovered = assertNotNull(service.resendContactCode(null, resend, "192.0.2.80"))
+        assertEquals(replacement.flowId, recovered.flowId)
+        assertEquals(replacement.expiresAtMillis, recovered.expiresAtMillis)
+        assertEquals(2L, sql { AuthEmailOutbox.selectAll().count() })
+        val verified = service.verifyContactCode(null, AitaEmailCodeVerifyRequestDataModel(recovered.flowId, code(recovered.flowId)), "192.0.2.80")
+        assertNotNull(verified)
+        assertNull(service.resendContactCode(null, resend, "192.0.2.80"))
+    }
+
+    @Test fun lostLoginAndPasswordRecoveryResendResponsesRecoverWithoutExtendingTheirBudget() = fixture {
+        user()
+        service.settings(sql { Users.selectAll().single()[Users.id] })
+        for (purpose in listOf("PASSWORDLESS_LOGIN", "PASSWORD_RECOVERY")) {
+            val flow = service.requestEmailCode(mainEmail, purpose, "en", "192.0.2.81")
+            sql { AuthOneTimeChallenges.update({ AuthOneTimeChallenges.publicId eq UUID.fromString(flow.flowId) }) { it[resendAfterMillis] = 1L } }
+            val replacement = assertNotNull(service.resend(flow.flowId, "en", "192.0.2.81", purpose))
+            val recovered = assertNotNull(service.resend(flow.flowId, "en", "192.0.2.81", purpose))
+            assertEquals(replacement.flowId, recovered.flowId)
+            assertEquals(replacement.expiresAtMillis, recovered.expiresAtMillis)
+            assertNull(service.resend(flow.flowId, "en", "192.0.2.81", if (purpose == "PASSWORDLESS_LOGIN") "PASSWORD_RECOVERY" else "PASSWORDLESS_LOGIN"))
+            assertNotNull(service.verifyEmailCode(AitaEmailCodeVerifyRequestDataModel(recovered.flowId, code(recovered.flowId)), purpose, device))
+            assertNull(service.resend(flow.flowId, "en", "192.0.2.81", purpose))
+        }
     }
 
     @Test fun contactProofCannotCrossPurposeDraftAddressOrActor() = fixture {

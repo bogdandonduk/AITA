@@ -15,28 +15,48 @@ private fun saveDownloadWeb(url: String, expected: Double, hash: String, fileNam
     catch (_) { result('unavailable'); return; }
     (async () => {
       let writer = null, reader = null;
-      const controller = new AbortController();
+      let controller = new AbortController();
       let timer;
       const armTimeout = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), 30000); };
       try {
         const handle = await selection;
-        armTimeout();
-        const response = await fetch(url, {credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal});
-        if (!response.ok || !response.body) throw Error('network');
-        const declared = response.headers.get('Content-Length');
-        if (declared !== null && Number(declared) !== expected) throw Error('integrity');
-        reader = response.body.getReader();
-        const chunks = []; let count = 0, reported = 0;
-        while (true) {
-          const chunk = await reader.read();
-          if (chunk.done) break;
-          armTimeout(); count += chunk.value.byteLength;
-          if (count > expected) throw Error('integrity');
-          chunks.push(chunk.value);
-          if (count - reported >= 262144) { progress(count,expected); reported = count; }
+        let chunks = [], count = 0, reported = 0;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          controller = new AbortController();
+          armTimeout();
+          try {
+            const response = await fetch(url, {credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal,
+              headers:count > 0 ? {'Range':'bytes='+count+'-'} : {}});
+            if (!response.ok || !response.body) throw Error('network');
+            const range = response.headers.get('Content-Range');
+            if (response.status === 206) {
+              const match = range && /^bytes ([0-9]+)-([0-9]+)\/([0-9]+)$/.exec(range);
+              if (!match || Number(match[1]) !== count || Number(match[2]) !== expected-1 || Number(match[3]) !== expected) throw Error('integrity');
+            } else if (response.status === 200) {
+              if (count > 0) { chunks = []; count = 0; reported = 0; progress(0,expected); }
+            } else throw Error('network');
+            const declared = response.headers.get('Content-Length');
+            if (declared !== null && Number(declared) !== expected-count) throw Error('integrity');
+            reader = response.body.getReader();
+            while (true) {
+              const chunk = await reader.read();
+              if (chunk.done) break;
+              armTimeout(); count += chunk.value.byteLength;
+              if (count > expected) throw Error('integrity');
+              chunks.push(chunk.value);
+              if (count - reported >= 262144) { progress(count,expected); reported = count; }
+            }
+            if (count !== expected) throw Error('network');
+            break;
+          } catch (error) {
+            if (error && error.message === 'integrity') throw error;
+            if (attempt === 3) throw Error('network');
+          } finally {
+            clearTimeout(timer); controller.abort();
+            if (reader) { try { await reader.cancel(); } catch (_) {} reader = null; }
+          }
+          await new Promise(resolve => setTimeout(resolve, 500 * (1 << attempt)));
         }
-        clearTimeout(timer);
-        if (count !== expected) throw Error('integrity');
         const blob = new Blob(chunks, {type:'application/octet-stream'}); chunks.length = 0;
         const digest = await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());
         const actual = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2,'0')).join('');

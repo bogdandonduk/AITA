@@ -10,22 +10,22 @@ import unittest
 
 @unittest.skipUnless(os.name == 'nt', 'PowerShell handoff is executed by Windows CI')
 class WindowsHandoffTests(unittest.TestCase):
-    def simulate(self, matching=True, exit_code=0, relaunch=True):
+    def simulate(self, matching=True, exit_code=0, relaunch=True, kind="msi"):
         source = (Path(__file__).resolve().parents[2] / 'composeApp/src/jvmMain/kotlin/kz/aita/WindowsUpdateHandoff.kt').read_text()
         script = source.split('internal val windowsUpdateScript = """', 1)[1].split('""".trimIndent()', 1)[0].replace("${'$'}", '$')
         with TemporaryDirectory(prefix="AITA pilot ' ") as name:
             folder = Path(name)
-            installer = folder / 'update.msi'; installer.write_bytes(b'installer-test')
+            installer = folder / ('update.' + kind); installer.write_bytes(b'installer-test')
             launcher = folder / 'AITA.exe'; launcher.write_bytes(b'launcher-test')
             user_data = folder / 'pending-transactions.db'; user_data.write_bytes(b'keep this work')
             helper = folder / 'helper.ps1'; output = folder / 'calls.json'
             prefix = '''$script:calls = [System.Collections.Generic.List[string]]::new()
-function Get-Process { param($Id, $ErrorAction) return $null }
+function Get-Process { param($Id, $Name, $ErrorAction) return $null }
 function Start-Process {
  param($FilePath, $ArgumentList, $Verb, [switch]$Wait, [switch]$PassThru)
  $script:calls.Add($FilePath)
- if ($FilePath.EndsWith('msiexec.exe')) {
-   [IO.File]::WriteAllText($env:AITA_TEST_INSTALL_ARGS, $ArgumentList)
+ if ($FilePath.EndsWith('msiexec.exe') -or $FilePath -eq $env:AITA_UPDATE_INSTALLER) {
+   [IO.File]::WriteAllText($env:AITA_TEST_INSTALL_ARGS, [string]$ArgumentList)
    return [pscustomobject]@{ ExitCode = [int]$env:AITA_TEST_EXIT }
  }
 }
@@ -43,9 +43,11 @@ function Start-Process {
             self.assertFalse(helper.exists())
             self.assertEqual(len(calls), (2 if relaunch else 1) if matching else 0, execution.stdout + execution.stderr)
             if matching and relaunch: self.assertEqual(calls[-1], str(launcher))
-            if matching: self.assertIn('INSTALLDIR="' + str(folder) + '"', (folder / 'args.txt').read_text(encoding='utf-8-sig'))
+            if matching and kind == "msi": self.assertIn('INSTALLDIR="' + str(folder) + '"', (folder / 'args.txt').read_text(encoding='utf-8-sig'))
             if not matching: self.assertIn('Installer checksum mismatch', execution.stdout)
             if matching and exit_code == 1602: self.assertIn('Windows Installer returned 1602', execution.stdout)
+
+    def test_exe_also_waits_then_relaunches(self): self.simulate(kind="exe")
 
     def test_normal_close_installs_without_reopening_the_application(self): self.simulate(relaunch=False)
     def test_installs_and_relaunches_without_deleting_local_work(self): self.simulate()

@@ -1,5 +1,8 @@
 package kz.aita.server.updates
 
+import io.ktor.server.plugins.partialcontent.PartialContent
+import io.ktor.server.application.install
+
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.config.ApplicationConfig
@@ -67,6 +70,7 @@ internal class ClientReleaseCatalog(private val directory: Path?, private val pu
 
 internal fun Route.installClientUpdateRoutes(catalog: ClientReleaseCatalog) {
     route("/client-updates") {
+        install(PartialContent)
         get("/{channel}.json") {
             val channel = when (call.parameters["channel"]) { "release" -> ReleaseChannel.RELEASE; "test" -> ReleaseChannel.TEST; else -> null }
             if (channel == null) { call.respond(HttpStatusCode.NotFound); return@get }
