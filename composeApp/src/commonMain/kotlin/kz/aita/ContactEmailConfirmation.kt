@@ -220,6 +220,9 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
 @Composable
 internal fun AppConfiguration.RegistrationEmailConfirmationScreen(pending: UserAuthSignUpDataModel, onBack: () -> Unit) {
     val confirmation = rememberContactEmailConfirmation(AitaContactPurpose.REGISTRATION, "", listOf(pending.email))
+    val scope = rememberCoroutineScope()
+    var existingAccount by remember { mutableStateOf<Boolean?>(null) }
+    var recoveryIdentifier by remember { mutableStateOf(pending.email) }
     val busy = stateValues.signUpInProgress
     Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.width(stateValues.boundWidgetWidth), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -227,10 +230,33 @@ internal fun AppConfiguration.RegistrationEmailConfirmationScreen(pending: UserA
                 fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
             Text(contactText("registration_detail"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             ContactEmailConfirmationContent(confirmation, enabled = !busy)
-            actionButton(Modifier.fillMaxWidth(), text = contactText("create_account"), enabled = confirmation.ready && !busy,
+            if (existingAccount != true) actionButton(Modifier.fillMaxWidth(), text = contactText("create_account"), enabled = confirmation.ready && !busy,
                 loading = busy, autoLoading = false) {
                 if (confirmation.ready && !stateValues.signUpInProgress) signUpUser(pending.copy(
-                    contactVerificationId = confirmation.draftId, contactEmailProofs = confirmation.proofs))
+                    contactVerificationId = confirmation.draftId, contactEmailProofs = confirmation.proofs), onFailure = { response ->
+                    scope.launch {
+                        if (response.httpStatusCode == 409 || response.httpStatusCode == 403 || response.transportFailure ||
+                            (response.httpStatusCode ?: 0) >= 500) {
+                            existingAccount = response.httpStatusCode == 409
+                            recoveryIdentifier = registrationRecoveryIdentifier(pending, response.message)
+                        }
+                    }
+                })
+            }
+            if (existingAccount != null) {
+                Text(contactText(if (existingAccount == true) "registration_exists" else "registration_uncertain"),
+                    color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+                fun openExisting(recover: Boolean) {
+                    scope.launch {
+                        registrationLoginEntry.value = RegistrationLoginEntry(recoveryIdentifier, recover)
+                        Navigation.UserAuth.clearLeft()
+                        onBack()
+                    }
+                }
+                actionButton(Modifier.fillMaxWidth(), text = contactText("existing_login"), enabled = !busy,
+                    autoLoading = false, onClick = { openExisting(false) })
+                actionButton(Modifier.fillMaxWidth(), text = authUiText("Forgot password?", "Забыли пароль?", "Құпия сөзді ұмыттыңыз ба?", "Сырсөздү унуттуңузбу?"), enabled = !busy,
+                    autoLoading = false, onClick = { openExisting(true) })
             }
             actionButton(Modifier.fillMaxWidth(), text = contactText("back"), enabled = !busy,
                 autoLoading = false, onClick = { if (!busy) onBack() })

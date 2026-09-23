@@ -101,3 +101,24 @@ test('large cache chunk batch persists once and a quota failure preserves the co
   assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key=?', ['cache-chunk-127']), [[rows[127][1]]]);
   await p.close();
 });
+
+
+test('startup cache cleanup skips empty deletes but persists real deletion without bypassing storage failures', async () => {
+  let p = await page();
+  await sql(p, 'CREATE TABLE IF NOT EXISTS key_value (key TEXT PRIMARY KEY, value TEXT)');
+  await sql(p, 'INSERT OR REPLACE INTO key_value VALUES (?, ?)', ['startup-saved', 'kept']);
+  const before = await p.evaluate(() => durableWrites);
+  for (let i=0;i<35;i++) await sql(p, 'DELETE FROM key_value WHERE key = ?', ['missing-startup-'+i]);
+  assert.equal(await p.evaluate(() => durableWrites), before);
+  await sql(p, 'DELETE FROM key_value WHERE key = ?', ['startup-saved']);
+  assert.equal(await p.evaluate(() => durableWrites), before+1);
+  await p.close(); p = await page();
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key = ?', ['startup-saved']), []);
+  await sql(p, 'INSERT OR REPLACE INTO key_value VALUES (?, ?)', ['cleanup-quota', 'keep-at-quota']);
+  await p.close(); p = await page(true);
+  // An empty cleanup also succeeds at quota; a real deletion must never be acknowledged there.
+  await sql(p, 'DELETE FROM key_value WHERE key = ?', ['missing-startup']);
+  await assert.rejects(sql(p, 'DELETE FROM key_value WHERE key = ?', ['cleanup-quota']), /quota failure/);
+  assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key = ?', ['cleanup-quota']), [['keep-at-quota']]);
+  await p.close();
+});

@@ -306,7 +306,7 @@ internal fun AppConfiguration.AuthPreferencesChooser(
     val themeTitle = stateValues.stringAppTheme
     val scaleTitle = localizedStringResource(910, "UI scale")
     Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
         AuthTinyChoiceChip(false, stateValues.appLanguage.uppercase(), contentDescription = languageTitle) { open = "language" }
         AuthTinyChoiceChip(false, "", contentDescription = themeTitle, iconPath = stateValues.drawablePathIconThemeDark,
             iconRes = stateValues.drawableResIconThemeDark.value) { open = "theme" }

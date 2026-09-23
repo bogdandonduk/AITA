@@ -147,6 +147,28 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
         password = ""; code = ""; newPassword = ""; repeatPassword = ""; error = ""
     }
 
+    val registrationEntry by registrationLoginEntry.collectAsState()
+    LaunchedEffect(registrationEntry) {
+        val entry = registrationEntry ?: return@LaunchedEffect
+        if (!registrationLoginEntry.compareAndSet(entry, null)) return@LaunchedEffect
+        if (entry.generation != currentAuthenticatedSessionGeneration() || getStoredUserAuthTokens?.invoke() != null) return@LaunchedEffect
+        reset(if (entry.recoverPassword) AitaLoginMode.RECOVERY else AitaLoginMode.PASSWORD)
+        selectedSavedUserId = null
+        if (normalizeAitaEmail(entry.identifier) != null) {
+            identifierType = AitaLoginIdentifierType.EMAIL
+            email = entry.identifier
+        } else {
+            identifierType = AitaLoginIdentifierType.PHONE
+            val digits = entry.identifier.removePrefix("+")
+            val country = countries.sortedByDescending { it.phoneNumberCode.length }
+                .firstOrNull { digits.startsWith(it.phoneNumberCode) }
+            if (country != null) {
+                phoneCountry = "+" + country.phoneNumberCode
+                phone = digits.removePrefix(country.phoneNumberCode)
+            }
+        }
+    }
+
     suspend fun finishSignIn() {
         val generation = installedSessionGeneration ?: pendingTokens?.let { tokens ->
             adoptAdvancedAuthenticationTokens(tokens).also {

@@ -563,6 +563,62 @@ class AitaAuthenticatorRecoveryDatabaseTest {
 
     private fun registrationTarget() = aitaContactDraftTarget(AitaContactPurpose.REGISTRATION, "", UUID.randomUUID().toString())
 
+    @Test fun failedFirstSessionRollsBackRegistrationAndLeavesEmailProofReusable() = fixture {
+        val target = registrationTarget()
+        val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(target, extraEmail), "192.0.2.90"))
+        val proof = assertNotNull(service.verifyContactCode(null,
+            AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)), "192.0.2.90")).proof
+        val accountId = UUID.randomUUID()
+        val hash = Pw.hash(password.toCharArray())
+        suspend fun register() = tokens.newPairForRegistration(accountId, device) {
+            val proofs = service.requireContactProofsInside(null, target, listOf(extraEmail), emptyList(), listOf(proof))
+            Users.insert {
+                it[id] = accountId; it[publicId] = "NEW-ACCOUNT"; it[phoneNumber] = mainPhone
+                it[email] = extraEmail; it[firstName] = "Test"; it[lastName] = "Registration"
+                it[countryLocale] = "kz"; it[passwordHash] = hash
+            }
+            service.consumeContactProofsInside(proofs, accountId)
+            service.markPrimaryEmailVerifiedInside(accountId, extraEmail)
+            true
+        }
+        sql {
+            exec("CREATE FUNCTION reject_first_session() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''simulated session failure''; END;'")
+            exec("CREATE TRIGGER reject_first_session BEFORE INSERT ON refresh_sessions FOR EACH ROW EXECUTE FUNCTION reject_first_session()")
+        }
+        assertFailsWith<ExposedSQLException> { register() }
+        sql {
+            assertEquals(0L, Users.selectAll().count())
+            assertEquals(0L, AuthLoginEmails.selectAll().count())
+            assertEquals(0L, RefreshSessions.selectAll().count())
+            assertNull(AuthContactVerifications.selectAll().single()[AuthContactVerifications.appliedEntityId])
+            exec("DROP TRIGGER reject_first_session ON refresh_sessions")
+        }
+        assertNotNull(register())
+        sql {
+            assertEquals(1L, Users.selectAll().count())
+            assertEquals(1L, RefreshSessions.selectAll().count())
+            assertEquals(accountId, AuthContactVerifications.selectAll().single()[AuthContactVerifications.appliedEntityId])
+        }
+        // Losing the HTTP response after commit must still leave a usable existing account.
+        val login = assertNotNull(service.passwordLogin(AitaPasswordLoginRequestDataModel(extraEmail, password), device))
+        assertEquals(AitaAuthNextStep.AUTHENTICATED, login.nextStep)
+        assertNotNull(login.tokenPair)
+        assertEquals(1L, sql { Users.selectAll().count() })
+    }
+
+    @Test fun legacyUnconfirmedAccountCanRecoverWithoutRegisteringOrLosingItsIdentity() = fixture {
+        val accountId = user()
+        assertNull(sql { AuthLoginEmails.selectAll().single()[AuthLoginEmails.verifiedAtMillis] })
+        val flow = service.requestEmailCode(mainEmail, "PASSWORD_RECOVERY", "en", "192.0.2.91")
+        val verified = assertNotNull(service.verifyEmailCode(AitaEmailCodeVerifyRequestDataModel(flow.flowId, code(flow.flowId)),
+            "PASSWORD_RECOVERY", device))
+        val replacement = "Replacement-Password-021!"
+        assertTrue(service.resetPassword(AitaPasswordRecoveryResetRequestDataModel(flow.flowId, verified.resetTicket, replacement)))
+        val login = assertNotNull(service.passwordLogin(AitaPasswordLoginRequestDataModel(mainEmail, replacement), device))
+        assertEquals(AitaAuthNextStep.AUTHENTICATED, login.nextStep)
+        assertEquals(accountId, sql { Users.selectAll().single()[Users.id] })
+    }
+
     @Test fun registrationQueuesAnAnonymousContactWithoutCreatingAnAccountOrLoginSession() = fixture {
         val target = registrationTarget()
         val flow = assertNotNull(service.requestContactCode(null, AitaContactCodeRequest(target, extraEmail), "192.0.2.40"))

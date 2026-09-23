@@ -16411,7 +16411,8 @@ fun logInUser(userAuthLogIn: UserAuthLogInDataModel, serverUrlOverride: String? 
     }
 }
 
-fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: String? = null) {
+fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: String? = null,
+    onFailure: ((ResponseDataModel<TokenPair>) -> Unit)? = null) {
     GlobalScope.launch(Dispatchers.ourIo) {
         if (!signUpUserMutex.tryLock()) {
             postInAppNotification(
@@ -16441,6 +16442,7 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
             )
 
             if (response.negative || response.payload == null) {
+                onFailure?.invoke(response)
                 clearTransientOrNeutralInAppNotifications()
                 postInAppNotificationNow(
                     response.message ?: localizedStringResourceMessage(
@@ -16470,6 +16472,7 @@ fun signUpUser(userAuthSignUp: UserAuthSignUpDataModel, serverUrlOverride: Strin
             }
         } catch (throwable: Throwable) {
             if (throwable is CancellationException) throw throwable
+            onFailure?.invoke(ResponseDataModel<TokenPair>(message = null, payload = null, negative = true, transportFailure = true))
             clearTransientOrNeutralInAppNotifications()
             postInAppNotificationNow(
                 localizedStringResourceMessage(

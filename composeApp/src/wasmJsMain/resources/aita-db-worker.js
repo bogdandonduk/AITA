@@ -68,15 +68,22 @@ async function execute(request) {
     switch (request.action) {
         case 'exec': {
             if (!request.sql) throw new Error('Missing SQL query');
+            const statement = request.sql.trim().replace(/;\s*$/, '');
+            // Startup clears obsolete account cache keys. A missing key changes nothing;
+            // exporting and committing the whole inventory database for each such DELETE
+            // delays every following read. Count trigger changes too; all real writes
+            // still wait for IndexedDB durability before acknowledgement.
+            const cacheDelete = /^DELETE\s+FROM\s+key_value\b/i.test(statement) && !statement.includes(';');
+            const changesBefore = cacheDelete ? database.exec('SELECT total_changes()')[0].values[0][0] : null;
             result = database.exec(request.sql, request.params)[0] || result;
             // A CTE can precede UPDATE/DELETE/INSERT as well as SELECT. Do not acknowledge
             // one of those writes without storing it just because a nested SELECT exists.
             // Ambiguous statements are deliberately treated as writes.
-            const statement = request.sql.trim().replace(/;\s*$/, '');
             const readOnly = /^PRAGMA\s+user_version\s*$/i.test(statement) ||
                 (/^(SELECT\b|WITH\b[\s\S]*?\bSELECT\b)/i.test(statement) && !statement.includes(';') &&
                     !/\b(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|PRAGMA|VACUUM|REINDEX|ATTACH|DETACH|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(statement));
-            if (!readOnly) {
+            const unchangedDelete = cacheDelete && database.exec('SELECT total_changes()')[0].values[0][0] === changesBefore;
+            if (!readOnly && !unchangedDelete) {
                 if (inTransaction) transactionChanged = true;
                 else await persist();
             }

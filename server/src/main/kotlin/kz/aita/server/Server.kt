@@ -3163,6 +3163,20 @@ class TokenService(private val cfg: JwtConfig) {
     userId: UUID,
     metaParam: Map<String, String>?,
     verifyInsideTransaction: () -> Boolean
+  ): TokenPair? = issueNewPair(userId, metaParam, verifyInsideTransaction = verifyInsideTransaction)
+
+  /** Account, confirmed contact, and first session commit together or all roll back. */
+  internal suspend fun newPairForRegistration(
+    userId: UUID,
+    metaParam: Map<String, String>?,
+    createInsideTransaction: () -> Boolean
+  ): TokenPair? = issueNewPair(userId, metaParam, createInsideTransaction) { true }
+
+  private suspend fun issueNewPair(
+    userId: UUID,
+    metaParam: Map<String, String>?,
+    createInsideTransaction: (() -> Boolean)? = null,
+    verifyInsideTransaction: () -> Boolean
   ): TokenPair? = coroutineScope {
     val refreshPlain = Refresh.newPlainToken()
     val refreshHash = Refresh.hash(refreshPlain)
@@ -3171,12 +3185,14 @@ class TokenService(private val cfg: JwtConfig) {
     val expires = REFRESH_SESSION_NEVER_EXPIRES_AT
     val sessionId = UUID.randomUUID()
 
-    val signAccessAsync = async(Dispatchers.Default) {
+    // A signing failure must happen before committing the account/session, too.
+    val accessToken = withContext(Dispatchers.Default) {
       signAccess(userId, sessionId, now)
     }
 
     val issued = newSuspendedTransaction(aitaServerIoContext) {
       maxAttempts = 1 // The credential verifier must not be invoked again by an implicit SQL retry.
+      if (createInsideTransaction != null && !createInsideTransaction()) return@newSuspendedTransaction false
       Users
         .selectAll()
         .where { Users.id eq userId }
@@ -3224,12 +3240,11 @@ class TokenService(private val cfg: JwtConfig) {
     }
 
     if (!issued) {
-      signAccessAsync.cancel()
       return@coroutineScope null
     }
     RealtimeServerBus.publish(entity = "notifications", userId = userId.toString(), reason = "signed_in")
     TokenPair(
-      signAccessAsync.await(),
+      accessToken,
       REFRESH_SESSION_NEVER_EXPIRES_AT_MILLIS,
       refreshPlain,
       REFRESH_SESSION_NEVER_EXPIRES_AT_MILLIS
@@ -18530,16 +18545,17 @@ fun Application.module() {
 
           var state23505Reached: Boolean
           var lateUniqueConflictResult = 0
+          var registeredTokens: TokenPair? = null
 
           do {
             state23505Reached = try {
               id = UUID.randomUUID()
 
-              newSuspendedTransaction(aitaServerIoContext) {
+              registeredTokens = tokenService.newPairForRegistration(id, metaFrom(call, body.deviceInfo)) {
                 lockPhoneLoginIdentityInside(phoneNumber)
                 if (phoneLoginIdentityHasOtherOwnerInside(phoneNumber)) {
                   lateUniqueConflictResult = 2
-                  return@newSuspendedTransaction false
+                  return@newPairForRegistration false
                 }
                 val emailProofIds = contactAuth.requireContactProofsInside(null, contactTarget, listOf(email), emptyList(), body.contactEmailProofs)
                 Users.insert {
@@ -18563,8 +18579,9 @@ fun Application.module() {
 
                 contactAuth.consumeContactProofsInside(emailProofIds, id)
                 contactAuth.markPrimaryEmailVerifiedInside(id, email)
-                false
+                true
               }
+              false
             } catch (exception: ExposedSQLException) {
               val constraint = (exception.cause as? PSQLException)?.serverErrorMessage?.constraint.orEmpty()
               val isUniqueCollision = exception.sqlState == "23505"
@@ -18604,9 +18621,7 @@ fun Application.module() {
             )
           }
 
-          id?.run {
-            val tokenPair: TokenPair = tokenService.newPair(this, metaFrom(call, body.deviceInfo))
-
+          registeredTokens?.let { tokenPair ->
             call.genericTokenPairResponse(
               status = HttpStatusCode.Created,
               payload = tokenPair
