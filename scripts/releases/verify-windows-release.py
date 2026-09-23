@@ -121,7 +121,7 @@ function Query($sql) {
             not identity['removeExisting'] or identity['relatedProducts'].strip('{}').upper() != UPGRADE_CODE):
         raise RuntimeError('MSI must preserve AITA identity and remove related older versions during an upgrade')
     if not (int(identity['initialize']) < int(identity['removeExisting']) < int(identity['installFiles'])) or identity['filesInUseDialog'] != 'MsiRMFilesInUse':
-        raise RuntimeError('MSI must support rollback and a Restart Manager files-in-use dialog')
+        raise RuntimeError('MSI must support rollback and a Restart Manager files-in-use dialog: ' + json.dumps(identity))
     return identity
 
 
