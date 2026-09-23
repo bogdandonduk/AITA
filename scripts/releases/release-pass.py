@@ -47,6 +47,15 @@ def ordered_release_targets(targets):
     return (["server"] if "server" in targets else []) + [t for t in targets if t not in {"server", "windows"}] + (["windows"] if "windows" in targets else [])
 
 
+def publish_completed_targets(run, targets):
+    if not all(run.state['stages'].get(t, {}).get('status') == 'complete' for t in targets):
+        run.say('HELD', 'Updater and GitHub publication wait for every requested platform to pass. Verified local artifacts and logs are retained.')
+        return False
+    if 'server' in targets and not run.stage('updater-feed', run.updater_feed):
+        return False
+    return run.stage('github', run.publish)
+
+
 def read_release_notes(path=None):
     notes = json.loads(Path(path).read_text()) if path else {
         'en': 'AITA release. See the versioned release record for changes and verification.',
@@ -509,12 +518,8 @@ def main():
                 results.append(False)
                 continue
             results.append(run.stage(target, getattr(run, target)))
-        if args.publish and 'server' in targets:
-            results.append(run.stage('updater-feed', run.updater_feed))
-        if args.publish and all(run.state['stages'].get(t, {}).get('status') == 'complete' for t in targets):
-            results.append(run.stage('github', run.publish))
-        elif args.publish:
-            run.say('HELD', 'GitHub publication waits for every requested client platform to pass. Verified local artifacts and logs are retained.')
+        if args.publish:
+            results.append(publish_completed_targets(run, targets))
         return 0 if all(results) else 1
     except Exception as error:
         run.say('STOP', str(error)); run.say('NEXT STEP', advice(error)); return 1

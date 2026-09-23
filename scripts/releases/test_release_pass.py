@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 def module(name, filename):
@@ -21,6 +21,27 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_incomplete_platform_never_publishes_a_partial_update_feed(self):
+        targets = ['android', 'windows', 'web', 'server']
+        for status in (None, 'running', 'failed', 'held'):
+            run = Mock()
+            run.state = {'stages': {t: {'status': 'complete'} for t in targets}}
+            if status is None:
+                del run.state['stages']['windows']
+            else:
+                run.state['stages']['windows']['status'] = status
+            self.assertFalse(release.publish_completed_targets(run, targets))
+            run.stage.assert_not_called()
+
+    def test_complete_release_publishes_feed_then_github_and_stops_on_feed_failure(self):
+        for feed_ok in (False, True):
+            run = Mock()
+            run.state = {'stages': {t: {'status': 'complete'} for t in ('android', 'server')}}
+            run.stage.side_effect = [feed_ok, True]
+            self.assertEqual(feed_ok, release.publish_completed_targets(run, ['android', 'server']))
+            self.assertEqual(['updater-feed', 'github'] if feed_ok else ['updater-feed'],
+                             [call.args[0] for call in run.stage.call_args_list])
+
     def test_compatible_backend_precedes_web_and_windows_collection_stays_last(self):
         self.assertEqual(['server', 'android', 'web', 'windows'], release.ordered_release_targets(['android', 'windows', 'web', 'server']))
         self.assertEqual(['web', 'windows'], release.ordered_release_targets(['windows', 'web']))
