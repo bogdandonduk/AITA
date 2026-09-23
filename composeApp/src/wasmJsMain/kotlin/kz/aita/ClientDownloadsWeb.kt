@@ -72,9 +72,10 @@ private fun saveDownloadWeb(url: String, expected: Double, hash: String, fileNam
         progress(count,expected); result('');
       } catch (error) {
         if (writer) { try { await writer.abort(); } catch (_) {} }
-        result(error && error.name === 'AbortError' && !controller.signal.aborted ? 'cancelled' :
-          error && ['integrity','network'].includes(error.message) ? error.message :
-          controller.signal.aborted || error && error.name === 'TypeError' ? 'network' : 'storage');
+        // Network timeouts are classified inside the transfer loop. Its cleanup also aborts
+        // the controller after success, so that signal must not classify picker/disk errors.
+        result(error && error.name === 'AbortError' ? 'cancelled' :
+          error && ['integrity','network'].includes(error.message) ? error.message : 'storage');
       } finally {
         clearTimeout(timer); controller.abort();
         if (reader) { try { await reader.cancel(); } catch (_) {} }
