@@ -1,0 +1,134 @@
+{
+  "version": "1.1.7",
+  "build": 18,
+  "revision": "3d86f2a8ae715b0405b60da750907b778643fad0",
+  "tag": "v1.1.7-b18",
+  "createdAt": "2026-09-23T09:28:21Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.1.7-18-android.apk",
+      "sha256": "423a88546032f02bd71d9fa7fa9dff200ec78b4ad11c17eff57037cf54bd7122",
+      "bytes": 72020814,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/AITA-1.1.7-18-android.apk"
+    },
+    {
+      "name": "AITA-1.1.7-18-android.aab",
+      "sha256": "4de071e9bc6a84c81a4e9273bcd409ef3ba55e26d7808ce8bc0f0095ee331d14",
+      "bytes": 46689733,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/AITA-1.1.7-18-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "d36c0305b2aaf687e0afcf5cfa7401588125bed6e19061142884011d27a5538a",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.7-18-web.zip",
+      "sha256": "1d6a018cc21df0f89897e616182897a01df7a8d93b6a87285cc08d3f19ed1041",
+      "bytes": 12836677,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/AITA-1.1.7-18-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "d36c0305b2aaf687e0afcf5cfa7401588125bed6e19061142884011d27a5538a",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/web-client-build.json"
+    },
+    {
+      "name": "AITA-1.1.7-18-windows.exe",
+      "sha256": "71eb46bb904d6dfd6c2d009a029c154e35e64799d0c4c387c7c98dd79df7fb8f",
+      "bytes": 136627712,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/AITA-1.1.7-18-windows.exe"
+    },
+    {
+      "name": "AITA-1.1.7-18-windows.msi",
+      "sha256": "bb387420c361fff2765ddad2c7a652f1ac63b04bbea9cb05b87baf45dfac5ba3",
+      "bytes": 136028612,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/AITA-1.1.7-18-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "ea0201764e2960caae9e5a4347c6d197af44ee470623f93a5aa511f312cfc5ec",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "b16e2695d82ef0313efd8dce5868911b5817bec2dd7a697f5046725fc22bb24a",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.1.7-b18/windows-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Fixed registration email confirmation and recovery after interrupted code resends. Update downloads retry and resume safely while retaining signature and checksum verification. Windows updates close the app before replacing its runtime, and installers support files-in-use recovery. Bluetooth receipt delivery is paced and feeds the barcode beyond the tear edge. Subscription checks recover after temporary connection failures.",
+    "ru": "\u0418\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 email \u043f\u0440\u0438 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438 \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u0430\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0430 \u043a\u043e\u0434\u0430 \u043f\u0440\u0438 \u043e\u0431\u0440\u044b\u0432\u0435 \u0441\u0432\u044f\u0437\u0438. \u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0439 \u043f\u043e\u0432\u0442\u043e\u0440\u044f\u044e\u0442\u0441\u044f \u0438 \u043f\u0440\u043e\u0434\u043e\u043b\u0436\u0430\u044e\u0442\u0441\u044f \u0441 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u043e\u0439 \u043f\u043e\u0434\u043f\u0438\u0441\u0438 \u0438 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c\u043d\u043e\u0439 \u0441\u0443\u043c\u043c\u044b. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 Windows \u0437\u0430\u043a\u0440\u044b\u0432\u0430\u0435\u0442 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u043f\u0435\u0440\u0435\u0434 \u0437\u0430\u043c\u0435\u043d\u043e\u0439 \u0444\u0430\u0439\u043b\u043e\u0432; \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u0449\u0438\u043a \u043e\u0431\u0440\u0430\u0431\u0430\u0442\u044b\u0432\u0430\u0435\u0442 \u0437\u0430\u043d\u044f\u0442\u044b\u0435 \u0444\u0430\u0439\u043b\u044b. \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u0430 \u043f\u0435\u0440\u0435\u0434\u0430\u0447\u0430 \u0447\u0435\u043a\u0430 \u043f\u043e Bluetooth \u0438 \u043f\u043e\u0434\u0430\u0447\u0430 \u0431\u0443\u043c\u0430\u0433\u0438 \u043f\u043e\u0441\u043b\u0435 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0430. \u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u0430\u0432\u043b\u0438\u0432\u0430\u0435\u0442\u0441\u044f \u043f\u043e\u0441\u043b\u0435 \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0445 \u0441\u0431\u043e\u0435\u0432 \u0441\u0435\u0442\u0438.",
+    "kk": "\u0422\u0456\u0440\u043a\u0435\u043b\u0443 \u043a\u0435\u0437\u0456\u043d\u0434\u0435 email \u0440\u0430\u0441\u0442\u0430\u0443 \u0436\u04d9\u043d\u0435 \u0431\u0430\u0439\u043b\u0430\u043d\u044b\u0441 \u04af\u0437\u0456\u043b\u0433\u0435\u043d\u0434\u0435 \u043a\u043e\u0434\u0442\u044b \u049b\u0430\u0439\u0442\u0430 \u0436\u0456\u0431\u0435\u0440\u0443 \u0442\u04af\u0437\u0435\u0442\u0456\u043b\u0434\u0456. \u0416\u0430\u04a3\u0430\u0440\u0442\u0443 \u0436\u04af\u043a\u0442\u0435\u043c\u0435\u043b\u0435\u0440\u0456 \u049b\u043e\u043b\u0442\u0430\u04a3\u0431\u0430 \u043c\u0435\u043d \u0431\u0430\u049b\u044b\u043b\u0430\u0443 \u0441\u043e\u043c\u0430\u0441\u044b\u043d \u0442\u0435\u043a\u0441\u0435\u0440\u0435 \u043e\u0442\u044b\u0440\u044b\u043f \u0436\u0430\u043b\u0493\u0430\u0441\u0430\u0434\u044b. Windows \u0436\u0430\u04a3\u0430\u0440\u0442\u0443\u044b \u0444\u0430\u0439\u043b\u0434\u0430\u0440\u0434\u044b \u0430\u0443\u044b\u0441\u0442\u044b\u0440\u043c\u0430\u0441 \u0431\u04b1\u0440\u044b\u043d \u049b\u043e\u043b\u0434\u0430\u043d\u0431\u0430\u043d\u044b \u0436\u0430\u0431\u0430\u0434\u044b. Bluetooth \u0430\u0440\u049b\u044b\u043b\u044b \u0447\u0435\u043a \u0436\u0456\u0431\u0435\u0440\u0443 \u0436\u04d9\u043d\u0435 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0442\u0430\u043d \u043a\u0435\u0439\u0456\u043d \u049b\u0430\u0493\u0430\u0437 \u0431\u0435\u0440\u0443 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b. \u0423\u0430\u049b\u044b\u0442\u0448\u0430 \u0436\u0435\u043b\u0456 \u0430\u049b\u0430\u0443\u044b\u043d\u0430\u043d \u043a\u0435\u0439\u0456\u043d \u0436\u0430\u0437\u044b\u043b\u044b\u043c \u0442\u0435\u043a\u0441\u0435\u0440\u0443\u0456 \u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0435\u0434\u0456.",
+    "ky": "\u041a\u0430\u0442\u0442\u0430\u043b\u0443\u0443\u0434\u0430 email \u044b\u0440\u0430\u0441\u0442\u043e\u043e \u0436\u0430\u043d\u0430 \u0431\u0430\u0439\u043b\u0430\u043d\u044b\u0448 \u04af\u0437\u04af\u043b\u0433\u04e9\u043d\u0434\u04e9 \u043a\u043e\u0434\u0434\u0443 \u043a\u0430\u0439\u0440\u0430 \u0436\u04e9\u043d\u04e9\u0442\u04af\u04af \u043e\u04a3\u0434\u043e\u043b\u0434\u0443. \u0416\u0430\u04a3\u044b\u0440\u0442\u0443\u0443 \u0436\u04af\u043a\u0442\u04e9\u04e9\u043b\u04e9\u0440\u04af \u043a\u043e\u043b \u0442\u0430\u043c\u0433\u0430 \u043c\u0435\u043d\u0435\u043d \u0442\u0435\u043a\u0448\u0435\u0440\u04af\u04af \u0441\u0443\u043c\u043c\u0430\u0441\u044b\u043d \u0442\u0435\u043a\u0448\u0435\u0440\u0438\u043f \u0443\u043b\u0430\u043d\u0442\u044b\u043b\u0430\u0442. Windows \u0436\u0430\u04a3\u044b\u0440\u0442\u0443\u0443\u0441\u0443 \u0444\u0430\u0439\u043b\u0434\u0430\u0440\u0434\u044b \u0430\u043b\u043c\u0430\u0448\u0442\u044b\u0440\u0443\u0443\u0434\u0430\u043d \u043c\u0443\u0440\u0443\u043d \u043a\u043e\u043b\u0434\u043e\u043d\u043c\u043e\u043d\u0443 \u0436\u0430\u0431\u0430\u0442. Bluetooth \u0447\u0435\u043a\u0442\u0435\u0440\u0438\u043d \u0436\u04e9\u043d\u04e9\u0442\u04af\u04af \u0436\u0430\u043d\u0430 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0434\u043e\u043d \u043a\u0438\u0439\u0438\u043d \u043a\u0430\u0433\u0430\u0437 \u0431\u0435\u0440\u04af\u04af \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b. \u0423\u0431\u0430\u043a\u0442\u044b\u043b\u0443\u0443 \u0442\u0430\u0440\u043c\u0430\u043a \u043a\u0430\u0442\u0430\u0441\u044b\u043d\u0430\u043d \u043a\u0438\u0439\u0438\u043d \u0436\u0430\u0437\u044b\u043b\u0443\u0443 \u0442\u0435\u043a\u0448\u0435\u0440\u04af\u04af\u0441\u04af \u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0435\u0442.",
+    "uz": "Ro\u2018yxatdan o\u2018tishda emailni tasdiqlash va aloqa uzilganda kodni qayta yuborish tuzatildi. Yangilanishlarni yuklash imzo va nazorat summasini tekshirgan holda davom etadi. Windows yangilanishi fayllarni almashtirishdan oldin ilovani yopadi. Bluetooth cheklari uzatish va shtrix-koddan keyingi qog\u2018oz chiqarish yaxshilandi. Vaqtinchalik tarmoq xatosidan keyin obuna tekshiruvi tiklanadi.",
+    "tg": "\u04b2\u0430\u043d\u0433\u043e\u043c\u0438 \u0431\u0430\u049b\u0430\u0439\u0434\u0433\u0438\u0440\u04e3 \u0442\u0430\u0441\u0434\u0438\u049b\u0438 email \u0432\u0430 \u0444\u0438\u0440\u0438\u0441\u0442\u043e\u0434\u0430\u043d\u0438 \u0442\u0430\u043a\u0440\u043e\u0440\u0438\u0438 \u0440\u0430\u043c\u0437 \u0431\u0430\u044a\u0434\u0438 \u049b\u0430\u0442\u044a\u0438 \u0430\u043b\u043e\u049b\u0430 \u0438\u0441\u043b\u043e\u04b3 \u0448\u0443\u0434. \u0411\u043e\u0440\u0433\u0438\u0440\u0438\u0438 \u043d\u0430\u0432\u0441\u043e\u0437\u04e3 \u0431\u043e \u0441\u0430\u043d\u04b7\u0438\u0448\u0438 \u0438\u043c\u0437\u043e \u0432\u0430 \u043c\u0430\u0431\u043b\u0430\u0493\u0438 \u043d\u0430\u0437\u043e\u0440\u0430\u0442\u04e3 \u0438\u0434\u043e\u043c\u0430 \u043c\u0435\u0451\u0431\u0430\u0434. \u041d\u0430\u0432\u0441\u043e\u0437\u0438\u0438 Windows \u043f\u0435\u0448 \u0430\u0437 \u0438\u0432\u0430\u0437 \u043a\u0430\u0440\u0434\u0430\u043d\u0438 \u0444\u0430\u0439\u043b\u04b3\u043e \u0431\u0430\u0440\u043d\u043e\u043c\u0430\u0440\u043e \u043c\u0435\u0431\u0430\u043d\u0434\u0430\u0434. \u0424\u0438\u0440\u0438\u0441\u0442\u043e\u0434\u0430\u043d\u0438 \u0440\u0430\u0441\u0438\u0434 \u0442\u0430\u0432\u0430\u0441\u0441\u0443\u0442\u0438 Bluetooth \u0432\u0430 \u0431\u0430\u0440\u043e\u0432\u0430\u0440\u0434\u0430\u043d\u0438 \u043a\u043e\u0493\u0430\u0437 \u0431\u0430\u044a\u0434\u0438 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434 \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434. \u0421\u0430\u043d\u04b7\u0438\u0448\u0438 \u043e\u0431\u0443\u043d\u0430 \u0431\u0430\u044a\u0434\u0438 \u0445\u0430\u0442\u043e\u0438 \u043c\u0443\u0432\u0430\u049b\u049b\u0430\u0442\u0438\u0438 \u0448\u0430\u0431\u0430\u043a\u0430 \u0431\u0430\u0440\u049b\u0430\u0440\u043e\u0440 \u043c\u0435\u0448\u0430\u0432\u0430\u0434."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-23T08:58:44Z",
+      "finishedAt": "2026-09-23T08:58:45Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-23T08:58:45Z",
+      "finishedAt": "2026-09-23T09:03:56Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-23T09:03:56Z",
+      "finishedAt": "2026-09-23T09:03:57Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-23T09:03:57Z",
+      "finishedAt": "2026-09-23T09:04:44Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-23T09:17:43Z",
+      "finishedAt": "2026-09-23T09:17:45Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-23T09:17:45Z",
+      "finishedAt": "2026-09-23T09:24:37Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-23T09:24:37Z",
+      "finishedAt": "2026-09-23T09:26:31Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-23T09:26:31Z",
+      "finishedAt": "2026-09-23T09:28:20Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
