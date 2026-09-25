@@ -311,6 +311,7 @@ class Run:
         self.env['AITA_WEB_URL'] = 'https://aita.kz/'
         shots = self.folder / ('browser-before-upload' if dist else 'browser-live')
         shots.mkdir(exist_ok=True); self.env['AITA_ARTIFACTS'] = str(shots)
+        self.env['AITA_WEB_TEST_OUTPUT'] = str(shots / 'registration')
         server = None
         if dist:
             class Handler(http.server.SimpleHTTPRequestHandler):
@@ -372,8 +373,15 @@ class Run:
         run_id = self.state['windowsRun']
         self.command('Wait for Windows installers', ['gh', 'run', 'watch', str(run_id), '--repo', REPOSITORY, '--exit-status', '--interval', '30'])
         downloaded = self.folder / 'windows'
-        self.command('Download verified Windows artifacts', ['gh', 'run', 'download', str(run_id), '--repo', REPOSITORY,
-            '--name', f'AITA-Windows-{self.tag}' + ('' if self.args.windows_signing == 'trusted' else '-UNSIGNED-PILOT'), '--dir', str(downloaded)])
+        legacy = json.loads(capture(['gh', 'api', f'repos/{REPOSITORY}/actions/runs/{run_id}/artifacts']))
+        legacy_name = f'AITA-Windows-{self.tag}' + ('' if self.args.windows_signing == 'trusted' else '-UNSIGNED-PILOT')
+        if any(a['name'] == legacy_name and not a['expired'] for a in legacy['artifacts']):
+            self.command('Download verified Windows artifacts', ['gh', 'run', 'download', str(run_id), '--repo', REPOSITORY,
+                '--name', legacy_name, '--dir', str(downloaded)])
+        else:
+            self.command('Receive verified Windows artifacts from private draft', [sys.executable,
+                str(Path(__file__).with_name('windows-draft-artifacts.py')), 'download', '--run', str(run_id),
+                '--revision', self.revision, '--destination', str(downloaded)])
         receipt = json.loads((downloaded / 'windows-verification.json').read_text())
         require(receipt['revision'] == self.revision and receipt['version'] == self.args.version and int(receipt['build']) == self.args.build,
                 'Windows build identity mismatch')

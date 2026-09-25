@@ -36,6 +36,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows updater or package verifier tests failed' }
   windows:
     needs: handoff
+    permissions:
+      contents: write
     # Pilot artifacts can validate a review branch before its fast-forward to master.
     # Trusted signing is confined to master; publication still requires pushed master.
     if: github.ref == 'refs/heads/master' || inputs.production == false
@@ -172,22 +174,17 @@ jobs:
           python build/release-tools/scripts/releases/verify-windows-release.py --directory build/windows-signing --version $env:AITA_RELEASE_VERSION --build $env:AITA_RELEASE_BUILD --revision $env:AITA_RELEASE_REVISION --production $env:PRODUCTION --icon composeApp/src/jvmMain/resources/drawable/app_icon.ico
           if ($LASTEXITCODE -ne 0) { throw 'Windows release verification failed' }
       - name: Save signed release or explicitly unsigned pilot artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.production && format('AITA-Windows-v{0}-b{1}', inputs.version, inputs.build) || format('AITA-Windows-v{0}-b{1}-UNSIGNED-PILOT', inputs.version, inputs.build) }}
-          path: build/windows-signing/*
-          if-no-files-found: error
-          retention-days: 30
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python build/release-tools/scripts/releases/windows-draft-artifacts.py upload --run $env:GITHUB_RUN_ID --revision $env:AITA_RELEASE_REVISION --path build/windows-signing
+          if ($LASTEXITCODE -ne 0) { throw 'Verified Windows artifact transport failed' }
       - name: Preserve native test and packaging diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: AITA-Windows-diagnostics-${{ github.run_id }}
-          path: |
-            shared/build/test-results/jvmTest/*.xml
-            composeApp/build/test-results/jvmTest/*.xml
-            composeApp/build/compose/logs/**
-            build/windows-package-temp/**/*.wxs
-            build/windows-installer-resources/**
-          if-no-files-found: ignore
-          retention-days: 14
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python build/release-tools/scripts/releases/windows-draft-artifacts.py upload --diagnostics --run $env:GITHUB_RUN_ID --revision $env:AITA_RELEASE_REVISION --path shared/build/test-results/jvmTest --path composeApp/build/test-results/jvmTest --path composeApp/build/compose/logs --path build/windows-package-temp --path build/windows-installer-resources
+          if ($LASTEXITCODE -ne 0) { throw 'Windows diagnostic preservation failed; workflow logs are retained' }
