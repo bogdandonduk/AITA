@@ -79,6 +79,13 @@ class ReleaseSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'changes application source'):
             self.validate()
 
+    def test_browser_navigation_fixture_can_distinguish_expected_cancellation(self):
+        fixture = self.tooling / validator.BROWSER_SMOKE_FIXTURE
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('record a cancelled read at the test navigation boundary')
+        self.commit()
+        self.validate()
+
     def test_incorrect_checkout_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'Checked out commits'):
             validator.validate(self.source, self.tooling, '0' * 40, self.revision)

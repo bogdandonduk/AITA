@@ -27,7 +27,7 @@ async function backgroundPixel(page) {
  await page.route('**/*.wasm*', async route => { await startupGate; await route.fallback(); });
  const errors=[], failed=[], responses=[], emptyUpdateResponses=[];
  const responseStatuses = new WeakMap(), activeRequests = new Set(), reloadRequests = new WeakSet();
- const reloadCancellations=[];
+ const reloadCancellations=[], authNavigationCancellations=[], authNavigationRequests=new WeakSet();
  page.on('request', request => activeRequests.add(request));
  page.on('requestfinished', request => activeRequests.delete(request));
  page.on('response', response => responseStatuses.set(response.request(), response.status()));
@@ -39,6 +39,10 @@ async function backgroundPixel(page) {
   if (entry.error === 'net::ERR_ABORTED' && responseStatuses.get(request) === 204 &&
       /^\/client-updates\/(release|test)\.json$/.test(entry.path)) emptyUpdateResponses.push(entry);
   else if (entry.error === 'net::ERR_ABORTED' && reloadRequests.has(request)) reloadCancellations.push(entry);
+  // Leaving the login composable cancels its read-only capability lookup. Only
+  // requests already pending at our own navigation gesture qualify; never hide
+  // an authentication mutation, a timeout, or an unrelated transport failure.
+  else if (entry.error === 'net::ERR_ABORTED' && authNavigationRequests.has(request)) authNavigationCancellations.push(entry);
   else failed.push(entry);
   activeRequests.delete(request);
  });
@@ -91,6 +95,9 @@ async function backgroundPixel(page) {
   // The guest footer stays at the bottom, outside the scrolling authentication form.
   // A fresh catalogue request proves the click opened Downloads without signing in.
   async function openGuestDownloads() {
+   for (const request of activeRequests) {
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/auth/capabilities') authNavigationRequests.add(request);
+   }
    await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/client-updates/release.json' && response.status() === 200),
     page.mouse.click(195, 804)
@@ -116,11 +123,11 @@ async function backgroundPixel(page) {
    page.mouse.click(20, 58)
   ]);
   await page.waitForLoadState('networkidle');
-  console.log(JSON.stringify({url:page.url(),canvasCount:await page.locator('canvas').count(),text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,responses},null,2));
+  console.log(JSON.stringify({url:page.url(),canvasCount:await page.locator('canvas').count(),text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,authNavigationCancellations,responses},null,2));
   if(errors.length || failed.length) process.exitCode=1;
  } catch(error) {
   resumeStartup();
-  console.log(JSON.stringify({failure:error.message,text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,responses},null,2));
+  console.log(JSON.stringify({failure:error.message,text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,authNavigationCancellations,responses},null,2));
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-failure.png'});
   process.exitCode=1;
  } finally {resumeStartup(); await context.unrouteAll({behavior:'ignoreErrors'}); await browser.close();}

@@ -6,6 +6,7 @@ import subprocess
 
 TEST_FIXTURE = 'shared/src/jvmTest/kotlin/kz/aita/AitaSharedJvmFlowTest.kt'
 ANDROID_ALIAS_FIXTURE = 'composeApp/src/jvmTest/kotlin/kz/aita/ManagedClientDownloadTest.kt'
+BROWSER_SMOKE_FIXTURE = 'scripts/linux-web/test/app-smoke.cjs'
 
 
 def git(root, *args):
@@ -20,7 +21,7 @@ def validate(source_root, tooling_root, revision, tooling_revision):
     subprocess.run(['git', '-C', str(tooling_root), 'merge-base', '--is-ancestor', revision, tooling_revision], check=True)
     changed = git(tooling_root, 'diff', '--name-only', revision, tooling_revision, '--').splitlines()
     forbidden = [path for path in changed if not (
-        path.startswith('scripts/releases/') or path in ('.github/workflows/build-windows-release.yml', TEST_FIXTURE, ANDROID_ALIAS_FIXTURE))]
+        path.startswith('scripts/releases/') or path in ('.github/workflows/build-windows-release.yml', TEST_FIXTURE, ANDROID_ALIAS_FIXTURE, BROWSER_SMOKE_FIXTURE))]
     if forbidden:
         raise RuntimeError('Verification repair changes application source: ' + ', '.join(forbidden))
     print(f'PINNED: Application {revision}; verification tools {tooling_revision}')
