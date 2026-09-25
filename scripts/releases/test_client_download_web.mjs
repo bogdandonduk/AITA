@@ -21,7 +21,7 @@ function attempt({ content = bytes, expected = bytes.length, hash = sha, picker 
     setTimeout:(fn, delay) => { const timer = setTimeout(fn, delay); timer.unref(); return timer; },
     URL:{createObjectURL: blob => { files.push(blob); return 'blob:owned'; },revokeObjectURL:()=>{}},
     document:{createElement:()=>({style:{},click:()=>actions.push('browser-download'),remove:()=>{}}),body:{appendChild:()=>{}}},
-    fetch:async (url, options) => { requests.push({url,options}); return new Response(content); },
+    fetch:async (url, options) => { requests.push({url,options}); return new Response(content,{headers:{'Content-Length':String(content.length)}}); },
     progress:()=>{}, result:resolve,
   }));
   return { done, actions, requests, files };
@@ -43,7 +43,7 @@ test('cancelling the picker does not fetch or save anything', async () => {
   const run = attempt({cancel:true}); assert.equal(await run.done, 'cancelled'); assert.equal(run.requests.length,0); assert.equal(run.files.length,0);
 });
 test('browser-managed fallback receives verified blob and reports no filesystem path', async () => {
-  const run = attempt({picker:false}); assert.equal(await run.done, '');
+  const run = attempt({picker:false}); assert.equal(await run.done, 'browser');
   assert.deepEqual(run.actions,['browser-download']);
   assert.deepEqual(new Uint8Array(await run.files[0].arrayBuffer()),bytes);
 });

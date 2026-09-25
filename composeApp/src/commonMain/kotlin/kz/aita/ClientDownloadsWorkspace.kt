@@ -15,11 +15,11 @@ internal data class DownloadsState(val entries: List<DownloadEntry> = emptyList(
     val loading: Boolean = false, val error: String? = null, val progress: Float? = null, val savingId: String? = null,
     val destinationLabel: String? = null, val canChooseFolder: Boolean = false,
     val folderReady: Boolean = false, val folderChanging: Boolean = false, val folderError: String? = null,
-    val savedId: String? = null, val savedDestination: String? = null,
+    val savedId: String? = null, val savedDestination: String? = null, val repeatSaveAvailable: Boolean = false,
     val installing: Boolean = false, val handoff: UpdateHandoff? = null,
     val webVersion: String? = null, val webBuild: Long? = null, val webNotes: Map<String, String> = emptyMap())
 internal data class ClientDownloadResult(val destination: String? = null, val cancelled: Boolean = false,
-    val prepared: PreparedClientInstaller? = null)
+    val prepared: PreparedClientInstaller? = null, val repeatSave: (() -> Boolean)? = null)
 
 internal expect fun clientDownloadsCanChooseFolder(): Boolean
 internal expect suspend fun clientDownloadsFolderLabel(folder: String?): String?
@@ -54,6 +54,7 @@ internal object DownloadsWorkspace {
     private var accepted: VerifiedClientRelease? = null
     private var release: ClientRelease? = null
     private var files = emptyMap<String, ClientDownloadFile>()
+    private var repeatSaveAction: (() -> Boolean)? = null
     private var pendingInstall: Pair<ClientDownloadInstallRequest, PreparedClientInstaller>? = null
     private var versions = emptyMap<String, ClientDownloadVersion>()
     private var folder: String? = null
@@ -67,8 +68,10 @@ internal object DownloadsWorkspace {
         mutable.update { it.copy(loading = true, error = null, canChooseFolder = clientDownloadsCanChooseFolder()) }
         scope.launch {
             try {
-                val inspection = inspectDownloadFolder(folder, folderLoaded,
-                    { readClientUpdatePreference("downloads-folder") }, ::clientDownloadsFolderLabel)
+                val inspection = if (!clientDownloadsCanChooseFolder()) DownloadFolderInspection(null, true)
+                else withTimeoutOrNull(10_000L) { inspectDownloadFolder(folder, folderLoaded,
+                    { readClientUpdatePreference("downloads-folder") }, ::clientDownloadsFolderLabel) }
+                    ?: DownloadFolderInspection(folder, folderLoaded, error = "storage")
                 folder = inspection.folder
                 folderLoaded = inspection.loaded
                 mutable.update { it.copy(destinationLabel = inspection.label, folderReady = inspection.error == null,
@@ -76,19 +79,26 @@ internal object DownloadsWorkspace {
                 val key = Base64.decode(backend.publicKey)
                 if (key.size !in 256..2048 || !isPublicClientReleaseUrl(backend.feedBase)) throw ClientUpdateFailure("configuration")
                 if (accepted == null) {
-                    accepted = readClientUpdatePreference(preference)?.let { verifyClientReleaseEnvelope(it, key, backend::verify) }
+                    accepted = try { withTimeoutOrNull(5_000L) { readClientUpdatePreference(preference) }
+                        ?.let { verifyClientReleaseEnvelope(it, key, backend::verify) } }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { null }
                     accepted?.takeIf { clientReleaseProblem(it.release, backend.nowMillis(), channel) == null }?.let { expose(it.release) }
                 }
-                val response = backend.fetch(channel)
+                val response = withTimeoutOrNull(45_000L) { backend.fetch(channel) } ?: throw ClientUpdateFailure("network")
                 if (response.status in setOf(204, 404)) return@launch
                 if (response.status != 200) throw ClientUpdateFailure("network")
                 val verified = verifyClientReleaseEnvelope(response.text, key, backend::verify) ?: throw ClientUpdateFailure("integrity")
                 val releaseProblem = clientReleaseProblem(verified.release, backend.nowMillis(), channel)
                 if (releaseProblem != null) throw ClientUpdateFailure(if (releaseProblem == "expired") "expired" else "integrity")
                 if (isClientReleaseRollback(verified, accepted) || verifiedDownloadVersions(verified.release) == null) throw ClientUpdateFailure("integrity")
-                writeClientUpdatePreference(preference, verified.envelope)
                 accepted = verified
                 expose(verified.release)
+                // Browser/private storage may be unavailable. A freshly authenticated catalogue is
+                // still usable in memory; keep its rollback floor for this running session.
+                try { withTimeoutOrNull(5_000L) { writeClientUpdatePreference(preference, verified.envelope) } }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { /* Optional catalogue cache is not a download destination. */ }
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) {
                 mutable.update { it.copy(error = (failure as? ClientUpdateFailure)?.reason ?: "network") }
@@ -136,26 +146,29 @@ internal object DownloadsWorkspace {
 
     fun save(entryId: String) {
         if (mutable.value.savingId != null || mutable.value.loading || mutable.value.folderChanging) return
-        if (!mutable.value.folderReady) {
+        if (clientDownloadsCanChooseFolder() && !mutable.value.folderReady) {
             mutable.update { it.copy(error = "storage") }; return
         }
-        val entry = mutable.value.entries.firstOrNull { it.id == entryId } ?: return
-        val file = files[entryId] ?: return
+        val entry = mutable.value.entries.firstOrNull { it.id == entryId } ?: run { reportProblem("expired"); return }
+        val file = files[entryId] ?: run { reportProblem("expired"); return }
         if (release?.let { clientReleaseProblem(it, backend.nowMillis(), channel) == null } != true) {
             mutable.update { it.copy(error = "expired") }; return
         }
         val request = if (entry.action == ClientDownloadAction.DOWNLOAD) null else
             ClientDownloadInstallRequest(release ?: return, versions[entryId] ?: return, file)
-        pendingInstall = null
-        mutable.update { it.copy(savingId = entryId, progress = 0f, error = null, savedId = null, savedDestination = null, handoff = null) }
+        pendingInstall = null; repeatSaveAction = null
+        mutable.update { it.copy(repeatSaveAvailable = false, savingId = entryId, progress = 0f, error = null, savedId = null, savedDestination = null, handoff = null) }
         // On the web, showSaveFilePicker must run in the original button gesture before suspension.
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                val result = saveClientDownload(file, entry.fileName, folder, request) { count, total ->
-                    mutable.update { it.copy(progress = if (total > 0) (count.toDouble() / total).toFloat().coerceIn(0f, 1f) else null) }
-                }
+                val result = withTimeoutOrNull(20 * 60_000L) {
+                    saveClientDownload(file, entry.fileName, folder, request) { count, total ->
+                        mutable.update { it.copy(progress = if (total > 0) (count.toDouble() / total).toFloat().coerceIn(0f, 1f) else null) }
+                    }
+                } ?: throw ClientUpdateFailure("network")
                 if (!result.cancelled) {
-                    mutable.update { it.copy(savedId = entryId, savedDestination = result.destination) }
+                    repeatSaveAction = result.repeatSave
+                    mutable.update { it.copy(savedId = entryId, savedDestination = result.destination, repeatSaveAvailable = result.repeatSave != null) }
                     if (request != null) {
                         val prepared = result.prepared ?: throw ClientUpdateFailure("integrity")
                         pendingInstall = request to prepared
@@ -165,6 +178,14 @@ internal object DownloadsWorkspace {
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { mutable.update { it.copy(error = (failure as? ClientUpdateFailure)?.reason ?: "storage") } }
             finally { mutable.update { it.copy(savingId = null, progress = null, installing = false) } }
+        }
+    }
+    fun repeatSave() {
+        try {
+            if (repeatSaveAction?.invoke() != true) throw ClientUpdateFailure("expired")
+        } catch (_: Exception) {
+            repeatSaveAction = null
+            mutable.update { it.copy(repeatSaveAvailable = false, error = "expired") }
         }
     }
     private suspend fun openPendingInstaller() {

@@ -4319,12 +4319,7 @@ private fun Application.startNotificationRetentionDaemon(backgroundScope: Corout
   }
 }
 
-private fun countryDefaultCurrencyCode(countryLocale: String): String {
-  return when (countryLocale.trim().lowercase()) {
-    "tj" -> "TJS"
-    else -> "KZT"
-  }
-}
+private fun countryDefaultCurrencyCode(countryLocale: String): String = countryCurrency(countryLocale)
 
 private fun ResultRow.toUserWalletDataModel(): UserWalletDataModel = UserWalletDataModel(
   id = this[UserWallets.id].toString(),
@@ -5627,17 +5622,25 @@ private fun insertOperationLogInsideTransaction(
   }
 }
 
-private fun storeLegalIdFormatForCountry(countryLocale: String?): LegalIdFormatDataModel {
-  val normalized = countryLocale?.trim()?.lowercase().orEmpty()
-  return defaultLegalIdFormats().firstOrNull { format ->
-    format.countryLocales.any { it.equals(normalized, ignoreCase = true) }
-  } ?: defaultLegalIdFormats().first()
+private class StoreConfigurationException(val key: String) : IllegalArgumentException(key)
+
+private fun canonicalStoreCountry(body: StoreDataModel): StoreDataModel {
+  val country = storeCountryFromPhones(body.phoneNumbers)
+    ?: throw StoreConfigurationException("store.phone_country")
+  if (body.parentStoreId != null) return body.copy(countryLocales = listOf(country.locale))
+  val forms = defaultCompanyForms().filter { country.locale in it.countryLocales }
+  val requested = body.companyForms.firstOrNull()?.id
+  // Old releases only offered id 0, including outside Kazakhstan. Preserve their LLC intent.
+  val form = forms.firstOrNull { it.id == requested }
+    ?: forms.firstOrNull().takeIf { requested.isNullOrBlank() || requested == "0" }
+    ?: throw StoreConfigurationException("store.company_form")
+  return body.copy(countryLocales = listOf(country.locale), companyForms = listOf(form), legalIdTypeId = form.legalIdFormatId)
 }
 
 private fun validateStoreLegalId(body: StoreDataModel): Boolean {
   if (body.parentStoreId != null) return true
-  val countryLocale = body.countryLocales.firstOrNull()
-  val format = storeLegalIdFormatForCountry(countryLocale)
+  val format = defaultLegalIdFormats().firstOrNull { it.id == body.legalIdTypeId && body.countryLocales.firstOrNull() in it.countryLocales }
+    ?: return false
   return body.legalId.matchesLegalIdFormat(format)
 }
 
@@ -17894,6 +17897,9 @@ fun Application.module() {
   }
 
   install(StatusPages) {
+    exception<StoreConfigurationException> { call, cause ->
+      call.safeGenericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage(cause.key))
+    }
     exception<SubscriptionFailure> { call, cause ->
       if (cause.httpStatus == 429) call.response.headers.append(HttpHeaders.RetryAfter, "60")
       call.safeGenericResponseNoPayload(HttpStatusCode.fromValue(cause.httpStatus), eventMessage(cause.key))
@@ -17941,6 +17947,11 @@ fun Application.module() {
     }
 
     exception<Throwable> { call, cause ->
+      val constraint = ((cause as? ExposedSQLException)?.cause as? PSQLException)?.serverErrorMessage?.constraint
+      if ((cause as? ExposedSQLException)?.sqlState == "23505" && constraint == "stores_parent_legal_id_unique_idx") {
+        call.safeGenericResponseNoPayload(HttpStatusCode.Conflict, eventMessage("store.legal_id_in_use"))
+        return@exception
+      }
       if (cause.isClassLoadingFailure()) {
         stabilizeServerRuntimeClassLoader("status-pages-classloading-failure")
         refreshSharedRuntimeSerializersAfterClassLoadingFailure("status-pages:${call.request.path()}", cause)
@@ -21423,7 +21434,7 @@ fun Application.module() {
           val rawBody = call.receiveAita<StoreDataModel>()
           val normalizedEmails = kz.aita.auth.canonicalAitaContactEmails(rawBody.emails)
             ?: throw BadRequestException("Invalid contact email")
-          val submittedBody = rawBody.copy(emails = normalizedEmails)
+          val submittedBody = canonicalStoreCountry(rawBody.copy(emails = normalizedEmails))
 
           if (!validateStoreAddress(submittedBody)) {
             return@post call.genericResponseNoPayload(
@@ -21515,7 +21526,7 @@ fun Application.module() {
                   it[Stores.companyForms] = if (parentStoreIdForBranch == null) body.companyForms else emptyList()
                   it[Stores.location] = body.location
                   it[Stores.address] = body.address.trim()
-                  it[Stores.legalIdTypeId] = if (parentStoreIdForBranch == null) body.legalIdTypeId.ifBlank { storeLegalIdFormatForCountry(body.countryLocales.firstOrNull()).id } else ""
+                  it[Stores.legalIdTypeId] = if (parentStoreIdForBranch == null) body.legalIdTypeId else ""
                   it[Stores.legalId] = if (parentStoreIdForBranch == null) body.legalId.trim() else ""
                   it[Stores.phoneNumbers] = body.phoneNumbers
                   it[Stores.emails] = body.emails
@@ -21579,7 +21590,7 @@ fun Application.module() {
           val rawBody = call.receiveAita<StoreDataModel>()
           val normalizedEmails = kz.aita.auth.canonicalAitaContactEmails(rawBody.emails)
             ?: throw BadRequestException("Invalid contact email")
-          val submittedBody = rawBody.copy(emails = normalizedEmails)
+          val submittedBody = canonicalStoreCountry(rawBody.copy(emails = normalizedEmails))
 
           if (!validateStoreAddress(submittedBody)) {
             return@put call.genericResponseNoPayload(
@@ -21683,7 +21694,7 @@ fun Application.module() {
               it[Stores.companyForms] = if (currentParentStoreId == null) body.companyForms else emptyList()
               it[Stores.location] = body.location
               it[Stores.address] = body.address.trim()
-              it[Stores.legalIdTypeId] = if (currentParentStoreId == null) body.legalIdTypeId.ifBlank { storeLegalIdFormatForCountry(body.countryLocales.firstOrNull()).id } else ""
+              it[Stores.legalIdTypeId] = if (currentParentStoreId == null) body.legalIdTypeId else ""
               it[Stores.legalId] = if (currentParentStoreId == null) body.legalId.trim() else ""
               it[Stores.phoneNumbers] = body.phoneNumbers
               it[Stores.emails] = body.emails

@@ -12,7 +12,7 @@ async function run(fetcher, options={}){
  const window={showSaveFilePicker:async()=>({createWritable:async()=>({write:async b=>saved=Buffer.from(await b.arrayBuffer()),close:async()=>{},abort:async()=>{saved=null;}})})};
  if(options.pickFailure)window.showSaveFilePicker=async()=>{throw options.pickFailure};
  if(options.writeFailure)window.showSaveFilePicker=async()=>({createWritable:async()=>({write:async()=>{throw options.writeFailure},abort:async()=>{saved=null}})});
- const result=await new Promise(resolve=>execute('https://updates.example.org/app.exe',data.length,hash,'AITA.exe',(n)=>progress.push(n),resolve,window,webcrypto,async(u,o)=>{calls.push(o.headers?.Range||'');return fetcher(calls.length,o);},(fn,ms)=>setTimeout(fn,ms===30000?ms:1),clearTimeout));
+ const result=await new Promise(resolve=>execute('https://updates.example.org/app.exe',data.length,hash,'AITA.exe',(n)=>progress.push(n),resolve,window,webcrypto,async(u,o)=>{calls.push(o.headers?.Range||'');return fetcher(calls.length,o);},(fn,ms)=>setTimeout(fn,[500,1000,2000].includes(ms)?1:ms),clearTimeout));
  return {saved,progress,calls,result};
 }
 test('browser resumes truncated binary then verifies complete hash before saving',async()=>{

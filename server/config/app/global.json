@@ -238,34 +238,38 @@
     "companyForms": [
       {
         "id": "0",
+        "countryLocales": [
+          "kz"
+        ],
+        "legalIdFormatId": "kz_bin",
         "name": [
           {
             "language": "main",
-            "value": "TOO"
+            "value": "LLP"
           },
           {
             "language": "en",
-            "value": "TOO"
+            "value": "LLP"
           },
           {
             "language": "ru",
-            "value": "TOO"
+            "value": "ТОО"
           },
           {
             "language": "kk",
-            "value": "TOO"
-          },
-          {
-            "language": "uz",
-            "value": "TOO"
-          },
-          {
-            "language": "tg",
-            "value": "TOO"
+            "value": "ЖШС"
           },
           {
             "language": "ky",
-            "value": "TOO"
+            "value": "ЖЧШ"
+          },
+          {
+            "language": "tg",
+            "value": "ҶДММ"
+          },
+          {
+            "language": "uz",
+            "value": "MChJ"
           }
         ],
         "parameters": [
@@ -306,6 +310,606 @@
             "nonLetterSymbolsEnabled": false
           }
         ]
+      },
+      {
+        "id": "kz_ip",
+        "countryLocales": [
+          "kz"
+        ],
+        "legalIdFormatId": "kz_iin",
+        "name": [
+          {
+            "language": "main",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "en",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "ru",
+            "value": "ИП"
+          },
+          {
+            "language": "kk",
+            "value": "ЖК"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке ишкер"
+          },
+          {
+            "language": "tg",
+            "value": "Соҳибкори инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "Yakka tartibdagi tadbirkor"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "IIN"
+              },
+              {
+                "language": "en",
+                "value": "IIN"
+              },
+              {
+                "language": "ru",
+                "value": "ИИН"
+              },
+              {
+                "language": "kk",
+                "value": "ЖСН"
+              },
+              {
+                "language": "ky",
+                "value": "Жеке идентификациялык номер"
+              },
+              {
+                "language": "tg",
+                "value": "Рақами мушаххаси инфиродӣ"
+              },
+              {
+                "language": "uz",
+                "value": "Shaxsiy identifikatsiya raqami"
+              }
+            ],
+            "value": "",
+            "length": 12,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "kz_joint_ip",
+        "countryLocales": [
+          "kz"
+        ],
+        "legalIdFormatId": "kz_bin",
+        "name": [
+          {
+            "language": "main",
+            "value": "Joint entrepreneurship"
+          },
+          {
+            "language": "en",
+            "value": "Joint entrepreneurship"
+          },
+          {
+            "language": "ru",
+            "value": "ИП (совместное предпринимательство)"
+          },
+          {
+            "language": "kk",
+            "value": "Бірлескен кәсіпкерлік"
+          },
+          {
+            "language": "ky",
+            "value": "Биргелешкен ишкердик"
+          },
+          {
+            "language": "tg",
+            "value": "Соҳибкории муштарак"
+          },
+          {
+            "language": "uz",
+            "value": "Birgalikdagi tadbirkorlik"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "BIN"
+              },
+              {
+                "language": "en",
+                "value": "BIN"
+              },
+              {
+                "language": "ru",
+                "value": "БИН"
+              },
+              {
+                "language": "kk",
+                "value": "БИН"
+              },
+              {
+                "language": "uz",
+                "value": "BIN"
+              },
+              {
+                "language": "tg",
+                "value": "БИН"
+              },
+              {
+                "language": "ky",
+                "value": "БИН"
+              }
+            ],
+            "value": "",
+            "length": 12,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "tj_llc",
+        "countryLocales": [
+          "tj"
+        ],
+        "legalIdFormatId": "tj_tin",
+        "name": [
+          {
+            "language": "main",
+            "value": "LLC"
+          },
+          {
+            "language": "en",
+            "value": "LLC"
+          },
+          {
+            "language": "ru",
+            "value": "ООО"
+          },
+          {
+            "language": "kk",
+            "value": "ЖШС"
+          },
+          {
+            "language": "ky",
+            "value": "ЖЧК"
+          },
+          {
+            "language": "tg",
+            "value": "ҶДММ"
+          },
+          {
+            "language": "uz",
+            "value": "MChJ"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "TIN"
+              },
+              {
+                "language": "en",
+                "value": "TIN"
+              },
+              {
+                "language": "ru",
+                "value": "ИНН / РМА"
+              },
+              {
+                "language": "kk",
+                "value": "СТН / РМА"
+              },
+              {
+                "language": "uz",
+                "value": "TIN"
+              },
+              {
+                "language": "tg",
+                "value": "РМА"
+              },
+              {
+                "language": "ky",
+                "value": "ИНН"
+              }
+            ],
+            "value": "",
+            "length": 9,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "tj_ip",
+        "countryLocales": [
+          "tj"
+        ],
+        "legalIdFormatId": "tj_tin",
+        "name": [
+          {
+            "language": "main",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "en",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "ru",
+            "value": "ИП"
+          },
+          {
+            "language": "kk",
+            "value": "ЖК"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке ишкер"
+          },
+          {
+            "language": "tg",
+            "value": "Соҳибкори инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "Yakka tartibdagi tadbirkor"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "TIN"
+              },
+              {
+                "language": "en",
+                "value": "TIN"
+              },
+              {
+                "language": "ru",
+                "value": "ИНН / РМА"
+              },
+              {
+                "language": "kk",
+                "value": "СТН / РМА"
+              },
+              {
+                "language": "uz",
+                "value": "TIN"
+              },
+              {
+                "language": "tg",
+                "value": "РМА"
+              },
+              {
+                "language": "ky",
+                "value": "ИНН"
+              }
+            ],
+            "value": "",
+            "length": 9,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "kg_llc",
+        "countryLocales": [
+          "kg"
+        ],
+        "legalIdFormatId": "kg_tin",
+        "name": [
+          {
+            "language": "main",
+            "value": "LLC"
+          },
+          {
+            "language": "en",
+            "value": "LLC"
+          },
+          {
+            "language": "ru",
+            "value": "ОсОО"
+          },
+          {
+            "language": "kk",
+            "value": "ЖШС"
+          },
+          {
+            "language": "ky",
+            "value": "ЖЧК"
+          },
+          {
+            "language": "tg",
+            "value": "ҶДММ"
+          },
+          {
+            "language": "uz",
+            "value": "MChJ"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "TIN"
+              },
+              {
+                "language": "en",
+                "value": "TIN"
+              },
+              {
+                "language": "ru",
+                "value": "ИНН"
+              },
+              {
+                "language": "kk",
+                "value": "СТН"
+              },
+              {
+                "language": "ky",
+                "value": "ИСН"
+              },
+              {
+                "language": "tg",
+                "value": "РМА"
+              },
+              {
+                "language": "uz",
+                "value": "STIR"
+              }
+            ],
+            "value": "",
+            "length": 14,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "kg_ip",
+        "countryLocales": [
+          "kg"
+        ],
+        "legalIdFormatId": "kg_tin",
+        "name": [
+          {
+            "language": "main",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "en",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "ru",
+            "value": "ИП"
+          },
+          {
+            "language": "kk",
+            "value": "ЖК"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке ишкер"
+          },
+          {
+            "language": "tg",
+            "value": "Соҳибкори инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "Yakka tartibdagi tadbirkor"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "TIN"
+              },
+              {
+                "language": "en",
+                "value": "TIN"
+              },
+              {
+                "language": "ru",
+                "value": "ИНН"
+              },
+              {
+                "language": "kk",
+                "value": "СТН"
+              },
+              {
+                "language": "ky",
+                "value": "ИСН"
+              },
+              {
+                "language": "tg",
+                "value": "РМА"
+              },
+              {
+                "language": "uz",
+                "value": "STIR"
+              }
+            ],
+            "value": "",
+            "length": 14,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "uz_llc",
+        "countryLocales": [
+          "uz"
+        ],
+        "legalIdFormatId": "uz_tin",
+        "name": [
+          {
+            "language": "main",
+            "value": "LLC"
+          },
+          {
+            "language": "en",
+            "value": "LLC"
+          },
+          {
+            "language": "ru",
+            "value": "ООО"
+          },
+          {
+            "language": "kk",
+            "value": "ЖШС"
+          },
+          {
+            "language": "ky",
+            "value": "ЖЧК"
+          },
+          {
+            "language": "tg",
+            "value": "ҶДММ"
+          },
+          {
+            "language": "uz",
+            "value": "MChJ"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "TIN"
+              },
+              {
+                "language": "en",
+                "value": "TIN"
+              },
+              {
+                "language": "ru",
+                "value": "ИНН"
+              },
+              {
+                "language": "kk",
+                "value": "СТН"
+              },
+              {
+                "language": "ky",
+                "value": "ИСН"
+              },
+              {
+                "language": "tg",
+                "value": "РМА"
+              },
+              {
+                "language": "uz",
+                "value": "STIR"
+              }
+            ],
+            "value": "",
+            "length": 9,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
+      },
+      {
+        "id": "uz_ip",
+        "countryLocales": [
+          "uz"
+        ],
+        "legalIdFormatId": "uz_pinfl",
+        "name": [
+          {
+            "language": "main",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "en",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "ru",
+            "value": "ИП"
+          },
+          {
+            "language": "kk",
+            "value": "ЖК"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке ишкер"
+          },
+          {
+            "language": "tg",
+            "value": "Соҳибкори инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "YTT"
+          }
+        ],
+        "parameters": [
+          {
+            "name": [
+              {
+                "language": "main",
+                "value": "PINFL"
+              },
+              {
+                "language": "en",
+                "value": "PINFL"
+              },
+              {
+                "language": "ru",
+                "value": "ПИНФЛ"
+              },
+              {
+                "language": "kk",
+                "value": "Жеке сәйкестендіру нөмірі"
+              },
+              {
+                "language": "ky",
+                "value": "Жеке идентификациялык номер"
+              },
+              {
+                "language": "tg",
+                "value": "Рақами шахсии мушаххас"
+              },
+              {
+                "language": "uz",
+                "value": "JSHSHIR"
+              }
+            ],
+            "value": "",
+            "length": 14,
+            "number": true,
+            "nonLetterSymbolsEnabled": false
+          }
+        ]
       }
     ],
     "countries": [
@@ -313,6 +917,10 @@
         "locale": "kz",
         "language": "kk",
         "name": [
+          {
+            "language": "main",
+            "value": "Kazakhstan"
+          },
           {
             "language": "en",
             "value": "Kazakhstan"
@@ -323,19 +931,19 @@
           },
           {
             "language": "kk",
-            "value": "Казакстан"
+            "value": "Қазақстан"
           },
           {
-            "language": "uz",
-            "value": "Qozogʻiston"
+            "language": "ky",
+            "value": "Казакстан"
           },
           {
             "language": "tg",
             "value": "Қазоқистон"
           },
           {
-            "language": "ky",
-            "value": "Казакстан"
+            "language": "uz",
+            "value": "Qozogʻiston"
           }
         ],
         "flagDrawablePath": "png/flag_kz.png",
@@ -700,23 +1308,243 @@
               },
               {
                 "language": "ru",
-                "value": "Cом"
+                "value": "Сомони"
               },
               {
                 "language": "kk",
-                "value": "Cом"
+                "value": "Сомони"
               },
               {
-                "language": "uz",
-                "value": "Somoniy"
+                "language": "ky",
+                "value": "Сомони"
               },
               {
                 "language": "tg",
                 "value": "Сомонӣ"
               },
               {
+                "language": "uz",
+                "value": "Somoniy"
+              }
+            ]
+          }
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              },
+              {
+                "language": "uz",
+                "value": "Karta"
+              },
+              {
+                "language": "tg",
+                "value": "Корт"
+              },
+              {
                 "language": "ky",
-                "value": "Сомони"
+                "value": "Карта"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "0"
+      },
+      {
+        "locale": "kg",
+        "language": "ky",
+        "name": [
+          {
+            "language": "main",
+            "value": "Kyrgyzstan"
+          },
+          {
+            "language": "en",
+            "value": "Kyrgyzstan"
+          },
+          {
+            "language": "ru",
+            "value": "Кыргызстан"
+          },
+          {
+            "language": "kk",
+            "value": "Қырғызстан"
+          },
+          {
+            "language": "ky",
+            "value": "Кыргызстан"
+          },
+          {
+            "language": "tg",
+            "value": "Қирғизистон"
+          },
+          {
+            "language": "uz",
+            "value": "Qirgʻiziston"
+          }
+        ],
+        "flagDrawablePath": "png/flag_kg.png",
+        "cities": [],
+        "phoneNumberCode": "996",
+        "phoneNumberSize": 9,
+        "currencies": [
+          {
+            "code": "KGS",
+            "symbol": "сом",
+            "name": [
+              {
+                "language": "main",
+                "value": "Kyrgyz som"
+              },
+              {
+                "language": "en",
+                "value": "Kyrgyz som"
+              },
+              {
+                "language": "ru",
+                "value": "Кыргызский сом"
+              },
+              {
+                "language": "kk",
+                "value": "Қырғыз сомы"
+              },
+              {
+                "language": "ky",
+                "value": "Кыргыз сому"
+              },
+              {
+                "language": "tg",
+                "value": "Соми қирғизӣ"
+              },
+              {
+                "language": "uz",
+                "value": "Qirgʻiz somi"
+              }
+            ]
+          }
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              },
+              {
+                "language": "uz",
+                "value": "Karta"
+              },
+              {
+                "language": "tg",
+                "value": "Корт"
+              },
+              {
+                "language": "ky",
+                "value": "Карта"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "0"
+      },
+      {
+        "locale": "uz",
+        "language": "uz",
+        "name": [
+          {
+            "language": "main",
+            "value": "Uzbekistan"
+          },
+          {
+            "language": "en",
+            "value": "Uzbekistan"
+          },
+          {
+            "language": "ru",
+            "value": "Узбекистан"
+          },
+          {
+            "language": "kk",
+            "value": "Өзбекстан"
+          },
+          {
+            "language": "ky",
+            "value": "Өзбекстан"
+          },
+          {
+            "language": "tg",
+            "value": "Ӯзбекистон"
+          },
+          {
+            "language": "uz",
+            "value": "Oʻzbekiston"
+          }
+        ],
+        "flagDrawablePath": "png/flag_uz.png",
+        "cities": [],
+        "phoneNumberCode": "998",
+        "phoneNumberSize": 9,
+        "currencies": [
+          {
+            "code": "UZS",
+            "symbol": "soʻm",
+            "name": [
+              {
+                "language": "main",
+                "value": "Uzbek sum"
+              },
+              {
+                "language": "en",
+                "value": "Uzbek sum"
+              },
+              {
+                "language": "ru",
+                "value": "Узбекский сум"
+              },
+              {
+                "language": "kk",
+                "value": "Өзбек сомы"
+              },
+              {
+                "language": "ky",
+                "value": "Өзбек суму"
+              },
+              {
+                "language": "tg",
+                "value": "Сӯми ӯзбекӣ"
+              },
+              {
+                "language": "uz",
+                "value": "Oʻzbek soʻmi"
               }
             ]
           }
@@ -1343,6 +2171,406 @@
         "maxLength": null,
         "digitsOnly": true,
         "regex": "^[0-9]{9}$"
+      },
+      {
+        "id": "kz_iin",
+        "countryLocales": [
+          "kz"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "IIN"
+          },
+          {
+            "language": "en",
+            "value": "IIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИИН"
+          },
+          {
+            "language": "kk",
+            "value": "ЖСН"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке идентификациялык номер"
+          },
+          {
+            "language": "tg",
+            "value": "Рақами мушаххаси инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "Shaxsiy identifikatsiya raqami"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "IIN"
+          },
+          {
+            "language": "en",
+            "value": "IIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИИН"
+          },
+          {
+            "language": "kk",
+            "value": "ЖСН"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке идентификациялык номер"
+          },
+          {
+            "language": "tg",
+            "value": "Рақами мушаххаси инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "Shaxsiy identifikatsiya raqami"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "12 digits"
+          },
+          {
+            "language": "en",
+            "value": "12 digits"
+          },
+          {
+            "language": "ru",
+            "value": "12 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "12 сан"
+          },
+          {
+            "language": "ky",
+            "value": "12 цифра"
+          },
+          {
+            "language": "tg",
+            "value": "12 рақам"
+          },
+          {
+            "language": "uz",
+            "value": "12 ta raqam"
+          }
+        ],
+        "required": true,
+        "length": 12,
+        "digitsOnly": true,
+        "regex": "^[0-9]{12}$"
+      },
+      {
+        "id": "kg_tin",
+        "countryLocales": [
+          "kg"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "TIN"
+          },
+          {
+            "language": "en",
+            "value": "TIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "СТН"
+          },
+          {
+            "language": "ky",
+            "value": "ИСН"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "TIN"
+          },
+          {
+            "language": "en",
+            "value": "TIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "СТН"
+          },
+          {
+            "language": "ky",
+            "value": "ИСН"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "14 digits"
+          },
+          {
+            "language": "en",
+            "value": "14 digits"
+          },
+          {
+            "language": "ru",
+            "value": "14 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "14 сан"
+          },
+          {
+            "language": "ky",
+            "value": "14 цифра"
+          },
+          {
+            "language": "tg",
+            "value": "14 рақам"
+          },
+          {
+            "language": "uz",
+            "value": "14 ta raqam"
+          }
+        ],
+        "required": true,
+        "length": 14,
+        "digitsOnly": true,
+        "regex": "^[0-9]{14}$"
+      },
+      {
+        "id": "uz_tin",
+        "countryLocales": [
+          "uz"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "TIN"
+          },
+          {
+            "language": "en",
+            "value": "TIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "СТН"
+          },
+          {
+            "language": "ky",
+            "value": "ИСН"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "TIN"
+          },
+          {
+            "language": "en",
+            "value": "TIN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "СТН"
+          },
+          {
+            "language": "ky",
+            "value": "ИСН"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "9 digits"
+          },
+          {
+            "language": "en",
+            "value": "9 digits"
+          },
+          {
+            "language": "ru",
+            "value": "9 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "9 сан"
+          },
+          {
+            "language": "ky",
+            "value": "9 цифра"
+          },
+          {
+            "language": "tg",
+            "value": "9 рақам"
+          },
+          {
+            "language": "uz",
+            "value": "9 ta raqam"
+          }
+        ],
+        "required": true,
+        "length": 9,
+        "digitsOnly": true,
+        "regex": "^[0-9]{9}$"
+      },
+      {
+        "id": "uz_pinfl",
+        "countryLocales": [
+          "uz"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "PINFL"
+          },
+          {
+            "language": "en",
+            "value": "PINFL"
+          },
+          {
+            "language": "ru",
+            "value": "ПИНФЛ"
+          },
+          {
+            "language": "kk",
+            "value": "Жеке сәйкестендіру нөмірі"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке идентификациялык номер"
+          },
+          {
+            "language": "tg",
+            "value": "Рақами шахсии мушаххас"
+          },
+          {
+            "language": "uz",
+            "value": "JSHSHIR"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "PINFL"
+          },
+          {
+            "language": "en",
+            "value": "PINFL"
+          },
+          {
+            "language": "ru",
+            "value": "ПИНФЛ"
+          },
+          {
+            "language": "kk",
+            "value": "Жеке сәйкестендіру нөмірі"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке идентификациялык номер"
+          },
+          {
+            "language": "tg",
+            "value": "Рақами шахсии мушаххас"
+          },
+          {
+            "language": "uz",
+            "value": "JSHSHIR"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "14 digits"
+          },
+          {
+            "language": "en",
+            "value": "14 digits"
+          },
+          {
+            "language": "ru",
+            "value": "14 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "14 сан"
+          },
+          {
+            "language": "ky",
+            "value": "14 цифра"
+          },
+          {
+            "language": "tg",
+            "value": "14 рақам"
+          },
+          {
+            "language": "uz",
+            "value": "14 ta raqam"
+          }
+        ],
+        "required": true,
+        "length": 14,
+        "digitsOnly": true,
+        "regex": "^[0-9]{14}$"
       }
     ],
     "getStockItemBranchAvailabilityPath": {

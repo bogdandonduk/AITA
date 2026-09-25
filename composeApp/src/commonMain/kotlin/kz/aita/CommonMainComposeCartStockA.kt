@@ -1323,7 +1323,7 @@ fun AppConfiguration.TransactionCartScreen() {
                     autoLoading = false,
                     modifier = Modifier.fillMaxWidth(),
                     text = if (context.transactionTypeIndex == 1) returnFlowText("batches") else stateValues.stringPayment,
-                    enabled = stateValues.latestNotification == null && invalidPromotionRestrictions.isEmpty() && invalidWholesaleCartItems.isEmpty() && firstUncheckedCondition == null,
+                    enabled = invalidPromotionRestrictions.isEmpty() && invalidWholesaleCartItems.isEmpty() && firstUncheckedCondition == null,
                     onDisabledClick = {
                         val firstRestriction = invalidPromotionRestrictions.firstOrNull()
 
@@ -5123,7 +5123,7 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
     val goodsInCart by getCartState(request.transactionTypeIndex, request.clientId).collectAsState()
     val defaultCurrency = stateValues.globalAppConfiguration
         .countries
-        .withTajikistanFallback()
+        .withSupportedCountries()
         .find { it.locale.equals(stateValues.userAccount?.countryLocale, ignoreCase = true) }
         ?.currencies
         ?.firstOrNull()
@@ -5247,7 +5247,7 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 text = localizedStringResource(637, "Save item and add to cart"),
                 iconPath = stateValues.drawablePathIconCheck,
-                enabled = draft.isValidStockDraft(stateValues.globalAppConfiguration) && stateValues.activeStoreId != null && stateValues.latestNotification == null,
+                enabled = draft.isValidStockDraft(stateValues.globalAppConfiguration) && stateValues.activeStoreId != null,
                 confirmationRequired = false,
                 onClick = {
                     val storeId = stateValues.activeStoreId ?: return@actionButton

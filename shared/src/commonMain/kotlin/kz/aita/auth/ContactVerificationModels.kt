@@ -90,3 +90,22 @@ fun aitaContactProofMatches(
     canonicalAitaContactTarget(requestedTarget)?.let { it == canonicalAitaContactTarget(storedTarget) } == true &&
     requestedActor == storedActor && normalizeAitaEmail(requestedAddress)?.let { it == normalizeAitaEmail(storedAddress) } == true &&
     now < expiresAt && consumedAt == null
+
+/** Only channel ownership established by the server is reusable. Login aliases are not SMS proof. */
+fun aitaReusableAccountContact(purpose: AitaContactPurpose, channel: AitaContactChannel,
+    address: String, verifiedAddresses: List<String>): Boolean {
+    if (purpose != AitaContactPurpose.STORE_CONTACT) return false
+    fun normalize(value: String) = when (channel) {
+        AitaContactChannel.EMAIL -> normalizeAitaEmail(value)
+        AitaContactChannel.PHONE -> normalizeAitaPhoneAlias(value)
+    }
+    val canonical = normalize(address) ?: return false
+    return verifiedAddresses.any { normalize(it) == canonical }
+}
+
+fun AitaAuthenticationSettingsDataModel.verifiedAccountContacts(channel: AitaContactChannel): List<String> = when (channel) {
+    AitaContactChannel.EMAIL -> (listOfNotNull(email.takeIf { emailVerified }) + additionalLoginEmails)
+        .mapNotNull(::normalizeAitaEmail).distinct()
+    // This alias is presently approved by EMAIL, not SMS. It must not attest phone ownership.
+    AitaContactChannel.PHONE -> emptyList()
+}

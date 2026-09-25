@@ -2668,7 +2668,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
                 actionButton(
                     text = stateValues.stringEdit,
-                    enabled = stateValues.latestNotification == null && accountEmailConfirmation.ready && profileConfirmation.ready
+                    enabled = accountEmailConfirmation.ready && profileConfirmation.ready
                 ) {
                     goAction.invoke()
                 }
@@ -2702,7 +2702,7 @@ internal fun AppConfiguration.transactionHistoryTypeTitle(type: String): String 
 
 internal fun AppConfiguration.transactionHistoryDefaultCurrencyCode(): String {
     return stateValues.globalAppConfiguration.countries
-        .withTajikistanFallback()
+        .withSupportedCountries()
         .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
         ?.currencies
         ?.firstOrNull()
@@ -6018,7 +6018,7 @@ fun AppConfiguration.MenuFinancesScreen() {
                                     TopUpCreateRequestDataModel(
                                         amount = amount,
                                         currencyCode = wallet?.currencyCode ?: stateValues.userAccount?.countryLocale?.let { locale ->
-                                            if (locale.equals("tj", true)) "TJS" else "KZT"
+                                            countryCurrency(locale)
                                         } ?: "KZT",
                                         providerId = selectedProviderId
                                     )

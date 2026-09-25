@@ -16,7 +16,7 @@ test('update reload bypasses a previously cached entry script without changing l
       res.setHeader('Content-Type', 'text/javascript');
       // Reproduce the old deployment's cache header, still held by returning browsers.
       res.setHeader('Cache-Control', 'public, max-age=14400');
-      res.end(`window.runningBuild = ${version}; globalThis.aitaWebEntry.ready();`);
+      res.end(`history.replaceState({ navigation: "keep" }, "", location.href); window.runningBuild = ${version}; globalThis.aitaWebEntry.ready();`);
     } else if (req.url.startsWith('/styles.css')) {
       res.setHeader('Content-Type', 'text/css'); res.end('');
     } else if (req.url.endsWith('.js')) {
@@ -32,7 +32,6 @@ test('update reload bypasses a previously cached entry script without changing l
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.addInitScript(() => history.replaceState({ navigation: 'keep' }, '', location.href));
     await page.goto(origin);
     await page.waitForFunction(() => window.runningBuild === 1);
     await page.evaluate(() => localStorage.setItem('test-unsent-cart', 'keep-me'));

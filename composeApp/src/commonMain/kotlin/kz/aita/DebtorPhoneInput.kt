@@ -25,7 +25,7 @@ internal fun AppConfiguration.DebtorPhoneInput(
     modifier: Modifier = Modifier.fillMaxWidth(),
     onValueChange: (String) -> Unit
 ) {
-    val countries = stateValues.globalAppConfiguration.countries.withTajikistanFallback()
+    val countries = stateValues.globalAppConfiguration.countries.withSupportedCountries()
     val detected = countries.sortedByDescending { it.phoneNumberCode.length }
         .firstOrNull { value.isNotBlank() && value.filter(Char::isDigit).startsWith(it.phoneNumberCode) }
     val initialCode = "+${(detected ?: countries.firstOrNull { it.locale.equals("kz", true) }

@@ -34,6 +34,9 @@ import kz.aita.auth.aitaContactEmailsRequiringProof
 import kz.aita.auth.canonicalAitaContactTarget
 import kz.aita.auth.AitaAuthenticationSettingsDataModel
 import kz.aita.auth.aitaAuthCodeDigits
+import kz.aita.auth.aitaReusableAccountContact
+import kz.aita.auth.verifiedAccountContacts
+import kz.aita.auth.AitaAdvancedAuthenticationClient
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlin.uuid.ExperimentalUuidApi
@@ -43,10 +46,12 @@ import kotlin.uuid.Uuid
 internal class ContactEmailConfirmationState(
     val target: AitaContactTarget,
     val draftId: String,
-    val requiredAddresses: List<String>?,
+    requiredAddresses: List<String>?,
     val owner: String?,
     val generation: Long
 ) {
+    var requiredAddresses by mutableStateOf(requiredAddresses)
+    val created = TimeSource.Monotonic.markNow()
     private data class Accepted(val result: AitaContactVerificationResult, val received: TimeMark)
     private var accepted by mutableStateOf<List<Accepted>>(emptyList())
     var clockTick by mutableLongStateOf(0L)
@@ -67,7 +72,7 @@ internal class ContactEmailConfirmationState(
         return accepted.filter { it.received.elapsedNow().inWholeMilliseconds <
             it.result.expiresAtMillis - it.result.serverTimeMillis }
     }
-    val proofs: List<AitaVerifiedContactProof> get() = fresh().map { it.result.proof }
+    val proofs: List<AitaVerifiedContactProof> get() = fresh().filter { it.result.address in requiredAddresses.orEmpty() }.map { it.result.proof }
     val pendingAddress: String? get() = requiredAddresses?.firstOrNull { address -> fresh().none { it.result.address == address } }
     val hasExpiredProof: Boolean get() = accepted.size > fresh().size
     val ready: Boolean get() = ownsCurrentSession() && canonicalAitaContactTarget(target) != null && requiredAddresses != null && !busy && pendingAddress == null
@@ -88,7 +93,30 @@ internal class ContactEmailConfirmationState(
 internal fun AppConfiguration.contactText(key: String, arguments: Map<String, String> = emptyMap()): String =
     EventMessages.render(EventMessageReference("contact.$key", arguments), stateValues.appLanguage).orEmpty()
 
-@OptIn(ExperimentalUuidApi::class)
+/** Ephemeral security material never enters synced form drafts or persistent device storage. */
+internal object ContactConfirmationMemory {
+    private val states = linkedMapOf<String, ContactEmailConfirmationState>()
+    @OptIn(ExperimentalUuidApi::class)
+    fun obtain(owner: String?, generation: Long, purpose: AitaContactPurpose, entityId: String,
+        parentId: String, required: List<String>?): ContactEmailConfirmationState {
+        states.entries.removeAll { (_, value) ->
+            val stale = value.owner != owner || value.generation != generation || value.created.elapsedNow().inWholeMinutes >= 20
+            if (stale) { value.disposed = true; value.clear() }
+            stale
+        }
+        val key = "$purpose|$entityId|$parentId|${required?.joinToString("|")}"
+        return states.getOrPut(key) {
+            while (states.size >= 12) states.remove(states.keys.first())?.let { it.disposed = true; it.clear() }
+            val draftId = Uuid.random().toString()
+            ContactEmailConfirmationState(aitaContactDraftTarget(purpose, entityId, draftId, parentId), draftId, required, owner, generation)
+        }
+    }
+    fun forget(state: ContactEmailConfirmationState) {
+        states.entries.removeAll { it.value === state }
+        state.disposed = true; state.clear()
+    }
+}
+
 @Composable
 internal fun AppConfiguration.rememberContactEmailConfirmation(
     purpose: AitaContactPurpose,
@@ -99,16 +127,33 @@ internal fun AppConfiguration.rememberContactEmailConfirmation(
 ): ContactEmailConfirmationState {
     val owner = stateValues.userAccount?.id
     val generation = currentAuthenticatedSessionGeneration()
-    val draftId = remember(owner, generation, purpose, entityId, parentId) { Uuid.random().toString() }
-    val target = aitaContactDraftTarget(purpose, entityId, draftId, parentId)
-    val required = aitaContactEmailsRequiringProof(emails, previousEmails)
-    // Edits, a different branch/draft, or a changed authenticated owner discard the old proof.
-    val state = remember(owner, generation, target, required, stateValues.userAccount?.email) {
-        ContactEmailConfirmationState(target, draftId, required, owner, generation)
+    val changed = aitaContactEmailsRequiringProof(emails, previousEmails)
+    val state = remember(owner, generation, purpose, entityId, parentId, changed) {
+        ContactConfirmationMemory.obtain(owner, generation, purpose, entityId, parentId, changed)
     }
-    DisposableEffect(state) { onDispose { state.disposed = true; state.clear() } }
+    // Do not clear a live challenge when Android recreates the activity or the user visits email.
+    // Code text is unnecessary to retain; flow/proof lifetime remains enforced by the server.
+    DisposableEffect(state) { onDispose { state.code = "" } }
+    var verifiedOwnerEmails by remember(owner, generation) { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(owner, generation, stateValues.userAccount?.email) {
+        if (purpose != AitaContactPurpose.STORE_CONTACT || owner == null) return@LaunchedEffect
+        try {
+            val settings = withTimeoutOrNull(15_000L) { AitaAdvancedAuthenticationClient.settings() }
+            val payload = settings?.payload
+            if (currentAuthenticatedSessionGeneration() == generation && userAccountState.payloadValue?.id == owner &&
+                settings != null && !settings.negative && payload != null) {
+                verifiedOwnerEmails = payload.verifiedAccountContacts(AitaContactChannel.EMAIL)
+            }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { /* A failed ownership check leaves ordinary confirmation available. */ }
+    }
+    LaunchedEffect(state, verifiedOwnerEmails) {
+        state.requiredAddresses = changed?.filterNot {
+            aitaReusableAccountContact(purpose, AitaContactChannel.EMAIL, it, verifiedOwnerEmails)
+        }
+    }
     LaunchedEffect(state) {
-        while (state.requiredAddresses?.isNotEmpty() == true) { delay(500L); state.clockTick++ }
+        while (true) { delay(500L); state.clockTick++ }
     }
     return state
 }
@@ -124,7 +169,9 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
         val destination = state.pendingAddress ?: return@send
         if (!enabled || state.busy || !state.ownsCurrentSession()) return@send
         val old = state.flow?.takeIf { state.flowAddress == destination && !countdown.expired }
-        if (old != null && countdown.resendSeconds > 0L) return@send
+        if (old != null && countdown.resendSeconds > 0L) {
+            state.error = contactText("resend_wait", mapOf("seconds" to countdown.resendSeconds.toString())); return@send
+        }
         state.busy = true; state.error = ""
         scope.launch {
             try {
@@ -149,6 +196,7 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
     }
     val verify: () -> Unit = verify@{
         val requestedFlow = state.flow ?: return@verify
+        if (state.code.length != 6) { state.error = contactText("six_digits"); return@verify }
         if (!enabled || state.busy || !state.ownsCurrentSession() || countdown.expired ||
             state.code.length != 6 || state.flowAddress != state.pendingAddress) return@verify
         val request = AitaEmailCodeVerifyRequestDataModel(requestedFlow.flowId, state.code)
@@ -199,7 +247,7 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
                     enabled = allowed, keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go,
                     onImeAction = verify, leadingIconPath = stateValues.drawablePathIconEmail,
                     sensitive = true, parentOwnsValue = true, onTransformValue = { aitaAuthCodeDigits(it).take(6) })
-                actionButton(Modifier.fillMaxWidth(), text = contactText("confirm"), enabled = allowed && state.code.length == 6,
+                actionButton(Modifier.fillMaxWidth(), text = contactText("confirm"), enabled = allowed,
                     loading = state.busy, autoLoading = false, onClick = verify)
                 Text(contactText("expires", mapOf("seconds" to countdown.expiresSeconds.toString())),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
@@ -208,7 +256,7 @@ internal fun AppConfiguration.ContactEmailConfirmationContent(state: ContactEmai
             val waiting = state.flowAddress == address && !countdown.expired && countdown.resendSeconds > 0L
             actionButton(Modifier.fillMaxWidth(), text = if (waiting) contactText("resend_wait", mapOf("seconds" to countdown.resendSeconds.toString()))
                 else contactText(if (state.flow == null || countdown.expired || state.flowAddress != address) "send" else "resend"),
-                enabled = allowed && address != null && !waiting, autoLoading = false, onClick = send)
+                enabled = allowed && address != null, loading = state.busy, autoLoading = false, onClick = send)
             // A stale authorization/consumed flow can be restarted without discarding the business form.
             if (state.error.isNotBlank() && state.flow != null) actionButton(Modifier.fillMaxWidth(),
                 text = contactText("again"), enabled = allowed, autoLoading = false, onClick = { if (allowed) state.clear() })
@@ -231,7 +279,7 @@ internal fun AppConfiguration.RegistrationEmailConfirmationScreen(pending: UserA
             Text(contactText("registration_detail"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             ContactEmailConfirmationContent(confirmation, enabled = !busy)
             if (existingAccount != true) actionButton(Modifier.fillMaxWidth(), text = contactText("create_account"), enabled = confirmation.ready && !busy,
-                loading = busy, autoLoading = false) {
+                loading = busy, autoLoading = false, unavailableText = contactText("required_before_save")) {
                 if (confirmation.ready && !stateValues.signUpInProgress) signUpUser(pending.copy(
                     contactVerificationId = confirmation.draftId, contactEmailProofs = confirmation.proofs), onFailure = { response ->
                     scope.launch {

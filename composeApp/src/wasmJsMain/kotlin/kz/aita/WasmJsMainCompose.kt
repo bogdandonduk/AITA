@@ -3,6 +3,8 @@ package kz.aita
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.MainScope
@@ -82,6 +84,11 @@ private fun completeBrowserEntryLoad(): Unit = js("""{
     if (globalThis.aitaWebEntry) globalThis.aitaWebEntry.ready();
 }""")
 
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+private fun failedBrowserEntryLoad(message: String): Unit = js("""{
+    if (globalThis.aitaWebEntry) globalThis.aitaWebEntry.failed(message);
+}""")
+
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     installWebRuntimeDiagnostics()
@@ -90,17 +97,24 @@ fun main() {
     installWasmComposePlatformBridges()
 
     MainScope().launch {
+        var openingStorage = true
         try {
             initializeBrowserDatabase()
+            openingStorage = false
             init()
-            document.getElementById("aita-startup")?.remove()
             ComposeViewport(document.body!!) {
                 AppConfiguration({ MainScreen() })
+                LaunchedEffect(Unit) {
+                    withFrameNanos { }
+                    document.getElementById("aita-startup")?.remove()
+                    completeBrowserEntryLoad()
+                }
             }
-            completeBrowserEntryLoad()
         } catch (failure: Throwable) {
             val alreadyOpen = failure.message.orEmpty().contains("already open in another tab")
-            document.getElementById("aita-startup-message")?.textContent = browserStartupFailureText(alreadyOpen)
+            // Rendering/engine failures must not be described as a storage permission problem.
+            val message = if (openingStorage) browserStartupFailureText(alreadyOpen) else ""
+            failedBrowserEntryLoad(message)
         }
     }
 }

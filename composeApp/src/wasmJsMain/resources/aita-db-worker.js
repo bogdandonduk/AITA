@@ -32,7 +32,10 @@ const ready = new Promise((resolve, reject) => {
     }
     // The cart book and session are live in memory. A second writer tab must not overwrite
     // the first tab's newer drafts or rotate its authentication token behind its back.
-    self.navigator.locks.request('aita.local.database.v1', { ifAvailable: true }, async lock => {
+    const lockController = new AbortController();
+    const lockWait = setTimeout(() => lockController.abort(), 3000);
+    self.navigator.locks.request('aita.local.database.v1', { signal: lockController.signal }, async lock => {
+        clearTimeout(lockWait);
         if (!lock) throw new Error('AITA is already open in another tab. Close that tab and reload.');
         SQL = await initSqlJs({ locateFile: () => '/sql-wasm.wasm' });
         storage = await new Promise((done, fail) => {
@@ -46,7 +49,10 @@ const ready = new Promise((resolve, reject) => {
         database = committedBytes ? new SQL.Database(committedBytes) : new SQL.Database();
         resolve();
         await new Promise(() => {}); // Worker termination releases the tab's exclusive lock.
-    }).catch(reject);
+    }).catch(error => {
+        clearTimeout(lockWait);
+        reject(lockController.signal.aborted ? new Error('AITA is already open in another tab. Close that tab and reload.') : error);
+    });
 });
 // Requests can arrive after a failed startup; retain the rejection without an unhandled event.
 ready.catch(() => {});

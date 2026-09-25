@@ -7,7 +7,7 @@ import org.w3c.dom.Worker
 
 /** Open local browser storage before any shared service or Compose state reads the database. */
 suspend fun initializeBrowserDatabase() {
-    val driver = WebWorkerDriver(Worker("/aita-db-worker.js"))
+    val driver = WebWorkerDriver(Worker("/aita-db-worker.js?v=20260925"))
     try {
         withTimeout(30_000) {
             val version = driver.executeQuery(null, "PRAGMA user_version", { cursor ->

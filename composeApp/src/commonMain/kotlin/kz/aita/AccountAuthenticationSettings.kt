@@ -70,9 +70,15 @@ private fun AppConfiguration.AccountAuthenticationSettingsContent(initiallyExpan
 
     @Composable
     fun QuietAction(onClick: () -> Unit, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-        TextButton(onClick = onClick, enabled = enabled && !loading,
-            colors = ButtonDefaults.textButtonColors(contentColor = stateValues.AccentColor,
-                disabledContentColor = stateValues.PlaceholderTextColor), content = content)
+        val waiting = localizedStringResource(1141, "Please wait…")
+        TextButton(onClick = {
+            if (enabled && !loading) onClick()
+            else error = if (loading) waiting
+                else eventMessage("action.requirements").visibleLocalizedString(stateValues.appLanguage, "")
+        }, colors = ButtonDefaults.textButtonColors(contentColor = stateValues.AccentColor)) {
+            if (loading) { AitaBusyIndicator(Modifier.size(18.dp), color = stateValues.AccentColor); Spacer(Modifier.width(8.dp)) }
+            content()
+        }
     }
 
     fun clearSensitive() {

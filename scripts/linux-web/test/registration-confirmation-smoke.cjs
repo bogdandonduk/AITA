@@ -39,6 +39,8 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   await page.getByRole('textbox',{name:'000000',exact:true}).waitFor();
   await enter(page.getByRole('textbox',{name:'000000',exact:true}),'１２３４５６');
   const confirm=page.getByRole('button',{name:/^Подтвердить email$|^Confirm email$/});await confirm.click({force:true});
+  // Actions remain pressable before validation; wait for the actual confirmation result.
+  await page.getByText(/Email confirmed|Email подтверждён/).first().waitFor();
   const create=page.getByRole('button',{name:/^Создать аккаунт$|^Create account$/});await create.waitFor();assert(await create.isEnabled());await create.click({force:true});
   await page.waitForTimeout(1000);assert.deepEqual(calls,['/auth/registration/email/request','/auth/registration/email/verify','/auth/signUp']);assert.deepEqual(errors,[]);
   await page.getByRole('button',{name:/^Войти в существующий аккаунт$|^Sign in to existing account$/}).waitFor();

@@ -27,6 +27,49 @@
         // These parameters only select the download; the signed feed is compared with the
         // build identity compiled into the running Wasm application.
         (() => {
+            const language = (navigator.language || 'en').split('-')[0];
+            const copy = {
+                en: ['AITA is still loading. Check your connection, then retry if needed.', 'This browser needs an update to open AITA. Use a current Chrome, Edge, Firefox or Safari.', 'AITA could not finish loading. Retry to fetch a fresh app copy. Your saved data will stay.', 'Retry', 'Download AITA'],
+                ru: ['AITA ещё загружается. Проверьте соединение; при необходимости повторите.', 'Обновите браузер для открытия AITA. Используйте актуальный Chrome, Edge, Firefox или Safari.', 'Не удалось загрузить AITA. Повторите, чтобы получить свежую версию. Сохранённые данные останутся.', 'Повторить', 'Скачать AITA'],
+                kk: ['AITA әлі жүктелуде. Байланысты тексеріп, қажет болса қайталаңыз.', 'AITA ашу үшін браузерді жаңартыңыз. Жаңа Chrome, Edge, Firefox немесе Safari қолданыңыз.', 'AITA жүктелмеді. Жаңа нұсқаны алу үшін қайталаңыз. Сақталған деректер қалады.', 'Қайталау', 'AITA жүктеу'],
+                ky: ['AITA жүктөлүп жатат. Байланышты текшерип, керек болсо кайталаңыз.', 'AITA ачуу үчүн браузерди жаңыртыңыз. Жаңы Chrome, Edge, Firefox же Safari колдонуңуз.', 'AITA жүктөлгөн жок. Жаңы нуска үчүн кайталаңыз. Сакталган маалымат калат.', 'Кайталоо', 'AITA жүктөө'],
+                tg: ['AITA ҳанӯз бор шуда истодааст. Пайвастшавиро санҷида, агар лозим бошад такрор кунед.', 'Барои кушодани AITA браузерро нав кунед. Chrome, Edge, Firefox ё Safari-и навро истифода баред.', 'AITA бор нашуд. Барои нусхаи нав такрор кунед. Маълумоти сабтшуда боқӣ мемонад.', 'Такрор', 'Боргирии AITA'],
+                uz: ['AITA hali yuklanmoqda. Ulanishni tekshiring va kerak boʻlsa qayta urining.', 'AITA ni ochish uchun brauzerni yangilang. Yangi Chrome, Edge, Firefox yoki Safari dan foydalaning.', 'AITA yuklanmadi. Yangi nusxani olish uchun qayta urining. Saqlangan maʼlumotlar qoladi.', 'Qayta urinish', 'AITA ni yuklab olish']
+            }[language] || null;
+            const words = copy || ['AITA is still loading. Check your connection, then retry if needed.', 'Update your browser to open AITA. Use a current Chrome, Edge, Firefox or Safari.', 'AITA could not finish loading. Retry to fetch a fresh copy. Your saved data will stay.', 'Retry', 'Download AITA'];
+            let finished = false;
+            let timer;
+            function showRecovery(message) {
+                if (finished) return;
+                const host = document.getElementById('aita-startup');
+                if (!host) return;
+                document.getElementById('aita-startup-message').textContent = message;
+                if (document.getElementById('aita-startup-retry')) return;
+                const retry = document.createElement('button');
+                retry.id = 'aita-startup-retry'; retry.textContent = words[3];
+                retry.onclick = () => {
+                    retry.disabled = true;
+                    const fresh = new URL(location.href);
+                    fresh.searchParams.set('_aita_refresh', String(Date.now()));
+                    location.replace(fresh.href);
+                };
+                host.appendChild(retry);
+                const downloads = document.createElement('a');
+                downloads.href = 'https://github.com/bogdandonduk/AITA/releases/latest';
+                downloads.textContent = words[4]; host.appendChild(downloads);
+            }
+            function loadingFailed() { showRecovery(words[2]); }
+            // Test features rather than guessing from the browser name or an embedded-browser UA.
+            let compatible = false;
+            try {
+                compatible = typeof WebAssembly === 'object' && typeof WebAssembly.Tag === 'function' &&
+                    WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,3,1,95,0])) &&
+                    !!navigator.locks && !!globalThis.crypto?.subtle && typeof indexedDB !== 'undefined';
+            } catch (_) {}
+            if (!compatible) { showRecovery(words[1]); return; }
+            window.addEventListener('error', loadingFailed);
+            window.addEventListener('unhandledrejection', loadingFailed);
+            timer = setTimeout(() => showRecovery(words[0]), 30000);
             const names = ['_aita_build', '_aita_refresh'];
             const storageKey = 'aita.web-entry-refresh';
             const entry = new URL('composeApp.js', location.href);
@@ -48,7 +91,11 @@
                 try { localStorage.setItem(storageKey, JSON.stringify(refresh)); } catch (_) {}
             }
             globalThis.aitaWebEntry = Object.freeze({
+                failed(message) { clearTimeout(timer); showRecovery(message || words[2]); },
                 ready() {
+                    finished = true; clearTimeout(timer);
+                    window.removeEventListener('error', loadingFailed);
+                    window.removeEventListener('unhandledrejection', loadingFailed);
                     const url = new URL(location.href);
                     if (!names.some(name => url.searchParams.has(name))) return;
                     // Keep unrelated query bytes (including signed links), the fragment and
@@ -63,6 +110,7 @@
             });
             const script = document.createElement('script');
             script.src = entry.href;
+            script.onerror = loadingFailed;
             document.body.appendChild(script);
         })();
     </script>

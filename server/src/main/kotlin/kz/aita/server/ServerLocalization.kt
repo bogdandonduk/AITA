@@ -49,7 +49,33 @@ internal fun enrichGlobalConfigurationLanguages(raw: String, bundled: JsonElemen
     val payload = root["payload"] as? JsonObject ?: return raw
     val languages = payload["languages"]?.let { jsonBase.decodeFromJsonElement(ListSerializer(AppLanguageDataModel.serializer()), it) }.orEmpty()
     val enriched = jsonBase.encodeToJsonElement(ListSerializer(AppLanguageDataModel.serializer()), languages.withBundledAppLanguages())
-    return JsonObject(root + ("payload" to JsonObject(payload + ("languages" to enriched)))).toString()
+    return JsonObject(root + ("payload" to enrichStoreCountryConfiguration(JsonObject(payload + ("languages" to enriched))))).toString()
+}
+
+/** Managed installations retain their own global.json; append newly supported countries explicitly. */
+internal fun enrichStoreCountryConfiguration(payload: JsonObject): JsonObject {
+    fun appendMissing(field: String, key: String, shipped: JsonArray): JsonArray {
+        val existing = payload[field] as? JsonArray ?: JsonArray(emptyList())
+        val ids = existing.mapNotNull { (it as? JsonObject)?.get(key)?.jsonPrimitive?.contentOrNull?.lowercase() }.toSet()
+        return JsonArray(existing + shipped.filter { it.jsonObject.getValue(key).jsonPrimitive.content.lowercase() !in ids })
+    }
+    val countries = jsonBase.encodeToJsonElement(ListSerializer(CountryDataModel.serializer()), defaultStoreCountries()).jsonArray
+    val forms = jsonBase.encodeToJsonElement(ListSerializer(CompanyFormDataModel.serializer()), defaultCompanyForms()).jsonArray
+    val formats = jsonBase.encodeToJsonElement(ListSerializer(LegalIdFormatDataModel.serializer()), defaultLegalIdFormats()).jsonArray
+    val indexedForms = forms.associateBy { it.jsonObject.getValue("id").jsonPrimitive.content }
+    val completeForms = JsonArray(appendMissing("companyForms", "id", forms).map { element ->
+        val form = element as? JsonObject ?: return@map element
+        val shipped = indexedForms[form["id"]?.jsonPrimitive?.contentOrNull]?.jsonObject ?: return@map form
+        JsonObject(form.toMutableMap().apply {
+            if ((form["countryLocales"] as? JsonArray).isNullOrEmpty()) put("countryLocales", shipped.getValue("countryLocales"))
+            if ((form["legalIdFormatId"] as? JsonPrimitive)?.contentOrNull.isNullOrBlank()) put("legalIdFormatId", shipped.getValue("legalIdFormatId"))
+        })
+    })
+    return JsonObject(payload + mapOf(
+        "countries" to appendMissing("countries", "locale", countries),
+        "companyForms" to completeForms,
+        "legalIdFormats" to appendMissing("legalIdFormats", "id", formats)
+    ))
 }
 
 private val bundledResponseLanguageValues: Map<String, List<LocalizedStringDataModel>> by lazy {

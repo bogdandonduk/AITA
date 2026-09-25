@@ -1858,15 +1858,28 @@ internal class AitaAdvancedAuthService(
         }
     }
 
+    internal fun verifiedActorContactsInside(actor: UUID, channel: AitaContactChannel): List<String> {
+        if (channel == AitaContactChannel.PHONE) return emptyList() // Enable only after real SMS ownership verification.
+        val user = Users.selectAll().where { Users.id eq actor }.singleOrNull() ?: return emptyList()
+        val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq actor }.singleOrNull()
+        val main = user[Users.email].takeIf { profile?.get(AuthSecurityProfiles.emailVerifiedAtMillis) != null }
+        val additional = AuthLoginEmails.selectAll().where { (AuthLoginEmails.userId eq actor) and
+            AuthLoginEmails.verifiedAtMillis.isNotNull() }.map { it[AuthLoginEmails.emailNormalized] }
+        return (listOfNotNull(main) + additional).mapNotNull(::normalizeAitaEmail).distinct()
+    }
+
     /** The caller's mutation transaction owns these locks until save/rollback. No code is accepted here. */
     internal fun requireContactProofsInside(actor: UUID?, target: AitaContactTarget, proposed: List<String>, previous: List<String>,
         proofs: List<AitaVerifiedContactProof>): List<UUID> {
-        val needed = aitaContactEmailsRequiringProof(proposed, previous) ?: throw BadRequestException("Invalid contact email")
+        val changed = aitaContactEmailsRequiringProof(proposed, previous) ?: throw BadRequestException("Invalid contact email")
+        val owned = if (actor != null && target.purpose == AitaContactPurpose.STORE_CONTACT)
+            verifiedActorContactsInside(actor, AitaContactChannel.EMAIL) else emptyList()
+        val needed = changed.filterNot { aitaReusableAccountContact(target.purpose, AitaContactChannel.EMAIL, it, owned) }
         if (needed.isEmpty()) return emptyList()
         config.requireSecurityConfigured()
         val canonicalTarget = canonicalAitaContactTarget(target) ?: throw AitaContactVerificationRequiredException()
         if (!contactTargetIsAuthorizedInside(actor, canonicalTarget)) throw AitaContactVerificationRequiredException()
-        if (proofs.size != needed.size || proofs.size > 10 || proofs.map { it.flowId }.distinct().size != proofs.size)
+        if (proofs.size < needed.size || proofs.size > changed.size || proofs.size > 10 || proofs.map { it.flowId }.distinct().size != proofs.size)
             throw AitaContactVerificationRequiredException()
         var earliestExpiry = Long.MAX_VALUE
         val matched = mutableSetOf<String>()
@@ -1881,7 +1894,7 @@ internal class AitaAdvancedAuthService(
             val now = System.currentTimeMillis()
             earliestExpiry = minOf(earliestExpiry, binding[AuthContactVerifications.receiptExpiresAtMillis] ?: 0L)
             val address = binding[AuthContactVerifications.address]
-            if (address !in needed || !matched.add(address) || row[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_CONTACT ||
+            if (address !in changed || !matched.add(address) || row[AuthOneTimeChallenges.purpose] != AUTH_PURPOSE_CONTACT ||
                 row[AuthOneTimeChallenges.userId] != actor || row[AuthOneTimeChallenges.verifiedAtMillis] == null ||
                 !aitaContactProofMatches(canonicalTarget, binding.contactTarget(), actor?.toString(), binding[AuthContactVerifications.actorUserId]?.toString(),
                     address, address, AitaContactChannel.valueOf(binding[AuthContactVerifications.channel]), now,
@@ -1891,7 +1904,7 @@ internal class AitaAdvancedAuthService(
                 throw AitaContactVerificationRequiredException()
             ids += publicId
         }
-        if (matched.size != needed.size || System.currentTimeMillis() >= earliestExpiry) throw AitaContactVerificationRequiredException()
+        if (!matched.containsAll(needed) || System.currentTimeMillis() >= earliestExpiry) throw AitaContactVerificationRequiredException()
         return ids
     }
 

@@ -4,6 +4,30 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class ServerLocalizationTest {
+    @Test fun existingInstallationGetsNewCountryRulesWithoutLosingOperatorConfiguration() {
+        val old = parsed("""{"countries":[{"locale":"kz","phoneNumberCode":"7","operatorCountry":true}],"companyForms":[{"id":"0","name":[{"language":"en","value":"Custom LLP"}]}],"legalIdFormats":[{"id":"kz_bin","operatorFormat":true}],"serverUrl":"https://operator.invalid","prices":[17],"unknown":true}""").jsonObject
+        val result = enrichStoreCountryConfiguration(old)
+        assertEquals(setOf("kz", "tj", "kg", "uz"), result.getValue("countries").jsonArray.map { it.jsonObject.getValue("locale").jsonPrimitive.content }.toSet())
+        assertEquals(old.getValue("countries").jsonArray.first(), result.getValue("countries").jsonArray.first())
+        val form = result.getValue("companyForms").jsonArray.first().jsonObject
+        assertEquals(old.getValue("companyForms").jsonArray.first().jsonObject["name"], form["name"])
+        assertEquals(JsonPrimitive("kz_bin"), form["legalIdFormatId"])
+        assertEquals(parsed("""["kz"]"""), form["countryLocales"])
+        assertEquals(old.getValue("legalIdFormats").jsonArray.first(), result.getValue("legalIdFormats").jsonArray.first())
+        for (key in listOf("serverUrl", "prices", "unknown")) assertEquals(old[key], result[key])
+        assertEquals(result, enrichStoreCountryConfiguration(result))
+    }
+
+    @Test fun shippedCountryConfigurationAndOfflineCatalogueAgree() {
+        val root = javaClass.getResourceAsStream("/config/app/global.json")!!.use { parsed(it.readBytes().toString(Charsets.UTF_8)) }.jsonObject
+        val payload = root.getValue("payload").jsonObject
+        // The JSON omits default-valued fields; compare the decoded models, not serialization style.
+        val json = kz.aita.jsonBase
+        assertEquals(kz.aita.defaultStoreCountries(), json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(kz.aita.CountryDataModel.serializer()), payload.getValue("countries")))
+        assertEquals(kz.aita.defaultCompanyForms(), json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(kz.aita.CompanyFormDataModel.serializer()), payload.getValue("companyForms")))
+        assertEquals(kz.aita.defaultLegalIdFormats(), json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(kz.aita.LegalIdFormatDataModel.serializer()), payload.getValue("legalIdFormats")))
+    }
+
     private fun parsed(text: String) = Json.parseToJsonElement(text)
     private fun merged(primary: String, bundled: String) = mergeConfigurationLanguageValues(parsed(primary), parsed(bundled))
 

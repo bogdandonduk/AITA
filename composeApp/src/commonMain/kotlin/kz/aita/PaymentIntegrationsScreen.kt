@@ -72,12 +72,9 @@ internal fun PaymentIntegrationsWorkspace(
             item {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onBack, enabled = !busy) { Text(strings.back) }
+                        AppConfiguration.actionButton(Modifier.weight(1f), text = strings.back, loading = busy, onClick = onBack)
                         Spacer(Modifier.weight(1f))
-                        OutlinedButton(onClick = onRefresh, enabled = !busy) {
-                            if (state.loading) { AitaBusyIndicator(Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
-                            Text(strings.refresh)
-                        }
+                        AppConfiguration.actionButton(Modifier.weight(1f), text = strings.refresh, loading = busy, onClick = onRefresh)
                     }
                     Text(strings.title, style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(4.dp))
@@ -292,8 +289,10 @@ private fun ProviderCard(
             footer?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Divider()
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onManage, enabled = capabilityEnabled && !busy) { Text(strings.manage) }
-                OutlinedButton(onClick = onTest, enabled = summary != null && !busy) { Text(strings.verify) }
+                AppConfiguration.actionButton(Modifier.weight(1f), text = strings.manage, enabled = capabilityEnabled,
+                    unavailableText = footer ?: strings.unavailable, loading = busy, onClick = onManage)
+                AppConfiguration.actionButton(Modifier.weight(1f), text = strings.verify, enabled = summary != null,
+                    unavailableText = strings.notConnected, loading = busy, onClick = onTest)
             }
         }
     }
@@ -404,8 +403,8 @@ private fun PaymentIntegrationEditorDialog(
             }
         },
         confirmButton = {
-            Button(
-                enabled = !busy && capabilityEnabled,
+            AppConfiguration.actionButton(
+                text = strings.save, enabled = capabilityEnabled, loading = busy, unavailableText = strings.kaspiContractRequired,
                 onClick = {
                     val secretCopy = token
                     clearEphemeralSecret()
@@ -424,26 +423,26 @@ private fun PaymentIntegrationEditorDialog(
                         )
                     )
                 },
-            ) { Text(strings.save) }
+            )
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (existing != null) {
-                    TextButton(
-                        enabled = !busy,
+                    AppConfiguration.actionButton(
+                        modifier = Modifier.weight(1f), text = strings.remove, loading = busy, confirmationRequired = true,
                         onClick = {
                             clearEphemeralSecret()
                             onDelete(PaymentIntegrationDeleteRequest(storeId, environment, existing.revision))
                         },
-                    ) { Text(strings.remove) }
+                    )
                 }
-                TextButton(
-                    enabled = !busy,
+                AppConfiguration.actionButton(
+                    modifier = Modifier.weight(1f), text = strings.cancel, loading = busy,
                     onClick = {
                         clearEphemeralSecret()
                         onDismiss()
                     },
-                ) { Text(strings.cancel) }
+                )
             }
         },
     )

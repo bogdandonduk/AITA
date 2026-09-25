@@ -93,6 +93,12 @@ private fun AppConfiguration.DownloadSavedLocation(downloads: DownloadsState) {
             Text(if (destination != null) "${downloadsText("saved")}: $destination" else downloadsText("browser_saved"),
                 color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
         }
+        if (downloads.repeatSaveAvailable) {
+            Text(downloadsText("browser_retry_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+            actionButton(text = downloadsText("browser_retry"), autoLoading = false, confirmationRequired = false,
+                iconPath = downloadsIconPath(), iconRes = downloadsIconResource(), onClick = DownloadsWorkspace::repeatSave)
+        }
+
     }
 }
 
@@ -152,7 +158,8 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                 }
                             })
                         actionButton(text = updateText("check"), iconPath = stateValues.drawablePathIconRefresh, iconRes = stateValues.drawableResIconRefresh.value, autoLoading = false, confirmationRequired = false,
-                            enabled = !downloads.loading && !downloads.folderChanging && downloads.savingId == null, onClick = DownloadsWorkspace::refresh)
+                            enabled = !downloads.loading && !downloads.folderChanging && downloads.savingId == null, loading = downloads.loading,
+                            unavailableText = localizedStringResource(1141, "Please wait…"), onClick = DownloadsWorkspace::refresh)
                     }
                 }
                 item("platform_tabs") {
@@ -215,7 +222,9 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                                 if (entry.kind == "APK" || entry.kind == "AAB") Text(downloadsText(entry.kind.lowercase()), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                                 actionButton(text = updateText(entry.action.name.lowercase()), iconPath = downloadsIconPath(), iconRes = downloadsIconResource(),
                                                     autoLoading = false, confirmationRequired = false,
-                                                    enabled = downloads.savingId == null && downloads.folderReady && !downloads.loading && !downloads.folderChanging,
+                                                    enabled = downloads.savingId == null && !downloads.loading && !downloads.folderChanging,
+                                                    loading = downloads.savingId == entry.id,
+                                                    unavailableText = localizedStringResource(1141, "Please wait…"),
                                                     onClick = { DownloadsWorkspace.save(entry.id) })
                                             }
                                         }

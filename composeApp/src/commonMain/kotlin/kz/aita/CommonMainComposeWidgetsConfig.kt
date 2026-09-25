@@ -2827,6 +2827,8 @@ fun CountryDataModel.mapIconRes(): DrawableResource {
         "en" -> Res.drawable.flag_en
         "ru" -> Res.drawable.flag_ru
         "tj" -> Res.drawable.flag_tj
+        "kg" -> Res.drawable.flag_kg
+        "uz" -> Res.drawable.flag_uz
         else -> Res.drawable.flag_kz
     }
 }
@@ -5490,90 +5492,10 @@ object AppConfiguration {
 
 }
 
-internal fun List<CountryDataModel>.withTajikistanFallback(): List<CountryDataModel> {
-    if (any { it.locale.equals("tj", true) || it.phoneNumberCode == "992" })
-        return this
-
-    val tajikistan = CountryDataModel(
-        locale = "tj",
-        language = "tg",
-        name = listOf(
-            LocalizedStringDataModel("main", "Tajikistan"),
-            LocalizedStringDataModel("en", "Tajikistan"),
-            LocalizedStringDataModel("ru", "Таджикистан"),
-            LocalizedStringDataModel("kk", "Тәжікстан"),
-            LocalizedStringDataModel("ky", "Тажикстан")
-        ),
-        flagDrawablePath = "png/flag_tj.png",
-        cities = listOf(
-            CityDataModel(
-                name = listOf(
-                    LocalizedStringDataModel("main", "Dushanbe"),
-                    LocalizedStringDataModel("en", "Dushanbe"),
-                    LocalizedStringDataModel("ru", "Душанбе"),
-                    LocalizedStringDataModel("kk", "Душанбе"),
-                    LocalizedStringDataModel("ky", "Душанбе")
-                ),
-                centerLatitude = 38.5606,
-                centerLongitude = 68.7778,
-                swLatitude = 38.4950,
-                swLongitude = 68.6800,
-                neLatitude = 38.6100,
-                neLongitude = 68.8800
-            ),
-            CityDataModel(
-                name = listOf(
-                    LocalizedStringDataModel("main", "Khujand"),
-                    LocalizedStringDataModel("en", "Khujand"),
-                    LocalizedStringDataModel("ru", "Худжанд"),
-                    LocalizedStringDataModel("kk", "Худжанд"),
-                    LocalizedStringDataModel("ky", "Хужанд")
-                ),
-                centerLatitude = 40.2894,
-                centerLongitude = 69.6270,
-                swLatitude = 40.2560,
-                swLongitude = 69.5900,
-                neLatitude = 40.3050,
-                neLongitude = 69.7300
-            )
-        ),
-        phoneNumberCode = "992",
-        phoneNumberSize = 9,
-        currencies = listOf(
-            CurrencyDataModel(
-                code = "TJS",
-                symbol = "SM",
-                name = listOf(
-                    LocalizedStringDataModel("main", "Somoni"),
-                    LocalizedStringDataModel("en", "Somoni"),
-                    LocalizedStringDataModel("ru", "Сомони"),
-                    LocalizedStringDataModel("kk", "Сомони"),
-                    LocalizedStringDataModel("ky", "Сомони")
-                )
-            )
-        ),
-        cashlessPaymentOptions = listOf(
-            PaymentOptionDataModel(
-                id = "0",
-                name = listOf(
-                    LocalizedStringDataModel("main", "Card"),
-                    LocalizedStringDataModel("en", "Card"),
-                    LocalizedStringDataModel("ru", "Карта"),
-                    LocalizedStringDataModel("kk", "Карта"),
-                    LocalizedStringDataModel("ky", "Карта")
-                )
-            )
-        ),
-        preferredCashlessPaymentOptionId = "0"
-    )
-
-    return this + tajikistan
-}
-
 @Composable
 fun AppConfiguration.countrySelectionPhoneNumberTextField(
     modifier: Modifier = Modifier,
-    countries: List<CountryDataModel> = stateValues.globalAppConfiguration.countries.withTajikistanFallback(),
+    countries: List<CountryDataModel> = stateValues.globalAppConfiguration.countries.withSupportedCountries(),
     valueInitial: String? = null,
     stateHost: StateHost? = null,
     stateKey: String? = null,
@@ -5593,7 +5515,7 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
     selectedCountryCodeInitial: String? = null,
     onValueChange: ((String, String, String?, () -> Unit) -> Unit)? = null
 ): DomainSelectionTextFieldContent {
-    val phoneCountries = countries.withTajikistanFallback()
+    val phoneCountries = countries.withSupportedCountries()
     val detectedCountry = valueInitial?.takeUnless { valueIsNationalNumber }?.removePrefix("+")?.let { normalized ->
         phoneCountries
             .sortedByDescending { it.phoneNumberCode.length }
@@ -5652,12 +5574,12 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
         imeWithAction = imeWithAction,
         contentInvalidText = stateValues.stringPhoneNumberMustBe,
         onContentValidityCheck = { text, _, selectedSecondaryId ->
-            countries.withTajikistanFallback().find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
+            countries.withSupportedCountries().find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
                 text.checkAsPhoneNumber(this)
             } == true
         },
         onFilterValue = { text, _, selectedSecondaryId ->
-            countries.withTajikistanFallback().find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
+            countries.withSupportedCountries().find { "+${it.phoneNumberCode}" == selectedSecondaryId }?.run {
                 text.filterAsPhoneNumber(this)
             } == true
         },
@@ -5912,11 +5834,14 @@ fun AppConfiguration.actionButton(
 
     confirmationRequired: Boolean? = null,
 
+    unavailableText: String? = null,
     onDisabledClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ): ActionButtonContent {
     val isEnabled = enabled
+    var actionPressed by remember { mutableStateOf(false) }
+    LaunchedEffect(loading) { if (!loading) actionPressed = false }
     val (networkFeedback, startNetworkFeedback) = rememberActionNetworkFeedback()
     fun startAutoLoadingPulse() { if (autoLoading) startNetworkFeedback() }
 
@@ -5932,7 +5857,7 @@ fun AppConfiguration.actionButton(
     val visuallyEnabled = isEnabled && !effectiveLoading
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (visuallyEnabled) enabledColor else disabledColor,
+        targetValue = if (!effectiveLoading || !actionPressed) enabledColor else disabledColor,
         animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS),
         label = "actionButtonBackground"
     )
@@ -5976,7 +5901,7 @@ fun AppConfiguration.actionButton(
             )
 
     val resolvedIconRes = iconRes
-    val showBusyAnimation = effectiveLoading && LocalLoadingAnimationsEnabled.current
+    val showBusyAnimation = actionFeedback
     val iconPresent = showBusyAnimation || icon != null || inferredIconPath != null
     val iconSize = iconSizeOverride ?: when {
         inferredIconPath == stateValues.drawablePathIconBackArrow -> 18.dp
@@ -6012,6 +5937,7 @@ fun AppConfiguration.actionButton(
                             if (actionNeedsConfirmation)
                                 confirmationDialogShown = true
                             else {
+                                actionPressed = true
                                 startAutoLoadingPulse()
                                 onClick()
                             }
@@ -6022,13 +5948,15 @@ fun AppConfiguration.actionButton(
                         indication = ripple(color = textColor)
                     )
                 else if (!effectiveLoading)
-                    onDisabledClick?.let { disabledClick ->
-                        aitaClickable(
-                            onClick = disabledClick,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = stateValues.ErrorColor)
-                        )
-                    } ?: this
+                    aitaClickable(
+                        onClick = {
+                            onDisabledClick?.invoke() ?: postInAppNotification(
+                                unavailableText ?: eventMessage("action.requirements").visibleLocalizedString(stateValues.appLanguage, ""),
+                                NotificationType.Negative, transient = true)
+                        },
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = stateValues.ErrorColor)
+                    )
                 else
                     this
             }
@@ -6166,8 +6094,13 @@ fun AppConfiguration.actionButton(
             negativeAction = { confirmationDialogShown = false },
             positiveAction = {
                 confirmationDialogShown = false
-                startAutoLoadingPulse()
-                onClick()
+                if (enabled && !loading) {
+                    actionPressed = true
+                    startAutoLoadingPulse()
+                    onClick()
+                } else onDisabledClick?.invoke() ?: postInAppNotification(
+                    unavailableText ?: eventMessage("action.requirements").visibleLocalizedString(stateValues.appLanguage, ""),
+                    NotificationType.Negative, transient = true)
             }
         )
     }

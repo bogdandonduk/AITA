@@ -2316,7 +2316,7 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
 ) {
     val activeStoreId = stateValues.activeStoreId
     val defaultCurrency = stateValues.globalAppConfiguration.countries
-        .withTajikistanFallback()
+        .withSupportedCountries()
         .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
         ?.currencies
         ?.firstOrNull()

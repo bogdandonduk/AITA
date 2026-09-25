@@ -16,23 +16,46 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kz.aita.auth.*
 import kotlin.time.TimeSource
+import kotlin.time.TimeMark
 
 internal data class AuthFlowCountdown(val resendSeconds: Long, val expiresSeconds: Long, val hasExpiry: Boolean) {
     val expired: Boolean get() = hasExpiry && expiresSeconds <= 0L
 }
 
+internal data class AuthFlowClockAnchor(val localTimeMillis: Long, val received: TimeMark)
+
+/** Returning from mail or a recreated screen must not grant a fresh UI countdown. */
+internal class AuthFlowClockMemory(private val clock: TimeSource = TimeSource.Monotonic) {
+    private data class Key(val flowId: String, val serverTime: Long, val resend: Long, val expiry: Long)
+    private val entries = linkedMapOf<Key, AuthFlowClockAnchor>()
+    private var session: Pair<String?, Long>? = null
+    fun anchor(flow: AitaAuthFlowDataModel?, owner: String?, generation: Long, localTimeMillis: Long): AuthFlowClockAnchor {
+        if (session != (owner to generation)) { entries.clear(); session = owner to generation }
+        entries.entries.removeAll { it.value.received.elapsedNow().inWholeMinutes >= 61 }
+        if (flow == null || flow.flowId.isBlank()) return AuthFlowClockAnchor(localTimeMillis, clock.markNow())
+        val key = Key(flow.flowId, flow.serverTimeMillis, flow.resendAfterMillis, flow.expiresAtMillis)
+        return entries.getOrPut(key) {
+            while (entries.size >= 64) entries.remove(entries.keys.first())
+            AuthFlowClockAnchor(localTimeMillis, clock.markNow())
+        }
+    }
+}
+
+private val authFlowClocks = AuthFlowClockMemory()
+
 /** Monotonic elapsed time prevents device clock changes from making resend/expiry flicker. */
 @Composable
 internal fun rememberAuthFlowCountdown(flow: AitaAuthFlowDataModel?): AuthFlowCountdown {
-    val epoch = remember(flow) { getCurrentTimeMillis() }
-    val mark = remember(flow) { TimeSource.Monotonic.markNow() }
-    val resend = remember(flow) { flow?.let { aitaAuthResendDelayMillis(it.resendAfterMillis, it.serverTimeMillis, epoch) } ?: 0L }
-    val expires = remember(flow) { flow?.let { aitaAuthExpiryDelayMillis(it.expiresAtMillis, it.serverTimeMillis, epoch) } ?: 0L }
-    var elapsed by remember(flow) { mutableLongStateOf(0L) }
-    LaunchedEffect(flow) {
+    val owner = userAccountState.payloadValue?.id
+    val generation = currentAuthenticatedSessionGeneration()
+    val anchor = remember(flow, owner, generation) { authFlowClocks.anchor(flow, owner, generation, getCurrentTimeMillis()) }
+    val resend = remember(anchor) { flow?.let { aitaAuthResendDelayMillis(it.resendAfterMillis, it.serverTimeMillis, anchor.localTimeMillis) } ?: 0L }
+    val expires = remember(anchor) { flow?.let { aitaAuthExpiryDelayMillis(it.expiresAtMillis, it.serverTimeMillis, anchor.localTimeMillis) } ?: 0L }
+    var elapsed by remember(anchor) { mutableLongStateOf(anchor.received.elapsedNow().inWholeMilliseconds.coerceAtLeast(0L)) }
+    LaunchedEffect(anchor) {
         while (flow != null && elapsed < maxOf(resend, expires)) {
             delay(500L)
-            elapsed = mark.elapsedNow().inWholeMilliseconds.coerceAtLeast(0L)
+            elapsed = anchor.received.elapsedNow().inWholeMilliseconds.coerceAtLeast(0L)
         }
     }
     return AuthFlowCountdown(aitaAuthCountdownSeconds(resend - elapsed), aitaAuthCountdownSeconds(expires - elapsed), (flow?.expiresAtMillis ?: 0L) > 0L)
@@ -40,8 +63,11 @@ internal fun rememberAuthFlowCountdown(flow: AitaAuthFlowDataModel?): AuthFlowCo
 
 @Composable
 internal fun AppConfiguration.AuthQuietAction(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    TextButton(enabled = enabled, onClick = onClick) {
-        Text(text, color = if (enabled) stateValues.AccentColor else stateValues.PlaceholderTextColor,
+    TextButton(onClick = {
+        if (enabled) onClick() else postInAppNotification(
+            eventMessage("action.requirements").visibleLocalizedString(stateValues.appLanguage, ""), NotificationType.Negative, transient = true)
+    }) {
+        Text(text, color = stateValues.AccentColor,
             fontSize = stateValues.smallTextSize, fontWeight = FontWeight.SemiBold)
     }
 }

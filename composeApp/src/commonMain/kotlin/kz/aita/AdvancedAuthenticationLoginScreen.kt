@@ -25,6 +25,13 @@ private enum class AitaLoginStep { PRIMARY, EMAIL_CODE, EMAIL_DESTINATION, EMAIL
 private enum class AitaCodeLoginMethod { EMAIL, AUTHENTICATOR }
 private enum class AitaLoginIdentifierType { PHONE, EMAIL, SAVED }
 
+/** Resume only an uncompleted factor step; never persist passwords, codes or login tokens. */
+private data class LoginContinuation(val generation: Long, val mode: AitaLoginMode, val step: AitaLoginStep,
+    val flow: AitaAuthFlowDataModel, val identifierType: AitaLoginIdentifierType, val phoneCountry: String,
+    val phone: String, val email: String, val selectedSavedUserId: String?, val codeMethod: AitaCodeLoginMethod,
+    val emailDestination: AitaEmailDestination, val created: kotlin.time.TimeMark = kotlin.time.TimeSource.Monotonic.markNow())
+private var loginContinuation: LoginContinuation? = null
+
 internal enum class AitaAuthFeatureAvailability { CHECKING, AVAILABLE, UNAVAILABLE, UNKNOWN }
 
 internal data class AitaAuthUiAvailability(
@@ -67,29 +74,34 @@ internal fun AppConfiguration.authResponseText(response: ResponseDataModel<*>): 
 
 @Composable
 internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
+    val continuation = remember {
+        loginContinuation?.takeIf { it.generation == currentAuthenticatedSessionGeneration() &&
+            getStoredUserAuthTokens?.invoke() == null && it.created.elapsedNow().inWholeMinutes < 15 }
+            .also { if (it == null) loginContinuation = null }
+    }
     var capabilities by remember { mutableStateOf<AitaAuthCapabilitiesDataModel?>(null) }
     var capabilitiesLoading by remember { mutableStateOf(true) }
     var capabilitiesError by remember { mutableStateOf("") }
     var capabilitiesRefresh by remember { mutableIntStateOf(0) }
-    var mode by remember { mutableStateOf(AitaLoginMode.PASSWORD) }
-    var codeMethod by remember { mutableStateOf(AitaCodeLoginMethod.EMAIL) }
-    var step by remember { mutableStateOf(AitaLoginStep.PRIMARY) }
-    var identifierType by remember { mutableStateOf(AitaLoginIdentifierType.PHONE) }
+    var mode by remember { mutableStateOf(continuation?.mode ?: AitaLoginMode.PASSWORD) }
+    var codeMethod by remember { mutableStateOf(continuation?.codeMethod ?: AitaCodeLoginMethod.EMAIL) }
+    var step by remember { mutableStateOf(continuation?.step ?: AitaLoginStep.PRIMARY) }
+    var identifierType by remember { mutableStateOf(continuation?.identifierType ?: AitaLoginIdentifierType.PHONE) }
     var savedUsers by remember { mutableStateOf<List<SavedLoginUser>>(emptyList()) }
     // Intentionally not rememberSaveable: the user must choose, even with a single identity.
-    var selectedSavedUserId by remember { mutableStateOf<String?>(null) }
+    var selectedSavedUserId by remember { mutableStateOf<String?>(continuation?.selectedSavedUserId) }
     LaunchedEffect(Unit) { savedUsers = SavedLoginUsers.list() }
     // The parent owns the submitted identifier. A second StateHost could restore visible text
     // after the parent had cleared it, causing valid-looking input to submit an empty login.
     var formGeneration by remember { mutableLongStateOf(0L) }
-    val countries = remember(stateValues.globalAppConfiguration.countries) { stateValues.globalAppConfiguration.countries.withTajikistanFallback() }
-    var phoneCountry by remember { mutableStateOf("+" + (countries.firstOrNull { it.locale.equals("kz", true) }?.phoneNumberCode ?: "7")) }
-    var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
+    val countries = remember(stateValues.globalAppConfiguration.countries) { stateValues.globalAppConfiguration.countries.withSupportedCountries() }
+    var phoneCountry by remember { mutableStateOf(continuation?.phoneCountry ?: ("+" + (countries.firstOrNull { it.locale.equals("kz", true) }?.phoneNumberCode ?: "7"))) }
+    var phone by remember { mutableStateOf(continuation?.phone.orEmpty()) }
+    var email by remember { mutableStateOf(continuation?.email.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
-    var emailDestination by remember { mutableStateOf(AitaEmailDestination.MAIN) }
-    var flow by remember { mutableStateOf<AitaAuthFlowDataModel?>(null) }
+    var emailDestination by remember { mutableStateOf(continuation?.emailDestination ?: AitaEmailDestination.MAIN) }
+    var flow by remember { mutableStateOf(continuation?.flow) }
     var newPassword by remember { mutableStateOf("") }
     var repeatPassword by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -100,6 +112,17 @@ internal fun AppConfiguration.AdvancedAuthenticationLoginScreen() {
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val currentBusy by rememberUpdatedState(busy)
+
+    SideEffect {
+        val pending = flow
+        loginContinuation = if (pending != null && pending.tokenPair == null && pending.resetTicket.isEmpty() &&
+            step in setOf(AitaLoginStep.EMAIL_CODE, AitaLoginStep.EMAIL_DESTINATION, AitaLoginStep.EMAIL_SECOND_FACTOR,
+                AitaLoginStep.TOTP, AitaLoginStep.PASSWORD_CONFIRMATION))
+            LoginContinuation(currentAuthenticatedSessionGeneration(), mode, step, pending, identifierType,
+                phoneCountry, phone, email, selectedSavedUserId, codeMethod, emailDestination,
+                loginContinuation?.takeIf { it.flow.flowId == pending.flowId }?.created ?: kotlin.time.TimeSource.Monotonic.markNow())
+        else null
+    }
 
     // Retry capability lookup after a transient outage and expose provider-wide failures while waiting.
     // Never query an anonymous per-account delivery status: that would disclose account existence.

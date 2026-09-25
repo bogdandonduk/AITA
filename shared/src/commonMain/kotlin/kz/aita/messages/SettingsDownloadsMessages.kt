@@ -1,6 +1,9 @@
 package kz.aita
 
 internal fun settingsDownloadsMessageTemplates() = listOf(
+    EventMessageTemplate("downloads.browser_retry", "Save verified file", "Сохранить проверенный файл", "Тексерілген файлды сақтау", ky = "Текшерилген файлды сактоо", tg = "Сабти файли санҷидашуда", uz = "Tekshirilgan faylni saqlash"),
+    EventMessageTemplate("downloads.browser_retry_help", "If your browser did not start saving, press below within one minute. After that, download again.", "Если браузер не начал сохранение, нажмите ниже в течение минуты. Позже скачайте файл заново.", "Браузер сақтауды бастамаса, бір минут ішінде төмендегі батырманы басыңыз. Одан кейін қайта жүктеңіз.", ky = "Браузер сактоону баштабаса, бир мүнөт ичинде төмөнкү баскычты басыңыз. Андан кийин кайра жүктөңүз.", tg = "Агар браузер сабтро оғоз накард, дар давоми як дақиқа тугмаи поёнро пахш кунед. Баъдтар аз нав боргирӣ кунед.", uz = "Brauzer saqlashni boshlamasa, bir daqiqa ichida quyidagi tugmani bosing. Keyin qayta yuklab oling."),
+
     EventMessageTemplate("downloads.auth_link", "Download AITA for your devices", "Скачать AITA для ваших устройств", "Құрылғыларыңызға AITA жүктеп алу", ky = "Түзмөктөрүңүз үчүн AITA жүктөп алуу", tg = "Боргирии AITA барои дастгоҳҳои шумо", uz = "Qurilmalaringiz uchun AITA’ni yuklab olish"),
     EventMessageTemplate("settings.title", "Settings", "Настройки", "Баптаулар", ky = "Жөндөөлөр", tg = "Танзимот", uz = "Sozlamalar"),
     EventMessageTemplate("downloads.title", "Downloads", "Загрузки", "Жүктеулер", ky = "Жүктөөлөр", tg = "Боргириҳо", uz = "Yuklamalar"),

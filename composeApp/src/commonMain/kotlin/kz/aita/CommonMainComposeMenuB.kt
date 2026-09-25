@@ -4685,7 +4685,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                val selectedCountry = stateValues.globalAppConfiguration.countries.run {
+                val selectedCountry = stateValues.globalAppConfiguration.countries.withSupportedCountries().run {
                     countryByPhoneSelection(phoneNumberTextFieldContent.selectedSecondaryId) ?: first()
                 }
 
@@ -4702,10 +4702,11 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                val companyFormDropdownListContent = if (!isBranchEditor) {
+                val countryForms = stateValues.globalAppConfiguration.companyFormsForCountry(selectedCountry.locale)
+                val companyFormDropdownListContent = if (!isBranchEditor) key(selectedCountry.locale) {
                     dropdownListWidget(
                         titleText = stateValues.stringCompanyForm,
-                        domains = stateValues.globalAppConfiguration.companyForms.map {
+                        domains = countryForms.map {
                             SelectableDomain(
                                 id = it.id,
                                 displayId = it.name,
@@ -4715,14 +4716,15 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                             )
                         },
                         showName = false,
-                        selectedInitial = editedStore?.companyForms?.takeIf { it.isNotEmpty() }?.first()?.id
+                        selectedInitial = editedStore?.companyForms?.firstOrNull()?.id?.takeIf { id -> countryForms.any { it.id == id } } ?: countryForms.firstOrNull()?.id
                     )
                 } else null
 
                 if (!isBranchEditor) {
                     Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                    val legalFormat = stateValues.globalAppConfiguration.legalIdFormatForCountry(selectedCountry.locale)
+                    val legalFormat = stateValues.globalAppConfiguration.storeLegalIdFormat(selectedCountry.locale, companyFormDropdownListContent?.selectedId)
+                        ?: stateValues.globalAppConfiguration.legalIdFormatForCountry(selectedCountry.locale)
                     val legalName = legalFormat.name.extractLocalizedString(stateValues.appLanguage) ?: localizedStringResource(523, "Legal ID")
                     val legalPlaceholder = legalFormat.placeholder.extractLocalizedString(stateValues.appLanguage) ?: localizedStringResource(524, "Enter legal ID")
 
@@ -4757,9 +4759,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                     fun buildStoreModel(location: LocationDataModel): StoreDataModel {
                         val address = location.displayAddress(stateValues.appLanguage)
 
-                        val companyForm = stateValues.globalAppConfiguration.companyForms
-                            .find { it.id == companyFormDropdownListContent?.selectedId }
-                            ?: stateValues.globalAppConfiguration.companyForms.firstOrNull()
+                        val companyForm = countryForms.find { it.id == companyFormDropdownListContent?.selectedId }
 
                         return StoreDataModel(
                             id = editedStore?.id.orEmpty(),
@@ -4796,10 +4796,21 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                     actionButton(
                         text = if (editedStore != null) stateValues.stringEditStore else stateValues.stringAddStore,
-                        enabled = stateValues.latestNotification == null && storeEmailConfirmation.ready && !storeSaveInProgress,
+                        enabled = !storeSaveInProgress,
                         loading = storeSaveInProgress, autoLoading = false
                     ) {
                         softKeyboardController?.hide()
+                        if (!storeEmailConfirmation.ready) {
+                            storeEmailConfirmation.error = contactText("required_before_save")
+                            postInAppNotification(storeEmailConfirmation.error, NotificationType.Negative, transient = true)
+                            return@actionButton
+                        }
+                        val fullPhone = selectedCountry.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim()
+                        if (storeCountryFromPhones(listOf(fullPhone))?.locale != selectedCountry.locale) {
+                            postInAppNotification(eventMessage("store.phone_country").visibleLocalizedString(stateValues.appLanguage, ""), NotificationType.Negative, transient = true)
+                            phoneNumberTextFieldContent.checkContentValidity()
+                            return@actionButton
+                        }
                         addressTextFieldContent.checkContentValidity()
                         phoneNumberTextFieldContent.checkContentValidity()
                         emailTextFieldContent.checkContentValidity()
@@ -4827,6 +4838,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                                     coroutineScope.launch {
                                         storeSaveInProgress = false
                                         if (result is DataState.Success) {
+                                            ContactConfirmationMemory.forget(storeEmailConfirmation)
                                             Navigation.Menu.pop()
                                             clearStoreEditorState()
                                         }
@@ -4837,6 +4849,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                                     coroutineScope.launch {
                                         storeSaveInProgress = false
                                         if (result is DataState.Success) {
+                                            ContactConfirmationMemory.forget(storeEmailConfirmation)
                                             Navigation.Menu.pop()
                                             clearStoreEditorState()
                                         }
@@ -4887,10 +4900,21 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
 
                     actionButton(
                         text = if (editedStore != null) localizedStringResource(534, "Edit branch") else localizedStringResource(533, "Add branch"),
-                        enabled = stateValues.latestNotification == null && storeEmailConfirmation.ready && !storeSaveInProgress,
+                        enabled = !storeSaveInProgress,
                         loading = storeSaveInProgress, autoLoading = false
                     ) {
                         softKeyboardController?.hide()
+                        if (!storeEmailConfirmation.ready) {
+                            storeEmailConfirmation.error = contactText("required_before_save")
+                            postInAppNotification(storeEmailConfirmation.error, NotificationType.Negative, transient = true)
+                            return@actionButton
+                        }
+                        val fullPhone = selectedCountry.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim()
+                        if (storeCountryFromPhones(listOf(fullPhone))?.locale != selectedCountry.locale) {
+                            postInAppNotification(eventMessage("store.phone_country").visibleLocalizedString(stateValues.appLanguage, ""), NotificationType.Negative, transient = true)
+                            phoneNumberTextFieldContent.checkContentValidity()
+                            return@actionButton
+                        }
                         addressTextFieldContent.checkContentValidity()
                         phoneNumberTextFieldContent.checkContentValidity()
                         emailTextFieldContent.checkContentValidity()
@@ -4917,6 +4941,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                                     coroutineScope.launch {
                                         storeSaveInProgress = false
                                         if (result is DataState.Success) {
+                                            ContactConfirmationMemory.forget(storeEmailConfirmation)
                                             Navigation.Menu.pop()
                                             clearStoreEditorState()
                                         }
@@ -4927,6 +4952,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                                     coroutineScope.launch {
                                         storeSaveInProgress = false
                                         if (result is DataState.Success) {
+                                            ContactConfirmationMemory.forget(storeEmailConfirmation)
                                             Navigation.Menu.pop()
                                             clearStoreEditorState()
                                         }

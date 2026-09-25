@@ -206,6 +206,27 @@ class AitaAuthenticatorRecoveryDatabaseTest {
         assertEquals(1, loadSecuritySessionsForUser(id, null).size)
     }
 
+    @Test fun storesReuseVerifiedOwnerEmailsButNeverUnverifiedLegacyContactsOrAnotherAccount() = fixture {
+        val owner = user(alias = true)
+        val target = AitaContactTarget(AitaContactPurpose.STORE_CONTACT, "new:${UUID.randomUUID()}")
+        assertTrue(sql { service.verifiedActorContactsInside(owner, AitaContactChannel.EMAIL) }.isEmpty())
+        assertTrue(sql { service.verifiedActorContactsInside(owner, AitaContactChannel.PHONE) }.isEmpty())
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(owner, target, listOf(mainEmail), emptyList(), emptyList()) }
+        }
+        sql { AuthSecurityProfiles.update({ AuthSecurityProfiles.userId eq owner }) { it[emailVerifiedAtMillis] = System.currentTimeMillis() } }
+        assertTrue(sql { service.requireContactProofsInside(owner, target, listOf(mainEmail.uppercase()), emptyList(), emptyList()) }.isEmpty())
+        addExtra(owner)
+        assertTrue(sql { service.requireContactProofsInside(owner, target, listOf(extraEmail), emptyList(), emptyList()) }.isEmpty())
+        val other = user(phone = "+998901234567", mail = "other@example.test")
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(other, target, listOf(mainEmail), emptyList(), emptyList()) }
+        }
+        assertFailsWith<AitaContactVerificationRequiredException> {
+            sql { service.requireContactProofsInside(owner, target.copy(purpose = AitaContactPurpose.SUPPLIER_CONTACT), listOf(mainEmail), emptyList(), emptyList()) }
+        }
+    }
+
     @Test fun otherDeviceLoginPersistsOneAlertAndOneEncryptedEmailWithoutRepeatingOnRefresh() = fixture {
         val id = user()
         sql { Users.update({ Users.id eq id }) { it[appLanguage] = "en" } }

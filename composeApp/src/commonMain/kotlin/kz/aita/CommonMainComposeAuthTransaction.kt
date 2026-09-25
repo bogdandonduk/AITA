@@ -346,14 +346,33 @@ internal fun AppConfiguration.AuthPreferencesChooser(
 }
 
 
+private data class PendingRegistrationMemory(val body: UserAuthSignUpDataModel, val generation: Long,
+    val created: kotlin.time.TimeMark = kotlin.time.TimeSource.Monotonic.markNow())
+private var pendingRegistrationMemory: PendingRegistrationMemory? = null
+
 @Composable
 fun AppConfiguration.UserAuthSignUpScreen(
 ) {
-    // Credentials and personally identifying sign-up data must live only for this visible form.
-    // AITA normally restores form drafts, but restoring an abandoned registration after relaunch
-    // would expose phone/email/password data on a shared device.
+    // Registration credentials never enter durable/synced form drafts. A short-lived in-memory
+    // continuation survives activity recreation while the user retrieves their confirmation code.
     val transientSignUpState = remember { object : StateHost() {} }
-    var pendingRegistration by remember { mutableStateOf<UserAuthSignUpDataModel?>(null) }
+    var pendingRegistration by remember { mutableStateOf(pendingRegistrationMemory?.takeIf {
+        it.generation == currentAuthenticatedSessionGeneration() && getStoredUserAuthTokens?.invoke() == null &&
+            it.created.elapsedNow().inWholeMinutes < 20
+    }?.body) }
+    SideEffect {
+        val value = pendingRegistration
+        pendingRegistrationMemory = value?.let {
+            pendingRegistrationMemory?.takeIf { old -> old.body == it && old.generation == currentAuthenticatedSessionGeneration() }
+                ?: PendingRegistrationMemory(it, currentAuthenticatedSessionGeneration())
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (getStoredUserAuthTokens?.invoke() != null ||
+                pendingRegistrationMemory?.generation != currentAuthenticatedSessionGeneration()) pendingRegistrationMemory = null
+        }
+    }
     val pending = pendingRegistration
     if (pending != null) {
         RegistrationEmailConfirmationScreen(pending) { pendingRegistration = null }
@@ -2832,7 +2851,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
         val currencyCode = liveLines.firstOrNull()?.currencyCode
             ?: paymentDraft?.debtor?.currency
-            ?: stateValues.globalAppConfiguration.countries.withTajikistanFallback()
+            ?: stateValues.globalAppConfiguration.countries.withSupportedCountries()
                 .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
                 ?.currencies
                 ?.firstOrNull()
@@ -3035,7 +3054,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     text = stateValues.stringComplete,
                     loading = stateValues.completeTransactionInProgress,
                     loadingText = localizedStringResource(224, "Completing transaction"),
-                    enabled = (alreadyCompleted || context.transactionTypeIndex != 1 || returnDestinationsReady(context.clientId)) && snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && stateValues.latestNotification == null && invalidWholesaleReceiptItems.isEmpty(),
+                    enabled = (alreadyCompleted || context.transactionTypeIndex != 1 || returnDestinationsReady(context.clientId)) && snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && invalidWholesaleReceiptItems.isEmpty(),
                     iconPath = completeReceiptIconPath,
                     iconRes = completeReceiptIconRes,
                     iconTintColor = Color.White,
@@ -3762,7 +3781,7 @@ internal fun List<CountryDataModel>.countryByPhoneSelection(selectedSecondaryId:
         ?.takeIf { it.isNotBlank() }
         ?: return null
 
-    return withTajikistanFallback()
+    return withSupportedCountries()
         .sortedByDescending { it.phoneNumberCode.length }
         .firstOrNull { it.phoneNumberCode == selectedCode }
 }
@@ -3777,7 +3796,7 @@ internal fun storePhoneQuickFillOption(
     if (digits.isBlank()) return null
 
     val country = countries
-        .withTajikistanFallback()
+        .withSupportedCountries()
         .sortedByDescending { it.phoneNumberCode.length }
         .firstOrNull { country ->
             digits.startsWith(country.phoneNumberCode) && digits.length > country.phoneNumberCode.length
@@ -4185,7 +4204,7 @@ internal data class ResolvedReturnBatchSelectionUiModel(
 )
 
 internal fun AppConfiguration.defaultTransactionCurrencyCode(): String =
-    stateValues.globalAppConfiguration.countries.withTajikistanFallback()
+    stateValues.globalAppConfiguration.countries.withSupportedCountries()
         .find { it.locale.equals(stateValues.userAccount?.countryLocale, true) }
         ?.currencies
         ?.firstOrNull()
@@ -5818,7 +5837,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
 
             actionButton(
                 text = stateValues.stringReceipt,
-                enabled = paymentValid && stateValues.latestNotification == null,
+                enabled = paymentValid,
                 onClick = {
                     val draft = TransactionPaymentDraftDataModel(
                         transactionTypeIndex = context.transactionTypeIndex,

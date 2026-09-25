@@ -6840,153 +6840,8 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
         pagingMaxPageSize = 200,
         paymentProviders = defaultPaymentProviders(),
         subscriptionPlans = defaultStoreSubscriptionPlans(),
-        companyForms = listOf(
-            CompanyFormDataModel(
-                id = "0",
-                name = listOf(
-                    LocalizedStringDataModel(
-                        language = "en",
-                        value = "TOO",
-                    ),
-                    LocalizedStringDataModel(
-                        language = "ru",
-                        value = "TOO"
-                    ),
-                    LocalizedStringDataModel(
-                        language = "kk",
-                        value = "TOO"
-                    )
-                ),
-                parameters = listOf(
-                    ParameterDataModel(
-                        name = listOf(
-                            LocalizedStringDataModel(
-                                language = "en",
-                                value = "БИН",
-                            ),
-                            LocalizedStringDataModel(
-                                language = "ru",
-                                value = "БИН"
-                            ),
-                            LocalizedStringDataModel(
-                                language = "kk",
-                                value = "БИН"
-                            )
-                        ),
-                        value = "",
-                        length = 12,
-                        number = true,
-                        nonLetterSymbolsEnabled = false
-                    )
-                )
-            )
-        ),
-        countries = listOf(
-            CountryDataModel(
-                locale = "kz",
-                language = "kk",
-                name = listOf(
-                    LocalizedStringDataModel(
-                        "en",
-                        "Kazakhstan"
-                    ),
-                    LocalizedStringDataModel(
-                        "ru",
-                        "Казахстан"
-                    ),
-                    LocalizedStringDataModel(
-                        "kk",
-                        "Казакстан"
-                    ),
-                    LocalizedStringDataModel("ky", "Казакстан")
-                ),
-                flagDrawablePath = "png/flag_kz.png",
-                phoneNumberCode = "7",
-                phoneNumberSize = 10,
-                currencies = listOf(
-                    CurrencyDataModel(
-                        code = "KZT",
-                        symbol = "₸",
-                        name = listOf(
-                            LocalizedStringDataModel(
-                                language = "en",
-                                value = "tenge"
-                            ),
-                            LocalizedStringDataModel(
-                                language = "ru",
-                                value = "тенге"
-                            ),
-                            LocalizedStringDataModel(
-                                language = "kk",
-                                value = "теңге"
-                            ),
-                            LocalizedStringDataModel("ky", "теңге")
-                        )
-                    ),
-                ),
-                cities = listOf(
-                    CityDataModel(
-                        name = listOf(
-                            LocalizedStringDataModel(
-                                "en",
-                                "Astana"
-                            ),
-                            LocalizedStringDataModel(
-                                "ru",
-                                "Астана"
-                            ),
-                            LocalizedStringDataModel(
-                                "kk",
-                                "Астана"
-                            ),
-                            LocalizedStringDataModel("ky", "Астана")
-                        ),
-                        51.1667, 71.4333,
-                        51.0230, 71.2660,
-                        51.250071, 71.5500
-                    ),
-                ),
-                cashlessPaymentOptions = listOf(
-                    PaymentOptionDataModel(
-                        "0",
-                        listOf(
-                            "Card" localized "main",
-                            "Card" localized "en",
-                            "Карта" localized "ru",
-                            "Карта" localized "kk",
-                        )
-                    ),
-                    PaymentOptionDataModel(
-                        "1",
-                        listOf(
-                            "QR" localized "main",
-                            "QR" localized "en",
-                            "QR" localized "ru",
-                            "QR" localized "kk",
-                        )
-                    ),
-                    PaymentOptionDataModel(
-                        "2",
-                        listOf(
-                            "Kaspi RED" localized "main",
-                            "Kaspi RED" localized "en",
-                            "Каспи RED" localized "ru",
-                            "Каспи RED" localized "kk",
-                        )
-                    ),
-                    PaymentOptionDataModel(
-                        "3",
-                        listOf(
-                            "Rakhmet" localized "main",
-                            "Rakhmet" localized "en",
-                            "Рахмет" localized "ru",
-                            "Рахмет" localized "kk",
-                        )
-                    )
-                ),
-                preferredCashlessPaymentOptionId = "1"
-            )
-        ),
+        companyForms = defaultCompanyForms(),
+        countries = defaultStoreCountries(),
         languages = listOf(
             AppLanguageDataModel(
                 "en",
@@ -8175,7 +8030,7 @@ fun getGlobalAppConfiguration(loadAll: Boolean = true) {
                 val currentConfiguration = globalAppConfigurationState.payloadValue
                 val anchoredPayload = response.payload.copy(
                     serverUrl = chooseClientServerUrlPair(currentConfiguration.serverUrl, response.payload.serverUrl)
-                )
+                ).withStoreCountryConfiguration()
                 globalAppConfigurationState.emit(DataState.Success(anchoredPayload, response.message))
 
                 if (loadAll) {
@@ -9687,7 +9542,7 @@ internal suspend fun ensureCachedGlobalConfigurationPrimedForNetwork() {
                     )
                 }
             )
-            globalAppConfigurationState.emit(DataState.Success(cachedConfigurationForThisInstall, cacheMessage()))
+            globalAppConfigurationState.emit(DataState.Success(cachedConfigurationForThisInstall.withStoreCountryConfiguration(), cacheMessage()))
         }
 
         cachedGlobalConfigurationPrimedForNetwork = true
@@ -19013,7 +18868,9 @@ data class CityDataModel(
 data class CompanyFormDataModel(
     val id: String,
     val name: List<LocalizedStringDataModel>,
-    val parameters: List<ParameterDataModel>
+    val parameters: List<ParameterDataModel>,
+    val countryLocales: List<String> = emptyList(),
+    val legalIdFormatId: String = ""
 )
 
 @kotlinx.serialization.Serializable
@@ -19029,65 +18886,6 @@ data class LegalIdFormatDataModel(
     val maxLength: Int? = null,
     val digitsOnly: Boolean = true,
     val regex: String? = null
-)
-
-fun defaultLegalIdFormats(): List<LegalIdFormatDataModel> = listOf(
-    LegalIdFormatDataModel(
-        id = "kz_bin",
-        countryLocales = listOf("kz"),
-        name = listOf(
-            LocalizedStringDataModel("main", "BIN"),
-            LocalizedStringDataModel("en", "BIN"),
-            LocalizedStringDataModel("ru", "БИН"),
-            LocalizedStringDataModel("kk", "БИН"),
-            LocalizedStringDataModel("ky", "БИН")
-        ),
-        label = listOf(
-            LocalizedStringDataModel("main", "Business Identification Number"),
-            LocalizedStringDataModel("en", "Business Identification Number"),
-            LocalizedStringDataModel("ru", "Бизнес-идентификационный номер"),
-            LocalizedStringDataModel("kk", "Бизнес сәйкестендіру нөмірі"),
-            LocalizedStringDataModel("ky", "Бизнес идентификациялык номери")
-        ),
-        placeholder = listOf(
-            LocalizedStringDataModel("main", "12 digits"),
-            LocalizedStringDataModel("en", "12 digits"),
-            LocalizedStringDataModel("ru", "12 цифр"),
-            LocalizedStringDataModel("kk", "12 сан"),
-            LocalizedStringDataModel("ky", "12 цифра")
-        ),
-        length = 12,
-        digitsOnly = true,
-        regex = "^[0-9]{12}$"
-    ),
-    LegalIdFormatDataModel(
-        id = "tj_tin",
-        countryLocales = listOf("tj"),
-        name = listOf(
-            LocalizedStringDataModel("main", "TIN"),
-            LocalizedStringDataModel("en", "TIN"),
-            LocalizedStringDataModel("ru", "ИНН / РМА"),
-            LocalizedStringDataModel("kk", "СТН / РМА"),
-            LocalizedStringDataModel("ky", "ИНН")
-        ),
-        label = listOf(
-            LocalizedStringDataModel("main", "Taxpayer Identification Number"),
-            LocalizedStringDataModel("en", "Taxpayer Identification Number"),
-            LocalizedStringDataModel("ru", "Идентификационный номер налогоплательщика"),
-            LocalizedStringDataModel("kk", "Салық төлеушінің сәйкестендіру нөмірі"),
-            LocalizedStringDataModel("ky", "Салык төлөөчүнүн идентификациялык номери")
-        ),
-        placeholder = listOf(
-            LocalizedStringDataModel("main", "9 digits"),
-            LocalizedStringDataModel("en", "9 digits"),
-            LocalizedStringDataModel("ru", "9 цифр"),
-            LocalizedStringDataModel("kk", "9 сан"),
-            LocalizedStringDataModel("ky", "9 цифра")
-        ),
-        length = 9,
-        digitsOnly = true,
-        regex = "^[0-9]{9}$"
-    )
 )
 
 fun GlobalAppConfigurationDataModel.legalIdFormatForCountry(countryLocale: String?): LegalIdFormatDataModel {
@@ -21869,7 +21667,9 @@ data class WorkerDataModel(
 @kotlinx.serialization.Serializable
 data class WorkerPrivilegeModeDataModel(
     val id: String,
-    val parameters: List<ParameterDataModel>
+    val parameters: List<ParameterDataModel>,
+    val countryLocales: List<String> = emptyList(),
+    val legalIdFormatId: String = ""
 )
 
 expect var getPersistentUiDraftValue: (suspend (String) -> String?)?

@@ -122,3 +122,14 @@ test('startup cache cleanup skips empty deletes but persists real deletion witho
   assert.deepEqual(await sql(p, 'SELECT value FROM key_value WHERE key = ?', ['cleanup-quota']), [['keep-at-quota']]);
   await p.close();
 });
+
+test('a reload waits for its previous worker to release storage without losing a saved cart', async () => {
+  const previous = await page();
+  await sql(previous, 'INSERT OR REPLACE INTO key_value VALUES (?, ?)', ['handover-cart', 'keep']);
+  const next = await page();
+  const reading = sql(next, 'SELECT value FROM key_value WHERE key = ?', ['handover-cart']);
+  await new Promise(resolve => setTimeout(resolve, 100));
+  await previous.close();
+  assert.deepEqual(await reading, [['keep']]);
+  await next.close();
+});

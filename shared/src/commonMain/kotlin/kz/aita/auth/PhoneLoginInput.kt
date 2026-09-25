@@ -65,6 +65,8 @@ fun normalizeAitaStoredMainPhone(raw: String, countryLocale: String): String? {
     val plan = when (countryLocale.trim().lowercase()) {
         "kz", "ru" -> "7" to 10
         "tj" -> "992" to 9
+        "kg", "ky" -> "996" to 9
+        "uz" -> "998" to 9
         else -> null
     }
     val digits = aitaAuthCodeDigits(raw)
@@ -81,6 +83,8 @@ fun aitaMainPhoneNationalCandidate(raw: String): Pair<String, Set<String>>? {
     return when {
         digits.length == 11 && digits.startsWith('7') -> digits.drop(1) to setOf("kz", "ru")
         digits.length == 12 && digits.startsWith("992") -> digits.drop(3) to setOf("tj")
+        digits.length == 12 && digits.startsWith("996") -> digits.drop(3) to setOf("kg", "ky")
+        digits.length == 12 && digits.startsWith("998") -> digits.drop(3) to setOf("uz")
         else -> null
     }
 }
