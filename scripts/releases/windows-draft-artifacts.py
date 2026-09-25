@@ -69,6 +69,11 @@ def upload(args):
         elif root.is_dir():
             files.extend((p, p.as_posix() if args.diagnostics else p.relative_to(root).as_posix())
                          for p in sorted(root.rglob('*')) if p.is_file())
+    if args.diagnostics:
+        # jpackage's temporary tree also contains complete copies of the Java
+        # runtime and installers. Preserve diagnostics without duplicating them.
+        files = [(p, n) for p, n in files if p.suffix.lower() in
+                 ('.xml', '.wxs', '.wxi', '.wxl', '.log', '.txt', '.ico', '.bmp', '.rtf')]
     require(files, 'No Windows artifacts to preserve')
     require(all(not p.is_symlink() and not Path(n).is_absolute() and '..' not in Path(n).parts for p, n in files),
             'Unsafe Windows artifact path')
@@ -102,9 +107,16 @@ def extract_package(archive, destination):
         package.extractall(destination)
 
 
+def validate_run(run):
+    # REST "name" follows run-name; identify the reviewed workflow by its path.
+    require(run.get('conclusion') == 'success' and run.get('status') == 'completed' and
+            run.get('path') == '.github/workflows/build-windows-release.yml' and
+            run.get('event') == 'workflow_dispatch', 'Windows workflow did not pass')
+
+
 def download(args):
     run = json.loads(gh('api', f'repos/{REPO}/actions/runs/{args.run}'))
-    require(run['conclusion'] == 'success' and run['name'] == 'Build AITA Windows Release', 'Windows workflow did not pass')
+    validate_run(run)
     tag = identity(args.run, run['run_attempt'], args.revision)
     value = draft_view(tag, args.revision)
     asset = next(a for a in value['assets'] if a['name'] == 'windows-package.zip')

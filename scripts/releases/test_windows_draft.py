@@ -53,6 +53,13 @@ class WindowsDraftTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'did not pass'):
                 draft.download(SimpleNamespace(run=123))
 
+    def test_custom_run_title_does_not_replace_workflow_identity(self):
+        good = dict(name='AITA Windows v1.1.9-b20', conclusion='success', status='completed',
+                    path='.github/workflows/build-windows-release.yml', event='workflow_dispatch')
+        draft.validate_run(good)
+        for change in (dict(path='.github/workflows/unrelated.yml'), dict(event='pull_request'), dict(status='in_progress')):
+            with self.assertRaises(RuntimeError): draft.validate_run(good | change)
+
     def test_existing_asset_is_immutable(self):
         args = SimpleNamespace(run=123, attempt=1, revision='a'*40, diagnostics=False)
         with patch.object(draft, 'gh', return_value='[{"tagName":"windows-build-123-1"}]') as gh, \
