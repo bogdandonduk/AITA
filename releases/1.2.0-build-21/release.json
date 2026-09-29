@@ -1,0 +1,163 @@
+{
+  "version": "1.2.0",
+  "build": 21,
+  "revision": "c662245f77aa94d025b1ae0bcc5aeceb57b7bae9",
+  "tag": "v1.2.0-b21",
+  "createdAt": "2026-09-29T06:08:34Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.2.0-21-android.apk",
+      "sha256": "348e53027fb945fae37d46a2ab27e4d3e83d11118356e45304e97c4c92c1588b",
+      "bytes": 72103239,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-android.apk"
+    },
+    {
+      "name": "AITA-1.2.0-21-android.aab",
+      "sha256": "09424e0ad25d90cb501921531713496dca99ad2967b23969d500a1bdfeff5f1d",
+      "bytes": 46763771,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "239323d5dc6502305ebfaa4c3e8480268151bf10e67523b62d3b758c1e5ca770",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.0-21-linux-x64.deb",
+      "sha256": "728cbd0279797ab7483e5843a2fa8527b1e7cd43d16aa6c1ba9dc296c1d7f5b2",
+      "bytes": 115174252,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-linux-x64.deb"
+    },
+    {
+      "name": "AITA-1.2.0-21-linux-x64.rpm",
+      "sha256": "f8dad908e12df1616a38f1bdb6fef4b4226a205152863912465cbf43acd2d1c3",
+      "bytes": 126554041,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-linux-x64.rpm"
+    },
+    {
+      "name": "linux-client-build.json",
+      "sha256": "239323d5dc6502305ebfaa4c3e8480268151bf10e67523b62d3b758c1e5ca770",
+      "bytes": 857,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/linux-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.0-21-windows.exe",
+      "sha256": "5cd5ec29933b5c42e227641fa11e2df02553763b00f908c7c9d33382e90cb616",
+      "bytes": 136771072,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-windows.exe"
+    },
+    {
+      "name": "AITA-1.2.0-21-windows.msi",
+      "sha256": "974ef87edf077b7fe254914a5b825a23f0490c8caa82321a76918d861bb1fbbe",
+      "bytes": 136171972,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "a4efd0272dcdef0314ea2c015ba5dda3907cebe04f633707410ac9aab0d52ffc",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "a11898f26b52ea690539a69675875597da02f20fd25c03537acf198789184e90",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/windows-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.0-21-web.zip",
+      "sha256": "0f11f7d58976ae2325c04006059ecc212deff9da9362d43f80febb5847a4b8e2",
+      "bytes": 12870790,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/AITA-1.2.0-21-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "239323d5dc6502305ebfaa4c3e8480268151bf10e67523b62d3b758c1e5ca770",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.0-b21/web-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Account deletion with password and security confirmation. Grams alongside kilograms; safer scale barcode matching and fractional quantities. Stock form and supply purchase price improvements. Independent OpenStreetMap address search for KZ, KG, TJ, UZ and RU. Russia configuration and Linux DEB/RPM downloads.",
+    "ru": "\u0423\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430 \u0441 \u043f\u0430\u0440\u043e\u043b\u0435\u043c \u0438 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435\u043c \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438. \u0413\u0440\u0430\u043c\u043c\u044b \u043d\u0430\u0440\u044f\u0434\u0443 \u0441 \u043a\u0438\u043b\u043e\u0433\u0440\u0430\u043c\u043c\u0430\u043c\u0438; \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u0432\u0435\u0441\u043e\u0432\u044b\u0445 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u043e\u0432 \u0438 \u0434\u0440\u043e\u0431\u043d\u043e\u0433\u043e \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0430. \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u0438\u044f \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0438 \u0442\u043e\u0432\u0430\u0440\u0430 \u0438 \u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f \u0437\u0430\u043a\u0443\u043f\u043e\u0447\u043d\u043e\u0439 \u0446\u0435\u043d\u044b \u0432 \u043f\u043e\u0441\u0442\u0430\u0432\u043a\u0435. \u0421\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u043f\u043e\u0438\u0441\u043a \u0430\u0434\u0440\u0435\u0441\u043e\u0432 OpenStreetMap \u0434\u043b\u044f KZ, KG, TJ, UZ \u0438 RU. \u041a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u044f \u0420\u043e\u0441\u0441\u0438\u0438 \u0438 \u0441\u0431\u043e\u0440\u043a\u0438 Linux DEB/RPM.",
+    "kk": "\u049a\u04b1\u043f\u0438\u044f \u0441\u04e9\u0437 \u0436\u04d9\u043d\u0435 \u049b\u0430\u0443\u0456\u043f\u0441\u0456\u0437\u0434\u0456\u043a \u0440\u0430\u0441\u0442\u0430\u0443\u044b\u043c\u0435\u043d \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u044b \u0436\u043e\u044e. \u041a\u0438\u043b\u043e\u0433\u0440\u0430\u043c\u043c\u0493\u0430 \u049b\u043e\u0441\u044b\u043c\u0448\u0430 \u0433\u0440\u0430\u043c\u043c; \u0441\u0430\u043b\u043c\u0430\u049b \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0442\u0430\u0440\u044b \u043c\u0435\u043d \u0431\u04e9\u043b\u0448\u0435\u043a \u043c\u04e9\u043b\u0448\u0435\u0440 \u0442\u04af\u0437\u0435\u0442\u0456\u043b\u0434\u0456. \u0422\u0430\u0443\u0430\u0440 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u0441\u044b \u0436\u04d9\u043d\u0435 \u0436\u0435\u0442\u043a\u0456\u0437\u0443\u0434\u0435\u0433\u0456 \u0441\u0430\u0442\u044b\u043f \u0430\u043b\u0443 \u0431\u0430\u0493\u0430\u0441\u044b \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b. KZ, KG, TJ, UZ, RU \u04af\u0448\u0456\u043d OpenStreetMap \u043c\u0435\u043a\u0435\u043d\u0436\u0430\u0439 \u0456\u0437\u0434\u0435\u0443\u0456. \u0420\u0435\u0441\u0435\u0439 \u0431\u0430\u043f\u0442\u0430\u0443\u043b\u0430\u0440\u044b \u0436\u04d9\u043d\u0435 Linux DEB/RPM.",
+    "ky": "\u0421\u044b\u0440\u0441\u04e9\u0437 \u0436\u0430\u043d\u0430 \u043a\u043e\u043e\u043f\u0441\u0443\u0437\u0434\u0443\u043a \u044b\u0440\u0430\u0441\u0442\u043e\u043e\u0441\u0443 \u043c\u0435\u043d\u0435\u043d \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u0443 \u04e9\u0447\u04af\u0440\u04af\u04af. \u041a\u0438\u043b\u043e\u0433\u0440\u0430\u043c\u043c\u0433\u0430 \u043a\u043e\u0448\u0443\u043c\u0447\u0430 \u0433\u0440\u0430\u043c\u043c; \u0441\u0430\u043b\u043c\u0430\u043a \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u0434\u043e\u0440\u0443 \u0436\u0430\u043d\u0430 \u0431\u04e9\u043b\u0447\u04e9\u043a \u0441\u0430\u043d \u043e\u04a3\u0434\u043e\u043b\u0434\u0443. \u0422\u043e\u0432\u0430\u0440 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u0441\u044b \u0436\u0430\u043d\u0430 \u0436\u0435\u0442\u043a\u0438\u0440\u04af\u04af\u0434\u04e9\u0433\u04af \u0441\u0430\u0442\u044b\u043f \u0430\u043b\u0443\u0443 \u0431\u0430\u0430\u0441\u044b \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b. KZ, KG, TJ, UZ, RU \u04af\u0447\u04af\u043d OpenStreetMap \u0434\u0430\u0440\u0435\u043a \u0438\u0437\u0434\u04e9\u04e9\u0441\u04af. \u041e\u0440\u0443\u0441\u0438\u044f \u0436\u04e9\u043d\u0434\u04e9\u04e9\u043b\u04e9\u0440\u04af \u0436\u0430\u043d\u0430 Linux DEB/RPM.",
+    "tg": "\u041d\u0435\u0441\u0442 \u043a\u0430\u0440\u0434\u0430\u043d\u0438 \u04b3\u0438\u0441\u043e\u0431 \u0431\u043e \u0440\u0430\u043c\u0437 \u0432\u0430 \u0442\u0430\u0441\u0434\u0438\u049b\u0438 \u0430\u043c\u043d\u0438\u044f\u0442. \u0413\u0440\u0430\u043c\u043c \u0434\u0430\u0440 \u0431\u0430\u0440\u043e\u0431\u0430\u0440\u0438 \u043a\u0438\u043b\u043e\u0433\u0440\u0430\u043c\u043c; \u0438\u0441\u043b\u043e\u04b3\u0438 \u0448\u0442\u0440\u0438\u0445\u043a\u043e\u0434\u04b3\u043e\u0438 \u0432\u0430\u0437\u043d\u04e3 \u0432\u0430 \u043c\u0438\u049b\u0434\u043e\u0440\u0438 \u043a\u0430\u0441\u0440\u04e3. \u0411\u0435\u04b3\u0431\u0443\u0434\u0438 \u043a\u043e\u0440\u0442\u0438 \u043c\u043e\u043b \u0432\u0430 \u043d\u0430\u0440\u0445\u0438 \u0445\u0430\u0440\u0438\u0434 \u04b3\u0430\u043d\u0433\u043e\u043c\u0438 \u0442\u0430\u044a\u043c\u0438\u043d\u043e\u0442. \u04b6\u0443\u0441\u0442\u0443\u04b7\u04ef\u0438 \u043c\u0443\u0441\u0442\u0430\u049b\u0438\u043b\u0438 \u0441\u0443\u0440\u043e\u0493\u0430\u04b3\u043e\u0438 OpenStreetMap \u0431\u0430\u0440\u043e\u0438 KZ, KG, TJ, UZ, RU. \u0422\u0430\u043d\u0437\u0438\u043c\u043e\u0442\u0438 \u0420\u0443\u0441\u0438\u044f \u0432\u0430 Linux DEB/RPM.",
+    "uz": "Parol va xavfsizlik tasdig\u2018i bilan hisobni o\u2018chirish. Kilogramm bilan birga gramm; vazn shtrixkodlari va kasr miqdor tuzatildi. Mahsulot kartasi va yetkazib berishdagi xarid narxi yaxshilandi. KZ, KG, TJ, UZ, RU uchun mustaqil OpenStreetMap manzil qidiruvi. Rossiya sozlamalari va Linux DEB/RPM."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-09-29T05:37:42Z",
+      "finishedAt": "2026-09-29T05:37:43Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-09-29T05:37:43Z",
+      "finishedAt": "2026-09-29T05:43:23Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-09-29T05:43:23Z",
+      "finishedAt": "2026-09-29T05:43:33Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-09-29T05:43:33Z",
+      "finishedAt": "2026-09-29T05:47:28Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-09-29T05:47:28Z",
+      "finishedAt": "2026-09-29T05:54:44Z"
+    },
+    "linux": {
+      "status": "complete",
+      "startedAt": "2026-09-29T05:54:44Z",
+      "finishedAt": "2026-09-29T05:55:18Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-09-29T06:07:06Z",
+      "finishedAt": "2026-09-29T06:07:27Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-09-29T06:02:47Z",
+      "finishedAt": "2026-09-29T06:04:23Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-09-29T06:07:27Z",
+      "finishedAt": "2026-09-29T06:08:34Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
