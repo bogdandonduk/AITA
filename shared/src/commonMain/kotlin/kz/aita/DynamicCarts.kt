@@ -121,7 +121,7 @@ object DynamicCarts {
                     return@change book
                 }
                 accepted = true
-                val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis())
+                val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis(), old?.supplyPrice)
                 book.copy(lines = (book.lines.filterNot { it.id == id && it.type == type && it.slot == slot } + row)
                     .sortedWith(compareBy<StoredCartLine> { it.addedAt }.thenBy { it.id }))
             } } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) {
@@ -131,6 +131,13 @@ object DynamicCarts {
             onCompleted?.invoke(saved && accepted && isCurrent(owner))
         }
         if (!queued) onCompleted?.invoke(false)
+    }
+
+    fun setSupplyPrice(id: String, slot: Int, price: PriceDataModel) {
+        require(price.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 && it <= 1_000_000_000_000.0 } == true)
+        changeAsync { book -> book.copy(lines = book.lines.map { row ->
+            if (row.type == 2 && row.slot == slot && row.id == id) row.copy(supplyPrice = price) else row
+        }, ui = book.ui.copy(payments = book.ui.payments - "2:$slot")) }
     }
 
     internal fun upsert(id: String, type: Int, slot: Int, quantity: QuantityDataModel) {
@@ -143,7 +150,7 @@ object DynamicCarts {
                 return@changeAsync book
             }
             val old = book.lines.firstOrNull { it.id == id && it.type == type && it.slot == slot }
-            val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis())
+            val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis(), old?.supplyPrice)
             book.copy(lines = (book.lines.filterNot { it.id == id && it.type == type && it.slot == slot } + row)
                 .sortedWith(compareBy<StoredCartLine> { it.addedAt }.thenBy { it.id }))
         }

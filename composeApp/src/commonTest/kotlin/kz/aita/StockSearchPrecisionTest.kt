@@ -26,11 +26,14 @@ class StockSearchPrecisionTest {
         assertEquals(2, result.items.size)
         assertNull(result.exactHit)
     }
-    @Test fun weightedInputDoesNotExpandDuringTypingButExplicitScannerStillResolvesIt() {
-        val stored = item("weighted", "12345")
-        val scan = "2112345010006"
+    @Test fun onlyCompleteScaleLabelsResolveWeightItemsAndLiteralProductCodesWin() {
+        val stored = item("weighted", "12345").copy(measurementUnitId="1")
+        val scan = "2112345010007"
         assertTrue(stored.matchesTransactionBarcode(scan))
-        assertTrue(typedStockSearch(listOf(stored), scan).items.isEmpty())
+        assertEquals(listOf(stored),typedStockSearch(listOf(stored), scan).items)
+        assertTrue(typedStockSearch(listOf(stored), scan.dropLast(1)).items.isEmpty())
+        assertTrue(typedStockSearch(listOf(stored), "2112345010006").items.isEmpty())
+        assertFalse(stored.copy(measurementUnitId="0").matchesTransactionBarcode(scan))
         val exact = item("full", scan)
         assertEquals(listOf(exact), typedStockSearch(listOf(stored, exact), scan).items)
     }

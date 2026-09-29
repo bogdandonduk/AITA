@@ -2,6 +2,7 @@ package kz.aita
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -168,7 +169,7 @@ private fun AppConfiguration.VerifiedAddressCard(
 
         if (preview != null) {
             Spacer(modifier = Modifier.height(10.dp))
-            CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
+            if (preview.url.isNotBlank()) CompositionLocalProvider(LocalKamelConfig provides kamelConfig) {
                 KamelImage(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -182,6 +183,7 @@ private fun AppConfiguration.VerifiedAddressCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
+                modifier = Modifier.clickable { onOpenMap(if (location.provider == AITA_ADDRESS_PROVIDER_OPEN) "https://www.openstreetmap.org/copyright" else preview.openMapUrl) },
                 text = preview.attribution,
                 color = stateValues.PlaceholderTextColor,
                 fontSize = stateValues.smallTextSize
@@ -353,6 +355,10 @@ internal fun AppConfiguration.storeVerifiedAddressPicker(
                 .heightIn(max = 280.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (state.suggestions.any { it.provider == AITA_ADDRESS_PROVIDER_OPEN }) {
+                Text("© OpenStreetMap contributors · ODbL 1.0", Modifier.padding(12.dp),
+                    color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
+            }
             state.suggestions.forEachIndexed { index, suggestion ->
                 AddressSuggestionRow(
                     suggestion = suggestion,

@@ -4157,6 +4157,10 @@ private fun realtimeAudienceAllowsInsideTransaction(userId: UUID, update: Realti
 /** Published only AFTER the security reset transaction commits. Replayed events are harmless:
  * each socket checks its own session row, so a later legitimate login is not disconnected.
  */
+internal suspend fun publishAccountDeleted(userId: UUID) {
+  RealtimeServerBus.publish(entity = "auth/security", userId = userId.toString(), reason = "account_deleted")
+}
+
 internal suspend fun publishAuthenticatorReset(userId: UUID) {
   RealtimeServerBus.publish(entity = "auth/security", userId = userId.toString(), reason = "authenticator_recovered")
 }
@@ -4783,7 +4787,7 @@ private fun List<String>.cleanBarcodes(): List<String> {
 }
 
 private fun GoodsItemDataModel.cleanBarcodeModelsForStore(storeId: UUID): List<GoodsItemBarcodeDataModel> {
-  return barcodeModels.normalizedGoodsItemBarcodesForStore(storeId.toString(), barcodes)
+  return barcodeModels.normalizedGoodsItemBarcodesForStore(storeId.toString(), barcodes, measurementUnitId.isWeightMeasurementUnitId())
 }
 
 private fun List<GoodsItemBarcodeDataModel>.cleanBarcodeStrings(): List<String> {
@@ -4793,7 +4797,8 @@ private fun List<GoodsItemBarcodeDataModel>.cleanBarcodeStrings(): List<String> 
 private fun ResultRow.stockBarcodeModels(): List<GoodsItemBarcodeDataModel> {
   return this[StockItems.barcodeModels].normalizedGoodsItemBarcodesForStore(
     storeId = this[StockItems.storeId].toString(),
-    legacyBarcodes = this[StockItems.barcodes]
+    legacyBarcodes = this[StockItems.barcodes],
+    weightEncoded = this[StockItems.measurementUnitId].isWeightMeasurementUnitId()
   )
 }
 
@@ -4804,7 +4809,8 @@ private fun ResultRow.stockBarcodeValues(): List<String> {
 private fun GoodsItemBarcodeDataModel.matchesScannedBarcodeForStore(
   scannedBarcode: String,
   rowStoreId: UUID,
-  currentStoreId: UUID
+  currentStoreId: UUID,
+  weightEncoded: Boolean
 ): Boolean {
   val cleanType = type.normalizedGoodsItemBarcodeType(value)
   if (cleanType == GOODS_ITEM_BARCODE_TYPE_INTERNAL) {
@@ -4816,7 +4822,7 @@ private fun GoodsItemBarcodeDataModel.matchesScannedBarcodeForStore(
     if (scopedStoreId != currentStoreId || rowStoreId != currentStoreId) return false
   }
 
-  return storedBarcodeMatchesScannedTransactionBarcode(value, scannedBarcode)
+  return storedBarcodeMatchesScannedTransactionBarcode(value, scannedBarcode, weightEncoded)
 }
 
 private fun ResultRow.stockBarcodeMatchesScannedBarcode(
@@ -4825,7 +4831,7 @@ private fun ResultRow.stockBarcodeMatchesScannedBarcode(
 ): Boolean {
   val rowStoreId = this[StockItems.storeId]
   return stockBarcodeModels().any { model ->
-    model.matchesScannedBarcodeForStore(scannedBarcode, rowStoreId, currentStoreId)
+    model.matchesScannedBarcodeForStore(scannedBarcode, rowStoreId, currentStoreId, this[StockItems.measurementUnitId].isWeightMeasurementUnitId())
   }
 }
 
@@ -5657,7 +5663,7 @@ private suspend fun canonicalizeStoreAddress(
   require(incoming.isResolvedAddress()) {
     "Select an address suggestion before saving"
   }
-  val resolved = YandexAddressService.resolve(
+  val resolved = AitaAddressService.resolve(
     provider = incoming.provider,
     providerObjectId = incoming.providerObjectId,
     query = incoming.displayAddress(incoming.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE }),
@@ -6738,6 +6744,7 @@ private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
 }
 
 private fun GoodsItemDataModel.matchesParentStockSearchQuery(rawQuery: String?): Boolean {
+  if (!rawQuery.isNullOrBlank() && rawQuery.trim().parseEmbeddedWeightBarcodeFormats().any { matchesEmbeddedWeightBarcode(it) }) return true
   val queryTokens = rawQuery
     ?.trim()
     ?.lowercase()
@@ -16743,11 +16750,21 @@ private fun learnSupplierPriceFromResponseLineInsideTransaction(
   )
 }
 
+private val configuredServerQuantityUnits: List<QuantityDataModel> by lazy {
+  val raw = readServerTextFile(configAppRootPath.resolve("global.json"), "config/app/global.json", "app/global.json")
+  val payload = Json.parseToJsonElement(raw).jsonObject["payload"]?.jsonObject
+  val values = payload?.get("goodsItemsQuantityUnits")
+  (values?.let { jsonBase.decodeFromJsonElement(ListSerializer(QuantityDataModel.serializer()), it) } ?: emptyList())
+    .filter { it.id.isNotBlank() && it.pricedAmount.isFinite() && it.pricedAmount > 0.0 }.withGramUnit()
+}
+
 private fun defaultServerQuantityForGoodsItem(
   measurementUnitId: String,
   total: Double
 ): QuantityDataModel {
+  configuredServerQuantityUnits.firstOrNull { it.id == measurementUnitId }?.let { return it.withTotalValue(total) }
   return when (measurementUnitId) {
+    GRAMS_UNIT_ID -> gramsQuantityUnit().withTotalValue(total)
     "1" -> QuantityDataModel(
       id = "1",
       immutableUnitName = listOf(
@@ -16986,9 +17003,15 @@ internal fun normalizeTransactionGoodsInsideTransaction(
     ) ?: return NormalizedTransactionGoodsResult(null, "not_found")
 
     val goodsItem = itemRow.toGoodsItemDataModel()
+    val canonicalUnit = defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity)
+    if (line.quantityUnit?.id?.let { it != canonicalUnit.id } == true ||
+        (canonicalUnit.roundTotal && kotlin.math.abs(line.quantity - kotlin.math.round(line.quantity)) > 0.000001) ||
+        line.quantity > 1_000_000_000.0 || line.pricePerUnit > 1_000_000_000_000.0) {
+      return NormalizedTransactionGoodsResult(null, "invalid_quantity")
+    }
     originalReceipt?.second?.let { sourceLine ->
       val sameItem = sourceLine.goodsItemId?.takeIf { it.isNotBlank() }?.let { it == goodsItem.id }
-        ?: goodsItem.allBarcodeValues().any { storedBarcodeMatchesScannedTransactionBarcode(it, sourceLine.barcode) }
+        ?: goodsItem.allBarcodeValues().any { storedBarcodeMatchesScannedTransactionBarcode(it, sourceLine.barcode, goodsItem.measurementUnitId.isWeightMeasurementUnitId()) }
       if (!sameItem) return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
     }
     if (line.returnDestinationKind != null &&
@@ -17061,7 +17084,7 @@ internal fun normalizeTransactionGoodsInsideTransaction(
     val normalizedPricePerUnit = when {
       originalReceipt != null -> originalReceipt.second.pricePerUnit
       transactionType == "return" && line.pricePerUnit >= 0.0 -> line.pricePerUnit
-      transactionType == "accept" && line.pricePerUnit > 0.0 -> line.pricePerUnit
+      transactionType == "accept" && line.pricePerUnit >= 0.0 -> line.pricePerUnit
       resolvedPrice.price.isNotBlank() -> resolvedPrice.price.toMoneyDouble()
       line.pricePerUnit >= 0.0 -> line.pricePerUnit
       else -> return NormalizedTransactionGoodsResult(null, "price_unavailable")
@@ -17072,7 +17095,7 @@ internal fun normalizeTransactionGoodsInsideTransaction(
       saleMethodId = appliedSaleMethodId,
       name = goodsItem.name.takeIf { it.isNotEmpty() } ?: line.name,
       goodsItemId = goodsItem.id.takeIf { it.isNotBlank() } ?: line.goodsItemId,
-      quantityUnit = line.quantityUnit ?: defaultServerQuantityForGoodsItem(goodsItem.measurementUnitId, line.quantity),
+      quantityUnit = canonicalUnit,
       currencyCode = originalReceipt?.second?.currencyCode?.takeIf { it.isNotBlank() }
         ?: line.currencyCode?.takeIf { it.isNotBlank() }
         ?: resolvedPrice.currency.takeIf { it.isNotBlank() },
@@ -17115,10 +17138,12 @@ private fun preserveGoodsItemNameInTransactionsInsideTransaction(
         val belongsToDeletedItem = line.goodsItemId == goodsItemIdText || goodsItemBarcodes.any { storedBarcode ->
           storedBarcodeMatchesScannedTransactionBarcode(
             storedBarcode = storedBarcode,
-            scannedBarcode = line.barcode
+            scannedBarcode = line.barcode,
+            weightEncoded = goodsItem.measurementUnitId.isWeightMeasurementUnitId()
           ) || storedBarcodeMatchesScannedTransactionBarcode(
             storedBarcode = line.barcode,
-            scannedBarcode = storedBarcode
+            scannedBarcode = storedBarcode,
+            weightEncoded = goodsItem.measurementUnitId.isWeightMeasurementUnitId()
           )
         }
 
@@ -17251,10 +17276,12 @@ private fun preserveExistingGoodsItemNamesInTransactionHistoryInsideTransaction(
         snapshot.barcodeValues.any { storedBarcode ->
           storedBarcodeMatchesScannedTransactionBarcode(
             storedBarcode = storedBarcode,
-            scannedBarcode = line.barcode
+            scannedBarcode = line.barcode,
+            weightEncoded = snapshot.measurementUnitId.isWeightMeasurementUnitId()
           ) || storedBarcodeMatchesScannedTransactionBarcode(
             storedBarcode = line.barcode,
-            scannedBarcode = storedBarcode
+            scannedBarcode = storedBarcode,
+            weightEncoded = snapshot.measurementUnitId.isWeightMeasurementUnitId()
           )
         }
       }
@@ -17710,7 +17737,7 @@ private suspend fun refreshAccessibleStoreAddresses(
 
   for (candidate in candidates) {
     val refreshed = runCatching {
-      YandexAddressService.resolve(
+      AitaAddressService.resolve(
         provider = candidate.location.provider,
         providerObjectId = candidate.location.providerObjectId,
         query = candidate.location.displayAddress(candidate.location.primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE }),
@@ -18211,6 +18238,7 @@ fun Application.module() {
 
   routing {
         installClientUpdateRoutes(this@module.environment.config)
+        installOpenAddressDownloads()
         installHelpRoutes(this@module.environment.config)
         installProfilePhotoRoutes()
         installStorePeopleRoutes()
@@ -18290,7 +18318,7 @@ fun Application.module() {
           }
 
           runCatching {
-            YandexAddressService.suggest(
+            AitaAddressService.suggest(
               query = cleanQuery,
               language = body.language,
               countryCodes = body.countryCodes,
@@ -18313,7 +18341,7 @@ fun Application.module() {
           call.checkPrincipal() ?: return@post
           val body = call.receiveAita<AddressResolveRequestDataModel>()
           runCatching {
-            YandexAddressService.resolve(
+            AitaAddressService.resolve(
               provider = body.provider,
               providerObjectId = body.providerObjectId,
               query = body.query,
@@ -18348,7 +18376,7 @@ fun Application.module() {
             call.application.publicServerUrl() ?: inferredUrl
           } ?: "http://127.0.0.1:8080"
           runCatching {
-            YandexAddressService.createMapPreview(
+            AitaAddressService.createMapPreview(
               location = body.location,
               language = body.language,
               darkTheme = body.darkTheme,
@@ -19641,6 +19669,13 @@ fun Application.module() {
               .firstOrNull()
               ?: return@newSuspendedTransaction null
 
+            // Changing kg to g without converting every batch would silently multiply inventory.
+            // Preserve the unit once this catalogue card has inventory history; create a new card instead.
+            if (body.measurementUnitId != goodsItemRow[StockItems.measurementUnitId] &&
+                StockBatchesV2.select(StockBatchesV2.id).where { StockBatchesV2.goodsItemId eq id }.limit(1).any()) {
+              stockItemChangeFailure = weightUnitChangeMessage()
+              return@newSuspendedTransaction null
+            }
             if ((body.measurementUnitId != goodsItemRow[StockItems.measurementUnitId] || !body.isActive) &&
                 stockItemHasPendingTransferInsideTransaction(id)) {
               stockItemChangeFailure = pendingStockTransferItemChangeMessage()

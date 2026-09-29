@@ -99,7 +99,10 @@ import kotlinx.coroutines.launch
                     }
                 }
                 item("add") {
-                    IconButton(enabled = ready && !adding && count < MAX_CART_SLOTS, onClick = {
+                    Box(modifier = Modifier.size(44.dp)
+                        .clip(RoundedCornerShape(stateValues.cornerRadius))
+                        .border(stateValues.unfocusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
+                        .clickable(enabled = ready && !adding && count < MAX_CART_SLOTS, role = Role.Button) {
                         adding = true
                         scope.launch {
                             try { DynamicCarts.add(type)?.let { Navigation.transactionWorkspace(type).setClientId(it) } }
@@ -107,8 +110,7 @@ import kotlinx.coroutines.launch
                             catch (_: Exception) { postInAppNotification(checkoutText("add_error"), NotificationType.Negative, transient = true) }
                             finally { adding = false }
                         }
-                    }, modifier = Modifier.size(44.dp).border(stateValues.unfocusedBorderWidth, stateValues.AccentColor,
-                        RoundedCornerShape(stateValues.cornerRadius))) {
+                    }, contentAlignment = Alignment.Center) {
                         CpImage(Modifier.size(22.dp), url = stateValues.drawablePathIconAdd, fallbackRes = stateValues.drawableResIconAdd.value,
                             contentDescription = checkoutText("add_cart"), tintColor = stateValues.AccentColor)
                     }

@@ -949,7 +949,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
                 ?.typeIds
                 ?.firstOrNull { parentId -> rootCategories.any { it.id == parentId } }
                 ?: selectedCategoryId
-                ?: rootCategories.firstOrNull()?.id
+                ?: "uncategorized"
 
             val subcategories = allCategories
                 .filter { it.typeIds.orEmpty().contains(selectedRootId) }
@@ -993,7 +993,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
                     options = rootOptions,
                     placeholder = stateValues.stringSelectCategory,
                     onSelected = { rootId ->
-                        onDraftChanged(draft.copy(categoryIds = listOf(rootId)))
+                        onDraftChanged(draft.copy(categoryIds = if (rootId == "uncategorized") emptyList() else listOf(rootId)))
                         rememberLatestStockAddEditCategorySelection(rootId, rootId)
                     }
                 )
@@ -2638,6 +2638,7 @@ fun AppConfiguration.StockSinglePriceEditor(
     price: PriceDataModel,
     quickFillPrices: List<PriceDataModel> = emptyList(),
     quickFillSalePrices: List<PriceDataModel> = emptyList(),
+    quickFillSupplyPrices: List<PriceDataModel> = emptyList(),
     onChanged: (PriceDataModel) -> Unit
 ) {
     val quickFills = quickFillPrices
@@ -3126,6 +3127,7 @@ internal fun AppConfiguration.StockPriceGroupEditor(
     prices: List<PriceDataModel>,
     addText: String,
     quickFillSalePrices: List<PriceDataModel> = emptyList(),
+    quickFillSupplyPrices: List<PriceDataModel> = emptyList(),
     onChanged: (List<PriceDataModel>) -> Unit
 ) {
     val currencies = stockCurrencyDomains()
@@ -3207,6 +3209,7 @@ internal fun AppConfiguration.StockPriceGroupEditor(
                 }
             )
 
+            SalePriceQuickFills(quickFillSupplyPrices, content.selectedSecondaryId ?: fallbackCurrency, content.value.text) { content.replaceText(it) }
             SupplyPriceQuickFills(quickFillSalePrices, content.selectedSecondaryId ?: fallbackCurrency, content.value.text) {
                 content.replaceText(it)
             }
@@ -3853,6 +3856,7 @@ internal fun GoodsItemDataModel.parentStoreStockBarcodeText(): String =
     allBarcodeValues().filter { it.isNotBlank() }.distinct().take(3).joinToString(" • ")
 
 internal fun GoodsItemDataModel.matchesParentStoreStockPickerFilter(rawQuery: String): Boolean {
+    if (rawQuery.isNotBlank() && matchesTransactionBarcode(rawQuery.trim())) return true
     val queryTokens = rawQuery
         .trim()
         .lowercase()
@@ -4137,7 +4141,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                 }.thenBy { it.visibleParentStoreStockName(stateValues.appLanguage).lowercase() }
                     .thenBy { it.id }
             )
-        AutomaticBarcodeChoice(cleanQuery, filteredItems, searchTextFieldContent.editedSinceCreation && !loading && serverEndReached, activeStoreId, { it.allBarcodeValues() }) { item ->
+        AutomaticBarcodeChoice(cleanQuery, filteredItems, searchTextFieldContent.editedSinceCreation && !loading && serverEndReached, activeStoreId, { item -> item.allBarcodeValues() + if (cleanQuery.parseEmbeddedWeightBarcodeFormats().any { item.matchesEmbeddedWeightBarcode(it) }) listOf(cleanQuery) else emptyList() }) { item ->
             onApply(item)
             searchTextFieldContent.reset()
         }
@@ -4586,7 +4590,7 @@ internal fun AppConfiguration.StockAddEditInfoTab(
                 ?.typeIds
                 ?.firstOrNull { parentId -> rootCategories.any { it.id == parentId } }
                 ?: selectedCategoryId
-                ?: rootCategories.firstOrNull()?.id
+                ?: "uncategorized"
 
             val subcategories = allCategories
                 .filter { it.typeIds.orEmpty().contains(selectedRootId) }
@@ -4611,7 +4615,7 @@ internal fun AppConfiguration.StockAddEditInfoTab(
             } else {
                 val rootCategoryDropdown = dropdownListWidget(
                     titleText = stateValues.stringCategory,
-                    domains = rootCategories.map { category ->
+                    domains = listOf(SelectableDomain(id = "uncategorized", displayId = pass23Text("uncategorized").toLocalizedSingleMain(), name = pass23Text("uncategorized").toLocalizedSingleMain(), iconPath = null, iconRes = null)) + rootCategories.map { category ->
                         val categoryName = category.name.visibleGoodsCategoryName(stateValues.appLanguage, category.id).toLocalizedSingleMain()
                         val categoryDescription = category.description?.visibleLocalizedString(stateValues.appLanguage, "")?.withoutGoodsCategoryPrefix()
                             ?: category.alias?.visibleLocalizedString(stateValues.appLanguage, "")?.withoutGoodsCategoryPrefix()
@@ -4625,13 +4629,13 @@ internal fun AppConfiguration.StockAddEditInfoTab(
                             iconRes = null
                         )
                     },
-                    selectedInitial = selectedRootId ?: rootCategories.first().id,
+                    selectedInitial = selectedRootId ?: "uncategorized",
                     showId = false,
                     showName = true,
                     search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_category_search"),
                     onSelected = { rootId ->
                         if (draft.categoryIds.firstOrNull() != rootId) {
-                            onDraftChanged(draft.copy(categoryIds = listOf(rootId)))
+                            onDraftChanged(draft.copy(categoryIds = if (rootId == "uncategorized") emptyList() else listOf(rootId)))
                         }
                         rememberLatestStockAddEditCategorySelection(rootId, rootId)
                     }
@@ -4651,7 +4655,7 @@ internal fun AppConfiguration.StockAddEditInfoTab(
 
                     dropdownListWidget(
                         titleText = localizedStringResource(184, "Subcategory"),
-                        domains = visibleSubcategories.map { category ->
+                        domains = listOf(SelectableDomain(id = currentRootId, displayId = pass23Text("no_subcategory").toLocalizedSingleMain(), name = pass23Text("no_subcategory").toLocalizedSingleMain(), iconPath = null, iconRes = null)) + visibleSubcategories.map { category ->
                             val categoryName = category.name.visibleGoodsCategoryName(stateValues.appLanguage, category.id).toLocalizedSingleMain()
                             val categoryDescription = category.description?.visibleLocalizedString(stateValues.appLanguage, "")
                                 ?: category.alias?.visibleLocalizedString(stateValues.appLanguage, "")
@@ -4665,7 +4669,7 @@ internal fun AppConfiguration.StockAddEditInfoTab(
                                 iconRes = null
                             )
                         },
-                        selectedInitial = selectedSubcategoryId ?: visibleSubcategories.first().id,
+                        selectedInitial = selectedSubcategoryId ?: currentRootId,
                         showId = false,
                         showName = true,
                         search = Triple(stateValues.stringSearchByAnyData, NavigationScreenModel.Stock.AddEditGoodsItem, "stock_subcategory_search"),
@@ -4802,7 +4806,20 @@ internal fun AppConfiguration.StockAddEditPricesTab(
     ) {
         item {
             StockPriceGroupEditor(
+                title = stateValues.stringSupplyPrice,
+                placeholder = stateValues.stringEnterSupplyPrice,
+                prices = draft.supplyPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
+                addText = "${stateValues.stringAdd} ${stateValues.stringSupplyPrice}",
+                onChanged = {
+                    onDraftChanged(
+                        draft.copy(supplyPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
+                    )
+                }
+            )
+
+            StockPriceGroupEditor(
                 title = stateValues.stringSalePrice,
+                quickFillSupplyPrices = draft.supplyPrices,
                 placeholder = stateValues.stringEnterSalePrice,
                 prices = draft.salePrices.ifEmpty { listOf(PriceDataModel("", defaultCurrency, "")) },
                 addText = "${stateValues.stringAdd} ${stateValues.stringSalePrice}",
@@ -4838,19 +4855,6 @@ internal fun AppConfiguration.StockAddEditPricesTab(
             )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
-
-            StockPriceGroupEditor(
-                title = stateValues.stringSupplyPrice,
-                placeholder = stateValues.stringEnterSupplyPrice,
-                quickFillSalePrices = draft.salePrices,
-                prices = draft.supplyPrices.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) },
-                addText = "${stateValues.stringAdd} ${stateValues.stringSupplyPrice}",
-                onChanged = {
-                    onDraftChanged(
-                        draft.copy(supplyPrices = it.ifEmpty { listOf(PriceDataModel("", draft.salePrices.firstOrNull()?.currency ?: defaultCurrency, "")) })
-                    )
-                }
-            )
 
             Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 

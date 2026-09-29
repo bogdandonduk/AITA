@@ -13,7 +13,7 @@ data class AitaLoginEmailFactorRequest(val flowId: String, val destination: Aita
 @Serializable
 data class AitaSecurityEmailProof(val flowId: String, val code: String)
 @Serializable
-enum class AitaSecurityEmailAction { LOGIN_POLICY, ADD_EMAIL, REMOVE_EMAIL, TOTP_SETUP, PROFILE }
+enum class AitaSecurityEmailAction { LOGIN_POLICY, ADD_EMAIL, REMOVE_EMAIL, TOTP_SETUP, PROFILE, ACCOUNT_DELETE }
 @Serializable
 data class AitaSecurityEmailRequest(
     val action: AitaSecurityEmailAction,
@@ -58,7 +58,7 @@ fun canonicalAitaSecurityTarget(action: AitaSecurityEmailAction, value: String):
     return when (action) {
         AitaSecurityEmailAction.LOGIN_POLICY -> AitaLoginSecondFactor.entries.firstOrNull { it.name == value }?.name
         AitaSecurityEmailAction.ADD_EMAIL, AitaSecurityEmailAction.REMOVE_EMAIL -> normalizeAitaEmail(value)
-        AitaSecurityEmailAction.TOTP_SETUP -> value.takeIf { it.isEmpty() }
+        AitaSecurityEmailAction.TOTP_SETUP, AitaSecurityEmailAction.ACCOUNT_DELETE -> value.takeIf { it.isEmpty() }
         AitaSecurityEmailAction.PROFILE -> {
             val fields = value.split('\n')
             if (fields.size != 3 || fields[2] !in listOf("true", "false") || normalizeAitaPhoneAlias(fields[0]) == null || normalizeAitaEmail(fields[1]) == null) null

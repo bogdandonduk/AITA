@@ -501,7 +501,7 @@ private val defaultStoreCountriesCatalogue: List<CountryDataModel> by lazy { lis
             )),
         preferredCashlessPaymentOptionId = "0",
     )) }
-fun defaultStoreCountries(): List<CountryDataModel> = defaultStoreCountriesCatalogue
+fun defaultStoreCountries(): List<CountryDataModel> = defaultStoreCountriesCatalogue + russiaCountry()
 
 private val defaultCompanyFormsCatalogue: List<CompanyFormDataModel> by lazy { listOf(CompanyFormDataModel(
         id = "0",
@@ -990,7 +990,7 @@ private val defaultCompanyFormsCatalogue: List<CompanyFormDataModel> by lazy { l
                 nonLetterSymbolsEnabled = false,
             )),
     )) }
-fun defaultCompanyForms(): List<CompanyFormDataModel> = defaultCompanyFormsCatalogue
+fun defaultCompanyForms(): List<CompanyFormDataModel> = defaultCompanyFormsCatalogue + russiaCompanyForms()
 
 private val defaultLegalIdFormatsCatalogue: List<LegalIdFormatDataModel> by lazy { listOf(LegalIdFormatDataModel(
         id = "kz_bin",
@@ -1435,7 +1435,7 @@ private val defaultLegalIdFormatsCatalogue: List<LegalIdFormatDataModel> by lazy
         digitsOnly = true,
         regex = "^[0-9]{14}$",
     )) }
-fun defaultLegalIdFormats(): List<LegalIdFormatDataModel> = defaultLegalIdFormatsCatalogue
+fun defaultLegalIdFormats(): List<LegalIdFormatDataModel> = defaultLegalIdFormatsCatalogue + russiaLegalIdFormats()
 
 /** Restore built-in countries missing from an older cached/server configuration. */
 fun List<CountryDataModel>.withSupportedCountries(): List<CountryDataModel> =
@@ -1453,6 +1453,7 @@ private fun List<CompanyFormDataModel>.withSupportedCompanyForms(): List<Company
 /** Upgrade older cached catalogues without replacing operator labels, prices or country settings. */
 fun GlobalAppConfigurationDataModel.withStoreCountryConfiguration(): GlobalAppConfigurationDataModel = copy(
     countries = countries.withSupportedCountries(),
+    goodsItemsQuantityUnits = goodsItemsQuantityUnits.withGramUnit(),
     companyForms = companyForms.withSupportedCompanyForms(),
     legalIdFormats = (legalIdFormats + defaultLegalIdFormats()).distinctBy { it.id }
 )
@@ -1476,7 +1477,8 @@ fun storeCountryFromPhones(phones: List<String>, countries: List<CountryDataMode
         countries.singleOrNull { country ->
             digits.startsWith(country.phoneNumberCode) && digits.length == country.phoneNumberCode.length + country.phoneNumberSize &&
                 // +7 is shared with Russia: Kazakhstan uses national prefixes 6 and 7.
-                (country.locale != "kz" || digits.getOrNull(1) in listOf('6', '7'))
+                (country.locale != "kz" || digits.getOrNull(1) in listOf('6', '7')) &&
+                (country.locale != "ru" || digits.getOrNull(1) in listOf('2', '3', '4', '5', '8', '9'))
         } ?: return null
     }.distinctBy { it.locale }
     return matches.singleOrNull()

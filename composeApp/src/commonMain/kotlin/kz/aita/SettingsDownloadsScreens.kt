@@ -107,10 +107,12 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
     val downloads by DownloadsWorkspace.state.collectAsState()
     val scope = rememberCoroutineScope()
     var webOpenFailed by remember { mutableStateOf(false) }
-    val platforms = listOf("android" to "Android", "windows" to "Windows", "web" to "Web", "macos" to "macOS", "ios" to "iOS")
+    val platforms = listOf("android" to "Android", "windows" to "Windows", "linux" to "Linux", "web" to "Web", "macos" to "macOS", "ios" to "iOS")
     var selectedPlatform by rememberNavigationSection("downloads:platform", when {
         getPlatformName().contains("wasm",ignoreCase=true) -> "web"
         getPlatformName().contains("android",ignoreCase=true) -> "android"
+        getPlatformName().contains("linux",ignoreCase=true) -> "linux"
+        getPlatformName().contains("mac",ignoreCase=true) -> "macos"
         else -> "windows"
     })
     var releaseTab by rememberNavigationSection("downloads:release", "current_release")
@@ -186,7 +188,7 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                 }
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(title, color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
-                                    Text(downloadsText(platform), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                    Text(if (platform == "linux") pass23Text("linux") else downloadsText(platform), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                 }
                             }
                             when (platform) {

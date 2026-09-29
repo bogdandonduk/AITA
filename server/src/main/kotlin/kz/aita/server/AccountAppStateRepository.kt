@@ -36,7 +36,7 @@ internal class AccountAppStateRepository(private val database: Database? = null)
         return newSuspendedTransaction(Dispatchers.IO, db = database) {
             exec("SET LOCAL lock_timeout = '3000ms'")
             // The account row also serializes first writes: two revision-zero requests cannot both win.
-            Users.select(Users.id).where { Users.id eq owner }.forUpdate().single()
+            require(Users.select(Users.isActive).where { Users.id eq owner }.forUpdate().single()[Users.isActive])
             val before = row(owner, request.scope)
             if (before.revision != request.expectedRevision) return@newSuspendedTransaction AppStateResult(before, conflict = true)
             if (before.revision == 0L) require(AccountAppStates.selectAll().where { AccountAppStates.owner eq owner }.count() < 256)

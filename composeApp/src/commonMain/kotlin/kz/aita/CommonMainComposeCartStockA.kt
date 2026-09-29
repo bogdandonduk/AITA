@@ -405,6 +405,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                 )
             }
 
+            if (goodsItem.categoryIds.isEmpty()) Text(pass23Text("category_notice"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
             goodsItem.categoryIds
                 .mapNotNull { goodsCategoryName(it) }
                 .joinToString(", ")
@@ -444,7 +445,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     batch = activeBatch
                 )
             }
-            val itemPrice = promotedItemPrice.finalPrice
+            val itemPrice = (if (transactionTypeIndex == 2) goodsItemInCart.supplyPrice else null) ?: promotedItemPrice.finalPrice
             val itemPriceTitle = when (transactionTypeIndex) {
                 0 -> if (saleMethodId == SALE_METHOD_WHOLESALE && goodsItem.isWholesaleEligible(goodsItemInCart.quantity.total)) {
                     localizedStringResource(246, "Wholesale price")
@@ -513,6 +514,14 @@ fun AppConfiguration.GoodsItemInCartWidget(
                         fontWeight = FontWeight.Bold
                     )
                 }
+            } else if (transactionTypeIndex == 2) {
+                StockSinglePriceEditor(title = itemPriceTitle, price = itemPrice,
+                    quickFillPrices = goodsItem.supplyPrices,
+                    onChanged = { edited ->
+                        if (edited.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 && it <= 1_000_000_000_000.0 } == true) {
+                            DynamicCarts.setSupplyPrice(goodsItem.id, goodsItemInCart.clientId, edited)
+                        }
+                    })
             } else {
                 StockPromotionPriceInfoLine(
                     title = itemPriceTitle,
@@ -1234,7 +1243,7 @@ fun AppConfiguration.TransactionCartScreen() {
         val cartTotalPrice = cartItemsWithGoods.sumOf { (_, cartItem, goodsItem) ->
             val saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL
             val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
-            val price = if (context.transactionTypeIndex == 1) {
+            val price = (if (context.transactionTypeIndex == 2) cartItem.supplyPrice else null) ?: if (context.transactionTypeIndex == 1) {
                 resolveReturnBatchSelection(
                     goodsItem = goodsItem,
                     cartItem = cartItem,
@@ -1255,7 +1264,7 @@ fun AppConfiguration.TransactionCartScreen() {
         val cartCurrency = cartItemsWithGoods.firstNotNullOfOrNull { (_, cartItem, goodsItem) ->
             val saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL
             val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
-            val price = if (context.transactionTypeIndex == 1) {
+            val price = (if (context.transactionTypeIndex == 2) cartItem.supplyPrice else null) ?: if (context.transactionTypeIndex == 1) {
                 resolveReturnBatchSelection(
                     goodsItem = goodsItem,
                     cartItem = cartItem,
@@ -3744,7 +3753,7 @@ fun StockAddEditDraft.toGoodsItem(
             .getOrNull(index)
             ?.normalizedGoodsItemBarcodeType(rawBarcode)
             ?: GOODS_ITEM_BARCODE_TYPE_STANDARD
-        rawBarcode.trim().toStoredGoodsItemBarcodeCandidates().map { candidate ->
+        rawBarcode.trim().toStoredGoodsItemBarcodeCandidates(selectedUnit?.isWeightQuantityUnit() == true).map { candidate ->
             GoodsItemBarcodeDataModel(
                 value = candidate,
                 type = cleanType,
@@ -5602,12 +5611,12 @@ internal fun AppConfiguration.StockConditionListEditor(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     text = localizedStringResource(1018, "Manual"),
                     iconPath = manualConditionIconPath,
                     iconRes = manualConditionIconRes,
@@ -5618,7 +5627,7 @@ internal fun AppConfiguration.StockConditionListEditor(
                 )
 
                 actionButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     text = localizedStringResource(1012, "Buyer age"),
                     iconPath = buyerAgeConditionIconPath,
                     iconRes = buyerAgeConditionIconRes,
@@ -5629,12 +5638,12 @@ internal fun AppConfiguration.StockConditionListEditor(
                 )
             }
 
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
+                horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 actionButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     text = localizedStringResource(1013, "Time"),
                     iconPath = timeConditionIconPath,
                     iconRes = timeConditionIconRes,
@@ -5645,7 +5654,7 @@ internal fun AppConfiguration.StockConditionListEditor(
                 )
 
                 actionButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     text = localizedStringResource(1499, "Margin"),
                     iconPath = marginConditionIconPath,
                     iconRes = marginConditionIconRes,

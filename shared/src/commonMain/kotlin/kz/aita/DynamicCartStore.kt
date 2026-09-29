@@ -16,7 +16,7 @@ data class CartScope(val accountId: String, val storeId: String, val generation:
 }
 
 @Serializable
-data class StoredCartLine(val id: String, val type: Int, val slot: Int, val quantity: QuantityDataModel, val addedAt: Long)
+data class StoredCartLine(val id: String, val type: Int, val slot: Int, val quantity: QuantityDataModel, val addedAt: Long, val supplyPrice: PriceDataModel? = null)
 
 @Serializable
 data class CartUiState(
@@ -77,6 +77,7 @@ data class CartBook(
     }
     fun validated(): CartBook {
         require(schema == 2 && revision >= 0 && counts.size == 3 && counts.all { it in INITIAL_CART_SLOTS..MAX_CART_SLOTS })
+        require(lines.all { row -> row.supplyPrice == null || row.type == 2 && row.supplyPrice.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 && it <= 1_000_000_000_000.0 } == true })
         require(lines.size <= 20_000 && lines.all { it.id.isNotBlank() && validCartSlot(it.type, it.slot) })
         require(lines.map { Triple(it.id, it.type, it.slot) }.distinct().size == lines.size)
         if (slots != null) {

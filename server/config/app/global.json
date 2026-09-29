@@ -910,6 +910,120 @@
             "nonLetterSymbolsEnabled": false
           }
         ]
+      },
+      {
+        "id": "ru_ooo",
+        "name": [
+          {
+            "language": "main",
+            "value": "Limited liability company"
+          },
+          {
+            "language": "en",
+            "value": "Limited liability company"
+          },
+          {
+            "language": "ru",
+            "value": "ООО"
+          },
+          {
+            "language": "kk",
+            "value": "ЖШҚ"
+          },
+          {
+            "language": "ky",
+            "value": "ЖЧК"
+          },
+          {
+            "language": "tg",
+            "value": "ҶДММ"
+          },
+          {
+            "language": "uz",
+            "value": "MChJ"
+          }
+        ],
+        "parameters": [],
+        "countryLocales": [
+          "ru"
+        ],
+        "legalIdFormatId": "ru_inn_10"
+      },
+      {
+        "id": "ru_ip",
+        "name": [
+          {
+            "language": "main",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "en",
+            "value": "Individual entrepreneur"
+          },
+          {
+            "language": "ru",
+            "value": "ИП"
+          },
+          {
+            "language": "kk",
+            "value": "ЖК"
+          },
+          {
+            "language": "ky",
+            "value": "Жеке ишкер"
+          },
+          {
+            "language": "tg",
+            "value": "Соҳибкори инфиродӣ"
+          },
+          {
+            "language": "uz",
+            "value": "YTT"
+          }
+        ],
+        "parameters": [],
+        "countryLocales": [
+          "ru"
+        ],
+        "legalIdFormatId": "ru_inn_12"
+      },
+      {
+        "id": "ru_ao",
+        "name": [
+          {
+            "language": "main",
+            "value": "Joint-stock company"
+          },
+          {
+            "language": "en",
+            "value": "Joint-stock company"
+          },
+          {
+            "language": "ru",
+            "value": "АО"
+          },
+          {
+            "language": "kk",
+            "value": "АҚ"
+          },
+          {
+            "language": "ky",
+            "value": "АК"
+          },
+          {
+            "language": "tg",
+            "value": "ҶС"
+          },
+          {
+            "language": "uz",
+            "value": "AJ"
+          }
+        ],
+        "parameters": [],
+        "countryLocales": [
+          "ru"
+        ],
+        "legalIdFormatId": "ru_inn_10"
       }
     ],
     "countries": [
@@ -1585,6 +1699,149 @@
           }
         ],
         "preferredCashlessPaymentOptionId": "0"
+      },
+      {
+        "locale": "ru",
+        "language": "ru",
+        "name": [
+          {
+            "language": "main",
+            "value": "Russia"
+          },
+          {
+            "language": "en",
+            "value": "Russia"
+          },
+          {
+            "language": "ru",
+            "value": "Россия"
+          },
+          {
+            "language": "kk",
+            "value": "Ресей"
+          },
+          {
+            "language": "ky",
+            "value": "Орусия"
+          },
+          {
+            "language": "tg",
+            "value": "Русия"
+          },
+          {
+            "language": "uz",
+            "value": "Rossiya"
+          }
+        ],
+        "flagDrawablePath": "png/flag_ru.png",
+        "cities": [],
+        "phoneNumberCode": "7",
+        "phoneNumberSize": 10,
+        "currencies": [
+          {
+            "code": "RUB",
+            "symbol": "₽",
+            "name": [
+              {
+                "language": "main",
+                "value": "Russian ruble"
+              },
+              {
+                "language": "en",
+                "value": "Russian ruble"
+              },
+              {
+                "language": "ru",
+                "value": "Российский рубль"
+              },
+              {
+                "language": "kk",
+                "value": "Ресей рублі"
+              },
+              {
+                "language": "ky",
+                "value": "Орус рубли"
+              },
+              {
+                "language": "tg",
+                "value": "Рубли русӣ"
+              },
+              {
+                "language": "uz",
+                "value": "Rossiya rubli"
+              }
+            ]
+          }
+        ],
+        "cashlessPaymentOptions": [
+          {
+            "id": "0",
+            "name": [
+              {
+                "language": "main",
+                "value": "Card"
+              },
+              {
+                "language": "en",
+                "value": "Card"
+              },
+              {
+                "language": "ru",
+                "value": "Карта"
+              },
+              {
+                "language": "kk",
+                "value": "Карта"
+              },
+              {
+                "language": "ky",
+                "value": "Карта"
+              },
+              {
+                "language": "tg",
+                "value": "Корт"
+              },
+              {
+                "language": "uz",
+                "value": "Karta"
+              }
+            ]
+          },
+          {
+            "id": "1",
+            "name": [
+              {
+                "language": "main",
+                "value": "QR / bank transfer"
+              },
+              {
+                "language": "en",
+                "value": "QR / bank transfer"
+              },
+              {
+                "language": "ru",
+                "value": "QR / СБП"
+              },
+              {
+                "language": "kk",
+                "value": "QR / аударым"
+              },
+              {
+                "language": "ky",
+                "value": "QR / которуу"
+              },
+              {
+                "language": "tg",
+                "value": "QR / интиқол"
+              },
+              {
+                "language": "uz",
+                "value": "QR / o‘tkazma"
+              }
+            ]
+          }
+        ],
+        "preferredCashlessPaymentOptionId": "0"
       }
     ],
     "languages": [
@@ -1888,6 +2145,42 @@
           {
             "language": "ky",
             "value": "кг"
+          }
+        ],
+        "total": 1.0,
+        "pricedAmount": 1.0,
+        "roundTotal": false
+      },
+      {
+        "id": "g",
+        "immutableUnitName": [
+          {
+            "language": "main",
+            "value": "g"
+          },
+          {
+            "language": "en",
+            "value": "g"
+          },
+          {
+            "language": "ru",
+            "value": "г"
+          },
+          {
+            "language": "kk",
+            "value": "г"
+          },
+          {
+            "language": "ky",
+            "value": "г"
+          },
+          {
+            "language": "tg",
+            "value": "г"
+          },
+          {
+            "language": "uz",
+            "value": "g"
           }
         ],
         "total": 1.0,
@@ -2571,6 +2864,206 @@
         "length": 14,
         "digitsOnly": true,
         "regex": "^[0-9]{14}$"
+      },
+      {
+        "id": "ru_inn_10",
+        "countryLocales": [
+          "ru"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "INN"
+          },
+          {
+            "language": "en",
+            "value": "INN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "Салық нөмірі"
+          },
+          {
+            "language": "ky",
+            "value": "Салык номери"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "INN"
+          },
+          {
+            "language": "en",
+            "value": "INN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "Салық нөмірі"
+          },
+          {
+            "language": "ky",
+            "value": "Салык номери"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "10 digits"
+          },
+          {
+            "language": "en",
+            "value": "10 digits"
+          },
+          {
+            "language": "ru",
+            "value": "10 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "10 сан"
+          },
+          {
+            "language": "ky",
+            "value": "10 цифра"
+          },
+          {
+            "language": "tg",
+            "value": "10 рақам"
+          },
+          {
+            "language": "uz",
+            "value": "10 ta raqam"
+          }
+        ],
+        "required": true,
+        "length": 10,
+        "digitsOnly": true,
+        "regex": "^[0-9]{10}$"
+      },
+      {
+        "id": "ru_inn_12",
+        "countryLocales": [
+          "ru"
+        ],
+        "name": [
+          {
+            "language": "main",
+            "value": "INN"
+          },
+          {
+            "language": "en",
+            "value": "INN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "Салық нөмірі"
+          },
+          {
+            "language": "ky",
+            "value": "Салык номери"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "label": [
+          {
+            "language": "main",
+            "value": "INN"
+          },
+          {
+            "language": "en",
+            "value": "INN"
+          },
+          {
+            "language": "ru",
+            "value": "ИНН"
+          },
+          {
+            "language": "kk",
+            "value": "Салық нөмірі"
+          },
+          {
+            "language": "ky",
+            "value": "Салык номери"
+          },
+          {
+            "language": "tg",
+            "value": "РМА"
+          },
+          {
+            "language": "uz",
+            "value": "STIR"
+          }
+        ],
+        "placeholder": [
+          {
+            "language": "main",
+            "value": "12 digits"
+          },
+          {
+            "language": "en",
+            "value": "12 digits"
+          },
+          {
+            "language": "ru",
+            "value": "12 цифр"
+          },
+          {
+            "language": "kk",
+            "value": "12 сан"
+          },
+          {
+            "language": "ky",
+            "value": "12 цифра"
+          },
+          {
+            "language": "tg",
+            "value": "12 рақам"
+          },
+          {
+            "language": "uz",
+            "value": "12 ta raqam"
+          }
+        ],
+        "required": true,
+        "length": 12,
+        "digitsOnly": true,
+        "regex": "^[0-9]{12}$"
       }
     ],
     "getStockItemBranchAvailabilityPath": {

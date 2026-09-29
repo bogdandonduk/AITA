@@ -72,6 +72,7 @@ internal fun enrichStoreCountryConfiguration(payload: JsonObject): JsonObject {
         })
     })
     return JsonObject(payload + mapOf(
+        "goodsItemsQuantityUnits" to appendMissing("goodsItemsQuantityUnits", "id", jsonBase.encodeToJsonElement(ListSerializer(QuantityDataModel.serializer()), listOf(gramsQuantityUnit())).jsonArray),
         "countries" to appendMissing("countries", "locale", countries),
         "companyForms" to completeForms,
         "legalIdFormats" to appendMissing("legalIdFormats", "id", formats)

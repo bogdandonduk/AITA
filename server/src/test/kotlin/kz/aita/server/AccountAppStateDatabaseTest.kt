@@ -25,7 +25,7 @@ class AccountAppStateDatabaseTest {
         val db = Database.connect("$url?currentSchema=$schema", driver = "org.postgresql.Driver", user = user, password = "")
         try {
             transaction(db) {
-                exec("CREATE TABLE users(id UUID PRIMARY KEY)")
+                exec("CREATE TABLE users(id UUID PRIMARY KEY, is_active boolean NOT NULL DEFAULT true)")
                 exec("INSERT INTO users(id) VALUES ('$owner'), ('$other')")
                 exec(javaClass.getResource("/db/migration/V117__account_app_state.sql")!!.readText())
             }

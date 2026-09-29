@@ -90,6 +90,22 @@ class TransactionStockDatabaseTest {
         stockBatchId = first.toString())
     private fun total(batch: UUID) = StockBatchesV2.selectAll().where { StockBatchesV2.id eq batch }.single()[StockBatchesV2.quantity].total
 
+    @Test fun kilogramsAndGramsKeepCanonicalUnitsAndFractionalStockThroughSaleAndReturn() = fixture { db -> transaction(db) {
+        StockItems.update({ StockItems.id eq item }) { it[measurementUnitId] = "1" }
+        StockBatchesV2.update({ StockBatchesV2.goodsItemId eq item }) { it[quantity] = q(2.0).copy(id="1",roundTotal=false) }
+        val sale = save("purchase",listOf(line(0.125)))
+        assertEquals("1",sale.goodsInTransaction.single().quantityUnit?.id)
+        assertEquals(1.875,total(first),0.000001)
+        save("return",listOf(returnLine(sale,0.125)))
+        assertEquals(2.0,total(first),0.000001)
+        assertNull(normalizeTransactionGoodsInsideTransaction(store,"purchase",listOf(line(125.0).copy(quantityUnit=gramsQuantityUnit())),listOf(store)).lines)
+        StockItems.update({ StockItems.id eq item }) { it[measurementUnitId] = GRAMS_UNIT_ID }
+        StockBatchesV2.update({ StockBatchesV2.goodsItemId eq item }) { it[quantity] = gramsQuantityUnit().withTotalValue(2000.0) }
+        val grams = save("purchase",listOf(line(125.0).copy(quantityUnit=gramsQuantityUnit())))
+        assertEquals(GRAMS_UNIT_ID,grams.goodsInTransaction.single().quantityUnit?.id)
+        assertEquals(1875.0,total(first),0.000001)
+    } }
+
     @Test fun saleCapturesMultipleRealSourcesAndReturnDoesNotFollowTheNewShelf() = fixture { db -> transaction(db) {
         val sale = save("purchase", listOf(line(5.0)))
         assertEquals(first.toString(), sale.goodsInTransaction.single().shelfBatchIdAtSale)

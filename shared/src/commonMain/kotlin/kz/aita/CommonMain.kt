@@ -2180,7 +2180,7 @@ fun GoodsItemDataModel.isWeightMeasurementUnit(
 }
 
 fun QuantityDataModel.isWeightQuantityUnit(): Boolean {
-    if (id == "1") return true
+    if (id == "1" || isGramQuantityUnit()) return true
 
     return immutableUnitName.any { localized ->
         val value = localized.value.trim().lowercase()
@@ -2360,7 +2360,7 @@ fun String.isVariableMeasureRetailBarcode(): Boolean {
 }
 
 fun String.parseEmbeddedWeightBarcodeFormats(
-    requireValidChecksum: Boolean = false,
+    requireValidChecksum: Boolean = true,
     allowZeroWeight: Boolean = false
 ): List<EmbeddedWeightBarcodeDataModel> {
     val digits = barcodeDigitsOnly()
@@ -2421,24 +2421,22 @@ fun String.parseEmbeddedWeightBarcodeFormats(
 }
 
 fun String.parseEmbeddedWeightBarcode(): EmbeddedWeightBarcodeDataModel? {
-    return parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = false)
+    return parseEmbeddedWeightBarcodeFormats(requireValidChecksum = true, allowZeroWeight = false)
         .firstOrNull()
 }
 
-fun String.toStoredGoodsItemBarcodeCandidates(): List<String> {
-    val weightedCandidates = parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
-        .flatMap { barcode ->
-            listOf(barcode.productBarcode) + barcode.productLookupCodes.filter { it.length >= 5 }
-        }
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .distinct()
-
-    return weightedCandidates.ifEmpty { listOf(trim()).filter { it.isNotEmpty() } }
+/** Ordinary retail/internal codes stay intact. Explicit weightEncoded callers use EAN 2+5+5+1.
+ * Persist one scale product identity, never aliases
+ * containing the first weight digit (which used to create false matches with other PLUs).
+ * A scale configured for 2+6+4+1 can be registered with its explicit 8-digit prefix+PLU. */
+fun String.toStoredGoodsItemBarcodeCandidates(weightEncoded: Boolean = false): List<String> {
+    if (!weightEncoded) return listOfNotNull(trim().takeIf { it.isNotEmpty() })
+    val scale = parseEmbeddedWeightBarcodeFormats(requireValidChecksum = true, allowZeroWeight = true).firstOrNull()
+    return listOfNotNull(scale?.productBarcode ?: trim().takeIf { it.isNotEmpty() })
 }
 
-fun String.toStoredGoodsItemBarcode(): String {
-    return toStoredGoodsItemBarcodeCandidates().firstOrNull() ?: trim()
+fun String.toStoredGoodsItemBarcode(weightEncoded: Boolean = false): String {
+    return toStoredGoodsItemBarcodeCandidates(weightEncoded).firstOrNull() ?: trim()
 }
 
 const val GOODS_ITEM_BARCODE_TYPE_STANDARD = "standard"
@@ -2472,14 +2470,14 @@ fun String.normalizedGoodsItemBarcodeType(cleanBarcodeValue: String? = null): St
     }
 }
 
-fun List<String>.cleanLegacyGoodsItemBarcodes(): List<String> {
-    return flatMap { it.trim().toStoredGoodsItemBarcodeCandidates() }
+fun List<String>.cleanLegacyGoodsItemBarcodes(weightEncoded: Boolean = false): List<String> {
+    return flatMap { it.trim().toStoredGoodsItemBarcodeCandidates(weightEncoded) }
         .filter { it.isNotBlank() }
         .distinct()
 }
 
-fun GoodsItemBarcodeDataModel.normalizedForStore(storeId: String): GoodsItemBarcodeDataModel? {
-    val cleanValue = value.trim().toStoredGoodsItemBarcode().takeIf { it.isNotBlank() } ?: return null
+fun GoodsItemBarcodeDataModel.normalizedForStore(storeId: String, weightEncoded: Boolean = false): GoodsItemBarcodeDataModel? {
+    val cleanValue = value.trim().toStoredGoodsItemBarcode(weightEncoded).takeIf { it.isNotBlank() } ?: return null
     val cleanType = type.normalizedGoodsItemBarcodeType(cleanValue)
     return copy(
         value = cleanValue,
@@ -2490,20 +2488,21 @@ fun GoodsItemBarcodeDataModel.normalizedForStore(storeId: String): GoodsItemBarc
 
 fun List<GoodsItemBarcodeDataModel>.normalizedGoodsItemBarcodesForStore(
     storeId: String,
-    legacyBarcodes: List<String> = emptyList()
+    legacyBarcodes: List<String> = emptyList(),
+    weightEncoded: Boolean = false
 ): List<GoodsItemBarcodeDataModel> {
-    val source = if (isNotEmpty()) this else legacyBarcodes.cleanLegacyGoodsItemBarcodes().map { barcode ->
+    val source = if (isNotEmpty()) this else legacyBarcodes.cleanLegacyGoodsItemBarcodes(weightEncoded).map { barcode ->
         GoodsItemBarcodeDataModel(value = barcode, type = GOODS_ITEM_BARCODE_TYPE_STANDARD)
     }
 
     return source
         .flatMap { model ->
             val rawType = model.type
-            model.value.trim().toStoredGoodsItemBarcodeCandidates().map { candidate ->
+            model.value.trim().toStoredGoodsItemBarcodeCandidates(weightEncoded).map { candidate ->
                 model.copy(value = candidate, type = rawType.normalizedGoodsItemBarcodeType(candidate))
             }
         }
-        .mapNotNull { it.normalizedForStore(storeId) }
+        .mapNotNull { it.normalizedForStore(storeId, weightEncoded) }
         .distinctBy { "${it.type}|${it.storeId.orEmpty()}|${it.value.normalizedBarcodeToken()}" }
 }
 
@@ -2513,7 +2512,7 @@ fun List<GoodsItemBarcodeDataModel>.toLegacyBarcodeStrings(): List<String> =
         .distinct()
 
 fun GoodsItemDataModel.effectiveBarcodeModels(): List<GoodsItemBarcodeDataModel> =
-    barcodeModels.normalizedGoodsItemBarcodesForStore(storeId, barcodes)
+    barcodeModels.normalizedGoodsItemBarcodesForStore(storeId, barcodes, measurementUnitId.isWeightMeasurementUnitId())
 
 fun GoodsItemDataModel.allBarcodeValues(): List<String> =
     effectiveBarcodeModels().toLegacyBarcodeStrings().ifEmpty { barcodes.cleanLegacyGoodsItemBarcodes() }
@@ -2528,21 +2527,22 @@ fun GoodsItemDataModel.internalBarcodeValues(): List<String> =
         .filter { it.type == GOODS_ITEM_BARCODE_TYPE_INTERNAL }
         .toLegacyBarcodeStrings()
 
-fun storedBarcodeMatchesScannedTransactionBarcode(storedBarcode: String, scannedBarcode: String): Boolean {
+fun storedBarcodeMatchesScannedTransactionBarcode(storedBarcode: String, scannedBarcode: String, weightEncoded: Boolean = false): Boolean {
     val storedToken = storedBarcode.normalizedBarcodeToken()
     val scannedToken = scannedBarcode.normalizedBarcodeToken()
 
     if (storedToken.isNotBlank() && storedToken == scannedToken) return true
+    if (!weightEncoded) return false
 
     val storedWeightedLookupTokens = storedBarcode
-        .parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+        .parseEmbeddedWeightBarcodeFormats(requireValidChecksum = true, allowZeroWeight = true)
         .flatMap { barcode -> listOf(barcode.productBarcode) + barcode.productLookupCodes }
         .map { it.normalizedBarcodeToken() }
         .filter { it.isNotBlank() }
         .toSet()
 
     val scannedWeightedLookupTokens = scannedBarcode
-        .parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
+        .parseEmbeddedWeightBarcodeFormats(requireValidChecksum = true, allowZeroWeight = true)
         .flatMap { barcode -> listOf(barcode.productBarcode) + barcode.productLookupCodes }
         .map { it.normalizedBarcodeToken() }
         .filter { it.isNotBlank() }
@@ -2558,18 +2558,18 @@ fun storedBarcodeMatchesScannedTransactionBarcode(storedBarcode: String, scanned
 fun GoodsItemDataModel.matchesEmbeddedWeightBarcode(
     embeddedWeightBarcode: EmbeddedWeightBarcodeDataModel
 ): Boolean {
+    if (!measurementUnitId.isWeightMeasurementUnitId()) return false
     val lookupCodes = embeddedWeightBarcode.productLookupCodes.map { it.normalizedBarcodeToken() }.toSet()
     val productBarcode = embeddedWeightBarcode.productBarcode.normalizedBarcodeToken()
 
     return allBarcodeValues().any { barcode ->
         val normalized = barcode.normalizedBarcodeToken()
-        val storedBarcode = barcode.toStoredGoodsItemBarcode().normalizedBarcodeToken()
+        val storedBarcode = barcode.toStoredGoodsItemBarcode(weightEncoded = true).normalizedBarcodeToken()
 
         normalized in lookupCodes ||
             storedBarcode == productBarcode ||
-            barcode.parseEmbeddedWeightBarcodeFormats(requireValidChecksum = false, allowZeroWeight = true)
-                .any { it.productBarcode.normalizedBarcodeToken() == productBarcode } ||
-            (normalized.length in setOf(12, 13, 14) && normalized.startsWith(productBarcode))
+            barcode.parseEmbeddedWeightBarcodeFormats(requireValidChecksum = true, allowZeroWeight = true)
+                .any { it.formatId == embeddedWeightBarcode.formatId && it.productBarcode.normalizedBarcodeToken() == productBarcode }
     }
 }
 
@@ -6941,7 +6941,7 @@ val globalAppConfigurationState = MutableDataStateFlowNonNull(
                 ),
                 roundTotal = false
             )
-        )
+        ).withGramUnit()
     )
 )
 val stringsState = MutableDataStateFlow<List<LocalizedStringGroupDataModel>>(GlobalScope)
@@ -16430,6 +16430,20 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
     supportMessageSendingState.emit(false)
 }
 
+/** Used only after the authenticated deletion endpoint confirms success. */
+suspend fun finishDeletedAccountLocally(owner: String, generation: Long) {
+    if (!authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != owner) return
+    invalidateSupplierNetworkSessionScope()
+    stopRealtimeUpdates()
+    try {
+        clearAuthenticatedSessionStorage(expectedGeneration = generation)
+        SavedLoginUsers.forget(owner)
+        setActiveStoreId(null, syncServer = false)
+    } finally {
+        clearAuthenticatedAccountRuntimeState()
+    }
+}
+
 fun logOutUser() {
     GlobalScope.launch(Dispatchers.ourIo) {
         if (!logOutUserMutex.tryLock()) {
@@ -19615,7 +19629,8 @@ class GoodsItemInCartDataModel(
     val transactionTypeIndex: Int,
     val clientId: Int,
     val quantity: QuantityDataModel,
-    val timeAdded: Long
+    val timeAdded: Long,
+    val supplyPrice: PriceDataModel? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -19662,6 +19677,7 @@ data class LocalizedStringGroupDataModel(
 )
 
 const val AITA_ADDRESS_PROVIDER_YANDEX = "yandex"
+const val AITA_ADDRESS_PROVIDER_OPEN = "openstreetmap"
 const val AITA_ADDRESS_REFRESH_INTERVAL_MILLIS = 7L * 24L * 60L * 60L * 1000L
 const val AITA_ADDRESS_CLIENT_REFRESH_COOLDOWN_MILLIS = 60L * 60L * 1000L
 
@@ -19765,7 +19781,7 @@ fun LocationDataModel.displayAddress(language: String): String =
         ?: name.trim()
 
 fun LocationDataModel.isResolvedAddress(): Boolean =
-    provider.equals(AITA_ADDRESS_PROVIDER_YANDEX, ignoreCase = true) &&
+    (provider.equals(AITA_ADDRESS_PROVIDER_YANDEX, ignoreCase = true) || provider == AITA_ADDRESS_PROVIDER_OPEN) &&
         providerObjectId.isNotBlank() &&
         hasValidCoordinates() &&
         displayAddress(primaryLanguage.ifBlank { DEFAULT_APP_LANGUAGE }).isNotBlank()

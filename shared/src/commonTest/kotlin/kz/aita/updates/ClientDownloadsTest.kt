@@ -32,4 +32,15 @@ class ClientDownloadsTest {
         assertEquals("AITA-1.0.4-4-android-universal.aab", clientDownloadFileName(current, aab))
         assertEquals(apk, selectClientArtifact(catalogue, ClientPlatform(ClientOs.ANDROID, ClientArch.UNIVERSAL, 36)))
     }
+    @Test fun linuxIsAdditiveAndCannotReplaceLegacyDownloads() {
+        val deb = ClientDownloadFile("LINUX", "X64", "DEB", "https://updates.example.org/app.deb", 4, "d".repeat(64), false)
+        val linux = ClientDownloadVersion("r4", "1.0.4", 4, files = listOf(deb))
+        val catalogue = release.copy(linuxDownloads = listOf(linux))
+        assertEquals(listOf("APK", "DEB"), verifiedDownloadVersions(catalogue)!!.single().files.map { it.kind })
+        assertNull(verifiedDownloadVersions(catalogue.copy(linuxDownloads = listOf(linux.copy(version = "1.0.3")))))
+        assertNull(verifiedDownloadVersions(catalogue.copy(linuxDownloads = listOf(linux.copy(files = listOf(aab))))))
+        val onlyLinux = catalogue.copy(artifacts = listOf(ClientArtifact(ClientOs.LINUX, ClientArch.X64, InstallerKind.DEB,
+            url = deb.url, bytes = deb.bytes, sha256 = deb.sha256)))
+        assertEquals(listOf(deb), verifiedDownloadVersions(onlyLinux)!!.single().files)
+    }
 }

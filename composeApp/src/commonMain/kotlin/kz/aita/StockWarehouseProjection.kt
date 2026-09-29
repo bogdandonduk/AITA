@@ -38,7 +38,7 @@ internal fun buildStockWarehouseProjection(
     )
 }
 
-/** Typed search is literal. Weighted-barcode decoding belongs to the explicit scanner path. */
+/** Partial input is literal; a complete, checksummed scale label can identify a kg/g item. */
 internal fun typedStockSearch(items: List<GoodsItemDataModel>, query: String): StockWarehouseSearchResult {
     val text = query.trim()
     if (text.isEmpty()) return StockWarehouseSearchResult(items)
@@ -55,5 +55,8 @@ internal fun typedStockSearch(items: List<GoodsItemDataModel>, query: String): S
             (item.containsSearchOperands - codes.toSet()).any { it.contains(text, ignoreCase = true) })) matching += item
     }
     if (exact.isNotEmpty()) return StockWarehouseSearchResult(exact, exact.singleOrNull(), text)
+    val scaleLabels = text.parseEmbeddedWeightBarcodeFormats()
+    val weighed = if (scaleLabels.isEmpty()) emptyList() else items.filter { item -> scaleLabels.any { item.matchesEmbeddedWeightBarcode(it) } }
+    if (weighed.isNotEmpty()) return StockWarehouseSearchResult(weighed, weighed.singleOrNull(), text)
     return StockWarehouseSearchResult(matching, null, text)
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AITA verified release pass: Android APK/AAB, Pages web, Windows CI, existing server updater.
+"""AITA verified release pass: Android APK/AAB, Linux DEB/RPM, Pages web, Windows CI, existing server updater.
 Run doctor first. Every invocation writes a redacted log and a machine-readable result under
 build/releases. Signing material stays outside Git. No Worker deployment or automatic repair.
 """
@@ -282,6 +282,21 @@ class Run:
             self.collect(path, f'AITA-{self.args.version}-{self.args.build}-android{path.suffix}', 'android', fingerprint)
         self.collect(ROOT / 'shared/build/generated/aitaClientBuild/client-build.json', 'android-client-build.json', 'android', None)
 
+    def linux(self):
+        require(sys.platform.startswith('linux'), 'Linux packages must be built on Linux')
+        require(shutil.which('dpkg-deb') and shutil.which('rpmbuild'), 'Install Linux packaging tools: sudo apt install fakeroot rpm')
+        self.command('Build Linux DEB and RPM with bundled runtime', ['bash', './gradlew',
+            ':composeApp:packageDeb', ':composeApp:packageRpm', '--no-daemon', '--no-watch-fs', '--max-workers=4', '--console=plain'])
+        packages = ROOT / 'composeApp/build/compose/binaries/main'
+        for kind in ('deb', 'rpm'):
+            matches = list((packages / kind).glob('*.' + kind))
+            require(len(matches) == 1, 'Expected exactly one Linux ' + kind.upper())
+            check = ['dpkg-deb', '--info', str(matches[0])] if kind == 'deb' else ['rpm', '-qip', str(matches[0])]
+            self.command('Verify Linux package metadata ' + kind, check)
+            self.collect(matches[0], f'AITA-{self.args.version}-{self.args.build}-linux-x64.{kind}', 'linux', None)
+        self.collect(ROOT / 'shared/build/generated/aitaClientBuild/client-build.json', 'linux-client-build.json', 'linux', None)
+        self.unchanged()
+
     def web(self):
         self.command('Build production web app', ['bash', 'scripts/linux-web/run-aita-wasm.sh', '--build-only', '--max-workers', '4'])
         dist = ROOT / 'composeApp/build/dist/wasmJs/productionExecutable'
@@ -420,12 +435,12 @@ class Run:
         entries = []
         for entry in self.state['artifacts']:
             path = self.assets / entry['name']; suffix = path.suffix.lower()
-            if suffix not in ('.apk', '.aab', '.msi', '.exe'): continue
+            if suffix not in ('.apk', '.aab', '.msi', '.exe', '.deb', '.rpm'): continue
             platform = entry['platform']
-            require(platform in ('android', 'windows') and sha(path) == entry['sha256'], 'Invalid updater artifact')
+            require(platform in ('android', 'windows', 'linux') and sha(path) == entry['sha256'], 'Invalid updater artifact')
             entries.append(dict(os=platform.upper(), kind=suffix[1:].upper(), arch='UNIVERSAL' if platform == 'android' else 'X64',
-                minimumOsMajor=24 if platform == 'android' else 10, path=str(path), buildInfo=str(self.assets / f'{platform}-client-build.json'),
-                publisherSigned=platform == 'android' or self.state.get('windowsSigning') == 'trusted Authenticode'))
+                minimumOsMajor=24 if platform == 'android' else (10 if platform == 'windows' else 0), path=str(path), buildInfo=str(self.assets / f'{platform}-client-build.json'),
+                publisherSigned=platform == 'android' or (platform == 'windows' and self.state.get('windowsSigning') == 'trusted Authenticode')))
         require(entries, 'No native installers available for the updater feed')
         if self.state.get('webUploadCompleted'):
             entries.append(dict(os='WEB', kind='WEB_RELOAD', url='https://aita.kz/', buildInfo=str(self.assets / 'web-client-build.json')))
@@ -498,7 +513,7 @@ def main():
     parser.add_argument('command', choices=['doctor', 'run'])
     parser.add_argument('--version')
     parser.add_argument('--build', type=int)
-    parser.add_argument('--targets', default='android,windows,web,server')
+    parser.add_argument('--targets', default='android,windows,linux,web,server')
     parser.add_argument('--windows-signing', choices=['pilot', 'trusted'], default='pilot', help='Owner-authorized unsigned pilot now; trusted signing later')
     parser.add_argument('--windows-run', type=int, help='Reuse an existing Windows CI run for this exact source SHA, version and build')
     parser.add_argument('--notes-file', type=Path, help='JSON release notes in EN/RU/KK/KY/TG/UZ; pinned at the start of the pass')
@@ -510,7 +525,7 @@ def main():
             doctor(run); return 0
         require(args.version and args.build, 'Supply --version and --build')
         targets = args.targets.split(',')
-        require(len(targets) == len(set(targets)) and set(targets) <= {'android', 'windows', 'web', 'server'}, 'Unknown/duplicate release target')
+        require(len(targets) == len(set(targets)) and set(targets) <= {'android', 'windows', 'linux', 'web', 'server'}, 'Unknown/duplicate release target')
         if not run.stage('source', run.pin) or not run.stage('verification', run.verify):
             return 1
         if 'windows' in targets:

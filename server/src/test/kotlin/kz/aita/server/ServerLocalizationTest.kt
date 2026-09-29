@@ -7,7 +7,7 @@ class ServerLocalizationTest {
     @Test fun existingInstallationGetsNewCountryRulesWithoutLosingOperatorConfiguration() {
         val old = parsed("""{"countries":[{"locale":"kz","phoneNumberCode":"7","operatorCountry":true}],"companyForms":[{"id":"0","name":[{"language":"en","value":"Custom LLP"}]}],"legalIdFormats":[{"id":"kz_bin","operatorFormat":true}],"serverUrl":"https://operator.invalid","prices":[17],"unknown":true}""").jsonObject
         val result = enrichStoreCountryConfiguration(old)
-        assertEquals(setOf("kz", "tj", "kg", "uz"), result.getValue("countries").jsonArray.map { it.jsonObject.getValue("locale").jsonPrimitive.content }.toSet())
+        assertEquals(setOf("kz", "tj", "kg", "uz", "ru"), result.getValue("countries").jsonArray.map { it.jsonObject.getValue("locale").jsonPrimitive.content }.toSet())
         assertEquals(old.getValue("countries").jsonArray.first(), result.getValue("countries").jsonArray.first())
         val form = result.getValue("companyForms").jsonArray.first().jsonObject
         assertEquals(old.getValue("companyForms").jsonArray.first().jsonObject["name"], form["name"])

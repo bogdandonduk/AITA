@@ -10,6 +10,7 @@ internal fun AppConfiguration.downloadsIconResource(): DrawableResource = if (is
 internal fun AppConfiguration.downloadPlatformIconResource(platform: String): DrawableResource {
     val dark = isDarkAppTheme(stateValues.appThemeId)
     return when (platform) {
+        "linux" -> Res.drawable.platform_linux
         "android" -> if (dark) Res.drawable._218_1 else Res.drawable._218_0
         "windows" -> if (dark) Res.drawable._219_1 else Res.drawable._219_0
         "web" -> if (dark) Res.drawable._220_1 else Res.drawable._220_0
@@ -17,5 +18,5 @@ internal fun AppConfiguration.downloadPlatformIconResource(platform: String): Dr
         else -> if (dark) Res.drawable._222_1 else Res.drawable._222_0
     }
 }
-internal fun AppConfiguration.downloadPlatformIconPath(platform: String): String = uiAppearanceResourcesState.value.catalog.drawable(
+internal fun AppConfiguration.downloadPlatformIconPath(platform: String): String = if (platform == "linux") "" else uiAppearanceResourcesState.value.catalog.drawable(
     when (platform) { "android" -> 218L; "windows" -> 219L; "web" -> 220L; "macos" -> 221L; else -> 222L }, stateValues.appThemeId)

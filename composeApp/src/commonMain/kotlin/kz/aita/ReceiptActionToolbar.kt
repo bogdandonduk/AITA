@@ -25,8 +25,11 @@ internal fun AppConfiguration.ReceiptActionToolbar(
         Action("share", stateValues.stringShare, stateValues.stringReceiptShared, 127, if (dark) Res.drawable._127_1 else Res.drawable._127_0),
         Action("whatsapp", stateValues.stringWhatsApp, stateValues.stringReceiptSentToWhatsApp, 128, if (dark) Res.drawable._128_1 else Res.drawable._128_0),
         Action("print", stateValues.stringPrint, stateValues.stringReceiptSentToPrinter, 129, if (dark) Res.drawable._129_1 else Res.drawable._129_0)
-    ) + if (onFinish != null) listOf(Action("finish", stateValues.stringQuit, "", 130, if (dark) Res.drawable._130_1 else Res.drawable._130_0)) else emptyList()
-    Box(Modifier.fillMaxWidth().padding(vertical = 5.dp), contentAlignment = Alignment.Center) {
+    )
+    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (onFinish != null) actionButton(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            text = pass23Text("finish"), iconPath = stateValues.drawablePathIconCheck,
+            autoLoading = false, confirmationRequired = false, onClick = onFinish)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             actions.forEach { action ->
                 TooltipBox(

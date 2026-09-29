@@ -72,10 +72,12 @@ enum class AitaTabIcon(val family: Int) {
     Windows(219),
     Web(220),
     MacOS(221),
-    Ios(222)
+    Ios(222),
+    Linux(227)
 }
 
 internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
+    "linux" -> AitaTabIcon.Linux
     "android" -> AitaTabIcon.Android
     "windows" -> AitaTabIcon.Windows
     "web" -> AitaTabIcon.Web
@@ -151,6 +153,7 @@ internal fun aitaTabIconForId(id: String): AitaTabIcon = when (id) {
 internal fun AppConfiguration.tabIconResource(icon: AitaTabIcon): DrawableResource {
     val dark = isDarkAppTheme(stateValues.appThemeId)
     return when(icon) {
+        AitaTabIcon.Linux -> Res.drawable.platform_linux
         AitaTabIcon.Android -> if (dark) Res.drawable._218_1 else Res.drawable._218_0
 AitaTabIcon.Windows -> if (dark) Res.drawable._219_1 else Res.drawable._219_0
 AitaTabIcon.Web -> if (dark) Res.drawable._220_1 else Res.drawable._220_0

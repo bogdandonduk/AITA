@@ -2402,6 +2402,8 @@ internal fun AppConfiguration.WorkerInviteStatusCard(
 @Composable
 fun AppConfiguration.MenuUserAccountScreen() {
     var logoutConfirmationShown by rememberSaveable { mutableStateOf(false) }
+    var deleteAccountShown by remember { mutableStateOf(false) }
+    if (deleteAccountShown) AccountDeletionSheet { deleteAccountShown = false }
 
     AitaScreenColumn(
         modifier = Modifier
@@ -2673,6 +2675,10 @@ fun AppConfiguration.MenuUserAccountScreen() {
                     goAction.invoke()
                 }
 
+                Spacer(Modifier.height(24.dp))
+                actionButton(text = accountDeletionText("title", stateValues.appLanguage),
+                    iconPath = stateValues.drawablePathIconDelete, autoLoading = false, confirmationRequired = false,
+                    onClick = { deleteAccountShown = true })
                 Spacer(
                     modifier = Modifier
                         .height(stateValues.screenHeight / 10)
@@ -2730,7 +2736,7 @@ internal fun AppConfiguration.transactionHistoryFindGoodsItem(line: GoodsItemInT
 
     return stock.firstOrNull { item ->
         item.matchesScannedBarcode(barcode) || item.allBarcodeValues().any { storedBarcode ->
-            storedBarcodeMatchesScannedTransactionBarcode(storedBarcode, barcode)
+            storedBarcodeMatchesScannedTransactionBarcode(storedBarcode, barcode, item.measurementUnitId.isWeightMeasurementUnitId())
         }
     }
 }

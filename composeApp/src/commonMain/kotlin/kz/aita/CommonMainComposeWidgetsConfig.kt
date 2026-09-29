@@ -1059,6 +1059,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
                     )
                 }
 
+                if (goodsItem.categoryIds.isEmpty()) Text(pass23Text("category_notice"),
+                    color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize)
                 if (categoriesText.isNotBlank()) {
                     StockCardInfoLine(
                         title = stateValues.stringCategory,
@@ -3444,11 +3446,11 @@ fun AppConfiguration.domainSelectionTextField(
     Column(modifier) {
         val titleTextPresent = titleText.isNotEmpty() && titleText.isNotBlank()
 
-        if (titleTextPresent || titleIconButtonPath != null)
+        if (titleTextPresent || titleIconButtonPath != null || titleIconButtonRes != null)
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (titleIconButtonPath != null && titleIconButtonRes != null)
+                if (titleIconButtonPath != null || titleIconButtonRes != null)
                     CpImage(
                         modifier = Modifier
                             .padding(2.dp)
@@ -3460,8 +3462,8 @@ fun AppConfiguration.domainSelectionTextField(
                                 indication = ripple(color = stateValues.TextColor, radius = cornerRadius),
                                 onClick = onTitleIconButtonClick ?: {}
                             ),
-                        url = titleIconButtonPath,
-                        fallbackRes = titleIconButtonRes,
+                        url = titleIconButtonPath.orEmpty(),
+                        fallbackRes = titleIconButtonRes ?: if (titleIconButtonPath == stateValues.drawablePathIconDelete) stateValues.drawableResIconDelete.value else null,
                         contentDescription = titleText
                     )
 
@@ -5538,13 +5540,16 @@ fun AppConfiguration.countrySelectionPhoneNumberTextField(
                 compareBy<CountryDataModel> { !it.locale.equals("kz", true) }
                     .thenBy { it.name.visibleLocalizedString(stateValues.appLanguage, it.locale) }
             )
+            .distinctBy { it.phoneNumberCode }
             .map {
+                val sharingCode = phoneCountries.filter { other -> other.phoneNumberCode == it.phoneNumberCode }
+                val countryName = sharingCode.joinToString(" / ") { other -> other.name.visibleLocalizedString(stateValues.appLanguage, other.locale) }
                 SelectableDomain(
                     id = "+${it.phoneNumberCode}",
                     displayId = "+${it.phoneNumberCode}".toLocalizedSingleMain(),
-                    name = it.name,
-                    iconPath = it.flagDrawablePath,
-                    iconRes = it.mapIconRes()
+                    name = countryName.toLocalizedSingleMain(),
+                    iconPath = it.flagDrawablePath.takeIf { sharingCode.size == 1 },
+                    iconRes = it.mapIconRes().takeIf { sharingCode.size == 1 }
                 )
             },
         selectedSecondaryInitial = selectedSecondaryInitial,

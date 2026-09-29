@@ -9,7 +9,7 @@ class StoreCountryCatalogueTest {
         val oldForm = defaultCompanyForms().first().copy(name = listOf(LocalizedStringDataModel("en", "Operator LLP")), countryLocales = emptyList(), legalIdFormatId = "")
         val old = current.copy(countries = defaultStoreCountries().take(2), companyForms = listOf(oldForm), legalIdFormats = defaultLegalIdFormats().take(1))
         val upgraded = old.withStoreCountryConfiguration()
-        assertEquals(4, upgraded.countries.size)
+        assertEquals(5, upgraded.countries.size)
         assertEquals(old.countries, upgraded.countries.take(2))
         assertEquals(oldForm.name, upgraded.companyForms.first().name)
         assertEquals("kz_bin", upgraded.companyForms.first().legalIdFormatId)
@@ -19,7 +19,7 @@ class StoreCountryCatalogueTest {
 
     @Test fun allSupportedCountriesWorkWithoutRemoteConfiguration() {
         val countries = defaultStoreCountries()
-        assertEquals(setOf("kz", "tj", "kg", "uz"), countries.map { it.locale }.toSet())
+        assertEquals(setOf("kz", "tj", "kg", "uz", "ru"), countries.map { it.locale }.toSet())
         assertEquals(countries.map { it.locale }, countries.take(1).withSupportedCountries().map { it.locale })
         assertEquals(countries, countries.withSupportedCountries())
         for ((country, phone, currency) in listOf(Triple("kz", "+7 777 123 45 67", "KZT"),
@@ -28,7 +28,7 @@ class StoreCountryCatalogueTest {
             assertEquals(currency, countryCurrency(country))
             assertTrue(defaultCompanyForms().count { country in it.countryLocales } >= 2)
         }
-        assertNull(storeCountryFromPhones(listOf("+7 912 1234567"))) // Shared +7 must not misclassify Russia.
+        assertEquals("ru", storeCountryFromPhones(listOf("+7 912 1234567"))?.locale) // Shared +7 must not misclassify Russia.
         assertNull(storeCountryFromPhones(listOf("7771234567")))
         assertNull(storeCountryFromPhones(listOf("+996")))
         assertNull(storeCountryFromPhones(listOf("+996555123456", "+998901234567")))
@@ -39,7 +39,7 @@ class StoreCountryCatalogueTest {
         assertEquals("kz_iin", forms.getValue("kz_ip").legalIdFormatId)
         assertEquals("kz_bin", forms.getValue("kz_joint_ip").legalIdFormatId)
         assertEquals("uz_pinfl", forms.getValue("uz_ip").legalIdFormatId)
-        val lengths = mapOf("kz_bin" to 12, "kz_iin" to 12, "tj_tin" to 9, "kg_tin" to 14, "uz_tin" to 9, "uz_pinfl" to 14)
+        val lengths = mapOf("kz_bin" to 12, "kz_iin" to 12, "tj_tin" to 9, "kg_tin" to 14, "uz_tin" to 9, "uz_pinfl" to 14, "ru_inn_10" to 10, "ru_inn_12" to 12)
         for ((id, length) in lengths) {
             val format = defaultLegalIdFormats().single { it.id == id }
             assertTrue("1".repeat(length).matchesLegalIdFormat(format))

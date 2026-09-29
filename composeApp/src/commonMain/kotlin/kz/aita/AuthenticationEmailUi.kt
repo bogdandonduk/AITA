@@ -179,7 +179,7 @@ internal fun AppConfiguration.LoginPolicyEditor(settings: AitaAuthenticationSett
 internal data class ProfileSecurityConfirmation(val ready: Boolean, val factor: String = "", val emailProof: AitaSecurityEmailProof? = null)
 
 @Composable
-internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, password: String): ProfileSecurityConfirmation {
+internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, password: String, action: AitaSecurityEmailAction = AitaSecurityEmailAction.PROFILE): ProfileSecurityConfirmation {
     val owner = stateValues.userAccount?.id
     val generation = currentAuthenticatedSessionGeneration()
     var settings by remember(owner, generation) { mutableStateOf<AitaAuthenticationSettingsDataModel?>(null) }
@@ -217,7 +217,7 @@ internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, p
     // New-address ownership is confirmed in the profile form, separately from this current-account factor.
     if (current.authenticatorEnabled) AuthenticatorCodeEntryField(factor, false, { factor = it }, {}, "profile-security-factor")
     val needsEmail = current.emailRequiredForLogin && !current.authenticatorEnabled
-    val proof = if (needsEmail) SecurityEmailProofInput(AitaSecurityEmailRequest(AitaSecurityEmailAction.PROFILE, target, password,
+    val proof = if (needsEmail) SecurityEmailProofInput(AitaSecurityEmailRequest(action, target, password,
         current.securityRevision, stateValues.appLanguage)) else null
     return ProfileSecurityConfirmation((!current.authenticatorEnabled || aitaSecondFactorIsWellFormed(factor)) && (!needsEmail || proof != null), factor, proof)
 }

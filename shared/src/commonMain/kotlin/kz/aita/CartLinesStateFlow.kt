@@ -13,7 +13,7 @@ internal class CartLinesStateFlow(
     private fun rows(snapshot: CartBookState): List<StoredCartLine> =
         if (snapshot.ready && snapshot.owner?.let(ownerIsCurrent) == true)
             snapshot.book.lines.filter { it.type == type && it.slot == slot } else emptyList()
-    private fun visible(rows: List<StoredCartLine>) = rows.map { GoodsItemInCartDataModel(it.id, it.type, it.slot, it.quantity, it.addedAt) }
+    private fun visible(rows: List<StoredCartLine>) = rows.map { GoodsItemInCartDataModel(it.id, it.type, it.slot, it.quantity, it.addedAt, it.supplyPrice) }
     override val value: List<GoodsItemInCartDataModel> get() = visible(rows(source.value))
     override val replayCache: List<List<GoodsItemInCartDataModel>> get() = listOf(value)
     override suspend fun collect(collector: FlowCollector<List<GoodsItemInCartDataModel>>): Nothing {

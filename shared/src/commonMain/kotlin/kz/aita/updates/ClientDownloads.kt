@@ -14,12 +14,22 @@ import kotlinx.serialization.Serializable
 
 /** Downloading an older release is explicit; it never changes updater selection/high-water rules. */
 fun verifiedDownloadVersions(release: ClientRelease): List<ClientDownloadVersion>? {
-    val versions = release.downloads.ifEmpty {
+    val basic = release.downloads.ifEmpty {
         listOf(ClientDownloadVersion(release.id, release.version, release.build, release.notes,
-            release.artifacts.filter { it.kind.name in setOf("APK", "MSI", "EXE") }.map {
+            release.artifacts.filter { it.kind.name in setOf("APK", "MSI", "EXE", "DEB", "RPM") && (release.linuxDownloads.isEmpty() || it.os != ClientOs.LINUX) }.map {
                 ClientDownloadFile(it.os.name, it.arch.name, it.kind.name, it.url, it.bytes, it.sha256)
             }))
     }.filter { it.files.isNotEmpty() }
+    if (release.linuxDownloads.size > 20 || release.linuxDownloads.any { version -> version.files.any { it.os != "LINUX" } }) return null
+    val versions = basic.toMutableList()
+    for (extra in release.linuxDownloads) {
+        val index = versions.indexOfFirst { it.build == extra.build }
+        if (index < 0) versions += extra else {
+            val before = versions[index]
+            if (before.id != extra.id || before.version != extra.version || before.notes != extra.notes) return null
+            versions[index] = before.copy(files = before.files + extra.files)
+        }
+    }
     if (versions.size > 20 || versions.distinctBy { it.build }.size != versions.size) return null
     for (version in versions) {
         if (!Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,79}").matches(version.id) ||
@@ -28,7 +38,7 @@ fun verifiedDownloadVersions(release: ClientRelease): List<ClientDownloadVersion
             version.notes.size > 12 || version.notes.any { (key, value) -> !Regex("[a-z]{2,3}").matches(key) || value.length > 24_000 } ||
             version.files.size !in 1..8 || version.files.distinctBy { Triple(it.os, it.arch, it.kind) }.size != version.files.size) return null
         for (file in version.files) {
-            if (!(file.os == "ANDROID" && file.kind in setOf("APK", "AAB") || file.os == "WINDOWS" && file.kind in setOf("EXE", "MSI")) ||
+            if (!(file.os == "ANDROID" && file.kind in setOf("APK", "AAB") || file.os == "WINDOWS" && file.kind in setOf("EXE", "MSI") || file.os == "LINUX" && file.kind in setOf("DEB", "RPM")) ||
                 file.arch !in setOf("ARM64", "X64", "UNIVERSAL") || !isPublicClientReleaseUrl(file.url) ||
                 file.bytes !in 1..CLIENT_INSTALLER_MAX_BYTES || !Regex("[0-9a-f]{64}").matches(file.sha256)) return null
             val uri = Url(file.url)

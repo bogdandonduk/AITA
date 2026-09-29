@@ -76,6 +76,8 @@ object AitaAdvancedAuthenticationClient {
     suspend fun updateLoginPolicy(request: AitaLoginPolicyRequest) =
         authRequest<AitaAuthenticationSettingsDataModel, AitaLoginPolicyRequest>(HttpMethod.Post, "auth/security/login-policy", request)
 
+    suspend fun deleteAccount(request: kz.aita.AccountDeletionRequest) = authRequest<String, kz.aita.AccountDeletionRequest>(HttpMethod.Post, "auth/security/account/delete", request)
+
     suspend fun settings() = authRequest<AitaAuthenticationSettingsDataModel, Unit>(HttpMethod.Get, "auth/security/settings")
 
     suspend fun startTotpSetup(request: AitaSensitiveSecurityActionRequestDataModel) =

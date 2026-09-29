@@ -174,7 +174,12 @@ internal fun AitaEditableText(
             // Handle-only motion is not a text edit, and must remain possible even in a field
             // whose old draft no longer passes today's validation rule.
             if (original != originalText.toString()) {
-                val transformed = inputTransform?.invoke(original) ?: original
+                val numeric = if (keyboardOptions.keyboardType == androidx.compose.ui.text.input.KeyboardType.Decimal ||
+                    keyboardOptions.keyboardType == androidx.compose.ui.text.input.KeyboardType.Number) {
+                    // Accept Unicode digits and either decimal separator without remapping letters.
+                    original.map { ch -> if (ch == ',') '.' else ch.digitToIntOrNull()?.let { ('0'.code + it).toChar() } ?: ch }.joinToString("")
+                } else original
+                val transformed = inputTransform?.invoke(numeric) ?: numeric
                 if (inputFilter?.invoke(transformed) == false) {
                     revertAllChanges()
                 } else if (transformed != original) {

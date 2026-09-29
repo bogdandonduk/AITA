@@ -80,6 +80,24 @@ class PublishClientReleaseTest(unittest.TestCase):
         self.assertEqual([3, 2], [x["build"] for x in second["downloads"]])
         self.assertEqual(first["downloads"][0], second["downloads"][1])
 
+    def test_linux_catalogue_is_additive_for_old_clients_and_preserves_history(self):
+        for kind in ("apk", "deb", "rpm"):
+            (self.root / ("app." + kind)).write_bytes(("inert " + kind).encode())
+        self.data["artifacts"] = [dict(os="ANDROID", kind="APK", path="app.apk")] + [
+            dict(os="LINUX", arch="X64", kind=kind.upper(), path="app." + kind) for kind in ("deb", "rpm")]
+        self.save()
+        def decoded():
+            with tempfile.TemporaryDirectory() as tmp:
+                return publisher.verify_envelope(publisher.read_json(self.publish()), base64.b64decode(self.build["publicKey"]), Path(tmp))
+        first = decoded()
+        self.assertEqual(["APK"], [x["kind"] for x in first["downloads"][0]["files"]])
+        self.assertEqual(["DEB", "RPM"], [x["kind"] for x in first["linuxDownloads"][0]["files"]])
+        self.data.update(build=3, sequence=3, id="release-3", version="1.0.3")
+        self.build.update(build="3", version="1.0.3"); self.save()
+        second = decoded()
+        self.assertEqual(first["linuxDownloads"][0], second["linuxDownloads"][1])
+        self.assertEqual([3, 2], [x["build"] for x in second["downloads"]])
+
     def test_same_build_cannot_replace_a_download_only_aab(self):
         (self.root / "app.aab").write_bytes(b"first signed bundle")
         self.data["artifacts"].append(dict(os="ANDROID", kind="AAB", path="app.aab"))

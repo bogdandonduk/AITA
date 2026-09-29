@@ -21,6 +21,18 @@ class DynamicCartStoreTest {
             saved[owner.storageKey] = value; saves++
         })
     }
+    @Test fun supplyPriceSurvivesPersistenceAndQuantityChangesWithoutChangingOtherCarts() = runTest {
+        val f = Memory(a); f.store.adopt(a)
+        val price = PriceDataModel("17.5", "KZT", "supplier")
+        val first = line(0, 2).copy(supplyPrice = price)
+        f.store.change(a) { it.copy(lines = listOf(first, line(1, 2))) }
+        f.store.change(a) { it.copy(lines = it.lines.map { l -> if (l.slot == 0) l.copy(quantity = l.quantity.withTotalValue(3.0)) else l }) }
+        val json = jsonBase.encodeToString(CartBook.serializer(), f.saved[a.storageKey]!!)
+        val restored = jsonBase.decodeFromString(CartBook.serializer(), json).validated()
+        assertEquals(price, restored.lines.first().supplyPrice)
+        assertEquals(3.0, restored.lines.first().quantity.total)
+        assertNull(restored.lines.last().supplyPrice)
+    }
     @Test fun freshBookStartsWithTwoAndAddsExactlyOne() = runTest {
         val f = Memory(a); f.store.adopt(a)
         assertEquals(listOf(2, 2, 2), f.store.state.value.book.counts)

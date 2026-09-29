@@ -1643,6 +1643,19 @@ internal class AitaAdvancedAuthService(
         return if (changed) settings(userId) else null
     }
 
+    suspend fun deleteAccount(userId: UUID, request: kz.aita.AccountDeletionRequest): String {
+        requireActionBudget("delete-account:$userId", 6, System.currentTimeMillis())
+        if (!request.confirmed) return "confirmation"
+        return newSuspendedTransaction(Dispatchers.IO) {
+            val user = lockSecurityUserInside(userId) ?: return@newSuspendedTransaction "confirmation"
+            if (!verifyEmailAliasCredentialsInside(user, request.currentPassword, request.secondFactorCode,
+                System.currentTimeMillis(), request.emailProof, AitaSecurityEmailAction.ACCOUNT_DELETE)) return@newSuspendedTransaction "confirmation"
+            accountDeletionBlockerInside(userId)?.let { return@newSuspendedTransaction it }
+            eraseAccountPersonalDataInside(userId)
+            "deleted"
+        }
+    }
+
     /** Called under the account row lock by the existing profile route. */
     internal fun verifyProfileSecurityInside(user: ResultRow, request: kz.aita.UserAccountUpdateDataModel): Boolean {
         val account = request.account
@@ -2495,6 +2508,15 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
                         eventMessage("auth.message.security_confirmation_failed_or_settings_changed_refresh_and_try_again"))
                     else call.genericResponse(HttpStatusCode.OK, result)
+                }
+                post("/account/delete") {
+                    val userId = call.checkPrincipal() ?: return@post
+                    val result = service.deleteAccount(userId, call.receiveAita<kz.aita.AccountDeletionRequest>())
+                    if (result == "deleted") {
+                        call.genericResponse(HttpStatusCode.OK, result, kz.aita.accountDeletionMessage(result))
+                        publishAccountDeleted(userId)
+                    }
+                    else call.genericResponseNoPayload(HttpStatusCode.BadRequest, kz.aita.accountDeletionMessage(result))
                 }
                 get("/settings") {
                     val userId = call.checkPrincipal() ?: return@get

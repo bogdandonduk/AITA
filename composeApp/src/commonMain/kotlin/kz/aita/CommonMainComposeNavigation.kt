@@ -87,11 +87,6 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
     }
 
     fun newDraft(): StockAddEditDraft {
-        val rememberedCategoryId = addEditState[
-            NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_LAST_SELECTED_CATEGORY_ID
-        ]?.takeIf { rememberedId ->
-            rememberedId.isNotBlank() && stateValues.goodsCategories.orEmpty().any { it.id == rememberedId }
-        }
 
         return StockAddEditDraft(
             barcodes = listOf(""),
@@ -99,7 +94,7 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             name = emptyLocalizedItemForCurrentLanguage(),
             description = emptyLocalizedItemForCurrentLanguage(),
             measurementUnitId = defaultMeasurementUnitId,
-            categoryIds = rememberedCategoryId?.let(::listOf) ?: emptyList(),
+            categoryIds = emptyList(),
             salePrices = listOf(
                 PriceDataModel(
                     price = "",
@@ -163,30 +158,6 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
             ?.toPersistentStockAddEditDraftOrNull()
         if (restored != null && (existing == null || restored.id == existing.id)) {
             draft = restored
-        } else if (existing == null && draft.categoryIds.isEmpty()) {
-            val restoredRootCategoryId = readAppStateDraft
-                ?.invoke(stockAddEditLastCategoryStorageKey("root"))
-                ?.takeIf { id ->
-                    id.isNotBlank() && stateValues.goodsCategories.orEmpty().any { it.id == id }
-                }
-            val restoredSelectedCategoryId = readAppStateDraft
-                ?.invoke(stockAddEditLastCategoryStorageKey("selected"))
-                ?.takeIf { id ->
-                    id.isNotBlank() && stateValues.goodsCategories.orEmpty().any { it.id == id }
-                }
-                ?: restoredRootCategoryId
-
-            restoredRootCategoryId?.let {
-                NavigationScreenModel.Stock.AddEditGoodsItem.setState(
-                    NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_LAST_SELECTED_ROOT_CATEGORY_ID to it
-                )
-            }
-            restoredSelectedCategoryId?.let {
-                NavigationScreenModel.Stock.AddEditGoodsItem.setState(
-                    NavigationScreenModel.Stock.AddEditGoodsItem.KEY_STATE_LAST_SELECTED_CATEGORY_ID to it
-                )
-                draft = draft.copy(categoryIds = listOf(it))
-            }
         }
         persistentDraftLoaded = true
     }

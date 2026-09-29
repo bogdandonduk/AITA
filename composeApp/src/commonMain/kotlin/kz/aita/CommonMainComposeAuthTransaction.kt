@@ -833,7 +833,8 @@ internal fun GoodsItemDataModel.matchesScannedBarcode(candidate: String): Boolea
     return allBarcodeValues().any { barcode ->
         storedBarcodeMatchesScannedTransactionBarcode(
             storedBarcode = barcode,
-            scannedBarcode = candidate
+            scannedBarcode = candidate,
+            weightEncoded = measurementUnitId.isWeightMeasurementUnitId()
         )
     }
 }
@@ -859,8 +860,7 @@ internal fun AppConfiguration.weightQuantityFromBarcode(
 
     return goodsItem
         .defaultCartQuantity(stateValues.globalAppConfiguration)
-        .copy(roundTotal = false)
-        .withTotalValue(embeddedWeightBarcode.weightKilograms)
+        .quantityFromScale(embeddedWeightBarcode)
 }
 
 internal fun AppConfiguration.batchBelongsToInventoryStoreForUi(batchStoreId: String?, activeStoreId: String?): Boolean {
@@ -1023,11 +1023,13 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
     if (!literalIsExact && !rawInput.looksLikeCompleteRetailBarcodeInput() && !numericBarcodeTypedAlone) return false
 
     val embeddedWeightBarcodes = candidate.parseEmbeddedWeightBarcodeFormats()
-    val weightedMatch = embeddedWeightBarcodes.firstNotNullOfOrNull { barcode ->
-        stock.firstOrNull { item ->
-            item.isWeightMeasurementUnit(stateValues.globalAppConfiguration) && item.matchesEmbeddedWeightBarcode(barcode)
-        }?.let { item -> item to barcode }
+    val weightedCandidates = embeddedWeightBarcodes.flatMap { barcode ->
+        stock.filter { item -> item.isWeightMeasurementUnit(stateValues.globalAppConfiguration) &&
+            item.matchesEmbeddedWeightBarcode(barcode) }.map { it to barcode }
     }
+    // Prefer the documented 5-digit PLU when old clients stored both format aliases.
+    // Distinct products are still ambiguous and must be selected explicitly below.
+    val weightedMatch = weightedCandidates.firstOrNull()
 
     val weightedGoodsItem = weightedMatch?.first
     val embeddedWeightBarcode = weightedMatch?.second ?: embeddedWeightBarcodes.firstOrNull()
@@ -2565,7 +2567,7 @@ internal fun AppConfiguration.buildTransactionReceiptLines(
         val batch = resolvedReturn?.batch
             ?: itemBatches.sortedForShelf(goodsItem).firstOrNull { it.id == goodsItem.activeShelfBatchId }
             ?: itemBatches.sortedForShelf(goodsItem).firstOrNull()
-        val price = resolvedReturn?.price ?: goodsItem.priceForTransaction(
+        val price = (if (transactionTypeIndex == 2) cartItem.supplyPrice else null) ?: resolvedReturn?.price ?: goodsItem.priceForTransaction(
             transactionTypeIndex = transactionTypeIndex,
             saleMethodId = saleMethodId,
             quantityTotal = cartItem.quantity.total,
@@ -4036,9 +4038,7 @@ internal fun AppConfiguration.CartQuantityBottomSheet(
     val unitText = quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
     val allowFraction = quantity.allowsFractionalStockQuantityInput()
     val maxFractionDigits = if (allowFraction) 3 else 0
-    val minimumAmount = quantity.pricedAmount
-        .takeIf { it > 0.0 }
-        ?: if (quantity.roundTotal) 1.0 else 0.001
+    val minimumAmount = if (allowFraction) 0.001 else 1.0
     val autoFocusAmount = platformAllowsAutomaticTextFieldFocus()
     val suppressSystemKeyboard = getPlatformName().contains("android", ignoreCase = true)
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -5650,7 +5650,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
                     }
 
-                    items(country.cashlessPaymentOptions.chunked(2)) { row ->
+                    items((country.cashlessPaymentOptions + if (context.transactionTypeIndex == 2) listOf(invoiceBankPaymentOption()) else emptyList()).chunked(2)) { row ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)

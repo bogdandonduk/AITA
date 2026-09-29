@@ -288,13 +288,25 @@ def publish(spec_path: Path, info_path: Path, private: Path, catalog: Path, base
             downloads = ([dict(id=identifier, version=ver, build=build, notes=notes, files=download_files)] if download_files else [])
             downloads += [previous for previous in history if previous["build"] != build]
             downloads = downloads[:20]
+            # Keep legacy clients' strict downloads list compatible while introducing Linux.
+            linux_files = [{k: item[k] for k in ("os", "arch", "kind", "url", "bytes", "sha256")}
+                           for item in artifacts if item["os"] == "LINUX"]
+            for item in linux_files:
+                item["publisherSigned"] = signing.get((item["os"], item["arch"], item["kind"]), False)
+            old_linux = old.get("linuxDownloads", []) if old else []
+            for previous in old_linux:
+                if previous["build"] == build:
+                    require(all(item in linux_files for item in previous["files"]), "Same-build refresh must preserve Linux downloads")
+            linux_downloads = ([dict(id=identifier, version=ver, build=build, notes=notes, files=linux_files)] if linux_files else [])
+            linux_downloads += [previous for previous in old_linux if previous["build"] != build]
+            linux_downloads = linux_downloads[:20]
             now = int(time.time() * 1000)
             release = dict(schema=1, channel=channel, sequence=sequence, id=identifier, version=ver, build=build,
                            publishedAtMillis=now, expiresAtMillis=now + days * 86_400_000, notes=notes, artifacts=artifacts,
-                           downloads=downloads)
+                           downloads=downloads, linuxDownloads=linux_downloads)
             payload = canonical_json(release)
             while len(payload) > 180_000 and len(downloads) > 1:
-                downloads.pop(); payload = canonical_json(release)
+                downloads.pop(); linux_downloads[:] = [entry for entry in linux_downloads if entry["build"] >= downloads[-1]["build"]]; payload = canonical_json(release)
             require(len(payload) <= 180_000, "Release payload too large")
             signature = openssl("dgst", "-sha256", "-sign", str(private), data=payload)
             envelope = dict(algorithm="RS256", payload=base64.b64encode(payload).decode("ascii"), signature=base64.b64encode(signature).decode("ascii"))
