@@ -103,7 +103,7 @@ internal class ManagedClientInstaller(
         }
     }
     /** Copy a verified public download into private installer storage, rechecking the exact bytes.
-     * The user's chosen download remains theirs; only this private copy is cleaned on next launch. */
+     * The public copy is tracked separately and removed only after this version is installed. */
     suspend fun importVerified(release: ClientRelease, artifact: ClientArtifact, source: File): PreparedClientInstaller = withContext(Dispatchers.IO) {
         if (!artifact.isFile || artifact.bytes !in 1..CLIENT_INSTALLER_MAX_BYTES || source.length() != artifact.bytes)
             throw ClientUpdateFailure("integrity")

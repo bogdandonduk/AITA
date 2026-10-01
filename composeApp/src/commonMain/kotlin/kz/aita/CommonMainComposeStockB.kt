@@ -401,6 +401,12 @@ fun AppConfiguration.StockBatchEditor(
         )
     }
 
+    // Draft persistence starts immediately; it must not cancel restoration of a fresh
+    // operation's dropdown defaults during the first recomposition.
+    val freshBatchOperation = remember(draftStateKey, existingBatch?.id, goodsItem.id, batchStoreId) {
+        existingBatch == null && restoredDraft == null
+    }
+
     LaunchedEffect(draft, draftStateKey) {
         draftStateKey?.let {
             NavigationScreenModel.Stock.AddEditGoodsItem.setState(
@@ -504,6 +510,7 @@ fun AppConfiguration.StockBatchEditor(
             item {
                 if (existingBatch == null) SimpleDropdownField(
                     title = returnFlowText("batch_kind"), selectedId = draft.kind.name, placeholder = stateValues.stringSelect,
+                    rememberChoiceKey = "batch-kind", restoreLastChoice = freshBatchOperation,
                     options = StockBatchKindDataModel.entries.map { DropdownOption(it.name, returnFlowText(it.name.lowercase())) },
                     onSelected = { val next = StockBatchKindDataModel.valueOf(it)
                         draft = draft.copy(kind = next, quantityUnitId = if (next == StockBatchKindDataModel.UNIVERSAL) goodsItem.measurementUnitId.ifBlank { defaultUnit.id } else draft.quantityUnitId) }
@@ -515,6 +522,7 @@ fun AppConfiguration.StockBatchEditor(
 
                 SimpleDropdownField(
                     title = stateValues.stringSupplier,
+                    rememberChoiceKey = "batch-supplier", restoreLastChoice = freshBatchOperation,
                     selectedId = draft.supplierId,
                     options = suppliers.map {
                         DropdownOption(
@@ -572,6 +580,8 @@ fun AppConfiguration.StockBatchEditor(
 
                 SimpleDropdownField(
                     title = localizedStringResource(270, "Unit"),
+                    rememberChoiceKey = "batch-unit:${goodsItem.measurementUnitId}",
+                    restoreLastChoice = freshBatchOperation,
                     selectedId = draft.quantityUnitId,
                     options = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.filter {
                         draft.kind != StockBatchKindDataModel.UNIVERSAL || it.id == goodsItem.measurementUnitId.ifBlank { defaultUnit.id }
@@ -612,6 +622,7 @@ fun AppConfiguration.StockBatchEditor(
                     title = stateValues.stringSalePrice,
                     price = draft.salePriceOverride ?: goodsItem.salePrices.firstOrNull() ?: PriceDataModel("", defaultCurrency, ""),
                     quickFillPrices = goodsItem.salePrices,
+                    quickFillSupplyPrices = listOf(draft.supplyPrice),
                     onChanged = { nextSalePrice ->
                         val previousSalePrice = draft.salePriceOverride ?: goodsItem.salePrices.firstOrNull()
                         val currentReturnPrice = draft.returnPriceOverride ?: goodsItem.returnPrices.firstOrNull()
@@ -750,10 +761,21 @@ fun AppConfiguration.StockBatchEditor(
             actionButton(
                 modifier = Modifier.fillMaxWidth(),
                 text = stateValues.stringConfirm,
-                enabled = !isSavingBatch &&
-                        parseStockQuantityInputText(draft.quantityText, selectedQuantityUnit)?.let { it > 0.0 } == true &&
-                        draft.supplyPrice.price.toDoubleOrNull()?.let { it >= 0.0 } == true,
-                onClick = {
+                enabled = !isSavingBatch, loading = isSavingBatch, autoLoading = false,
+                confirmationRequired = false,
+                onClick = saveBatch@ {
+                    val validation = when {
+                        parseStockQuantityInputText(draft.quantityText, selectedQuantityUnit)?.let { it.isFinite() && it > 0.0 } != true -> "batch_quantity"
+                        draft.supplyPrice.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 } != true -> "batch_price"
+                        draft.manufacturedDateText.isNotBlank() && stockDateInputTextToMillis(draft.manufacturedDateText) == null -> "batch_date"
+                        draft.expirationDateText.isNotBlank() && stockDateInputTextToMillis(draft.expirationDateText) == null -> "batch_date"
+                        else -> null
+                    }
+                    if (validation != null) {
+                        saveError = pass24Text(validation)
+                        postInAppNotification(saveError!!, NotificationType.Negative, transient = true)
+                        return@saveBatch
+                    }
                     if (!isSavingBatch) {
                         saveError = null
                         isSavingBatch = true
@@ -932,6 +954,7 @@ fun AppConfiguration.StockAddEditIdentityPage(
                 },
                 placeholder = localizedStringResource(188, "Select unit"),
                 onSelected = {
+                    saveOperationChoice("stock-unit", it)
                     onDraftChanged(draft.copy(measurementUnitId = it))
                 }
             )
@@ -1999,6 +2022,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
             actionButton(
                 modifier = Modifier.padding(8.dp),
                 text = localizedStringResource(194, "Add batch"),
+                autoLoading = false, confirmationRequired = false,
                 iconPath = stateValues.drawablePathIconAdd,
                 onClick = {
                     coroutineScope.launch {
@@ -2216,6 +2240,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                         SimpleDropdownField(
                             title = stateValues.stringSupplier,
                             selectedId = selectedSupplierId,
+                            rememberChoiceKey = "supplier-price-supplier",
                             options = supplierOptions,
                             placeholder = stateValues.stringSupplier,
                             onSelected = { selectedSupplierId = it }
@@ -2673,6 +2698,7 @@ fun AppConfiguration.StockSinglePriceEditor(
 
         SimpleDropdownField(
             title = localizedStringResource(268, "Currency"),
+            rememberChoiceKey = "stock-currency", restoreLastChoice = price.price.isBlank(),
             selectedId = price.currency,
             options = stateValues.globalAppConfiguration
                 .countries
@@ -2692,6 +2718,7 @@ fun AppConfiguration.StockSinglePriceEditor(
             }
         )
 
+        SalePriceQuickFills(quickFillSupplyPrices, price.currency, price.price) { onChanged(price.copy(price = it)) }
         SupplyPriceQuickFills(quickFillSalePrices, price.currency, price.price) {
             onChanged(price.copy(price = it))
         }
@@ -3218,6 +3245,7 @@ internal fun AppConfiguration.StockPriceGroupEditor(
 
             LaunchedEffect(content.value.text, content.selectedSecondaryId) {
                 val selectedCurrencyId = content.selectedSecondaryId ?: item.selectedSecondaryDomainId
+                if (selectedCurrencyId != item.selectedSecondaryDomainId) saveOperationChoice("stock-currency", selectedCurrencyId)
                 val nextItem = item.copy(
                     value = content.value,
                     selectedDomainId = "text",
@@ -4549,6 +4577,7 @@ internal fun AppConfiguration.StockAddEditInfoTab(
 
             val measurementUnitDropdown = dropdownListWidget(
                 titleText = stateValues.stringMeasurementUnit,
+                onSelected = { saveOperationChoice("stock-unit", it) },
                 domains = stockQuantityUnitDomains(),
                 selectedInitial = draft.measurementUnitId,
                 showId = false,

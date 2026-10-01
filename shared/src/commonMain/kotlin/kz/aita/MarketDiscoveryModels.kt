@@ -135,6 +135,7 @@ fun MarketDiscoveryResult.validatedDiscovery(
 
 internal fun MarketOffer.hasValidDiscoveryPrice(): Boolean {
     val price = priceMinor
+    if (originalPriceMinor != null && (price == null || originalPriceMinor <= price || originalPriceMinor > 1_000_000_000_000L)) return false
     if (price == null) return currencyCode == null && pricedAmount == null && unitId == null && unitName.isEmpty()
     return price in 0L..1_000_000_000_000L && currencyCode?.matches(Regex("[A-Z]{3}")) == true &&
         pricedAmount?.let { it.isFinite() && it > 0.0 } == true && !unitId.isNullOrBlank() && unitId.length <= 128 &&

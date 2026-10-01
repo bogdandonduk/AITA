@@ -3559,10 +3559,8 @@ internal fun paymentInputNormalize(value: String): String {
 }
 
 internal fun moneyInputFromDouble(value: Double): String {
-    val rounded = kotlin.math.floor(value.coerceAtLeast(0.0) * 100.0) / 100.0
-    val whole = rounded.toLong()
-    val cents = kotlin.math.round((rounded - whole) * 100.0).toInt()
-    return "$whole.${cents.toString().padStart(2, '0')}"
+    val minor = moneyMinorUnits(value)
+    return "${minor / 100}.${(minor % 100).toString().padStart(2, '0')}"
 }
 
 internal fun List<LocalizedStringDataModel>.visibleLocalizedString(
@@ -4727,6 +4725,7 @@ internal fun AppConfiguration.DebtPercentQuickButtons(
     currencySymbol: String,
     currentAmount: Double,
     percents: List<Double> = listOf(10.0, 25.0, 50.0, 75.0, 100.0),
+    capAtBase: Boolean = true,
     onSelected: (Double) -> Unit
 ) {
     LazyRow(
@@ -4734,7 +4733,7 @@ internal fun AppConfiguration.DebtPercentQuickButtons(
         modifier = Modifier.fillMaxWidth()
     ) {
         items(percents) { percent ->
-            val amount = (baseAmount * percent / 100.0).roundMoney().coerceAtMost(baseAmount)
+            val amount = percentQuickFillAmount(baseAmount, percent, capAtBase)
             if (amount > 0.0 && kotlin.math.abs(amount - currentAmount.roundMoney()) >= 0.01) {
                 Box(
                     modifier = Modifier
@@ -5419,34 +5418,17 @@ fun AppConfiguration.TransactionPaymentScreen() {
             }
         }
 
-        fun fieldMax(field: String): Double {
-            if (paymentMode.id != "2")
-                return Double.POSITIVE_INFINITY
-
-            val cash = if (field == "cash") 0.0 else cashText.toMoneyDouble()
-            val card = if (field == "card") 0.0 else cardText.toMoneyDouble()
-            val debt = if (field == "debt") 0.0 else debtText.toMoneyDouble()
-
-            return (total - cash - card - debt).coerceAtLeast(0.0).roundMoney()
-        }
-
         fun setPaymentField(field: String, rawValue: String) {
             paymentDraftEdited = true
             paymentModeDefaultsInitializedFor = paymentMode.id
             val normalized = paymentInputNormalize(rawValue)
-            val numericValue = normalized.toMoneyDouble()
-            val maxValue = fieldMax(field)
-
-            val finalText = if (paymentMode.id == "2" && numericValue > maxValue) {
-                moneyInputFromDouble(maxValue)
-            } else {
-                normalized
-            }
-
-            when (field) {
-                "card" -> cardText = finalText
-                "debt" -> debtText = finalText
-                else -> cashText = finalText
+            if (paymentMode.id == "2") {
+                val next = fillMixedPaymentRemainder(total, cashText, cardText, debtText, field, normalized)
+                cashText = next.cash; cardText = next.card; debtText = next.debt
+            } else when (field) {
+                "card" -> cardText = normalized
+                "debt" -> debtText = normalized
+                else -> cashText = normalized
             }
         }
 
@@ -5561,6 +5543,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                 debtorValid
 
         fun targetForField(field: String): Double {
+            if (paymentMode.id == "2") return mixedPaymentQuickFillTarget(total, paidCash, field)
             return when (field) {
                 "card" -> (total - paidCash - debtAmount).coerceAtLeast(0.0)
                 "debt" -> (total - paidCash - paidCard).coerceAtLeast(0.0)
@@ -6049,4 +6032,3 @@ fun AppConfiguration.TransactionPaymentScreen() {
 //      }
 //  }
 //}
-

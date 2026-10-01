@@ -669,7 +669,9 @@ internal class MarketplaceRepository(private val db: Connection,
                     .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) },
                 availability=if(batch!=null && minor!=null && batch.quantity.total >= total) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
                 checkedAtMillis=now,sourceUpdatedAtMillis=maxOf(candidate.sourceUpdated,item.updatedAtMillis,batch?.updatedAtMillis ?: 0L),
-                saved=listing.id in saved,product=listing.product)
+                saved=listing.id in saved,product=listing.product,
+                originalPriceMinor=base?.takeIf { it.currency.trim().uppercase() == currency }?.price?.let(::marketPriceMinor)
+                    ?.takeIf { original -> minor != null && original > minor })
         }
     }
 }

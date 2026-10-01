@@ -288,7 +288,8 @@ internal fun ownsDraftKey(key: String, owner: String, store: String?): Boolean =
     key.split(':').filter { it.endsWith("NavigationScreenModelRoute") }.all(::appStateSafeRoute) &&
     (key.startsWith("aita-ui-draft-v1:$owner:${store ?: "no-store"}:") ||
         key.startsWith("stock-add-edit-goods-item:$owner:${store ?: "no-store"}:") ||
-        key.startsWith("stock-add-edit-last-category:$owner:${store ?: "no-store"}:"))
+        key.startsWith("stock-add-edit-last-category:$owner:${store ?: "no-store"}:") ||
+        key.startsWith("operation-choice:$owner:${store ?: "no-store"}:"))
 
 internal val readAppStateDraft: (suspend (String) -> String?) = AppStateWorkspace::readDraft
 internal val writeAppStateDraft: (suspend (String, String?) -> Unit) = AppStateWorkspace::writeDraft

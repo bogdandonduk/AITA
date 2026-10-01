@@ -5159,6 +5159,11 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
     var draft by remember(request.barcode, request.transactionTypeIndex, request.clientId, defaultCurrency, defaultMeasurementUnitId) {
         mutableStateOf(newQuickDraft())
     }
+    LaunchedEffect(request.barcode, request.transactionTypeIndex, request.clientId) {
+        val initial = draft
+        val defaults = withLastStockChoices(initial)
+        if (draft == initial) draft = defaults
+    }
     var selectedTabId by rememberSaveable(request.barcode, request.transactionTypeIndex, request.clientId) { mutableStateOf("info") }
     var returnPriceManuallyEdited by rememberSaveable(request.barcode, request.transactionTypeIndex, request.clientId) { mutableStateOf(false) }
 

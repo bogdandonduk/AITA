@@ -8,7 +8,7 @@ const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
 const account={id:id(99),publicId:'MARKET-TEST',phoneNumber:'',email:'market@example.test',firstName:'Aida',lastName:'',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:process.env.AITA_TEST_LANGUAGE||'en',appThemeId:Number(process.env.AITA_TEST_THEME||0),appModeId:1};
 const shops=[{storeId:id(80),branchStoreId:id(180),shareBranchAvailability:true,displayName:'Green Basket',city:'Almaty',publicAddress:'Abay avenue, 42',pickupNote:'Collect your shopping at the front counter',published:true,revision:1},{storeId:id(81),branchStoreId:id(181),shareBranchAvailability:true,displayName:'Everyday Market',city:'Almaty',publicAddress:'Dostyk avenue, 18',pickupNote:'Open every day',published:true,revision:1}];
 const categories=['Pantry','Fresh food','Home & care'].map((s,i)=>({id:id(i+1),name:[{language:'en',value:s}],ancestorIds:[]}));
-function offers(now){return ['Mountain honey','Wholegrain bread','Garden tomatoes','Breakfast oats','Fresh milk','Everyday soap'].map((title,i)=>({id:id(101+i),storefront:shops[i%2],title,description:'A thoughtful everyday choice for your next shopping trip.',gtin:null,categoryIds:[categories[i%3].id],priceMinor:[285000,89000,125000,149000,75000,59000][i],currencyCode:'KZT',pricedAmount:1,unitId:'piece',unitName:[{language:'en',value:'pack'}],availability:'recorded_in_stock',checkedAtMillis:now,sourceUpdatedAtMillis:10,saved:i===2,product:{imageUrls:['https://media.example.com/product-'+i+'.svg','https://media.example.com/product-'+(i+1)+'.svg'],brand:'Everyday essentials',manufacturer:'Local producer',countryOfOrigin:'Kazakhstan',attributes:[{name:'Pack size',value:'1 pack'}]}}));}
+function offers(now){return ['Mountain honey','Wholegrain bread','Garden tomatoes','Breakfast oats','Fresh milk','Everyday soap'].map((title,i)=>({id:id(101+i),storefront:shops[i%2],title,description:'A thoughtful everyday choice for your next shopping trip.',gtin:null,categoryIds:[categories[i%3].id],priceMinor:[285000,89000,125000,149000,75000,59000][i],originalPriceMinor:i===0?350000:null,currencyCode:'KZT',pricedAmount:1,unitId:'piece',unitName:[{language:'en',value:'pack'}],availability:'recorded_in_stock',checkedAtMillis:now,sourceUpdatedAtMillis:10,saved:i===2,product:{imageUrls:['https://media.example.com/product-'+i+'.svg','https://media.example.com/product-'+(i+1)+'.svg'],brand:'Everyday essentials',manufacturer:'Local producer',countryOfOrigin:'Kazakhstan',attributes:[{name:'Pack size',value:'1 pack'}]}}));}
 function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5d1','#92bda8'];return `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="400" viewBox="0 0 500 400"><rect width="500" height="400" fill="#f1eee7"/><ellipse cx="250" cy="337" rx="85" ry="15" fill="#222" opacity=".08"/><rect x="175" y="87" width="150" height="240" rx="28" fill="${colors[i%6]}"/><rect x="193" y="173" width="114" height="103" rx="10" fill="#fff9ec"/><path d="M228 220l15 16 30-34" fill="none" stroke="#47534a" stroke-width="7" stroke-linecap="round"/><rect x="185" y="78" width="130" height="29" rx="8" fill="#536258"/></svg>`;}
 (async()=>{
  const server=http.createServer((req,res)=>{try{const p=path.join(dist,req.url==='/'?'index.html':decodeURIComponent(req.url.split('?')[0]));const bytes=fs.readFileSync(p);res.setHeader('Content-Type',p.endsWith('.wasm')?'application/wasm':p.endsWith('.js')?'text/javascript':p.endsWith('.html')?'text/html':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream');res.end(bytes);}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');
@@ -71,7 +71,10 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await shot('market-wide');
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(1200);await shot('market-phone');
   await page.setViewportSize({width:1440,height:1040});await page.waitForTimeout(1200);
-  await click(150,645);await until(()=>calls.some(x=>x.path.endsWith('/detail')));await shot('product-detail');
+  fs.writeFileSync(path.join(output,'home-aria.txt'),await page.locator('body').ariaSnapshot());
+  await page.mouse.move(750,800);await page.mouse.wheel(0,450);await page.waitForTimeout(1000);await shot('home-promos');
+  fs.writeFileSync(path.join(output,'promos-aria.txt'),await page.locator('body').ariaSnapshot());
+  await page.getByRole('button').filter({hasText:/Mountain honey/}).first().click({force:true});await until(()=>calls.some(x=>x.path.endsWith('/detail')));await shot('product-detail');
   await click(460,483);await page.waitForTimeout(400);await shot('product-photo-two');
   await click(610,142);
   await shot('product-locations');
@@ -101,7 +104,13 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await click(450,1005);await page.waitForTimeout(1200);await page.keyboard.press('Tab');
   assert.match(await page.locator('body').ariaSnapshot(), /Find your next favourite shop/, 'The marketplace Shops section must survive reload');
   await page.getByRole('button',{name:'Products',exact:true}).click({force:true});await page.waitForTimeout(1200);
-  await page.getByRole('button',{name:'Add to list',exact:true}).nth(1).click({force:true});
+  const addOats = page.getByRole('button',{name:'Add to list',exact:true}).nth(1);
+  for(let i=0;i<12;i++) {
+   const box=await addOats.boundingBox().catch(()=>null);
+   if(box && box.y>180 && box.y+box.height<980) break;
+   await page.mouse.move(750,800);await page.mouse.wheel(0,300);await page.waitForTimeout(600);
+  }
+  await addOats.click({force:true});
   await until(()=>lines.some(l=>l.offerId===id(104)));assert.equal(shoppingRevision,6);await shot('offer-added');
   assert.deepEqual(errors,[]);
   assert.equal(lines.length,3);assert.deepEqual(savedShops,[id(80)]);

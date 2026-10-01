@@ -17,6 +17,10 @@ class AppStateNavigationTest {
         assertFalse(ownsDraftKey("aita-ui-draft-v1:owner:elsewhere:Stock:search:value", "owner", "store"))
         assertFalse(ownsDraftKey("aita-ui-draft-v1:owner:store:Security:password:value", "owner", "store"))
         assertTrue(ownsDraftKey("stock-add-edit-last-category:owner:store:root", "owner", "store"))
+        assertTrue(ownsDraftKey("operation-choice:owner:store:batch-kind", "owner", "store"))
+        assertTrue(ownsDraftKey("operation-choice:owner:no-store:stock-unit", "owner", null))
+        assertFalse(ownsDraftKey("operation-choice:other:store:batch-kind", "owner", "store"))
+        assertFalse(ownsDraftKey("operation-choice:owner:other:batch-kind", "owner", "store"))
     }
     @Test fun entireMenuTrailSurvivesSaveRestoreAndResize() {
         val trail = listOf(NavigationScreenModel.Menu.List, NavigationScreenModel.Menu.Settings,

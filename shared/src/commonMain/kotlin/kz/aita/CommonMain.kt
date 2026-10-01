@@ -2578,7 +2578,13 @@ fun GoodsItemDataModel.firstBarcode(): String {
 }
 
 fun Double.roundMoney(): Double {
-    return kotlin.math.floor(this * 100.0) / 100.0
+    val scaled = this * 100.0
+    val nearest = kotlin.math.round(scaled)
+    // Preserve the existing truncation policy, but don't turn 0.29 into 0.28 because
+    // binary multiplication represents the exact cent infinitesimally below 29.
+    val tolerance = maxOf(1e-9, kotlin.math.abs(scaled) * 2e-16)
+    val minor = if (kotlin.math.abs(scaled - nearest) <= tolerance) nearest else kotlin.math.floor(scaled)
+    return minor / 100.0
 }
 
 fun String.toMoneyDouble(): Double {
@@ -18222,84 +18228,51 @@ fun decideStockBatchMove(
         request, onCompleted)
 }
 
-fun updateGoodsBatches(
-    goodsBatches: List<GoodsBatchDataModel>,
-    onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
-) {
-    GlobalScope.launch(Dispatchers.ourIo) {
-        updateGoodsBatchMutex.withLock {
-            val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
-                HttpMethod.Put,
-                endpointUrl = globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
-                body = goodsBatches
-            )
+fun updateGoodsBatches(goodsBatches: List<GoodsBatchDataModel>, onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?) =
+    saveGoodsBatches(goodsBatches, false, onCompleted)
 
-            if (response.negative) {
-                postInAppNotification(response.message, NotificationType.Negative)
+fun addGoodsBatches(goodsBatches: List<GoodsBatchDataModel>, onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?) =
+    saveGoodsBatches(goodsBatches, true, onCompleted)
 
-                onCompleted?.invoke(DataState.Empty())
-            } else {
-                postInAppNotification(response.message, NotificationType.Positive)
-
-                stockBatchesState.emit(
-                    DataState.Success(
-                        mutableListOf<GoodsBatchDataModel>().also { newList ->
-                            (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
-                                newList.addAll(this)
-                            }
-
-                            response.payload!!.forEach { item ->
-                                val index = newList.indexOfFirst { it.id == item.id }
-
-                                if (index >= 0) {
-                                    newList[index] = item
-                                } else {
-                                    newList.add(item)
-                                }
-                            }
-                        }
-                    )
-                )
-
-                onCompleted?.invoke(DataState.Success(response.payload!!))
-            }
-        }
+private fun saveGoodsBatches(goodsBatches: List<GoodsBatchDataModel>, adding: Boolean,
+    onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?) {
+    val owner = inventoryOwners.current
+    if (!inventoryOwnerIsCurrent(owner) || goodsBatches.isEmpty() || goodsBatches.any { it.storeId != owner.storeId }) {
+        onCompleted?.invoke(DataState.Empty(stockMovementContextChangedMessage())); return
     }
-}
-
-fun addGoodsBatches(
-    goodsBatches: List<GoodsBatchDataModel>,
-    onCompleted: ((DataState<List<GoodsBatchDataModel>>) -> Unit)?
-) {
+    val lock = if (adding) addGoodsBatchMutex else updateGoodsBatchMutex
+    if (!lock.tryLock()) { onCompleted?.invoke(DataState.Empty(stockMovementBusyMessage())); return }
     GlobalScope.launch(Dispatchers.ourIo) {
-        addGoodsBatchMutex.withLock {
+        var completed: DataState<List<GoodsBatchDataModel>> = DataState.Empty(stockMovementContextChangedMessage())
+        try {
+            if (!inventoryOwnerIsCurrent(owner)) return@launch
             val response = networkRequest<List<GoodsBatchDataModel>, List<GoodsBatchDataModel>>(
-                HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.addStockBatchPath.first,
-                body = goodsBatches
+                if (adding) HttpMethod.Post else HttpMethod.Put,
+                endpointUrl = if (adding) globalAppConfigurationState.payloadValue.addStockBatchPath.first else globalAppConfigurationState.payloadValue.updateStockBatchPath.first,
+                body = goodsBatches, headers = mapOf("store_id" to owner.storeId.orEmpty()),
+                expectedSessionGeneration = owner.sessionGeneration
             )
-
-            if (response.negative) {
-                postInAppNotification(response.message, NotificationType.Negative)
-
-                onCompleted?.invoke(DataState.Empty())
-            } else {
-                postInAppNotification(response.message, NotificationType.Positive)
-
-                stockBatchesState.emit(
-                    DataState.Success(
-                        mutableListOf<GoodsBatchDataModel>().also { newList ->
-                            (stockBatchesState.value.value as? DataState.Success)?.payload?.run {
-                                newList.addAll(this)
-                            }
-
-                            newList.addAll(response.payload!!)
-                        }
-                    )
-                )
-
-                onCompleted?.invoke(DataState.Success(response.payload!!))
+            inventoryStateMutex.withLock {
+                if (!inventoryOwnerIsCurrent(owner)) return@withLock
+                val payload = response.payload
+                if (response.negative || payload.isNullOrEmpty() || payload.any { it.storeId != owner.storeId }) {
+                    val message = response.message ?: stockMovementUnconfirmedMessage()
+                    completed = DataState.Empty(message)
+                    postInAppNotification(message, NotificationType.Negative)
+                } else {
+                    val byId = stockBatchesState.payloadValue.orEmpty().associateBy { it.id }.toMutableMap()
+                    payload.forEach { byId[it.id] = it }
+                    stockBatchesState.emit(DataState.Success(byId.values.toList(), response.message))
+                    completed = DataState.Success(payload, response.message)
+                    postInAppNotification(response.message, NotificationType.Positive)
+                }
             }
+        } catch (failure: Throwable) {
+            ensureConnectionOwnerActive(failure)
+            completed = DataState.Empty(stockMovementUnconfirmedMessage())
+        } finally {
+            lock.unlock()
+            onCompleted?.invoke(if (inventoryOwnerIsCurrent(owner)) completed else DataState.Empty(stockMovementContextChangedMessage()))
         }
     }
 }

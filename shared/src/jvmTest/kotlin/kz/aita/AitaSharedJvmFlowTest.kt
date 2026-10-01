@@ -617,6 +617,30 @@ class AitaSharedJvmFlowTest {
     }
 
     @Test
+    fun unconfirmedBatchSaveCompletesAndAllowsRetryWithoutReplacingStock() = runBlocking {
+        val existing = aitaTestBatch(id = "batch-existing", goodsItemId = "item", quantityTotal = 3.0)
+        val added = aitaTestBatch(id = "batch-retry", goodsItemId = "item", quantityTotal = 12.0)
+        stockBatchesState.emit(DataState.Success(listOf(existing)))
+        environment.nextGoodsBatchResponse = emptyList()
+        val missingReply = CompletableDeferred<DataState<List<GoodsBatchDataModel>>>()
+        addGoodsBatches(listOf(added)) { missingReply.complete(it) }
+        assertTrue(withTimeout(8_000L) { missingReply.await() } is DataState.Empty)
+        assertEquals(listOf(existing), stockBatchesState.payloadValue)
+
+        environment.nextGoodsBatchResponse = listOf(added.copy(storeId = AITA_FLOW_DESTINATION_STORE_ID))
+        val wrongStore = CompletableDeferred<DataState<List<GoodsBatchDataModel>>>()
+        addGoodsBatches(listOf(added)) { wrongStore.complete(it) }
+        assertTrue(withTimeout(8_000L) { wrongStore.await() } is DataState.Empty)
+        assertEquals(listOf(existing), stockBatchesState.payloadValue)
+
+        environment.nextGoodsBatchResponse = listOf(added)
+        val retry = CompletableDeferred<DataState<List<GoodsBatchDataModel>>>()
+        addGoodsBatches(listOf(added)) { retry.complete(it) }
+        assertEquals(listOf(added), requireAitaFlowSuccess(retry).payload)
+        assertEquals(setOf(existing.id, added.id), stockBatchesState.payloadValue!!.map { it.id }.toSet())
+    }
+
+    @Test
     fun loadsBranchAvailabilityMovesBatchAndAcceptsMovementDecision() = runBlocking {
         userAccountState.emit(DataState.Success(aitaTestUserAccount()))
         publishActiveInventoryStoreId(AITA_FLOW_SOURCE_STORE_ID)

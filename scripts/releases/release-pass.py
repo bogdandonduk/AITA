@@ -346,6 +346,8 @@ class Run:
                              ['node', 'scripts/linux-web/test/profile-photo-smoke.cjs'])
                 self.command('Marketplace browsing, saved shops and shopping trip in the browser',
                              ['node', 'scripts/linux-web/test/marketplace-smoke.cjs'])
+                self.command('Stock prices, batch retry, remembered choices, analytics and mixed payment',
+                             ['node', 'scripts/linux-web/test/stock-operations-smoke.cjs'])
                 self.command('Font preferences, download layout and offline support history in the browser',
                              ['node', 'scripts/linux-web/test/appearance-offline-smoke.cjs'])
                 self.command('Saved workspace restoration and remote session revocation in the browser',

@@ -53,7 +53,9 @@ data class MarketOffer(
     val checkedAtMillis: Long,
     val sourceUpdatedAtMillis: Long,
     val saved: Boolean = false,
-    val product: MarketProductDetails = MarketProductDetails()
+    val product: MarketProductDetails = MarketProductDetails(),
+    // Present only when the current public quote includes a genuine reduction from the base price.
+    val originalPriceMinor: Long? = null
 )
 
 const val MARKET_AVAILABILITY_RECORDED = "recorded_in_stock"

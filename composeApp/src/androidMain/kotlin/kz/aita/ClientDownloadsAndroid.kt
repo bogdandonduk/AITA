@@ -72,6 +72,8 @@ internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileNam
                     if (resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null) != 1)
                         throw ClientUpdateFailure("storage")
                 }
+                if (prepared != null) InstalledDownloadCleanup(androidDownloadInstallers()).record(OwnedInstallerDownload(
+                    uri.toString(), prepared.build, prepared.channel, prepared.bytes, prepared.sha256))
                 val name = documentName(uri) ?: fileName
                 ClientDownloadResult("${clientDownloadsFolderLabel(folder)}/$name", prepared = prepared)
             } catch (failure: Exception) {
@@ -91,8 +93,26 @@ internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileNam
             } while (!destination.createNewFile())
             try {
                 FileOutputStream(destination).use { output -> temporary.inputStream().use { it.copyTo(output) }; output.fd.sync() }
+                if (prepared != null) InstalledDownloadCleanup(androidDownloadInstallers()).record(OwnedInstallerDownload(
+                    destination.canonicalPath, prepared.build, prepared.channel, prepared.bytes, prepared.sha256, destination.lastModified()))
                 ClientDownloadResult(destination.canonicalPath, prepared = prepared)
             } catch (failure: Exception) { destination.delete(); throw failure }
         }
     } finally { temporary.delete() }
+}
+
+internal fun cleanAndroidDownloadCopies(installed: kz.aita.updates.ClientBuildIdentity) {
+    val resolver = downloadContext().contentResolver
+    InstalledDownloadCleanup(androidDownloadInstallers()).clean(installed) { record ->
+        if (!record.location.startsWith("content://")) removeOwnedInstallerFile(record)
+        else {
+            val uri = Uri.parse(record.location)
+            try {
+                val same = resolver.openInputStream(uri)?.use { record.matches(it) } ?: false
+                if (!same) true
+                else if (DocumentsContract.isDocumentUri(downloadContext(), uri)) DocumentsContract.deleteDocument(resolver, uri)
+                else resolver.delete(uri, null, null) > 0
+            } catch (_: java.io.FileNotFoundException) { true }
+        }
+    }
 }

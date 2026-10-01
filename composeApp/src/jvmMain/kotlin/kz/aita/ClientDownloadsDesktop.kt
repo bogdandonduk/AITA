@@ -49,6 +49,8 @@ internal actual suspend fun saveClientDownload(file: ClientDownloadFile, fileNam
             val destination = File(directory, name)
             try {
                 Files.move(temporary.toPath(), destination.toPath())
+                if (prepared != null) InstalledDownloadCleanup(desktopDownloadInstallers()).record(OwnedInstallerDownload(
+                    destination.canonicalPath, prepared.build, prepared.channel, prepared.bytes, prepared.sha256, destination.lastModified()))
                 return@withContext ClientDownloadResult(destination.canonicalPath, prepared = prepared)
             } catch (_: java.nio.file.FileAlreadyExistsException) { attempt++; if (attempt > 9999) throw ClientUpdateFailure("storage") }
         }

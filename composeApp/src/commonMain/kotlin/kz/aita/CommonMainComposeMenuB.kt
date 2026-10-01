@@ -2680,23 +2680,24 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         }
 
         var analyticsSection by rememberNavigationSection("analytics:section", MenuAnalyticsTab.Sales.id)
-        val selectedTabContent = tabRowWidget(
+        val filters: @Composable () -> Unit = {
+            Column(Modifier.fillMaxWidth()) {
+        tabRowWidget(
             selectedIndexInitial = analyticsSection,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = stateValues.marginTextField, vertical = 2.dp),
             tabs = listOf(
-                TabContent(MenuAnalyticsTab.Sales.id, stateValues.stringSale),
-                TabContent(MenuAnalyticsTab.Returns.id, stateValues.stringReturn),
-                TabContent(MenuAnalyticsTab.Acceptance.id, stateValues.stringSupply),
-                TabContent(MenuAnalyticsTab.Stock.id, stateValues.stringStock),
-                TabContent(MenuAnalyticsTab.Suppliers.id, stateValues.stringSuppliers),
-                TabContent(MenuAnalyticsTab.Workers.id, stateValues.stringWorkers),
-                TabContent(MenuAnalyticsTab.CashRegister.id, localizedStringResource(256, "Cash registers"))
+                TabContent(MenuAnalyticsTab.Sales.id, stateValues.stringSale) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.Returns.id, stateValues.stringReturn) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.Acceptance.id, stateValues.stringSupply) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.Stock.id, stateValues.stringStock) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.Suppliers.id, stateValues.stringSuppliers) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.Workers.id, stateValues.stringWorkers) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.CashRegister.id, localizedStringResource(256, "Cash registers")) { analyticsSection = it }
             )
         )
 
-        LaunchedEffect(selectedTabContent.id) { analyticsSection = selectedTabContent.id }
         val periodOptions = listOf(
             "today" to localizedStringResource(260, "Today"),
             "7" to localizedStringResource(261, "7 days"),
@@ -2729,7 +2730,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         Row(
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .fillMaxWidth()
                 .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField),
             horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
@@ -2760,7 +2761,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         Text(
             modifier = Modifier
-                .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                .fillMaxWidth()
                 .padding(horizontal = stateValues.marginTextField, vertical = 2.dp),
             text = localizedStringResource(1163, "Analytics scope"),
             color = stateValues.TextColor,
@@ -2799,7 +2800,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         ?: analyticsDomains.first().id
                     val selector = dropdownListWidget(
                         modifier = Modifier
-                            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                            .fillMaxWidth()
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
                         domains = analyticsDomains,
@@ -2817,7 +2818,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         ?: analyticsDomains.first().id
                     val selector = dropdownListWidget(
                         modifier = Modifier
-                            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                            .fillMaxWidth()
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
                         domains = analyticsDomains,
@@ -2835,7 +2836,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         ?: analyticsDomains.first().id
                     val selector = dropdownListWidget(
                         modifier = Modifier
-                            .fillMaxWidth(if (stateValues.isNarrowScreen) 1f else 0.8f)
+                            .fillMaxWidth()
                             .padding(horizontal = stateValues.marginTextField, vertical = 4.dp),
                         titleText = localizedStringResource(1168, "Select exact analytics target"),
                         domains = analyticsDomains,
@@ -2851,7 +2852,10 @@ fun AppConfiguration.MenuAnalyticsScreen() {
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
-        val selectedTab = MenuAnalyticsTab.fromId(selectedTabContent.id)
+            }
+        }
+
+        val selectedTab = MenuAnalyticsTab.fromId(analyticsSection)
         val currencyCode = cashRegister?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
         val workersPayload by storeWorkerMembershipsState.payload.collectAsState()
         val workers = workersPayload.orEmpty()
@@ -2867,12 +2871,17 @@ fun AppConfiguration.MenuAnalyticsScreen() {
             selectedAnalyticsCategoryId
         ) { getCurrentTimeMillis() }
         if (prepared == null) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                item("filters") { filters() }
+                item("status") {
             MessageText(
                 modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextFieldGroup),
                 text = if (analyticsFailed) authUiText("Could not prepare analytics", "Не удалось подготовить аналитику", "Аналитиканы дайындау мүмкін болмады", "Талдоону даярдоо мүмкүн болгон жок")
                     else authUiText("Preparing analytics…", "Подготавливаем аналитику…", "Аналитика дайындалуда…", "Талдоо даярдалууда…")
             )
             if (analyticsFailed) actionButton(text = authUiText("Retry", "Повторить", "Қайталау", "Кайталоо"), onClick = { AnalyticsWorkspace.retry() })
+                }
+            }
         } else {
             if (prepared.remoteOnly) MessageText(
                 modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextField),
@@ -2912,7 +2921,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         currencyCode = currencyCode,
                         emptyText = localizedStringResource(258, "No sales in this period"),
                         analyticsDashboard = analyticsDashboard,
-                        summary = prepared.type("purchase")
+                        summary = prepared.type("purchase"), header = filters
                     )
                 }
 
@@ -2924,7 +2933,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         currencyCode = currencyCode,
                         emptyText = localizedStringResource(275, "No returns in this period"),
                         analyticsDashboard = analyticsDashboard,
-                        summary = prepared.type("return")
+                        summary = prepared.type("return"), header = filters
                     )
                 }
 
@@ -2936,15 +2945,15 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                         currencyCode = currencyCode,
                         emptyText = localizedStringResource(276, "No supply transactions in this period"),
                         analyticsDashboard = analyticsDashboard,
-                        summary = prepared.type("accept")
+                        summary = prepared.type("accept"), header = filters
                     )
                 }
 
-                MenuAnalyticsTab.Stock -> MenuAnalyticsStockScreen(analyticsDashboard, prepared.stock)
+                MenuAnalyticsTab.Stock -> MenuAnalyticsStockScreen(analyticsDashboard, prepared.stock, header = filters)
 
                 MenuAnalyticsTab.Suppliers -> {
                     MenuAnalyticsSuppliersScreen(
-                        prepared = prepared,
+                        prepared = prepared, header = filters,
                         dashboard = analyticsDashboard,
                         currencyCode = currencyCode
                     )
@@ -2953,7 +2962,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 MenuAnalyticsTab.Workers -> {
                     MenuAnalyticsWorkersScreen(
                         workers = workers,
-                        prepared = prepared,
+                        prepared = prepared, header = filters,
                         currencyCode = currencyCode
                     )
                 }
@@ -2961,6 +2970,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 MenuAnalyticsTab.CashRegister -> {
                     if (!prepared.cashAvailable || !currentUserCanViewCashRegister(activeStoreId)) MessageText(text = authUiText("Detailed cash records are not available", "Подробные записи кассы недоступны", "Кассаның толық жазбалары қолжетімсіз", "Накталай акчанын толук жазуулары жеткиликсиз"))
                     else MenuAnalyticsCashRegisterScreen(
+                        header = filters,
                         currentAmount = cashRegister?.currentAmount ?: 0.0,
                         events = scopedCashRegisterEvents,
                         currencyCode = currencyCode,
@@ -2996,7 +3006,8 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
     currencyCode: String,
     emptyText: String,
     analyticsDashboard: StoreAnalyticsDashboardDataModel? = null,
-    summary: AnalyticsTypeSummary
+    summary: AnalyticsTypeSummary,
+    header: @Composable () -> Unit = {}
 ) {
     val totalCash = summary.cash
     val totalCard = summary.card
@@ -3062,7 +3073,10 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        val section = sectionTabsWidget(
+        var section by rememberNavigationSection("section:analytics:$transactionType:${stateValues.activeStoreId.orEmpty()}", "overview")
+        val tabs: @Composable () -> Unit = {
+            sectionTabsWidget(
+            selectedId = section, onSelected = { section = it },
             stateKey = "analytics:$transactionType:${stateValues.activeStoreId.orEmpty()}",
             tabs = buildList {
                 add(TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")))
@@ -3080,9 +3094,9 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
+        }
 
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "transaction_${transactionType}_$section"),
@@ -3093,6 +3107,7 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
                 .padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
+            item(key = "analytics-filters") { header(); tabs() }
             item(key = "MenuAnalyticsTransactionScreen:$section:0") {
                 Text(
                     text = title,
@@ -3251,7 +3266,8 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
 @Composable
 internal fun AppConfiguration.MenuAnalyticsStockScreen(
     dashboard: StoreAnalyticsDashboardDataModel?,
-    summary: AnalyticsStockSummary
+    summary: AnalyticsStockSummary,
+    header: @Composable () -> Unit = {}
 ) {
     val activeItems = summary.activeItems
     val inactiveItems = summary.items - activeItems
@@ -3261,7 +3277,10 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
     val currencyCode = dashboard?.currencyCode?.takeIf { it.isNotBlank() } ?: currentAnalyticsCurrencyCode()
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        val section = sectionTabsWidget(
+        var section by rememberNavigationSection("section:analytics:stock:${stateValues.activeStoreId.orEmpty()}", "overview")
+        val tabs: @Composable () -> Unit = {
+            sectionTabsWidget(
+            selectedId = section, onSelected = { section = it },
             stateKey = "analytics:stock:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
                 TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
@@ -3269,9 +3288,9 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
+        }
 
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "stock_$section"),
@@ -3282,6 +3301,7 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
                 .padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
+            item(key = "analytics-filters") { header(); tabs() }
             item(key = "MenuAnalyticsStockScreen:$section:0") {
                 Text(
                     text = stateValues.stringStock,
@@ -3343,14 +3363,18 @@ internal fun AppConfiguration.MenuAnalyticsStockScreen(
 internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
     prepared: PreparedAnalytics,
     dashboard: StoreAnalyticsDashboardDataModel?,
-    currencyCode: String
+    currencyCode: String,
+    header: @Composable () -> Unit = {}
 ) {
     val supplierRows = prepared.suppliers.map { item ->
         if (item.name.isNotEmpty()) item else item.copy(name = listOf(LocalizedStringDataModel("main",
             if (item.id == "unknown") localizedStringResource(156, "Not specified") else item.id)))
     }
     Column(modifier = Modifier.fillMaxWidth()) {
-        val section = sectionTabsWidget(
+        var section by rememberNavigationSection("section:analytics:suppliers:${stateValues.activeStoreId.orEmpty()}", "overview")
+        val tabs: @Composable () -> Unit = {
+            sectionTabsWidget(
+            selectedId = section, onSelected = { section = it },
             stateKey = "analytics:suppliers:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
                 TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
@@ -3358,9 +3382,9 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
+        }
 
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "suppliers_$section"),
@@ -3371,6 +3395,7 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
                 .padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
+            item(key = "analytics-filters") { header(); tabs() }
             item(key = "MenuAnalyticsSuppliersScreen:$section:0") {
                 Text(
                     text = stateValues.stringSuppliers,
@@ -3415,7 +3440,8 @@ internal fun AppConfiguration.MenuAnalyticsSuppliersScreen(
 internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
     workers: List<StoreWorkerDataModel>,
     prepared: PreparedAnalytics,
-    currencyCode: String
+    currencyCode: String,
+    header: @Composable () -> Unit = {}
 ) {
     val salesByWorkshift = prepared.workshifts.map { item -> item.copy(
         name = listOf(LocalizedStringDataModel("main", "${localizedStringResource(661, "Active workshift")} #${item.id}")),
@@ -3423,7 +3449,10 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
     ) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        val section = sectionTabsWidget(
+        var section by rememberNavigationSection("section:analytics:workers:${stateValues.activeStoreId.orEmpty()}", "overview")
+        val tabs: @Composable () -> Unit = {
+            sectionTabsWidget(
+            selectedId = section, onSelected = { section = it },
             stateKey = "analytics:workers:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
                 TabContent("overview", authUiText("Overview", "Обзор", "Шолу", "Жалпы көрүнүш")),
@@ -3431,9 +3460,9 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
+        }
 
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "workers_$section"),
@@ -3444,6 +3473,7 @@ internal fun AppConfiguration.MenuAnalyticsWorkersScreen(
                 .padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
+            item(key = "analytics-filters") { header(); tabs() }
             item(key = "MenuAnalyticsWorkersScreen:$section:0") {
                 Text(
                     text = stateValues.stringWorkers,
@@ -3490,7 +3520,8 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
     currentAmount: Double,
     events: List<CashRegisterEventDataModel>,
     currencyCode: String,
-    prepared: PreparedAnalytics
+    prepared: PreparedAnalytics,
+    header: @Composable () -> Unit = {}
 ) {
     val saleCashTotal = prepared.saleCash
     val returnCashTotal = prepared.returnCash
@@ -3503,7 +3534,10 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
     val extractionAmount = extractionAmountText.toMoneyDouble()
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        val section = sectionTabsWidget(
+        var section by rememberNavigationSection("section:analytics:cash:${stateValues.activeStoreId.orEmpty()}", "overview")
+        val tabs: @Composable () -> Unit = {
+            sectionTabsWidget(
+            selectedId = section, onSelected = { section = it },
             stateKey = "analytics:cash:${stateValues.activeStoreId.orEmpty()}",
             tabs = listOf(
                 TabContent("overview", localizedStringResource(443, "Balance")),
@@ -3512,9 +3546,9 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.Start)
                 .padding(horizontal = stateValues.marginTextField, vertical = stateValues.marginTextField / 2),
         )
+        }
 
         LazyColumn(
             state = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Analytics, "cash_register_$section"),
@@ -3525,6 +3559,7 @@ internal fun AppConfiguration.MenuAnalyticsCashRegisterScreen(
                 .padding(stateValues.marginTextField),
             contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
         ) {
+            item(key = "analytics-filters") { header(); tabs() }
             item(key = "MenuAnalyticsCashRegisterScreen:$section:0") {
                 Text(
                     text = localizedStringResource(256, "Cash registers"),

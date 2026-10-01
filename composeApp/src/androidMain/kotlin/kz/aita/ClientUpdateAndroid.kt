@@ -43,7 +43,7 @@ internal actual suspend fun writeClientUpdatePreference(key: String,value: Strin
 }
 internal actual suspend fun prepareClientInstaller(release: ClientRelease, artifact: ClientArtifact, progress: (Long,Long)->Unit) = withContext(Dispatchers.IO) { androidUpdates().prepare(release,artifact,progress) }
 internal actual suspend fun restoreClientInstaller(release: ClientRelease, artifact: ClientArtifact) = withContext(Dispatchers.IO) { androidUpdates().restore(release,artifact) }
-internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) = withContext(Dispatchers.IO) { androidUpdates().clean(installed); androidDownloadInstallers().clean(installed) }
+internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) = withContext(Dispatchers.IO) { androidUpdates().clean(installed); androidDownloadInstallers().clean(installed); cleanAndroidDownloadCopies(installed) }
 internal actual suspend fun handoffClientUpdate(release: ClientRelease, artifact: ClientArtifact, prepared: PreparedClientInstaller?): UpdateHandoff {
     if (artifact != selectClientArtifact(release,clientUpdatePlatform()) || !clientReleaseIsNewer(release,installedClientBuild())) throw ClientUpdateFailure("integrity")
     if (artifact.kind == InstallerKind.PLAY_STORE) return withContext(Dispatchers.Main) {

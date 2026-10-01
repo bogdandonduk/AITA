@@ -36,7 +36,7 @@ internal fun supplyQuickFillBase(prices: List<PriceDataModel>, currency: String)
         Text(pass23Text("markup"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         Spacer(Modifier.height(6.dp))
         DebtPercentQuickButtons(base, currency, current.toDoubleOrNull() ?: 0.0,
-            percents = listOf(100.0, 110.0, 120.0, 130.0, 150.0, 200.0)) { onSelected(moneyInputFromDouble(it)) }
+            percents = listOf(100.0, 110.0, 120.0, 130.0, 150.0, 200.0), capAtBase = false) { onSelected(moneyInputFromDouble(it)) }
         Spacer(Modifier.height(6.dp))
     }
 }

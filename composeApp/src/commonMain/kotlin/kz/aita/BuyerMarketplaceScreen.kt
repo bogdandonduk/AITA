@@ -178,6 +178,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
 
     val catalogueReady = catalogueIsCurrent(revision)
     val rows = data.page?.offers.orEmpty()
+    val home = !savedOnly && shopId == null && categoryId == null && search.isBlank() && city.isBlank()
     AitaScreenColumn(
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1440.dp,
@@ -218,12 +219,25 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                             else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу", "Маркетке кайтуу"),
                             autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
                     }
-                    if (shopId == null) MarketExperienceHero(savedOnly)
+                    if (shopId == null && !home) MarketExperienceHero(savedOnly)
+                    if (home) MarketHomeWelcome(onCatalogue = { choosingCategory = true }, onShops = { browseSection = "shops" })
                     MarketBrowseControls(browse, catalogue, onChooseCategory = { choosingCategory = true })
                     if (data.failure != null || saveFailure != null) Text((saveFailure ?: data.failure).orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
                         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     MarketShoppingFeedback(shopping)
                 }
+            }
+            if (home) {
+                item(key = "home-catalogue", span = { GridItemSpan(maxLineSpan) }) {
+                    MarketHomeCatalogue(catalogue) { id -> categoryId = id; limit = MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore = null }
+                }
+                if (rows.isNotEmpty()) item(key = "home-collections", span = { GridItemSpan(maxLineSpan) }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    MarketHomePromotions(rows, onOffer = { openedId = it })
+                    MarketHomeCollections(rows, onOffer = { openedId = it }, onShop = ::visitShop)
+                    }
+                }
+                item(key = "home-all", span = { GridItemSpan(maxLineSpan) }) { MarketHomeHeading(pass24Text("all")) }
             }
             if (data.page == null && data.loading) items(6) { LoadingSkeleton(Modifier.fillMaxWidth().heightIn(min = 240.dp), layout = LoadingLayout.MarketplaceCard, rows = 1) }
             else if (rows.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {

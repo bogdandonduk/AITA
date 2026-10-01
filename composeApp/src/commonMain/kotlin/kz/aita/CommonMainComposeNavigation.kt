@@ -153,11 +153,15 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
 
     LaunchedEffect(draftStorageKey, existing?.id, stateValues.goodsCategories.orEmpty().size, AppStateWorkspace.restoreRevision.collectAsState().value) {
         persistentDraftLoaded = false
+        val beforeRestore = draft
         val restored = readAppStateDraft
             ?.invoke(draftStorageKey)
             ?.toPersistentStockAddEditDraftOrNull()
         if (restored != null && (existing == null || restored.id == existing.id)) {
-            draft = restored
+            if (draft == beforeRestore) draft = restored
+        } else if (existing == null && draft == beforeRestore && draft == newDraft()) {
+            val defaults = withLastStockChoices(draft)
+            if (draft == beforeRestore) draft = defaults
         }
         persistentDraftLoaded = true
     }
@@ -1178,6 +1182,7 @@ fun AppConfiguration.SimpleTextInput(
         stateHost = stateHost,
         stateKey = stateKey,
         valueInitial = value,
+        parentOwnsValue = stateHost == null && stateKey == null,
         placeholderText = placeholder,
         leadingIcon = leadingIconPath?.let { path ->
             {
@@ -1741,9 +1746,14 @@ fun AppConfiguration.SimpleDropdownField(
     selectedId: String?,
     options: List<DropdownOption>,
     placeholder: String,
+    rememberChoiceKey: String? = null,
+    restoreLastChoice: Boolean = true,
     onSelected: (String) -> Unit
-) = AitaDropdownField(modifier = modifier, title = title, selectedId = selectedId,
-    options = options, placeholder = placeholder, onSelected = onSelected)
+) {
+    val choose = rememberOperationChoiceHandler(rememberChoiceKey, restoreLastChoice, selectedId, options.map { it.id }, onSelected)
+    AitaDropdownField(modifier = modifier, title = title, selectedId = selectedId,
+        options = options, placeholder = placeholder, onSelected = choose)
+}
 
 
 @Composable
