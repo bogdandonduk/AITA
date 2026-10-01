@@ -1,0 +1,163 @@
+{
+  "version": "1.2.1",
+  "build": 22,
+  "revision": "f3ba5051522add9981162cc826cca1a57f1758a3",
+  "tag": "v1.2.1-b22",
+  "createdAt": "2026-10-01T10:23:56Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.2.1-22-android.apk",
+      "sha256": "f7263184c8359542cce8905d7a2a0b438064e562fe9c87365c3d06876f18515c",
+      "bytes": 72119623,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-android.apk"
+    },
+    {
+      "name": "AITA-1.2.1-22-android.aab",
+      "sha256": "528a800b2c21658d8e69a8b3f2c718ef015f012aaa28bfd480c17b156319bbee",
+      "bytes": 46779275,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "516b57d648675b92647aaf3ef93f08b2a8877e7c97982febc5c0e57cd7685ba8",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.1-22-linux-x64.deb",
+      "sha256": "bddf57ee741b80cad95e633f824d0db6f5311f7c7b05cb2434df37578e100e70",
+      "bytes": 115251718,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-linux-x64.deb"
+    },
+    {
+      "name": "AITA-1.2.1-22-linux-x64.rpm",
+      "sha256": "fad43197ae73114c5d5225a23bb667d4379324d34db86544ee55accfb778e1f5",
+      "bytes": 126650852,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-linux-x64.rpm"
+    },
+    {
+      "name": "linux-client-build.json",
+      "sha256": "516b57d648675b92647aaf3ef93f08b2a8877e7c97982febc5c0e57cd7685ba8",
+      "bytes": 857,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/linux-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.1-22-web.zip",
+      "sha256": "3450743c953cd21828eb227da4ee049ecc2d0404f5669446c36feace01b795ce",
+      "bytes": 12885976,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "516b57d648675b92647aaf3ef93f08b2a8877e7c97982febc5c0e57cd7685ba8",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/web-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.1-22-windows.exe",
+      "sha256": "7fe5dd85e6f0c4a2624d33c24087dc703b11bab8df5dca951d42e5edeb7c9d38",
+      "bytes": 136861184,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-windows.exe"
+    },
+    {
+      "name": "AITA-1.2.1-22-windows.msi",
+      "sha256": "e53216f2b930f92bdf0fdd203a5690d240fed04af39bd7d0df65736bee5bd3c5",
+      "bytes": 136262084,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/AITA-1.2.1-22-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "c140b39eeb502bbbad2686cea38fb6278ed43106b1971da36f057181521d58df",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "cbb159faddafe24e280a50c29aeb333f84af7c3d439a60006570f42358459ee6",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.1-b22/windows-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Remembered stock and batch dropdown choices; reliable batch quantity quick fills and save retry; corrected purchase-based sale markup and cent precision; automatic mixed-payment remainder; scrolling analytics filters; safe cleanup of AITA-owned installers after installation; a marketplace home with catalogue, discoveries, shops and real promotions.",
+    "ru": "\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u0432\u044b\u0431\u043e\u0440\u0430 \u0432 \u0441\u043f\u0438\u0441\u043a\u0430\u0445 \u0442\u043e\u0432\u0430\u0440\u043e\u0432 \u0438 \u043f\u0430\u0440\u0442\u0438\u0439; \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u044b \u0431\u044b\u0441\u0442\u0440\u043e\u0435 \u0437\u0430\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0430 \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u043e\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u043f\u0430\u0440\u0442\u0438\u0438, \u043d\u0430\u0446\u0435\u043d\u043a\u0430 \u043e\u0442 \u0446\u0435\u043d\u044b \u043f\u043e\u0441\u0442\u0430\u0432\u043a\u0438 \u0438 \u0442\u043e\u0447\u043d\u043e\u0441\u0442\u044c \u043a\u043e\u043f\u0435\u0435\u043a; \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043e\u0441\u0442\u0430\u0442\u043e\u043a \u0432 \u0441\u043c\u0435\u0448\u0430\u043d\u043d\u043e\u0439 \u043e\u043f\u043b\u0430\u0442\u0435; \u043f\u0440\u043e\u043a\u0440\u0443\u0442\u043a\u0430 \u0444\u0438\u043b\u044c\u0442\u0440\u043e\u0432 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0438 \u0432\u043c\u0435\u0441\u0442\u0435 \u0441 \u043e\u0442\u0447\u0451\u0442\u043e\u043c; \u043e\u0447\u0438\u0441\u0442\u043a\u0430 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u0449\u0438\u043a\u043e\u0432, \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0445 AITA, \u043f\u043e\u0441\u043b\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0438; \u0433\u043b\u0430\u0432\u043d\u0430\u044f \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0430 \u0441 \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u043e\u043c, \u043d\u0430\u0445\u043e\u0434\u043a\u0430\u043c\u0438, \u043c\u0430\u0433\u0430\u0437\u0438\u043d\u0430\u043c\u0438 \u0438 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u043c\u0438 \u0441\u043a\u0438\u0434\u043a\u0430\u043c\u0438.",
+    "kk": "\u0422\u0430\u0443\u0430\u0440\u043b\u0430\u0440 \u043c\u0435\u043d \u043f\u0430\u0440\u0442\u0438\u044f\u043b\u0430\u0440\u0434\u0430\u0493\u044b \u0442\u0430\u04a3\u0434\u0430\u0443 \u0441\u0430\u049b\u0442\u0430\u043b\u0430\u0434\u044b; \u043c\u04e9\u043b\u0448\u0435\u0440\u0434\u0456 \u0436\u044b\u043b\u0434\u0430\u043c \u0442\u043e\u043b\u0442\u044b\u0440\u0443, \u043f\u0430\u0440\u0442\u0438\u044f\u043d\u044b \u049b\u0430\u0439\u0442\u0430 \u0441\u0430\u049b\u0442\u0430\u0443, \u0441\u0430\u0442\u044b\u043f \u0430\u043b\u0443 \u0431\u0430\u0493\u0430\u0441\u044b\u043d\u0430\u043d \u04af\u0441\u0442\u0435\u043c\u0435 \u0436\u04d9\u043d\u0435 \u0430\u049b\u0448\u0430 \u0434\u04d9\u043b\u0434\u0456\u0433\u0456 \u0442\u04af\u0437\u0435\u0442\u0456\u043b\u0434\u0456; \u0430\u0440\u0430\u043b\u0430\u0441 \u0442\u04e9\u043b\u0435\u043c \u049b\u0430\u043b\u0434\u044b\u0493\u044b \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0442\u044b \u0442\u043e\u043b\u0442\u044b\u0440\u044b\u043b\u0430\u0434\u044b; \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 \u0441\u04af\u0437\u0433\u0456\u043b\u0435\u0440\u0456 \u0435\u0441\u0435\u043f\u043f\u0435\u043d \u0431\u0456\u0440\u0433\u0435 \u0436\u044b\u043b\u0436\u0438\u0434\u044b; \u043e\u0440\u043d\u0430\u0442\u0443\u0434\u0430\u043d \u043a\u0435\u0439\u0456\u043d AITA \u0441\u0430\u049b\u0442\u0430\u0493\u0430\u043d \u043e\u0440\u043d\u0430\u0442\u049b\u044b\u0448\u0442\u0430\u0440 \u0442\u0430\u0437\u0430\u043b\u0430\u043d\u0430\u0434\u044b; \u043a\u0430\u0442\u0430\u043b\u043e\u0433, \u0434\u04af\u043a\u0435\u043d\u0434\u0435\u0440 \u0436\u04d9\u043d\u0435 \u043d\u0430\u049b\u0442\u044b \u0436\u0435\u04a3\u0456\u043b\u0434\u0456\u043a\u0442\u0435\u0440\u0456 \u0431\u0430\u0440 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441 \u0431\u0430\u0441\u0442\u044b \u0431\u0435\u0442\u0456.",
+    "ky": "\u0422\u043e\u0432\u0430\u0440 \u0436\u0430\u043d\u0430 \u043f\u0430\u0440\u0442\u0438\u044f \u0442\u0438\u0437\u043c\u0435\u043b\u0435\u0440\u0438\u043d\u0434\u0435\u0433\u0438 \u0442\u0430\u043d\u0434\u043e\u043e \u0441\u0430\u043a\u0442\u0430\u043b\u0430\u0442; \u0441\u0430\u043d\u0434\u044b \u0442\u0435\u0437 \u0442\u043e\u043b\u0442\u0443\u0440\u0443\u0443, \u043f\u0430\u0440\u0442\u0438\u044f\u043d\u044b \u043a\u0430\u0439\u0440\u0430 \u0441\u0430\u043a\u0442\u043e\u043e, \u0441\u0430\u0442\u044b\u043f \u0430\u043b\u0443\u0443 \u0431\u0430\u0430\u0441\u044b\u043d\u0430\u043d \u04af\u0441\u0442\u04e9\u043a \u0436\u0430\u043d\u0430 \u0430\u043a\u0447\u0430\u043d\u044b\u043d \u0442\u0430\u043a\u0442\u044b\u0433\u044b \u043e\u04a3\u0434\u043e\u043b\u0434\u0443; \u0430\u0440\u0430\u043b\u0430\u0448 \u0442\u04e9\u043b\u04e9\u043c\u0434\u04af\u043d \u043a\u0430\u043b\u0434\u044b\u0433\u044b \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0442\u044b\u043a \u0442\u043e\u043b\u0442\u0443\u0440\u0443\u043b\u0430\u0442; \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 \u0447\u044b\u043f\u043a\u0430\u043b\u0430\u0440\u044b \u043e\u0442\u0447\u0451\u0442 \u043c\u0435\u043d\u0435\u043d \u0436\u044b\u043b\u0430\u0442; \u043e\u0440\u043d\u043e\u0442\u0443\u043b\u0433\u0430\u043d\u0434\u0430\u043d \u043a\u0438\u0439\u0438\u043d AITA \u0441\u0430\u043a\u0442\u0430\u0433\u0430\u043d \u043e\u0440\u043d\u043e\u0442\u0443\u0443\u0447\u0443\u043b\u0430\u0440 \u0442\u0430\u0437\u0430\u043b\u0430\u043d\u0430\u0442; \u043a\u0430\u0442\u0430\u043b\u043e\u0433, \u0434\u04af\u043a\u04e9\u043d\u0434\u04e9\u0440 \u0436\u0430\u043d\u0430 \u0447\u044b\u043d\u044b\u0433\u044b \u0430\u0440\u0437\u0430\u043d\u0434\u0430\u0442\u0443\u0443\u043b\u0430\u0440 \u043c\u0435\u043d\u0435\u043d \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441 \u0431\u0430\u0448\u043a\u044b \u0431\u0435\u0442\u0438.",
+    "tg": "\u0418\u043d\u0442\u0438\u0445\u043e\u0431 \u0434\u0430\u0440 \u0440\u04ef\u0439\u0445\u0430\u0442\u04b3\u043e\u0438 \u043c\u043e\u043b\u0443 \u043f\u0430\u0440\u0442\u0438\u044f \u043d\u0438\u0433\u043e\u04b3 \u0434\u043e\u0448\u0442\u0430 \u043c\u0435\u0448\u0430\u0432\u0430\u0434; \u043f\u0443\u0440\u043a\u0443\u043d\u0438\u0438 \u0437\u0443\u0434\u0438 \u043c\u0438\u049b\u0434\u043e\u0440, \u0441\u0430\u0431\u0442\u0438 \u0442\u0430\u043a\u0440\u043e\u0440\u0438\u0438 \u043f\u0430\u0440\u0442\u0438\u044f, \u043d\u0430\u0440\u0445\u0438 \u0444\u0443\u0440\u04ef\u0448 \u0430\u0437 \u0445\u0430\u0440\u0438\u0434 \u0432\u0430 \u0434\u0430\u049b\u0438\u049b\u0438\u0438 \u043c\u0430\u0431\u043b\u0430\u0493 \u0438\u0441\u043b\u043e\u04b3 \u0448\u0443\u0434\u0430\u043d\u0434; \u0431\u0430\u049b\u0438\u044f\u0438 \u043f\u0430\u0440\u0434\u043e\u0445\u0442\u0438 \u043e\u043c\u0435\u0445\u0442\u0430 \u0445\u0443\u0434\u043a\u043e\u0440 \u043f\u0443\u0440 \u043c\u0435\u0448\u0430\u0432\u0430\u0434; \u0444\u0438\u043b\u0442\u0440\u04b3\u043e\u0438 \u0442\u0430\u04b3\u043b\u0438\u043b \u0431\u043e \u04b3\u0438\u0441\u043e\u0431\u043e\u0442 \u04b3\u0430\u0440\u0430\u043a\u0430\u0442 \u043c\u0435\u043a\u0443\u043d\u0430\u043d\u0434; \u0444\u0430\u0439\u043b\u04b3\u043e\u0438 \u043d\u0430\u0441\u0431\u0438 \u043d\u0438\u0433\u043e\u04b3\u0434\u043e\u0448\u0442\u0430\u0438 AITA \u0431\u0430\u044a\u0434\u0438 \u043d\u0430\u0441\u0431 \u0442\u043e\u0437\u0430 \u043c\u0435\u0448\u0430\u0432\u0430\u043d\u0434; \u0441\u0430\u04b3\u0438\u0444\u0430\u0438 \u0430\u0441\u043e\u0441\u0438\u0438 \u0431\u043e\u0437\u043e\u0440 \u0431\u043e \u0444\u0435\u04b3\u0440\u0438\u0441\u0442, \u043c\u0430\u0493\u043e\u0437\u0430\u04b3\u043e \u0432\u0430 \u0442\u0430\u0445\u0444\u0438\u0444\u04b3\u043e\u0438 \u0432\u043e\u049b\u0435\u04e3.",
+    "uz": "Mahsulot va partiya ro\u2018yxatlaridagi tanlovlar saqlanadi; miqdorni tez to\u2018ldirish, partiyani qayta saqlash, xarid narxidan ustama va pul aniqligi tuzatildi; aralash to\u2018lov qoldig\u2018i avtomatik to\u2018ldiriladi; tahlil filtrlari hisobot bilan siljiydi; AITA saqlagan o\u2018rnatish fayllari o\u2018rnatilgandan keyin tozalanadi; katalog, do\u2018konlar va haqiqiy chegirmalar bilan yangi market bosh sahifasi."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-10-01T09:57:15Z",
+      "finishedAt": "2026-10-01T09:57:16Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-10-01T09:57:16Z",
+      "finishedAt": "2026-10-01T10:02:52Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:02:52Z",
+      "finishedAt": "2026-10-01T10:03:02Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:03:02Z",
+      "finishedAt": "2026-10-01T10:06:51Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:06:51Z",
+      "finishedAt": "2026-10-01T10:12:27Z"
+    },
+    "linux": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:12:27Z",
+      "finishedAt": "2026-10-01T10:13:01Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:13:01Z",
+      "finishedAt": "2026-10-01T10:20:44Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:20:44Z",
+      "finishedAt": "2026-10-01T10:23:15Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-10-01T10:23:15Z",
+      "finishedAt": "2026-10-01T10:23:55Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
