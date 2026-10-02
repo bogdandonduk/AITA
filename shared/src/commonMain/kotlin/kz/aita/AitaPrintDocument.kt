@@ -8,6 +8,7 @@ private const val RECEIPT_PAPER_WIDTH_KEY = "receipt-paper-width-mm"
 val receiptPaperWidthMmState = MutableStateFlow(80)
 val systemReceiptPrinterNameState = MutableStateFlow<String?>(null)
 var chooseSystemReceiptPrinterAction: (suspend () -> ReceiptPlatformActionResult)? = null
+var printStockItemLabelPlatformAction: (suspend (StockItemLabelDataModel) -> ReceiptPlatformActionResult?)? = null
 var printReceiptDocumentPlatformAction: (suspend (String, AitaPdfDocument) -> ReceiptPlatformActionResult)? = null
 
 fun receiptUsesSystemDocumentPrinting(): Boolean = preferHtmlDocumentPrinting ||

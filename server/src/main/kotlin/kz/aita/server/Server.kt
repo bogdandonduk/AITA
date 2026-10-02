@@ -20610,6 +20610,7 @@ fun Application.module() {
           val userId = call.checkPrincipal() ?: return@put
           val bodies = call.receiveOneOrList<GoodsBatchDataModel>()
 
+          var staleEditor = false
           val updated = newSuspendedTransaction(aitaServerIoContext) {
             val requestedStoreIds = bodies.map { body ->
               runCatching { UUID.fromString(body.storeId) }.getOrNull() ?: return@newSuspendedTransaction run { rollback(); null }
@@ -20658,7 +20659,15 @@ fun Application.module() {
                 .singleOrNull()
                 ?: return@newSuspendedTransaction run { rollback(); null }
 
+              if (!stockBatchEditRevisionMatches(body.expectedUpdatedAtMillis, previousBatchRow[StockBatchesV2.updatedAtMillis])) {
+                staleEditor = true
+                return@newSuspendedTransaction run { rollback(); null }
+              }
+              if (!body.quantity.total.isFinite() || body.quantity.total < 0.0)
+                return@newSuspendedTransaction run { rollback(); null }
+
               val sanitizedBody = body.copy(
+                expectedUpdatedAtMillis = null,
                 kind = StockBatchKindDataModel.valueOf(previousBatchRow[StockBatchesV2.kind]),
                 supplierId = nextSupplierId?.toString(),
                 supplierOrderId = nextSupplierOrderId?.toString(),
@@ -20783,8 +20792,8 @@ fun Application.module() {
               message = getResponse("18").message
             )
           } ?: call.genericResponseNoPayload(
-            HttpStatusCode.BadRequest,
-            eventMessage("message.cannot_update_stock_batch")
+            if (staleEditor) HttpStatusCode.Conflict else HttpStatusCode.BadRequest,
+            if (staleEditor) stockEditingMessage("batch_changed") else eventMessage("message.cannot_update_stock_batch")
           )
         }
 

@@ -22,7 +22,7 @@ class TemplateTests(unittest.TestCase):
                 self.assertEqual(args[args.index('--type')+1],kind)
                 self.assertEqual(args[args.index('--win-upgrade-uuid')+1],'f100f3af-cba2-42e5-928d-8165d1a271a5')
                 template=(Path(args[args.index('--resource-dir')+1])/'main.wxs').read_text()
-                self.assertIn('After="InstallInitialize"',template);self.assertIn('MsiRMFilesInUse',template)
+                self.assertIn('After="InstallInitialize"',template);self.assertIn('MsiRMFilesInUse',template);self.assertIn('MsiLogging',template)
             self.assertEqual((image/'AITA.exe').read_bytes(),b'unchanged verified application')
     def test_changed_jdk_template_requires_review(self):
         with TemporaryDirectory() as temp:

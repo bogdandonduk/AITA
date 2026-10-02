@@ -105,6 +105,7 @@ private fun AppConfiguration.DownloadSavedLocation(downloads: DownloadsState) {
 @Composable
 internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOpenFolderSettings: (() -> Unit)? = null) {
     val downloads by DownloadsWorkspace.state.collectAsState()
+    val installerDetails by clientInstallerDetailsState.collectAsState()
     val scope = rememberCoroutineScope()
     var webOpenFailed by remember { mutableStateOf(false) }
     val platforms = listOf("android" to "Android", "windows" to "Windows", "linux" to "Linux", "web" to "Web", "macos" to "macOS", "ios" to "iOS")
@@ -133,6 +134,7 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                 }
                 item("download_status") {
                     DownloadCard {
+                        installerDetails?.let { Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
                         downloads.error?.let { problem ->
                             val reason = problem.takeIf { it in setOf("configuration", "network", "integrity", "expired", "storage", "space", "unavailable", "unsupported") } ?: "unavailable"
                             Text(updateText("error.$reason"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)

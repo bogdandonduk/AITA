@@ -1024,7 +1024,7 @@ object LabelPrinterPlatformJvmBridge {
             PlatformLabelPrinterDataModel(
                 id = "service:$name",
                 name = name,
-                subtitle = "System raw print service • use only for label printers that accept TSPL/ZPL/CPCL bytes",
+                subtitle = deviceWorkflowText("label_system_help"),
                 configured = configuredService.equals(name, ignoreCase = true),
                 available = true
             )
@@ -1477,6 +1477,20 @@ private fun installDesktopPlatformActionsJvm() {
 
     printReceiptEscPosBytes = { printerBytes ->
         printReceiptBytesOnDesktop(printerBytes)
+    }
+
+    printStockItemLabelPlatformAction = { label ->
+        withContext(Dispatchers.IO) {
+            LabelPrinterPlatformJvmBridge.loadPersistedConfiguration()
+            val service = LabelPrinterPlatformJvmBridge.labelPrinterServiceName
+            if (service == SYSTEM_DOCUMENT_PRINTER_ID ||
+                (service != null && label.protocol == LABEL_PRINTER_PROTOCOL_AUTO)) {
+                printSystemLabel(label, service.takeUnless { it == SYSTEM_DOCUMENT_PRINTER_ID }) { selected ->
+                    LabelPrinterPlatformJvmBridge.configureLabelPrinterDeviceId("service:$selected")
+                    configuredLabelPrinterDeviceIdState.value = "service:$selected"
+                }
+            } else null // Explicit TSPL/ZPL/CPCL and direct USB/Bluetooth keep their native byte protocol.
+        }
     }
 
     listPlatformLabelPrinterDevicesAction = {

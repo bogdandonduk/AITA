@@ -142,6 +142,12 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
                         Text(updateText("android_install_help"), color=stateValues.PlaceholderTextColor, fontSize=stateValues.smallTextSize)
                     }
                     if (current.platform?.os == ClientOs.WINDOWS) {
+                        SimpleDropdownField(title = pass26Text("installer"), selectedId = artifact.kind.name,
+                            options = release.artifacts.filter { it.os == ClientOs.WINDOWS &&
+                                (it.arch == current.platform?.arch || it.arch == ClientArch.UNIVERSAL) }
+                                .distinctBy { it.kind }.map { DropdownOption(it.kind.name, it.kind.name) },
+                            placeholder = pass26Text("installer"),
+                            onSelected = { if (!current.busy) AppUpdateWorkspace.selectWindowsInstaller(InstallerKind.valueOf(it)) })
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.material3.Checkbox(checked = current.backgroundDownloads,
                                 onCheckedChange = AppUpdateWorkspace::setBackgroundDownloads,
@@ -185,6 +191,8 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
 
 @Composable
 private fun AppConfiguration.UpdateCheckFooter(current: ClientUpdateState) {
+    val installerDetails by clientInstallerDetailsState.collectAsState()
+    installerDetails?.let { SelectionContainer { Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) } }
     current.problem?.let { reason ->
         val known=setOf("configuration","network","integrity","expired","storage","space","package","signing","install","unavailable","unsupported")
         Text(updateText("error.${reason.takeIf { it in known } ?: "install"}"),color=if(reason=="configuration") stateValues.PlaceholderTextColor else stateValues.ErrorColor,fontSize=stateValues.smallTextSize)

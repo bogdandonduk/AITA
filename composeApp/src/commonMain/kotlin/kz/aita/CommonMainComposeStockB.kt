@@ -358,6 +358,9 @@ fun AppConfiguration.StockBatchEditor(
     onCancel: () -> Unit,
     onSaved: () -> Unit
 ) {
+    var removeQuantityText by rememberSaveable(existingBatch?.id) { mutableStateOf("") }
+    var removeQuantityError by remember { mutableStateOf<String?>(null) }
+    val editRevision = remember(existingBatch?.id) { existingBatch?.updatedAtMillis }
     val batchStoreId=existingBatch?.storeId ?: stateValues.activeStoreId ?: goodsItem.storeId
     val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
         .find { it.id == goodsItem.measurementUnitId }
@@ -578,6 +581,30 @@ fun AppConfiguration.StockBatchEditor(
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
+                if (existingBatch != null) {
+                    Text(pass26Text("remove_quantity"), color = stateValues.TextColor,
+                        fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                    Text(pass26Text("remove_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                    Spacer(Modifier.height(stateValues.marginTextField))
+                    SimpleTextInput(Modifier.fillMaxWidth(), value = removeQuantityText,
+                        placeholder = localizedStringResource(271, "Quantity"),
+                        keyboardType = if (selectedQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
+                        onTransformValue = { sanitizeStockQuantityInput(it, selectedQuantityAllowsFraction) },
+                        onValueChange = { removeQuantityText = it; removeQuantityError = null })
+                    StockQuantityQuickFillButtons(selectedQuantityUnit, removeQuantityText,
+                        onAmountSelected = { removeQuantityText = it; removeQuantityError = null })
+                    removeQuantityError?.let { Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
+                    Spacer(Modifier.height(stateValues.marginTextField))
+                    actionButton(text = pass26Text("remove_quantity"), iconPath = stateValues.drawablePathIconSubtract,
+                        autoLoading = false, confirmationRequired = false, enabled = !isSavingBatch,
+                        onClick = {
+                            val next = subtractBatchQuantityText(draft.quantityText, removeQuantityText, selectedQuantityUnit)
+                            if (next == null) removeQuantityError = pass26Text("remove_error")
+                            else { draft = draft.copy(quantityText = next); removeQuantityText = ""; removeQuantityError = null }
+                        })
+                    Spacer(Modifier.height(stateValues.marginTextFieldGroup))
+                }
+
                 SimpleDropdownField(
                     title = localizedStringResource(270, "Unit"),
                     rememberChoiceKey = "batch-unit:${goodsItem.measurementUnitId}",
@@ -765,15 +792,14 @@ fun AppConfiguration.StockBatchEditor(
                 confirmationRequired = false,
                 onClick = saveBatch@ {
                     val validation = when {
-                        parseStockQuantityInputText(draft.quantityText, selectedQuantityUnit)?.let { it.isFinite() && it > 0.0 } != true -> "batch_quantity"
+                        parseStockQuantityInputText(draft.quantityText, selectedQuantityUnit)?.let { it.isFinite() && (it > 0.0 || (existingBatch != null && it == 0.0)) } != true -> if (existingBatch == null) "batch_quantity" else "zero_quantity"
                         draft.supplyPrice.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 } != true -> "batch_price"
                         draft.manufacturedDateText.isNotBlank() && stockDateInputTextToMillis(draft.manufacturedDateText) == null -> "batch_date"
                         draft.expirationDateText.isNotBlank() && stockDateInputTextToMillis(draft.expirationDateText) == null -> "batch_date"
                         else -> null
                     }
                     if (validation != null) {
-                        saveError = pass24Text(validation)
-                        postInAppNotification(saveError!!, NotificationType.Negative, transient = true)
+                        saveError = if (validation == "zero_quantity") pass26Text(validation) else pass24Text(validation)
                         return@saveBatch
                     }
                     if (!isSavingBatch) {
@@ -812,6 +838,7 @@ fun AppConfiguration.StockBatchEditor(
                         additionalNotesLocalized = draft.additionalNotesLocalized.filter { it.value.isNotBlank() },
                         createdAtMillis = existingBatch?.createdAtMillis ?: now,
                         updatedAtMillis = now,
+                        expectedUpdatedAtMillis = draft.editRevision ?: editRevision,
                         createdByUserId = existingBatch?.createdByUserId.orEmpty(),
                         isActive = true
                     )
@@ -4825,6 +4852,8 @@ internal fun AppConfiguration.StockAddEditPricesTab(
                     )
                 }
             )
+
+            Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
             StockPriceGroupEditor(
                 title = stateValues.stringSalePrice,

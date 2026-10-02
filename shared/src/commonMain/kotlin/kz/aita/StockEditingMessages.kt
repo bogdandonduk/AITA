@@ -2,6 +2,7 @@ package kz.aita
 
 fun stockEditingMessage(key: String): List<LocalizedStringDataModel> {
     val text = when (key) {
+        "batch_changed" -> listOf("This batch changed on another operation. Reopen it to use the current balance.", "Партия изменилась после другой операции. Откройте её заново, чтобы использовать актуальный остаток.", "Партия басқа операциядан кейін өзгерді. Ағымдағы қалдық үшін қайта ашыңыз.", "Партия башка операциядан кийин өзгөрдү. Учурдагы калдык үчүн кайра ачыңыз.", "Партия баъди амалиёти дигар тағйир ёфт. Барои бақияи ҷорӣ аз нав кушоед.", "Partiya boshqa amaldan keyin o‘zgardi. Joriy qoldiq uchun qayta oching.")
         "legacy_barcode" -> listOf("Older shortened barcode. Check the name and select the item manually.", "Старый сокращённый штрихкод. Проверьте название и выберите товар вручную.", "Бұрын қысқартылған штрихкод. Атауын тексеріп, тауарды қолмен таңдаңыз.", "Эски кыскартылган штрихкод. Атын текшерип, товарды кол менен тандаңыз.", "Штрихкоди кӯтоҳи кӯҳна. Номро санҷед ва молро дастӣ интихоб кунед.", "Eski qisqartirilgan shtrix-kod. Nomini tekshirib, mahsulotni qo‘lda tanlang.")
         "name" -> listOf("Enter the item name", "Введите название товара", "Тауар атауын енгізіңіз", "Товардын атын киргизиңиз", "Номи молро ворид кунед", "Mahsulot nomini kiriting")
         "barcode" -> listOf("Enter at least one barcode", "Введите хотя бы один штрихкод", "Кемінде бір штрихкод енгізіңіз", "Кеминде бир штрихкод киргизиңиз", "Ақаллан як штрихкод ворид кунед", "Kamida bitta shtrix-kod kiriting")

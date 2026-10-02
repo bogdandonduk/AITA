@@ -63,7 +63,11 @@ internal class ClientUpdateCoordinator(
             started = true
             try {
             val installed = backend.installedBuild()
-            val platform = backend.platform()
+            val platform = backend.platform().let { detected ->
+                if (detected.os == ClientOs.WINDOWS) detected.copy(windowsInstaller =
+                    if (backend.readPreference("windows-installer") == "MSI") InstallerKind.MSI else InstallerKind.EXE)
+                else detected
+            }
             key = runCatching { Base64.decode(backend.publicKey) }.getOrDefault(byteArrayOf())
             mutable.update { it.copy(installed = installed, platform = platform,
                 configured = key.size in 256..2048 && isPublicClientReleaseUrl(backend.feedBase)) }
@@ -127,7 +131,7 @@ internal class ClientUpdateCoordinator(
         val s = mutable.value
         val release = s.available ?: return
         val artifact = s.artifact ?: return
-        if (!s.backgroundDownloads || s.platform?.os != ClientOs.WINDOWS || artifact.kind != InstallerKind.MSI ||
+        if (!s.backgroundDownloads || s.platform?.os != ClientOs.WINDOWS || artifact.kind !in setOf(InstallerKind.EXE, InstallerKind.MSI) ||
             s.prepared != null || s.offline || s.problem != null || s.busy || s.handoff != null) return
         val identity = release.identity + ":" + artifact.sha256
         // Cancellation/errors pause automatic retries for this artifact in this process.
@@ -136,6 +140,18 @@ internal class ClientUpdateCoordinator(
         automaticAttempt = identity
         downloadUpdate(installWhenReady = false)
     }
+    fun selectWindowsInstaller(kind: InstallerKind) { scope.launch {
+        if (kind !in setOf(InstallerKind.EXE, InstallerKind.MSI) || !operation.tryLock()) return@launch
+        try {
+            val platform = mutable.value.platform?.takeIf { it.os == ClientOs.WINDOWS } ?: return@launch
+            backend.writePreference("windows-installer", kind.name)
+            mutable.update { it.copy(platform = platform.copy(windowsInstaller = kind), problem = null) }
+            automaticAttempt = null
+            accepted?.release?.let { expose(it, notify = false) }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { mutable.update { it.copy(problem = "storage") } }
+        finally { operation.unlock() }
+    } }
     fun setBackgroundDownloads(enabled: Boolean) { scope.launch {
         try {
             backend.writePreference(pref("background-downloads"), enabled.toString())
@@ -297,4 +313,5 @@ internal object AppUpdateWorkspace {
     fun cancelDownload() = coordinator.cancelDownload()
     fun installUpdate() = coordinator.installUpdate()
     fun setBackgroundDownloads(enabled: Boolean) = coordinator.setBackgroundDownloads(enabled)
+    fun selectWindowsInstaller(kind: InstallerKind) = coordinator.selectWindowsInstaller(kind)
 }

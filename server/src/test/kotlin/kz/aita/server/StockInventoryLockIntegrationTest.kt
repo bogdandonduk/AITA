@@ -71,6 +71,19 @@ class StockInventoryLockIntegrationTest {
         assertEquals(1,parallel(::move,::move).count { it })
         assertEquals(3.0,scalar(c,"SELECT quantity FROM ${f.schema}.stock WHERE id=1").toDouble())
     }
+    @Test fun concurrentEditorsCannotRestoreAnOldBalanceAfterAnotherChange() = fixture { f, c ->
+        exec(c, "ALTER TABLE ${f.schema}.stock ADD COLUMN revision bigint NOT NULL DEFAULT 100")
+        fun edit(): Boolean = transaction(f) { tx ->
+            val revision = scalar(tx, "SELECT revision FROM ${f.schema}.stock WHERE id=1").toLong()
+            if (!stockBatchEditRevisionMatches(100L, revision)) return@transaction false
+            Thread.sleep(40)
+            exec(tx, "UPDATE ${f.schema}.stock SET quantity=7, revision=101 WHERE id=1")
+            true
+        }
+        assertEquals(1, parallel(::edit, ::edit).count { it })
+        assertEquals(7.0, scalar(c, "SELECT quantity FROM ${f.schema}.stock WHERE id=1").toDouble())
+        assertTrue(stockBatchEditRevisionMatches(null, 101L), "Older clients remain protocol-compatible")
+    }
     @Test fun competingAcceptanceAndRejectionDecideOnlyOnce() = fixture { f,c ->
         fun decide(accept: Boolean): Boolean = transaction(f) { tx ->
             if (scalar(tx,"SELECT status FROM ${f.schema}.decision WHERE id=1") != "pending") return@transaction false

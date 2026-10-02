@@ -18,6 +18,7 @@ def prepare(jdk, destination):
     # the old product if replacement fails. WiX's Restart Manager UI asks the user to close apps.
     source = source.replace(old, '<RemoveExistingProducts After="InstallInitialize"/>')
     source = source.replace('<UIRef Id="JpUI"/>', '<UIRef Id="JpUI"/>\n    <UI><DialogRef Id="MsiRMFilesInUse"/></UI>')
+    source = source.replace('<UIRef Id="JpUI"/>', '<Property Id="MsiLogging" Value="voicewarmup"/>\n    <UIRef Id="JpUI"/>')
     destination.mkdir(parents=True, exist_ok=True)
     (destination / 'main.wxs').write_text(source, encoding='utf-8')
     print('READY: Transactional Windows upgrade with files-in-use dialog')

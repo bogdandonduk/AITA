@@ -67,7 +67,7 @@ internal object LiveCollectionWorkspace {
                 }
                 if (stockResult.value?.owner != owner) stockResult.value = null
                 val previous = stockResult.value
-                if (previous?.stock === items && previous.batches === batches && previous.stores === stores) return@collectLatest
+                if (previous?.stock == items && previous.batches == batches.orEmpty() && previous.stores == stores) return@collectLatest
                 val batchSource = batches.orEmpty()
                 val storeId = activeStoreIdState.value
                 fun belongsToStore(batchStoreId: String) = batchStoreId.isNotBlank() && batchStoreId == storeId
@@ -77,7 +77,10 @@ internal object LiveCollectionWorkspace {
                     batchSource.filter { it.isSelectableActiveStockBatch() && belongsToStore(it.storeId) }.groupBy { it.goodsItemId },
                     warehouseBatches, warehouseBatches.mapValues { (_, rows) -> rows.sumOf { it.quantity.total } })
                 ensureActive()
-                if (inventoryViewScopeKey() == owner && stockState.payloadValue === items && stockBatchesState.payloadValue === batches && storesState.payloadValue.orEmpty() === stores)
+                // StateFlow suppresses equal payload emissions. An equal cloud/cache replacement
+                // can change list identity without scheduling another calculation; rejecting it
+                // here would strand every transaction search on the previous inventory index.
+                if (inventoryViewScopeKey() == owner && stockState.payloadValue == items && stockBatchesState.payloadValue == batches && storesState.payloadValue.orEmpty() == stores)
                     stockResult.value = result
             }
         }

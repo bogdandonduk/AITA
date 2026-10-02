@@ -16,7 +16,8 @@ import org.jetbrains.compose.resources.DrawableResource
 internal fun AppConfiguration.ReceiptActionToolbar(
     activeAction: String?,
     onAction: (String, String) -> Unit,
-    onFinish: (() -> Unit)? = null
+    onFinish: (() -> Unit)? = null,
+    onFinishAndPrint: (() -> Unit)? = null
 ) {
     val dark = isDarkAppTheme(stateValues.appThemeId)
     data class Action(val id: String, val label: String, val success: String, val family: Int, val res: DrawableResource)
@@ -29,7 +30,11 @@ internal fun AppConfiguration.ReceiptActionToolbar(
     Column(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (onFinish != null) actionButton(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             text = pass23Text("finish"), iconPath = stateValues.drawablePathIconCheck,
-            autoLoading = false, confirmationRequired = false, onClick = onFinish)
+            autoLoading = false, confirmationRequired = false, enabled = activeAction == null, onClick = onFinish)
+        if (onFinishAndPrint != null) actionButton(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            text = pass26Text("finish_print"), iconPath = stateValues.drawablePathIconReceipt,
+            autoLoading = false, confirmationRequired = false, loading = activeAction == "print",
+            enabled = activeAction == null, onClick = onFinishAndPrint)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             actions.forEach { action ->
                 TooltipBox(

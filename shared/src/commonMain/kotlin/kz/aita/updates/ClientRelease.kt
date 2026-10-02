@@ -74,7 +74,7 @@ data class ClientBuildIdentity(
 
 data class ClientPlatform(val os: ClientOs, val arch: ClientArch, val osMajor: Int = 0,
     val description: String = "", val storeManaged: Boolean = false,
-    val linuxPackage: InstallerKind? = null)
+    val linuxPackage: InstallerKind? = null, val windowsInstaller: InstallerKind = InstallerKind.EXE)
 
 /** Never use fuzzy OS/architecture matching, filename guessing, or a server-supplied shell command. */
 fun selectClientArtifact(release: ClientRelease, platform: ClientPlatform): ClientArtifact? {
@@ -92,7 +92,9 @@ fun selectClientArtifact(release: ClientRelease, platform: ClientPlatform): Clie
             }
     }
     return eligible.sortedWith(compareBy<ClientArtifact> { if (it.arch == platform.arch) 0 else 1 }
-        .thenBy { when (it.kind) { InstallerKind.PKG, InstallerKind.MSI, InstallerKind.DEB -> 0; else -> 1 } }).firstOrNull()
+        .thenBy { if (platform.os == ClientOs.WINDOWS) {
+            if (it.kind == platform.windowsInstaller) 0 else 1
+        } else when (it.kind) { InstallerKind.PKG, InstallerKind.DEB -> 0; else -> 1 } }).firstOrNull()
 }
 
 fun clientReleaseIsNewer(release: ClientRelease, installed: ClientBuildIdentity): Boolean =

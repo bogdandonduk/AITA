@@ -1754,7 +1754,7 @@ fun AppConfiguration.TransactionSelectionScreen(
 
         val selectedTransactionFilterId = scopeRowContent.id
         val transactionSearchQuery = searchTextFieldContent.value.text.trim()
-        LaunchedEffect(transactionSearchQuery, context.transactionTypeIndex, context.clientId) {
+        LaunchedEffect(transactionSearchQuery, transactionScopedStock, suggestionBatches, context.transactionTypeIndex, context.clientId) {
             if (transactionSearchQuery.isBlank() || !searchTextFieldContent.editedSinceCreation) return@LaunchedEffect
             delay(500)
             val result = typedStockSearch(transactionScopedStock, transactionSearchQuery)
@@ -2737,11 +2737,12 @@ internal fun AppConfiguration.StockQuantityQuickFillButtons(
     quantityUnit: QuantityDataModel,
     currentText: String,
     modifier: Modifier = Modifier,
+    shortcutAmounts: List<Double>? = null,
     onAmountSelected: (String) -> Unit
 ) {
     val currentAmount = parseStockQuantityInputText(currentText, quantityUnit)
     val unitText = quantityUnit.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
-    val amounts = stockQuantityShortcutAmounts(quantityUnit)
+    val amounts = (shortcutAmounts ?: stockQuantityShortcutAmounts(quantityUnit))
         .filterNot { amount ->
             currentAmount != null && abs(currentAmount - amount) < 0.000001
         }
@@ -2996,42 +2997,54 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
             snapshotForScreen.receiptPdfFileName(labels)
         }
 
-        fun runReceiptAction(action: String, successMessage: String) {
+        fun finishReceipt() {
+            receiptScope.launch {
+                latestTransactionReceiptSnapshotState.emit(null)
+                when (context.transactionTypeIndex) {
+                    0 -> Navigation.TransactionSale.clear()
+                    1 -> Navigation.TransactionReturn.clear()
+                    else -> Navigation.TransactionSupply.clear()
+                }
+            }
+        }
+
+        fun runReceiptAction(action: String, successMessage: String,
+            target: TransactionReceiptSnapshotDataModel = snapshotForScreen, finishAfterPrint: Boolean = false) {
             if (activeReceiptAction != null) return
             val actionOwner = captureReceiptActionOwner()
-            activeReceiptAction = action // reserve synchronously, before launching
+            val inventoryOwner = inventoryViewScopeKey()
+            activeReceiptAction = action
             receiptScope.launch {
                 try {
-                    if (action == "print" && receiptUsesSystemDocumentPrinting()) {
-                        val document = snapshotForScreen.buildReceiptPdfDocument(receiptLanguage, labels)
+                    val targetFileName = target.receiptPdfFileName(labels)
+                    val result = if (action == "print" && receiptUsesSystemDocumentPrinting()) {
+                        val document = withContext(Dispatchers.Default) { target.buildReceiptPdfDocument(receiptLanguage, labels) }
                         if (!actionOwner.isCurrent()) return@launch
-                        receiptActionNotification(printReceiptDocument(fileName, document), deviceWorkflowText("print_opened"), actionOwner)
-                        return@launch
-                    }
-                    val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf() else pdfCache.value ?: withContext(Dispatchers.Default) {
-                        snapshotForScreen.buildReceiptPdfBytes(receiptLanguage, labels)
-                    }.also { pdfCache.value = it }
-                    if (!actionOwner.isCurrent()) return@launch
-                    val result = when (action) {
-                        "pdf" -> saveReceiptPdf(fileName, pdf, labels)
-                        "share" -> shareReceiptPdf(fileName, pdf, whatsappOnly = false, labels = labels)
-                        "whatsapp" -> shareReceiptPdf(fileName, pdf, whatsappOnly = true, labels = labels)
-                        else -> {
-                            val escPos = withContext(Dispatchers.Default) {
-                                snapshotForScreen.buildReceiptEscPosBytes(receiptLanguage, labels)
+                        printReceiptDocument(targetFileName, document)
+                    } else {
+                        val pdf = if (action == "print" && receiptPrintUsesCurrentPage) byteArrayOf()
+                            else if (target == snapshotForScreen && pdfCache.value != null) pdfCache.value!!
+                            else withContext(Dispatchers.Default) { target.buildReceiptPdfBytes(receiptLanguage, labels) }
+                                .also { if (target == snapshotForScreen) pdfCache.value = it }
+                        if (!actionOwner.isCurrent()) return@launch
+                        when (action) {
+                            "pdf" -> saveReceiptPdf(targetFileName, pdf, labels)
+                            "share" -> shareReceiptPdf(targetFileName, pdf, whatsappOnly = false, labels = labels)
+                            "whatsapp" -> shareReceiptPdf(targetFileName, pdf, whatsappOnly = true, labels = labels)
+                            else -> {
+                                val escPos = withContext(Dispatchers.Default) { target.buildReceiptEscPosBytes(receiptLanguage, labels) }
+                                if (!actionOwner.isCurrent()) return@launch
+                                printReceipt(targetFileName, pdf, escPos, labels)
                             }
-                            if (!actionOwner.isCurrent()) return@launch
-                            printReceipt(fileName, pdf, escPos, labels)
                         }
                     }
                     receiptActionNotification(result, successMessage, actionOwner)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
+                    if (result.success && finishAfterPrint && actionOwner.isCurrent() && inventoryOwner == inventoryViewScopeKey() &&
+                        latestTransactionReceiptSnapshotState.value?.transaction?.id == target.transaction.id) finishReceipt()
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
                     if (actionOwner.isCurrent()) postInAppNotification(stateValues.stringReceiptActionFailed, NotificationType.Negative)
-                } finally {
-                    activeReceiptAction = null
-                }
+                } finally { activeReceiptAction = null }
             }
         }
 
@@ -3056,7 +3069,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     text = stateValues.stringComplete,
                     loading = stateValues.completeTransactionInProgress,
                     loadingText = localizedStringResource(224, "Completing transaction"),
-                    enabled = (alreadyCompleted || context.transactionTypeIndex != 1 || returnDestinationsReady(context.clientId)) && snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && invalidWholesaleReceiptItems.isEmpty(),
+                    enabled = (alreadyCompleted || context.transactionTypeIndex != 1 || returnDestinationsReady(context.clientId)) && snapshotForScreen.lines.isNotEmpty() && !stateValues.completeTransactionInProgress && activeReceiptAction == null && invalidWholesaleReceiptItems.isEmpty(),
                     iconPath = completeReceiptIconPath,
                     iconRes = completeReceiptIconRes,
                     iconTintColor = Color.White,
@@ -3093,20 +3106,38 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                         }
                     }
                 )
-            } else {
-                ReceiptActionToolbar(
-                    activeAction = activeReceiptAction,
-                    onAction = ::runReceiptAction,
-                    onFinish = {
-                        coroutineScope.launch {
-                            latestTransactionReceiptSnapshotState.emit(null)
-                            when (context.transactionTypeIndex) {
-                                0 -> Navigation.TransactionSale.clear()
-                                1 -> Navigation.TransactionReturn.clear()
-                                else -> Navigation.TransactionSupply.clear()
+                Spacer(Modifier.height(stateValues.marginTextField))
+                actionButton(
+                    text = pass26Text("finish_print"), iconPath = stateValues.drawablePathIconReceipt,
+                    autoLoading = false, confirmationRequired = false,
+                    loading = activeReceiptAction == "complete_print" || activeReceiptAction == "print",
+                    enabled = activeReceiptAction == null && !stateValues.completeTransactionInProgress &&
+                        snapshotForScreen.lines.isNotEmpty() && invalidWholesaleReceiptItems.isEmpty() &&
+                        (context.transactionTypeIndex != 1 || returnDestinationsReady(context.clientId)),
+                    onClick = {
+                        val owner = captureReceiptActionOwner()
+                        val inventoryOwner = inventoryViewScopeKey()
+                        activeReceiptAction = "complete_print"
+                        // Commit once to obtain the stable receipt ID. Print failure keeps that
+                        // completed receipt open for retry; it must never submit a second sale.
+                        completeTransaction(currentTransaction.copy(timeMillis = getCurrentTimeMillis()),
+                            context.transactionTypeIndex, context.clientId, snapshotForScreen,
+                            onSettled = { saved -> if (!saved) receiptScope.launch { activeReceiptAction = null } }) {
+                            val saved = latestTransactionReceiptSnapshotState.value
+                            receiptScope.launch {
+                                activeReceiptAction = null
+                                if (saved != null && owner.isCurrent() && inventoryOwner == inventoryViewScopeKey())
+                                    runReceiptAction("print", stateValues.stringReceiptSentToPrinter, saved, finishAfterPrint = true)
                             }
                         }
                     }
+                )
+            } else {
+                ReceiptActionToolbar(
+                    activeAction = activeReceiptAction,
+                    onAction = { action, success -> runReceiptAction(action, success) },
+                    onFinishAndPrint = { runReceiptAction("print", stateValues.stringReceiptSentToPrinter, finishAfterPrint = true) },
+                    onFinish = ::finishReceipt
                 )
             }
 

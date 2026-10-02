@@ -8,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 private fun desktopUpdates(path: String = ".aita/client-updates") = ManagedClientInstaller(File(System.getProperty("user.home"), path)) { from, to ->
     try { Files.move(from.toPath(),to.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
@@ -31,7 +32,8 @@ internal actual fun clientUpdatePlatform(): ClientPlatform {
     }.getOrNull() else null
     return ClientPlatform(when { name.contains("win",true) -> ClientOs.WINDOWS; name.contains("mac",true) -> ClientOs.MACOS; else -> ClientOs.LINUX },
         when (System.getProperty("os.arch").orEmpty().lowercase()) { "aarch64", "arm64" -> ClientArch.ARM64; "x86_64", "amd64", "x64" -> ClientArch.X64; else -> ClientArch.UNIVERSAL },
-        version.substringBefore('.').toIntOrNull() ?: 0, "$name $version", GeneratedClientBuild.identity.distribution == "store", linuxPackage)
+        version.substringBefore('.').toIntOrNull() ?: 0, "$name $version", GeneratedClientBuild.identity.distribution == "store", linuxPackage,
+        if (os == ClientOs.WINDOWS && desktopUpdates().readPreference("windows-installer") == "MSI") InstallerKind.MSI else InstallerKind.EXE)
 }
 internal actual suspend fun verifyClientReleaseSignature(payload: ByteArray, signature: ByteArray, publicKey: ByteArray) =
     withContext(Dispatchers.IO) { verifyRsaClientRelease(payload,signature,publicKey) }
@@ -39,8 +41,24 @@ internal actual suspend fun readClientUpdatePreference(key: String) = withContex
 internal actual suspend fun writeClientUpdatePreference(key: String, value: String?) = withContext(Dispatchers.IO) { desktopUpdates().writePreference(key,value) }
 internal actual suspend fun prepareClientInstaller(release: ClientRelease, artifact: ClientArtifact, progress: (Long,Long)->Unit) = withContext(Dispatchers.IO) { desktopUpdates().prepare(release,artifact,progress) }
 internal actual suspend fun restoreClientInstaller(release: ClientRelease, artifact: ClientArtifact) = withContext(Dispatchers.IO) { desktopUpdates().restore(release,artifact) }
-internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) = withContext(Dispatchers.IO) { desktopUpdates().clean(installed); desktopDownloadInstallers().clean(installed)
-    InstalledDownloadCleanup(desktopDownloadInstallers()).clean(installed, ::removeOwnedInstallerFile) }
+internal actual suspend fun cleanCompletedClientInstallers(installed: ClientBuildIdentity) {
+    restoreWindowsInstallerResult()
+    suspend fun clean() {
+        desktopUpdates().clean(installed); desktopDownloadInstallers().clean(installed)
+        InstalledDownloadCleanup(desktopDownloadInstallers()).clean(installed, ::removeOwnedInstallerFile)
+    }
+    withContext(Dispatchers.IO) {
+        if (!windowsInstallerIsRunning()) clean()
+        else kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+            // A manually started installer can open AITA before its final MSI action ends.
+            // Keep both its source and public download until Windows releases the operation.
+            repeat(60) {
+                kotlinx.coroutines.delay(30_000)
+                if (!windowsInstallerIsRunning()) { clean(); return@launch }
+            }
+        }
+    }
+}
 internal actual suspend fun handoffClientUpdate(release: ClientRelease, artifact: ClientArtifact, prepared: PreparedClientInstaller?): UpdateHandoff = withContext(Dispatchers.IO) {
     if (artifact != selectClientArtifact(release,clientUpdatePlatform()) || !clientReleaseIsNewer(release,installedClientBuild())) throw ClientUpdateFailure("integrity")
     if (!artifact.isFile) {
@@ -61,7 +79,7 @@ private suspend fun openDesktopInstaller(release: ClientRelease, artifact: Clien
     val file = storage.verifiedFile(prepared, artifact)
     when (clientUpdatePlatform().os) {
         ClientOs.WINDOWS -> {
-            val launcher = windowsUpdateLauncher(System.getProperty("jpackage.app-path"))
+            val launcher = currentWindowsUpdateLauncher()
             if (artifact.kind in setOf(InstallerKind.MSI, InstallerKind.EXE) && launcher != null) {
                 withContext(Dispatchers.Main) { AppStateWorkspace.flush() }
                 flushCartsBeforeClientUpdate()
@@ -69,8 +87,10 @@ private suspend fun openDesktopInstaller(release: ClientRelease, artifact: Clien
                 // Helper has verified the file and is waiting for this exact process to exit.
                 // The new process acknowledges the build before ManagedClientInstaller cleans up.
                 kotlin.system.exitProcess(0)
-            } else if (artifact.kind == InstallerKind.MSI) ProcessBuilder("msiexec.exe", "/i", file.absolutePath, "/norestart").start()
-            else ProcessBuilder(file.absolutePath).start()
+            } else {
+                clientInstallerDetailsState.value = windowsInstallerMessage("launcher")
+                throw ClientUpdateFailure("install")
+            }
         }
         ClientOs.MACOS -> ProcessBuilder("/usr/bin/open", file.absolutePath).start()
         ClientOs.LINUX -> ProcessBuilder("xdg-open", file.absolutePath).start()
@@ -89,10 +109,10 @@ internal suspend fun installPreparedWindowsUpdateOnExit(): Boolean = withContext
     val artifact = state.artifact ?: return@withContext false
     val prepared = state.prepared ?: return@withContext false
     if (!state.backgroundDownloads || !state.configured || platform.os != ClientOs.WINDOWS ||
-        state.busy || artifact.kind != InstallerKind.MSI || artifact != selectClientArtifact(release, platform) ||
+        state.busy || artifact.kind !in setOf(InstallerKind.MSI, InstallerKind.EXE) || artifact != selectClientArtifact(release, platform) ||
         clientReleaseProblem(release, System.currentTimeMillis(), installedClientBuild().channel) != null ||
         !clientReleaseIsNewer(release, installedClientBuild())) return@withContext false
-    val launcher = windowsUpdateLauncher(System.getProperty("jpackage.app-path")) ?: return@withContext false
+    val launcher = currentWindowsUpdateLauncher() ?: return@withContext false
     if (prepared.build != release.build || prepared.releaseId != release.id || prepared.channel != release.channel)
         throw ClientUpdateFailure("integrity")
     val file = desktopUpdates().verifiedFile(prepared, artifact)

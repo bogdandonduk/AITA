@@ -17,7 +17,7 @@ class ReturnCheckoutTest {
             supplyPrice = PriceDataModel("1", "KZT", ""), kind = StockBatchKindDataModel.UNIVERSAL)
         val raw = draft.toNavigationStateString()
         assertEquals(StockBatchKindDataModel.UNIVERSAL, goodsBatchDraftFromNavigationStateString(raw)?.kind)
-        assertEquals(StockBatchKindDataModel.NORMAL, goodsBatchDraftFromNavigationStateString(raw.substringBeforeLast(GOODS_BATCH_DRAFT_SEPARATOR))?.kind)
+        assertEquals(StockBatchKindDataModel.NORMAL, goodsBatchDraftFromNavigationStateString(raw.split(GOODS_BATCH_DRAFT_SEPARATOR).take(23).joinToString(GOODS_BATCH_DRAFT_SEPARATOR))?.kind)
     }
     @Test fun persistedCheckoutCanRestoreBatchStep() {
         assertEquals(NavigationScreenModel.Transaction.ReturnBatches,

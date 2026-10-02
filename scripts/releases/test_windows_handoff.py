@@ -34,7 +34,7 @@ function Start-Process {
             env = dict(os.environ, AITA_UPDATE_READY=str(folder / 'ready'), AITA_UPDATE_LAUNCHER=str(launcher),
                 AITA_UPDATE_INSTALLER=str(installer), AITA_UPDATE_PARENT='99999999', AITA_UPDATE_LOG=str(folder / 'install.log'),
                 AITA_UPDATE_SHA256=hashlib.sha256(installer.read_bytes()).hexdigest() if matching else '0'*64,
-                AITA_UPDATE_RELAUNCH=str(relaunch).lower(), AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output), AITA_TEST_INSTALL_ARGS=str(folder / 'args.txt'))
+                AITA_UPDATE_ACTIVE=str(folder / 'active'), AITA_UPDATE_RESULT=str(folder / 'result'), AITA_UPDATE_RELAUNCH=str(relaunch).lower(), AITA_TEST_EXIT=str(exit_code), AITA_TEST_CALLS=str(output), AITA_TEST_INSTALL_ARGS=str(folder / 'args.txt'))
             execution = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
                            env=env, check=True, capture_output=True, text=True, timeout=30)
             calls = json.loads(output.read_text(encoding='utf-8-sig'))
@@ -43,7 +43,9 @@ function Start-Process {
             self.assertFalse(helper.exists())
             self.assertEqual(len(calls), (2 if relaunch else 1) if matching else 0, execution.stdout + execution.stderr)
             if matching and relaunch: self.assertEqual(calls[-1], str(launcher))
-            if matching and kind == "msi": self.assertIn('INSTALLDIR="' + str(folder) + '"', (folder / 'args.txt').read_text(encoding='utf-8-sig'))
+            if matching: self.assertIn('INSTALLDIR="' + str(folder) + '"', (folder / 'args.txt').read_text(encoding='utf-8-sig'))
+            self.assertFalse((folder / 'active').exists())
+            self.assertEqual((folder / 'result').read_text().startswith('success'), matching and exit_code in (0, 3010))
             if not matching: self.assertIn('Installer checksum mismatch', execution.stdout)
             if matching and exit_code == 1602: self.assertIn('Windows Installer returned 1602', execution.stdout)
 

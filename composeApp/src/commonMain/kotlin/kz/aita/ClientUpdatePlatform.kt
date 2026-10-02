@@ -3,6 +3,8 @@ package kz.aita
 import kz.aita.updates.*
 import kotlinx.serialization.Serializable
 
+internal val clientInstallerDetailsState = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
 internal class ClientUpdateFailure(val reason: String) : Exception(reason)
 @Serializable
 internal data class PreparedClientInstaller(val releaseId: String, val build: Long, val channel: ReleaseChannel,

@@ -4612,7 +4612,12 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
     var selectedBarcode by rememberSaveable(goodsItem.id, barcodeOptions.joinToString("|")) {
         mutableStateOf(barcodeOptions.firstOrNull().orEmpty())
     }
-    var copies by rememberSaveable(goodsItem.id) { mutableStateOf(1) }
+    var copiesText by rememberSaveable(goodsItem.id) { mutableStateOf("1") }
+    val copies = copiesText.toIntOrNull()?.takeIf { it in 1..99 }
+    var printing by remember { mutableStateOf(false) }
+    var printError by remember { mutableStateOf<String?>(null) }
+    val protocol by configuredLabelPrinterProtocolState.collectAsState()
+    val copiesUnit = QuantityDataModel(id = "0", immutableUnitName = emptyList(), total = 1.0, pricedAmount = 1.0, roundTotal = true)
     val coroutineScope = rememberCoroutineScope()
     val previewLabel = StockItemLabelDataModel(
         itemName = itemName,
@@ -4621,15 +4626,15 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
         priceLabel = priceLabel,
         storeName = officialStoreName,
         unitText = defaultUnitText,
-        copies = copies,
-        protocol = LABEL_PRINTER_PROTOCOL_AUTO
+        copies = copies ?: 1,
+        protocol = protocol
     )
 
     AitaBottomSheet(
         title = localizedStringResource(1288, "Print item label"),
         iconPath = stateValues.drawablePathIconPrintTag,
         iconRes = stateValues.drawableResIconPrintTag.value,
-        onDismiss = onDismiss
+        onDismiss = { if (!printing) onDismiss() }
     ) {
         LazyColumn(
             modifier = Modifier
@@ -4757,52 +4762,65 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         fontWeight = FontWeight.Bold
                     )
                     actionButton(
-                        text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("−", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу"),
-                        enabled = copies > 1,
+                        text = "", iconPath = stateValues.drawablePathIconSubtract, iconContentDescription = authUiText("Decrease quantity", "Уменьшить количество", "Санды азайту", "Санды азайтуу"),
+                        enabled = !printing && (copies ?: 1) > 1,
                         confirmationRequired = false,
-                        onClick = { copies = (copies - 1).coerceAtLeast(1) }
+                        onClick = { copiesText = ((copies ?: 1) - 1).coerceAtLeast(1).toString() }
                     )
-                    Text(
-                        text = copies.toString(),
-                        color = stateValues.TextColor,
-                        fontSize = stateValues.titleTextSize,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.widthIn(min = 36.dp)
+                    SimpleTextInput(
+                        modifier = Modifier.widthIn(min = 70.dp, max = 140.dp),
+                        value = copiesText, placeholder = "1–99",
+                        keyboardType = KeyboardType.Number,
+                        onTransformValue = { it.filter(Char::isDigit).take(3) },
+                        onValueChange = { copiesText = it; printError = null }
                     )
                     actionButton(
-                        text = "", icon = { Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { Text("+", color = stateValues.AccentTextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold) } }, iconContentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү"),
-                        enabled = copies < 99,
+                        text = "", iconPath = stateValues.drawablePathIconAdd, iconContentDescription = authUiText("Increase quantity", "Увеличить количество", "Санды көбейту", "Санды көбөйтүү"),
+                        enabled = !printing && (copies ?: 0) < 99,
                         confirmationRequired = false,
-                        onClick = { copies = (copies + 1).coerceAtMost(99) }
+                        onClick = { copiesText = ((copies ?: 0) + 1).coerceAtMost(99).toString() }
                     )
                 }
             }
 
             item {
+                StockQuantityQuickFillButtons(copiesUnit, copiesText,
+                    shortcutAmounts = listOf(1.0, 5.0, 10.0, 20.0, 50.0, 99.0),
+                    onAmountSelected = { copiesText = it; printError = null })
+            }
+            item {
+                printError?.let { Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1288, "Print item label"),
                     iconPath = stateValues.drawablePathIconPrintTag,
                     iconRes = stateValues.drawableResIconPrintTag.value,
-                    enabled = selectedBarcode.isNotBlank(),
-                    onDisabledClick = {
-                        postInAppNotification(
-                            localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label."),
-                            NotificationType.Negative,
-                            transient = true
-                        )
-                    },
+                    enabled = !printing, loading = printing, autoLoading = false,
                     confirmationRequired = false,
-                    onClick = {
+                    onClick = printLabel@ {
+                        if (printing) return@printLabel
+                        if (copies == null) { printError = pass26Text("copies"); return@printLabel }
+                        if (selectedBarcode.isBlank()) {
+                            printError = localizedStringResource(1299, "This item has no barcode yet; add a barcode before printing a shelf label.")
+                            return@printLabel
+                        }
+                        val owner = captureReceiptActionOwner()
+                        val inventoryOwner = inventoryViewScopeKey()
+                        val label = previewLabel.copy(copies = copies)
+                        printing = true; printError = null
                         coroutineScope.launch {
-                            receiptActionNotification(
-                                printStockItemLabelDocument(
-                                    label = previewLabel.copy(copies = copies.coerceIn(1, 99)),
-                                    notConfiguredMessage = localizedStringResource(1269, "Paper document printing is not configured for this platform")
-                                ),
-                                localizedStringResource(1325, "Label opened for printing")
-                            )
+                            try {
+                                val result = printStockItemLabel(label,
+                                    notConfiguredMessage = localizedStringResource(1269, "Paper document printing is not configured for this platform"))
+                                if (owner.isCurrent() && inventoryOwner == inventoryViewScopeKey()) {
+                                    if (result.success) {
+                                        receiptActionNotification(result, deviceWorkflowText("print_queued"), owner)
+                                        onDismiss()
+                                    } else printError = result.message
+                                }
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (_: Exception) { printError = deviceWorkflowText("driver_print_failed") }
+                            finally { printing = false }
                         }
                     }
                 )
@@ -5803,7 +5821,8 @@ internal data class GoodsBatchDraft(
     val additionalNotesLocalized: List<LocalizedStringDataModel> = emptyList(),
     val status: StockBatchStatusDataModel = StockBatchStatusDataModel.Delivered,
     val kind: StockBatchKindDataModel = StockBatchKindDataModel.NORMAL,
-    val promotions: List<StockPromotionDataModel> = emptyList()
+    val promotions: List<StockPromotionDataModel> = emptyList(),
+    val editRevision: Long? = null
 )
 
 internal const val GOODS_BATCH_DRAFT_SEPARATOR = "\u001F"
@@ -5837,7 +5856,8 @@ internal fun GoodsBatchDraft.toNavigationStateString(): String {
         additionalNotes,
         status.name,
         jsonBase.encodeToString(ListSerializer(LocalizedStringDataModel.serializer()), additionalNotesLocalized),
-        kind.name
+        kind.name,
+        editRevision?.toString().orEmpty()
     ).joinToString(GOODS_BATCH_DRAFT_SEPARATOR) { it.cleanForGoodsBatchDraftState() }
 }
 
@@ -5904,7 +5924,8 @@ internal fun goodsBatchDraftFromNavigationStateString(raw: String): GoodsBatchDr
                 values.getOrNull(notesIndex).orEmpty().takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList()
             },
             status = StockBatchStatusDataModel.valueOf(values.getOrNull(statusIndex).orEmpty().ifBlank { StockBatchStatusDataModel.Delivered.name }),
-            kind = values.getOrNull(localizedNotesIndex + 1)?.let { runCatching { StockBatchKindDataModel.valueOf(it) }.getOrNull() } ?: StockBatchKindDataModel.NORMAL
+            kind = values.getOrNull(localizedNotesIndex + 1)?.let { runCatching { StockBatchKindDataModel.valueOf(it) }.getOrNull() } ?: StockBatchKindDataModel.NORMAL,
+            editRevision = values.getOrNull(localizedNotesIndex + 2)?.toLongOrNull()
         )
     }.getOrNull()
 }
@@ -6255,6 +6276,7 @@ internal fun GoodsBatchDataModel.toDraft(
         },
         status = status,
         kind = kind,
+        editRevision = updatedAtMillis,
         promotions = promotions
     )
 }

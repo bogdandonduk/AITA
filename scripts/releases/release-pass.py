@@ -350,6 +350,10 @@ class Run:
                              ['node', 'scripts/linux-web/test/stock-operations-smoke.cjs'])
                 self.command('Offline item and batch journal survives reload and synchronization',
                              ['node', 'scripts/linux-web/test/inventory-offline-smoke.cjs'])
+                self.command('New inventory search and label copies after offline creation',
+                             ['node', 'scripts/linux-web/test/inventory-label-actions-smoke.cjs'])
+                self.command('Batch subtraction, receipt print retry and device action spacing',
+                             ['node', 'scripts/linux-web/test/receipt-batch-actions-smoke.cjs'])
                 self.command('Profile password, email proof and refreshed authenticator choices',
                              ['node', 'scripts/linux-web/test/profile-security-smoke.cjs'])
                 self.command('Font preferences, download layout and offline support history in the browser',

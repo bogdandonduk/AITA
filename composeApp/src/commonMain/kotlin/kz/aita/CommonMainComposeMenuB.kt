@@ -1079,7 +1079,9 @@ internal fun AppConfiguration.DeviceSettingsCard(
         }
 
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
-        content()
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+            content()
+        }
     }
 }
 

@@ -984,6 +984,7 @@ suspend fun printStockItemLabel(
     protocol: String = label.protocol,
     notConfiguredMessage: String = "Sticky label printer is not configured for this platform"
 ): ReceiptPlatformActionResult {
+    printStockItemLabelPlatformAction?.invoke(label.copy(protocol = normalizeLabelPrinterProtocol(protocol)))?.let { return it }
     if (labelUsesSystemDocumentPrinting()) return printStockItemLabelDocument(label, notConfiguredMessage)
     val normalizedProtocol = normalizeLabelPrinterProtocol(protocol)
     return printLabelPrinterBytes?.invoke(
@@ -4245,11 +4246,12 @@ fun completeTransaction(
     transactionTypeIndex: Int,
     clientId: Int,
     receiptSnapshot: TransactionReceiptSnapshotDataModel,
+    onSettled: ((Boolean) -> Unit)? = null,
     onCompleted: (() -> Unit)? = null
 ) {
-    val cartOwner = DynamicCarts.captureScope() ?: return
+    val cartOwner = DynamicCarts.captureScope() ?: run { onSettled?.invoke(false); return }
     GlobalScope.launch(Dispatchers.ourIo) {
-        if (!DynamicCarts.isCurrent(cartOwner) || transaction.storeId != cartOwner.storeId) return@launch
+        if (!DynamicCarts.isCurrent(cartOwner) || transaction.storeId != cartOwner.storeId) { onSettled?.invoke(false); return@launch }
         if (!completeTransactionMutex.tryLock()) {
             postInAppNotification(
                 localizedStringResourceMessage(
@@ -4261,9 +4263,11 @@ fun completeTransaction(
                 NotificationType.Neutral,
                 transient = true
             )
+            onSettled?.invoke(false)
             return@launch
         }
 
+        var transactionSaved = false
         try {
             completeTransactionInProgressState.emit(true)
             val transactionWithOperationId = transaction.withClientOperationId()
@@ -4309,6 +4313,7 @@ fun completeTransaction(
                             ),
                             NotificationType.Positive
                         )
+                        transactionSaved = true
                         onCompleted?.invoke()
                         return@launch
                     }
@@ -4355,11 +4360,13 @@ fun completeTransaction(
             }
 
             postInAppNotification(response.message, NotificationType.Positive)
+            transactionSaved = true
             onCompleted?.invoke()
         } finally {
             withContext(NonCancellable) {
                 completeTransactionInProgressState.emit(false)
                 completeTransactionMutex.unlock()
+                onSettled?.invoke(transactionSaved)
             }
         }
     }
@@ -19462,7 +19469,9 @@ data class GoodsBatchDataModel(
     val createdByUserId: String? = null,
 
     val isActive: Boolean = true,
-    val kind: StockBatchKindDataModel = StockBatchKindDataModel.NORMAL
+    val kind: StockBatchKindDataModel = StockBatchKindDataModel.NORMAL,
+    // Optional editor precondition. Never stored as batch content by the server.
+    val expectedUpdatedAtMillis: Long? = null
 )
 
 //@kotlinx.serialization.Serializable

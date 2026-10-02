@@ -63,6 +63,30 @@ class ClientUpdateCoordinatorTest {
         return release().copy(artifacts = listOf(ClientArtifact(ClientOs.WINDOWS, ClientArch.X64,
             InstallerKind.MSI, "https://updates.example.org/update.msi", 20, "a".repeat(64))))
     }
+    @Test fun windowsDefaultsToExeAndPersistsExplicitMsiChoiceAcrossPolls() = scenario { b, c, _ ->
+        val msi = b.windowsRelease().artifacts.single()
+        val exe = msi.copy(kind = InstallerKind.EXE, url = "https://updates.example.org/update.exe", sha256 = "b".repeat(64))
+        b.announce(b.release().copy(artifacts = listOf(msi, exe))); c.start()
+        assertEquals(InstallerKind.EXE, c.state.value.artifact?.kind)
+        assertEquals(1, b.preparations)
+        c.selectWindowsInstaller(InstallerKind.MSI)
+        assertEquals("MSI", b.values["windows-installer"])
+        assertEquals(InstallerKind.MSI, c.state.value.artifact?.kind)
+        assertNull(c.state.value.prepared)
+        c.checkNow()
+        assertEquals(InstallerKind.MSI, c.state.value.artifact?.kind)
+        c.update(); assertEquals(1, b.installs)
+    }
+    @Test fun installerChoiceCannotChangeDuringDownload() = scenario { b, c, _ ->
+        val msi = b.windowsRelease().artifacts.single()
+        val exe = msi.copy(kind = InstallerKind.EXE, url = "https://updates.example.org/update.exe", sha256 = "b".repeat(64))
+        b.preparationGate = CompletableDeferred()
+        b.announce(b.release().copy(artifacts = listOf(msi, exe))); c.start()
+        c.selectWindowsInstaller(InstallerKind.MSI)
+        assertEquals(InstallerKind.EXE, c.state.value.artifact?.kind)
+        assertNull(b.values["windows-installer"])
+        c.cancelDownload()
+    }
     @Test fun windowsPreparesInBackgroundButNeverClosesWorkingApplication() = scenario { b, c, _ ->
         b.announce(b.windowsRelease()); c.start()
         assertTrue(c.state.value.backgroundDownloads)
