@@ -258,19 +258,12 @@ internal fun platformSupportsCameraBarcodeScanner(): Boolean {
 internal fun platformSupportsVoiceInput(): Boolean =
     startPlatformVoiceInput != null && (isPlatformVoiceInputAvailable?.invoke() ?: true)
 
-internal fun normalizeVisibleBarcodeFieldInput(previousValue: String, rawValue: String): String {
-    val rawStored = rawValue.toStoredGoodsItemBarcode()
-    val previousStored = previousValue.toStoredGoodsItemBarcode()
-
-    if (previousStored.isNotBlank() && rawStored.startsWith(previousStored) && rawStored.length > previousStored.length) {
-        val appendedPart = rawStored.removePrefix(previousStored).toStoredGoodsItemBarcode()
-        if (appendedPart.length >= 6 || appendedPart.looksLikeCompleteRetailBarcodeInput()) {
-            return appendedPart
-        }
-    }
-
-    return if (rawStored.length > 32) rawStored.takeLast(32) else rawStored
-}
+// A scanner can deliver several edits before the parent recomposes. Comparing the
+// live editor with a captured parent value mistook those edits for a second scan
+// and removed the first digits. A barcode editor must preserve the entered value;
+// explicit camera/generator replacements and checkout scan framing happen elsewhere.
+internal fun normalizeVisibleBarcodeFieldInput(rawValue: String): String =
+    rawValue.toStoredGoodsItemBarcode()
 
 
 fun getTransformedTextWithSelectionFocusTextColor(

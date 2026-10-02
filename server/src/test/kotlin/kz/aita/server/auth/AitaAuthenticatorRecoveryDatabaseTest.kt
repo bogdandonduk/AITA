@@ -870,10 +870,27 @@ class AitaAuthenticatorRecoveryDatabaseTest {
         }
     }
 
-    private fun profileRequest(id: UUID, email: String, proof: AitaSecurityEmailProof? = null) = kz.aita.UserAccountUpdateDataModel(
+
+    @Test fun evenUnchangedProfileRequiresPasswordAndIndependentProofWithoutLoginTwoFactorPolicy() = fixture {
+        val id = user(); service.settings(id)
+        val request = profileRequest(id, mainEmail)
+        assertFalse(sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), request) })
+        val emailProof = proof(id, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(mainPhone, mainEmail, true))
+        assertFalse(sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), profileRequest(id, mainEmail, emailProof, "wrong")) })
+        assertTrue(sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), profileRequest(id, mainEmail, emailProof)) })
+        assertFalse(sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), profileRequest(id, mainEmail, emailProof)) })
+    }
+    @Test fun enrolledUserCanChooseEmailForProfileButCannotSkipTheSecondProof() = fixture {
+        val id = user(enrolled = true)
+        val request = profileRequest(id, mainEmail)
+        assertFalse(sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), request) })
+        val emailProof = proof(id, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(mainPhone, mainEmail, true))
+        assertTrue(sql { service.verifyProfileSecurityInside(Users.selectAll().where { Users.id eq id }.single(), profileRequest(id, mainEmail, emailProof)) })
+    }
+    private fun profileRequest(id: UUID, email: String, proof: AitaSecurityEmailProof? = null, currentPassword: String = password) = kz.aita.UserAccountUpdateDataModel(
         account = kz.aita.UserAccountDataModel(id = id.toString(), phoneNumber = mainPhone, email = email,
             firstName = "Test", lastName = "Account", countryLocale = "kz", workerAccountIds = null, supplierAccountIds = null,
-            createdAt = 0L, isActive = true), password = password, newPassword = null, emailProof = proof)
+            createdAt = 0L, isActive = true), password = currentPassword, newPassword = null, emailProof = proof)
 
     private fun encrypt(context: String, text: String): String {
         val iv = ByteArray(12).also(java.security.SecureRandom()::nextBytes)

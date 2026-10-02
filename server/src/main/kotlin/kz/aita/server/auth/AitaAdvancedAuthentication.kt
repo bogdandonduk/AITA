@@ -1329,6 +1329,13 @@ internal class AitaAdvancedAuthService(
         defersMainEmailProof: Boolean = false): Boolean {
         if (password.length !in 1..1024 || !user[Users.isActive] || !Pw.verify(password.toCharArray(), user[Users.passwordHash])) return false
         val profile = AuthSecurityProfiles.selectAll().where { AuthSecurityProfiles.userId eq user[Users.id] }.singleOrNull()
+        // Editing or deleting an account always needs password + one independent proof,
+        // regardless of whether the user requires a second factor for ordinary sign-in.
+        if (action == AitaSecurityEmailAction.PROFILE || action == AitaSecurityEmailAction.ACCOUNT_DELETE) {
+            if (proof != null) return verifySecurityEmailInside(user, proof, action, target, now)
+            return profile?.get(AuthSecurityProfiles.totpEnabledAtMillis) != null &&
+                verifySecondFactorInside(user[Users.id], secondFactor, now)
+        }
         if (profile?.get(AuthSecurityProfiles.totpEnabledAtMillis) != null) return verifySecondFactorInside(user[Users.id], secondFactor, now)
         if (profile?.get(AuthSecurityProfiles.emailRequiredForLogin) == true && !defersMainEmailProof)
             return action != null && verifySecurityEmailInside(user, proof, action, target, now)
@@ -1656,15 +1663,12 @@ internal class AitaAdvancedAuthService(
         }
     }
 
+    internal fun requireProfileConfirmationBudget(userId: UUID) =
+        requireActionBudget("profile-confirmation:$userId", 12, System.currentTimeMillis())
+
     /** Called under the account row lock by the existing profile route. */
     internal fun verifyProfileSecurityInside(user: ResultRow, request: kz.aita.UserAccountUpdateDataModel): Boolean {
         val account = request.account
-        val changesProtectedValues = normalizeAitaEmail(account.email) != normalizeAitaEmail(user[Users.email]) ||
-            normalizeAitaPhoneAlias(account.phoneNumber) != normalizeAitaStoredMainPhone(user[Users.phoneNumber], user[Users.countryLocale]) ||
-            account.isActive != user[Users.isActive] || !request.newPassword.isNullOrBlank()
-        if (!changesProtectedValues) return true
-        // The profile route has already locked and validated an exact new-address contact receipt.
-        // Existing password and enrolled-factor checks below still authorize the account change.
         return verifyEmailAliasCredentialsInside(user, request.password, request.secondFactorCode, System.currentTimeMillis(),
             request.emailProof, AitaSecurityEmailAction.PROFILE, aitaProfileSecurityTarget(account.phoneNumber, account.email, account.isActive))
     }
@@ -2529,7 +2533,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val result = service.startTotpSetup(userId, request)
                     if (result == null) {
                         call.genericResponseNoPayload(
-                            HttpStatusCode.Unauthorized,
+                            HttpStatusCode.BadRequest,
                             eventMessage("auth.message.security_confirmation_failed")
                         )
                     } else {
@@ -2541,7 +2545,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaTotpSetupConfirmRequestDataModel>()
                     val result = service.confirmTotpSetup(userId, request)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.authenticator_code_is_invalid"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.authenticator_code_is_invalid"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 
@@ -2558,7 +2562,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaSensitiveSecurityActionRequestDataModel>()
                     val result = service.disableTotp(userId, request)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.security_confirmation_failed"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.security_confirmation_failed"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
 
@@ -2566,7 +2570,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaSensitiveSecurityActionRequestDataModel>()
                     val codes = service.regenerateRecoveryCodes(userId, request)
-                    if (codes == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.security_confirmation_failed"))
+                    if (codes == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.security_confirmation_failed"))
                     else call.genericResponse(HttpStatusCode.OK, AitaAuthFlowDataModel(nextStep = AitaAuthNextStep.COMPLETE, recoveryCodes = codes))
                 }
 
@@ -2608,7 +2612,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaEmailCodeResendRequestDataModel>()
                     val result = service.resend(request.flowId, request.locale, call.authClientIp(), AUTH_PURPOSE_PHONE, userId)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized,
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest,
                         eventMessage("auth.message.request_a_new_code"))
                     else call.genericResponse(HttpStatusCode.Accepted, result)
                 }
@@ -2617,7 +2621,7 @@ fun Route.installAitaAdvancedAuthenticationRoutes(
                     val userId = call.checkPrincipal() ?: return@post
                     val request = call.receiveAita<AitaPhoneAliasConfirmRequestDataModel>()
                     val result = service.confirmPhoneAlias(userId, request)
-                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.Unauthorized, eventMessage("auth.message.the_confirmation_code_is_invalid_or_expired"))
+                    if (result == null) call.genericResponseNoPayload(HttpStatusCode.BadRequest, eventMessage("auth.message.the_confirmation_code_is_invalid_or_expired"))
                     else call.genericResponse(HttpStatusCode.OK, result)
                 }
             }

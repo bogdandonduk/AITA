@@ -2403,6 +2403,8 @@ internal fun AppConfiguration.WorkerInviteStatusCard(
 fun AppConfiguration.MenuUserAccountScreen() {
     var logoutConfirmationShown by rememberSaveable { mutableStateOf(false) }
     var deleteAccountShown by remember { mutableStateOf(false) }
+    var accountSaveError by remember { mutableStateOf("") }
+    var savingAccount by remember { mutableStateOf(false) }
     if (deleteAccountShown) AccountDeletionSheet { deleteAccountShown = false }
 
     AitaScreenColumn(
@@ -2553,8 +2555,9 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
                 val confirmationPasswordTextFieldContent: GenericTextFieldContent? = passwordTextField(
                     titleText = stateValues.stringConfirmationPassword,
-                    placeholderText = stateValues.stringRequiredToEditAccount,
-                    contentInvalidText = stateValues.stringRequiredToEditAccount + ". \n" + stateValues.stringPasswordMustBe,
+                    placeholderText = stateValues.stringEnterPassword,
+                    contentInvalidText = stockEditingMessage("confirmation_required").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                    onContentValidityCheck = { it.isNotBlank() },
                     imeWithAction = ImeWithAction(ImeAction.Go) {
                         goAction?.invoke()
                     },
@@ -2566,13 +2569,11 @@ fun AppConfiguration.MenuUserAccountScreen() {
                     find { it.locale.equals(phoneNumberTextFieldContent.selectedId, true) } ?: first()
                 }.phoneNumberCode + phoneNumberTextFieldContent.value.text.trim()
                 val profileEmail = emailTextFieldContent.value.text.trim()
-                val protectedProfileChange = kz.aita.auth.normalizeAitaPhoneAlias(profilePhone) !=
-                    stateValues.userAccount?.let { kz.aita.auth.normalizeAitaStoredMainPhone(it.phoneNumber, it.countryLocale) } ||
-                    kz.aita.auth.normalizeAitaEmail(profileEmail) != kz.aita.auth.normalizeAitaEmail(stateValues.userAccount?.email.orEmpty()) ||
-                    passwordTextFieldContent?.value?.text?.isNotEmpty() == true
-                val profileConfirmation = if (protectedProfileChange) ProfileSecurityConfirmationInput(
+                Text(stockEditingMessage("confirmation_password").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                val profileConfirmation = ProfileSecurityConfirmationInput(
                     kz.aita.auth.aitaProfileSecurityTarget(profilePhone, profileEmail, true),
-                    confirmationPasswordTextFieldContent?.value?.text.orEmpty()) else ProfileSecurityConfirmation(true)
+                    confirmationPasswordTextFieldContent?.value?.text.orEmpty())
 
 //        responseText(
 //          stateValues.stringUserWithThisPhoneNumberIsAlreadyRegistered,
@@ -2606,8 +2607,11 @@ fun AppConfiguration.MenuUserAccountScreen() {
 
                 Spacer(modifier = Modifier.height(outerSpace))
 
-                goAction = {
+                goAction = saveAccount@{
+                    if (savingAccount) return@saveAccount
                     softKeyboardController?.hide()
+                    accountSaveError = if (!profileConfirmation.ready)
+                        stockEditingMessage("confirmation_required").extractLocalizedString(stateValues.appLanguage).orEmpty() else ""
 
                     phoneNumberTextFieldContent.checkContentValidity()
                     emailTextFieldContent.checkContentValidity()
@@ -2633,6 +2637,7 @@ fun AppConfiguration.MenuUserAccountScreen() {
                         && confirmationPasswordTextFieldContent.isContentValid
                         && profileConfirmation.ready && accountEmailConfirmation.ready
                     ) {
+                        savingAccount = true
                         updateUser(
                             userAccountUpdate = UserAccountUpdateDataModel(
                                 account = UserAccountDataModel(
@@ -2659,18 +2664,24 @@ fun AppConfiguration.MenuUserAccountScreen() {
                                 secondFactorCode = profileConfirmation.factor,
                                 emailProof = profileConfirmation.emailProof,
                                 contactEmailProofs = accountEmailConfirmation.proofs
-                            )
+                            ),
+                            onCompleted = { response ->
+                                savingAccount = false
+                                if (response.negative) accountSaveError = response.message?.extractLocalizedString(stateValues.appLanguage).orEmpty()
+                                else {
+                                    accountSaveError = ""
+                                    confirmationPasswordTextFieldContent.reset()
+                                    passwordTextFieldContent.reset()
+                                    repeatedPasswordTextFieldContent?.reset()
+                                }
+                            }
                         )
-
-                        confirmationPasswordTextFieldContent.reset()
-                        passwordTextFieldContent.reset()
-                        repeatedPasswordTextFieldContent?.reset()
                     }
                 }
 
+                if (accountSaveError.isNotBlank()) Text(accountSaveError, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                 actionButton(
-                    text = stateValues.stringEdit,
-                    enabled = accountEmailConfirmation.ready && profileConfirmation.ready
+                    text = stateValues.stringEdit, enabled = !savingAccount, loading = savingAccount, autoLoading = false
                 ) {
                     goAction.invoke()
                 }

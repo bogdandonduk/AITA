@@ -101,4 +101,32 @@ class ParentMarketplaceProfileDatabaseTest {
         assertEquals(source[StockItems.imagePaths], mirrored[StockItems.imagePaths])
         assertEquals(originalProfile, mirrored[StockItems.marketplaceProfile])
     } }
+    @Test fun sameNameInternalCodesSelectTheCorrectParentInsteadOfColliding() = fixture { db -> transaction(db) {
+        val otherParent = UUID.randomUUID()
+        seed(otherParent, parent, "Same toy", "", "other", "15", StockMarketplaceProfile())
+        fun barcode(id: UUID, value: String, store: UUID) {
+            StockItems.update({ StockItems.id eq id }) {
+                it[barcodes] = listOf(value)
+                it[barcodeModels] = listOf(GoodsItemBarcodeDataModel(value, GOODS_ITEM_BARCODE_TYPE_INTERNAL, store.toString()))
+                it[name] = localizedRows("Same toy")
+            }
+        }
+        barcode(parentItem, "2618000001248", parent)
+        barcode(otherParent, "2610000008746", parent)
+        barcode(branchItem, "2618000001248", branch)
+        val mirror = assertNotNull(mirrorBranchStockItemToParentInsideTransaction(item(branchItem), userId = owner, now = 100))
+        assertEquals(parentItem, mirror[StockItems.id])
+        assertEquals(listOf("2610000008746"), item(otherParent)[StockItems.barcodes])
+        assertEquals(3L, StockItems.selectAll().count())
+    } }
+    @Test fun combiningExistingParentAliasesNeverOverwritesAnotherParentCard() = fixture { db -> transaction(db) {
+        val second = UUID.randomUUID()
+        seed(second, parent, "Other product", "", "other", "15", StockMarketplaceProfile())
+        StockItems.update({ StockItems.id eq second }) { it[barcodes] = listOf("2618000001248") }
+        StockItems.update({ StockItems.id eq branchItem }) { it[barcodes] = listOf("4006381333931", "2618000001248") }
+        mirrorBranchStockItemToParentInsideTransaction(item(branchItem), userId = owner, now = 100)
+        assertEquals(listOf("4006381333931"), item(parentItem)[StockItems.barcodes])
+        assertEquals(listOf("2618000001248"), item(second)[StockItems.barcodes])
+    } }
+
 }

@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 import kz.aita.*
 
 object AitaAdvancedAuthenticationClient {
+    val securityRevision = kotlinx.coroutines.flow.MutableStateFlow(0L)
     suspend fun capabilities(): ResponseDataModel<AitaAuthCapabilitiesDataModel> {
         val response = authRequest<AitaAuthCapabilitiesDataModel, Unit>(HttpMethod.Get, "auth/capabilities")
         // A positively identified older AITA origin can still accept password sign-in. Do not
@@ -127,7 +128,13 @@ object AitaAdvancedAuthenticationClient {
         endpointUrl = endpoint,
         body = body,
         expectedSessionGeneration = if (cloudEndpointRequiresAuthentication(endpoint)) currentAuthenticatedSessionGeneration() else null
-    ).withAuthFailureMessage()
+    ).withAuthFailureMessage().also { response ->
+        if (!response.negative && endpoint in setOf("auth/security/totp/setup/confirm", "auth/security/totp/disable",
+                "auth/security/login-policy", "auth/security/totp/login-policy", "auth/security/email/confirm",
+                "auth/security/email/remove", "auth/security/phone/confirm")) {
+            securityRevision.value += 1L
+        }
+    }
 }
 
 internal suspend fun passwordLoginWithCompatibility(

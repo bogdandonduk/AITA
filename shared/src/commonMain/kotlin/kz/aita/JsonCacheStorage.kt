@@ -38,3 +38,12 @@ private val jsonTextCache by lazy { ChunkedTextCache(
 internal suspend fun readJsonCacheText(key: String): String? = jsonTextCache.get(key)
 internal suspend fun writeJsonCacheText(key: String, text: String) = jsonTextCache.put(key, text)
 internal suspend fun deleteJsonCacheText(key: String) = jsonTextCache.delete(key)
+
+internal suspend fun readRequiredJsonJournal(key: String): String? {
+    val text = readJsonCacheText(key)
+    if (text == null) {
+        val marker = "aita-cache-chunks-v1:${key.length}:$key:manifest"
+        check(getLocalKv(marker) == null && getLocalKv(key) == null) { "Stored journal is unreadable" }
+    }
+    return text
+}

@@ -656,18 +656,23 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 text = stateValues.stringConfirm,
                 loading = isSavingStockItem,
                 loadingText = localizedStringResource(1141, "Please wait…"),
-                enabled = !isSavingStockItem &&
-                    canSaveVisibleStockDraft &&
-                    (!isEditingStockItem || existing != null) &&
-                    draft.isValidStockDraft(stateValues.globalAppConfiguration) &&
-                    stateValues.activeStoreId != null,
+                enabled = !isSavingStockItem,
                 onClick = {
                     if (isSavingStockItem) return@actionButton
                     if (!canSaveVisibleStockDraft) {
-                        postInAppNotification(currentUserPermissionDeniedMessage(), NotificationType.Negative, transient = true)
+                        stockSaveError = currentUserPermissionDeniedMessage().extractLocalizedString(stateValues.appLanguage)
                         return@actionButton
                     }
-                    val storeId = stateValues.activeStoreId ?: return@actionButton
+                    val errors = draft.stockDraftErrors(stateValues.globalAppConfiguration)
+                    if (errors.isNotEmpty()) {
+                        stockSaveError = errors.joinToString("\n") { stockEditingMessage(it).extractLocalizedString(stateValues.appLanguage).orEmpty() }
+                        return@actionButton
+                    }
+                    val storeId = stateValues.activeStoreId
+                    if (storeId == null || (isEditingStockItem && existing == null)) {
+                        stockSaveError = eventMessage("message.could_not_load_stock_try_again").extractLocalizedString(stateValues.appLanguage)
+                        return@actionButton
+                    }
                     val goodsItem = draft.toGoodsItem(storeId, stateValues.globalAppConfiguration, existing)
                     stockSaveError = null
                     isSavingStockItem = true
@@ -1565,7 +1570,7 @@ fun AppConfiguration.BarcodeTextInput(
         successHighlightPulseKey = barcodeFillHighlightPulseKey,
         contentInvalidText = stateValues.stringBarcode,
         onContentValidityCheck = { it.isNotBlank() },
-        onTransformValue = { raw -> normalizeVisibleBarcodeFieldInput(value, raw) },
+        onTransformValue = ::normalizeVisibleBarcodeFieldInput,
         onFilterValue = { candidate -> candidate.all { char -> char.isDigit() || char.isLetter() } },
         onValueChange = { candidate, applyChange ->
             if (candidate.all { char -> char.isDigit() || char.isLetter() }) {

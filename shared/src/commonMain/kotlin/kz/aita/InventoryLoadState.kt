@@ -85,6 +85,7 @@ internal suspend fun publishActiveInventoryStoreId(storeId: String?, selectionIs
             inventoryAccessRevision++
             val retain = sameInventoryAccountAndStore(previous, owner)
             if (!retain) {
+                inventoryCreatePendingState.value = emptyList()
                 selectStoreSubscriptionScope(cleanId)
                 AnalyticsWorkspace.invalidate()
                 storeAnalyticsDashboardState.emit(DataState.Empty())

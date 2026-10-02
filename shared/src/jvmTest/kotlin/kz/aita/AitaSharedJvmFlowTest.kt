@@ -74,6 +74,8 @@ private class AitaFlowTestEnvironment {
     var nextWorkerRemovalRequestResponse: StoreWorkerRequestDataModel? = null
     var nextRemovedWorkerResponse: StoreWorkerDataModel? = null
     var nextWorkshiftResponse: WorkshiftDataModel? = null
+    var echoCreatedInventoryBodies = false
+    var loseNextCreatedItemReply = false
     var nextGoodsItemResponse: GoodsItemDataModel? = null
     var nextGoodsBatchResponse: List<GoodsBatchDataModel>? = null
     var nextDeletedGoodsItemId: String? = null
@@ -536,6 +538,8 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun addsUpdatesDeletesGoodsItemAndKeepsLocalStockStateInSync() = runBlocking {
+        storesState.emit(DataState.Success(listOf(aitaTestStore())))
+        waitUntilAitaFlowCondition { currentUserHasStorePermission(AITA_FLOW_SOURCE_STORE_ID, STORE_PERMISSION_STOCK_ITEM_CREATE) }
         // Exercise the recovery request that previously raced the mutation on Windows.
         environment.stores = listOf(aitaTestStore(id = AITA_FLOW_SOURCE_STORE_ID))
         val refreshed = refreshUserAccountNow(currentAuthenticatedSessionGeneration(), refreshRelatedData = false)
@@ -578,6 +582,8 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun addsUpdatesDeletesStockBatchesAndKeepsLocalBatchStateInSync() = runBlocking {
+        storesState.emit(DataState.Success(listOf(aitaTestStore())))
+        waitUntilAitaFlowCondition { currentUserHasStorePermission(AITA_FLOW_SOURCE_STORE_ID, STORE_PERMISSION_STOCK_ITEM_CREATE) }
         stockBatchesState.emit(DataState.Success(emptyList()))
         waitUntilAitaFlowCondition { stockBatchesState.payloadValue?.isEmpty() == true }
 
@@ -618,6 +624,8 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun unconfirmedBatchSaveCompletesAndAllowsRetryWithoutReplacingStock() = runBlocking {
+        storesState.emit(DataState.Success(listOf(aitaTestStore())))
+        waitUntilAitaFlowCondition { currentUserHasStorePermission(AITA_FLOW_SOURCE_STORE_ID, STORE_PERMISSION_STOCK_ITEM_CREATE) }
         val existing = aitaTestBatch(id = "batch-existing", goodsItemId = "item", quantityTotal = 3.0)
         val added = aitaTestBatch(id = "batch-retry", goodsItemId = "item", quantityTotal = 12.0)
         stockBatchesState.emit(DataState.Success(listOf(existing)))
@@ -638,6 +646,39 @@ class AitaSharedJvmFlowTest {
         addGoodsBatches(listOf(added)) { retry.complete(it) }
         assertEquals(listOf(added), requireAitaFlowSuccess(retry).payload)
         assertEquals(setOf(existing.id, added.id), stockBatchesState.payloadValue!!.map { it.id }.toSet())
+    }
+
+    @Test
+    fun offlineCreatesSurviveReadsAndReplayInOrderWithLostReplyWithoutDuplicatingIds() = runBlocking {
+        val store = aitaTestStore().copy(architectureVersion = 2)
+        environment.stores = listOf(store)
+        storesState.emit(DataState.Success(listOf(store)))
+        waitUntilAitaFlowCondition { currentStoreHasWorkspaceAccess(store.id) }
+        environment.echoCreatedInventoryBodies = true
+        cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+        val itemResult = CompletableDeferred<DataState<GoodsItemDataModel>>()
+        addGoodsItem(aitaTestGoodsItem(id = "", name = "Offline toy", barcode = "2618000001248")) { itemResult.complete(it) }
+        val item = requireAitaFlowSuccess(itemResult).payload
+        val batchResult = CompletableDeferred<DataState<List<GoodsBatchDataModel>>>()
+        addGoodsBatches(listOf(aitaTestBatch(id = "", goodsItemId = item.id, quantityTotal = 5.0))) { batchResult.complete(it) }
+        val batch = requireAitaFlowSuccess(batchResult).payload.single()
+        assertTrue(environment.requests.none { it.path == "stock/add" || it.path == "stockBatches/add" })
+        assertEquals(2, InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
+        assertEquals(item, InventoryCreates.overlayItems(inventoryOwners.current, emptyList()).single())
+        assertEquals(batch, InventoryCreates.overlayBatches(inventoryOwners.current, emptyList()).single())
+        assertTrue(InventoryCreates.pending("unrelated-account").isEmpty())
+        cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_REACHABLE
+        environment.loseNextCreatedItemReply = true
+        InventoryCreates.flush()
+        assertEquals(1, environment.stock.size)
+        assertEquals(2, InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
+        assertTrue(environment.batches.isEmpty())
+        InventoryCreates.flush(force = true)
+        assertEquals(listOf(item.id), environment.stock.map { it.id })
+        assertEquals(listOf(batch.id), environment.batches.map { it.id })
+        assertTrue(InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty())
+        assertEquals(listOf("stock/add", "stock/add", "stockBatches/add"), environment.requests
+            .map { it.path }.filter { it == "stock/add" || it == "stockBatches/add" })
     }
 
     @Test
@@ -2294,8 +2335,10 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             }
             "stock/get" -> aitaTestSuccessEnvelope(environment.stock)
             "stock/add" -> {
-                val item = environment.nextGoodsItemResponse ?: aitaTestGoodsItem(id = "server-added")
+                val item = if (environment.echoCreatedInventoryBodies) jsonBase.decodeFromString<GoodsItemDataModel>((request.body as io.ktor.http.content.TextContent).text)
+                    else environment.nextGoodsItemResponse ?: aitaTestGoodsItem(id = "server-added")
                 environment.stock = environment.stock.upsertAitaTestItem(item)
+                if (environment.loseNextCreatedItemReply) { environment.loseNextCreatedItemReply = false; throw java.io.IOException("Lost reply after commit") }
                 aitaTestSuccessEnvelope(item)
             }
             "stock/update" -> {
@@ -2310,7 +2353,8 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             }
             "stockBatches/get" -> aitaTestSuccessEnvelope(environment.batches)
             "stockBatches/add" -> {
-                val batches = environment.nextGoodsBatchResponse.orEmpty()
+                val batches = if (environment.echoCreatedInventoryBodies) jsonBase.decodeFromString<List<GoodsBatchDataModel>>((request.body as io.ktor.http.content.TextContent).text)
+                    else environment.nextGoodsBatchResponse.orEmpty()
                 environment.batches = batches.fold(environment.batches) { acc, batch -> acc.upsertAitaTestBatch(batch) }
                 aitaTestSuccessEnvelope(batches)
             }

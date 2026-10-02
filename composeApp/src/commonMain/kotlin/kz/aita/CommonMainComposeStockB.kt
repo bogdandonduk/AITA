@@ -1813,6 +1813,8 @@ fun AppConfiguration.StockAddEditBatchesPage(
         return
     }
 
+    InventoryPendingFeedback()
+
     if (addingBatch || editing) {
         StockBatchEditor(
             modifier = modifier,
@@ -3883,36 +3885,8 @@ internal fun GoodsItemDataModel.visibleParentStoreStockName(language: String): S
 internal fun GoodsItemDataModel.parentStoreStockBarcodeText(): String =
     allBarcodeValues().filter { it.isNotBlank() }.distinct().take(3).joinToString(" • ")
 
-internal fun GoodsItemDataModel.matchesParentStoreStockPickerFilter(rawQuery: String): Boolean {
-    if (rawQuery.isNotBlank() && matchesTransactionBarcode(rawQuery.trim())) return true
-    val queryTokens = rawQuery
-        .trim()
-        .lowercase()
-        .split(Regex("\\s+"))
-        .filter { it.isNotBlank() }
-
-    if (queryTokens.isEmpty()) return true
-
-    val searchableText = buildList {
-        add(id)
-        add(storeId)
-        addAll(allBarcodeValues())
-        addAll(allBarcodeValues().map { it.toStoredGoodsItemBarcode() })
-        addAll(name.map { it.value })
-        addAll(description.map { it.value })
-        add(measurementUnitId)
-        addAll(categoryIds)
-        addAll(salePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-        addAll(supplyPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-        addAll(returnPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-        addAll(wholesalePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-        note?.let { add(it) }
-        addAll(noteLocalized.map { it.value })
-        addAll(conditions)
-    }.joinToString(" ").lowercase()
-
-    return queryTokens.all { token -> searchableText.contains(token) }
-}
+internal fun GoodsItemDataModel.matchesParentStoreStockPickerFilter(rawQuery: String): Boolean =
+    matchesParentCatalogueQuery(rawQuery) || isLegacyParentBarcodeCandidate(rawQuery)
 
 internal fun GoodsItemDataModel.toParentStoreStockTemplateDraft(
     currentDraft: StockAddEditDraft,
@@ -4161,6 +4135,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
         val lookupBarcode = draft.standardBarcodeForGenericLookup()
         val filteredItems = (serverLoadedItems + cachedFilteredItems)
             .distinctBy { it.id }
+            .searchParentCatalogue(cleanQuery)
             .sortedWith(
                 compareByDescending<GoodsItemDataModel> { item ->
                     lookupBarcode?.let { lookup ->
@@ -4232,11 +4207,15 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                         val barcodeMatched = lookupBarcode?.let { lookup ->
                             item.allBarcodeValues().flatMap { it.toStoredGoodsItemBarcodeCandidates() }.any { it == lookup }
                         } == true
+                        if (item.isLegacyParentBarcodeCandidate(cleanQuery)) Text(
+                            stockEditingMessage("legacy_barcode").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize,
+                            modifier = Modifier.padding(horizontal = 8.dp))
                         ParentStoreStockPickerItemCard(
                             item = item,
                             barcodeMatched = barcodeMatched,
                             profileOnly = profileOnly,
-                            onApply = { onApply(item); searchTextFieldContent.reset() }
+                            onApply = { onApply(item.withConfirmedParentBarcode(cleanQuery)); searchTextFieldContent.reset() }
                         )
                     }
 
@@ -4421,6 +4400,7 @@ internal fun AppConfiguration.GlobalGoodsSelectionBottomSheet(
             .filter { it.matchesGlobalGoodsPickerFilter(cleanQuery, selectedCategoryIds) }
         val filteredItems = (serverLoadedItems + cachedFilteredItems)
             .distinctBy { it.id }
+
             .sortedWith(
                 compareByDescending<GenericGoodsItemDataModel> { item ->
                     draft.standardBarcodeForGenericLookup()?.let { lookup ->

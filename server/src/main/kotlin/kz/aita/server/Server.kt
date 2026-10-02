@@ -4795,7 +4795,8 @@ private fun List<GoodsItemBarcodeDataModel>.cleanBarcodeStrings(): List<String> 
 }
 
 private fun ResultRow.stockBarcodeModels(): List<GoodsItemBarcodeDataModel> {
-  return this[StockItems.barcodeModels].normalizedGoodsItemBarcodesForStore(
+  return this[StockItems.barcodeModels].restoreFullLegacyBarcodeModels(this[StockItems.barcodes],
+    this[StockItems.measurementUnitId].isWeightMeasurementUnitId()).normalizedGoodsItemBarcodesForStore(
     storeId = this[StockItems.storeId].toString(),
     legacyBarcodes = this[StockItems.barcodes],
     weightEncoded = this[StockItems.measurementUnitId].isWeightMeasurementUnitId()
@@ -4852,6 +4853,10 @@ private fun stockBarcodeModelsConflictInsideStore(
   existingBarcode: GoodsItemBarcodeDataModel,
   existingRowStoreId: UUID
 ): Boolean {
+  // The database uniqueness rule protects the literal code within a location, regardless
+  // of whether a client labelled that code standard or internal.
+  if (incomingRowStoreId == existingRowStoreId && incomingBarcode.value.normalizedBarcodeToken().isNotBlank() &&
+      incomingBarcode.value.normalizedBarcodeToken() == existingBarcode.value.normalizedBarcodeToken()) return true
   val incomingType = incomingBarcode.type.normalizedGoodsItemBarcodeType(incomingBarcode.value)
   val existingType = existingBarcode.type.normalizedGoodsItemBarcodeType(existingBarcode.value)
 
@@ -6741,39 +6746,6 @@ private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
     updatedAtMillis = this[StockItems.updatedAtMillis],
     isActive = this[StockItems.isActive]
   )
-}
-
-private fun GoodsItemDataModel.matchesParentStockSearchQuery(rawQuery: String?): Boolean {
-  if (!rawQuery.isNullOrBlank() && rawQuery.trim().parseEmbeddedWeightBarcodeFormats().any { matchesEmbeddedWeightBarcode(it) }) return true
-  val queryTokens = rawQuery
-    ?.trim()
-    ?.lowercase()
-    ?.split(Regex("\\s+"))
-    ?.filter { it.isNotBlank() }
-    .orEmpty()
-
-  if (queryTokens.isEmpty()) return true
-
-  val searchableText = buildList {
-    add(id)
-    add(userId)
-    add(storeId)
-    addAll(allBarcodeValues())
-    addAll(allBarcodeValues().map { it.toStoredGoodsItemBarcode() })
-    addAll(name.map { it.value })
-    addAll(description.map { it.value })
-    add(measurementUnitId)
-    addAll(categoryIds)
-    addAll(salePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-    addAll(returnPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-    addAll(supplyPrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-    addAll(wholesalePrices.flatMap { listOf(it.price, it.currency, it.supplierId) })
-    note?.let { add(it) }
-    addAll(noteLocalized.map { it.value })
-    addAll(conditions)
-  }.joinToString(" ").lowercase()
-
-  return queryTokens.all { token -> searchableText.contains(token) }
 }
 
 private fun decodeSupplierStringList(value: String?): List<String> {
@@ -16218,46 +16190,15 @@ private fun cloneStockItemToStoreInsideTransaction(
 }
 
 
-private fun stockItemParentMirrorIdentityTokens(row: ResultRow): Set<String> {
-  val standardBarcodeTokens = row.stockBarcodeModels()
-    .filter { model -> model.type.normalizedGoodsItemBarcodeType(model.value) == GOODS_ITEM_BARCODE_TYPE_STANDARD }
-    .flatMap { model -> model.value.toStoredGoodsItemBarcodeCandidates() + listOf(model.value) }
-    .map { token -> "standard:${token.normalizedBarcodeToken()}" }
-    .filter { token -> token.substringAfter(':').isNotBlank() }
-    .toSet()
-  if (standardBarcodeTokens.isNotEmpty()) return standardBarcodeTokens
+private fun stockItemParentMirrorIdentityTokens(row: ResultRow): Set<String> =
+  (row.stockBarcodeModels().map { it.value } + row[StockItems.barcodes])
+    .map { it.normalizedBarcodeToken() }.filter { it.isNotBlank() }.toSet()
 
-  val nameTokens = row[StockItems.name]
-    .map { it.value.trim().lowercase() }
-    .filter { it.isNotBlank() }
-    .map { "name:$it" }
-    .toSet()
-  if (nameTokens.isNotEmpty()) return nameTokens
-
-  return row.stockBarcodeModels()
-    .flatMap { model -> model.value.toStoredGoodsItemBarcodeCandidates() + listOf(model.value) }
-    .map { token -> "barcode:${token.normalizedBarcodeToken()}" }
-    .filter { token -> token.substringAfter(':').isNotBlank() }
-    .toSet()
-}
-
-private fun stockItemsMatchForParentMirror(source: ResultRow, candidate: ResultRow): Boolean {
-  val sourceTokens = stockItemParentMirrorIdentityTokens(source)
-  val candidateTokens = stockItemParentMirrorIdentityTokens(candidate)
-  return sourceTokens.isNotEmpty() && candidateTokens.isNotEmpty() && sourceTokens.any { it in candidateTokens }
-}
-
-private fun findMatchingParentMirrorStockItemInsideTransaction(
-  parentStoreId: UUID,
-  sourceItemRow: ResultRow
-): ResultRow? {
-  return StockItems
-    .selectAll()
-    .where {
-      (StockItems.storeId eq parentStoreId) and
-         (StockItems.isActive eq true)
-    }
-    .firstOrNull { candidate -> stockItemsMatchForParentMirror(sourceItemRow, candidate) }
+private fun findMatchingParentMirrorStockItemInsideTransaction(parentStoreId: UUID, sourceItemRow: ResultRow): ResultRow? {
+  val tokens = stockItemParentMirrorIdentityTokens(sourceItemRow)
+  return StockItems.selectAll().where {
+    (StockItems.storeId eq parentStoreId) and (StockItems.isActive eq true)
+  }.firstOrNull { candidate -> stockItemParentMirrorIdentityTokens(candidate).any { it in tokens } }
 }
 
 private fun UpdateBuilder<*>.setParentStockMirrorFieldsFromBranchRow(
@@ -16304,32 +16245,33 @@ internal fun mirrorBranchStockItemToParentInsideTransaction(
     .where { Stores.id eq branchStoreId }.singleOrNull() ?: return null
   val parentStoreId = branchStore[Stores.parentStoreId] ?: return null
 
-  val existingParentMirror = previousBranchItemRow
-    ?.let { findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, it) }
-    ?: findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, branchItemRow)
-
-  return if (existingParentMirror == null) {
-    val mirrorId = UUID.randomUUID()
-    StockItems.insert {
-      it[StockItems.id] = mirrorId
-      it[StockItems.userId] = userId
-      it[StockItems.storeId] = parentStoreId
-      it[StockItems.createdAtMillis] = now
-      it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now)
-    }
-    StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
-  } else {
+  // Internal barcodes are full identities too. A title is never sufficient: distinct
+  // products may share one. Prefer the current code before the prior branch revision.
+  val existingParentMirror = findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, branchItemRow)
+    ?: previousBranchItemRow?.let { findMatchingParentMirrorStockItemInsideTransaction(parentStoreId, it) }
+  if (existingParentMirror != null) {
     val mirrorId = existingParentMirror[StockItems.id]
+    val nextCodes = branchItemRow.stockBarcodeModels().normalizedGoodsItemBarcodesForStore(
+      parentStoreId.toString(), branchItemRow[StockItems.barcodes])
+    // A branch can contain a combination of aliases belonging to separate parent cards.
+    // Preserve that independent catalogue instead of failing the whole branch create.
+    if (barcodeClashesInsideTransaction(parentStoreId, mirrorId, nextCodes)) return existingParentMirror
     StockItems.update({ StockItems.id eq mirrorId }) {
-      // Automatic parent profiles resolve public text/photos from the parent's stock fields.
-      // Internet-specific edits must not indirectly replace that generic profile.
       it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now,
-        preservedPublicProfileSource = existingParentMirror.takeIf {
-          branchStore[Stores.branchType] == StoreBranchType.INTERNET.name
-        })
+        preservedPublicProfileSource = existingParentMirror.takeIf { branchStore[Stores.branchType] == StoreBranchType.INTERNET.name })
     }
-    StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
+    return StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
   }
+
+  val mirrorId = UUID.randomUUID()
+  StockItems.insert {
+    it[StockItems.id] = mirrorId
+    it[StockItems.userId] = userId
+    it[StockItems.storeId] = parentStoreId
+    it[StockItems.createdAtMillis] = now
+    it.setParentStockMirrorFieldsFromBranchRow(branchItemRow, parentStoreId, now)
+  }
+  return StockItems.selectAll().where { StockItems.id eq mirrorId }.single()
 }
 
 private fun findOrCloneDestinationStockItemInsideTransaction(
@@ -16513,7 +16455,9 @@ private fun barcodeClashesInsideTransaction(
       val sameItem = currentItemId != null && rowId == currentItemId
       val rowStoreId = row[StockItems.storeId]
 
-      !sameItem && row.stockBarcodeModels().any { existingBarcode ->
+      !sameItem && (row[StockItems.barcodes].any { stored ->
+        incomingModels.any { it.value.normalizedBarcodeToken() == stored.normalizedBarcodeToken() }
+      } || row.stockBarcodeModels().any { existingBarcode ->
         incomingModels.any { incomingBarcode ->
           stockBarcodeModelsConflictInsideStore(
             incomingBarcode = incomingBarcode,
@@ -16522,7 +16466,7 @@ private fun barcodeClashesInsideTransaction(
             existingRowStoreId = rowStoreId
           )
         }
-      }
+      })
     }
 }
 
@@ -19425,7 +19369,7 @@ fun Application.module() {
               }
               .orderBy(StockItems.updatedAtMillis, SortOrder.DESC)
               .map { it.toGoodsItemDataModel() }
-              .filter { item -> item.matchesParentStockSearchQuery(cleanQuery) }
+              .searchParentCatalogue(cleanQuery)
               .drop(offset)
               .take(limit)
           }
@@ -19510,6 +19454,7 @@ fun Application.module() {
           val userId = call.checkPrincipal() ?: return@post
           val body = call.receiveAita<GoodsItemDataModel>()
 
+          var failureMessage = eventMessage("message.invalid_stock_item_or_duplicated_barcode")
           val inserted = newSuspendedTransaction(aitaServerIoContext) {
             val storeId = runCatching { UUID.fromString(body.storeId) }.getOrNull()
               ?: return@newSuspendedTransaction null
@@ -19520,7 +19465,14 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_ITEM_CREATE, requireWorkshift = true))
               return@newSuspendedTransaction null
 
-            lockStockInventoryInsideTransaction(listOf(storeId))
+            lockStockInventoryInsideTransaction(listOf(storeId, rootStoreIdForAccessInsideTransaction(storeId)))
+            val requestedId = body.id.takeIf { it.isNotBlank() }?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            requestedId?.let { id ->
+              val existing = StockItems.selectAll().where { StockItems.id eq id }.singleOrNull()
+              if (existing != null) return@newSuspendedTransaction if (existing[StockItems.storeId] == storeId &&
+                  existing[StockItems.userId] == userId && existing[StockItems.isActive])
+                existing.toGoodsItemDataModel() to null else null
+            }
 
             val cleanBarcodeModels = body.cleanBarcodeModelsForStore(storeId)
             val cleanBarcodes = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { body.barcodes.cleanBarcodes() }
@@ -19528,13 +19480,15 @@ fun Application.module() {
             if (cleanBarcodes.isEmpty())
               return@newSuspendedTransaction null
 
-            if (barcodeClashesInsideTransaction(storeId, null, cleanBarcodeModels))
+            if (barcodeClashesInsideTransaction(storeId, null, cleanBarcodeModels)) {
+              failureMessage = stockEditingMessage("duplicate")
               return@newSuspendedTransaction null
+            }
 
             val sanitizedPromotions = body.promotions.sanitizedStockPromotions()
             val requestedMarketProfile = body.marketplaceProfileForSave()
             val now = System.currentTimeMillis()
-            val id = UUID.randomUUID()
+            val id = requestedId ?: UUID.randomUUID()
 
             StockItems.insert {
               it[StockItems.id] = id
@@ -19627,7 +19581,7 @@ fun Application.module() {
             )
           } ?: call.genericResponseNoPayload(
             status = HttpStatusCode.Conflict,
-            message = eventMessage("message.invalid_stock_item_or_duplicated_barcode")
+            message = failureMessage
           )
         }
 
@@ -19649,7 +19603,7 @@ fun Application.module() {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_ITEM_EDIT, requireWorkshift = true) &&
                 !userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE, requireWorkshift = true))
               return@newSuspendedTransaction null
-            lockStockInventoryInsideTransaction(listOf(storeId))
+            lockStockInventoryInsideTransaction(listOf(storeId, rootStoreIdForAccessInsideTransaction(storeId)))
 
             val cleanBarcodeModels = body.cleanBarcodeModelsForStore(storeId)
             val cleanBarcodes = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { body.barcodes.cleanBarcodes() }
@@ -19657,8 +19611,10 @@ fun Application.module() {
             if (cleanBarcodes.isEmpty())
               return@newSuspendedTransaction null
 
-            if (barcodeClashesInsideTransaction(storeId, id, cleanBarcodeModels))
+            if (barcodeClashesInsideTransaction(storeId, id, cleanBarcodeModels)) {
+              stockItemChangeFailure = stockEditingMessage("duplicate")
               return@newSuspendedTransaction null
+            }
 
             val goodsItemRow = StockItems
               .selectAll()
@@ -23645,6 +23601,7 @@ fun Application.module() {
           val uuid = call.checkPrincipal() ?: return@put
 
           val body = call.receiveAita<UserAccountUpdateDataModel>()
+          advancedAuthService(tokenService, call.application).requireProfileConfirmationBudget(uuid)
           val newAccount = body.account
           val cleanNewPassword = body.newPassword?.trim()?.takeIf { it.isNotBlank() }
 
@@ -23764,7 +23721,9 @@ fun Application.module() {
 
             "security_confirmation" -> call.genericResponseNoPayload(HttpStatusCode.BadRequest,
               message = eventMessage("message.confirm_this_change_with_your_current_security_method"))
-            "unauthorized", "password_mismatch" -> call.respondAitaUnauthorized()
+            "unauthorized" -> call.respondAitaUnauthorized()
+            "password_mismatch" -> call.genericResponseNoPayload(HttpStatusCode.BadRequest,
+              message = eventMessage("auth.message.security_confirmation_failed"))
 
             "phone_number_and_email_clash" -> call.genericResponseNoPayload(
               HttpStatusCode.Conflict,

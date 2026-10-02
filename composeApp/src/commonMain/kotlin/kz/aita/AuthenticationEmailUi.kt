@@ -100,8 +100,12 @@ internal fun AppConfiguration.SecurityEmailProofInput(
                 text = (if (flow == null) authUiText("Get email confirmation", "Получить подтверждение по email", "Email растауын алу", "Электрондук почта аркылуу ырастоо алуу")
                     else authUiText("Resend", "Ещё код", "Қайта жіберу", "Кайра жөнөтүү")) +
                     if (countdown.resendSeconds > 0L) " · ${countdown.resendSeconds}" else "",
-                enabled = enabled && !busy && request.currentPassword.isNotBlank() && canonicalAitaSecurityTarget(request.action, request.target) != null && countdown.resendSeconds == 0L,
+                enabled = enabled && !busy && countdown.resendSeconds == 0L,
                 loading = busy, autoLoading = false) {
+                if (request.currentPassword.isBlank() || canonicalAitaSecurityTarget(request.action, request.target) == null) {
+                    error = stockEditingMessage("confirmation_required").extractLocalizedString(stateValues.appLanguage).orEmpty()
+                    return@actionButton
+                }
                 if (!busy && owner != null && authenticatedSessionGenerationIsCurrent(generation) && userAccountState.payloadValue?.id == owner) {
                     busy = true; error = ""
                     scope.launch {
@@ -186,7 +190,10 @@ internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, p
     var error by remember(owner, generation) { mutableStateOf("") }
     var revision by remember { mutableIntStateOf(0) }
     var factor by remember(owner, generation, target) { mutableStateOf("") }
-    LaunchedEffect(owner, generation, revision) {
+    val securityRevision by AitaAdvancedAuthenticationClient.securityRevision.collectAsState()
+    LaunchedEffect(owner, generation, revision, securityRevision) {
+        settings = null
+        factor = ""
         if (owner == null || !authenticatedSessionGenerationIsCurrent(generation) || userAccountState.payloadValue?.id != owner) return@LaunchedEffect
         try {
             val response = withTimeoutOrNull(20_000L) { AitaAdvancedAuthenticationClient.settings() }
@@ -214,10 +221,29 @@ internal fun AppConfiguration.ProfileSecurityConfirmationInput(target: String, p
             settings = null; error = ""; factor = ""; revision++
         }
     }
-    // New-address ownership is confirmed in the profile form, separately from this current-account factor.
-    if (current.authenticatorEnabled) AuthenticatorCodeEntryField(factor, false, { factor = it }, {}, "profile-security-factor")
-    val needsEmail = current.emailRequiredForLogin && !current.authenticatorEnabled
+    Text(stockEditingMessage("confirmation_help").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+        color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+    var selected by remember(owner, generation, current.securityRevision) {
+        mutableStateOf(if (current.authenticatorEnabled) AitaLoginSecondFactor.AUTHENTICATOR else AitaLoginSecondFactor.EMAIL)
+    }
+    val options = listOf(AitaLoginSecondFactor.EMAIL) +
+        if (current.authenticatorEnabled) listOf(AitaLoginSecondFactor.AUTHENTICATOR) else emptyList()
+    AitaDropdownField(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        title = accountPresentationText("two_factor"), selectedId = selected.name,
+        placeholder = accountPresentationText("email"), options = options.map {
+            DropdownOption(it.name, accountPresentationText(if (it == AitaLoginSecondFactor.EMAIL) "email" else "authenticator"))
+        }, onSelected = { selected = AitaLoginSecondFactor.valueOf(it); factor = "" })
+    if (!current.authenticatorEnabled) {
+        Text(stockEditingMessage("authenticator_help").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        TextButton(onClick = { coroutineScope.launch { Navigation.Menu.go(NavigationScreenModel.Menu.Security, stateValues.isNarrowScreen) } }) {
+            Text(stockEditingMessage("security_settings").extractLocalizedString(stateValues.appLanguage).orEmpty(), color = stateValues.AccentColor)
+        }
+    }
+    val needsEmail = selected == AitaLoginSecondFactor.EMAIL
+    if (!needsEmail) AuthenticatorCodeEntryField(factor, false, { factor = it }, {}, "profile-security-factor")
     val proof = if (needsEmail) SecurityEmailProofInput(AitaSecurityEmailRequest(action, target, password,
         current.securityRevision, stateValues.appLanguage)) else null
-    return ProfileSecurityConfirmation((!current.authenticatorEnabled || aitaSecondFactorIsWellFormed(factor)) && (!needsEmail || proof != null), factor, proof)
+    return ProfileSecurityConfirmation(password.isNotBlank() &&
+        if (needsEmail) proof != null else aitaSecondFactorIsWellFormed(factor), if (needsEmail) "" else factor, proof)
 }

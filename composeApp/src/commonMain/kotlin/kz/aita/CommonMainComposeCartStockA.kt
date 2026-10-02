@@ -1958,6 +1958,7 @@ fun AppConfiguration.StockWarehouseScreen() {
             )
         }
     ) {
+        InventoryPendingFeedback()
         AnimatedVisibility(visible = sortMenuExpanded) {
             Column(
                 modifier = Modifier
@@ -3794,29 +3795,22 @@ fun StockAddEditDraft.toGoodsItem(
     )
 }
 
-fun StockAddEditDraft.isValidStockDraft(configuration: GlobalAppConfigurationDataModel): Boolean {
-    val cleanBarcodes = barcodes.map { it.trim().toStoredGoodsItemBarcode() }.filter { it.isNotEmpty() }
-
-    val hasName = name.any { it.value.isNotBlank() }
-    val hasBarcode = cleanBarcodes.isNotEmpty()
-    val hasUnit = measurementUnitId.isNotBlank()
-    val hasSalePrice = salePrices.any { it.price.toDoubleOrNull()?.let { price -> price >= 0.0 } == true }
-    val hasSupplyPrice = supplyPrices.any { it.price.toDoubleOrNull()?.let { price -> price >= 0.0 } == true }
-    val hasWholesalePrice = wholesalePrices.any { it.price.toDoubleOrNull()?.let { price -> price > 0.0 } == true }
-    val wholesaleMinimumUnit = configuration.goodsItemsQuantityUnits.find { it.id == measurementUnitId }
-        ?: configuration.goodsItemsQuantityUnits.firstOrNull()
-        ?: QuantityDataModel(
-            id = measurementUnitId,
-            immutableUnitName = emptyList(),
-            total = 1.0,
-            pricedAmount = 1.0,
-            roundTotal = measurementUnitId == "0"
-        )
-    val hasWholesaleMinimum = parseStockQuantityInputText(wholesaleMinQuantityText, wholesaleMinimumUnit)?.let { it > 0.0 } == true
-
-    return hasName && hasBarcode && hasUnit && hasSalePrice && hasSupplyPrice && (!hasWholesalePrice || hasWholesaleMinimum) &&
-        (marketplaceProfile?.product?.hasInvalidMarketProductInput() != true)
+internal fun StockAddEditDraft.stockDraftErrors(configuration: GlobalAppConfigurationDataModel): List<String> = buildList {
+    if (name.none { it.value.isNotBlank() }) add("name")
+    if (barcodes.none { it.trim().isNotEmpty() }) add("barcode")
+    if (measurementUnitId.isBlank() || configuration.goodsItemsQuantityUnits.none { it.id == measurementUnitId }) add("unit")
+    fun validPrice(price: PriceDataModel): Boolean = price.price.trim().replace(',', '.').toDoubleOrNull()
+        ?.let { it.isFinite() && it >= 0.0 && price.currency.isNotBlank() } == true
+    if (salePrices.isEmpty() || salePrices.any { !validPrice(it) }) add("sale_price")
+    if (supplyPrices.isEmpty() || supplyPrices.any { !validPrice(it) }) add("supply_price")
+    val wholesale = wholesalePrices.filter { it.price.isNotBlank() }
+    val unit = configuration.goodsItemsQuantityUnits.find { it.id == measurementUnitId }
+    if (wholesale.isNotEmpty() && (wholesale.any { !validPrice(it) || it.price.toMoneyDouble() <= 0.0 } ||
+            unit == null || parseStockQuantityInputText(wholesaleMinQuantityText, unit)?.let { it.isFinite() && it > 0.0 } != true)) add("wholesale")
+    if (marketplaceProfile?.product?.hasInvalidMarketProductInput() == true) add("marketplace")
 }
+
+fun StockAddEditDraft.isValidStockDraft(configuration: GlobalAppConfigurationDataModel): Boolean = stockDraftErrors(configuration).isEmpty()
 
 internal fun StockPromotionDataModel.visiblePromotionTitle(language: String, fallback: String): String =
     title.visibleLocalizedString(language, fallback).ifBlank { fallback }
@@ -5129,6 +5123,8 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
     request: QuickStockAddSheetRequest,
     onDismiss: () -> Unit
 ) {
+    var saveError by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
     val goodsInCart by getCartState(request.transactionTypeIndex, request.clientId).collectAsState()
     val defaultCurrency = stateValues.globalAppConfiguration
         .countries
@@ -5255,18 +5251,26 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
                 )
             }
 
+            if (saveError.isNotBlank()) Text(saveError, color = stateValues.ErrorColor,
+                fontSize = stateValues.smallTextSize, modifier = Modifier.padding(horizontal = 8.dp))
             actionButton(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 text = localizedStringResource(637, "Save item and add to cart"),
                 iconPath = stateValues.drawablePathIconCheck,
-                enabled = draft.isValidStockDraft(stateValues.globalAppConfiguration) && stateValues.activeStoreId != null,
+                enabled = !saving, loading = saving, autoLoading = false,
                 confirmationRequired = false,
                 onClick = {
+                    saveError = draft.stockDraftErrors(stateValues.globalAppConfiguration).joinToString("\n") {
+                        stockEditingMessage(it).extractLocalizedString(stateValues.appLanguage).orEmpty()
+                    }
+                    if (saveError.isNotBlank()) return@actionButton
                     val storeId = stateValues.activeStoreId ?: return@actionButton
+                    saving = true
                     val goodsItem = draft.toGoodsItem(storeId, stateValues.globalAppConfiguration, null)
                     addGoodsItem(goodsItem) { result ->
+                        saving = false
                         if (result is DataState.Success) {
                             addGoodsItemToTransactionCart(
                                 goodsItem = result.payload,
@@ -5276,7 +5280,8 @@ internal fun AppConfiguration.QuickStockAddBottomSheet(
                                 currentCart = goodsInCart
                             )
                             closeQuickStockAddSheet()
-                        }
+                        } else saveError = result.message?.extractLocalizedString(stateValues.appLanguage)
+                            ?: stockEditingMessage("storage").extractLocalizedString(stateValues.appLanguage).orEmpty()
                     }
                 }
             )

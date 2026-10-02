@@ -56,15 +56,27 @@ class AccountDeletionDatabaseTest {
                 val tokens=TokenService(JwtConfig("test","test","test","test-only-key-".repeat(8),900000L,86400000L))
                 application { service=AitaAdvancedAuthService(tokens,config,this) }
                 startApplication()
+                suspend fun deleteWithEmail(who: UUID): String? {
+                    val flow = assertNotNull(service.requestSecurityEmail(who, AitaSecurityEmailRequest(AitaSecurityEmailAction.ACCOUNT_DELETE,
+                        "", password, service.settings(who).securityRevision), "192.0.2.15"))
+                    val code = transaction(db) {
+                        val challenge = AuthOneTimeChallenges.selectAll().where { AuthOneTimeChallenges.publicId eq UUID.fromString(flow.flowId) }.single()
+                        val mail = AuthEmailOutbox.selectAll().where { AuthEmailOutbox.challengeId eq challenge[AuthOneTimeChallenges.id] }.single()
+                        val message = Json.parseToJsonElement(decrypt(config.encryptionKey, "auth-email:${mail[AuthEmailOutbox.id]}", requireNotNull(mail[AuthEmailOutbox.payloadCiphertext]))).jsonObject
+                        Regex("(?<![0-9])[0-9]{6}(?![0-9])").find(message.getValue("text").jsonPrimitive.content)!!.value
+                    }
+                    return service.deleteAccount(who, AccountDeletionRequest(password, emailProof = AitaSecurityEmailProof(flow.flowId, code), confirmed = true))
+                }
                 assertEquals("confirmation",service.deleteAccount(id,AccountDeletionRequest("wrong",confirmed=true)))
                 assertEquals("confirmation",service.deleteAccount(id,AccountDeletionRequest(password)))
                 val store=UUID.randomUUID()
                 transaction(db) { exec("INSERT INTO stores(id,public_id,owner_user_ids,country_locales,name) VALUES ('$store','DELETESTORE','[\"$id\"]','[\"kz\"]','[]')") }
-                assertEquals("owned_business",service.deleteAccount(id,AccountDeletionRequest(password,confirmed=true)))
+                assertEquals("confirmation",service.deleteAccount(id,AccountDeletionRequest(password,confirmed=true)))
+                assertEquals("owned_business",deleteWithEmail(id))
                 transaction(db) { exec("UPDATE stores SET owner_user_ids='[\"$other\"]' WHERE id='$store'") }
                 val login=service.passwordLogin(kz.aita.auth.AitaPasswordLoginRequestDataModel("delete-0@example.test",password),mapOf("installationId" to "first"))
                 assertNotNull(login?.tokenPair)
-                assertEquals("deleted",service.deleteAccount(id,AccountDeletionRequest(password,confirmed=true)))
+                assertEquals("deleted",deleteWithEmail(id))
                 transaction(db) {
                     val row=Users.selectAll().where { Users.id eq id }.single()
                     assertFalse(row[Users.isActive]);assertEquals("",row[Users.firstName]);assertEquals("",row[Users.passwordHash])
