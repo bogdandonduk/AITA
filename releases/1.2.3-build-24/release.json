@@ -1,0 +1,163 @@
+{
+  "version": "1.2.3",
+  "build": 24,
+  "revision": "fedece674e0fa2db019991490c928f2d132b5ded",
+  "tag": "v1.2.3-b24",
+  "createdAt": "2026-10-02T14:54:23Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.2.3-24-android.apk",
+      "sha256": "cd824177cb86c9b0347a56ad2f8d055be53553b8f737fa4d077446c240c1efb8",
+      "bytes": 72627523,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-android.apk"
+    },
+    {
+      "name": "AITA-1.2.3-24-android.aab",
+      "sha256": "47890d889be7b27392d305fcd65cfc42e8bafe4a9d9778c4fe50c45f78b6c324",
+      "bytes": 47296329,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "4153e1632c5cfec0e3f94a5e797dcdb22bf75fe1e870f7d6b696e2ae19183c01",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.3-24-linux-x64.deb",
+      "sha256": "53773a8c0ce743008d3aad3da637df97bdf56751dc2fb33de19f51adfd4ccb21",
+      "bytes": 116059082,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-linux-x64.deb"
+    },
+    {
+      "name": "AITA-1.2.3-24-linux-x64.rpm",
+      "sha256": "fb776227933231a495f16d3f486430ee474b50fd889083ccb1ac1668ee7ce6c9",
+      "bytes": 127488152,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-linux-x64.rpm"
+    },
+    {
+      "name": "linux-client-build.json",
+      "sha256": "4153e1632c5cfec0e3f94a5e797dcdb22bf75fe1e870f7d6b696e2ae19183c01",
+      "bytes": 857,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/linux-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.3-24-windows.exe",
+      "sha256": "ce4bf2e4bb1c5d9ecc7b793fe670492589bc48e631f3bc49fbca126d8aa52825",
+      "bytes": 137704960,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-windows.exe"
+    },
+    {
+      "name": "AITA-1.2.3-24-windows.msi",
+      "sha256": "329ab96442447c02d9dde9743df0d8afc778c8ee8cb03e4a52e5263880d4ec2e",
+      "bytes": 137105868,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "8b6e64de645a8141cb422f1bb99559b46effac8a22d4b1da0dc2ba0175f31d8a",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "db193ffd0b6a6c9d7ce2b53bce8ca19bbfabf0f21f592596ccd2502cf5e47427",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/windows-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.3-24-web.zip",
+      "sha256": "8291b8ee8ee8de63c6bba1b9132e35a99c9caf18907ebec355ebbca95b175435",
+      "bytes": 12954581,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/AITA-1.2.3-24-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "4153e1632c5cfec0e3f94a5e797dcdb22bf75fe1e870f7d6b696e2ae19183c01",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.3-b24/web-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Equal device and price-section spacing; newly added goods appear immediately in transaction search. EXE/MSI choice, reliable Windows update handoff and installer logs. Complete and print receipts; direct printing to saved desktop label printers, label copy quick fills and automatic sheet close. Quick batch quantity removal with protection against stale concurrent edits.",
+    "ru": "\u0415\u0434\u0438\u043d\u044b\u0435 \u043e\u0442\u0441\u0442\u0443\u043f\u044b \u0443 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432 \u0438 \u0440\u0430\u0437\u0434\u0435\u043b\u043e\u0432 \u0446\u0435\u043d. \u041d\u043e\u0432\u044b\u0435 \u0442\u043e\u0432\u0430\u0440\u044b \u0441\u0440\u0430\u0437\u0443 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b \u0432 \u043f\u043e\u0438\u0441\u043a\u0435 \u043f\u0440\u043e\u0434\u0430\u0436\u0438. \u0412\u044b\u0431\u043e\u0440 EXE/MSI, \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043d\u0430\u044f \u043f\u0435\u0440\u0435\u0434\u0430\u0447\u0430 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u0449\u0438\u043a\u0443 Windows \u0438 \u0436\u0443\u0440\u043d\u0430\u043b\u044b \u043e\u0448\u0438\u0431\u043e\u043a. \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0438\u0435 \u0441 \u043f\u0435\u0447\u0430\u0442\u044c\u044e \u0447\u0435\u043a\u0430; \u043f\u0440\u044f\u043c\u0430\u044f \u043f\u0435\u0447\u0430\u0442\u044c \u043d\u0430\u043a\u043b\u0435\u0435\u043a \u043d\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0439 \u043d\u0430\u0441\u0442\u043e\u043b\u044c\u043d\u044b\u0439 \u043f\u0440\u0438\u043d\u0442\u0435\u0440, \u0432\u0432\u043e\u0434 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0430 \u0438 \u0437\u0430\u043a\u0440\u044b\u0442\u0438\u0435 \u043e\u043a\u043d\u0430 \u043f\u043e\u0441\u043b\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438. \u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u0443\u043c\u0435\u043d\u044c\u0448\u0435\u043d\u0438\u0435 \u043e\u0441\u0442\u0430\u0442\u043a\u0430 \u043f\u0430\u0440\u0442\u0438\u0438 \u0441 \u0437\u0430\u0449\u0438\u0442\u043e\u0439 \u043e\u0442 \u043e\u0434\u043d\u043e\u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e\u0433\u043e \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f.",
+    "kk": "\u049a\u04b1\u0440\u044b\u043b\u0493\u044b\u043b\u0430\u0440 \u04d9\u0440\u0435\u043a\u0435\u0442\u0442\u0435\u0440\u0456 \u043c\u0435\u043d \u0431\u0430\u0493\u0430 \u0431\u04e9\u043b\u0456\u043c\u0434\u0435\u0440\u0456\u043d\u0456\u04a3 \u0430\u0440\u0430\u043b\u044b\u049b\u0442\u0430\u0440\u044b \u0440\u0435\u0442\u0442\u0435\u043b\u0434\u0456. \u0416\u0430\u04a3\u0430 \u0442\u0430\u0443\u0430\u0440\u043b\u0430\u0440 \u043c\u04d9\u043c\u0456\u043b\u0435 \u0456\u0437\u0434\u0435\u0443\u0456\u043d\u0434\u0435 \u0431\u0456\u0440\u0434\u0435\u043d \u043a\u04e9\u0440\u0456\u043d\u0435\u0434\u0456. EXE/MSI \u0442\u0430\u04a3\u0434\u0430\u0443, Windows \u0436\u0430\u04a3\u0430\u0440\u0442\u0443\u044b\u043d \u043e\u0440\u043d\u0430\u0442\u0443 \u0436\u04d9\u043d\u0435 \u049b\u0430\u0442\u0435 \u0436\u0443\u0440\u043d\u0430\u043b\u044b. \u0427\u0435\u043a\u0442\u0456 \u0430\u044f\u049b\u0442\u0430\u0443 \u0436\u04d9\u043d\u0435 \u0431\u0430\u0441\u044b\u043f \u0448\u044b\u0493\u0430\u0440\u0443; \u0441\u0430\u049b\u0442\u0430\u043b\u0493\u0430\u043d \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0433\u0435 \u0436\u0430\u043f\u0441\u044b\u0440\u043c\u0430 \u0431\u0430\u0441\u0443, \u0434\u0430\u043d\u0430 \u0441\u0430\u043d\u044b\u043d \u0435\u043d\u0433\u0456\u0437\u0443. \u041f\u0430\u0440\u0442\u0438\u044f \u049b\u0430\u043b\u0434\u044b\u0493\u044b\u043d \u0430\u0437\u0430\u0439\u0442\u0443 \u0436\u04d9\u043d\u0435 \u049b\u0430\u0442\u0430\u0440 \u04e9\u0437\u0433\u0435\u0440\u0456\u0441\u0442\u0435\u0440\u0434\u0435\u043d \u049b\u043e\u0440\u0493\u0430\u0443.",
+    "ky": "\u0422\u04af\u0437\u043c\u04e9\u043a \u0430\u0440\u0430\u043a\u0435\u0442\u0442\u0435\u0440\u0438 \u043c\u0435\u043d\u0435\u043d \u0431\u0430\u0430 \u0431\u04e9\u043b\u04af\u043c\u0434\u04e9\u0440\u04af\u043d\u04af\u043d \u0430\u0440\u0430\u043b\u044b\u043a\u0442\u0430\u0440\u044b \u043e\u04a3\u0434\u043e\u043b\u0434\u0443. \u0416\u0430\u04a3\u044b \u0442\u043e\u0432\u0430\u0440\u043b\u0430\u0440 \u0438\u0437\u0434\u04e9\u04e9\u0434\u04e9 \u0434\u0430\u0440\u043e\u043e \u043a\u04e9\u0440\u04af\u043d\u04e9\u0442. EXE/MSI \u0442\u0430\u043d\u0434\u043e\u043e, Windows \u0436\u0430\u04a3\u044b\u0440\u0442\u0443\u0443\u0441\u0443 \u0436\u0430\u043d\u0430 \u043a\u0430\u0442\u0430 \u0436\u0443\u0440\u043d\u0430\u043b\u044b. \u0427\u0435\u043a\u0442\u0438 \u0430\u044f\u043a\u0442\u043e\u043e \u0436\u0430\u043d\u0430 \u0431\u0430\u0441\u044b\u043f \u0447\u044b\u0433\u0430\u0440\u0443\u0443; \u0441\u0430\u043a\u0442\u0430\u043b\u0433\u0430\u043d \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0433\u0435 \u044d\u043d\u0431\u0435\u043b\u0433\u0438 \u0447\u044b\u0433\u0430\u0440\u0443\u0443, \u043d\u0443\u0441\u043a\u0430 \u0441\u0430\u043d\u044b\u043d \u043a\u0438\u0440\u0433\u0438\u0437\u04af\u04af. \u041f\u0430\u0440\u0442\u0438\u044f \u043a\u0430\u043b\u0434\u044b\u0433\u044b\u043d \u0430\u0437\u0430\u0439\u0442\u0443\u0443 \u0436\u0430\u043d\u0430 \u0431\u0438\u0440 \u0443\u0447\u0443\u0440\u0434\u0430\u0433\u044b \u04e9\u0437\u0433\u04e9\u0440\u0442\u04af\u04af\u043b\u04e9\u0440\u0434\u04e9\u043d \u043a\u043e\u0440\u0433\u043e\u043e.",
+    "tg": "\u0424\u043e\u0441\u0438\u043b\u0430\u0438 \u0430\u043c\u0430\u043b\u04b3\u043e\u0438 \u0434\u0430\u0441\u0442\u0433\u043e\u04b3\u04b3\u043e \u0432\u0430 \u0431\u0430\u0445\u0448\u04b3\u043e\u0438 \u043d\u0430\u0440\u0445 \u0438\u0441\u043b\u043e\u04b3 \u0448\u0443\u0434. \u041c\u043e\u043b\u04b3\u043e\u0438 \u043d\u0430\u0432 \u0444\u0430\u0432\u0440\u0430\u043d \u0434\u0430\u0440 \u04b7\u0443\u0441\u0442\u0443\u04b7\u04ef \u043f\u0430\u0439\u0434\u043e \u043c\u0435\u0448\u0430\u0432\u0430\u043d\u0434. \u0418\u043d\u0442\u0438\u0445\u043e\u0431\u0438 EXE/MSI, \u043d\u0430\u0432\u0441\u043e\u0437\u0438\u0438 Windows \u0432\u0430 \u0441\u0430\u0431\u0442\u0438 \u0445\u0430\u0442\u043e\u04b3\u043e. \u0410\u043d\u04b7\u043e\u043c \u0432\u0430 \u0447\u043e\u043f\u0438 \u0447\u0435\u043a; \u0447\u043e\u043f\u0438 \u0442\u0430\u043c\u0493\u0430 \u0431\u0430 \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0438 \u0437\u0430\u0445\u0438\u0440\u0430\u0448\u0443\u0434\u0430, \u0432\u043e\u0440\u0438\u0434 \u043a\u0430\u0440\u0434\u0430\u043d\u0438 \u0448\u0443\u043c\u043e\u0440\u0430\u0438 \u043d\u0443\u0441\u0445\u0430\u04b3\u043e. \u041a\u0430\u043c \u043a\u0430\u0440\u0434\u0430\u043d\u0438 \u0431\u0430\u049b\u0438\u044f\u0438 \u043f\u0430\u0440\u0442\u0438\u044f \u0431\u043e \u043c\u0443\u04b3\u043e\u0444\u0438\u0437\u0430\u0442 \u0430\u0437 \u0442\u0430\u0493\u0439\u0438\u0440\u043e\u0442\u0438 \u04b3\u0430\u043c\u0437\u0430\u043c\u043e\u043d.",
+    "uz": "Qurilma amallari va narx bo\u2018limlari orasidagi masofalar tuzatildi. Yangi tovarlar qidiruvda darhol ko\u2018rinadi. EXE/MSI tanlovi, Windows yangilanishi va xato jurnali. Chekni yakunlash va chop etish; saqlangan printerga yorliq chop etish, nusxa sonini kiritish. Partiya qoldig\u2018ini kamaytirish va bir vaqtdagi o\u2018zgarishlardan himoya."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:01:09Z",
+      "finishedAt": "2026-10-02T14:01:15Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:01:15Z",
+      "finishedAt": "2026-10-02T14:07:45Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:07:45Z",
+      "finishedAt": "2026-10-02T14:08:01Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:08:01Z",
+      "finishedAt": "2026-10-02T14:12:33Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:12:33Z",
+      "finishedAt": "2026-10-02T14:19:47Z"
+    },
+    "linux": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:19:47Z",
+      "finishedAt": "2026-10-02T14:20:20Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:52:12Z",
+      "finishedAt": "2026-10-02T14:52:32Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:26:58Z",
+      "finishedAt": "2026-10-02T14:47:14Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-10-02T14:53:42Z",
+      "finishedAt": "2026-10-02T14:54:23Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
