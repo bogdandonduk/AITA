@@ -209,6 +209,9 @@ class Run:
         return True
 
     def pin(self):
+        if 'linux' in self.args.targets.split(','):
+            require(shutil.which('dpkg-deb') and shutil.which('rpmbuild'),
+                    'Linux packaging tools are missing: configure dpkg-deb and rpmbuild in PATH before starting the release')
         require(not capture(['git', 'status', '--porcelain']), 'Commit the reviewed changes before a release pass; source must be clean')
         self.revision = capture(['git', 'rev-parse', 'HEAD'])
         remote = capture(['git', 'ls-remote', 'origin', 'refs/heads/master']).split()[0]
@@ -514,7 +517,7 @@ class Run:
 
 
 def doctor(run):
-    for tool in ('git', 'gh', 'java', 'keytool', 'jarsigner', 'python3', 'npx', 'curl'):
+    for tool in ('git', 'gh', 'java', 'keytool', 'jarsigner', 'python3', 'npx', 'curl', 'dpkg-deb', 'rpmbuild'):
         run.say('READY' if shutil.which(tool) else 'MISSING', tool)
     run.say('READY' if (SIGNING / 'android.json').exists() else 'SETUP NEEDED', 'Android signing (APK and AAB)')
     run.say('READY' if Path('/usr/local/sbin/aita-release-server').exists() else 'SETUP NEEDED', 'Restricted server deployment helper')

@@ -431,6 +431,9 @@ internal fun shouldPreferLocalDrawable(
     localRes: DrawableResource?
 ): Boolean {
     if (localRes == null) return false
+    // Bundled-only assets (for example Linux) have no remote URL. Do not request
+    // the drawable directory before displaying their supplied local resource.
+    if (url.isBlank()) return true
 
     val fileName = url
         .substringBefore('?')

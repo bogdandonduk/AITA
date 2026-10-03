@@ -18,7 +18,17 @@ class LinuxInstallerHandoffTest {
             linuxTerminalCommand(file) { it == "/usr/bin/gnome-terminal" })
         assertNull(linuxTerminalCommand(file) { false })
     }
-    @Test fun helperHasValidShellSyntaxAndProtectsArguments() {
+    @Test fun helperProtectsArgumentsAndVerifiesBeforeInstall() {
+        val script = linuxInstallerScript(File("/tmp/a'$(never).deb"), "a".repeat(64),
+            listOf("/usr/bin/sudo", "/usr/bin/apt-get", "install", "--", "/tmp/a'$(never).deb"),
+            999999, File("/opt/aita/bin/AITA"), File("/tmp/ready"), "test-token", File("/tmp/result"), File("/tmp/log"), true)
+        assertContains(script, linuxShellQuote(File("/tmp/a'$(never).deb").absolutePath))
+        assertContains(script, linuxShellQuote("/tmp/a'$(never).deb"))
+        assertTrue(script.indexOf("verify") < script.indexOf("/usr/bin/sudo"))
+    }
+    @Test fun helperHasValidLinuxShellSyntax() {
+        org.junit.Assume.assumeTrue("Linux helper syntax requires the Linux shell",
+            System.getProperty("os.name").lowercase().contains("linux"))
         val dir = java.nio.file.Files.createTempDirectory("aita-helper-test").toFile()
         try {
             val script = File(dir, "helper.sh")
