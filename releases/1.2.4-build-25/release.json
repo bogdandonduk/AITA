@@ -1,0 +1,163 @@
+{
+  "version": "1.2.4",
+  "build": 25,
+  "revision": "82f050fbddee7f629e6aab1de7019511087e0402",
+  "tag": "v1.2.4-b25",
+  "createdAt": "2026-10-03T20:18:12Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.2.4-25-android.apk",
+      "sha256": "bd07a5cb340b6dc73ba0fde77e76053b03cbf7b933b9b239c0b7b698b8e89da2",
+      "bytes": 72677723,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-android.apk"
+    },
+    {
+      "name": "AITA-1.2.4-25-android.aab",
+      "sha256": "a4c62c95f5365c6e1013bd5c1c7865957b8bb0feae2fadfc556d92e7e303868e",
+      "bytes": 47349699,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "0082b57d81db958f39355a1df86ca34f7e882a723be064d531ab0b00e7d6547a",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.4-25-linux-x64.deb",
+      "sha256": "0ba633d1ccdfc782ec86a1a07c5a6a64f452d1613da2d248a84f1e3b0ca6b35c",
+      "bytes": 116232944,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-linux-x64.deb"
+    },
+    {
+      "name": "AITA-1.2.4-25-linux-x64.rpm",
+      "sha256": "7c9e8d82fbcf73ffcd052e772e2fbc42a5b67e52aa17c2bf9852aee44aeb9d10",
+      "bytes": 127654962,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-linux-x64.rpm"
+    },
+    {
+      "name": "linux-client-build.json",
+      "sha256": "0082b57d81db958f39355a1df86ca34f7e882a723be064d531ab0b00e7d6547a",
+      "bytes": 857,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/linux-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.4-25-windows.exe",
+      "sha256": "82058b0d84c4158694e2599e56d8260827ee6d8a32d5fc0298f40bfab3debea6",
+      "bytes": 137872896,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-windows.exe"
+    },
+    {
+      "name": "AITA-1.2.4-25-windows.msi",
+      "sha256": "6995f3ad6ff258f23ff35d2b76f675b5d72928beb5116709c4e2621152231b8d",
+      "bytes": 137273804,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "fabf8b9630534624c1c0913daf7e29f1dba9f142b48e05f2f69604f2055440d5",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "9302333a1a00181e62c1a37c7f91c5c3a7d689b7a38402fdcd7fc3238e92610d",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/windows-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.4-25-web.zip",
+      "sha256": "9728356e7b2772126cc8c31aa3d326ec697492df58a3c7a8aa8982a93ab3d6b5",
+      "bytes": 12984346,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/AITA-1.2.4-25-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "0082b57d81db958f39355a1df86ca34f7e882a723be064d531ab0b00e7d6547a",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.4-b25/web-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Guest update notifications open Downloads. Added platform store links and corrected Apple icons. Checkout retries preserve one operation and clear the completed cart; quick cart discounts are reflected in receipts, returns and analytics. Linux updates use a verified package-manager handoff. Thermal analytics and saved A4 printer selection improved. Browser recovery and optional diagnostics strengthened. Marketplace gains recent searches, removable filters and clear discount labels. Android APK/AAB, Windows pilot EXE/MSI and Linux DEB/RPM. Actual printer hardware and the reported Chrome crash remain field-validation items.",
+    "ru": "\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u043e\u0431 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0438 \u0431\u0435\u0437 \u0432\u0445\u043e\u0434\u0430 \u043e\u0442\u043a\u0440\u044b\u0432\u0430\u044e\u0442 \u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0438. \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b \u0441\u0441\u044b\u043b\u043a\u0438 \u043d\u0430 \u043c\u0430\u0433\u0430\u0437\u0438\u043d\u044b \u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c \u0438 \u0438\u0441\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u044b \u0437\u043d\u0430\u0447\u043a\u0438 Apple. \u041f\u043e\u0432\u0442\u043e\u0440 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0438\u044f \u043f\u0440\u043e\u0434\u0430\u0436\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442 \u043e\u0434\u043d\u0443 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044e \u0438 \u043e\u0447\u0438\u0449\u0430\u0435\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043d\u043d\u0443\u044e \u043a\u043e\u0440\u0437\u0438\u043d\u0443; \u0431\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u043a\u0438\u0434\u043a\u0438 \u0443\u0447\u0438\u0442\u044b\u0432\u0430\u044e\u0442\u0441\u044f \u0432 \u0447\u0435\u043a\u0430\u0445, \u0432\u043e\u0437\u0432\u0440\u0430\u0442\u0430\u0445 \u0438 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0435. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 Linux \u043f\u0435\u0440\u0435\u0434\u0430\u0451\u0442\u0441\u044f \u043c\u0435\u043d\u0435\u0434\u0436\u0435\u0440\u0443 \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0441 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u043e\u0439 \u0444\u0430\u0439\u043b\u0430. \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u044b \u043f\u0435\u0447\u0430\u0442\u044c \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0438 \u043d\u0430 \u043b\u0435\u043d\u0442\u0435 \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435 \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0430 A4. \u0423\u0441\u0438\u043b\u0435\u043d\u044b \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0432\u0435\u0431-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f \u0438 \u0434\u043e\u0431\u0440\u043e\u0432\u043e\u043b\u044c\u043d\u0430\u044f \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430. \u0412 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0435 \u043f\u043e\u044f\u0432\u0438\u043b\u0438\u0441\u044c \u043d\u0435\u0434\u0430\u0432\u043d\u0438\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b, \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e\u0435 \u0441\u043d\u044f\u0442\u0438\u0435 \u0444\u0438\u043b\u044c\u0442\u0440\u043e\u0432 \u0438 \u043f\u043e\u043d\u044f\u0442\u043d\u044b\u0435 \u0441\u043a\u0438\u0434\u043a\u0438. Android APK/AAB, Windows EXE/MSI \u0434\u043b\u044f \u043f\u0438\u043b\u043e\u0442\u0430, Linux DEB/RPM. \u0424\u0438\u0437\u0438\u0447\u0435\u0441\u043a\u0438\u0435 \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u044b \u0438 \u0441\u0431\u043e\u0439 Chrome \u043d\u0430 \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f \u0442\u0440\u0435\u0431\u0443\u044e\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 \u043d\u0430 \u043c\u0435\u0441\u0442\u0435.",
+    "kk": "\u0416\u04af\u0439\u0435\u0433\u0435 \u043a\u0456\u0440\u043c\u0435\u0433\u0435\u043d\u0434\u0435 \u0436\u0430\u04a3\u0430\u0440\u0442\u0443 \u0445\u0430\u0431\u0430\u0440\u043b\u0430\u043c\u0430\u0441\u044b \u0416\u04af\u043a\u0442\u0435\u0443\u043b\u0435\u0440\u0434\u0456 \u0430\u0448\u0430\u0434\u044b. \u041f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430 \u0434\u04af\u043a\u0435\u043d\u0434\u0435\u0440\u0456\u043d\u0456\u04a3 \u0441\u0456\u043b\u0442\u0435\u043c\u0435\u043b\u0435\u0440\u0456 \u0436\u04d9\u043d\u0435 Apple \u0431\u0435\u043b\u0433\u0456\u0448\u0435\u043b\u0435\u0440\u0456 \u049b\u043e\u0441\u044b\u043b\u0434\u044b. \u0421\u0430\u0442\u0443\u0434\u044b \u049b\u0430\u0439\u0442\u0430\u043b\u0430\u043f \u0430\u044f\u049b\u0442\u0430\u0443 \u0431\u0456\u0440 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044f\u043d\u044b \u0441\u0430\u049b\u0442\u0430\u0439\u0434\u044b, \u0430\u044f\u049b\u0442\u0430\u043b\u0493\u0430\u043d \u0441\u0435\u0431\u0435\u0442 \u0442\u0430\u0437\u0430\u043b\u0430\u043d\u0430\u0434\u044b. \u0416\u044b\u043b\u0434\u0430\u043c \u0436\u0435\u04a3\u0456\u043b\u0434\u0456\u043a\u0442\u0435\u0440 \u0447\u0435\u043a\u0442\u0435\u0440\u0434\u0435, \u049b\u0430\u0439\u0442\u0430\u0440\u044b\u043c\u0434\u0430\u0440\u0434\u0430 \u0436\u04d9\u043d\u0435 \u0442\u0430\u043b\u0434\u0430\u0443\u0434\u0430 \u0435\u0441\u043a\u0435\u0440\u0456\u043b\u0435\u0434\u0456. Linux \u0436\u0430\u04a3\u0430\u0440\u0442\u0443\u044b \u0442\u0435\u043a\u0441\u0435\u0440\u0456\u043b\u0433\u0435\u043d \u043f\u0430\u043a\u0435\u0442 \u0430\u0440\u049b\u044b\u043b\u044b \u043e\u0440\u043d\u0430\u0442\u044b\u043b\u0430\u0434\u044b. \u0422\u0430\u0441\u043f\u0430\u0493\u0430 \u0435\u0441\u0435\u043f \u0431\u0430\u0441\u044b\u043f \u0448\u044b\u0493\u0430\u0440\u0443, A4 \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0456\u043d \u0441\u0430\u049b\u0442\u0430\u0443, \u0432\u0435\u0431-\u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0456\u0440\u0443 \u0436\u04d9\u043d\u0435 \u0435\u0440\u0456\u043a\u0442\u0456 \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b. \u041c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0442\u0435 \u0441\u043e\u04a3\u0493\u044b \u0456\u0437\u0434\u0435\u0443\u043b\u0435\u0440 \u043c\u0435\u043d \u044b\u04a3\u0493\u0430\u0439\u043b\u044b \u0441\u04af\u0437\u0433\u0456\u043b\u0435\u0440 \u0431\u0430\u0440.",
+    "ky": "\u041a\u0438\u0440\u0431\u0435\u0433\u0435\u043d \u043a\u043e\u043b\u0434\u043e\u043d\u0443\u0443\u0447\u0443 \u04af\u0447\u04af\u043d \u0436\u0430\u04a3\u044b\u0440\u0442\u0443\u0443 \u0431\u0438\u043b\u0434\u0438\u0440\u04af\u04af\u0441\u04af \u0416\u04af\u043a\u0442\u04e9\u04e9\u043b\u04e9\u0440\u0434\u04af \u0430\u0447\u0430\u0442. \u041f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430 \u0434\u04af\u043a\u04e9\u043d\u0434\u04e9\u0440\u04af\u043d\u04af\u043d \u0448\u0438\u043b\u0442\u0435\u043c\u0435\u043b\u0435\u0440\u0438 \u0436\u0430\u043d\u0430 Apple \u0431\u0435\u043b\u0433\u0438\u043b\u0435\u0440\u0438 \u043a\u043e\u0448\u0443\u043b\u0434\u0443. \u0421\u0430\u0442\u0443\u0443\u043d\u0443 \u043a\u0430\u0439\u0440\u0430 \u0431\u04af\u0442\u04af\u0440\u04af\u04af \u0431\u0438\u0440 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044f\u043d\u044b \u0441\u0430\u043a\u0442\u0430\u0439\u0442, \u0431\u04af\u0442\u043a\u04e9\u043d \u0441\u0435\u0431\u0435\u0442 \u0442\u0430\u0437\u0430\u043b\u0430\u043d\u0430\u0442. \u042b\u043a\u0447\u0430\u043c \u0430\u0440\u0437\u0430\u043d\u0434\u0430\u0442\u0443\u0443\u043b\u0430\u0440 \u0447\u0435\u043a\u0442\u0435\u0440\u0434\u0435, \u043a\u0430\u0439\u0442\u0430\u0440\u0443\u0443\u0434\u0430 \u0436\u0430\u043d\u0430 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430\u0434\u0430 \u044d\u0441\u0435\u043f\u0442\u0435\u043b\u0435\u0442. Linux \u0436\u0430\u04a3\u044b\u0440\u0442\u0443\u0443\u0441\u0443 \u0442\u0435\u043a\u0448\u0435\u0440\u0438\u043b\u0433\u0435\u043d \u043f\u0430\u043a\u0435\u0442 \u0430\u0440\u043a\u044b\u043b\u0443\u0443 \u043e\u0440\u043d\u043e\u0442\u0443\u043b\u0430\u0442. \u0422\u0430\u0441\u043c\u0430\u0433\u0430 \u043e\u0442\u0447\u0435\u0442 \u0431\u0430\u0441\u044b\u043f \u0447\u044b\u0433\u0430\u0440\u0443\u0443, A4 \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0438\u043d \u0441\u0430\u043a\u0442\u043e\u043e, \u0432\u0435\u0431-\u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0442\u0438\u0440\u04af\u04af \u0436\u0430\u043d\u0430 \u044b\u043a\u0442\u044b\u044f\u0440\u0434\u0443\u0443 \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430 \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b. \u041c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0442\u0435 \u0430\u043a\u044b\u0440\u043a\u044b \u0438\u0437\u0434\u04e9\u04e9\u043b\u04e9\u0440 \u0436\u0430\u043d\u0430 \u044b\u04a3\u0433\u0430\u0439\u043b\u0443\u0443 \u0447\u044b\u043f\u043a\u0430\u043b\u0430\u0440 \u0431\u0430\u0440.",
+    "tg": "\u041f\u0435\u0448 \u0430\u0437 \u0432\u043e\u0440\u0438\u0434\u0448\u0430\u0432\u04e3 \u043e\u0433\u043e\u04b3\u0438\u0438 \u043d\u0430\u0432\u0441\u043e\u0437\u04e3 \u0431\u0430\u0445\u0448\u0438 \u0411\u043e\u0440\u0433\u0438\u0440\u0438\u04b3\u043e\u0440\u043e \u043c\u0435\u043a\u0443\u0448\u043e\u044f\u0434. \u041f\u0430\u0439\u0432\u0430\u043d\u0434\u04b3\u043e\u0438 \u043c\u0430\u0493\u043e\u0437\u0430\u04b3\u043e\u0438 \u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0430\u04b3\u043e \u0432\u0430 \u043d\u0438\u0448\u043e\u043d\u0430\u04b3\u043e\u0438 Apple \u0438\u043b\u043e\u0432\u0430 \u0448\u0443\u0434\u0430\u043d\u0434. \u0422\u0430\u043a\u0440\u043e\u0440\u0438 \u0430\u043d\u04b7\u043e\u043c\u0438 \u0444\u0443\u0440\u04ef\u0448 \u044f\u043a \u0430\u043c\u0430\u043b\u0438\u0451\u0442\u0440\u043e \u043d\u0438\u0433\u043e\u04b3 \u043c\u0435\u0434\u043e\u0440\u0430\u0434 \u0432\u0430 \u0441\u0430\u0431\u0430\u0434\u0438 \u0430\u043d\u04b7\u043e\u043c\u0451\u0444\u0442\u0430 \u0442\u043e\u0437\u0430 \u043c\u0435\u0448\u0430\u0432\u0430\u0434. \u0422\u0430\u0445\u0444\u0438\u0444\u04b3\u043e\u0438 \u0437\u0443\u0434 \u0434\u0430\u0440 \u0440\u0430\u0441\u0438\u0434\u04b3\u043e, \u0431\u0430\u0440\u0433\u0430\u0440\u0434\u043e\u043d\u04e3 \u0432\u0430 \u0442\u0430\u04b3\u043b\u0438\u043b \u04b3\u0438\u0441\u043e\u0431 \u043c\u0435\u0448\u0430\u0432\u0430\u043d\u0434. \u041d\u0430\u0432\u0441\u043e\u0437\u0438\u0438 Linux \u0431\u0430\u0441\u0442\u0430\u0438 \u0441\u0430\u043d\u04b7\u0438\u0434\u0430\u0448\u0443\u0434\u0430\u0440\u043e \u0438\u0441\u0442\u0438\u0444\u043e\u0434\u0430 \u043c\u0435\u0431\u0430\u0440\u0430\u0434. \u0427\u043e\u043f\u0438 \u04b3\u0438\u0441\u043e\u0431\u043e\u0442 \u0434\u0430\u0440 \u043d\u0430\u0432\u043e\u0440, \u043d\u0438\u0433\u043e\u04b3\u0434\u043e\u0440\u0438\u0438 \u043f\u0440\u0438\u043d\u0442\u0435\u0440\u0438 A4, \u0431\u0430\u0440\u049b\u0430\u0440\u043e\u0440\u0441\u043e\u0437\u0438\u0438 \u0432\u0435\u0431 \u0432\u0430 \u0442\u0430\u0448\u0445\u0438\u0441\u0438 \u0438\u0445\u0442\u0438\u0451\u0440\u04e3 \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434\u0430\u043d\u0434. \u041c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441 \u04b7\u0443\u0441\u0442\u0443\u04b7\u04ef\u04b3\u043e\u0438 \u043e\u0445\u0438\u0440\u0438\u043d \u0432\u0430 \u0444\u0438\u043b\u0442\u0440\u04b3\u043e\u0438 \u049b\u0443\u043b\u0430\u0439 \u0434\u043e\u0440\u0430\u0434.",
+    "uz": "Kirishdan oldin yangilanish bildirishnomasi Yuklamalarni ochadi. Platforma do\u2018konlari havolalari va Apple belgilari qo\u2018shildi. Savdoni qayta yakunlash bitta operatsiyani saqlaydi va yakunlangan savat tozalanadi. Tezkor chegirmalar chek, qaytarish va tahlilda hisoblanadi. Linux yangilanishi tekshirilgan paket orqali o\u2018rnatiladi. Rulonga hisobot chop etish, A4 printerini saqlash, vebni tiklash va ixtiyoriy diagnostika yaxshilandi. Marketpleysda so\u2018nggi qidiruvlar va qulay filtrlar mavjud."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:30:56Z",
+      "finishedAt": "2026-10-03T19:30:57Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:30:57Z",
+      "finishedAt": "2026-10-03T19:37:36Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:37:36Z",
+      "finishedAt": "2026-10-03T19:37:45Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:37:45Z",
+      "finishedAt": "2026-10-03T19:38:36Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:38:36Z",
+      "finishedAt": "2026-10-03T19:45:25Z"
+    },
+    "linux": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:45:25Z",
+      "finishedAt": "2026-10-03T19:45:59Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-10-03T20:17:18Z",
+      "finishedAt": "2026-10-03T20:17:38Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-10-03T19:55:07Z",
+      "finishedAt": "2026-10-03T19:55:33Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-10-03T20:17:38Z",
+      "finishedAt": "2026-10-03T20:18:11Z"
+    }
+  },
+  "visibility": "private GitHub repository; downloads require repository access",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
