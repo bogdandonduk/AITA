@@ -3,6 +3,8 @@ package kz.aita
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.decodeFromString
 
+val cartQuickDiscountsState = MutableStateFlow<Map<String, Double>>(emptyMap())
+val cartCheckoutsState = MutableStateFlow<Map<String, CartCheckoutAttempt>>(emptyMap())
 val cartSaleMethodIdsState = MutableStateFlow<Map<String, String>>(emptyMap())
 val cartConditionChecksState = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 private val paymentDrafts = MutableStateFlow<Map<String, TransactionPaymentDraftDataModel>>(emptyMap())
@@ -11,6 +13,8 @@ private val returnReasons = MutableStateFlow<Map<String, String>>(emptyMap())
 private val returnBatches = MutableStateFlow<Map<String, CartReturnBatchSelectionDataModel>>(emptyMap())
 private val cartScrolls = MutableStateFlow<Map<String, TransactionCartScrollStateDataModel>>(emptyMap())
 internal fun publishCartUiState(ui: CartUiState) {
+    cartQuickDiscountsState.value = ui.discounts
+    cartCheckoutsState.value = ui.checkouts
     cartSaleMethodIdsState.value = ui.saleMethods
     cartConditionChecksState.value = ui.checks
     paymentDrafts.value = ui.payments
@@ -105,3 +109,11 @@ internal suspend fun readLegacyCartUiState() = CartUiState(
     checks = legacyCartValue<Map<String, Boolean>>("transaction_cart_condition_checks").orEmpty(),
     scrolls = legacyCartValue<Map<String, TransactionCartScrollStateDataModel>>("transaction_cart_scroll_states").orEmpty()
 )
+
+fun setCartQuickDiscount(slot: Int, percent: Double) {
+    require(validCartSlot(0, slot) && validQuickDiscount(percent))
+    val key = "0:$slot"
+    DynamicCarts.editUiAsync { ui -> if (key in ui.checkouts) ui else ui.copy(
+        discounts = if (percent == 0.0) ui.discounts - key else ui.discounts + (key to percent),
+        payments = ui.payments - key) }
+}

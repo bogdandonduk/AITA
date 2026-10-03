@@ -16907,6 +16907,8 @@ internal fun normalizeTransactionGoodsInsideTransaction(
     ?: stockVisibleStoreIdsInsideTransaction(storeId)
 
   for (line in lines) {
+    if (!kz.aita.validQuickDiscount(line.quickDiscountPercent) || (transactionType == "accept" && line.quickDiscountPercent != 0.0))
+      return NormalizedTransactionGoodsResult(null, "invalid_quantity")
     if (!line.quantity.isFinite() || line.quantity <= 0.0 || !line.pricePerUnit.isFinite()) {
       return NormalizedTransactionGoodsResult(null, "invalid_quantity")
     }
@@ -17034,8 +17036,12 @@ internal fun normalizeTransactionGoodsInsideTransaction(
       else -> return NormalizedTransactionGoodsResult(null, "price_unavailable")
     }
 
+    val discountPercent = if (transactionType == "purchase") line.quickDiscountPercent else originalReceipt?.second?.quickDiscountPercent ?: 0.0
     normalizedLines += line.copy(
-      pricePerUnit = kotlin.math.round(normalizedPricePerUnit.coerceAtLeast(0.0) * 100.0) / 100.0,
+      pricePerUnit = kz.aita.discountedUnitPrice(normalizedPricePerUnit.coerceAtLeast(0.0), if (transactionType == "purchase") discountPercent else 0.0),
+      quickDiscountPercent = discountPercent,
+      priceBeforeDiscount = if (transactionType == "purchase" && discountPercent > 0.0) normalizedPricePerUnit.roundMoney()
+        else originalReceipt?.second?.priceBeforeDiscount,
       saleMethodId = appliedSaleMethodId,
       name = goodsItem.name.takeIf { it.isNotEmpty() } ?: line.name,
       goodsItemId = goodsItem.id.takeIf { it.isNotBlank() } ?: line.goodsItemId,
@@ -17923,6 +17929,7 @@ fun Application.module() {
         call.safeGenericResponseNoPayload(HttpStatusCode.Conflict, eventMessage("store.legal_id_in_use"))
         return@exception
       }
+      call.application.captureServerDiagnostic(cause)
       if (cause.isClassLoadingFailure()) {
         stabilizeServerRuntimeClassLoader("status-pages-classloading-failure")
         refreshSharedRuntimeSerializersAfterClassLoadingFailure("status-pages:${call.request.path()}", cause)

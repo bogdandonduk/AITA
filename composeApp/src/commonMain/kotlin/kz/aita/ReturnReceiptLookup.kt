@@ -159,6 +159,8 @@ internal fun AppConfiguration.requestReturnReceiptScan(raw: String, slot: Int): 
                                         line.quantity.copy(total = receiptReturnMinimum(line.quantity, line.quantity.total)),
                                         CartReturnBatchSelectionDataModel(goodsItemId = goods.id,
                                             pricePerUnit = original.pricePerUnit, currencyCode = line.currencyCode,
+                                            originalQuickDiscountPercent = original.quickDiscountPercent,
+                                            originalPriceBeforeDiscount = original.priceBeforeDiscount,
                                             originalTransactionId = receipt.serverReceiptIdOrNull(),
                                             originalClientOperationId = receipt.clientOperationId.takeIf { it.isNotBlank() },
                                             originalTransactionLineIndex = line.index,

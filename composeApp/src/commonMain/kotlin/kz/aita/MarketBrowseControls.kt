@@ -45,6 +45,7 @@ internal fun AppConfiguration.MarketBrowseControls(
                 enabledColor = stateValues.BackgroundColor, textColor = stateValues.TextColor,
                 autoLoading = false, confirmationRequired = false, onClick = browse::clearFilters)
         }
+        MarketSearchShortcuts(browse, categoryLabel)
         val roots = catalogue?.categories.orEmpty().filter { it.ancestorIds.isEmpty() }.take(8)
         if (roots.isNotEmpty() && !browse.filtersExpanded) LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(roots,key={it.id}) { entry ->

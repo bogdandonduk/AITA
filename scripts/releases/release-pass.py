@@ -227,12 +227,16 @@ class Run:
         public = SIGNING / 'update-public.txt'
         require(public.is_file(), 'Updater signing public key is missing; run setup-android-signing.py')
         self.env['AITA_UPDATE_PUBLIC_KEY'] = public.read_text().strip()
+        recovery_key = json.loads((ROOT / 'composeApp/src/wasmJsMain/resources/downloads-public-key.json').read_text())
+        require(recovery_key.get('spki') == self.env['AITA_UPDATE_PUBLIC_KEY'], 'Recovery-download public key must match the release verification key')
         self.env['AITA_UPDATE_FEED_BASE'] = 'https://aita-api.bogdan-donduk.workers.dev/client-updates'
         self.say('SOURCE', self.revision)
 
     def verify(self):
         self.command('Shared, UI and server regression checks', ['bash', './gradlew', ':shared:jvmTest', ':composeApp:jvmTest', ':server:test',
             '--no-daemon', '--no-watch-fs', '--max-workers=4', '--console=plain'])
+        self.command('Recovery download verification', ['node', 'scripts/linux-web/test/recovery-downloads.test.cjs'])
+        self.command('Browser startup recovery', ['node', '--test', 'scripts/linux-web/test/startup-recovery-policy.test.cjs'])
         self.command('Browser interrupted-download recovery', ['node', '--test', 'scripts/linux-web/test/download-recovery.test.cjs'])
         self.command('Release automation tests', [sys.executable, '-m', 'unittest', 'discover', '-s', 'scripts/releases', '-p', 'test_*.py'])
 
@@ -339,6 +343,7 @@ class Run:
             self.command('Browser smoke check before upload' if dist else 'Browser smoke check on aita.kz',
                          ['node', 'scripts/linux-web/test/app-smoke.cjs'])
             if dist:
+                self.command('Browser stale-entry and unsupported-engine recovery', ['node', 'scripts/linux-web/test/startup-recovery.test.cjs'])
                 self.env['AITA_WEB_DIST'] = str(dist)
                 self.command('Guest registration email confirmation in the browser',
                              ['node', 'scripts/linux-web/test/registration-confirmation-smoke.cjs'])

@@ -121,6 +121,7 @@ internal fun Route.diagnosticProtectedRoutes(repository: DiagnosticRepository, s
 fun Route.installRuntimeDiagnosticRoutes(config: ApplicationConfig, backgroundScope: CoroutineScope) {
     val settings = DiagnosticServerSettings.read(config)
     val repository = DatabaseDiagnostics()
+    application.installServerDiagnosticCapture(repository, settings, backgroundScope)
     val budget = DiagnosticRequestBudget()
     diagnosticPublicRoutes(repository, settings, budget)
     authenticate("auth-jwt") { diagnosticProtectedRoutes(repository, settings, budget) }

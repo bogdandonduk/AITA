@@ -19,3 +19,11 @@
   Cache-Control: no-cache
 /styles.css
   Cache-Control: no-cache
+/aita-recovery.js
+  Cache-Control: no-cache
+/downloads.html
+  Cache-Control: no-cache
+/downloads.js
+  Cache-Control: no-cache
+/downloads-public-key.json
+  Cache-Control: no-cache

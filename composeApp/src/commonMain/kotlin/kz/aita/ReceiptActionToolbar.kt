@@ -31,10 +31,13 @@ internal fun AppConfiguration.ReceiptActionToolbar(
         if (onFinish != null) actionButton(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             text = pass23Text("finish"), iconPath = stateValues.drawablePathIconCheck,
             autoLoading = false, confirmationRequired = false, enabled = activeAction == null, onClick = onFinish)
-        if (onFinishAndPrint != null) actionButton(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        if (onFinishAndPrint != null) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        actionButton(modifier = Modifier.weight(1f),
             text = pass26Text("finish_print"), iconPath = stateValues.drawablePathIconReceipt,
             autoLoading = false, confirmationRequired = false, loading = activeAction == "print",
             enabled = activeAction == null, onClick = onFinishAndPrint)
+        PrintSelectionButton(enabled = activeAction == null)
+        }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             actions.forEach { action ->
                 TooltipBox(
@@ -58,6 +61,7 @@ internal fun AppConfiguration.ReceiptActionToolbar(
                     )
                 }
             }
+            PrintSelectionButton(enabled = activeAction == null)
         }
     }
 }

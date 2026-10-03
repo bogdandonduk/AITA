@@ -691,6 +691,8 @@ data class CartReturnBatchSelectionDataModel(
     val shelfBatchIdAtSale: String? = null,
     val originalReceiptTimeMillis: Long? = null,
     val originalReceiptQuantity: Double? = null,
+    val originalQuickDiscountPercent: Double = 0.0,
+    val originalPriceBeforeDiscount: Double? = null,
     val stockBatchId: String? = null,
     val pricePerUnit: Double? = null,
     val currencyCode: String = "",
@@ -729,7 +731,9 @@ data class TransactionReceiptLineDataModel(
     val originalClientOperationId: String? = null,
     val returnDestinationKind: StockBatchKindDataModel? = null,
     val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
-    val shelfBatchIdAtSale: String? = null
+    val shelfBatchIdAtSale: String? = null,
+    val quickDiscountPercent: Double = 0.0,
+    val priceBeforeDiscount: Double? = null
 ) {
     val total: Double
         get() = quantity.total * pricePerUnit
@@ -1745,6 +1749,17 @@ private fun MutableList<Byte>.finishReceiptEscPosDocument() {
     addEscPosCommand(0x1D, 0x56, 0x42, 0x00) // partial cut when supported; ignored by many tear-bar 58mm devices
 }
 
+/** Report text goes through the same bounded, native-width raster transport as receipts. */
+fun AitaPdfDocument.buildTextDocumentEscPosBytes(): ByteArray {
+    val lines = blocks.map { if (it.role == AitaPdfRole.Divider) RECEIPT_ESC_POS_SEPARATOR else it.text }
+    renderReceiptRaster(lines)?.let { return it }
+    val bytes = mutableListOf<Byte>()
+    bytes.startReceiptEscPosDocument()
+    lines.forEach { bytes.addEscPosWrappedLine(it) }
+    bytes.finishReceiptEscPosDocument()
+    return bytes.toByteArray()
+}
+
 fun buildReceiptPrinterTestEscPosBytes(title: String = "AITA printer test", dateText: String = ""): ByteArray {
     val document = receiptPrinterTestDocument(title, dateText)
     renderReceiptRaster(document.blocks.map { if (it.role == AitaPdfRole.Divider) "------------------------" else it.text })?.let { return it }
@@ -1888,6 +1903,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPdfDocument(language: String
             line.returnReason.takeIf { it.isNotBlank() }?.let { reason ->
                 appendLine("   ${labels.returnReason}: $reason")
             }
+            if (line.quickDiscountAmount() > 0) appendLine("   ${quickDiscountLabel(language)} ${receiptMoney(line.quickDiscountPercent)}%: -${receiptMoney(line.quickDiscountAmount())} ${line.currencySymbol}")
             appendLine("   ${receiptQuantityText(line.quantity, language)} x ${receiptMoney(line.pricePerUnit)} ${line.currencySymbol} = ${receiptMoney(line.total)} ${line.currencySymbol}")
         }
     }
@@ -4270,7 +4286,10 @@ fun completeTransaction(
         var transactionSaved = false
         try {
             completeTransactionInProgressState.emit(true)
-            val transactionWithOperationId = transaction.withClientOperationId()
+            val attempt = DynamicCarts.beginCheckout(cartOwner, transactionTypeIndex, clientId, transaction, receiptSnapshot)
+                ?: return@launch
+            val transactionWithOperationId = attempt.transaction
+            val stableReceipt = attempt.receipt
             postInAppNotification(
                 localizedStringResourceMessage(
                     id = 224,
@@ -4302,8 +4321,8 @@ fun completeTransaction(
                 if (shouldQueueForCloudRetry) {
                     val localCompleted = queueTransactionThroughLocalNetwork(transactionWithOperationId)
                     if (localCompleted != null) {
-                        latestTransactionReceiptSnapshotState.emit(receiptSnapshot.copy(transaction = localCompleted))
-                        DynamicCarts.delete(transactionTypeIndex, clientId, cartOwner)
+                        latestTransactionReceiptSnapshotState.emit(stableReceipt.completedWith(localCompleted))
+                        check(DynamicCarts.delete(transactionTypeIndex, clientId, cartOwner))
                         postInAppNotification(
                             localNetworkMessage(
                                 id = 733,
@@ -4319,6 +4338,7 @@ fun completeTransaction(
                     }
                 }
 
+                if (!shouldQueueForCloudRetry) DynamicCarts.abandonRejectedCheckout(cartOwner, transactionTypeIndex, clientId)
                 postInAppNotification(response.message, NotificationType.Negative)
                 return@launch
             }
@@ -4326,7 +4346,7 @@ fun completeTransaction(
             val completed = response.payload
 
             latestTransactionReceiptSnapshotState.emit(
-                receiptSnapshot.copy(transaction = completed)
+                stableReceipt.completedWith(completed)
             )
 
             transactionsState.emit(
@@ -4350,7 +4370,7 @@ fun completeTransaction(
                 )
             }
 
-            DynamicCarts.delete(transactionTypeIndex, clientId, cartOwner)
+            check(DynamicCarts.delete(transactionTypeIndex, clientId, cartOwner))
 
             activeStoreIdState.value?.let {
                 getStock(it)
@@ -4362,6 +4382,10 @@ fun completeTransaction(
             postInAppNotification(response.message, NotificationType.Positive)
             transactionSaved = true
             onCompleted?.invoke()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            if (DynamicCarts.isCurrent(cartOwner)) postInAppNotification(eventMessage("checkout.ui.save_error"), NotificationType.Negative)
+            RuntimeDiagnostics.capture(failure, "checkout.complete")
         } finally {
             withContext(NonCancellable) {
                 completeTransactionInProgressState.emit(false)
@@ -12113,7 +12137,7 @@ private suspend fun enqueueLocalNetworkOperation(operation: LocalNetworkQueuedOp
 
 private fun transactionLocalId(operationId: String): String = "local_${operationId.takeLast(48)}"
 
-private fun TransactionDataModel.withClientOperationId(): TransactionDataModel =
+internal fun TransactionDataModel.withClientOperationId(): TransactionDataModel =
     if (clientOperationId.isNotBlank()) this else copy(clientOperationId = "txn-${newDiagnosticId()}")
 
 private fun queuedTransactionOperation(transaction: TransactionDataModel): LocalNetworkQueuedOperationDataModel =
@@ -19629,7 +19653,9 @@ data class GoodsItemInTransactionDataModel(
     val originalClientOperationId: String? = null,
     val returnDestinationKind: StockBatchKindDataModel? = null,
     val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
-    val shelfBatchIdAtSale: String? = null
+    val shelfBatchIdAtSale: String? = null,
+    val quickDiscountPercent: Double = 0.0,
+    val priceBeforeDiscount: Double? = null
 )
 
 @kotlinx.serialization.Serializable
@@ -20703,6 +20729,7 @@ data class StoreAnalyticsDashboardDataModel(
     val categoryIdFilter: String? = null,
 
     val grossSales: Double = 0.0,
+    val quickDiscountTotal: Double = 0.0,
     val returnsAmount: Double = 0.0,
     val supplyCost: Double = 0.0,
     val netRevenue: Double = 0.0,
@@ -21275,6 +21302,7 @@ fun buildStoreAnalyticsDashboard(
         supplierIdFilter = supplierIdFilter.cleanAnalyticsFilterId(),
         categoryIdFilter = categoryIdFilter.cleanAnalyticsFilterId(),
         grossSales = grossSales,
+        quickDiscountTotal = saleTransactions.sumOf { tx -> tx.goodsInTransaction.sumOf { it.quickDiscountAmount() } }.roundMoney(),
         returnsAmount = returnsAmount,
         supplyCost = supplyCost,
         netRevenue = netRevenue,

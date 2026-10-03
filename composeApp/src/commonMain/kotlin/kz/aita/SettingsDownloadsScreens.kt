@@ -210,10 +210,15 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                         } })
                                     if (webOpenFailed) Text(updateText("error.unavailable"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                                 }
-                                "macos", "ios" -> Text(downloadsText("deferred"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                "macos", "ios" -> {
+                                    Text(downloadsText("deferred"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                    PlatformStoreAction(platform)
+                                    Text(pass27Text("store_pending"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                }
                                 else -> {
                                     if (entries.isEmpty()) Text(if (downloads.loading) updateText("checking") else if (releaseTab == "previous_releases") visualText("downloads.older_empty") else downloadsText("unavailable"),
                                         color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                                    if (entries.isNotEmpty()) Text(pass27Text("store_pending"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                     entries.groupBy { it.version to it.build }.entries.forEach { (identity, releaseEntries) ->
                                         Text("${downloadsText(if (releaseTab == "current_release") "latest" else "previous")}: ${identity.first} · ${updateText("build")} ${identity.second}",
                                             color = stateValues.TextColor, fontSize = stateValues.textSize, fontWeight = FontWeight.Bold)
@@ -224,12 +229,17 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                                 Text("${entry.fileName} · ${downloadFileSize(entry.sizeBytes)}", color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                                 if (entry.kind == "APK" || entry.kind == "AAB") Text(downloadsText(entry.kind.lowercase()), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                                                actionButton(text = updateText(entry.action.name.lowercase()), iconPath = downloadsIconPath(), iconRes = downloadsIconResource(),
+                                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField), verticalAlignment = Alignment.CenterVertically) {
+                                                Box(Modifier.weight(1f)) {
+                                                actionButton(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp), text = updateText(entry.action.name.lowercase()), iconPath = downloadsIconPath(), iconRes = downloadsIconResource(),
                                                     autoLoading = false, confirmationRequired = false,
                                                     enabled = downloads.savingId == null && !downloads.loading && !downloads.folderChanging,
                                                     loading = downloads.savingId == entry.id,
                                                     unavailableText = localizedStringResource(1141, "Please wait…"),
                                                     onClick = { DownloadsWorkspace.save(entry.id) })
+                                                }
+                                                PlatformStoreAction(platform, Modifier.weight(1f))
+                                                }
                                             }
                                         }
                                     }

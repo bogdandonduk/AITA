@@ -35,6 +35,6 @@ test('unsupported Wasm receives a browser explanation and a usable native downlo
   await context.addInitScript(() => { WebAssembly.validate = () => false; });
   const page = await context.newPage(); await page.goto(origin);
   assert.match(await page.locator('#aita-startup-message').textContent(), /Обновите браузер/);
-  assert.equal(await page.locator('#aita-startup a').getAttribute('href'), 'https://github.com/bogdandonduk/AITA/releases/latest');
+  assert.equal(await page.locator('#aita-startup a').getAttribute('href'), 'downloads.html');
   assert.equal(await page.evaluate(() => window.aitaWebEntry), undefined);
 }));

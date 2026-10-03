@@ -5,6 +5,15 @@ import java.awt.print.Printable
 import kotlin.test.*
 
 class SystemReceiptPrintingTest {
+    @Test fun reportOnRollReflowsAtPrinterWidthWithoutA4Padding() {
+        val original = AitaPdfDocument(listOf(AitaPdfBlock("AITA Analytics", AitaPdfRole.Title), AitaPdfBlock("Sales: 1234 KZT")),
+            width = 595f, minHeight = 842f, maxHeight = 842f, margin = 42f)
+        val roll = SystemReceiptPages(original.forReceiptPaper(58))
+        assertEquals(1, roll.numberOfPages)
+        assertTrue(roll.getPageFormat(0).height < 150)
+        assertEquals(58 * 72.0 / 25.4, roll.getPageFormat(0).width, .01)
+        assertEquals(842.0, SystemReceiptPages(original).getPageFormat(0).height)
+    }
     @Test fun driverPagesUseExactRollWidthsAndShortReceiptHeight() {
         for (width in listOf(58, 80)) {
             val document = AitaPdfDocument(listOf(AitaPdfBlock("125 ₸ Қазақша"))).forReceiptPaper(width)

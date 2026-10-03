@@ -111,6 +111,7 @@ fun main() {
                 }
             }
         } catch (failure: Throwable) {
+            RuntimeDiagnostics.capture(failure, "web.startup")
             val alreadyOpen = failure.message.orEmpty().contains("already open in another tab")
             // Rendering/engine failures must not be described as a storage permission problem.
             val message = if (openingStorage) browserStartupFailureText(alreadyOpen) else ""

@@ -98,3 +98,26 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
         append("</main></body></html>")
     }
 }
+
+val systemA4PrinterNameState = MutableStateFlow<String?>(null)
+var chooseSystemA4PrinterAction: (suspend () -> ReceiptPlatformActionResult)? = null
+var listSystemDocumentPrintersAction: (suspend () -> List<PlatformReceiptPrinterDataModel>)? = null
+var selectSystemDocumentPrinterAction: (suspend (Boolean, String?) -> ReceiptPlatformActionResult)? = null
+var printA4DocumentPlatformAction: (suspend (String, AitaPdfDocument) -> ReceiptPlatformActionResult)? = null
+val reportPrintOnReceiptState = MutableStateFlow(false)
+suspend fun loadReportPrintDestination() {
+    reportPrintOnReceiptState.value = getLocalKv("report-print-on-receipt") == "true"
+}
+suspend fun saveReportPrintDestination(receipt: Boolean) {
+    putLocalKv("report-print-on-receipt", receipt.toString()); reportPrintOnReceiptState.value = receipt
+}
+suspend fun printAnalyticsReport(snapshot: AnalyticsReportSnapshotDataModel): ReceiptPlatformActionResult {
+    val title = snapshot.analyticsReportPdfFileName()
+    val document = snapshot.buildAnalyticsReportPdfDocument()
+    return if (reportPrintOnReceiptState.value) {
+        if (receiptUsesSystemDocumentPrinting()) printReceiptDocument(title, document)
+        else printReceiptEscPos(document.buildTextDocumentEscPosBytes())
+    } else printA4DocumentPlatformAction?.invoke(title, document)
+        ?: if (preferHtmlDocumentPrinting) printHtmlDocument(title, document.toPrintHtml(title))
+        else printPdfDocument(title, renderAitaPdfDocument(document), deviceWorkflowText("report_failed"))
+}

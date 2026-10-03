@@ -80,6 +80,21 @@ object DynamicCarts {
         putLocalKv(owner.storageKey + ".present", "1")
         writeJsonCacheText(owner.storageKey, raw)
     }
+    /** Persist the immutable request before sending it; retries keep the same server idempotency key. */
+    suspend fun beginCheckout(owner: CartScope, type: Int, slot: Int, transaction: TransactionDataModel,
+        receipt: TransactionReceiptSnapshotDataModel): CartCheckoutAttempt? = work.run {
+        val key = "$type:$slot"
+        var result: CartCheckoutAttempt? = null
+        val saved = store.change(owner) { book ->
+            if (!book.contains(type, slot)) return@change book
+            result = book.ui.checkouts[key] ?: CartCheckoutAttempt(transaction.withClientOperationId(), receipt)
+            book.copy(ui = book.ui.copy(checkouts = book.ui.checkouts + (key to result!!)))
+        }
+        result.takeIf { saved && isCurrent(owner) }
+    }
+    suspend fun abandonRejectedCheckout(owner: CartScope, type: Int, slot: Int) = work.run {
+        store.change(owner) { book -> book.copy(ui = book.ui.copy(checkouts = book.ui.checkouts - "$type:$slot")) }
+    }
     suspend fun add(type: Int): Int? = captureScope()?.let { owner -> work.run { store.add(owner, type) } }
     suspend fun reveal(type: Int, slot: Int): Boolean = captureScope()?.let { owner -> work.run { store.reveal(owner, type, slot) } } ?: false
     suspend fun retryRestore() = adoptCurrent()
@@ -94,7 +109,7 @@ object DynamicCarts {
     }
     internal suspend fun flush() = work.drain()
     internal fun editUiAsync(transform: (CartUiState) -> CartUiState) = changeAsync { book ->
-        val updated = transform(book.ui)
+        val updated = transform(book.ui).preservingPending(book.ui)
         book.copy(ui = if (book.slots == null) updated else updated.retainingCarts(book::contains))
     }
     suspend fun remove(type: Int, slot: Int, owner: CartScope? = captureScope()): Boolean {
@@ -112,7 +127,7 @@ object DynamicCarts {
         val queued = work.post {
             var accepted = false
             val saved = try { store.change(owner) { book ->
-                if (!book.contains(type, slot)) return@change book
+                if (!book.contains(type, slot) || "$type:$slot" in book.ui.checkouts) return@change book
                 val old = book.lines.firstOrNull { it.id == id && it.type == type && it.slot == slot }
                 val quantity = old?.quantity?.let { it.copy(total = it.total + delta.total) } ?: delta
                 val maximum = if (type == 1) book.ui.batches[cartReturnBatchSelectionKey(type, slot, id)]?.originalReceiptQuantity else null
@@ -135,7 +150,7 @@ object DynamicCarts {
 
     fun setSupplyPrice(id: String, slot: Int, price: PriceDataModel) {
         require(price.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 && it <= 1_000_000_000_000.0 } == true)
-        changeAsync { book -> book.copy(lines = book.lines.map { row ->
+        changeAsync { book -> if ("2:$slot" in book.ui.checkouts) book else book.copy(lines = book.lines.map { row ->
             if (row.type == 2 && row.slot == slot && row.id == id) row.copy(supplyPrice = price) else row
         }, ui = book.ui.copy(payments = book.ui.payments - "2:$slot")) }
     }
@@ -143,7 +158,7 @@ object DynamicCarts {
     internal fun upsert(id: String, type: Int, slot: Int, quantity: QuantityDataModel) {
         require(id.isNotBlank() && validCartSlot(type, slot))
         changeAsync { book ->
-            if (book.slots != null && !book.contains(type, slot)) return@changeAsync book
+            if ("$type:$slot" in book.ui.checkouts || (book.slots != null && !book.contains(type, slot))) return@changeAsync book
             val maximum = if (type == 1) book.ui.batches[cartReturnBatchSelectionKey(type, slot, id)]?.originalReceiptQuantity else null
             if (!validReceiptCartQuantity(quantity, maximum)) {
                 postInAppNotification(eventMessage("return.quantity_limit"), NotificationType.Negative, transient = true)
@@ -160,7 +175,7 @@ object DynamicCarts {
         selection: CartReturnBatchSelectionDataModel): Boolean {
         var added = false
         val saved = work.run { store.change(owner) { book ->
-            if (!book.contains(1, slot) || book.lines.any { it.type == 1 && it.slot == slot && it.id == selection.goodsItemId }) book
+            if ("1:$slot" in book.ui.checkouts || !book.contains(1, slot) || book.lines.any { it.type == 1 && it.slot == slot && it.id == selection.goodsItemId }) book
             else {
                 require(quantity.total.isFinite() && quantity.total > 0.0 && validReceiptCartQuantity(quantity, selection.originalReceiptQuantity))
                 val key = cartReturnBatchSelectionKey(1, slot, selection.goodsItemId)
@@ -174,7 +189,7 @@ object DynamicCarts {
 
     internal fun removeItem(id: String, type: Int, slot: Int) {
         require(validCartSlot(type, slot))
-        changeAsync { book -> book.copy(lines = book.lines.filterNot { it.id == id && it.type == type && it.slot == slot },
+        changeAsync { book -> if ("$type:$slot" in book.ui.checkouts) book else book.copy(lines = book.lines.filterNot { it.id == id && it.type == type && it.slot == slot },
             ui = book.ui.withoutItem(type, slot, id)) }
     }
     internal suspend fun removeItemEverywhere(id: String) {

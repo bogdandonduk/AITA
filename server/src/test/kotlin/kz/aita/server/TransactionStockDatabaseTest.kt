@@ -90,6 +90,19 @@ class TransactionStockDatabaseTest {
         stockBatchId = first.toString())
     private fun total(batch: UUID) = StockBatchesV2.selectAll().where { StockBatchesV2.id eq batch }.single()[StockBatchesV2.quantity].total
 
+    @Test fun cartDiscountUsesAuthoritativePriceAndRefundsOnlyWhatWasPaid() = fixture { db -> transaction(db) {
+        val sale = save("purchase", listOf(line(2.0).copy(pricePerUnit = 0.01, quickDiscountPercent = 25.0, priceBeforeDiscount = 999.0)))
+        val sold = sale.goodsInTransaction.single()
+        assertEquals(7.5, sold.pricePerUnit)
+        assertEquals(10.0, sold.priceBeforeDiscount)
+        assertEquals(5.0, sold.quickDiscountAmount())
+        val back = save("return", listOf(returnLine(sale).copy(pricePerUnit = 999.0, quickDiscountPercent = 100.0)))
+        assertEquals(7.5, back.goodsInTransaction.single().pricePerUnit)
+        assertEquals(25.0, back.goodsInTransaction.single().quickDiscountPercent)
+        assertEquals(2.5, back.goodsInTransaction.single().quickDiscountAmount())
+        assertNull(normalizeTransactionGoodsInsideTransaction(store, "purchase", listOf(line().copy(quickDiscountPercent = 101.0)), listOf(store)).lines)
+    } }
+
     @Test fun kilogramsAndGramsKeepCanonicalUnitsAndFractionalStockThroughSaleAndReturn() = fixture { db -> transaction(db) {
         StockItems.update({ StockItems.id eq item }) { it[measurementUnitId] = "1" }
         StockBatchesV2.update({ StockBatchesV2.goodsItemId eq item }) { it[quantity] = q(2.0).copy(id="1",roundTotal=false) }

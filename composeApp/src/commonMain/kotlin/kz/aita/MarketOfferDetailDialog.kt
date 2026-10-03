@@ -123,6 +123,7 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                         Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
                             if(current.product.brand.isNotBlank()) Text(current.product.brand,color=stateValues.TextColor.copy(alpha=.65f),fontSize=stateValues.smallTextSize)
                             Text(current.title,color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
+                            MarketPromotionPrice(current)
                             Text(marketPriceLabel(current),color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
                             if(current.description.isNotBlank()) Text(current.description,color=stateValues.TextColor,fontSize=stateValues.textSize)
                             MarketProductFacts(current.product)

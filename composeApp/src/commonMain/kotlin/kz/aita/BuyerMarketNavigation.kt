@@ -26,6 +26,7 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
     var scrollRestore by mutableStateOf<BuyerReturnPoint?>(null)
     val section = mutableStateOf("products")
     var filtersExpanded by mutableStateOf(false)
+    var recentSearches by mutableStateOf<List<String>>(emptyList())
     val grid = LazyGridState()
     var gridQuery: MarketDiscoveryQuery? = null
     val directory = MarketShopDirectoryNavigation(savedOnly)

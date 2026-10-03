@@ -93,7 +93,12 @@ private suspend fun openDesktopInstaller(release: ClientRelease, artifact: Clien
             }
         }
         ClientOs.MACOS -> ProcessBuilder("/usr/bin/open", file.absolutePath).start()
-        ClientOs.LINUX -> ProcessBuilder("xdg-open", file.absolutePath).start()
+        ClientOs.LINUX -> {
+            withContext(Dispatchers.Main) { AppStateWorkspace.flush() }
+            flushCartsBeforeClientUpdate()
+            if (!startLinuxUpdateHandoff(file, artifact.sha256, artifact.kind)) throw ClientUpdateFailure("install")
+            kotlin.system.exitProcess(0)
+        }
         else -> throw ClientUpdateFailure("unsupported")
     }
     // Installer exit or wizard launch is not installation acknowledgement. Do not delete the file yet.

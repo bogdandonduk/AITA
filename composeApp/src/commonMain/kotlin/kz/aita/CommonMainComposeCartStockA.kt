@@ -184,6 +184,8 @@ fun AppConfiguration.GoodsItemInCartWidget(
     increaseQuantityAction: () -> Unit,
     decreaseQuantityAction: () -> Unit
 ) {
+    val cartDiscounts by cartQuickDiscountsState.collectAsState()
+    val quickDiscount = if (transactionTypeIndex == 0) cartDiscounts["0:${goodsItemInCart.clientId}"] ?: 0.0 else 0.0
     val isWeightQuantity = goodsItem.isWeightMeasurementUnit(stateValues.globalAppConfiguration) || !goodsItemInCart.quantity.roundTotal
     var showQuantityBottomSheet by rememberSaveable(goodsItemInCart.id, goodsItemInCart.quantity.total) {
         mutableStateOf(false)
@@ -445,7 +447,8 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     batch = activeBatch
                 )
             }
-            val itemPrice = (if (transactionTypeIndex == 2) goodsItemInCart.supplyPrice else null) ?: promotedItemPrice.finalPrice
+            val grossPrice = (if (transactionTypeIndex == 2) goodsItemInCart.supplyPrice else null) ?: promotedItemPrice.finalPrice
+            val itemPrice = if (quickDiscount > 0.0) grossPrice.copy(price = discountedUnitPrice(grossPrice.price.toMoneyDouble(), quickDiscount).moneyText()) else grossPrice
             val itemPriceTitle = when (transactionTypeIndex) {
                 0 -> if (saleMethodId == SALE_METHOD_WHOLESALE && goodsItem.isWholesaleEligible(goodsItemInCart.quantity.total)) {
                     localizedStringResource(246, "Wholesale price")
@@ -525,9 +528,11 @@ fun AppConfiguration.GoodsItemInCartWidget(
             } else {
                 StockPromotionPriceInfoLine(
                     title = itemPriceTitle,
-                    promotedPrice = promotedItemPrice,
+                    promotedPrice = promotedItemPrice.copy(finalPrice = itemPrice),
                     textColor = textColor
                 )
+                if (quickDiscount > 0.0) StockCardInfoLine(title = quickDiscountLabel(stateValues.appLanguage),
+                    value = "${quickDiscount.moneyText()}%", textColor = stateValues.AccentColor)
             }
 
             goodsItem.firstViolatedPromotionRestriction(
@@ -1240,6 +1245,8 @@ fun AppConfiguration.TransactionCartScreen() {
             }
         }
 
+        val discounts by cartQuickDiscountsState.collectAsState()
+        val discountPercent = discounts["${context.transactionTypeIndex}:${context.clientId}"] ?: 0.0
         val cartTotalPrice = cartItemsWithGoods.sumOf { (_, cartItem, goodsItem) ->
             val saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL
             val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
@@ -1258,7 +1265,7 @@ fun AppConfiguration.TransactionCartScreen() {
                     batch = activeCartBatch(goodsItem, cartItem)
                 )
             }
-            price.price.toMoneyDouble() * cartItem.quantity.total
+            discountedUnitPrice(price.price.toMoneyDouble(), discountPercent) * cartItem.quantity.total
         }
 
         val cartCurrency = cartItemsWithGoods.firstNotNullOfOrNull { (_, cartItem, goodsItem) ->
@@ -1328,6 +1335,7 @@ fun AppConfiguration.TransactionCartScreen() {
                     }
                 }
 
+                if (context.transactionTypeIndex == 0) CartQuickDiscount(context.clientId, discountPercent)
                 actionButton(
                     autoLoading = false,
                     modifier = Modifier.fillMaxWidth(),
@@ -4790,8 +4798,9 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
             }
             item {
                 printError?.let { Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 actionButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     text = localizedStringResource(1288, "Print item label"),
                     iconPath = stateValues.drawablePathIconPrintTag,
                     iconRes = stateValues.drawableResIconPrintTag.value,
@@ -4824,6 +4833,8 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                         }
                     }
                 )
+                PrintSelectionButton(label = true, enabled = !printing)
+                }
             }
         }
     }

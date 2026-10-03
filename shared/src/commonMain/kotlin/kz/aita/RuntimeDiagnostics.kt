@@ -59,14 +59,17 @@ object RuntimeDiagnostics {
         catch (_: Throwable) { }
         refreshStatus()
     }
+    var preferencesChanged: ((Boolean, Boolean) -> Unit)? = null
     fun setEnabled(enabled: Boolean) {
         if (!enabled) activeUpload.value?.cancel()
         recorder.value?.setEnabled(enabled); refreshStatus()
+        preferencesChanged?.invoke(state.value.enabled, state.value.approximateLocation)
         if (enabled) sendNow()
     }
     fun setApproximateLocation(enabled: Boolean) {
         if (!enabled) activeUpload.value?.cancel()
         recorder.value?.setLocation(enabled); refreshStatus()
+        preferencesChanged?.invoke(state.value.enabled, state.value.approximateLocation)
     }
     fun clearPending(accountId: String?) {
         activeUpload.value?.cancel()

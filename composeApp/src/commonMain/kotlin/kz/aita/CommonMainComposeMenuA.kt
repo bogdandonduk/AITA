@@ -2822,6 +2822,8 @@ internal fun AppConfiguration.transactionHistoryReceiptSnapshot(transaction: Tra
             barcode = sourceLine.barcode,
             quantity = quantity,
             pricePerUnit = sourceLine.pricePerUnit.roundMoney(),
+            quickDiscountPercent = sourceLine.quickDiscountPercent,
+            priceBeforeDiscount = sourceLine.priceBeforeDiscount,
             currencyCode = currencyCode,
             currencySymbol = transactionHistoryCurrencySymbol(currencyCode),
             saleMethodId = sourceLine.saleMethodId,

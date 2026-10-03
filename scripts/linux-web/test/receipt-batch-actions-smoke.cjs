@@ -81,12 +81,22 @@ try {
  console.log('PASS: subtract 3 from 12; Confirm sends 9 once with revision');
  await button('Sale').last().click({force:true});await page.waitForTimeout(1000);
  await page.getByRole('button').filter({hasText:/^Mountain honey/}).click({force:true});await page.waitForTimeout(700);
+ await page.getByRole('button').filter({hasText:/^Discount ·/}).click({force:true});await page.waitForTimeout(500);
+ await button('10%').click({force:true});await page.waitForTimeout(600);await page.mouse.click(350,600);await page.keyboard.press('Tab');await page.waitForTimeout(400);
+ // Reload also checks that the cart discount is durable. Compose 1.9.2's browser semantics
+ // retain the closed Dialog owner, so a fresh scene restores its accessibility tree.
+ await page.reload({waitUntil:'domcontentloaded'});await page.locator('canvas').first().waitFor({timeout:60000});await page.waitForTimeout(4000);await page.keyboard.press('Tab');
+ await button('Sale').last().click({force:true});await page.waitForTimeout(700);
  await button('Payment').click({force:true});await page.waitForTimeout(900);
  fs.writeFileSync(out+'/payment.txt',await page.locator('body').ariaSnapshot());await shot('payment');
  await button('Receipt').click({force:true});await page.waitForTimeout(800);
  await shot('receipt-before');fs.writeFileSync(out+'/receipt-before.txt',await page.locator('body').ariaSnapshot());
  await page.evaluate(()=>window.__failPrint=true);
  await button('Complete and print').click({force:true});await until(()=>completedTransactions.length===1,'Complete once');await page.waitForTimeout(1200);
+ assert.equal(completedTransactions[0].goodsInTransaction[0].quickDiscountPercent,10);
+ assert.equal(completedTransactions[0].goodsInTransaction[0].pricePerUnit,225);
+ assert.equal(completedTransactions[0].goodsInTransaction[0].priceBeforeDiscount,250);
+ assert.ok(completedTransactions[0].clientOperationId);
  assert.equal(await page.evaluate(()=>top.__printAttempts),1);await shot('receipt-print-failed');
  await page.mouse.click(350,110);await page.keyboard.press('Tab');await page.waitForTimeout(400);
  fs.writeFileSync(out+'/receipt-failed.txt',await page.locator('body').ariaSnapshot());
@@ -98,6 +108,16 @@ try {
  await shot('receipt-finished');fs.writeFileSync(out+'/receipt-finished.txt',await page.locator('body').ariaSnapshot());
  assert.doesNotMatch(await page.locator('body').ariaSnapshot(),/button \"Complete and print\"/);
  console.log('PASS: Complete and print commits once; print failure keeps receipt, retry prints and closes without another sale');
+ await page.getByRole('button').filter({hasText:/^Mountain honey/}).click({force:true});await page.waitForTimeout(600);
+ await button('Payment').click({force:true});await page.waitForTimeout(700);
+ await button('Receipt').click({force:true});await page.waitForTimeout(700);
+ await button('Complete').click({force:true});await until(()=>completedTransactions.length===2,'Ordinary Complete commits');await page.waitForTimeout(1400);
+ assert.doesNotMatch(await page.locator('body').ariaSnapshot(),/button \"Complete and print\"/);
+ assert.equal(completedTransactions[1].goodsInTransaction[0].pricePerUnit,250,'Discount cleared with the previous cart');
+ assert.notEqual(completedTransactions[0].clientOperationId,completedTransactions[1].clientOperationId);
+ await shot('ordinary-complete');
+ console.log('PASS: ordinary Complete exits preview, clears its cart and discount; next sale has a new operation ID');
+
  await button('Menu').click({force:true});await page.waitForTimeout(700);
  fs.writeFileSync(out+'/menu.txt',await page.locator('body').ariaSnapshot());await shot('menu');
  await button('Devices').click({force:true});await page.waitForTimeout(900);await shot('devices-wide');

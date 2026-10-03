@@ -105,7 +105,7 @@ internal fun AppConfiguration.MarketHomeCollections(offers: List<MarketOffer>, o
 
 @Composable
 internal fun AppConfiguration.MarketHomePromotions(offers: List<MarketOffer>, onOffer: (String) -> Unit) {
-    val promotions = remember(offers) { offers.filter { (it.originalPriceMinor ?: -1L) > (it.priceMinor ?: Long.MAX_VALUE) }.take(8) }
+    val promotions = remember(offers) { offers.filter { marketPromotionPercent(it) != null }.take(8) }
     if (promotions.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         MarketHomeHeading(localizedStringResource(920, "Promos"))

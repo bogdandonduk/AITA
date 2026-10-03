@@ -12,7 +12,8 @@ private const val BUYER_NAVIGATION_KEY = "buyer_navigation_place"
     val section: String = "products", val filters: Boolean = false,
     val directoryText: String = "", val directoryCity: String = "",
     val directoryRequest: MarketShopDirectoryRequest = MarketShopDirectoryRequest(),
-    val directoryIndex: Int = 0, val directoryOffset: Int = 0
+    val directoryIndex: Int = 0, val directoryOffset: Int = 0,
+    val recentSearches: List<String> = emptyList()
 )
 @Serializable internal data class SavedBuyerNavigation(
     val market: SavedBuyerBrowse, val saved: SavedBuyerBrowse,
@@ -23,7 +24,7 @@ private const val BUYER_NAVIGATION_KEY = "buyer_navigation_place"
 private fun BuyerBrowseNavigation.savedPlace() = SavedBuyerBrowse(point(), returnPoint.value, section.value,
     filtersExpanded, directory.text, directory.city, directory.request,
     directory.restorePosition?.first ?: directory.scroll.firstVisibleItemIndex,
-    directory.restorePosition?.second ?: directory.scroll.firstVisibleItemScrollOffset)
+    directory.restorePosition?.second ?: directory.scroll.firstVisibleItemScrollOffset, recentSearches)
 
 private fun BuyerBrowseNavigation.restorePlace(saved: SavedBuyerBrowse) {
     val p = saved.point
@@ -34,6 +35,7 @@ private fun BuyerBrowseNavigation.restorePlace(saved: SavedBuyerBrowse) {
     limit.value = (p.limit.coerceIn(MARKET_DISCOVERY_PAGE_SIZE, MARKET_DISCOVERY_MAX_OFFERS) / MARKET_DISCOVERY_PAGE_SIZE) * MARKET_DISCOVERY_PAGE_SIZE
     section.value = saved.section.takeIf { it in setOf("products", "shops") } ?: "products"
     filtersExpanded = saved.filters
+    recentSearches = saved.recentSearches.take(8).map { it.trim().take(120) }.filter(String::isNotBlank).distinctBy { it.lowercase() }
     returnPoint.value = saved.back?.takeIf { it.query.normalizedDiscoveryQuery() != null }
     scrollRestore = p.copy(query = query, index = p.index.coerceIn(0, MARKET_DISCOVERY_MAX_OFFERS), offset = p.offset.coerceIn(0, 10000))
     directory.text = saved.directoryText.take(120); directory.city = saved.directoryCity.take(100)

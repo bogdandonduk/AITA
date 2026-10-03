@@ -4,13 +4,35 @@ package kz.aita
 private var webDiagnosticsInstalled = false
 private fun ownBrowserJournal(onGranted: () -> Unit, onUnavailable: () -> Unit): Unit = js("""{
     if (!navigator.locks || !navigator.locks.request) { onUnavailable(); return; }
-    navigator.locks.request('aita.runtime-diagnostics.journal', async () => {
-        onGranted();
-        await new Promise(() => {});
-    }).catch(() => onUnavailable());
+    const claim = slot => {
+        if (slot >= 8) { onUnavailable(); return; }
+        const key = 'aita.runtime-diagnostics' + (slot ? '.' + slot : '');
+        navigator.locks.request(key + '.journal', {ifAvailable: true}, async lock => {
+            if (!lock) { claim(slot + 1); return; }
+            globalThis.aitaDiagnosticKey = key;
+            onGranted();
+            await new Promise(() => {});
+        }).catch(() => onUnavailable());
+    };
+    claim(0);
 }""")
-private fun browserJournalRead(): String? = js("localStorage.getItem('aita.runtime-diagnostics')")
-private fun browserJournalWrite(value: String): Unit = js("localStorage.setItem('aita.runtime-diagnostics', value)")
+private fun browserJournalRead(): String? = js("localStorage.getItem(globalThis.aitaDiagnosticKey)")
+private fun browserJournalWrite(value: String): Unit = js("localStorage.setItem(globalThis.aitaDiagnosticKey, value)")
+private fun browserDiagnosticPreferences(onChange: (Boolean, Boolean) -> Unit): Unit = js("""{
+    const apply = () => {
+        try {
+            const value = JSON.parse(localStorage.getItem('aita.runtime-diagnostics.preferences'));
+            if (value && typeof value.enabled === 'boolean' && typeof value.location === 'boolean') onChange(value.enabled, value.location);
+        } catch (_) {}
+    };
+    window.addEventListener('storage', event => { if (event.key === 'aita.runtime-diagnostics.preferences') apply(); });
+    apply();
+}""")
+private fun saveBrowserDiagnosticPreferences(enabled: Boolean, location: Boolean): Unit = js("""{
+    const value = JSON.stringify({enabled, location});
+    try { if (localStorage.getItem('aita.runtime-diagnostics.preferences') !== value) localStorage.setItem('aita.runtime-diagnostics.preferences', value); } catch (_) {}
+}""")
+private fun previousBrowserStartInterrupted(): Boolean = js("globalThis.aitaRecovery?.previousIncomplete === true")
 private fun browserFamily(): String = js("""{
     const ua = navigator.userAgent || '';
     for (const name of ['Firefox', 'Edg', 'Chrome', 'Version']) {
@@ -53,6 +75,16 @@ internal fun installWebRuntimeDiagnostics() {
                 browserJournalWrite(value)
             }
         }, diagnosticBuildContext(DiagnosticDevice("web", browserFamily(), "WebAssembly", "browser")), newId = ::newDiagnosticId)
+        RuntimeDiagnostics.preferencesChanged = ::saveBrowserDiagnosticPreferences
+        browserDiagnosticPreferences { enabled, location ->
+            RuntimeDiagnostics.preferencesChanged = null
+            try {
+                if (RuntimeDiagnostics.state.value.enabled != enabled) RuntimeDiagnostics.setEnabled(enabled)
+                if (RuntimeDiagnostics.state.value.approximateLocation != location) RuntimeDiagnostics.setApproximateLocation(location)
+            } finally { RuntimeDiagnostics.preferencesChanged = ::saveBrowserDiagnosticPreferences }
+        }
+        saveBrowserDiagnosticPreferences(RuntimeDiagnostics.state.value.enabled, RuntimeDiagnostics.state.value.approximateLocation)
+        if (previousBrowserStartInterrupted()) RuntimeDiagnostics.captureBrowser("InterruptedStartup", "web.startup_interrupted", "")
         RuntimeDiagnostics.sendNow()
     }, onUnavailable = { RuntimeDiagnostics.platformStorageUnavailable() })
     browserErrorHooks { type, category, stack -> RuntimeDiagnostics.captureBrowser(type, category, stack) }

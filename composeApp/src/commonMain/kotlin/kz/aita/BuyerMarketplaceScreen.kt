@@ -79,6 +79,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
     val latestLimit by rememberUpdatedState(limit)
     val requests = remember(account, generation, query) { Channel<Unit>(Channel.CONFLATED) }
     val gridState = rememberBuyerBrowseGrid(browse, resultsReady = data.page != null)
+    LaunchedEffect(openedId) { if (openedId != null) browse.recentSearches = rememberMarketSearch(browse.recentSearches, appliedSearch) }
     val inputPending = search != appliedSearch || (shopId == null && city != appliedCity)
     LaunchedEffect(account, savedOnly, search, city, shopId) {
         delay(350)
@@ -340,6 +341,7 @@ private fun AppConfiguration.MarketOfferCard(offer: MarketOffer, saving: Boolean
         Column(Modifier.padding(horizontal=2.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
             if(offer.product.brand.isNotBlank()) Text(offer.product.brand,color=stateValues.TextColor.copy(alpha=.65f),fontSize=stateValues.smallTextSize,maxLines=1,overflow=TextOverflow.Ellipsis)
             Text(offer.title,color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
+            MarketPromotionPrice(offer)
             Text(marketPriceLabel(offer),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick=onShop).padding(vertical=8.dp),
                 verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)) {

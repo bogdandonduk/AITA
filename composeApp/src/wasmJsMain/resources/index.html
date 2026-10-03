@@ -19,6 +19,7 @@
     <p id="aita-startup-message"></p>
     <noscript>AITA requires JavaScript and WebAssembly support.</noscript>
 </main>
+    <script src="aita-recovery.js"></script>
     <script src="aita-page-lifecycle.js"></script>
     <script src="aita-print.js"></script>
     <script>
@@ -49,13 +50,14 @@
                 retry.id = 'aita-startup-retry'; retry.textContent = words[3];
                 retry.onclick = () => {
                     retry.disabled = true;
+                    globalThis.aitaRecovery?.retry();
                     const fresh = new URL(location.href);
                     fresh.searchParams.set('_aita_refresh', String(Date.now()));
                     location.replace(fresh.href);
                 };
                 host.appendChild(retry);
                 const downloads = document.createElement('a');
-                downloads.href = 'https://github.com/bogdandonduk/AITA/releases/latest';
+                downloads.href = 'downloads.html';
                 downloads.textContent = words[4]; host.appendChild(downloads);
             }
             function loadingFailed() { showRecovery(words[2]); }
@@ -67,6 +69,8 @@
                     !!navigator.locks && !!globalThis.crypto?.subtle && typeof indexedDB !== 'undefined';
             } catch (_) {}
             if (!compatible) { showRecovery(words[1]); return; }
+            if (globalThis.aitaRecovery?.blocked) { showRecovery(words[2]); return; }
+            globalThis.aitaRecovery?.begin();
             window.addEventListener('error', loadingFailed);
             window.addEventListener('unhandledrejection', loadingFailed);
             timer = setTimeout(() => showRecovery(words[0]), 30000);
@@ -94,6 +98,7 @@
                 failed(message) { clearTimeout(timer); showRecovery(message || words[2]); },
                 ready() {
                     finished = true; clearTimeout(timer);
+                    globalThis.aitaRecovery?.ready();
                     window.removeEventListener('error', loadingFailed);
                     window.removeEventListener('unhandledrejection', loadingFailed);
                     const url = new URL(location.href);

@@ -1448,6 +1448,10 @@ private fun installDesktopPlatformActionsJvm() {
 
     // Restore only the saved label here; printer/driver enumeration stays off the startup path.
     restoreSystemReceiptPrinterName()
+    chooseSystemA4PrinterAction = { withContext(Dispatchers.IO) { chooseSystemA4Printer() } }
+    listSystemDocumentPrintersAction = { withContext(Dispatchers.IO) { listSystemDocumentPrinters() } }
+    selectSystemDocumentPrinterAction = { a4, name -> withContext(Dispatchers.IO) { selectSystemDocumentPrinter(a4, name) } }
+    printA4DocumentPlatformAction = { title, document -> withContext(Dispatchers.IO) { printSystemA4Document(title, document) } }
     chooseSystemReceiptPrinterAction = { withContext(Dispatchers.IO) { chooseSystemReceiptPrinter() } }
     printReceiptDocumentPlatformAction = { title, document ->
         withContext(Dispatchers.IO) { printSystemReceiptDocument(title, document) }

@@ -21,6 +21,31 @@ class DynamicCartStoreTest {
             saved[owner.storageKey] = value; saves++
         })
     }
+    @Test fun checkoutSurvivesFailedClearAndRestartWithSameOperationAndOtherCartsUntouched() = runTest {
+        val f = Memory(a); f.store.adopt(a)
+        val tx = TransactionDataModel("", 0, "purchase", a.storeId, emptyList(), 10.0, 0.0, 0, timeMillis = 100,
+            clientOperationId = "stable-operation")
+        val receipt = TransactionReceiptSnapshotDataModel(tx, null, emptyList(),
+            TransactionPaymentDraftDataModel(0, 0, "0", 10.0, 0.0, 0), "KZT", "KZT")
+        val attempt = CartCheckoutAttempt(tx, receipt)
+        f.store.change(a) { it.copy(lines = listOf(line(0), line(1)),
+            ui = CartUiState(discounts = mapOf("0:0" to 10.0, "0:1" to 25.0), checkouts = mapOf("0:0" to attempt))) }
+        f.fail = true
+        assertFailsWith<IllegalStateException> { f.store.change(a) { it.withoutCart(0, 0) } }
+        assertEquals(attempt, f.store.state.value.book.ui.checkouts["0:0"])
+        val serialized = jsonBase.encodeToString(CartBook.serializer(), f.saved[a.storageKey]!!)
+        f.saved[a.storageKey] = jsonBase.decodeFromString(CartBook.serializer(), serialized)
+        val renewed = a.copy(generation = 3, epoch = 3); f.current = renewed; f.fail = false
+        f.store.adopt(renewed)
+        assertEquals("stable-operation", f.store.state.value.book.ui.checkouts["0:0"]!!.transaction.clientOperationId)
+        val before = f.store.state.value.book.ui
+        val edited = before.copy(discounts = mapOf("0:0" to 100.0, "0:1" to 50.0)).preservingPending(before)
+        assertEquals(mapOf("0:0" to 10.0, "0:1" to 50.0), edited.discounts)
+        assertTrue(f.store.change(renewed) { it.withoutCart(0, 0) })
+        assertTrue(f.store.state.value.book.ui.checkouts.isEmpty())
+        assertEquals(listOf(1), f.store.state.value.book.lines.map { it.slot })
+        assertEquals(mapOf("0:1" to 25.0), f.store.state.value.book.ui.discounts)
+    }
     @Test fun supplyPriceSurvivesPersistenceAndQuantityChangesWithoutChangingOtherCarts() = runTest {
         val f = Memory(a); f.store.adopt(a)
         val price = PriceDataModel("17.5", "KZT", "supplier")

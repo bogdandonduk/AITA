@@ -618,29 +618,20 @@ fun AppConfiguration.MenuDevicesScreen() {
                         iconPath = stateValues.drawablePathIconAnalyticsReport,
                         iconRes = stateValues.drawableResIconAnalyticsReport.value
                     ) {
-                        actionButton(
-                            modifier = Modifier.fillMaxWidth(),
-                            text = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print") else localizedStringResource(616, "Open system devices"),
-                            iconPath = if (preferHtmlDocumentPrinting) stateValues.drawablePathIconAnalyticsReport else stateValues.drawablePathIconDevices,
-                            iconRes = if (preferHtmlDocumentPrinting) stateValues.drawableResIconAnalyticsReport.value else stateValues.drawableResIconDevices.value,
-                            confirmationRequired = false,
-                            loading = printingReceipt,
-                            autoLoading = false,
-                            enabled = !printingReceipt,
-                            onClick = {
-                                if (!preferHtmlDocumentPrinting) openPlatformDevicesSettings()
-                                else {
-                                    printingReceipt = true
-                                    devicesScope.launch {
-                                        try {
-                                            val title = localizedStringResource(1252, "A4 paper printer")
-                                            receiptActionNotification(printHtmlDocument(title,
-                                                systemPrinterTestDocument(title).toPrintHtml(title)), deviceWorkflowText("print_opened"))
-                                        } finally { printingReceipt = false }
-                                    }
-                                }
-                            }
-                        )
+                        var showA4Selection by remember { mutableStateOf(false) }
+                        if (showA4Selection) PrinterSelectionSheet(report = true, a4Only = true, onDismiss = { showA4Selection = false })
+                        val printerName by systemA4PrinterNameState.collectAsState()
+                        printerName?.let { Text(it, color = stateValues.TextColor, fontSize = stateValues.textSize) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            actionButton(modifier = Modifier.weight(1f), text = pass27Text("choose_printer"),
+                                iconPath = stateValues.drawablePathIconReceipt, autoLoading = false, confirmationRequired = false,
+                                loading = printingReceipt, enabled = !printingReceipt, onClick = {
+                                    showA4Selection = true
+                                })
+                            PrintSelectionButton(report = true, a4Only = true, enabled = !printingReceipt)
+                        }
+                        if (preferHtmlDocumentPrinting) Text(pass27Text("browser_printer"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
+
                     }
                 }
             }
@@ -2261,6 +2252,7 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
     val summaryRows = dashboard?.let { d ->
         listOf(
             row(localizedStringResource(694, "Gross sales"), d.grossSales.money(reportCurrency)),
+            row(quickDiscountLabel(stateValues.appLanguage), d.quickDiscountTotal.money(reportCurrency)),
             row(localizedStringResource(695, "Returns amount"), d.returnsAmount.money(reportCurrency)),
             row(localizedStringResource(697, "Net revenue"), d.netRevenue.money(reportCurrency)),
             row(localizedStringResource(673, "Gross profit estimate"), d.estimatedGrossProfit.money(reportCurrency), localizedStringResource(690, "Estimated from current/latest supply prices")),
@@ -2413,6 +2405,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
     var pdfCache by remember(snapshot) { mutableStateOf<ByteArray?>(null) }
     var activeExport by remember(snapshot) { mutableStateOf<String?>(null) }
     val exportScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { loadReportPrintDestination() }
     val saveNotConfiguredText = localizedStringResource(1267, "PDF export is not configured for this platform")
     val shareNotConfiguredText = localizedStringResource(1268, "PDF sharing is not configured for this platform")
     val printNotConfiguredText = localizedStringResource(1269, "Paper document printing is not configured for this platform")
@@ -2426,10 +2419,10 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
         activeExport = action
         exportScope.launch {
             try {
-                if (action == "print" && preferHtmlDocumentPrinting) {
-                    val html = snapshot.buildAnalyticsReportPdfDocument().toPrintHtml(fileName)
+                if (action == "print") {
                     if (!owner.isCurrent()) return@launch
-                    receiptActionNotification(printHtmlDocument(fileName, html), printSuccessText, owner)
+                    val result = withContext(Dispatchers.ourIo) { printAnalyticsReport(snapshot) }
+                    receiptActionNotification(result, printSuccessText, owner)
                     return@launch
                 }
                 val bytes = pdfCache ?: withContext(Dispatchers.Default) { snapshot.buildAnalyticsReportPdfBytes() }.also { pdfCache = it }
@@ -2455,7 +2448,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
         MessageText(
             modifier = Modifier.fillMaxWidth(),
             text = localizedStringResource(1240, "Printable summary"),
-            subText = if (preferHtmlDocumentPrinting) deviceWorkflowText("system_print_help") else localizedStringResource(1249, "Transaction receipts use ESC/POS thermal printers. Analytics reports use A4 paper printing."),
+            subText = pass27Text("print_destination"),
             textSize = stateValues.textSize,
             subTextSize = stateValues.smallTextSize
         )
@@ -2490,17 +2483,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     autoLoading = false,
                     onClick = { export("share") }
                 )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1245, "Print report"),
-                    iconPath = stateValues.drawablePathIconDevices,
-                    iconRes = stateValues.drawableResIconDevices.value,
-                    confirmationRequired = false,
-                    enabled = activeExport == null,
-                    loading = activeExport == "print",
-                    autoLoading = false,
-                    onClick = { export("print") }
-                )
+                ReportPrintAction(activeExport != null, activeExport == "print") { export("print") }
             }
         } else {
             Column(
@@ -2530,17 +2513,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     autoLoading = false,
                     onClick = { export("share") }
                 )
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1245, "Print report"),
-                    iconPath = stateValues.drawablePathIconDevices,
-                    iconRes = stateValues.drawableResIconDevices.value,
-                    confirmationRequired = false,
-                    enabled = activeExport == null,
-                    loading = activeExport == "print",
-                    autoLoading = false,
-                    onClick = { export("print") }
-                )
+                ReportPrintAction(activeExport != null, activeExport == "print") { export("print") }
             }
         }
     }
@@ -3029,6 +3002,8 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
                 value = dashboard.grossSales.money(dashboard.currencyCode.ifBlank { currencyCode }),
                 subtitle = localizedStringResource(357, "Cash + cashless")
             ),
+            AnalyticsSummaryCardData(title = quickDiscountLabel(stateValues.appLanguage),
+                value = dashboard.quickDiscountTotal.money(dashboard.currencyCode.ifBlank { currencyCode })),
             AnalyticsSummaryCardData(
                 title = localizedStringResource(697, "Net revenue"),
                 value = dashboard.netRevenue.money(dashboard.currencyCode.ifBlank { currencyCode }),
@@ -5479,16 +5454,7 @@ fun AppConfiguration.MainScreen() {
                             notification = notification,
                             compact = true,
                             onDismiss = { dismissInAppNotification(notification.id) },
-                            onOpenHistory = {
-                                if (notification.category == MISSED_NOTIFICATION_CATEGORY) {
-                                    requestUnreadNotifications()
-                                    dismissInAppNotification(notification.id, markAsRead = false)
-                                } else markNotificationRead(notification.id)
-                                coroutineScope.launch {
-                                    Navigation.goMain(NavigationScreenModel.Menu.Main)
-                                    Navigation.Menu.go(NavigationScreenModel.Menu.Notifications, stateValues.isNarrowScreen)
-                                }
-                            }
+                            onOpenHistory = { openNotification(notification) }
                         )
                     }
                 }
@@ -5560,16 +5526,7 @@ fun AppConfiguration.MainScreen() {
                                 notification = notification,
                                 compact = false,
                                 onDismiss = { dismissInAppNotification(notification.id) },
-                                onOpenHistory = {
-                                    if (notification.category == MISSED_NOTIFICATION_CATEGORY) {
-                                        requestUnreadNotifications()
-                                        dismissInAppNotification(notification.id, markAsRead = false)
-                                    } else markNotificationRead(notification.id)
-                                    coroutineScope.launch {
-                                        Navigation.goMain(NavigationScreenModel.Menu.Main)
-                                        Navigation.Menu.go(NavigationScreenModel.Menu.Notifications, stateValues.isNarrowScreen)
-                                    }
-                                }
+                                onOpenHistory = { openNotification(notification) }
                             )
                         }
                     }
@@ -5688,8 +5645,8 @@ fun AppConfiguration.MainScreen() {
                                 contentDescription = model.name, tintColor = iconTintColor
                             )
                             if (model == NavigationScreenModel.Menu.Main) {
-                                MenuUpdateMarker(Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-3).dp))
-                                MenuNotificationsMarker(Modifier.align(Alignment.TopStart).offset(x = (-4).dp, y = (-3).dp))
+                                MenuUpdateMarker(Modifier.align(Alignment.TopEnd))
+                                MenuNotificationsMarker(Modifier.align(Alignment.TopStart))
                             }
                         }
 
