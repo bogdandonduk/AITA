@@ -32,6 +32,14 @@ class StoreCommerceTest {
         assertFalse(b.copy(name=" ").valid());assertFalse(b.copy(email="no-at").valid());assertFalse(b.copy(promoEndsAtMillis=99).valid())
         assertEquals(0.0,b.copy(isActive=false).activeDiscount(150))
     }
+    @Test fun decimalRemainderCanBeCompletelyWrittenOffWithoutAllowingOverdraw() {
+        val remaining=assertNotNull(writeOffRemaining(q(0.3),0.1))
+        assertEquals(0.2,remaining)
+        assertEquals(0.0,writeOffRemaining(q(remaining),0.2))
+        assertEquals(0.0,writeOffRemaining(q(0.3-0.1),0.2))
+        assertNull(writeOffRemaining(q(0.199),0.2))
+        assertNull(writeOffRemaining(q(0.2),0.201))
+    }
     @Test fun promotionClockOnlyWakesAtAnActualFutureBoundary() {
         val buyer=StoreBuyer(id,store,"Buyer",discountPercent=15.0,promoStartsAtMillis=100,promoEndsAtMillis=200)
         assertEquals(100L,nextBuyerPromoBoundary(listOf(buyer),50))

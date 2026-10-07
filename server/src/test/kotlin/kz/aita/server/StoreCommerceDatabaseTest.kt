@@ -137,6 +137,15 @@ class StoreCommerceDatabaseTest {
         assertFailsWith<CommerceProblem>{transaction(db){writeOffInsideTransaction(owner,otherStore,command().copy(storeId=otherStore.toString()))}}
         transaction(db){assertEquals(2.0,total(first));assertTrue(StockWriteOffs.selectAll().empty())}
     }
+    @Test fun repeatedFractionalWriteOffsReachExactlyZero()=fixture {db->
+        transaction(db){StockBatchesV2.update({StockBatchesV2.id eq first}){it[quantity]=q(0.3).copy(roundTotal=false,id="1")}}
+        transaction(db){writeOffInsideTransaction(owner,store,command(0.1));assertEquals(0.2,total(first))}
+        transaction(db){
+            writeOffInsideTransaction(owner,store,command(0.2))
+            assertEquals(0.0,total(first));assertEquals(2L,StockWriteOffs.selectAll().count())
+            assertEquals(second,StockItems.selectAll().single()[StockItems.activeShelfBatchId])
+        }
+    }
     @Test fun buyerUpdatesHaveRevisionFencesAndImmutableReplayResults()=fixture {db->
         val request=BuyerWrite(UUID.randomUUID().toString(),buyer())
         val saved=transaction(db){saveBuyerInsideTransaction(owner,store,request)}

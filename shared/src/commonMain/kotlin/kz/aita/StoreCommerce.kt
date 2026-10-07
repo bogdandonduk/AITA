@@ -51,10 +51,13 @@ import kotlinx.serialization.Serializable
 @Serializable data class BuyerWrite(val operationId: String, val buyer: StoreBuyer)
 
 fun writeOffRemaining(available: QuantityDataModel, removal: Double): Double? {
-    if (!available.total.isFinite() || !removal.isFinite() || removal <= 0 || removal > available.total ||
+    if (!available.total.isFinite() || available.total < 0 || !removal.isFinite() || removal <= 0 ||
+        (removal > available.total && (available.roundTotal || removal-available.total > 1e-9)) ||
         (available.roundTotal && removal != kotlin.math.floor(removal)) ||
         (!available.roundTotal && kotlin.math.abs(removal*1000-kotlin.math.round(removal*1000))>0.000001)) return null
-    return (available.total-removal).coerceAtLeast(0.0)
+    val remaining = (available.total-removal).coerceAtLeast(0.0)
+    // Match stock's three decimal places instead of leaving binary subtraction dust.
+    return if (available.roundTotal) remaining else kotlin.math.round(remaining*1000.0)/1000.0
 }
 fun commerceMessage(key: String) = listOf("en","ru","kk","ky","tg","uz").map { LocalizedStringDataModel(it,commerceText(key,it)) }
 
