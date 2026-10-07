@@ -5,7 +5,7 @@ fun realtimeSequenceHasGap(previous: Long?, next: Long?): Boolean =
 
 internal fun realtimeEntityUsesStoreFamily(entity: String): Boolean {
     val root = entity.trim('/').lowercase().substringBefore('/')
-    return root in setOf("all", "stock", "stockbatches", "transactions", "logs", "operationlogs", "stores", "workers", "analytics", "subscriptions")
+    return root in setOf("store-buyers", "stock-writeoffs", "all", "stock", "stockbatches", "transactions", "logs", "operationlogs", "stores", "workers", "analytics", "subscriptions")
 }
 
 internal fun realtimeScopeMatches(entity: String, changedStore: String, selectedStore: String?,

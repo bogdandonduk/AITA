@@ -733,6 +733,7 @@ data class TransactionReceiptLineDataModel(
     val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
     val shelfBatchIdAtSale: String? = null,
     val quickDiscountPercent: Double = 0.0,
+    val discounts: SaleDiscounts? = null,
     val priceBeforeDiscount: Double? = null
 ) {
     val total: Double
@@ -1887,6 +1888,7 @@ fun TransactionReceiptSnapshotDataModel.buildReceiptPdfDocument(language: String
     }
     appendLine("${labels.date}: ${receiptDateTimeText(transaction.timeMillis)}")
     cashierName.takeIf { it.isNotBlank() }?.let { appendLine("${labels.cashier}: $it") }
+    transaction.buyer?.let {appendLine("${commerceText("buyer",language)}: ${it.name}")}
     appendLine("--------------------------------", AitaPdfRole.Divider)
 
     if (lines.isEmpty()) {
@@ -12704,7 +12706,8 @@ suspend fun syncLocalNetworkOperationsToCloudNow(): Int {
 
     return localNetworkCloudSyncMutex.withLock {
         InventoryCreates.flush()
-        val inventoryBlockedStores = userAccountState.payloadValue?.id?.let { InventoryCreates.pending(it).map { it.storeId }.toSet() }.orEmpty()
+        StoreCommerceClient.flush()
+        val inventoryBlockedStores = userAccountState.payloadValue?.id?.let { InventoryCreates.pending(it).map { it.storeId }.toSet() }.orEmpty() + StoreCommerceClient.pendingStoreIds()
         val pending = localNetworkQueuedOperationsState.value
             .filter { it.storeId !in inventoryBlockedStores }
             .filter { it.status == LOCAL_NETWORK_QUEUE_PENDING || it.status == LOCAL_NETWORK_QUEUE_SYNCING }
@@ -13664,6 +13667,7 @@ private suspend fun refreshRealtimeEntitiesFromServer(entities: Set<String>) {
             refreshInventoryAfterRealtimeInvalidation()
         }
 
+        if (anyEntityMatches("store-buyers", "stock-writeoffs")) StoreCommerceClient.invalidate()
         if (anyEntityMatches("debtors")) getDebtors(storeId)
         if (anyEntityMatches("cashregister")) getCashRegister(storeId)
         if (anyEntityMatches("workshifts")) getCurrentWorkshift(storeId)
@@ -13962,7 +13966,7 @@ private fun launchCloudConnectionReconciliation(
             runCloudConnectionReconciliationStep("notifications") {
                 syncPendingNotificationsToServerNow()
             }
-            runCloudConnectionReconciliationStep("inventory_outbox") { InventoryCreates.flush() }
+            runCloudConnectionReconciliationStep("inventory_outbox") { InventoryCreates.flush(); StoreCommerceClient.flush(); StoreCommerceClient.invalidate() }
             runCloudConnectionReconciliationStep("local_outbox") {
                 syncLocalNetworkOperationsToCloudNow()
             }
@@ -18511,6 +18515,9 @@ const val STORE_PERMISSION_SUPPLIER_ORDERS_VIEW = "supplier_orders_view"
 const val STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE = "supplier_orders_manage"
 const val STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE = "supplier_orders_receive"
 
+const val STORE_PERMISSION_BUYERS_VIEW = "buyers_view"
+const val STORE_PERMISSION_BUYERS_MANAGE = "buyers_manage"
+
 const val STORE_PERMISSION_DEBTORS_VIEW = "debtors_view"
 const val STORE_PERMISSION_DEBTORS_MANAGE = "debtors_manage"
 const val STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE = "debtor_payments_manage"
@@ -18554,6 +18561,7 @@ const val OPERATION_LOG_ACTION_MOVED = "moved"
 
 
 val ALL_STORE_PERMISSION_IDS = listOf(
+    STORE_PERMISSION_BUYERS_VIEW, STORE_PERMISSION_BUYERS_MANAGE,
     STORE_PERMISSION_SALE_TRANSACTION,
     STORE_PERMISSION_RETURN_TRANSACTION,
     STORE_PERMISSION_SUPPLY_TRANSACTION,
@@ -19655,6 +19663,7 @@ data class GoodsItemInTransactionDataModel(
     val sourceBatchAllocations: List<TransactionStockAllocationDataModel> = emptyList(),
     val shelfBatchIdAtSale: String? = null,
     val quickDiscountPercent: Double = 0.0,
+    val discounts: SaleDiscounts? = null,
     val priceBeforeDiscount: Double? = null
 )
 
@@ -20730,6 +20739,8 @@ data class StoreAnalyticsDashboardDataModel(
 
     val grossSales: Double = 0.0,
     val quickDiscountTotal: Double = 0.0,
+    val writeOffCount: Int? = null,
+    val writeOffCosts: Map<String, Double> = emptyMap(),
     val returnsAmount: Double = 0.0,
     val supplyCost: Double = 0.0,
     val netRevenue: Double = 0.0,
@@ -20786,7 +20797,8 @@ data class TransactionDataModel(
     val debtor: DebtorDataModel? = null,
     val timeMillis: Long,
     val clientOperationId: String = "",
-    val actorUserId: String? = null
+    val actorUserId: String? = null,
+    val buyer: TransactionBuyerSnapshot? = null
 )
 
 private data class MutableAnalyticsReturnReasonAccumulator(

@@ -184,8 +184,11 @@ fun AppConfiguration.GoodsItemInCartWidget(
     increaseQuantityAction: () -> Unit,
     decreaseQuantityAction: () -> Unit
 ) {
+    var showItemDiscount by rememberSaveable(goodsItemInCart.clientId,goodsItem.id) {mutableStateOf(false)}
+    val promoClock by cartBuyerPromoClockState.collectAsState()
     val cartDiscounts by cartQuickDiscountsState.collectAsState()
-    val quickDiscount = if (transactionTypeIndex == 0) cartDiscounts["0:${goodsItemInCart.clientId}"] ?: 0.0 else 0.0
+    val cartBuyers by cartBuyersState.collectAsState()
+    val quickDiscount = if(transactionTypeIndex==0) cartSaleDiscounts(goodsItemInCart.clientId,goodsItem.id,cartDiscounts,cartBuyers["0:${goodsItemInCart.clientId}"],now=promoClock).effectivePercent() else 0.0
     val isWeightQuantity = goodsItem.isWeightMeasurementUnit(stateValues.globalAppConfiguration) || !goodsItemInCart.quantity.roundTotal
     var showQuantityBottomSheet by rememberSaveable(goodsItemInCart.id, goodsItemInCart.quantity.total) {
         mutableStateOf(false)
@@ -315,8 +318,14 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                if(transactionTypeIndex==0) ItemDiscountControls(goodsItemInCart.clientId,goodsItem.id) {showItemDiscount=!showItemDiscount}
             }
 
+            androidx.compose.animation.AnimatedVisibility(showItemDiscount && transactionTypeIndex==0) {
+                DiscountMiniEditor(commerceText("item_discount"),cartDiscounts["0:${goodsItemInCart.clientId}:${goodsItem.id}"] ?: 0.0) {
+                    setCartItemDiscount(goodsItemInCart.clientId,goodsItem.id,it);showItemDiscount=false
+                }
+            }
             if (transactionTypeIndex == 0 && goodsItem.hasWholesalePrice()) {
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -853,6 +862,12 @@ fun AppConfiguration.GoodsItemInCartWidget(
 @Composable
 fun AppConfiguration.TransactionCartScreen() {
     val context = rememberTransactionContext()
+    var discountExpanded by rememberSaveable(context.clientId,context.transactionTypeIndex) { mutableStateOf(false) }
+    var buyerExpanded by rememberSaveable(context.clientId,context.transactionTypeIndex) { mutableStateOf(false) }
+    val promoClock by cartBuyerPromoClockState.collectAsState()
+    val selectedBuyers by cartBuyersState.collectAsState()
+    val pendingCheckouts by cartCheckoutsState.collectAsState()
+    if(buyerExpanded) CartBuyerSheet(context.clientId,onDismiss={buyerExpanded=false})
 
     AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
@@ -869,7 +884,13 @@ fun AppConfiguration.TransactionCartScreen() {
                     1 -> stateValues.drawablePathIconTransactionReturn
                     else -> stateValues.drawablePathIconTransactionSupply
                 },
+                trailingIconDescriptions = mapOf(stateValues.drawablePathIconPromos to commerceText("cart_discount"),
+                    stateValues.drawablePathIconUserAccount to commerceText("choose_buyer")),
                 trailingIcons = buildList<Triple<String, DrawableResource, () -> Unit>> {
+                    if(context.transactionTypeIndex==0 && "0:${context.clientId}" !in pendingCheckouts) {
+                        add(Triple(stateValues.drawablePathIconPromos,stateValues.drawableResIconPromos.value) {discountExpanded=!discountExpanded})
+                        add(Triple(stateValues.drawablePathIconUserAccount,stateValues.drawableResIconUserAccount.value) {buyerExpanded=true})
+                    }
                     add(
                         Triple(stockAddIconPath(), stockAddIconFallback()) {
                             openQuickStockAddSheet(
@@ -899,6 +920,17 @@ fun AppConfiguration.TransactionCartScreen() {
             )
         }
     ) {
+        androidx.compose.animation.AnimatedVisibility(discountExpanded && context.transactionTypeIndex==0) {
+            CartDiscountPanel(context.clientId) {discountExpanded=false}
+        }
+        if(context.transactionTypeIndex==0) selectedBuyers["0:${context.clientId}"]?.let {buyer ->
+            Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("${commerceText("buyer")}: ${buyer.name}" + if(buyer.activeDiscount(promoClock)>0) " · ${buyer.activeDiscount(promoClock).moneyText()}%" else "",
+                    modifier=Modifier.weight(1f),color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
+                actionButton(modifier=Modifier.size(36.dp),text="",iconPath=stateValues.drawablePathIconCancel,
+                    iconContentDescription=commerceText("no_buyer"),autoLoading=false,confirmationRequired=false,onClick={setCartBuyer(context.clientId,null)})
+            }
+        }
         if (context.transactionTypeIndex == 1 && ReturnReceiptLookup(context.clientId)) return@AitaScreenColumn
         val goodsInCart by getCartState(
             context.transactionTypeIndex,
@@ -1246,7 +1278,7 @@ fun AppConfiguration.TransactionCartScreen() {
         }
 
         val discounts by cartQuickDiscountsState.collectAsState()
-        val discountPercent = discounts["${context.transactionTypeIndex}:${context.clientId}"] ?: 0.0
+        val selectedBuyers by cartBuyersState.collectAsState()
         val cartTotalPrice = cartItemsWithGoods.sumOf { (_, cartItem, goodsItem) ->
             val saleMethodId = saleMethodIds["${context.transactionTypeIndex}:${context.clientId}:${cartItem.id}"] ?: SALE_METHOD_RETAIL
             val itemBatches = batchesByGoodsItemId[goodsItem.id].orEmpty()
@@ -1265,7 +1297,7 @@ fun AppConfiguration.TransactionCartScreen() {
                     batch = activeCartBatch(goodsItem, cartItem)
                 )
             }
-            discountedUnitPrice(price.price.toMoneyDouble(), discountPercent) * cartItem.quantity.total
+            discountedUnitPrice(price.price.toMoneyDouble(), if(context.transactionTypeIndex==0) cartSaleDiscounts(context.clientId,cartItem.id,discounts,selectedBuyers["0:${context.clientId}"],now=promoClock).effectivePercent() else 0.0) * cartItem.quantity.total
         }
 
         val cartCurrency = cartItemsWithGoods.firstNotNullOfOrNull { (_, cartItem, goodsItem) ->
@@ -1335,7 +1367,6 @@ fun AppConfiguration.TransactionCartScreen() {
                     }
                 }
 
-                if (context.transactionTypeIndex == 0) CartQuickDiscount(context.clientId, discountPercent)
                 actionButton(
                     autoLoading = false,
                     modifier = Modifier.fillMaxWidth(),

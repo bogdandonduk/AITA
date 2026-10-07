@@ -22,6 +22,7 @@ await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JS
 let addedBatches=[],addedItems=[],batchAttempts=0,offline=false,updatedBatches=[],completedTransactions=[],writeOffs=[];
 let buyers=[{id:id(710),storeId:physical.id,name:'Loyal buyer',email:'loyal@example.test',discountPercent:7,promoTitle:'Welcome',revision:1,isActive:true}];
 const parentBuyer={id:id(711),storeId:parent.id,name:'Parent buyer',phone:'+77000000000',discountPercent:5,revision:1,isActive:true};
+let loseWriteOffReply=true;
 const calls=[],errors=[],memory=[],rendererCrashes=[],consoleErrors=[],lifecycle=[];const browserCdp=await browser.newBrowserCDPSession();await browserCdp.send('Target.setDiscoverTargets',{discover:true});browserCdp.on('Target.targetCrashed',event=>rendererCrashes.push(event));await context.routeWebSocket('**',ws=>ws.close());
 await context.route('**/*',async route=>{
  const u=new URL(route.request().url());if(u.origin===origin)return route.continue();if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname});return route.fulfill({response});}
@@ -48,6 +49,7 @@ await context.route('**/*',async route=>{
     const batch={...b,quantity:{...b.quantity,total:b.quantity.total-command.quantity},updatedAtMillis:Date.now()};updatedBatches=updatedBatches.filter(x=>x.id!==b.id).concat(batch);
     payload={batch,record:{command,goodsItemId:b.goodsItemId,goodsName:tr('Mountain honey'),quantityUnit:{...b.quantity,total:command.quantity},supplyPrice:b.supplyPrice,cost:command.quantity*100,actorUserId:account.id,timeMillis:Date.now(),batchRemaining:batch.quantity.total}};writeOffs.push(payload);
    }
+    if(loseWriteOffReply){loseWriteOffReply=false;offline=true;return route.abort('internetdisconnected');}
   } else payload={records:writeOffs.map(v=>v.record)};
  }
  else if(p==='/stockBatches/add') {
@@ -83,91 +85,30 @@ const tab=async pattern=>{await page.getByRole('button').filter({hasText:pattern
 const until=async(check,label)=>{for(let i=0;i<240&&!check();i++)await page.waitForTimeout(250);assert.ok(check(),label);};
 try {
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(7000);await page.keyboard.press('Tab');
- await button('Stock').click({force:true});await page.waitForTimeout(1200);
- await button('Add batch').first().click({force:true});await page.waitForTimeout(800);await button('Back').last().click({force:true});await page.waitForTimeout(800);
- fs.writeFileSync(out+'/batches-open.txt',await page.locator('body').ariaSnapshot());await shot('batches-open');
- await button('svg/29_0.svg').nth(1).click({force:true});await page.waitForTimeout(900);
- await button('Write-offs').click({force:true});await page.waitForTimeout(650);
- fs.writeFileSync(out+'/writeoff-open.txt',await page.locator('body').ariaSnapshot());await shot('writeoff-open');
- const removal=page.getByRole('textbox').first();await removal.fill('3',{force:true});
- await button('Write off').click({force:true});await page.waitForTimeout(400);
- fs.writeFileSync(out+'/writeoff-confirm.txt',await page.locator('body').ariaSnapshot());
- await button('Confirm').last().click({force:true});await until(()=>writeOffs.length===1,'Write-off committed');await page.waitForTimeout(900);
- assert.equal(updatedBatches[0].quantity.total,9);assert.equal(writeOffs[0].record.command.reason,'DAMAGED');assert.equal(writeOffs[0].record.cost,300);
- console.log('PASS: write-off subtracts 3 from 12 and records a reason plus cost');
- // Recreate the accessibility owner after Compose closes its nested confirmation dialog.
- await page.reload({waitUntil:'domcontentloaded'});await page.locator('canvas').first().waitFor({timeout:60000});await page.waitForTimeout(3000);await page.keyboard.press('Tab');
- await button('Sale').last().click({force:true});await page.waitForTimeout(1000);
- await page.getByRole('button').filter({hasText:/^Mountain honey/}).click({force:true});await page.waitForTimeout(700);
- await button('Item discount').click({force:true});await page.waitForTimeout(400);await button('20%').click({force:true});await page.waitForTimeout(600);
- await button('Cart discount').click({force:true});await page.waitForTimeout(400);await button('10%').click({force:true});await page.waitForTimeout(600);
- await button('Select buyer').click({force:true});await page.waitForTimeout(600);
- fs.writeFileSync(out+'/buyer-picker.txt',await page.locator('body').ariaSnapshot());await shot('buyer-picker');
- await button('Select buyer').last().click({force:true});await page.waitForTimeout(600);
- // Reload also checks that the cart discount is durable. Compose 1.9.2's browser semantics
- // retain the closed Dialog owner, so a fresh scene restores its accessibility tree.
+ await button('Stock').click({force:true});await page.waitForTimeout(1000);
+ await button('Add batch').first().click({force:true});await page.waitForTimeout(500);await button('Back').last().click({force:true});await page.waitForTimeout(500);
+ await button('svg/29_0.svg').nth(1).click({force:true});await page.waitForTimeout(500);
+ await button('Write-offs').click({force:true});await page.waitForTimeout(500);
+ await page.getByRole('textbox').first().fill('3',{force:true});await button('Write off').click({force:true});await page.waitForTimeout(300);await button('Confirm').last().click({force:true});
+ await until(()=>writeOffs.length===1,'First write-off reached simulated server');await page.waitForTimeout(2500);
  await page.reload({waitUntil:'domcontentloaded'});await page.locator('canvas').first().waitFor({timeout:60000});await page.waitForTimeout(4000);await page.keyboard.press('Tab');
- await button('Sale').last().click({force:true});await page.waitForTimeout(700);
- await page.setViewportSize({width:390,height:844});await page.waitForTimeout(800);await shot('cart-phone');
- assert.ok(await button('Cart discount').isVisible());assert.ok(await button('Select buyer').isVisible());
- await page.setViewportSize({width:1440,height:1040});await page.waitForTimeout(800);await shot('cart-wide');
- await button('Payment').click({force:true});await page.waitForTimeout(900);
- fs.writeFileSync(out+'/payment.txt',await page.locator('body').ariaSnapshot());await shot('payment');
- await button('Receipt').click({force:true});await page.waitForTimeout(800);
- await shot('receipt-before');fs.writeFileSync(out+'/receipt-before.txt',await page.locator('body').ariaSnapshot());
- await page.evaluate(()=>window.__failPrint=true);
- await button('Complete and print').click({force:true});await until(()=>completedTransactions.length===1,'Complete once');await page.waitForTimeout(1200);
- assert.equal(completedTransactions[0].goodsInTransaction[0].quickDiscountPercent,33.04);
- assert.equal(completedTransactions[0].goodsInTransaction[0].pricePerUnit,167.4);
- assert.equal(completedTransactions[0].goodsInTransaction[0].priceBeforeDiscount,250);
- assert.ok(completedTransactions[0].clientOperationId);assert.equal(completedTransactions[0].buyer.name,'Loyal buyer');assert.deepEqual(completedTransactions[0].goodsInTransaction[0].discounts,{itemPercent:20,cartPercent:10,buyerPercent:7});
- assert.equal(await page.evaluate(()=>top.__printAttempts),1);await shot('receipt-print-failed');
- await page.mouse.click(350,110);await page.keyboard.press('Tab');await page.waitForTimeout(400);
- fs.writeFileSync(out+'/receipt-failed.txt',await page.locator('body').ariaSnapshot());
- await page.evaluate(()=>window.__failPrint=false);
- await button('Complete and print').click({force:true});await page.waitForTimeout(1500);
- await page.mouse.click(350,110);await page.keyboard.press('Tab');await page.waitForTimeout(400);
- assert.equal(completedTransactions.length,1,'Print retry must not create a second transaction');
- assert.equal(await page.evaluate(()=>top.__labelPrints),1);
- await shot('receipt-finished');fs.writeFileSync(out+'/receipt-finished.txt',await page.locator('body').ariaSnapshot());
- assert.doesNotMatch(await page.locator('body').ariaSnapshot(),/button \"Complete and print\"/);
- console.log('PASS: Complete and print commits once; print failure keeps receipt, retry prints and closes without another sale');
- await page.getByRole('button').filter({hasText:/^Mountain honey/}).click({force:true});await page.waitForTimeout(600);
- await button('Payment').click({force:true});await page.waitForTimeout(700);
- await button('Receipt').click({force:true});await page.waitForTimeout(700);
- await button('Complete').click({force:true});await until(()=>completedTransactions.length===2,'Ordinary Complete commits');await page.waitForTimeout(1400);
- assert.doesNotMatch(await page.locator('body').ariaSnapshot(),/button \"Complete and print\"/);
- assert.equal(completedTransactions[1].goodsInTransaction[0].pricePerUnit,250,'Discount cleared with the previous cart');assert.ok(!completedTransactions[1].buyer);
- assert.notEqual(completedTransactions[0].clientOperationId,completedTransactions[1].clientOperationId);
- await shot('ordinary-complete');
- console.log('PASS: ordinary Complete exits preview, clears its cart and discount; next sale has a new operation ID');
-
- await button('Menu').click({force:true});await page.waitForTimeout(700);
- fs.writeFileSync(out+'/menu.txt',await page.locator('body').ariaSnapshot());await shot('menu');
- await button('Buyers').click({force:true});await page.waitForTimeout(700);
- fs.writeFileSync(out+'/buyers.txt',await page.locator('body').ariaSnapshot());await shot('buyers');
- await button('From parent store').click({force:true});await page.waitForTimeout(500);
- await button('Add to this branch').click({force:true});await page.waitForTimeout(500);
- fs.writeFileSync(out+'/buyer-editor.txt',await page.locator('body').ariaSnapshot());await shot('buyer-editor');
- const buyerFields=page.getByRole('textbox'),nameBounds=await buyerFields.nth(0).boundingBox(),discountBounds=await buyerFields.nth(5).boundingBox();
- const replaceField=async(box,text)=>{assert.ok(box);await page.mouse.click(box.x+30,box.y+box.height/2);await page.keyboard.press('ControlOrMeta+A');await page.keyboard.press('Backspace');await page.keyboard.type(text);await page.waitForTimeout(300);};
- await replaceField(nameBounds,'Branch special buyer');await replaceField(discountBounds,'12');
- await button('Save').click({force:true});await until(()=>buyers.some(b=>b.name==='Branch special buyer'),'Buyer imported');await page.waitForTimeout(800);
- assert.equal(parentBuyer.discountPercent,5);assert.equal(buyers.find(b=>b.name==='Branch special buyer').discountPercent,12);
- await page.reload({waitUntil:'domcontentloaded'});await page.locator('canvas').first().waitFor({timeout:60000});await page.waitForTimeout(3000);await page.keyboard.press('Tab');
- await button('Active').click({force:true});await page.waitForTimeout(700);await shot('buyers-saved');
- assert.match(await page.locator('body').ariaSnapshot(),/Branch special buyer/);
- console.log('PASS: parent buyer imported with independent branch promotion, persisted across reload');
- await button('Menu').last().click({force:true});await page.waitForTimeout(500);await button('Back').last().click({force:true});await page.waitForTimeout(500);
- await button('Devices').click({force:true});await page.waitForTimeout(900);await shot('devices-wide');
- fs.writeFileSync(out+'/devices.txt',await page.locator('body').ariaSnapshot());
- const refresh=await button('Refresh printers').boundingBox(),test=await button('Send test receipt').boundingBox(),clear=await button('Forget printer selection').boundingBox();
- assert.ok(refresh&&test&&clear);{const a=test.y-refresh.y-refresh.height,b=clear.y-test.y-test.height;assert.ok(a>=6&&Math.abs(a-b)<=1,JSON.stringify({a,b}));}
- await page.setViewportSize({width:390,height:844});await page.waitForTimeout(900);await shot('devices-phone');
- console.log('PASS: devices spacing and narrow rendering');
-
-
-
+ await shot('offline-reloaded');fs.writeFileSync(out+'/offline-reloaded.txt',await page.locator('body').ariaSnapshot());
+ assert.match(await page.locator('body').ariaSnapshot(),/9(?:\.0)? pc\./,'Offline reload retains the deducted stock');
+ assert.equal(writeOffs.length,1);assert.equal(updatedBatches[0].quantity.total,9);
+ offline=false;
+ await button('Refresh').first().click({force:true});
+ await until(()=>calls.filter(c=>c.path.endsWith('/writeoffs')&&c.method==='POST').length>=2,'Pending write-off replayed');await page.waitForTimeout(1500);
+ const attempts=calls.filter(c=>c.path.endsWith('/writeoffs')&&c.method==='POST').map(c=>JSON.parse(c.body));
+ assert.equal(new Set(attempts.map(a=>a.id)).size,1,'Lost acknowledgement must reuse the command identity');
+ assert.equal(writeOffs.length,1);assert.equal(updatedBatches[0].quantity.total,9,'Retry must not subtract again');
+ console.log('PASS: acknowledgement loss, offline reload, reconnect and identical replay leave one ledger entry and correct balance');
+ await page.reload({waitUntil:'domcontentloaded'});await page.locator('canvas').first().waitFor({timeout:60000});await page.waitForTimeout(2500);await page.keyboard.press('Tab');
+ await button('Menu').last().click({force:true});await page.waitForTimeout(600);await button('Analytics').click({force:true});await page.waitForTimeout(1800);
+ fs.writeFileSync(out+'/analytics-open.txt',await page.locator('body').ariaSnapshot());
+ await button('Write-offs').click({force:true});await page.waitForTimeout(900);await shot('writeoff-analytics');
+ fs.writeFileSync(out+'/analytics.txt',await page.locator('body').ariaSnapshot());
+ const analytics=await page.locator('body').ariaSnapshot();assert.match(analytics,/Damage \/ breakage/);assert.match(analytics,/300\.00 KZT/);
+ console.log('PASS: analytics shows canonical write-off reason and cost after synchronization');
 
 } catch(e){await shot('failure');fs.writeFileSync(out+'/failure-aria.txt',await page.locator('body').ariaSnapshot());throw e;}
 finally {fs.writeFileSync(out+'/calls.json',JSON.stringify(calls,null,2));await browser.close();server.close();}

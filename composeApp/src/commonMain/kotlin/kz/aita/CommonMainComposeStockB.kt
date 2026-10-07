@@ -358,8 +358,8 @@ fun AppConfiguration.StockBatchEditor(
     onCancel: () -> Unit,
     onSaved: () -> Unit
 ) {
-    var removeQuantityText by rememberSaveable(existingBatch?.id) { mutableStateOf("") }
-    var removeQuantityError by remember { mutableStateOf<String?>(null) }
+    var showWriteOff by rememberSaveable(existingBatch?.id) { mutableStateOf(false) }
+    if(showWriteOff && existingBatch!=null) StockWriteOffEditor(existingBatch,onDismiss={showWriteOff=false},onSaved={showWriteOff=false;onSaved()})
     val editRevision = remember(existingBatch?.id) { existingBatch?.updatedAtMillis }
     val batchStoreId=existingBatch?.storeId ?: stateValues.activeStoreId ?: goodsItem.storeId
     val defaultUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits
@@ -581,27 +581,9 @@ fun AppConfiguration.StockBatchEditor(
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
-                if (existingBatch != null) {
-                    Text(pass26Text("remove_quantity"), color = stateValues.TextColor,
-                        fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
-                    Text(pass26Text("remove_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-                    Spacer(Modifier.height(stateValues.marginTextField))
-                    SimpleTextInput(Modifier.fillMaxWidth(), value = removeQuantityText,
-                        placeholder = localizedStringResource(271, "Quantity"),
-                        keyboardType = if (selectedQuantityAllowsFraction) KeyboardType.Decimal else KeyboardType.Number,
-                        onTransformValue = { sanitizeStockQuantityInput(it, selectedQuantityAllowsFraction) },
-                        onValueChange = { removeQuantityText = it; removeQuantityError = null })
-                    StockQuantityQuickFillButtons(selectedQuantityUnit, removeQuantityText,
-                        onAmountSelected = { removeQuantityText = it; removeQuantityError = null })
-                    removeQuantityError?.let { Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize) }
-                    Spacer(Modifier.height(stateValues.marginTextField))
-                    actionButton(text = pass26Text("remove_quantity"), iconPath = stateValues.drawablePathIconSubtract,
-                        autoLoading = false, confirmationRequired = false, enabled = !isSavingBatch,
-                        onClick = {
-                            val next = subtractBatchQuantityText(draft.quantityText, removeQuantityText, selectedQuantityUnit)
-                            if (next == null) removeQuantityError = pass26Text("remove_error")
-                            else { draft = draft.copy(quantityText = next); removeQuantityText = ""; removeQuantityError = null }
-                        })
+                if(existingBatch!=null) {
+                    actionButton(text=commerceText("writeoffs"),iconPath=stateValues.drawablePathIconSubtract,autoLoading=false,
+                        confirmationRequired=false,onClick={showWriteOff=true})
                     Spacer(Modifier.height(stateValues.marginTextFieldGroup))
                 }
 

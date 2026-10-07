@@ -2129,6 +2129,7 @@ internal enum class MenuAnalyticsTab(val id: String) {
     Returns("returns"),
     Acceptance("acceptance"),
     Stock("stock"),
+    WriteOffs("writeoffs"),
     Suppliers("suppliers"),
     Workers("workers"),
     CashRegister("cash_register");
@@ -2183,6 +2184,7 @@ internal fun AppConfiguration.analyticsReportTabTitle(tab: MenuAnalyticsTab): St
     MenuAnalyticsTab.Sales -> stateValues.stringSale
     MenuAnalyticsTab.Returns -> stateValues.stringReturn
     MenuAnalyticsTab.Acceptance -> stateValues.stringSupply
+    MenuAnalyticsTab.WriteOffs -> commerceText("writeoffs")
     MenuAnalyticsTab.Stock -> stateValues.stringStock
     MenuAnalyticsTab.Suppliers -> stateValues.stringSuppliers
     MenuAnalyticsTab.Workers -> stateValues.stringWorkers
@@ -2253,6 +2255,8 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
         listOf(
             row(localizedStringResource(694, "Gross sales"), d.grossSales.money(reportCurrency)),
             row(quickDiscountLabel(stateValues.appLanguage), d.quickDiscountTotal.money(reportCurrency)),
+            row(commerceText("writeoff_count"), d.writeOffCount?.toString() ?: "—"),
+            row(commerceText("writeoff_cost"), if(d.writeOffCount==null) "—" else d.writeOffCosts.entries.joinToString(" · ") {it.value.money(it.key)}.ifBlank {"0"}),
             row(localizedStringResource(695, "Returns amount"), d.returnsAmount.money(reportCurrency)),
             row(localizedStringResource(697, "Net revenue"), d.netRevenue.money(reportCurrency)),
             row(localizedStringResource(673, "Gross profit estimate"), d.estimatedGrossProfit.money(reportCurrency), localizedStringResource(690, "Estimated from current/latest supply prices")),
@@ -2294,6 +2298,8 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
             row(localizedStringResource(1312, "Return reasons"), dashboard?.topReturnedItemsByQuantity.orEmpty().flatMap { it.returnReasons }.map { it.reason }.distinct().size.toString())
         )
         MenuAnalyticsTab.Acceptance -> transactionRows(supply)
+        MenuAnalyticsTab.WriteOffs -> listOf(row(commerceText("writeoff_count"),dashboard?.writeOffCount?.toString() ?: "—")) +
+            dashboard?.writeOffCosts.orEmpty().map {(currency,cost)->row(commerceText("writeoff_cost"),cost.money(currency))}
         MenuAnalyticsTab.Stock -> listOf(
             row(stateValues.stringItems, if (preparedAnalytics.stock.available) preparedAnalytics.stock.items.toString() else "—"),
             row(localizedStringResource(280, "Active items"), if (preparedAnalytics.stock.available) preparedAnalytics.stock.activeItems.toString() else "—"),
@@ -2553,6 +2559,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         }
 
         LaunchedEffect(activeStoreId) {
+            StoreCommerceClient.start(); launch {StoreCommerceClient.refreshWriteOffs()}
             AnalyticsWorkspace.refreshServerTotalsIfNeeded()
             activeStoreId?.let { storeId ->
                 if (currentUserCanViewTransactionHistory(storeId)) getTransactions(storeId)
@@ -2667,6 +2674,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 TabContent(MenuAnalyticsTab.Returns.id, stateValues.stringReturn) { analyticsSection = it },
                 TabContent(MenuAnalyticsTab.Acceptance.id, stateValues.stringSupply) { analyticsSection = it },
                 TabContent(MenuAnalyticsTab.Stock.id, stateValues.stringStock) { analyticsSection = it },
+                TabContent(MenuAnalyticsTab.WriteOffs.id, commerceText("writeoffs"),icon=AitaTabIcon.Remove) {analyticsSection=it},
                 TabContent(MenuAnalyticsTab.Suppliers.id, stateValues.stringSuppliers) { analyticsSection = it },
                 TabContent(MenuAnalyticsTab.Workers.id, stateValues.stringWorkers) { analyticsSection = it },
                 TabContent(MenuAnalyticsTab.CashRegister.id, localizedStringResource(256, "Cash registers")) { analyticsSection = it }
@@ -2924,6 +2932,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                     )
                 }
 
+                MenuAnalyticsTab.WriteOffs -> WriteOffAnalyticsScreen(prepared,header=filters)
                 MenuAnalyticsTab.Stock -> MenuAnalyticsStockScreen(analyticsDashboard, prepared.stock, header = filters)
 
                 MenuAnalyticsTab.Suppliers -> {
@@ -3002,6 +3011,8 @@ internal fun AppConfiguration.MenuAnalyticsTransactionScreen(
                 value = dashboard.grossSales.money(dashboard.currencyCode.ifBlank { currencyCode }),
                 subtitle = localizedStringResource(357, "Cash + cashless")
             ),
+            AnalyticsSummaryCardData(title=commerceText("writeoff_cost"), value=if(dashboard.writeOffCount==null) "—" else (dashboard.writeOffCosts[dashboard.currencyCode.uppercase()] ?: 0.0).money(dashboard.currencyCode)),
+            AnalyticsSummaryCardData(title=commerceText("profit_after"), value=if(dashboard.writeOffCount==null) "—" else (dashboard.estimatedGrossProfit-(dashboard.writeOffCosts[dashboard.currencyCode.uppercase()] ?: 0.0)).money(dashboard.currencyCode)),
             AnalyticsSummaryCardData(title = quickDiscountLabel(stateValues.appLanguage),
                 value = dashboard.quickDiscountTotal.money(dashboard.currencyCode.ifBlank { currencyCode })),
             AnalyticsSummaryCardData(

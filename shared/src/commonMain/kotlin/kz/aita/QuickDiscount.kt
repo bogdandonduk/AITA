@@ -22,6 +22,6 @@ fun TransactionReceiptSnapshotDataModel.completedWith(completed: TransactionData
     transaction = completed,
     lines = lines.mapIndexed { index, line -> completed.goodsInTransaction.getOrNull(index)?.let { actual ->
         line.copy(pricePerUnit = actual.pricePerUnit, quantity = line.quantity.copy(total = actual.quantity),
-            quickDiscountPercent = actual.quickDiscountPercent, priceBeforeDiscount = actual.priceBeforeDiscount)
+            quickDiscountPercent = actual.quickDiscountPercent, discounts = actual.discounts, priceBeforeDiscount = actual.priceBeforeDiscount)
     } ?: line }
 )

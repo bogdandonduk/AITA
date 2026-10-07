@@ -115,6 +115,7 @@ object Transactions: Table("transactions") {
   val cardPaymentOptionId = integer("card_payment_option_id")
   val debtor = text("debtor").nullable()
   val timeMillis = long("time_millis")
+  val buyer = jsonb("buyer", jsonBase, TransactionBuyerSnapshot.serializer()).nullable()
   val clientOperationId = text("client_operation_id").nullable().uniqueIndex()
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
 
@@ -177,7 +178,8 @@ private fun ResultRow.toTransactionDataModel(): TransactionDataModel = Transacti
   debtor = this[Transactions.debtor]?.let { raw -> jsonBase.decodeFromString<DebtorDataModel>(raw) },
   timeMillis = this[Transactions.timeMillis],
   clientOperationId = this[Transactions.clientOperationId].orEmpty(),
-  actorUserId = this[Transactions.userId].toString()
+  actorUserId = this[Transactions.userId].toString(),
+  buyer = this[Transactions.buyer]
 )
 
 object Debtors: Table("debtors") {
@@ -4181,7 +4183,7 @@ private suspend fun publishWorkerRealtimeBundle(storeId: String?, reason: String
   }
 }
 
-private suspend fun publishStockRealtimeBundle(storeId: String?, reason: String) {
+internal suspend fun publishStockRealtimeBundle(storeId: String?, reason: String) {
   val cleanStoreId = storeId?.trim()?.takeIf { it.isNotBlank() }
   RealtimeServerBus.publish(entity = "stock", storeId = cleanStoreId, reason = reason)
   RealtimeServerBus.publish(entity = "stockBatches", storeId = cleanStoreId, reason = reason)
@@ -4191,7 +4193,7 @@ private suspend fun publishStockRealtimeBundle(storeId: String?, reason: String)
   publishMarketplaceStockChange(cleanStoreId)
 }
 
-private suspend fun publishStockRealtimeBundle(storeIds: Iterable<String?>, reason: String) {
+internal suspend fun publishStockRealtimeBundle(storeIds: Iterable<String?>, reason: String) {
   val cleanStoreIds = storeIds
     .mapNotNull { it?.trim()?.takeIf { value -> value.isNotBlank() } }
     .distinct()
@@ -4651,7 +4653,7 @@ private fun storesShareInventoryRootInsideTransaction(firstStoreId: UUID, second
   return rootStoreIdForAccessInsideTransaction(firstStoreId) == rootStoreIdForAccessInsideTransaction(secondStoreId)
 }
 
-private fun RoutingCall.matchesInventoryContextStoreIdInsideTransaction(userId: UUID, storeId: UUID): Boolean {
+internal fun RoutingCall.matchesInventoryContextStoreIdInsideTransaction(userId: UUID, storeId: UUID): Boolean {
   val headerStoreId = inventoryContextStoreId()
   if (headerStoreId != null) {
     return storesShareInventoryRootInsideTransaction(headerStoreId, storeId)
@@ -4886,7 +4888,7 @@ private fun rootStoreIdForAccessInsideTransaction(storeId: UUID): UUID {
     ?: storeId
 }
 
-private fun lockStockInventoryInsideTransaction(storeIds: Iterable<UUID>) {
+internal fun lockStockInventoryInsideTransaction(storeIds: Iterable<UUID>) {
   lockStockInventoryRootsInsideTransaction(storeIds.map(::rootStoreIdForAccessInsideTransaction))
 }
 
@@ -5243,7 +5245,7 @@ private fun userHasRequiredActiveWorkshiftInsideTransaction(userId: UUID, storeI
   return !userRequiresWorkshiftInsideTransaction(userId, storeId) || activeWorkshiftIdInsideTransaction(userId, storeId) != null
 }
 
-private fun userCanUseStoreActionInsideTransaction(userId: UUID, storeId: UUID, permission: String, requireWorkshift: Boolean = true): Boolean {
+internal fun userCanUseStoreActionInsideTransaction(userId: UUID, storeId: UUID, permission: String, requireWorkshift: Boolean = true): Boolean {
   if (!userHasStorePermissionInsideTransaction(userId, storeId, permission)) return false
   val management = isManagementStoreInsideTransaction(storeId)
   if (management && permission in BRANCH_ONLY_STORE_PERMISSIONS) return false
@@ -5546,7 +5548,7 @@ private fun OperationLogDataModel.matchesStockItemHistory(goodsItemId: String, b
   return false
 }
 
-private fun insertOperationLogInsideTransaction(
+internal fun insertOperationLogInsideTransaction(
   actorUserId: UUID,
   storeId: UUID,
   action: String,
@@ -5555,9 +5557,10 @@ private fun insertOperationLogInsideTransaction(
   title: List<LocalizedStringDataModel>,
   details: List<LocalizedStringDataModel> = emptyList(),
   metadata: Map<String, String> = emptyMap(),
-  now: Long = System.currentTimeMillis()
+  now: Long = System.currentTimeMillis(),
+  required: Boolean = false
 ) {
-  runCatching {
+  val outcome = runCatching {
     val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
     val storeRow = Stores
       .select(Stores.publicId, Stores.name)
@@ -5592,7 +5595,7 @@ private fun insertOperationLogInsideTransaction(
       .empty()
       .not()
 
-    if (duplicateAlreadyExists)
+    if (duplicateAlreadyExists && !required)
       return@runCatching
 
     val resources = serverEventResourceCatalogue()
@@ -5631,6 +5634,7 @@ private fun insertOperationLogInsideTransaction(
             "actorUserId" to actorUserId.toString(), "operationLogId" to logId.toString()), nowMillis = now)
       }
   }
+  if (required) outcome.getOrThrow()
 }
 
 private class StoreConfigurationException(val key: String) : IllegalArgumentException(key)
@@ -15878,7 +15882,7 @@ private fun supplierProfileCommercialHistoryCountsInsideTransaction(
 
 private fun Long.supplierProfileCountAsInt(): Int = coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-private fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
+internal fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
   return GoodsBatchDataModel(
     id = this[StockBatchesV2.id].toString(),
     kind = StockBatchKindDataModel.valueOf(this[StockBatchesV2.kind]),
@@ -16891,7 +16895,8 @@ internal fun normalizeTransactionGoodsInsideTransaction(
   storeId: UUID,
   transactionType: String,
   lines: List<GoodsItemInTransactionDataModel>,
-  visibleStoreIdsOverride: List<UUID>? = null
+  visibleStoreIdsOverride: List<UUID>? = null,
+  buyerDiscountPercent: Double = 0.0
 ): NormalizedTransactionGoodsResult {
   lockStockInventoryInsideTransaction(listOf(storeId))
   val transactionTypeIndex = when (transactionType) {
@@ -16907,6 +16912,8 @@ internal fun normalizeTransactionGoodsInsideTransaction(
     ?: stockVisibleStoreIdsInsideTransaction(storeId)
 
   for (line in lines) {
+    if (line.discounts?.valid() == false || (line.discounts != null && transactionType == "purchase" && kotlin.math.abs((line.discounts?.buyerPercent ?: 0.0)-buyerDiscountPercent)>0.000001))
+      return NormalizedTransactionGoodsResult(null, "invalid_discount")
     if (!kz.aita.validQuickDiscount(line.quickDiscountPercent) || (transactionType == "accept" && line.quickDiscountPercent != 0.0))
       return NormalizedTransactionGoodsResult(null, "invalid_quantity")
     if (!line.quantity.isFinite() || line.quantity <= 0.0 || !line.pricePerUnit.isFinite()) {
@@ -17036,10 +17043,12 @@ internal fun normalizeTransactionGoodsInsideTransaction(
       else -> return NormalizedTransactionGoodsResult(null, "price_unavailable")
     }
 
-    val discountPercent = if (transactionType == "purchase") line.quickDiscountPercent else originalReceipt?.second?.quickDiscountPercent ?: 0.0
+    val normalizedDiscounts = if(transactionType == "purchase") line.discounts?.copy(buyerPercent=buyerDiscountPercent) else originalReceipt?.second?.discounts
+    val discountPercent = if (transactionType == "purchase") normalizedDiscounts?.effectivePercent() ?: line.quickDiscountPercent else originalReceipt?.second?.quickDiscountPercent ?: 0.0
     normalizedLines += line.copy(
       pricePerUnit = kz.aita.discountedUnitPrice(normalizedPricePerUnit.coerceAtLeast(0.0), if (transactionType == "purchase") discountPercent else 0.0),
       quickDiscountPercent = discountPercent,
+      discounts = normalizedDiscounts,
       priceBeforeDiscount = if (transactionType == "purchase" && discountPercent > 0.0) normalizedPricePerUnit.roundMoney()
         else originalReceipt?.second?.priceBeforeDiscount,
       saleMethodId = appliedSaleMethodId,
@@ -17270,7 +17279,7 @@ private fun preserveExistingGoodsItemNamesInTransactionHistoryInsideTransaction(
   return updatedTransactions
 }
 
-private fun updateGoodsItemActiveShelfBatchInsideTransaction(
+internal fun updateGoodsItemActiveShelfBatchInsideTransaction(
   goodsItemId: UUID,
   storeId: UUID,
   now: Long,
@@ -18126,7 +18135,8 @@ fun Application.module() {
         !path.startsWith("/company/", ignoreCase = true) &&
         !path.startsWith("/supplierContracts/", ignoreCase = true) &&
         !path.startsWith("/supplierOrders/", ignoreCase = true) &&
-        !path.startsWith("/suppliers/", ignoreCase = true)
+        !path.startsWith("/suppliers/", ignoreCase = true) &&
+        !Regex("/stores/[^/]+/(buyers|writeoffs)").matches(path.trimEnd('/'))
       ) {
         RealtimeServerBus.publish(
           entity = entityPath,
@@ -18142,7 +18152,7 @@ fun Application.module() {
       val logAction = operationLogActionForHttpMutation(methodText, entityPath)
       val logEntityType = operationLogEntityForPath(entityPath)
       val normalizedEntityPath = entityPath.lowercase()
-      val routeWritesSpecificOperationLog = normalizedEntityPath.startsWith("support/") ||
+      val routeWritesSpecificOperationLog = Regex("stores/[^/]+/(buyers|writeoffs)").matches(normalizedEntityPath) || normalizedEntityPath.startsWith("support/") ||
          normalizedEntityPath.startsWith("company/") ||
          normalizedEntityPath.startsWith("notifications") ||
          normalizedEntityPath.startsWith("operationlogs") ||
@@ -18193,6 +18203,7 @@ fun Application.module() {
         installHelpRoutes(this@module.environment.config)
         installProfilePhotoRoutes()
         installStorePeopleRoutes()
+        installStoreCommerceRoutes()
     installRuntimeDiagnosticRoutes(this@module.environment.config, backgroundScope)
         // Store-scoped payment integration management and advanced account authentication.
         installAitaPaymentManagementRoutes()
@@ -25553,7 +25564,9 @@ fun Application.module() {
               goodsItemIdFilter = goodsItemIdFilter,
               supplierIdFilter = supplierIdFilter,
               categoryIdFilter = categoryIdFilter
-            )
+            ).withWriteOffs(StockWriteOffs.selectAll().where {
+                (StockWriteOffs.storeId eq storeId) and (StockWriteOffs.time greaterEq startMillis) and (StockWriteOffs.time less endMillisExclusive)
+              }.map {it[StockWriteOffs.result].record})
           }
 
           dashboard?.let {
@@ -25688,7 +25701,10 @@ fun Application.module() {
               if (visibleStoreIds.isEmpty())
                 return@newSuspendedTransaction null
 
+              val canonicalBuyer = try { canonicalBuyerInsideTransaction(storeId,body.buyer.takeIf {body.type=="purchase"}) }
+                catch(e:CommerceProblem) { transactionFailureMessage=commerceMessage(e.key); return@newSuspendedTransaction null }
               val normalizedGoodsResult = normalizeTransactionGoodsInsideTransaction(
+                buyerDiscountPercent = canonicalBuyer?.discountPercent ?: 0.0,
                 storeId = storeId,
                 transactionType = body.type,
                 lines = body.goodsInTransaction,
@@ -25710,7 +25726,9 @@ fun Application.module() {
                 return@newSuspendedTransaction null
               }
 
-              var transactionToSave = body.copy(goodsInTransaction = normalizedGoodsInTransaction)
+              val returnBuyer = if(body.type=="return") normalizedGoodsInTransaction.mapNotNull {it.originalTransactionId}.distinct().takeIf {it.size==1}
+                ?.single()?.let {source->Transactions.select(Transactions.buyer).where {(Transactions.id eq UUID.fromString(source)) and (Transactions.storeId eq storeId)}.singleOrNull()?.get(Transactions.buyer)} else null
+              var transactionToSave = body.copy(goodsInTransaction = normalizedGoodsInTransaction, buyer = canonicalBuyer ?: returnBuyer)
 
               val transactionTotal = transactionToSave.goodsInTransaction
                 .sumOf { it.quantity * it.pricePerUnit }
@@ -25775,6 +25793,7 @@ fun Application.module() {
                 }
                 it[Transactions.timeMillis] = timeMillis
                 it[Transactions.clientOperationId] = requestClientOperationId
+                it[Transactions.buyer] = transactionToSave.buyer
               }
 
               syncTransactionReturnItemsInsideTransaction(

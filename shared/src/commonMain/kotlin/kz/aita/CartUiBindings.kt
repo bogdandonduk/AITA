@@ -3,6 +3,8 @@ package kz.aita
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.decodeFromString
 
+val cartBuyerPromoClockState = MutableStateFlow(getCurrentTimeMillis())
+val cartBuyersState = MutableStateFlow<Map<String, StoreBuyer>>(emptyMap())
 val cartQuickDiscountsState = MutableStateFlow<Map<String, Double>>(emptyMap())
 val cartCheckoutsState = MutableStateFlow<Map<String, CartCheckoutAttempt>>(emptyMap())
 val cartSaleMethodIdsState = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -13,6 +15,7 @@ private val returnReasons = MutableStateFlow<Map<String, String>>(emptyMap())
 private val returnBatches = MutableStateFlow<Map<String, CartReturnBatchSelectionDataModel>>(emptyMap())
 private val cartScrolls = MutableStateFlow<Map<String, TransactionCartScrollStateDataModel>>(emptyMap())
 internal fun publishCartUiState(ui: CartUiState) {
+    cartBuyersState.value = ui.buyers
     cartQuickDiscountsState.value = ui.discounts
     cartCheckoutsState.value = ui.checkouts
     cartSaleMethodIdsState.value = ui.saleMethods
@@ -117,3 +120,19 @@ fun setCartQuickDiscount(slot: Int, percent: Double) {
         discounts = if (percent == 0.0) ui.discounts - key else ui.discounts + (key to percent),
         payments = ui.payments - key) }
 }
+
+fun setCartItemDiscount(slot: Int, goodsId: String, percent: Double) {
+    require(validCartSlot(0,slot) && goodsId.isNotBlank() && validQuickDiscount(percent))
+    val cart = "0:$slot"; val key = "$cart:$goodsId"
+    DynamicCarts.editUiAsync { it.copy(discounts = if (percent == 0.0) it.discounts-key else it.discounts+(key to percent), payments = it.payments-cart) }
+}
+fun setCartBuyer(slot: Int, buyer: StoreBuyer?) {
+    val owner = DynamicCarts.captureScope() ?: return
+    require(validCartSlot(0,slot) && (buyer == null || buyer.valid() && buyer.isActive && buyer.storeId == owner.storeId))
+    val key = "0:$slot"
+    DynamicCarts.editUiAsync { it.copy(buyers = if (buyer == null) it.buyers-key else it.buyers+(key to buyer), payments = it.payments-key) }
+}
+fun cartSaleDiscounts(slot: Int, goodsId: String, discounts: Map<String,Double> = cartQuickDiscountsState.value,
+    buyer: StoreBuyer? = cartBuyersState.value["0:$slot"], now:Long=getCurrentTimeMillis()): SaleDiscounts = SaleDiscounts(
+    itemPercent = discounts["0:$slot:$goodsId"] ?: 0.0, cartPercent = discounts["0:$slot"] ?: 0.0,
+    buyerPercent = buyer?.activeDiscount(now) ?: 0.0)

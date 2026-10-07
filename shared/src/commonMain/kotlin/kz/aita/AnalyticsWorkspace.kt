@@ -91,11 +91,12 @@ internal class AnalyticsInputs(
     val events: List<CashRegisterEventDataModel>,
     val suppliers: List<SupplierDataModel>,
     val currency: String,
-    val cashAvailable: Boolean = true
+    val cashAvailable: Boolean = true,
+    val writeOffs: List<StockWriteOff>? = null
 ) {
     fun sameSources(other: AnalyticsInputs): Boolean = owner == other.owner && selection == other.selection &&
         window == other.window && currency == other.currency && cashAvailable == other.cashAvailable && transactions === other.transactions &&
-        stock === other.stock && batches === other.batches && events === other.events && suppliers === other.suppliers
+        writeOffs === other.writeOffs && stock === other.stock && batches === other.batches && events === other.events && suppliers === other.suppliers
 }
 
 internal suspend fun prepareAnalytics(input: AnalyticsInputs): PreparedAnalytics {
@@ -111,7 +112,7 @@ internal suspend fun prepareAnalytics(input: AnalyticsInputs): PreparedAnalytics
     context.ensureActive()
     val dashboard = buildStoreAnalyticsDashboard(storeId, input.window.startMillis, input.window.endMillisExclusive,
         input.transactions, input.stock, input.batches, input.currency,
-        selection.goodsItemId, selection.supplierId, selection.categoryId)
+        selection.goodsItemId, selection.supplierId, selection.categoryId).withWriteOffs(input.writeOffs)
     context.ensureActive()
     val zone = TimeZone.of(input.window.timeZoneId)
     val types = scoped.groupBy { it.type }.mapValues { (_, txs) ->
@@ -246,7 +247,7 @@ object AnalyticsWorkspace {
                 cashRegisterEventsState.payload.map { Unit }, cashRegisterState.payload.map { Unit }, suppliersState.payload.map { Unit },
                 inventoryOwners.state.map { Unit }, activeStoreIdState.map { Unit }, userAccountState.payload.map { Unit },
                 storesState.payload.map { Unit }, myWorkerMembershipsState.payload.map { Unit },
-                requests.map { Unit }, refreshRevision.map { Unit }, globalAppConfigurationState.payload.map { Unit }, dates
+                StoreCommerceClient.state.map {Unit}, requests.map { Unit }, refreshRevision.map { Unit }, globalAppConfigurationState.payload.map { Unit }, dates
             )
             var last: AnalyticsInputs? = null
             var lastRemote: Pair<SelectionRequest, Pair<AnalyticsWindow, Long>>? = null
@@ -298,7 +299,8 @@ object AnalyticsWorkspace {
                     ?: globalAppConfigurationState.payloadValue.countries.getFirstCurrencyByCountry(userAccountState.payloadValue?.countryLocale.orEmpty())?.code.orEmpty()
                 val input = AnalyticsInputs(owner, selection, window, transactions, stock, batches,
                     cashRegisterEventsState.payloadValue.orEmpty(), suppliersState.payloadValue.orEmpty(), currency,
-                    currentUserCanViewCashRegister(owner.storeId) && cashRegisterEventsState.payloadValue != null)
+                    currentUserCanViewCashRegister(owner.storeId) && cashRegisterEventsState.payloadValue != null,
+                    StoreCommerceClient.current().takeIf {it.historyLoaded}?.writeOffs)
                 if (last?.sameSources(input) == true && result.value != null) return@collectLatest
                 try {
                     val computed = prepareAnalytics(input)

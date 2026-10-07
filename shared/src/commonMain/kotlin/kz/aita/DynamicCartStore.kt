@@ -22,6 +22,7 @@ data class StoredCartLine(val id: String, val type: Int, val slot: Int, val quan
 data class CartUiState(
     val saleMethods: Map<String, String> = emptyMap(),
     val discounts: Map<String, Double> = emptyMap(),
+    val buyers: Map<String, StoreBuyer> = emptyMap(),
     val checkouts: Map<String, CartCheckoutAttempt> = emptyMap(),
     val payments: Map<String, TransactionPaymentDraftDataModel> = emptyMap(),
     val suppliers: Map<String, String> = emptyMap(),
@@ -36,16 +37,16 @@ data class CartUiState(
             fun locked(key: String) = previous.checkouts.keys.any { key == it || key.startsWith("$it:") }
             return filterKeys { !locked(it) } + old.filterKeys(::locked)
         }
-        return copy(discounts = discounts.preserve(previous.discounts), checkouts = previous.checkouts,
+        return copy(buyers = buyers.preserve(previous.buyers), discounts = discounts.preserve(previous.discounts), checkouts = previous.checkouts,
             saleMethods = saleMethods.preserve(previous.saleMethods), payments = payments.preserve(previous.payments),
             suppliers = suppliers.preserve(previous.suppliers), reasons = reasons.preserve(previous.reasons),
             batches = batches.preserve(previous.batches))
     }
-    fun keys(): Set<String> = discounts.keys + checkouts.keys + saleMethods.keys + payments.keys + suppliers.keys + reasons.keys + batches.keys + checks.keys + scrolls.keys
+    fun keys(): Set<String> = buyers.keys + discounts.keys + checkouts.keys + saleMethods.keys + payments.keys + suppliers.keys + reasons.keys + batches.keys + checks.keys + scrolls.keys
     fun withoutCart(type: Int, slot: Int): CartUiState {
         val key = "$type:$slot"
         fun <T> Map<String, T>.keepOthers() = filterKeys { it != key && !it.startsWith("$key:") }
-        return copy(discounts = discounts.keepOthers(), checkouts = checkouts.keepOthers(), saleMethods = saleMethods.keepOthers(), payments = payments.keepOthers(),
+        return copy(buyers = buyers.keepOthers(), discounts = discounts.keepOthers(), checkouts = checkouts.keepOthers(), saleMethods = saleMethods.keepOthers(), payments = payments.keepOthers(),
             suppliers = suppliers.keepOthers(), reasons = reasons.keepOthers(), batches = batches.keepOthers(),
             checks = checks.keepOthers(), scrolls = scrolls.keepOthers())
     }
@@ -56,13 +57,13 @@ data class CartUiState(
             val slot = parts.getOrNull(1)?.toIntOrNull()
             type != null && slot != null && contains(type, slot)
         }
-        return copy(discounts = discounts.keepActive(), checkouts = checkouts.keepActive(), saleMethods = saleMethods.keepActive(), payments = payments.keepActive(),
+        return copy(buyers = buyers.keepActive(), discounts = discounts.keepActive(), checkouts = checkouts.keepActive(), saleMethods = saleMethods.keepActive(), payments = payments.keepActive(),
             suppliers = suppliers.keepActive(), reasons = reasons.keepActive(), batches = batches.keepActive(),
             checks = checks.keepActive(), scrolls = scrolls.keepActive())
     }
     fun withoutItem(type: Int, slot: Int, id: String): CartUiState {
         val key = "$type:$slot:$id"
-        return copy(saleMethods = saleMethods - key, reasons = reasons - key, batches = batches - key,
+        return copy(discounts = discounts - key, payments = payments - "$type:$slot", saleMethods = saleMethods - key, reasons = reasons - key, batches = batches - key,
             checks = checks.filterKeys { it != key && !it.startsWith("$key:") })
     }
 }
@@ -89,6 +90,7 @@ data class CartBook(
             nextSlotIds = nextSlotIds ?: counts)
     }
     fun validated(): CartBook {
+        require(ui.buyers.all { (key, buyer) -> key.startsWith("0:") && buyer.valid() })
         require(ui.discounts.all { (key, value) -> key.startsWith("0:") && validQuickDiscount(value) })
         require(ui.checkouts.values.all { it.transaction.clientOperationId.isNotBlank() })
         require(schema == 2 && revision >= 0 && counts.size == 3 && counts.all { it in INITIAL_CART_SLOTS..MAX_CART_SLOTS })

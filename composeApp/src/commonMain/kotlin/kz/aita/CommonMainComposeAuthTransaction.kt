@@ -2416,7 +2416,7 @@ internal fun AppConfiguration.ReceiptPreviewLine(
     }
 
     if (line.quickDiscountAmount() > 0) ReceiptPreviewText(
-        "${quickDiscountLabel(stateValues.appLanguage)} ${line.quickDiscountPercent.moneyText()}%: −${line.quickDiscountAmount().moneyText()} ${line.currencySymbol}")
+        "${quickDiscountLabel(stateValues.appLanguage)} ${line.quickDiscountPercent.moneyText()}%: -${line.quickDiscountAmount().moneyText()} ${line.currencySymbol}")
     ReceiptPreviewRow(
         title = "$quantityText x ${line.pricePerUnit.moneyText()} ${line.currencySymbol}".trim(),
         value = "${line.total.moneyText()} ${line.currencySymbol}",
@@ -2439,8 +2439,9 @@ internal fun AppConfiguration.ReceiptPreviewTotals(
     ReceiptPreviewDivider()
     Spacer(modifier = Modifier.height(8.dp))
 
+    snapshot.transaction.buyer?.let {ReceiptPreviewRow(commerceText("buyer"),it.name)}
     val discount = snapshot.lines.sumOf { it.quickDiscountAmount() }.roundMoney()
-    if (discount > 0) ReceiptPreviewRow(quickDiscountLabel(stateValues.appLanguage), "−${discount.moneyText()} ${snapshot.currencySymbol}")
+    if (discount > 0) ReceiptPreviewRow(quickDiscountLabel(stateValues.appLanguage), "-${discount.moneyText()} ${snapshot.currencySymbol}")
     ReceiptPreviewRow(
         title = labels.total.uppercase(),
         value = "${total.moneyText()} ${snapshot.currencySymbol}",
@@ -2550,7 +2551,9 @@ internal fun AppConfiguration.buildTransactionReceiptLines(
     returnReasons: Map<String, String> = emptyMap(),
     returnBatchSelections: Map<String, CartReturnBatchSelectionDataModel> = emptyMap(),
     clientId: Int = 0,
-    quickDiscountPercent: Double = 0.0
+    quickDiscountPercent: Double = 0.0,
+    itemDiscounts: Map<String, Double> = emptyMap(),
+    buyer: StoreBuyer? = null
 ): List<TransactionReceiptLineDataModel> {
     if (cart.isEmpty()) return emptyList()
     val stockById = stock.associateBy { it.id }
@@ -2583,15 +2586,18 @@ internal fun AppConfiguration.buildTransactionReceiptLines(
             ?.symbol
             ?: price.currency
 
+        val discountParts = SaleDiscounts(itemDiscounts["0:$clientId:${goodsItem.id}"] ?: 0.0, quickDiscountPercent, buyer?.activeDiscount() ?: 0.0)
+        val effectiveDiscount = discountParts.effectivePercent()
         TransactionReceiptLineDataModel(
             index = index,
             goodsItemId = goodsItem.id,
             name = goodsItem.name,
             barcode = goodsItem.firstBarcode(),
             quantity = cartItem.quantity,
-            pricePerUnit = discountedUnitPrice(price.price.toMoneyDouble(), if (transactionTypeIndex == 0) quickDiscountPercent else 0.0),
-            quickDiscountPercent = if (transactionTypeIndex == 0) quickDiscountPercent else if (transactionTypeIndex == 1) returnSelection?.originalQuickDiscountPercent ?: 0.0 else 0.0,
-            priceBeforeDiscount = if (transactionTypeIndex == 0) price.price.toMoneyDouble().takeIf { quickDiscountPercent > 0.0 }
+            pricePerUnit = discountedUnitPrice(price.price.toMoneyDouble(), if (transactionTypeIndex == 0) effectiveDiscount else 0.0),
+            discounts = discountParts.takeIf { transactionTypeIndex == 0 },
+            quickDiscountPercent = if (transactionTypeIndex == 0) effectiveDiscount else if (transactionTypeIndex == 1) returnSelection?.originalQuickDiscountPercent ?: 0.0 else 0.0,
+            priceBeforeDiscount = if (transactionTypeIndex == 0) price.price.toMoneyDouble().takeIf { effectiveDiscount > 0.0 }
                 else if (transactionTypeIndex == 1) returnSelection?.originalPriceBeforeDiscount else null,
             currencyCode = price.currency,
             currencySymbol = currencySymbol,
@@ -2839,6 +2845,8 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
         val latestSnapshot by latestTransactionReceiptSnapshotState.collectAsState()
         val discounts by cartQuickDiscountsState.collectAsState()
+        val buyers by cartBuyersState.collectAsState()
+        val buyerPromoClock by cartBuyerPromoClockState.collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
         val cartReturnReasons by getCartReturnReasonsState().collectAsState()
         val returnBatchSelections by getCartReturnBatchSelectionsState().collectAsState()
@@ -2846,13 +2854,14 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
 
         val paymentDraft = paymentDrafts[transactionSupplySupplierKey(context.transactionTypeIndex, context.clientId)]
 
-        val liveLines = remember(discounts, goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds, cartReturnReasons, returnBatchSelections) {
+        val liveLines = remember(buyerPromoClock, buyers, discounts, goodsInCart, stateValues.stock, stateValues.stockBatches, context.transactionTypeIndex, context.clientId, saleMethodIds, cartReturnReasons, returnBatchSelections) {
             buildTransactionReceiptLines(
                 cart = goodsInCart,
                 stock = stateValues.stock.orEmpty(),
                 stockBatches = stateValues.stockBatches.orEmpty(),
                 transactionTypeIndex = context.transactionTypeIndex,
                 quickDiscountPercent = discounts["${context.transactionTypeIndex}:${context.clientId}"] ?: 0.0,
+                itemDiscounts = discounts, buyer = buyers["0:${context.clientId}"],
                 saleMethodIds = saleMethodIds,
                 returnReasons = cartReturnReasons,
                 returnBatchSelections = returnBatchSelections,
@@ -2906,6 +2915,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
         )
 
         val currentTransaction = TransactionDataModel(
+            buyer = buyers["0:${context.clientId}"]?.receiptSnapshot().takeIf {context.transactionTypeIndex==0},
             id = "",
             workshiftId = 0L,
             type = transactionServerType(context.transactionTypeIndex),
@@ -2916,6 +2926,7 @@ fun AppConfiguration.TransactionReceiptPreviewScreen() {
                     quantity = it.quantity.total,
                     pricePerUnit = it.pricePerUnit,
                     quickDiscountPercent = it.quickDiscountPercent,
+                    discounts = it.discounts,
                     priceBeforeDiscount = it.priceBeforeDiscount,
                     supplierId = null,
                     saleMethodId = it.saleMethodId,
@@ -5199,6 +5210,8 @@ fun AppConfiguration.TransactionPaymentScreen() {
             context.clientId
         ).collectAsState()
         val discounts by cartQuickDiscountsState.collectAsState()
+        val buyers by cartBuyersState.collectAsState()
+        val buyerPromoClock by cartBuyerPromoClockState.collectAsState()
         val saleMethodIds by cartSaleMethodIdsState.collectAsState()
         val returnBatchSelections by getCartReturnBatchSelectionsState().collectAsState()
 
@@ -5210,7 +5223,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
         }
 
         val lines = remember(
-            discounts, goodsInCart,
+            buyerPromoClock, buyers, discounts, goodsInCart,
             stateValues.stock,
             stateValues.stockBatches,
             context.transactionTypeIndex,
@@ -5225,6 +5238,7 @@ fun AppConfiguration.TransactionPaymentScreen() {
                 stockBatches = stateValues.stockBatches.orEmpty(),
                 transactionTypeIndex = context.transactionTypeIndex,
                 quickDiscountPercent = discounts["${context.transactionTypeIndex}:${context.clientId}"] ?: 0.0,
+                itemDiscounts = discounts, buyer = buyers["0:${context.clientId}"],
                 saleMethodIds = saleMethodIds,
                 returnBatchSelections = returnBatchSelections,
                 clientId = context.clientId

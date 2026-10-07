@@ -1,42 +1,59 @@
 package kz.aita
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
+/** Same compact controls for a cart and a single line; no permanent full-width action below the cart. */
 @Composable
-internal fun AppConfiguration.CartQuickDiscount(slot: Int, percent: Double) {
-    var open by remember(slot) { mutableStateOf(false) }
-    val checkouts by cartCheckoutsState.collectAsState()
-    if ("0:$slot" in checkouts) return
-    actionButton(text = "${quickDiscountLabel(stateValues.appLanguage)} · ${percent.moneyText()}%",
-        autoLoading = false, confirmationRequired = false, onClick = { open = true })
-    if (open) AitaBottomSheet(title = quickDiscountLabel(stateValues.appLanguage), onDismiss = { open = false }) {
-        var draft by remember(slot) { mutableStateOf(percent.moneyText()) }
-        var error by remember { mutableStateOf(false) }
-        Text(pass27Text("discount_help"), color = stateValues.TextColor, fontSize = stateValues.smallTextSize)
-        val input = genericTextField(titleText = "%", valueInitial = draft,
-            keyboardType = KeyboardType.Decimal, placeholderText = "0–100", onValueChange = { raw, apply ->
-                draft = raw; error = false; apply()
-            })
-        Spacer(Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(listOf(0, 5, 10, 15, 20, 25, 50)) { value ->
-                actionButton(text = "$value%", autoLoading = false, confirmationRequired = false,
-                    onClick = { setCartQuickDiscount(slot, value.toDouble()); open = false })
+internal fun AppConfiguration.DiscountMiniEditor(title: String, percent: Double, onApply: (Double) -> Unit) {
+    var draft by remember(percent) { mutableStateOf(percent.moneyText()) }
+    var error by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Text(title,color=stateValues.TextColor,fontSize=stateValues.accentTextSize)
+        val field=genericTextField(titleText="%",valueInitial=draft,keyboardType=KeyboardType.Decimal,
+            placeholderText="0–100",onValueChange={raw,apply->draft=raw;error=false;apply()})
+        LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            items(listOf(0,5,10,15,20,25,50)) {value->
+                actionButton(text="$value%",autoLoading=false,confirmationRequired=false,onClick={onApply(value.toDouble())})
             }
         }
-        Spacer(Modifier.height(8.dp))
-        if (error) Text(pass27Text("discount_error"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
-        actionButton(text = pass27Text("apply"), autoLoading = false, confirmationRequired = false, onClick = {
-            val value = input.value.text.trim().replace(',', '.').toDoubleOrNull()
-            if (value == null || !validQuickDiscount(value)) error = true
-            else { setCartQuickDiscount(slot, value); open = false }
+        if(error) Text(pass27Text("discount_error"),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize)
+        actionButton(text=commerceText("apply"),autoLoading=false,confirmationRequired=false,onClick={
+            val value=field.value.text.trim().replace(',','.').toDoubleOrNull()
+            if(value==null || !validQuickDiscount(value)) error=true else onApply(value)
         })
+    }
+}
+
+@Composable
+internal fun AppConfiguration.ItemDiscountControls(slot:Int,goodsId:String,onToggle:()->Unit) {
+    val discounts by cartQuickDiscountsState.collectAsState()
+    val pending by cartCheckoutsState.collectAsState()
+    val percent=discounts["0:$slot:$goodsId"] ?: 0.0
+    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+        if(percent>0) Text("${percent.moneyText()}%",color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
+        actionButton(modifier=Modifier.size(40.dp),text="",iconPath=stateValues.drawablePathIconPromos,
+            iconRes=stateValues.drawableResIconPromos.value,iconContentDescription=commerceText("item_discount"),
+            enabled="0:$slot" !in pending,autoLoading=false,confirmationRequired=false,onClick=onToggle)
+    }
+
+}
+
+@Composable
+internal fun AppConfiguration.CartDiscountPanel(slot:Int,onDismiss:()->Unit) {
+    val discounts by cartQuickDiscountsState.collectAsState()
+    val pending by cartCheckoutsState.collectAsState()
+    if("0:$slot" in pending) return
+    Column(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        DiscountMiniEditor(commerceText("cart_discount"),discounts["0:$slot"] ?: 0.0) {setCartQuickDiscount(slot,it);onDismiss()}
+        Text(commerceText("discount_help"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
     }
 }

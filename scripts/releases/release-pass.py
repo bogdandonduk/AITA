@@ -360,8 +360,10 @@ class Run:
                              ['node', 'scripts/linux-web/test/inventory-offline-smoke.cjs'])
                 self.command('New inventory search and label copies after offline creation',
                              ['node', 'scripts/linux-web/test/inventory-label-actions-smoke.cjs'])
-                self.command('Batch subtraction, receipt print retry and device action spacing',
+                self.command('Write-offs, stacked cart discounts, parent buyers, receipt retry and device spacing',
                              ['node', 'scripts/linux-web/test/receipt-batch-actions-smoke.cjs'])
+                self.command('Write-off lost-acknowledgement recovery and analytics',
+                             ['node', 'scripts/linux-web/test/store-commerce-offline-smoke.cjs'])
                 self.command('Profile password, email proof and refreshed authenticator choices',
                              ['node', 'scripts/linux-web/test/profile-security-smoke.cjs'])
                 self.command('Font preferences, download layout and offline support history in the browser',

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 6,
+  "revision": 7,
   "tutorials": [
     {
       "id": "account.register",
@@ -5301,6 +5301,189 @@
           "text": {
             "en": "Do not treat a restored form as a completed transaction. Confirm the active store, current records and any unsent edits before continuing.",
             "ru": "Восстановленная форма не означает завершённую операцию. Перед продолжением проверьте активный магазин, актуальные записи и неотправленные изменения."
+          },
+          "screenshots": []
+        }
+      ]
+    },
+    {
+      "id": "sale.discounts",
+      "modes": [
+        "STORE"
+      ],
+      "category": "SALES",
+      "title": {
+        "en": "Item, cart and buyer discounts",
+        "ru": "Скидки на товар, корзину и покупателя",
+        "kk": "Тауар, себет және сатып алушы жеңілдіктері",
+        "ky": "Товар, себет жана сатып алуучу арзандатуулары",
+        "tg": "Тахфифи мол, сабад ва харидор",
+        "uz": "Tovar, savat va xaridor chegirmalari"
+      },
+      "introduction": {
+        "en": "Discounts keep their original prices in receipts and history.",
+        "ru": "Исходные цены и скидки сохраняются в чеках и истории.",
+        "kk": "Бастапқы бағалар мен жеңілдіктер чектерде және тарихта сақталады.",
+        "ky": "Баштапкы баалар жана арзандатуулар чектерде жана тарыхта сакталат.",
+        "tg": "Нархҳои аслӣ ва тахфифҳо дар расидҳо ва таърих мемонанд.",
+        "uz": "Asl narxlar va chegirmalar cheklar va tarixda saqlanadi."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "In a sale cart, use the promotion icon on an item to expand its discount. Enter a percentage or choose a quick value.",
+            "ru": "В корзине продажи нажмите значок акции у товара. Введите процент скидки или выберите быстрое значение.",
+            "kk": "Сату себетінде тауардың акция белгішесін басыңыз. Жеңілдік пайызын енгізіңіз не дайын мәнді таңдаңыз.",
+            "ky": "Сатуу себетинде товардын акция белгисин басыңыз. Пайызды киргизиңиз же даяр маанини тандаңыз.",
+            "tg": "Дар сабади фурӯш нишонаи аксияи молро пахш кунед. Фоизро ворид ё арзиши тайёрро интихоб кунед.",
+            "uz": "Savdoda tovarning aksiya belgisini bosing. Foizni kiriting yoki tayyor qiymatni tanlang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Use the promotion icon in the cart header for the whole-cart discount. Discounts apply successively: 10% and 10% give 19% overall.",
+            "ru": "Значок акции в шапке корзины открывает общую скидку. Скидки применяются последовательно: 10% и 10% дают 19% в сумме.",
+            "kk": "Себет тақырыбындағы акция белгішесі жалпы жеңілдікті ашады. 10% және 10% кезекпен қолданылса, жалпы 19% болады.",
+            "ky": "Себет башындагы акция белгиси жалпы арзандатууну ачат. 10% жана 10% кезеги менен колдонулганда жалпы 19% болот.",
+            "tg": "Нишонаи аксия дар сарлавҳаи сабад тахфифи умумиро мекушояд. 10% ва 10% пайдарпай дар маҷмӯъ 19% мешаванд.",
+            "uz": "Savat sarlavhasidagi aksiya belgisi umumiy chegirmani ochadi. Ketma-ket 10% va 10% jami 19% beradi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Select a buyer with the person icon to apply their active promotion. Review the final amount before payment; a changed promotion must be reviewed again.",
+            "ru": "Значок покупателя позволяет применить его действующую акцию. Перед оплатой проверьте итог; изменённую акцию нужно подтвердить заново.",
+            "kk": "Адам белгішесі арқылы сатып алушының белсенді акциясын қолданыңыз. Төлем алдында қорытындыны тексеріңіз; өзгерген акцияны қайта қараңыз.",
+            "ky": "Адам белгиси аркылуу сатып алуучунун активдүү акциясын колдонуңуз. Төлөмдөн мурда жыйынтыкты текшериңиз; өзгөргөн акцияны кайра караңыз.",
+            "tg": "Бо нишонаи шахс аксияи фаъоли харидорро интихоб кунед. Пеш аз пардохт маблағро санҷед; аксияи тағйирёфтаро аз нав бинед.",
+            "uz": "Xaridor belgisida uning faol aksiyasini tanlang. To‘lovdan oldin yakuniy summani tekshiring; o‘zgargan aksiyani qayta ko‘ring."
+          },
+          "screenshots": []
+        }
+      ]
+    },
+    {
+      "id": "stock.write-offs",
+      "modes": [
+        "STORE"
+      ],
+      "category": "STOCK",
+      "title": {
+        "en": "Write off goods from a batch",
+        "ru": "Списать товары из партии",
+        "kk": "Партиядан тауарды есептен шығару",
+        "ky": "Партиядан товарды эсептен чыгаруу",
+        "tg": "Аз партия молро аз ҳисоб баровардан",
+        "uz": "Partiyadan tovarni hisobdan chiqarish"
+      },
+      "introduction": {
+        "en": "Write-offs reduce stock and record costs without creating a sale or changing cash.",
+        "ru": "Списание уменьшает остаток и учитывает себестоимость без продажи и изменения кассы.",
+        "kk": "Есептен шығару сатусыз және кассаны өзгертпей қалдықты азайтып, өзіндік құнды тіркейді.",
+        "ky": "Эсептен чыгаруу сатуусуз жана кассаны өзгөртпөй калдыкты азайтып, наркты каттайт.",
+        "tg": "Азҳисоббарорӣ бақия ва арзишро бе фурӯш ё тағйири хазина сабт мекунад.",
+        "uz": "Hisobdan chiqarish savdosiz va kassani o‘zgartirmay qoldiqni kamaytiradi hamda tannarxni qayd etadi."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open a batch for editing, then Write-offs. Enter the quantity in the batch unit and choose a reason. Other requires a comment.",
+            "ru": "Откройте редактирование партии → Списания. Укажите количество в единицах партии и причину. Для «Другое» обязателен комментарий.",
+            "kk": "Партияны өзгерту → Есептен шығару. Партия бірлігіндегі мөлшер мен себепті таңдаңыз. «Басқа» үшін түсініктеме қажет.",
+            "ky": "Партияны түзөтүү → Эсептен чыгаруу. Партия бирдигиндеги санды жана себепти тандаңыз. «Башка» үчүн комментарий керек.",
+            "tg": "Таҳрири партия → Аз ҳисоб баровардан. Миқдорро бо воҳиди партия ва сабаб ворид кунед. Барои «Дигар» шарҳ лозим аст.",
+            "uz": "Partiyani tahrirlash → Hisobdan chiqarish. Partiya birligidagi miqdor va sababni tanlang. «Boshqa» uchun izoh kerak."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Confirm the deduction. Offline, the saved command waits for reconnection; do not create another command for the same batch while it is pending.",
+            "ru": "Подтвердите списание. Без сети сохранённая операция дождётся подключения; пока она ожидает отправки, не создавайте новое списание из той же партии.",
+            "kk": "Есептен шығаруды растаңыз. Желісіз сақталған операция қосылымды күтеді; ол жіберілгенше осы партияға жаңа операция жасамаңыз.",
+            "ky": "Эсептен чыгарууну ырастаңыз. Желесиз сакталган операция байланыш күтөт; ал жөнөтүлгөнчө ошол партияга жаңы операция түзбөңүз.",
+            "tg": "Амалиётро тасдиқ кунед. Бе шабака он пайвастшавиро интизор мешавад; то фиристодан барои ҳамон партия амалиёти нав насозед.",
+            "uz": "Amalni tasdiqlang. Tarmoqsiz saqlangan amal ulanishni kutadi; yuborilguncha shu partiya uchun yangi amal yaratmang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Open Analytics → Write-offs to see reasons, quantities and costs for the selected period. Costs in different currencies remain separate.",
+            "ru": "В Аналитика → Списания видны причины, количества и себестоимость за выбранный период. Разные валюты учитываются отдельно.",
+            "kk": "Талдау → Есептен шығару бөлімінде кезеңнің себептері, мөлшері және құны көрсетіледі. Валюталар бөлек есептеледі.",
+            "ky": "Аналитика → Эсептен чыгаруу бөлүмүндө мезгилдин себептери, саны жана наркы көрсөтүлөт. Валюталар өзүнчө эсептелет.",
+            "tg": "Дар Таҳлил → Аз ҳисоб баровардан сабаб, миқдор ва арзиши давра намоён аст. Асъорҳо алоҳида ҳисоб мешаванд.",
+            "uz": "Tahlil → Hisobdan chiqarishda davr sabablari, miqdori va tannarxi ko‘rinadi. Valyutalar alohida hisoblanadi."
+          },
+          "screenshots": []
+        }
+      ]
+    },
+    {
+      "id": "partners.buyers",
+      "modes": [
+        "STORE"
+      ],
+      "category": "PARTNERS",
+      "title": {
+        "en": "Buyers and personal promotions",
+        "ru": "Покупатели и персональные акции",
+        "kk": "Сатып алушылар мен жеке акциялар",
+        "ky": "Сатып алуучулар жана жеке акциялар",
+        "tg": "Харидорон ва аксияҳои шахсӣ",
+        "uz": "Xaridorlar va shaxsiy aksiyalar"
+      },
+      "introduction": {
+        "en": "Maintain a store buyer directory and choose a buyer for each sale cart.",
+        "ru": "Ведите справочник покупателей магазина и выбирайте покупателя отдельно для каждой корзины продажи.",
+        "kk": "Дүкен сатып алушыларын сақтап, әр сату себетіне бөлек сатып алушы таңдаңыз.",
+        "ky": "Дүкөн сатып алуучуларын сактап, ар бир сатуу себетине өзүнчө сатып алуучу тандаңыз.",
+        "tg": "Рӯйхати харидоронро нигоҳ доред ва барои ҳар сабади фурӯш харидор интихоб кунед.",
+        "uz": "Do‘kon xaridorlarini saqlang va har savat uchun alohida xaridor tanlang."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Menu → Buyers → Add. Enter a name, optional contacts and a personal percentage promotion with an optional end date.",
+            "ru": "Откройте Меню → Покупатели → Добавить. Укажите имя, при необходимости контакты и персональную процентную акцию со сроком действия или без него.",
+            "kk": "Мәзір → Сатып алушылар → Қосу. Атын, қажет болса байланысын және мерзімі бар не жоқ жеке пайыздық акциясын енгізіңіз.",
+            "ky": "Меню → Сатып алуучулар → Кошуу. Атын, керек болсо байланышын жана мөөнөттүү же мөөнөтсүз жеке пайыздык акциясын киргизиңиз.",
+            "tg": "Меню → Харидорон → Илова. Ном, тамоси ихтиёрӣ ва аксияи фоизиро бо муҳлат ё бе он ворид кунед.",
+            "uz": "Menyu → Xaridorlar → Qo‘shish. Ism, ixtiyoriy aloqa va muddatli yoki muddatsiz foizli aksiyani kiriting."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "In a branch, From parent store imports a separate buyer copy. Branch edits never change the parent record.",
+            "ru": "В филиале вкладка «Из головного магазина» создаёт отдельную копию покупателя. Изменения филиала не меняют запись родителя.",
+            "kk": "Филиалда «Бас дүкеннен» қойындысы бөлек көшірме жасайды. Филиал өзгерістері бас дүкен жазбасын өзгертпейді.",
+            "ky": "Филиалда «Башкы дүкөндөн» өтмөгү өзүнчө көчүрмө түзөт. Филиалдын өзгөртүүлөрү башкы жазууга таасир этпейт.",
+            "tg": "Дар филиал «Аз мағозаи асосӣ» нусхаи алоҳида месозад. Тағйири филиал сабти асосиро иваз намекунад.",
+            "uz": "Filialda «Bosh do‘kondan» alohida nusxa yaratadi. Filial o‘zgarishlari bosh yozuvni o‘zgartirmaydi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Archive buyers who are no longer used. Earlier receipts keep the buyer name and the promotion used at the time of sale.",
+            "ru": "Неиспользуемых покупателей можно архивировать. Старые чеки сохраняют имя покупателя и применённую на момент продажи акцию.",
+            "kk": "Қолданылмайтын сатып алушыны мұрағаттаңыз. Ескі чектерде сол сәттегі аты мен акциясы сақталады.",
+            "ky": "Колдонулбаган сатып алуучуну архивдеңиз. Эски чектерде сатуу учурундагы аты жана акциясы сакталат.",
+            "tg": "Харидори истифоданашударо бойгонӣ кунед. Расидҳои пешина ном ва аксияи вақти фурӯшро нигоҳ медоранд.",
+            "uz": "Ishlatilmaydigan xaridorni arxivlang. Eski cheklar savdodagi ism va aksiyani saqlaydi."
           },
           "screenshots": []
         }

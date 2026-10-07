@@ -277,6 +277,8 @@ internal fun AppConfiguration.workerPermissionLabel(permissionId: String): Strin
         STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE -> localizedStringResource(1269, "Create and edit supplier orders")
         STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE -> localizedStringResource(1270, "Receive supplier orders")
         STORE_PERMISSION_DEBTORS_VIEW -> localizedStringResource(1271, "View debtors")
+        STORE_PERMISSION_BUYERS_VIEW -> commerceText("buyers")
+        STORE_PERMISSION_BUYERS_MANAGE -> commerceText("edit_buyer")
         STORE_PERMISSION_DEBTORS_MANAGE -> localizedStringResource(1272, "Create and edit debtors")
         STORE_PERMISSION_DEBTOR_PAYMENTS_MANAGE -> localizedStringResource(1273, "Record debtor payments")
         STORE_PERMISSION_ANALYTICS_VIEW -> localizedStringResource(457, "View analytics")
@@ -2823,6 +2825,7 @@ internal fun AppConfiguration.transactionHistoryReceiptSnapshot(transaction: Tra
             quantity = quantity,
             pricePerUnit = sourceLine.pricePerUnit.roundMoney(),
             quickDiscountPercent = sourceLine.quickDiscountPercent,
+            discounts = sourceLine.discounts,
             priceBeforeDiscount = sourceLine.priceBeforeDiscount,
             currencyCode = currencyCode,
             currencySymbol = transactionHistoryCurrencySymbol(currencyCode),
@@ -4103,6 +4106,7 @@ internal fun String.isTechnicalOperationLogText(): Boolean {
 }
 
 internal fun AppConfiguration.operationLogActionText(action: String): String = when (action) {
+    "written_off" -> commerceText("writeoffs")
     OPERATION_LOG_ACTION_CREATED -> localizedStringResource(990, "Adding")
     OPERATION_LOG_ACTION_UPDATED -> localizedStringResource(991, "Editing")
     OPERATION_LOG_ACTION_DELETED -> localizedStringResource(992, "Deleting")
@@ -4118,6 +4122,7 @@ internal fun AppConfiguration.operationLogActionText(action: String): String = w
 }
 
 internal fun AppConfiguration.operationLogEntityText(entityType: String): String = when (entityType) {
+    "buyer" -> commerceText("buyer")
     OPERATION_LOG_ENTITY_STORE -> stateValues.stringStore
     OPERATION_LOG_ENTITY_WORKER -> stateValues.stringWorkers
     OPERATION_LOG_ENTITY_WORKSHIFT -> localizedStringResource(661, "Active workshift")
@@ -4901,6 +4906,7 @@ fun AppConfiguration.MenuScreen() {
                     is NavigationScreenModel.Menu.AddEditWorker -> {
                         MenuAddEditWorkerScreen()
                     }
+                    is NavigationScreenModel.Menu.Buyers -> MenuBuyersScreen()
                     is NavigationScreenModel.Menu.Suppliers -> {
                         MenuSuppliersScreen()
                     }
@@ -5011,7 +5017,8 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AddEditWorker -> {
                             MenuAddEditWorkerScreen()
                         }
-                        is NavigationScreenModel.Menu.Suppliers -> {
+                        is NavigationScreenModel.Menu.Buyers -> MenuBuyersScreen()
+                    is NavigationScreenModel.Menu.Suppliers -> {
                             MenuSuppliersScreen()
                         }
                         is NavigationScreenModel.Menu.AddEditSupplier -> {
@@ -5116,7 +5123,8 @@ fun AppConfiguration.MenuScreen() {
                         is NavigationScreenModel.Menu.AddEditWorker -> {
                             MenuAddEditWorkerScreen()
                         }
-                        is NavigationScreenModel.Menu.Suppliers -> {
+                        is NavigationScreenModel.Menu.Buyers -> MenuBuyersScreen()
+                    is NavigationScreenModel.Menu.Suppliers -> {
                             MenuSuppliersScreen()
                         }
                         is NavigationScreenModel.Menu.AddEditSupplier -> {
@@ -5190,7 +5198,7 @@ internal fun menuDestinationRequiresStoreSubscription(model: NavigationScreenMod
     NavigationScreenModel.Menu.TransactionHistoryReceiptPreview,
     NavigationScreenModel.Menu.OperationLogs, NavigationScreenModel.Menu.Analytics,
     NavigationScreenModel.Menu.AddEditWorker,
-    NavigationScreenModel.Menu.Suppliers, NavigationScreenModel.Menu.AddEditSupplier,
+    NavigationScreenModel.Menu.Buyers, NavigationScreenModel.Menu.Suppliers, NavigationScreenModel.Menu.AddEditSupplier,
     NavigationScreenModel.Menu.Debtors, NavigationScreenModel.Menu.CloseDebt,
     NavigationScreenModel.Menu.GoodsCategories, NavigationScreenModel.Menu.AddEditGoodsCategory,
     NavigationScreenModel.Menu.Devices, NavigationScreenModel.Menu.ShopWindow -> true
@@ -5209,6 +5217,7 @@ internal fun AppConfiguration.canOpenMenuDestination(model: NavigationScreenMode
         NavigationScreenModel.Menu.Workers -> true // Personal employment remains available without a store subscription.
         NavigationScreenModel.Menu.ShopWindow -> currentStoreModel(activeStoreId)?.isInternetBranch() == true && currentUserOwnsStore(activeStoreId)
         NavigationScreenModel.Menu.Stores -> true
+        NavigationScreenModel.Menu.Buyers -> canViewStoreBuyers(activeStoreId)
         NavigationScreenModel.Menu.Suppliers -> activeOwnerFallback || currentUserCanViewSuppliers(activeStoreId) || currentUserCanViewSupplierOrders(activeStoreId) || currentUserCanManageSupplierOrders(activeStoreId) || currentUserCanReceiveSupplierOrders(activeStoreId)
         NavigationScreenModel.Menu.Debtors -> activeOwnerFallback || currentUserCanViewDebtors(activeStoreId) || currentUserCanManageDebtorPayments(activeStoreId)
         NavigationScreenModel.Menu.GoodsCategories -> activeOwnerFallback || currentUserCanViewStock(activeStoreId) || currentUserOwnsStore(activeStoreId)

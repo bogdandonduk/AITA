@@ -242,6 +242,6 @@ internal fun <T> mergeById(base: List<T>, pending: List<T>, id: (T) -> String): 
 internal suspend fun stockItemsWithPendingCreates(owner: InventoryOwner, rows: List<GoodsItemDataModel>) =
     InventoryCreates.overlayItems(owner, filterRecentlyDeletedStockItems(rows))
 internal suspend fun stockBatchesWithPendingCreates(owner: InventoryOwner, rows: List<GoodsBatchDataModel>) =
-    InventoryCreates.overlayBatches(owner, filterRecentlyDeletedStockBatches(rows))
+    StoreCommerceClient.overlayBatches(owner, InventoryCreates.overlayBatches(owner, filterRecentlyDeletedStockBatches(rows)))
 
 suspend fun retryPendingInventoryCreates() { InventoryCreates.flush(force = true) }

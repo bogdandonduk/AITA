@@ -44,6 +44,7 @@ object DynamicCarts {
             old + (key to CartLinesStateFlow(state, type, slot, ::isCurrent)) }.getValue(key)
     }
     internal suspend fun adoptCurrent() {
+        StoreCommerceClient.start()
         val owner = requestedOwner()
         try { work.run { store.adopt(owner) } }
         catch (cancel: CancellationException) { throw cancel }

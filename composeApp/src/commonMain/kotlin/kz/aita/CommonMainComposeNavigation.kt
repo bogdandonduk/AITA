@@ -1983,6 +1983,7 @@ fun AppConfiguration.ScreenAppBarWidget(
     cornerRadius: Dp = stateValues.cornerRadius,
     leadingContent: @Composable (() -> Unit)? = null,
     trailingIcons: List<Triple<String, DrawableResource, () -> Unit>> = emptyList(),
+    trailingIconDescriptions: Map<String,String> = emptyMap(),
     onBack: (() -> Unit)? = null
 ) {
     Column(
@@ -2091,6 +2092,7 @@ fun AppConfiguration.ScreenAppBarWidget(
                         text = "",
                         iconPath = it.first,
                         iconRes = it.second,
+                        iconContentDescription = trailingIconDescriptions[it.first].orEmpty(),
                         autoLoading = false,
                         onClick = it.third
                     )
@@ -2997,6 +2999,11 @@ sealed class NavigationScreenModel(
                 get() = AppConfiguration.stateValues.drawableResIconDebtors.value
         }
 
+        data object Buyers: Menu("MenuBuyersNavigationScreenModelRoute") {
+            override val iconPath: String get() = AppConfiguration.stateValues.drawablePathIconUserAccount
+            override val name: String get() = commerceText("buyers")
+            override val iconRes: DrawableResource get() = AppConfiguration.stateValues.drawableResIconUserAccount.value
+        }
         data object Suppliers: Menu("MenuSuppliersNavigationScreenModelRoute") {
             override val iconPath: String
                 get() = AppConfiguration.stateValues.drawablePathIconSuppliers
@@ -3208,6 +3215,7 @@ internal fun persistentAppNavigationScreens(): List<NavigationScreenModel> = lis
     NavigationScreenModel.Menu.OperationLogs,
     NavigationScreenModel.Menu.Debtors,
     NavigationScreenModel.Menu.CloseDebt,
+    NavigationScreenModel.Menu.Buyers,
     NavigationScreenModel.Menu.Suppliers,
     NavigationScreenModel.Menu.AddEditSupplier,
     NavigationScreenModel.Menu.GoodsCategories,
@@ -3742,7 +3750,8 @@ object Navigation {
             NavigationScreenModel.Menu.OperationLogs,
             NavigationScreenModel.Menu.Analytics,
             NavigationScreenModel.Menu.Workers,
-            NavigationScreenModel.Menu.Suppliers,
+            NavigationScreenModel.Menu.Buyers,
+    NavigationScreenModel.Menu.Suppliers,
             NavigationScreenModel.Menu.Debtors,
             NavigationScreenModel.Menu.Security,
             NavigationScreenModel.Menu.Devices,
