@@ -22,15 +22,20 @@ internal class DesktopInstanceLease private constructor(
 ) : AutoCloseable {
     override fun close() { runCatching { listener.close() }; runCatching { lock.release() }; channel.close() }
     companion object {
+        // Windows enforces byte-range locks for reads as well as writes. Reserve
+        // byte zero for ownership; another launcher may read the activation
+        // endpoint after it without touching the locked region.
+        private const val ACTIVATION_OFFSET = 1L
+
         fun acquire(directory: File, onActivate: () -> Unit): DesktopInstanceLease? {
             check(directory.isDirectory || directory.mkdirs()) { "Cannot open AITA data directory" }
             val path = File(directory, "application.lock").toPath()
             val channel = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE)
-            val lock = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
+            val lock = try { channel.tryLock(0, ACTIVATION_OFFSET, false) } catch (_: OverlappingFileLockException) { null }
             if (lock == null) {
                 try {
                     repeat(10) {
-                        val data = ByteBuffer.allocate(128); channel.read(data, 0); data.flip()
+                        val data = ByteBuffer.allocate(128); channel.read(data, ACTIVATION_OFFSET); data.flip()
                         val parts = Charsets.UTF_8.decode(data).toString().trim().split(':')
                         val port = parts.firstOrNull()?.toIntOrNull()
                         if (port != null && parts.size == 2) {
@@ -50,7 +55,9 @@ internal class DesktopInstanceLease private constructor(
             try {
                 val listener = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
                 val token = UUID.randomUUID().toString()
-                channel.truncate(0); channel.write(ByteBuffer.wrap("${listener.localPort}:$token".toByteArray()), 0); channel.force(true)
+                channel.truncate(ACTIVATION_OFFSET)
+                channel.write(ByteBuffer.wrap("${listener.localPort}:$token".toByteArray()), ACTIVATION_OFFSET)
+                channel.force(true)
                 val lease = DesktopInstanceLease(channel, lock, listener)
                 thread(name = "AITA-window-activation", isDaemon = true) {
                     while (!listener.isClosed) runCatching {
