@@ -92,4 +92,15 @@ class ChunkedTextCacheTest {
         cache.put("stock", "replacement")
         assertEquals("replacement", cache.get("stock"))
     }
+    @Test fun cleanupFailureAfterCommitDoesNotTurnSavedInventoryIntoAnError() = runTest {
+        val rows=mutableMapOf<String,String>();var generation=0
+        val cache=ChunkedTextCache(read={key,_->rows[key]},write={key,value->rows[key]=value},
+            remove={error("cleanup unavailable")},removePrefixExcept={_,_->error("cleanup unavailable")},
+            newGeneration={(++generation).toString(16)},chunkSize=8,maxLength=1024)
+        cache.put("inventory-journal","saved command")
+        assertEquals("saved command",cache.get("inventory-journal"))
+        cache.put("inventory-journal","next saved command")
+        assertEquals("next saved command",cache.get("inventory-journal"))
+    }
+
 }

@@ -186,7 +186,7 @@ fun AppConfiguration.StockBatchCard(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Text(
-                    text = batch.quantity.quantityText(stateValues.appLanguage),
+                    text = stockBatchQuantityForUi(batch),
                     color = stateValues.TextColor,
                     fontSize = stateValues.accentTextSize,
                     fontWeight = FontWeight.Bold,
@@ -256,7 +256,7 @@ fun AppConfiguration.StockBatchCard(
             }
 
             if (batch.kind != StockBatchKindDataModel.NORMAL) StockCardInfoLine(
-                title = returnFlowText("batch_kind"), value = returnFlowText(batch.kind.name.lowercase()), textColor = stateValues.AccentColor
+                title = returnFlowText("batch_kind"), value = returnFlowText(batch.displayKind.name.lowercase()), textColor = stateValues.AccentColor
             )
 
             StockCardInfoLine(
@@ -516,9 +516,10 @@ fun AppConfiguration.StockBatchEditor(
                     rememberChoiceKey = "batch-kind", restoreLastChoice = freshBatchOperation,
                     options = StockBatchKindDataModel.entries.map { DropdownOption(it.name, returnFlowText(it.name.lowercase())) },
                     onSelected = { val next = StockBatchKindDataModel.valueOf(it)
-                        draft = draft.copy(kind = next, quantityUnitId = if (next == StockBatchKindDataModel.UNIVERSAL) goodsItem.measurementUnitId.ifBlank { defaultUnit.id } else draft.quantityUnitId) }
+                        draft = draft.copy(kind = next, quantityText = if (next == StockBatchKindDataModel.UNLIMITED) "1" else draft.quantityText, quantityUnitId = if (next in setOf(StockBatchKindDataModel.UNIVERSAL, StockBatchKindDataModel.UNLIMITED)) goodsItem.measurementUnitId.ifBlank { defaultUnit.id } else draft.quantityUnitId) }
                 )
                 else Text("${returnFlowText("batch_kind")}: ${returnFlowText(draft.kind.name.lowercase())}", color = stateValues.TextColor)
+                if (draft.kind == StockBatchKindDataModel.UNLIMITED) Text(inventoryExperienceText("unlimited_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 if (draft.kind == StockBatchKindDataModel.UNIVERSAL) Text(returnFlowText("universal_detail"),
                     color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                 Spacer(Modifier.height(stateValues.marginTextField))
@@ -557,6 +558,7 @@ fun AppConfiguration.StockBatchEditor(
 
                 Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
+                if (draft.kind != StockBatchKindDataModel.UNLIMITED) {
                 SimpleTextInput(
                     modifier = Modifier.fillMaxWidth(),
                     value = draft.quantityText,
@@ -587,13 +589,15 @@ fun AppConfiguration.StockBatchEditor(
                     Spacer(Modifier.height(stateValues.marginTextFieldGroup))
                 }
 
+                }
+
                 SimpleDropdownField(
                     title = localizedStringResource(270, "Unit"),
                     rememberChoiceKey = "batch-unit:${goodsItem.measurementUnitId}",
                     restoreLastChoice = freshBatchOperation,
                     selectedId = draft.quantityUnitId,
                     options = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.filter {
-                        draft.kind != StockBatchKindDataModel.UNIVERSAL || it.id == goodsItem.measurementUnitId.ifBlank { defaultUnit.id }
+                        draft.kind !in setOf(StockBatchKindDataModel.UNIVERSAL, StockBatchKindDataModel.UNLIMITED) || it.id == goodsItem.measurementUnitId.ifBlank { defaultUnit.id }
                     }.map {
                         DropdownOption(
                             id = it.id,
@@ -815,7 +819,8 @@ fun AppConfiguration.StockBatchEditor(
                         shelfPosition = existingBatch?.shelfPosition,
                         shelfPriority = existingBatch?.shelfPriority ?: stateValues.stockBatches.orEmpty().count { it.goodsItemId == goodsItem.id },
                         status = draft.status,
-                        kind = draft.kind,
+                        kind = if (draft.kind == StockBatchKindDataModel.UNLIMITED) StockBatchKindDataModel.UNIVERSAL else draft.kind,
+                        unlimitedQuantity = draft.kind == StockBatchKindDataModel.UNLIMITED,
                         additionalNotes = draft.additionalNotes.takeIf { it.isNotBlank() },
                         additionalNotesLocalized = draft.additionalNotesLocalized.filter { it.value.isNotBlank() },
                         createdAtMillis = existingBatch?.createdAtMillis ?: now,
@@ -1631,7 +1636,7 @@ internal fun AppConfiguration.IncomingStockBatchTransferCard(
                 )
             }
             Text(
-                text = batch.quantity.quantityText(stateValues.appLanguage),
+                text = stockBatchQuantityForUi(batch),
                 color = stateValues.AccentColor,
                 fontSize = stateValues.accentTextSize,
                 fontWeight = FontWeight.Bold,
@@ -2005,7 +2010,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
                         }
                     )
 
-                    if (canMoveBatch && batch.quantity.total > 0.0 && branchAvailability?.locations.orEmpty().any { it.storeId != batch.storeId }) {
+                    if (canMoveBatch && batch.tracksQuantity && batch.quantity.total > 0.0 && branchAvailability?.locations.orEmpty().any { it.storeId != batch.storeId }) {
                         Spacer(modifier = Modifier.height(6.dp))
                         actionButton(
                             modifier = Modifier.fillMaxWidth(),
@@ -2973,11 +2978,9 @@ internal fun AppConfiguration.StockLocalizedStringGroupEditor(
     }
 
     val persistentEditorKey = localizedGroupEditorPersistentKey(persistentKey)
-    val editorIdentityKey = persistentEditorKey ?: listOf(
-        title,
-        placeholder,
-        values.joinToString("|") { "${it.language}:${it.value}" }
-    ).joinToString("::")
+    // Editing a character must not recreate the editor and lose its cursor/focus.
+    // External value changes are reconciled by the effect below.
+    val editorIdentityKey = persistentEditorKey ?: "$title::$placeholder"
 
     var focusTargetIndex by rememberSaveable(editorIdentityKey) {
         mutableStateOf(-1)
@@ -3911,6 +3914,7 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
     item: GoodsItemDataModel,
     barcodeMatched: Boolean,
     profileOnly: Boolean = false,
+    selected: Boolean? = null,
     onApply: () -> Unit
 ) {
     val name = item.visibleParentStoreStockName(stateValues.appLanguage)
@@ -3988,7 +3992,7 @@ internal fun AppConfiguration.ParentStoreStockPickerItemCard(
 
             actionButton(
                 autoLoading = false,
-                text = if (profileOnly) marketProductText("market.profile_parent") else localizedStringResource(1218, "Use parent item"),
+                text = if (selected != null) (if (selected) "✓ " else "○ ") + inventoryExperienceText("select_many") else if (profileOnly) marketProductText("market.profile_parent") else localizedStringResource(1218, "Use parent item"),
                 iconPath = parentStoreStockIconPath(),
                 confirmationRequired = false,
                 onClick = onApply
@@ -4025,6 +4029,8 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
     onDismiss: () -> Unit,
     onApply: (GoodsItemDataModel) -> Unit
 ) {
+    var multi by remember { mutableStateOf(false) }
+    var selection by remember { mutableStateOf<Map<String, GoodsItemDataModel>>(emptyMap()) }
     val pickerPageSize = if (stateValues.isNarrowScreen) 18 else 32
     val cachedParentStoreStock by parentStoreStockState.payload.collectAsState()
     val autoFocusSearch = platformAllowsAutomaticTextFieldFocus()
@@ -4060,6 +4066,11 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
             overflow = TextOverflow.Ellipsis
         )
 
+        if (!profileOnly && existing == null && parentStoreId != null) {
+            ParentStockBulkActions(activeStoreId, parentStoreId, selection.values.toList(), multi,
+                onMulti = { multi = !multi; selection = emptyMap() },
+                onAdded = { ids -> selection = selection.filterKeys { it !in ids } })
+        }
         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
         Text(
@@ -4153,7 +4164,7 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                 }.thenBy { it.visibleParentStoreStockName(stateValues.appLanguage).lowercase() }
                     .thenBy { it.id }
             )
-        AutomaticBarcodeChoice(cleanQuery, filteredItems, searchTextFieldContent.editedSinceCreation && !loading && serverEndReached, activeStoreId, { item -> item.allBarcodeValues() + if (cleanQuery.parseEmbeddedWeightBarcodeFormats().any { item.matchesEmbeddedWeightBarcode(it) }) listOf(cleanQuery) else emptyList() }) { item ->
+        AutomaticBarcodeChoice(cleanQuery, filteredItems, searchTextFieldContent.editedSinceCreation && !multi && !loading && serverEndReached, activeStoreId, { item -> item.allBarcodeValues() + if (cleanQuery.parseEmbeddedWeightBarcodeFormats().any { item.matchesEmbeddedWeightBarcode(it) }) listOf(cleanQuery) else emptyList() }) { item ->
             onApply(item)
             searchTextFieldContent.reset()
         }
@@ -4222,9 +4233,11 @@ internal fun AppConfiguration.ParentStoreStockSelectionBottomSheet(
                             modifier = Modifier.padding(horizontal = 8.dp))
                         ParentStoreStockPickerItemCard(
                             item = item,
-                            barcodeMatched = barcodeMatched,
+                            barcodeMatched = barcodeMatched || item.id in selection,
+                            selected = if (multi) item.id in selection else null,
                             profileOnly = profileOnly,
-                            onApply = { onApply(item.withConfirmedParentBarcode(cleanQuery)); searchTextFieldContent.reset() }
+                            onApply = { if (multi) selection = if (item.id in selection) selection - item.id else selection + (item.id to item)
+                                else { onApply(item.withConfirmedParentBarcode(cleanQuery)); searchTextFieldContent.reset() } }
                         )
                     }
 

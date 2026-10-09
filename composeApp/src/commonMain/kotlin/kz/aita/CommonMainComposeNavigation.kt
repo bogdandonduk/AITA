@@ -508,6 +508,11 @@ fun AppConfiguration.StockAddEditGoodsItemScreen() {
                 title = if (isEditingStockItem) stateValues.stringEditGoodsItem else stateValues.stringAddGoodsItem,
                 iconPath = if (isEditingStockItem) stateValues.drawablePathIconEdit else stateValues.drawablePathIconAdd,
                 trailingIcons = stockAddEditTrailingIcons,
+                trailingIconDescriptions = mapOf(
+                    parentStoreStockIconPath() to localizedStringResource(1212, "Parent store"),
+                    globalGoodsIconPath() to localizedStringResource(1169, "Global goods"),
+                    undoTemplateIconPath() to localizedStringResource(1184, "Undo template")
+                ),
                 onBack = if (showStockEditorBack) {
                     {
                         coroutineScope.launch {
@@ -1404,6 +1409,8 @@ internal fun AppConfiguration.InlineBarcodeCameraScanner(
     onBarcodeDetected: (String) -> Unit,
     onClose: () -> Unit
 ) {
+    val consensus = remember(visible) { CameraBarcodeConsensus() }
+    val latestDetected by rememberUpdatedState(onBarcodeDetected)
     AnimatedVisibility(
         modifier = modifier
             .fillMaxWidth()
@@ -1418,7 +1425,7 @@ internal fun AppConfiguration.InlineBarcodeCameraScanner(
                 Modifier
                     .fillMaxWidth()
                     .height(if (stateValues.isNarrowScreen) 260.dp else 320.dp),
-                onBarcodeDetected,
+                { raw -> consensus.accept(raw, getCurrentTimeMillis())?.let(latestDetected) },
                 onClose
             )
         }
@@ -1986,6 +1993,7 @@ fun AppConfiguration.ScreenAppBarWidget(
     trailingIconDescriptions: Map<String,String> = emptyMap(),
     onBack: (() -> Unit)? = null
 ) {
+    val scanner = rememberTransactionToolbarScanner()
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -2083,6 +2091,8 @@ fun AppConfiguration.ScreenAppBarWidget(
                 )
             }
 
+            if (scanner != null) TransactionToolbarScannerButton(scanner)
+
             trailingIcons.takeIf { it.isNotEmpty() }?.run {
                 forEach {
                     Spacer(modifier = Modifier.width(8.dp))
@@ -2109,6 +2119,8 @@ fun AppConfiguration.ScreenAppBarWidget(
                     .fillMaxWidth()
                     .height(stateValues.unfocusedBorderWidth)
             )
+        if (scanner != null) TransactionToolbarScannerPreview(scanner)
+
     }
 }
 
@@ -2297,7 +2309,9 @@ fun AppConfiguration.searchTextField(
             captureTransactionBarcodeInput = captureTransactionBarcodeInput
         )
 
-        val onCameraBarcodeDetected: (String) -> Unit = { raw ->
+        val searchCameraConsensus = remember(barcodeCamScannerVisible) { CameraBarcodeConsensus() }
+        val onCameraBarcodeDetected: (String) -> Unit = cameraResult@{ scanned ->
+            val raw = searchCameraConsensus.accept(scanned, getCurrentTimeMillis()) ?: return@cameraResult
             val candidate = if (onBarcodeScanned != null) raw.trim() else raw.transactionBarcodeCandidate() ?: raw.trim()
             if (candidate.isNotBlank()) {
                 val now = getCurrentTimeMillis()

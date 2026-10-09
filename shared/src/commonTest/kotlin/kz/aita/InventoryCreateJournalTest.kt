@@ -41,4 +41,16 @@ class InventoryCreateJournalTest {
         val other = GoodsItemDataModel(id = "b", storeId = "store")
         assertEquals(listOf(other, pending), mergeById(listOf(pending.copy(barcodes = emptyList()), other), listOf(pending)) { it.id })
     }
+    @Test fun twoOfflineEditsKeepTheirRevisionAndDependencyAfterRestart() = runTest {
+        var disk:String?=null
+        fun journal()=InventoryCreateJournal({disk},{_,text->disk=text})
+        val before=GoodsItemDataModel(id="item",storeId="store",updatedAtMillis=10)
+        val first=InventoryCreateCommand("one","store",item=before.copy(updateOperationId="one",expectedUpdatedAtMillis=10),editsItem=true,previousItem=before)
+        val next=InventoryCreateCommand("two","store",item=before.copy(barcodes=listOf("SECOND"),updateOperationId="two",expectedUpdatedAtMillis=10),editsItem=true,previousItem=first.item,dependsOn="one")
+        journal().change("account"){listOf(first,next)}
+        val restored=journal().list("account")
+        assertEquals(listOf(first,next),restored)
+        assertEquals(next.item,mergeById(listOf(before),restored.mapNotNull{it.item}){it.id}.single())
+    }
+
 }

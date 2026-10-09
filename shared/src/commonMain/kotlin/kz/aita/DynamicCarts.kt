@@ -139,7 +139,8 @@ object DynamicCarts {
                 accepted = true
                 val row = StoredCartLine(id, type, slot, quantity, old?.addedAt ?: getCurrentTimeMillis(), old?.supplyPrice)
                 book.copy(lines = (book.lines.filterNot { it.id == id && it.type == type && it.slot == slot } + row)
-                    .sortedWith(compareBy<StoredCartLine> { it.addedAt }.thenBy { it.id }))
+                    .sortedWith(compareBy<StoredCartLine> { it.addedAt }.thenBy { it.id }),
+                    ui = book.ui.copy(payments = book.ui.payments - "$type:$slot"))
             } } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) {
                 if (isCurrent(owner)) postInAppNotification(eventMessage("checkout.ui.save_error"), NotificationType.Negative, transient = true)
                 false

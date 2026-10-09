@@ -722,7 +722,8 @@ internal data class TransactionUiContext(
 internal data class QuickStockAddSheetRequest(
     val barcode: String,
     val transactionTypeIndex: Int,
-    val clientId: Int
+    val clientId: Int,
+    val onAdded: () -> Unit = {}
 )
 
 internal val quickStockAddSheetRequestState = MutableStateFlow<QuickStockAddSheetRequest?>(null)
@@ -737,7 +738,8 @@ internal fun AppConfiguration.openQuickStockAddSheet(
             QuickStockAddSheetRequest(
                 barcode = barcode.transactionBarcodeCandidate() ?: barcode.trim(),
                 transactionTypeIndex = transactionTypeIndex,
-                clientId = clientId
+                clientId = clientId,
+                onAdded = transactionSearchCompletion.capture()
             )
         )
     }
@@ -884,7 +886,7 @@ internal fun AppConfiguration.availableSaleQuantityFor(goodsItem: GoodsItemDataM
                     batch.status != StockBatchStatusDataModel.SoldOut &&
                     batch.status != StockBatchStatusDataModel.InTransit
         }
-        .sumOf { it.quantity.total.coerceAtLeast(0.0) }
+        .availableStockQuantity()
 }
 
 internal fun AppConfiguration.hasSaleStock(goodsItem: GoodsItemDataModel): Boolean {
@@ -1054,7 +1056,7 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
 
         if (embeddedWeightBarcode != null && quantityFromBarcode == null && weightedGoodsItem != null) {
             postInAppNotification(
-                "Barcode ${embeddedWeightBarcode.rawBarcode} matched ${goodsItem.name.visibleLocalizedString(stateValues.appLanguage, candidate)}, but this item is not configured as sold by weight.",
+                inventoryExperienceMessage("weight_setup", "barcode" to embeddedWeightBarcode.rawBarcode, "name" to goodsItem.name.visibleLocalizedString(stateValues.appLanguage, candidate)),
                 NotificationType.Negative,
                 transient = true
             )
@@ -1064,7 +1066,7 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
 
         if (transactionTypeIndex == 0 && !hasSaleStock(goodsItem)) {
             postInAppNotification(
-                "Barcode $candidate matched ${goodsItem.name.visibleLocalizedString(stateValues.appLanguage, candidate)}, but it is out of stock.",
+                inventoryExperienceMessage("out_of_stock", "barcode" to candidate, "name" to goodsItem.name.visibleLocalizedString(stateValues.appLanguage, candidate)),
                 NotificationType.Negative,
                 transient = true
             )
@@ -1087,7 +1089,14 @@ internal fun AppConfiguration.tryHandleTransactionBarcodeInput(
             onCompleted = { saved -> coroutineScope.launch {
                 val pending = (pendingTransactionBarcodeAdds[pendingKey] ?: 1) - 1
                 if (pending > 0) pendingTransactionBarcodeAdds[pendingKey] = pending else pendingTransactionBarcodeAdds.remove(pendingKey)
-                if (saved) completeSearch()
+                if (saved) {
+                    completeSearch()
+                    // A scan changes the payable amount: a receipt preview needs fresh payment confirmation.
+                    if (Navigation.getCurrentTransactionScreens(transactionTypeIndex, clientId, stateValues.isNarrowScreen)
+                            .value.lastOrNull() is NavigationScreenModel.Transaction.ReceiptPreview) {
+                        Navigation.transactionWorkspace(transactionTypeIndex).pop(navigateAfterwards = NavigationScreenModel.Transaction.Payment)
+                    }
+                }
             } }
         )
         requestTransactionBarcodeFocus()
@@ -1140,7 +1149,8 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
             }
         }
     }
-    var buffer by rememberSaveable(transactionTypeIndex, clientId) { mutableStateOf("") }
+    // A partial scanner burst is transient input, never navigation or persisted cart state.
+    var buffer by remember(transactionTypeIndex, clientId) { mutableStateOf("") }
 
     val latestCart by rememberUpdatedState(currentCart)
     val latestCaptureEnabled by rememberUpdatedState(captureEnabled)
@@ -1205,7 +1215,8 @@ internal fun AppConfiguration.TransactionBarcodeHidInput(
         delay(160)
         if (owner.isCurrent() && inventoryOwner == inventoryViewScopeKey() && barcodeHandler(buffer + "\n")) buffer = ""
     }
-    LaunchedEffect(captureEnabled) { if (!captureEnabled) buffer = "" }
+    val modalOpen = transactionBarcodeModalOpen()
+    LaunchedEffect(captureEnabled, modalOpen) { if (!captureEnabled || modalOpen) buffer = "" }
     TransactionBarcodeFocusEffect(
         contextKey = "$transactionTypeIndex:$clientId:${stateValues.activeStoreId}",
         captureEnabled = captureEnabled,
@@ -1344,7 +1355,7 @@ internal fun AppConfiguration.itemHasPresentStockBatchForTransactionSelection(it
 internal fun GoodsItemDataModel.transactionSelectionQuantity(activeBatches: List<GoodsBatchDataModel>): Double {
     return activeBatches
         .filter { it.goodsItemId == id }
-        .sumOf { it.quantity.total }
+        .availableStockQuantity()
 }
 
 internal fun GoodsItemInTransactionDataModel.transactionSelectionStockItemId(
@@ -1378,7 +1389,7 @@ internal fun buildTransactionSelectionSmartSets(
     // Caller has already applied the account/store hierarchy filter on the UI thread.
     val activeBatches = batches.filter { it.isSelectableActiveStockBatch() }
     val activeBatchesByItem = activeBatches.groupBy { it.goodsItemId }
-    val quantityByItem = activeBatchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
+    val quantityByItem = activeBatchesByItem.mapValues { (_, itemBatches) -> itemBatches.availableStockQuantity() }
     val inStockIds = quantityByItem
         .filterValues { quantity -> quantity > 0.0 }
         .keys
@@ -2155,16 +2166,13 @@ fun AppConfiguration.TransactionScreen() {
                 navigationScreensRight.lastOrNull() as? NavigationScreenModel.Transaction
                     ?: NavigationScreenModel.Transaction.Cart
 
-            // The selection pane can remain visible beside payment: do not scan into that cart.
-            val visiblePaneModels = if (stateValues.isNarrowScreen) listOf(leftTransactionPaneModel)
-                else listOf(leftTransactionPaneModel, rightTransactionPaneModel)
+            // Keep the scanner available through payment and preview; committed checkout owns an immutable cart.
             TransactionBarcodeHidInput(
                 transactionTypeIndex = transactionTypeIndex,
                 clientId = clientId,
                 currentCart = goodsInCart,
-                captureEnabled = cartPersistenceHydrated && cartNavigationReady && visiblePaneModels.all {
-                    it is NavigationScreenModel.Transaction.Selection || it is NavigationScreenModel.Transaction.Cart
-                }
+                captureEnabled = cartPersistenceHydrated && cartNavigationReady &&
+                    "$transactionTypeIndex:$clientId" !in cartCheckoutsState.collectAsState().value
             )
 
             fun paneMotionTarget(stack: List<NavigationScreenModel>) = AitaSceneMotionTarget(
@@ -2627,6 +2635,7 @@ internal fun Double.moneyText(): String {
 }
 
 internal fun Double.quantityAmountText(roundTotal: Boolean, maxFractionDigits: Int = 3): String {
+    if (this == Double.POSITIVE_INFINITY) return "∞"
     if (roundTotal)
         return toInt().toString()
 

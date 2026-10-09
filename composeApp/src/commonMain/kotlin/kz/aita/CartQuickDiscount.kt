@@ -14,20 +14,21 @@ import androidx.compose.ui.unit.dp
 /** Same compact controls for a cart and a single line; no permanent full-width action below the cart. */
 @Composable
 internal fun AppConfiguration.DiscountMiniEditor(title: String, percent: Double, onApply: (Double) -> Unit) {
-    var draft by remember(percent) { mutableStateOf(percent.moneyText()) }
+    var draft by remember(percent) { mutableStateOf(if (percent == 0.0) "" else percent.moneyText()) }
     var error by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text(title,color=stateValues.TextColor,fontSize=stateValues.accentTextSize)
         val field=genericTextField(titleText="%",valueInitial=draft,keyboardType=KeyboardType.Decimal,
             placeholderText="0–100",onValueChange={raw,apply->draft=raw;error=false;apply()})
-        LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            items(listOf(0,5,10,15,20,25,50)) {value->
-                actionButton(text="$value%",autoLoading=false,confirmationRequired=false,onClick={onApply(value.toDouble())})
-            }
-        }
+        StockQuantityQuickFillButtons(
+            quantityUnit = QuantityDataModel(id = "percent", total = 0.0, pricedAmount = 1.0,
+                roundTotal = true, immutableUnitName = listOf(LocalizedStringDataModel("main", "%"))),
+            currentText = draft, shortcutAmounts = listOf(0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 50.0),
+            onAmountSelected = { selected -> draft = selected; field.replaceText(selected); error = false }
+        )
         if(error) Text(pass27Text("discount_error"),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize)
         actionButton(text=commerceText("apply"),autoLoading=false,confirmationRequired=false,onClick={
-            val value=field.value.text.trim().replace(',','.').toDoubleOrNull()
+            val value=field.value.text.trim().replace(',','.').let { if (it.isEmpty()) 0.0 else it.toDoubleOrNull() }
             if(value==null || !validQuickDiscount(value)) error=true else onApply(value)
         })
     }

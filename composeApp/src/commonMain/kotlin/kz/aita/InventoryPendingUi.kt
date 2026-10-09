@@ -15,11 +15,28 @@ internal fun AppConfiguration.InventoryPendingFeedback() {
     val pending = entries.filter { it.storeId == stateValues.activeStoreId }
     if (pending.isEmpty()) return
     var busy by remember { mutableStateOf(false) }
+    var actionError by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("${stockEditingMessage("pending").extractLocalizedString(stateValues.appLanguage).orEmpty()}: ${pending.size}",
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         val failure = pending.firstNotNullOfOrNull { it.failure?.extractLocalizedString(stateValues.appLanguage) }
         if (!failure.isNullOrBlank()) Text(failure, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+        else Text(stockEditingMessage("saved_local").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+            color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        if (actionError.isNotEmpty()) Text(actionError, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+        pending.firstOrNull { it.rejected }?.let { rejected ->
+            actionButton(text=inventoryExperienceText("discard_rejected"),enabled=!busy,loading=busy,
+                autoLoading=false,confirmationRequired=true,subText=inventoryExperienceText("discard_rejected_help"),onClick={
+                    busy=true
+                    actionError=""
+                    coroutineScope.launch {
+                        try {
+                            if (discardPendingInventoryChange(rejected.id)) getStock(rejected.storeId)
+                            else actionError = stockEditingMessage("storage").extractLocalizedString(stateValues.appLanguage).orEmpty()
+                        } finally {busy=false}
+                    }
+                })
+        }
         TextButton(enabled = !busy, onClick = {
             busy = true
             coroutineScope.launch { try { retryPendingInventoryCreates() } finally { busy = false } }

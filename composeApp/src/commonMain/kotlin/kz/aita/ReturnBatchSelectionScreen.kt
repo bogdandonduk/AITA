@@ -65,7 +65,7 @@ internal fun AppConfiguration.returnDestinationsReady(slot: Int): Boolean {
                         ordered.forEach { batch ->
                             ReturnBatchChoice(selected = selection?.stockBatchId == batch.id && selection.returnDestinationKind == null,
                                 title = buildString {
-                                    if (batch.kind != StockBatchKindDataModel.NORMAL) append(returnFlowText(batch.kind.name.lowercase()) + " • ")
+                                    if (batch.kind != StockBatchKindDataModel.NORMAL) append(returnFlowText(batch.displayKind.name.lowercase()) + " • ")
                                     append(returnBatchSummaryText(goods, batch, candidates, selection?.currencyCode ?: defaultTransactionCurrencyCode()))
                                 },
                                 detail = listOfNotNull(

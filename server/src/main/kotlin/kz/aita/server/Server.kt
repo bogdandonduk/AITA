@@ -15885,7 +15885,8 @@ private fun Long.supplierProfileCountAsInt(): Int = coerceAtMost(Int.MAX_VALUE.t
 internal fun ResultRow.toGoodsBatchDataModel(): GoodsBatchDataModel {
   return GoodsBatchDataModel(
     id = this[StockBatchesV2.id].toString(),
-    kind = StockBatchKindDataModel.valueOf(this[StockBatchesV2.kind]),
+    kind = StockBatchKindDataModel.valueOf(this[StockBatchesV2.kind]).let { if (it == StockBatchKindDataModel.UNLIMITED) StockBatchKindDataModel.UNIVERSAL else it },
+    unlimitedQuantity = this[StockBatchesV2.kind] == StockBatchKindDataModel.UNLIMITED.name,
     goodsItemId = this[StockBatchesV2.goodsItemId].toString(),
     userId = this[StockBatchesV2.userId].toString(),
     storeId = this[StockBatchesV2.storeId].toString(),
@@ -16968,7 +16969,7 @@ internal fun normalizeTransactionGoodsInsideTransaction(
       if (!sameItem) return NormalizedTransactionGoodsResult(null, "return_receipt_invalid")
     }
     if (line.returnDestinationKind != null &&
-      (transactionType != "return" || line.returnDestinationKind == StockBatchKindDataModel.NORMAL || !line.stockBatchId.isNullOrBlank())) {
+      (transactionType != "return" || line.returnDestinationKind !in setOf(StockBatchKindDataModel.RETURNED, StockBatchKindDataModel.UNIVERSAL) || !line.stockBatchId.isNullOrBlank())) {
       return NormalizedTransactionGoodsResult(null, "return_batch_not_found")
     }
     val requestedStockBatchIdText = if (transactionType == "return") {
@@ -17383,6 +17384,10 @@ private fun subtractStockForTransactionLineInsideTransaction(
        row[StockBatchesV2.status] != StockBatchStatusDataModel.SoldOut.name
   }
 
+  // A nondepleting item is a deliberate stock policy, not an enormous fictitious balance.
+  batches.firstOrNull { it[StockBatchesV2.kind] == StockBatchKindDataModel.UNLIMITED.name }?.let { batch ->
+    return listOf(TransactionStockAllocationDataModel(batch[StockBatchesV2.id].toString(), storeId.toString(), quantityToSubtract))
+  }
   val allocations = planTransactionStockConsumption(batches.map { batch ->
     TransactionStockAllocationDataModel(batch[StockBatchesV2.id].toString(), batch[StockBatchesV2.storeId].toString(), batch[StockBatchesV2.quantity].total)
   }, quantityToSubtract) ?: return null
@@ -17493,6 +17498,7 @@ private fun addStockForTransactionLineInsideTransaction(
 
   if (targetBatch != null) {
     val batchId = targetBatch[StockBatchesV2.id]
+    if (targetBatch[StockBatchesV2.kind] == StockBatchKindDataModel.UNLIMITED.name) return batchId.toString()
     val currentQuantity = targetBatch[StockBatchesV2.quantity]
     val nextTotal = currentQuantity.total + quantityToAdd
     if (!nextTotal.isFinite()) return null
@@ -19368,6 +19374,10 @@ fun Application.module() {
             ?.coerceAtLeast(0)
             ?: 0
 
+          val stableOrder = call.request.queryParameters["order"] == "id"
+          val cursorText = call.request.queryParameters["after_id"]
+          val cursor = cursorText?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+          if (cursorText != null && cursor == null) return@get call.genericResponseNoPayload(HttpStatusCode.BadRequest, message=getResponse("13").message)
           val result = newSuspendedTransaction(aitaServerIoContext) {
             if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false))
               return@newSuspendedTransaction null
@@ -19379,6 +19389,12 @@ fun Application.module() {
               rootStoreId
             }
 
+            if (stableOrder && cleanQuery == null) {
+              return@newSuspendedTransaction StockItems.selectAll().where {
+                (StockItems.storeId eq parentStoreId) and (StockItems.isActive eq true) and
+                   (cursor?.let { StockItems.id greater it } ?: Op.TRUE)
+              }.orderBy(StockItems.id, SortOrder.ASC).limit(limit).map { it.toGoodsItemDataModel() }
+            }
             StockItems
               .selectAll()
               .where {
@@ -19623,6 +19639,16 @@ fun Application.module() {
               return@newSuspendedTransaction null
             lockStockInventoryInsideTransaction(listOf(storeId, rootStoreIdForAccessInsideTransaction(storeId)))
 
+            val operationId = body.updateOperationId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            if (body.updateOperationId != null && (operationId == null || body.expectedUpdatedAtMillis == null))
+              return@newSuspendedTransaction null
+            if (operationId != null) {
+              StockItemEditCommands.selectAll().where { StockItemEditCommands.id eq operationId }.singleOrNull()?.let { saved ->
+                if (saved[StockItemEditCommands.storeId] != storeId || saved[StockItemEditCommands.actorId] != userId ||
+                    saved[StockItemEditCommands.request] != body) return@newSuspendedTransaction null
+                return@newSuspendedTransaction saved[StockItemEditCommands.result] to null
+              }
+            }
             val cleanBarcodeModels = body.cleanBarcodeModelsForStore(storeId)
             val cleanBarcodes = cleanBarcodeModels.cleanBarcodeStrings().ifEmpty { body.barcodes.cleanBarcodes() }
 
@@ -19642,6 +19668,11 @@ fun Application.module() {
               }
               .firstOrNull()
               ?: return@newSuspendedTransaction null
+
+            if (body.expectedUpdatedAtMillis != null && body.expectedUpdatedAtMillis != goodsItemRow[StockItems.updatedAtMillis]) {
+              stockItemChangeFailure = stockEditingMessage("item_changed")
+              return@newSuspendedTransaction null
+            }
 
             // Changing kg to g without converting every batch would silently multiply inventory.
             // Preserve the unit once this catalogue card has inventory history; create a new card instead.
@@ -19713,7 +19744,7 @@ fun Application.module() {
               preserveGoodsItemNameInTransactionsInsideTransaction(storeId, goodsItemRow)
             }
 
-            val now = Instant.now().toEpochMilli()
+            val now = maxOf(Instant.now().toEpochMilli(), goodsItemRow[StockItems.updatedAtMillis] + 1)
 
             val affected = StockItems.update({
               (StockItems.id eq id) and
@@ -19783,7 +19814,15 @@ fun Application.module() {
               )
             }
 
-            updatedRow.toGoodsItemDataModel() to parentMirrorRow?.get(StockItems.storeId)?.toString()
+            val result = updatedRow.toGoodsItemDataModel()
+            if (operationId != null) StockItemEditCommands.insert {
+              it[StockItemEditCommands.id] = operationId
+              it[StockItemEditCommands.storeId] = storeId
+              it[StockItemEditCommands.actorId] = userId
+              it[StockItemEditCommands.request] = body
+              it[StockItemEditCommands.result] = result
+            }
+            result to parentMirrorRow?.get(StockItems.storeId)?.toString()
           }
 
           updated?.let { (item, parentMirrorStoreId) ->
@@ -20010,6 +20049,7 @@ fun Application.module() {
               .singleOrNull()
               ?: return@newSuspendedTransaction null
 
+            if (sourceBatchRow[StockBatchesV2.kind] == StockBatchKindDataModel.UNLIMITED.name) return@newSuspendedTransaction null
             val sourceStatus = sourceBatchRow[StockBatchesV2.status]
             if (sourceStatus in setOf(
                 StockBatchStatusDataModel.Ordered.name,
@@ -20459,7 +20499,8 @@ fun Application.module() {
                 }
                 .singleOrNull()
 
-              if (inventoryItem == null || (body.kind == StockBatchKindDataModel.UNIVERSAL &&
+              if (!body.quantity.total.isFinite() || body.quantity.total < 0.0 || (!body.tracksQuantity && body.quantity.total != 1.0)) return@newSuspendedTransaction run { rollback(); null }
+              if (inventoryItem == null || (body.displayKind in setOf(StockBatchKindDataModel.UNIVERSAL, StockBatchKindDataModel.UNLIMITED) &&
                   body.quantity.id != defaultServerQuantityForGoodsItem(inventoryItem[StockItems.measurementUnitId], 0.0).id))
                 return@newSuspendedTransaction run { rollback(); null }
 
@@ -20520,7 +20561,7 @@ fun Application.module() {
                 it[StockBatchesV2.supplierOrderId] = nextSupplierOrderId
 
                 it[StockBatchesV2.quantity] = body.quantity
-                it[StockBatchesV2.kind] = body.kind.name
+                it[StockBatchesV2.kind] = body.displayKind.name
 
                 it[StockBatchesV2.supplyPrice] = sanitizedSupplyPrice
                 it[StockBatchesV2.salePriceOverride] = body.salePriceOverride
@@ -20696,7 +20737,9 @@ fun Application.module() {
                 additionalNotesLocalized = cleanLocalizedValues(body.additionalNotesLocalized)
               )
 
-              if (sanitizedBody.kind == StockBatchKindDataModel.UNIVERSAL) {
+              if (sanitizedBody.kind in setOf(StockBatchKindDataModel.UNIVERSAL, StockBatchKindDataModel.UNLIMITED)) {
+                if (sanitizedBody.kind == StockBatchKindDataModel.UNLIMITED && body.quantity.total != 1.0)
+                  return@newSuspendedTransaction run { rollback(); null }
                 val measurement = StockItems.select(StockItems.measurementUnitId).where { StockItems.id eq goodsItemId }
                   .singleOrNull()?.get(StockItems.measurementUnitId) ?: return@newSuspendedTransaction run { rollback(); null }
                 if (body.quantity.id != defaultServerQuantityForGoodsItem(measurement, 0.0).id)

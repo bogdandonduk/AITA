@@ -65,8 +65,11 @@ internal class ChunkedTextCache(
             writeBatch!!.invoke(rows)
         } else write(header.first, header.second)
         // Interrupted cleanup is harmless: only the committed generation is ever read.
-        remove(key)
-        removePrefixExcept(prefix(key), generationPrefix)
+        try {
+            remove(key)
+            removePrefixExcept(prefix(key), generationPrefix)
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (_: Exception) { /* Manifest already committed. Cleanup failure cannot turn a saved operation into a false failure. */ }
     }
 
     suspend fun delete(key: String) = mutexFor(key).withLock {

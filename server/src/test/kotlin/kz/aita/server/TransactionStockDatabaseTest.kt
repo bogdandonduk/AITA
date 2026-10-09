@@ -39,6 +39,7 @@ class TransactionStockDatabaseTest {
                 exec("INSERT INTO stores(id) VALUES ('$store'),('$otherStore')")
                 SchemaUtils.create(StockItems, StockBatchesV2, Transactions, TransactionReturnItems)
                 exec(javaClass.getResource("/db/migration/V118__stock_batch_kind.sql")!!.readText())
+                exec(javaClass.getResource("/db/migration/V134__nondepleting_stock_batches.sql")!!.readText())
                 StockItems.insert {
                     it[id] = item; it[userId] = owner; it[storeId] = store
                     it[barcodes] = listOf("123456789"); it[name] = listOf(LocalizedStringDataModel("en", "Milk"))
@@ -89,6 +90,18 @@ class TransactionStockDatabaseTest {
         originalTransactionId = sale.id, originalTransactionLineIndex = 0, originalClientOperationId = sale.clientOperationId,
         stockBatchId = first.toString())
     private fun total(batch: UUID) = StockBatchesV2.selectAll().where { StockBatchesV2.id eq batch }.single()[StockBatchesV2.quantity].total
+
+
+    @Test fun unlimitedBatchRecordsSaleSourcesAndReturnWithoutChangingAnyTrackedBalance() = fixture { db -> transaction(db) {
+        StockBatchesV2.update({StockBatchesV2.id eq first}) {it[kind]=StockBatchKindDataModel.UNLIMITED.name;it[quantity]=q(1.0)}
+        val sale=save("purchase",listOf(line(2000.0)))
+        assertEquals(2000.0,sale.goodsInTransaction.single().quantity)
+        assertEquals(first.toString(),sale.goodsInTransaction.single().sourceBatchAllocations.single().stockBatchId)
+        assertEquals(1.0,total(first));assertEquals(8.0,total(second))
+        val returned=save("return",listOf(returnLine(sale,500.0)))
+        assertEquals(500.0,returned.goodsInTransaction.single().quantity)
+        assertEquals(1.0,total(first));assertEquals(8.0,total(second))
+    } }
 
     @Test fun cartDiscountUsesAuthoritativePriceAndRefundsOnlyWhatWasPaid() = fixture { db -> transaction(db) {
         val sale = save("purchase", listOf(line(2.0).copy(pricePerUnit = 0.01, quickDiscountPercent = 25.0, priceBeforeDiscount = 999.0)))

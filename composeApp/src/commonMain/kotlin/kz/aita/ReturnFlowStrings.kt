@@ -1,6 +1,7 @@
 package kz.aita
 
 internal fun AppConfiguration.returnFlowText(key: String): String {
+    if (key == "unlimited") return inventoryExperienceText("unlimited")
     val words = returnFlowWords[key] ?: return key
     val index = when (stateValues.appLanguage.lowercase()) { "ru" -> 1; "kk" -> 2; "ky" -> 3; "tg", "tj" -> 4; "uz" -> 5; else -> 0 }
     return words[index]

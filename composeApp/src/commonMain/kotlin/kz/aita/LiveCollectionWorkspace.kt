@@ -75,7 +75,7 @@ internal object LiveCollectionWorkspace {
                 val result = LiveStockCollections(owner, items, batchSource, stores, items.associateBy { it.id },
                     batchSource.filter { it.isActive && belongsToStore(it.storeId) }.groupBy { it.goodsItemId },
                     batchSource.filter { it.isSelectableActiveStockBatch() && belongsToStore(it.storeId) }.groupBy { it.goodsItemId },
-                    warehouseBatches, warehouseBatches.mapValues { (_, rows) -> rows.sumOf { it.quantity.total } })
+                    warehouseBatches, warehouseBatches.mapValues { (_, rows) -> rows.availableStockQuantity() })
                 ensureActive()
                 // StateFlow suppresses equal payload emissions. An equal cloud/cache replacement
                 // can change list identity without scheduling another calculation; rejecting it

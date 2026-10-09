@@ -13,7 +13,7 @@ internal fun transactionBarcodeFocusTarget(
 ): TransactionBarcodeFocusTarget = when {
     !captureEnabled || !windowFocused || modalOpen || otherEditorFocused -> TransactionBarcodeFocusTarget.None
     preferSearch && searchAttached -> TransactionBarcodeFocusTarget.Search
-    preferSearch -> TransactionBarcodeFocusTarget.None // Wait for the visible field to attach.
+    // Payment/receipt has no visible search field; keep the HID input ready there.
     else -> TransactionBarcodeFocusTarget.Hid
 }
 

@@ -79,6 +79,7 @@ internal fun writeOffInsideTransaction(user: UUID,store: UUID,command: StockWrit
     val row=StockBatchesV2.selectAll().where {(StockBatchesV2.id eq batchId) and (StockBatchesV2.storeId eq store)}.singleOrNull()
         ?: throw CommerceProblem("changed",HttpStatusCode.NotFound)
     val batch=row.toGoodsBatchDataModel()
+    if (!batch.tracksQuantity) throw CommerceProblem("batch_busy")
     if(!batch.isActive || batch.status !in setOf(StockBatchStatusDataModel.OnShelf,StockBatchStatusDataModel.Delivered))
         throw CommerceProblem("batch_busy")
     if(!StockBatchMovements.select(StockBatchMovements.id).where {

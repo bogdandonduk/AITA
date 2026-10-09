@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /** Special groups still hold separate records and units for each goods item. */
 @Serializable
-enum class StockBatchKindDataModel { NORMAL, RETURNED, UNIVERSAL }
+enum class StockBatchKindDataModel { NORMAL, RETURNED, UNIVERSAL, UNLIMITED }
 
 /** Captured by the server in the same transaction that debits inventory. */
 @Serializable
@@ -52,3 +52,10 @@ fun validReceiptCartQuantity(quantity: QuantityDataModel, maximum: Double?): Boo
     (maximum.isFinite() && maximum > 0.0 && quantity.total.isFinite() &&
         quantity.total >= receiptReturnMinimum(quantity, maximum) - 0.000001 &&
         quantity.total <= maximum + 0.000001 && (!quantity.roundTotal || quantity.total % 1.0 == 0.0))
+
+/** Availability for UI/validation only. Infinity must never be stored as a quantity or money value. */
+val GoodsBatchDataModel.tracksQuantity: Boolean get() = !unlimitedQuantity && kind != StockBatchKindDataModel.UNLIMITED
+fun Iterable<GoodsBatchDataModel>.availableStockQuantity(): Double =
+    if (any { !it.tracksQuantity }) Double.POSITIVE_INFINITY else sumOf { it.quantity.total.coerceAtLeast(0.0) }
+
+val GoodsBatchDataModel.displayKind: StockBatchKindDataModel get() = if (tracksQuantity) kind else StockBatchKindDataModel.UNLIMITED

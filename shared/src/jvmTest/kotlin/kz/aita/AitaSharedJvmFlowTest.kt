@@ -74,6 +74,10 @@ private class AitaFlowTestEnvironment {
     var nextWorkerRemovalRequestResponse: StoreWorkerRequestDataModel? = null
     var nextRemovedWorkerResponse: StoreWorkerDataModel? = null
     var nextWorkshiftResponse: WorkshiftDataModel? = null
+    var echoEditedInventoryBodies = false
+    var loseNextEditedItemReply = false
+    val acceptedEdits = mutableMapOf<String,GoodsItemDataModel>()
+    val editedRequests = mutableListOf<GoodsItemDataModel>()
     var echoCreatedInventoryBodies = false
     var loseNextCreatedItemReply = false
     var nextGoodsItemResponse: GoodsItemDataModel? = null
@@ -679,6 +683,54 @@ class AitaSharedJvmFlowTest {
         assertTrue(InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty())
         assertEquals(listOf("stock/add", "stock/add", "stockBatches/add"), environment.requests
             .map { it.path }.filter { it == "stock/add" || it == "stockBatches/add" })
+    }
+
+    @Test
+    fun twoOfflineEditsSurviveHydrationAndLostReplyThenRebaseInOrder() = runBlocking {
+        val store=aitaTestStore().copy(architectureVersion=2)
+        environment.stores=listOf(store);storesState.emit(DataState.Success(listOf(store)))
+        waitUntilAitaFlowCondition {currentStoreHasWorkspaceAccess(store.id)}
+        val original=aitaTestGoodsItem(id="edited-item",name="Before",barcode="2618000001248").copy(updatedAtMillis=10)
+        environment.stock=listOf(original);stockState.emit(DataState.Success(listOf(original)))
+        environment.echoEditedInventoryBodies=true
+        cloudTransportStatusState.value=CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+        val first=CompletableDeferred<DataState<GoodsItemDataModel>>()
+        updateGoodsItem(original.copy(name=aitaTestLocalized("First offline edit"),expectedUpdatedAtMillis=10)) {first.complete(it)}
+        val firstItem=requireAitaFlowSuccess(first).payload
+        val second=CompletableDeferred<DataState<GoodsItemDataModel>>()
+        updateGoodsItem(firstItem.copy(name=aitaTestLocalized("Second offline edit"))) {second.complete(it)}
+        val latest=requireAitaFlowSuccess(second).payload
+        assertEquals(2,InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
+        assertEquals(latest,InventoryCreates.overlayItems(inventoryOwners.current,listOf(original)).single())
+        assertTrue(environment.editedRequests.isEmpty())
+        cloudTransportStatusState.value=CLOUD_TRANSPORT_STATUS_REACHABLE
+        environment.loseNextEditedItemReply=true
+        InventoryCreates.flush()
+        assertEquals(1,environment.acceptedEdits.size)
+        assertEquals(2,InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
+        assertEquals(latest.name,InventoryCreates.overlayItems(inventoryOwners.current,environment.stock).single().name)
+        InventoryCreates.flush(force=true)
+        assertEquals(2,environment.acceptedEdits.size)
+        assertTrue(InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty())
+        assertEquals(latest.name,environment.stock.single().name)
+        assertEquals(12L,environment.stock.single().updatedAtMillis)
+        assertEquals(listOf(10L,10L,11L),environment.editedRequests.map {it.expectedUpdatedAtMillis})
+    }
+
+    @Test
+    fun lifetimeWorkspaceCanDurablyAddBeyondBasicCatalogueSize() = runBlocking {
+        val store=aitaTestStore().copy(architectureVersion=2)
+        environment.stores=listOf(store);storesState.emit(DataState.Success(listOf(store)))
+        waitUntilAitaFlowCondition {currentStoreHasWorkspaceAccess(store.id)}
+        val rows=(1..1500).map {aitaTestGoodsItem(id="large-$it",name="Item $it",barcode="CODE-$it")}
+        stockState.emit(DataState.Success(rows))
+        cloudTransportStatusState.value=CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+        val result=CompletableDeferred<DataState<GoodsItemDataModel>>()
+        addGoodsItem(aitaTestGoodsItem(id="large-new",name="Beyond basic",barcode="CODE-NEW")) {result.complete(it)}
+        requireAitaFlowSuccess(result)
+        assertEquals(1501,stockState.payloadValue!!.size)
+        val saved=readJsonCacheText("cache_json:"+inventoryCacheKey("stock",inventoryOwners.current))!!
+        assertEquals(1501,jsonBase.decodeFromString<List<GoodsItemDataModel>>(saved).size)
     }
 
     @Test
@@ -2342,8 +2394,19 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
                 aitaTestSuccessEnvelope(item)
             }
             "stock/update" -> {
-                val item = environment.nextGoodsItemResponse ?: environment.stock.firstOrNull() ?: aitaTestGoodsItem(id = "server-updated")
+                val item = if (environment.echoEditedInventoryBodies) {
+                    val input=jsonBase.decodeFromString<GoodsItemDataModel>((request.body as io.ktor.http.content.TextContent).text)
+                    environment.editedRequests+=input
+                    val operation=requireNotNull(input.updateOperationId)
+                    environment.acceptedEdits[operation] ?: run {
+                        val before=environment.stock.single {it.id==input.id}
+                        check(before.updatedAtMillis==input.expectedUpdatedAtMillis) { "Offline edit was not rebased to the acknowledged revision" }
+                        input.copy(updateOperationId=null,expectedUpdatedAtMillis=null,updatedAtMillis=before.updatedAtMillis+1)
+                            .also {environment.acceptedEdits[operation]=it}
+                    }
+                } else environment.nextGoodsItemResponse ?: environment.stock.firstOrNull() ?: aitaTestGoodsItem(id = "server-updated")
                 environment.stock = environment.stock.upsertAitaTestItem(item)
+                if(environment.loseNextEditedItemReply) {environment.loseNextEditedItemReply=false;throw java.io.IOException("Lost edit reply after commit")}
                 aitaTestSuccessEnvelope(item)
             }
             "stock/delete" -> {

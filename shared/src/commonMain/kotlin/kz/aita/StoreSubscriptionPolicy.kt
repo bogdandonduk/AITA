@@ -31,6 +31,7 @@ fun basicStoreSubscriptionPlan(
 fun lifetimeStoreSubscriptionPlan(regionCode: String, currencyCode: String): StoreSubscriptionPlanDataModel =
     basicStoreSubscriptionPlan(0L, currencyCode, regionCode).copy(
         id = SUBSCRIPTION_LIFETIME_PLAN, hidden = true,
+        maxBranches = Int.MAX_VALUE, maxWorkers = Int.MAX_VALUE, maxStockItems = Int.MAX_VALUE,
         name = listOf(LocalizedStringDataModel("en", "Lifetime access"), LocalizedStringDataModel("ru", "Бессрочный доступ"), LocalizedStringDataModel("kk", "Мерзімсіз қолжетімділік"), LocalizedStringDataModel("ky", "Мөөнөтсүз мүмкүнчүлүк")),
         description = listOf(
             LocalizedStringDataModel("en", "Unlocked by a promo code for this location. No renewal charges."),

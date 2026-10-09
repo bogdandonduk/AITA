@@ -319,6 +319,13 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     overflow = TextOverflow.Ellipsis
                 )
                 if(transactionTypeIndex==0) ItemDiscountControls(goodsItemInCart.clientId,goodsItem.id) {showItemDiscount=!showItemDiscount}
+                onDelete?.let { remove ->
+                    actionButton(modifier = Modifier.size(40.dp),
+                        text = "", enabledColor = stateValues.ErrorColor,
+                        iconPath = stateValues.drawablePathIconCancel,
+                        iconContentDescription = stateValues.stringDelete,
+                        onClick = { remove(goodsItem) })
+                }
             }
 
             androidx.compose.animation.AnimatedVisibility(showItemDiscount && transactionTypeIndex==0) {
@@ -473,7 +480,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
             } else {
                 itemBatches
                     .filter { it.status != StockBatchStatusDataModel.Deleted && it.status != StockBatchStatusDataModel.WrittenOff }
-                    .sumOf { it.quantity.total }
+                    .availableStockQuantity()
             }
 
             StockCardInfoLine(
@@ -527,11 +534,14 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     )
                 }
             } else if (transactionTypeIndex == 2) {
-                StockSinglePriceEditor(title = itemPriceTitle, price = itemPrice,
+                var supplyDraft by remember(goodsItemInCart.id, goodsItemInCart.clientId) { mutableStateOf(itemPrice) }
+                StockSinglePriceEditor(title = itemPriceTitle, price = supplyDraft,
                     quickFillPrices = goodsItem.supplyPrices,
                     onChanged = { edited ->
-                        if (edited.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 && it <= 1_000_000_000_000.0 } == true) {
-                            DynamicCarts.setSupplyPrice(goodsItem.id, goodsItemInCart.clientId, edited)
+                        supplyDraft = edited
+                        val savedPrice = edited.copy(price = edited.price.trim().replace(',', '.').ifEmpty { "0" })
+                        if (savedPrice.price.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 && it <= 1_000_000_000_000.0 } == true) {
+                            DynamicCarts.setSupplyPrice(goodsItem.id, goodsItemInCart.clientId, savedPrice)
                         }
                     })
             } else {
@@ -566,7 +576,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
 
             StockCardInfoLine(
                 title = localizedStringResource(1181, "Available total"),
-                value = "${availableQuantity.quantityAmountText(goodsItemInCart.quantity.roundTotal)} $cartUnitText".trim(),
+                value = if (availableQuantity.isInfinite()) inventoryExperienceText("unlimited") else "${availableQuantity.quantityAmountText(goodsItemInCart.quantity.roundTotal)} $cartUnitText".trim(),
                 textColor = textColor
             )
 
@@ -584,7 +594,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
                     value = listOfNotNull(
                         "#${sortedItemBatches.indexOfFirst { it.id == batch.id } + 1}",
                         batchSupplierText,
-                        batch.quantity.quantityText(stateValues.appLanguage),
+                        stockBatchQuantityForUi(batch),
                         batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
                         batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" },
                         stockBatchStatusText(batch.status)
@@ -824,38 +834,7 @@ fun AppConfiguration.GoodsItemInCartWidget(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .padding(end = 16.dp, top = 16.dp, start = 8.dp, bottom = 16.dp),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            onDelete?.let {
-                actionButton(
-                    text = "",
-                    enabledColor = stateValues.ErrorColor,
-                    iconPath = stateValues.drawablePathIconCancel,
-                    iconContentDescription = stateValues.stringDelete,
-                ) {
-                    onDelete(goodsItem)
-                }
-            }
 
-//      Spacer(
-//        modifier = Modifier
-//          .height(stateValues.marginTextField)
-//      )
-//
-//      onEdit?.let {
-//        actionButton(
-//          text = "",
-//          iconPath = stateValues.drawablePathIconEdit,
-//          iconContentDescription = stateValues.drawablePathIconEdit,
-//        ) {
-//          onEdit(goodsItem)
-//        }
-//      }
-        }
     }
 }
 
@@ -1009,7 +988,7 @@ fun AppConfiguration.TransactionCartScreen() {
                                 it.status != StockBatchStatusDataModel.WrittenOff &&
                                 it.status != StockBatchStatusDataModel.SoldOut
                     }
-                    .sumOf { it.quantity.total }
+                    .availableStockQuantity()
             }
         }
 
@@ -2164,7 +2143,7 @@ internal fun stockWarehouseBatchesByItemForUi(batches: List<GoodsBatchDataModel>
 
 internal fun GoodsItemDataModel.stockWarehouseQuantityForUi(
     batchesByItem: Map<String, List<GoodsBatchDataModel>>
-): Double = batchesByItem[id].orEmpty().sumOf { it.quantity.total }
+): Double = batchesByItem[id].orEmpty().availableStockQuantity()
 
 internal fun GoodsItemDataModel.stockWarehouseSortPriceForUi(): Double? =
     salePrices
@@ -2273,7 +2252,7 @@ internal fun stockWarehouseItemsForFilter(
 ): List<GoodsItemDataModel> {
     if (filterId == STOCK_WAREHOUSE_FILTER_TOTAL) return items
 
-    val quantityByItem = batchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
+    val quantityByItem = batchesByItem.mapValues { (_, itemBatches) -> itemBatches.availableStockQuantity() }
     return items.filter { item ->
         val quantity = quantityByItem[item.id] ?: 0.0
         when (filterId) {
@@ -2302,7 +2281,7 @@ internal fun stockWarehouseMetricsForUi(
     batchesByItem: Map<String, List<GoodsBatchDataModel>>
 ): StockWarehouseMetricsData {
     val activeBatchCount = batchesByItem.values.sumOf { it.size }
-    val quantityByItem = batchesByItem.mapValues { (_, itemBatches) -> itemBatches.sumOf { it.quantity.total } }
+    val quantityByItem = batchesByItem.mapValues { (_, itemBatches) -> itemBatches.availableStockQuantity() }
 
     return StockWarehouseMetricsData(
         totalItems = items.size,
@@ -3019,13 +2998,13 @@ fun AppConfiguration.StockWarehouseScreenContent(
                             items(visibleItems, key = { it.id }, contentType = { "stock_item" }) { item ->
                                 val itemBatches = displayBatchesByItem[item.id].orEmpty()
                                 val availableQuantity = remember(itemBatches, transactionTypeIndex) {
-                                    itemBatches.asSequence().filter { batch ->
+                                    itemBatches.filter { batch ->
                                         if (transactionTypeIndex == null) {
                                             batch.status != StockBatchStatusDataModel.Deleted && batch.status != StockBatchStatusDataModel.WrittenOff
                                         } else {
                                             batch.isSelectableActiveStockBatch()
                                         }
-                                    }.sumOf { it.quantity.total }
+                                    }.availableStockQuantity()
                                 }
                                 val trulyOutOfStock = disableIfOutOfStock && availableQuantity <= 0.0
 
@@ -3829,6 +3808,7 @@ fun StockAddEditDraft.toGoodsItem(
         noteLocalized = cleanNoteLocalized,
         conditions = conditions.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
         createdAtMillis = current?.createdAtMillis ?: now,
+        expectedUpdatedAtMillis = current?.updatedAtMillis,
         updatedAtMillis = now,
         isActive = true
     )
@@ -4764,7 +4744,7 @@ internal fun AppConfiguration.StockItemLabelPrintBottomSheet(
                             sortedBatches.forEach { batch ->
                                 val isSelected = batch.id == selectedBatchId
                                 val batchInfo = buildList {
-                                    add(batch.quantity.quantityText(stateValues.appLanguage))
+                                    add(stockBatchQuantityForUi(batch))
                                     batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let {
                                         add("${localizedStringResource(234, "Expires")}: $it")
                                     }
@@ -5179,176 +5159,8 @@ internal fun AppConfiguration.TransactionSupplySupplierBanner(
 }
 
 @Composable
-internal fun AppConfiguration.QuickStockAddBottomSheet(
-    request: QuickStockAddSheetRequest,
-    onDismiss: () -> Unit
-) {
-    var saveError by remember { mutableStateOf("") }
-    var saving by remember { mutableStateOf(false) }
-    val goodsInCart by getCartState(request.transactionTypeIndex, request.clientId).collectAsState()
-    val defaultCurrency = stateValues.globalAppConfiguration
-        .countries
-        .withSupportedCountries()
-        .find { it.locale.equals(stateValues.userAccount?.countryLocale, ignoreCase = true) }
-        ?.currencies
-        ?.firstOrNull()
-        ?.code
-        ?: stateValues.globalAppConfiguration.countries.firstOrNull()?.currencies?.firstOrNull()?.code
-        ?: "KZT"
-
-    val defaultMeasurementUnitId = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.firstOrNull()?.id ?: "0"
-
-    fun newQuickDraft(): StockAddEditDraft = StockAddEditDraft(
-        barcodes = listOf(request.barcode.takeIf { it.isNotBlank() }.orEmpty()),
-        barcodeTypes = listOf(GOODS_ITEM_BARCODE_TYPE_STANDARD),
-        name = emptyLocalizedItemForCurrentLanguage(),
-        description = emptyLocalizedItemForCurrentLanguage(),
-        measurementUnitId = defaultMeasurementUnitId,
-        categoryIds = emptyList(),
-        salePrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
-        returnPrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
-        supplyPrices = listOf(PriceDataModel(price = "0", currency = defaultCurrency, supplierId = "")),
-        wholesalePrices = listOf(PriceDataModel(price = "", currency = defaultCurrency, supplierId = "")),
-        noteLocalized = emptyLocalizedItemForCurrentLanguage()
-    )
-
-    var draft by remember(request.barcode, request.transactionTypeIndex, request.clientId, defaultCurrency, defaultMeasurementUnitId) {
-        mutableStateOf(newQuickDraft())
-    }
-    LaunchedEffect(request.barcode, request.transactionTypeIndex, request.clientId) {
-        val initial = draft
-        val defaults = withLastStockChoices(initial)
-        if (draft == initial) draft = defaults
-    }
-    var selectedTabId by rememberSaveable(request.barcode, request.transactionTypeIndex, request.clientId) { mutableStateOf("info") }
-    var returnPriceManuallyEdited by rememberSaveable(request.barcode, request.transactionTypeIndex, request.clientId) { mutableStateOf(false) }
-
-    val tabs = listOf(
-        StockAddEditTabContent(
-            id = "info",
-            title = localizedStringResource(252, "Info"),
-            iconPath = stateValues.drawablePathIconEdit
-        ),
-        StockAddEditTabContent(
-            id = "conditions",
-            title = localizedStringResource(609, "Conditions"),
-            iconPath = stateValues.drawablePathIconCheck,
-            count = draft.conditions.size
-        ),
-        StockAddEditTabContent(
-            id = "prices",
-            title = localizedStringResource(253, "Generic prices"),
-            iconPath = stateValues.drawablePathIconFinances
-        ),
-        StockAddEditTabContent(id = "marketplace", title = marketProductText("market.profile_tab"),
-            iconPath = marketIconPath(148), iconRes = marketIconFallback(148)),
-        StockAddEditTabContent(
-            id = "promos", title = localizedStringResource(920, "Promos"),
-            iconPath = stateValues.drawablePathIconPromos,
-            iconRes = stateValues.drawableResIconPromos.value,
-            count = draft.promotions.size
-        )
-    )
-
-    AitaBottomSheet(
-        title = localizedStringResource(636, "Quick add item"),
-        iconPath = stockAddIconPath(),
-        onDismiss = onDismiss
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            StockAddEditTabs(
-                modifier = Modifier.fillMaxWidth(),
-                selectedId = selectedTabId,
-                tabs = tabs,
-                onSelected = { selectedTabId = it }
-            )
-
-            val centeredFormModifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-
-            when (selectedTabId) {
-                "marketplace" -> LazyColumn(modifier = centeredFormModifier.padding(16.dp)) {
-                    item { StockMarketplaceEditor(draft, emptyList(), Modifier.fillMaxWidth(), onDraftChanged = { draft = it }) }
-                }
-                "promos" -> LazyColumn(modifier = centeredFormModifier.padding(stateValues.marginTextField)) {
-                    item {
-                        StockPromotionListEditor(
-                            promotions = draft.promotions,
-                            onPromotionsChanged = { draft = draft.copy(promotions = it.sanitizedStockPromotions()) },
-                            quantityUnit = stateValues.globalAppConfiguration.goodsItemsQuantityUnits.find { it.id == draft.measurementUnitId }
-                        )
-                        Spacer(Modifier.height(24.dp))
-                    }
-                }
-                "conditions" -> StockAddEditConditionsTab(
-                    modifier = centeredFormModifier,
-                    draft = draft,
-                    contentFillFraction = 1f,
-                    onDraftChanged = { draft = it }
-                )
-
-                "prices" -> StockAddEditPricesTab(
-                    modifier = centeredFormModifier,
-                    draft = draft,
-                    defaultCurrency = defaultCurrency,
-                    returnPriceManuallyEdited = returnPriceManuallyEdited,
-                    onReturnPriceManuallyEditedChanged = { returnPriceManuallyEdited = it },
-                    contentFillFraction = 1f,
-                    onDraftChanged = { draft = it }
-                )
-
-                else -> StockAddEditInfoTab(
-                    modifier = centeredFormModifier,
-                    draft = draft,
-                    contentFillFraction = 1f,
-                    onDraftChanged = { draft = it }
-                )
-            }
-
-            if (saveError.isNotBlank()) Text(saveError, color = stateValues.ErrorColor,
-                fontSize = stateValues.smallTextSize, modifier = Modifier.padding(horizontal = 8.dp))
-            actionButton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                text = localizedStringResource(637, "Save item and add to cart"),
-                iconPath = stateValues.drawablePathIconCheck,
-                enabled = !saving, loading = saving, autoLoading = false,
-                confirmationRequired = false,
-                onClick = {
-                    saveError = draft.stockDraftErrors(stateValues.globalAppConfiguration).joinToString("\n") {
-                        stockEditingMessage(it).extractLocalizedString(stateValues.appLanguage).orEmpty()
-                    }
-                    if (saveError.isNotBlank()) return@actionButton
-                    val storeId = stateValues.activeStoreId ?: return@actionButton
-                    saving = true
-                    val goodsItem = draft.toGoodsItem(storeId, stateValues.globalAppConfiguration, null)
-                    addGoodsItem(goodsItem) { result ->
-                        saving = false
-                        if (result is DataState.Success) {
-                            addGoodsItemToTransactionCart(
-                                goodsItem = result.payload,
-                                transactionTypeIndex = request.transactionTypeIndex,
-                                clientId = request.clientId,
-                                configuration = stateValues.globalAppConfiguration,
-                                currentCart = goodsInCart
-                            )
-                            closeQuickStockAddSheet()
-                        } else saveError = result.message?.extractLocalizedString(stateValues.appLanguage)
-                            ?: stockEditingMessage("storage").extractLocalizedString(stateValues.appLanguage).orEmpty()
-                    }
-                }
-            )
-        }
-    }
-}
-
+internal fun AppConfiguration.QuickStockAddBottomSheet(request: QuickStockAddSheetRequest, onDismiss: () -> Unit) =
+    CompactQuickStockAdd(request, onDismiss)
 
 @Composable
 internal fun AppConfiguration.StockConditionMinuteField(
@@ -6317,7 +6129,7 @@ internal fun GoodsBatchDataModel.toDraft(
             additionalNotes?.takeIf { it.isNotBlank() }?.let { listOf(LocalizedStringDataModel("main", it)) } ?: emptyList()
         },
         status = status,
-        kind = kind,
+        kind = displayKind,
         editRevision = updatedAtMillis,
         promotions = promotions
     )

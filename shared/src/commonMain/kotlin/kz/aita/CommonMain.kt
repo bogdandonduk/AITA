@@ -12252,6 +12252,7 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
 
     val eligible = batches.filter { it.goodsItemId == item.id && it.isActive &&
         (transactionType != "return" || it.isReturnDestination()) }
+    if (delta < 0 && eligible.any { it.storeId == storeId && !it.tracksQuantity && it.status in setOf(StockBatchStatusDataModel.Delivered, StockBatchStatusDataModel.OnShelf) }) return batches
     val candidateIds = mutableListOf<String>().apply {
         line.stockBatchId?.takeIf { it.isNotBlank() }?.let { add(it) }
         item.activeShelfBatchId?.let { add(it) }
@@ -12299,7 +12300,7 @@ private fun mutateLocalBatchQuantity(batches: List<GoodsBatchDataModel>, item: G
         return batches + batch
     }
     return batches.map { batch ->
-        if (batch.id == targetId) {
+        if (batch.id == targetId && batch.tracksQuantity) {
             val updatedQuantity = batch.quantity.copy(total = (batch.quantity.total + delta).coerceAtLeast(0.0))
             val updatedStatus = if (batch.status == StockBatchStatusDataModel.SoldOut && delta > 0.0) StockBatchStatusDataModel.Delivered else batch.status
             batch.copy(quantity = updatedQuantity, status = updatedStatus, updatedAtMillis = getCurrentTimeMillis())
@@ -17925,7 +17926,9 @@ fun getParentStoreStock(
     limit: Int = 80,
     offset: Int = 0,
     updateSharedState: Boolean = true,
-    appendToSharedState: Boolean = false
+    appendToSharedState: Boolean = false,
+    stableOrder: Boolean = false,
+    afterId: String? = null
 ): Flow<DataState<List<GoodsItemDataModel>>> {
     return flow {
         getParentStoreStockMutex.withLock {
@@ -17949,6 +17952,7 @@ fun getParentStoreStock(
                     cleanQuery?.let { put("q", it) }
                     put("limit", cleanLimit)
                     put("offset", cleanOffset)
+                    if (stableOrder) { put("order", "id"); afterId?.let { put("after_id", it) } }
                 }
             )
 
@@ -18019,44 +18023,25 @@ fun updateGoodsItem(
 ) {
     val owner = inventoryOwners.current
     GlobalScope.launch(Dispatchers.ourIo) {
-        val completion: DataState<GoodsItemDataModel> = updateGoodsItemMutex.withLock {
-            try {
-                val response = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(
-                    HttpMethod.Put,
-                    endpointUrl = globalAppConfigurationState.payloadValue.updateGoodsItemPath.first,
-                    body = goodsItem, headers = mapOf("store_id" to goodsItem.storeId),
-                    expectedSessionGeneration = owner.sessionGeneration
-                )
-                val savedGoodsItem = response.payload
-
-                if (response.negative || savedGoodsItem == null) {
-                    val message = response.message ?: stockItemSaveFailureMessage()
-                    DataState.Empty(message)
-                } else {
-                    postInAppNotification(response.message, NotificationType.Positive)
-                    applySavedGoodsItemToStockState(
-                        savedGoodsItem = savedGoodsItem,
-                        responseMessage = response.message,
-                        owner = owner
-                    )
-                    DataState.Success(savedGoodsItem, response.message)
-                }
-            } catch (throwable: Throwable) {
-                if (throwable is CancellationException) throw throwable
-                val message = stockItemSaveFailureMessage()
-                logNetworkAttempt("FAILED stock item update ${networkFailureSummary(throwable)}")
-                DataState.Empty(message)
-            }
+        val result = try { updateGoodsItemMutex.withLock { InventoryCreates.updateItem(owner, goodsItem) } }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (error: Exception) {
+            RuntimeDiagnostics.capture(error, "inventory_item_edit")
+            DataState.Empty(stockItemSaveFailureMessage())
         }
-
-        onCompleted?.invoke(completion)
+        onCompleted?.invoke(if (inventoryOwnerIsCurrent(owner)) result else DataState.Empty(inventoryLoadFailureMessage()))
     }
 }
 
 fun addGoodsItem(goodsItem: GoodsItemDataModel, onCompleted: ((DataState<GoodsItemDataModel>) -> Unit)?) {
     val owner = inventoryOwners.current
     GlobalScope.launch(Dispatchers.ourIo) {
-        val result = addGoodsItemMutex.withLock { InventoryCreates.createItem(owner, goodsItem) }
+        val result = try { addGoodsItemMutex.withLock { InventoryCreates.createItem(owner, goodsItem) } }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (error: Exception) {
+            RuntimeDiagnostics.capture(error, "inventory_item_create")
+            DataState.Empty(stockItemSaveFailureMessage())
+        }
         onCompleted?.invoke(if (inventoryOwnerIsCurrent(owner)) result else DataState.Empty(inventoryLoadFailureMessage()))
     }
 }
@@ -19502,6 +19487,8 @@ data class GoodsBatchDataModel(
 
     val isActive: Boolean = true,
     val kind: StockBatchKindDataModel = StockBatchKindDataModel.NORMAL,
+    // Additive wire field: older clients can still decode the entire stock snapshot.
+    val unlimitedQuantity: Boolean = false,
     // Optional editor precondition. Never stored as batch content by the server.
     val expectedUpdatedAtMillis: Long? = null
 )
@@ -19579,7 +19566,10 @@ data class GoodsItemDataModel(
 
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    // Immutable offline edit identity and optimistic precondition; never stored as item content.
+    val updateOperationId: String? = null,
+    val expectedUpdatedAtMillis: Long? = null
 ): Searchable {
 
     override val exactSearchOperands: List<String>
@@ -21251,7 +21241,7 @@ fun buildStoreAnalyticsDashboard(
 
     val activeBatches = scopedBatches.filter { it.isActive }
     val activeStockQuantityByItem = activeBatches.groupBy { it.goodsItemId }.mapValues { (_, itemBatches) ->
-        itemBatches.sumOf { it.quantity.total }
+        itemBatches.filter { it.tracksQuantity }.sumOf { it.quantity.total }
     }
     val now = getCurrentTimeMillis()
     val expiringSoonCutoff = now + 14L * 24L * 60L * 60L * 1000L
@@ -21260,7 +21250,7 @@ fun buildStoreAnalyticsDashboard(
     var stockValueAtSalePrice = 0.0
     activeBatches.forEach { batch ->
         val item = stockById[batch.goodsItemId]
-        val quantity = batch.quantity.total.coerceAtLeast(0.0)
+        val quantity = if (batch.tracksQuantity) batch.quantity.total.coerceAtLeast(0.0) else 0.0
         val supplyPrice = batch.supplyPrice.price.toMoneyDouble()
         val salePrice = batch.salePriceOverride?.price?.toMoneyDouble()
             ?: item?.analyticsEstimatedSalePricePerUnit(batchesByItem[batch.goodsItemId].orEmpty())
@@ -21270,10 +21260,11 @@ fun buildStoreAnalyticsDashboard(
     }
 
     val activeItems = scopedStock.filter { it.isActive }
-    val outOfStockItemCount = activeItems.count { (activeStockQuantityByItem[it.id] ?: 0.0) <= 0.0 }
+    val untrackedItemIds = activeBatches.filter { !it.tracksQuantity }.map { it.goodsItemId }.toSet()
+    val outOfStockItemCount = activeItems.count { it.id !in untrackedItemIds && (activeStockQuantityByItem[it.id] ?: 0.0) <= 0.0 }
     val lowStockItemCount = activeItems.count { item ->
         val quantity = activeStockQuantityByItem[item.id] ?: 0.0
-        quantity > 0.0 && quantity <= 5.0
+        item.id !in untrackedItemIds && quantity > 0.0 && quantity <= 5.0
     }
     val expiredBatchCount = activeBatches.count { batch -> batch.expirationDateMillis?.let { it < now } == true }
     val expiringSoonBatchCount = activeBatches.count { batch -> batch.expirationDateMillis?.let { it in now..expiringSoonCutoff } == true }

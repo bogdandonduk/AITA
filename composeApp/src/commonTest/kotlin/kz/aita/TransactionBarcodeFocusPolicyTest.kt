@@ -12,13 +12,13 @@ class TransactionBarcodeFocusPolicyTest {
 
     @Test fun wideCheckoutUsesVisibleSearch() = assertEquals(TransactionBarcodeFocusTarget.Search, target())
     @Test fun attachedSearchNeverCompetesWithHiddenInput() = assertEquals(TransactionBarcodeFocusTarget.Search, target(attached = true))
-    @Test fun initialLayoutWaitsForSearchAttachment() = assertEquals(TransactionBarcodeFocusTarget.None, target(attached = false))
+    @Test fun paymentWithoutSearchUsesHiddenReceiver() = assertEquals(TransactionBarcodeFocusTarget.Hid, target(attached = false))
     @Test fun narrowCheckoutUsesHiddenReceiver() = assertEquals(TransactionBarcodeFocusTarget.Hid, target(visible = false, attached = false))
     @Test fun modalWinsOverSearch() = assertEquals(TransactionBarcodeFocusTarget.None, target(modal = true))
     @Test fun modalAlsoWinsOverHiddenReceiver() = assertEquals(TransactionBarcodeFocusTarget.None, target(modal = true, visible = false))
     @Test fun manualEditorIsNeverInterrupted() = assertEquals(TransactionBarcodeFocusTarget.None, target(editing = true))
     @Test fun inactiveWindowDoesNotTakeFocus() = assertEquals(TransactionBarcodeFocusTarget.None, target(window = false))
-    @Test fun paymentAndReceiptDisableCapture() = assertEquals(TransactionBarcodeFocusTarget.None, target(capture = false))
+    @Test fun committedCheckoutDisablesCapture() = assertEquals(TransactionBarcodeFocusTarget.None, target(capture = false))
     @Test fun returningToCheckoutRestoresItsTarget() {
         assertEquals(TransactionBarcodeFocusTarget.None, target(capture = false))
         assertEquals(TransactionBarcodeFocusTarget.Search, target(capture = true))
@@ -28,8 +28,8 @@ class TransactionBarcodeFocusPolicyTest {
             val flags = (0..5).map { bits and (1 shl it) != 0 }
             val actual = transactionBarcodeFocusTarget(flags[0], flags[1], flags[2], flags[3], flags[4], flags[5])
             val blocked = !flags[0] || !flags[1] || flags[2] || flags[3]
-            assertEquals(if (blocked || flags[4] && !flags[5]) TransactionBarcodeFocusTarget.None
-                else if (flags[4]) TransactionBarcodeFocusTarget.Search else TransactionBarcodeFocusTarget.Hid, actual)
+            assertEquals(if (blocked) TransactionBarcodeFocusTarget.None
+                else if (flags[4] && flags[5]) TransactionBarcodeFocusTarget.Search else TransactionBarcodeFocusTarget.Hid, actual)
         }
     }
     @Test fun actualDesktopAndBrowserPlatformNamesUseSearch() {

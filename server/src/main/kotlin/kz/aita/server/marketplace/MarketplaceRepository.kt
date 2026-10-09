@@ -461,7 +461,7 @@ internal class MarketplaceRepository(private val db: Connection,
             // Decimal selling units such as 3 x 0.1 kg must not become 0.30000000000000004
             // and incorrectly fail against a recorded 0.3 kg batch.
             val total = marketRequestedQuantity(line.basis.pricedAmount, line.units)
-            if (!total.isFinite() || !batch.isMarketSellableAt(offer.storefront.operatingBranchId, now) || batch.quantity.total < total)
+            if (!total.isFinite() || !batch.isMarketSellableAt(offer.storefront.operatingBranchId, now) || (batch.tracksQuantity && batch.quantity.total < total))
                 return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_QUANTITY)
             if (item.firstViolatedPromotionRestriction(0, total, batch, now) != null)
                 return@map MarketShoppingQuotedLine(line, offer, status = MARKET_QUOTE_PRICE)
@@ -667,7 +667,7 @@ internal class MarketplaceRepository(private val db: Connection,
                 pricedAmount=priced.takeIf { minor!=null },unitId=batch?.quantity?.id?.takeIf { minor!=null },
                 unitName=if(minor==null) emptyList() else batch?.quantity?.immutableUnitName.orEmpty().take(12)
                     .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) },
-                availability=if(batch!=null && minor!=null && batch.quantity.total >= total) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
+                availability=if(batch!=null && minor!=null && (!batch.tracksQuantity || batch.quantity.total >= total)) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,
                 checkedAtMillis=now,sourceUpdatedAtMillis=maxOf(candidate.sourceUpdated,item.updatedAtMillis,batch?.updatedAtMillis ?: 0L),
                 saved=listing.id in saved,product=listing.product,
                 originalPriceMinor=base?.takeIf { it.currency.trim().uppercase() == currency }?.price?.let(::marketPriceMinor)

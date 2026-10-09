@@ -731,7 +731,7 @@ internal fun AppConfiguration.StockBatchShelfPreviewCard(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "${batch.quantity.total} ${batch.quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()}",
+            text = stockBatchQuantityForUi(batch),
             color = stateValues.TextColor,
             fontSize = stateValues.textSize,
             fontWeight = FontWeight.Bold,
@@ -913,7 +913,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
         if(managementStore) batches.sortedWith(compareBy<GoodsBatchDataModel> { it.expirationDateMillis ?: Long.MAX_VALUE }.thenBy { it.createdAtMillis })
         else batches.sortedForShelf(goodsItem)
     }
-    val totalQuantity = remember(shelfBatches) { shelfBatches.sumOf { it.quantity.total } }
+    val totalQuantity = remember(shelfBatches) { shelfBatches.availableStockQuantity() }
     val quantityUnitText = shelfBatches
         .firstOrNull()
         ?.quantity
@@ -1077,7 +1077,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                     value = if (shelfBatches.isEmpty()) {
                         localizedStringResource(199, "No batches yet")
                     } else {
-                        "$totalQuantity $quantityUnitText • ${shelfBatches.size} ${localizedStringResource(138, "Batches")}"
+                        (if (totalQuantity.isInfinite()) inventoryExperienceText("unlimited") else "${totalQuantity.quantityAmountText(false)} $quantityUnitText") + " • ${shelfBatches.size} ${localizedStringResource(138, "Batches")}"
                     },
                     textColor = if (shelfBatches.isEmpty()) stateValues.ErrorColor else textColor
                 )
@@ -1105,7 +1105,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
 
                     val activeBatchInfo = listOfNotNull(
                         activeBatchSupplier,
-                        batch.quantity.quantityText(stateValues.appLanguage),
+                        stockBatchQuantityForUi(batch),
                         batch.deliveredAtMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(342, "Delivered")} $it" },
                         batch.expirationDateMillis?.toStockDateInputText()?.takeIf { it.isNotBlank() }?.let { "${localizedStringResource(234, "Expires")} $it" },
                         batch.shelfPosition?.takeIf { transactionTypeIndex == null && it.isNotBlank() }?.let { "${localizedStringResource(344, "Shelf position")} $it" }

@@ -362,6 +362,10 @@ class Run:
                              ['node', 'scripts/linux-web/test/inventory-label-actions-smoke.cjs'])
                 self.command('Write-offs, stacked cart discounts, parent buyers, receipt retry and device spacing',
                              ['node', 'scripts/linux-web/test/receipt-batch-actions-smoke.cjs'])
+                self.command('Quick item creation, nondepleting stock and bulk parent templates',
+                             ['node', 'scripts/linux-web/test/quick-stock-import-smoke.cjs'])
+                self.command('Erasable supply price and payment amount in the browser',
+                             ['node', 'scripts/linux-web/test/numeric-cart-smoke.cjs'])
                 self.command('Write-off lost-acknowledgement recovery and analytics',
                              ['node', 'scripts/linux-web/test/store-commerce-offline-smoke.cjs'])
                 self.command('Profile password, email proof and refreshed authenticator choices',

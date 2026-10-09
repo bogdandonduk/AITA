@@ -361,6 +361,7 @@ private fun AppConfiguration.AndroidBarcodeCameraScannerPane(
     onBarcodeDetected: (String) -> Unit,
     onClose: () -> Unit
 ) {
+    val latestBarcodeDetected by rememberUpdatedState(onBarcodeDetected)
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
@@ -390,62 +391,98 @@ private fun AppConfiguration.AndroidBarcodeCameraScannerPane(
     }
 
     DisposableEffect(lifecycleOwner, lensFacing) {
+        val disposed = java.util.concurrent.atomic.AtomicBoolean(false)
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        var boundProvider: ProcessCameraProvider? = null
+        var boundPreview: Preview? = null
+        var boundAnalysis: ImageAnalysis? = null
         val listener = Runnable {
+            if (disposed.get()) return@Runnable
             runCatching {
                 val provider = cameraProviderFuture.get()
-                provider.unbindAll()
+                boundProvider = provider
 
                 val preview = Preview.Builder()
                     .build()
                     .also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
+                boundPreview = preview
                 val imageAnalysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(androidx.camera.core.resolutionselector.ResolutionSelector.Builder()
+                        .setResolutionStrategy(androidx.camera.core.resolutionselector.ResolutionStrategy(
+                            android.util.Size(1280, 720),
+                            androidx.camera.core.resolutionselector.ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)).build())
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                     .also { analysis ->
                         analysis.setAnalyzer(analysisExecutor) { imageProxy ->
                             val mediaImage = imageProxy.image
-                            if (mediaImage == null) {
+                            if (disposed.get() || mediaImage == null) {
                                 imageProxy.close()
                                 return@setAnalyzer
                             }
 
                             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                            scanner.process(image)
-                                .addOnSuccessListener { barcodes ->
-                                    val raw = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
+                            val scan = runCatching { scanner.process(image) }.getOrElse {
+                                imageProxy.close()
+                                return@setAnalyzer
+                            }
+                            scan.addOnSuccessListener { barcodes ->
+                                    if (disposed.get()) return@addOnSuccessListener
+                                    val candidates = barcodes.filter { !it.rawValue.isNullOrBlank() }.distinctBy { it.rawValue }
+                                    // Multiple packages in view must not select an arbitrary first result.
+                                    val decoded = candidates.singleOrNull()
+                                    val raw = decoded?.rawValue?.takeIf { value ->
+                                        decoded.format !in setOf(com.google.mlkit.vision.barcode.common.Barcode.FORMAT_EAN_13,
+                                            com.google.mlkit.vision.barcode.common.Barcode.FORMAT_EAN_8,
+                                            com.google.mlkit.vision.barcode.common.Barcode.FORMAT_UPC_A) || value.hasValidGtinChecksum()
+                                    }
                                     if (!raw.isNullOrBlank()) {
                                         mainExecutor.execute {
-                                            statusText = raw
-                                            onBarcodeDetected(raw)
+                                            if (!disposed.get()) {
+                                                statusText = raw
+                                                latestBarcodeDetected(raw)
+                                            }
                                         }
                                     }
                                 }
                                 .addOnFailureListener { throwable ->
                                     mainExecutor.execute {
-                                        statusText = throwable.message ?: "Camera scanner error"
+                                        if (!disposed.get()) statusText = inventoryExperienceText("camera_failed")
                                     }
                                 }
                                 .addOnCompleteListener { imageProxy.close() }
                         }
                     }
 
+                boundAnalysis = imageAnalysis
                 val selector = CameraSelector.Builder()
                     .requireLensFacing(lensFacing)
                     .build()
 
                 camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, imageAnalysis)
+                previewView.setOnTouchListener { view, event ->
+                    if (event.action == android.view.MotionEvent.ACTION_UP) {
+                        val point = previewView.meteringPointFactory.createPoint(event.x, event.y)
+                        runCatching { camera?.cameraControl?.startFocusAndMetering(androidx.camera.core.FocusMeteringAction.Builder(point).build()) }
+                        view.performClick()
+                    }
+                    true
+                }
                 runCatching { camera?.cameraControl?.enableTorch(torchOn) }
             }.onFailure { throwable ->
-                statusText = throwable.message ?: "Could not start camera"
+                if (!disposed.get()) statusText = inventoryExperienceText("camera_failed")
             }
         }
 
         cameraProviderFuture.addListener(listener, mainExecutor)
 
         onDispose {
-            runCatching { cameraProviderFuture.get().unbindAll() }
+            disposed.set(true)
+            boundAnalysis?.clearAnalyzer()
+            // Never block the main thread on provider initialization or unbind another scanner.
+            runCatching { boundProvider?.unbind(*listOfNotNull(boundPreview, boundAnalysis).toTypedArray()) }
+            previewView.setOnTouchListener(null)
             camera = null
         }
     }

@@ -9,14 +9,18 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
-/** Immutable creates. UUIDs are allocated before disk/network I/O and reused after lost replies. */
+/** Durable inventory writes. IDs and optimistic preconditions survive lost replies and restarts. */
 @Serializable
 data class InventoryCreateCommand(
     val id: String,
     val storeId: String,
     val item: GoodsItemDataModel? = null,
     val batches: List<GoodsBatchDataModel> = emptyList(),
-    val failure: List<LocalizedStringDataModel>? = null
+    val failure: List<LocalizedStringDataModel>? = null,
+    val editsItem: Boolean = false,
+    val previousItem: GoodsItemDataModel? = null,
+    val dependsOn: String? = null,
+    val rejected: Boolean = false
 )
 
 /** One journal per account, independent of the selected store and of short-lived session tokens. */
@@ -85,21 +89,26 @@ internal object InventoryCreates {
         return mergeById(cloud, batches) { it.id }
     }
 
-    private suspend fun project(owner: InventoryOwner, command: InventoryCreateCommand, remove: Boolean = false): Boolean =
+    private suspend fun project(owner: InventoryOwner, command: InventoryCreateCommand, remove: Boolean = false, ignorePendingIds: Set<String> = emptySet()): Boolean =
         inventoryStateMutex.withLock {
             if (userAccountState.payloadValue?.id != owner.accountId || !authenticatedSessionGenerationIsCurrent(owner.sessionGeneration)) return@withLock false
             val current = inventoryOwnerIsCurrent(owner)
             if (current && stockLoadStatusState.value.accessDenied) return@withLock false
             var durable = true
-            command.item?.let { item ->
+            command.item?.let { proposed ->
+                val item = if (remove && command.editsItem) command.previousItem ?: proposed else proposed
                 val cached = (if (current) stockState.payloadValue else null) ?: readJsonCacheText(CACHE_PREFIX + inventoryCacheKey("stock", owner))
                     ?.let { jsonBase.decodeFromString<List<GoodsItemDataModel>>(it) }.orEmpty()
-                val rows = cached.filterNot { it.id == item.id } + if (remove) emptyList() else listOf(item)
+                val base = cached.filterNot { it.id == item.id } + if (remove && !command.editsItem) emptyList() else listOf(item)
+                val queue = journal.list(requireNotNull(owner.accountId))
+                val at = queue.indexOfFirst { it.id == command.id }
+                val later = (if (at >= 0) queue.drop(at + 1) else queue).filter { it.storeId == owner.storeId && it.id !in ignorePendingIds }.mapNotNull { it.item }
+                val rows = mergeById(base, later) { it.id }
                 val saved = persistInventoryCacheLocked("stock", owner, rows)
                 durable = durable && saved
                 if (current) {
                     stockState.emit(DataState.Success(rows))
-                    stockLoadStatusState.value = stockLoadStatusState.value.copy(source = InventoryLoadSource.Local, cacheWriteFailed = !saved)
+                    stockLoadStatusState.value = stockLoadStatusState.value.copy(source = InventoryLoadSource.Local, cacheWriteFailed = !saved, failure = null)
                 }
             }
             if (command.batches.isNotEmpty()) {
@@ -111,7 +120,7 @@ internal object InventoryCreates {
                 durable = durable && saved
                 if (current) {
                     stockBatchesState.emit(DataState.Success(rows))
-                    stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(source = InventoryLoadSource.Local, cacheWriteFailed = !saved)
+                    stockBatchesLoadStatusState.value = stockBatchesLoadStatusState.value.copy(source = InventoryLoadSource.Local, cacheWriteFailed = !saved, failure = null)
                 }
             }
             durable
@@ -126,6 +135,22 @@ internal object InventoryCreates {
         val response = submit(owner, command, STORE_PERMISSION_STOCK_ITEM_CREATE)
         return if (response.negative) DataState.Empty(response.message) else DataState.Success(response.payload?.item ?: item, response.message)
     }
+    suspend fun updateItem(owner: InventoryOwner, input: GoodsItemDataModel): DataState<GoodsItemDataModel> {
+        val account = owner.accountId ?: return DataState.Empty(currentUserPermissionDeniedMessage())
+        val previous = stockState.payloadValue.orEmpty().firstOrNull { it.id == input.id && it.storeId == owner.storeId }
+            ?: return DataState.Empty(inventoryLoadFailureMessage())
+        val dependency = pending(account).lastOrNull { it.item?.id == input.id && it.storeId == owner.storeId }
+        if (dependency?.rejected == true) return DataState.Empty(dependency.failure)
+        val operation = newDiagnosticId()
+        val item = input.copy(updateOperationId = operation, expectedUpdatedAtMillis = input.expectedUpdatedAtMillis ?: previous.updatedAtMillis)
+        val command = InventoryCreateCommand(operation, input.storeId, item = item, editsItem = true,
+            previousItem = previous, dependsOn = dependency?.id)
+        val permission = if (currentUserHasStorePermission(owner.storeId, STORE_PERMISSION_STOCK_ITEM_EDIT))
+            STORE_PERMISSION_STOCK_ITEM_EDIT else STORE_PERMISSION_STOCK_PROMOTIONS_MANAGE
+        val response = submit(owner, command, permission)
+        return if (response.negative) DataState.Empty(response.message) else DataState.Success(response.payload?.item ?: item, response.message)
+    }
+
     suspend fun createBatches(owner: InventoryOwner, input: List<GoodsBatchDataModel>): DataState<List<GoodsBatchDataModel>> {
         val now = getCurrentTimeMillis()
         val batches = input.map { it.copy(id = it.id.ifBlank { newDiagnosticId() }, userId = owner.accountId.orEmpty(),
@@ -150,7 +175,7 @@ internal object InventoryCreates {
             try {
                 change(account) { it + command }
             } catch (cancel: CancellationException) { throw cancel }
-            catch (_: Exception) { return failure(stockEditingMessage("storage")) }
+            catch (error: Exception) { RuntimeDiagnostics.capture(error, "inventory_journal_write"); return failure(stockEditingMessage("storage")) }
             try { project(owner, command) }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { /* The committed journal still owns the operation; hydration can recover it. */ }
@@ -178,11 +203,18 @@ internal object InventoryCreates {
             for (command in pending(account)) {
                 if (userAccountState.payloadValue?.id != account || !authenticatedSessionGenerationIsCurrent(generation)) return null
                 if (command.storeId in blockedStores) continue
+                if (command.rejected) {
+                    blockedStores += command.storeId
+                    continue
+                }
+                // Re-read after earlier acknowledgments: their accepted timestamp unlocks dependent edits.
+                val readyCommand = pending(account).firstOrNull { it.id == command.id } ?: continue
+                if (readyCommand.dependsOn != null) { blockedStores += command.storeId; continue }
                 if (command.id != initialId && command.id in initialSubmissions.value) {
                     blockedStores += command.storeId
                     continue
                 }
-                val response: ResponseDataModel<InventoryCreateCommand> = withTimeoutOrNull(12_000L) { send(command, generation) }
+                val response: ResponseDataModel<InventoryCreateCommand> = withTimeoutOrNull(12_000L) { send(readyCommand, generation) }
                     ?: ResponseDataModel(stockEditingMessage("pending"), null, true, transportFailure = true)
                 if (userAccountState.payloadValue?.id != account || !authenticatedSessionGenerationIsCurrent(generation)) return null
                 val owner = inventoryOwners.current
@@ -190,17 +222,21 @@ internal object InventoryCreates {
                     // Cache the accepted result before acknowledging the journal. An interrupted ack
                     // repeats the exact same create UUID; the server returns its existing row.
                     val cached = project(owner.copy(storeId = command.storeId, accountId = account, sessionGeneration = generation), response.payload)
-                    if (cached) change(account) { rows -> rows.filterNot { it.id == command.id } }
+                    if (cached) change(account) { rows -> rows.filterNot { it.id == command.id }.map { next ->
+                        if (next.dependsOn == command.id) next.copy(dependsOn = null,
+                            item = next.item?.copy(expectedUpdatedAtMillis = response.payload.item?.updatedAtMillis),
+                            previousItem = response.payload.item) else next
+                    } }
                     else change(account) { rows -> rows.map { if (it.id == command.id) it.copy(failure = stockEditingMessage("storage")) else it } }
                     if (command.id == initialId) return response
                 } else {
                     val definiteRejection = !response.transportFailure && response.httpStatusCode in listOf(400, 403, 404, 409, 422)
-                    if (command.id == initialId && definiteRejection) {
+                    if (command.id == initialId && definiteRejection && pending(account).none { it.dependsOn == command.id }) {
                         change(account) { rows -> rows.filterNot { it.id == command.id } }
                         project(owner.copy(storeId = command.storeId, accountId = account, sessionGeneration = generation), command, remove = true)
                         return response
                     }
-                    change(account) { rows -> rows.map { if (it.id == command.id) it.copy(failure = response.message) else it } }
+                    change(account) { rows -> rows.map { if (it.id == command.id) it.copy(failure = if (response.transportFailure) null else response.message, rejected = definiteRejection) else it } }
                     blockedStores += command.storeId
                     if (response.transportFailure || response.httpStatusCode == 401) break
                 }
@@ -211,12 +247,42 @@ internal object InventoryCreates {
         return null
     }
 
+    suspend fun retryRejected() {
+        val owner = inventoryOwners.current
+        val account = owner.accountId ?: return
+        sender.withLock {
+            if (inventoryOwnerIsCurrent(owner)) change(account) { rows -> rows.map { it.copy(rejected = false) } }
+        }
+        flush(force = true)
+    }
+
+    // Only a user-confirmed rejection can be discarded, never an uncertain server acknowledgment.
+    suspend fun discardRejected(id: String): Boolean = sender.withLock {
+        val owner = inventoryOwners.current
+        val account = owner.accountId ?: return@withLock false
+        val rows = pending(account)
+        val failed = rows.firstOrNull { it.id == id && it.storeId == owner.storeId && it.rejected } ?: return@withLock false
+        val discarded = mutableSetOf(id)
+        rows.forEach { row ->
+            if (row.dependsOn in discarded || (!failed.editsItem && failed.item != null && row.batches.any { it.goodsItemId == failed.item.id })) discarded += row.id
+        }
+        if (!inventoryOwnerIsCurrent(owner)) return@withLock false
+        // Save the rollback projection before removing the journal. A disk failure leaves it reviewable.
+        val restore = failed.copy(item = failed.previousItem ?: failed.item)
+        val cached = project(owner, restore, remove = true, ignorePendingIds = discarded)
+        if (!cached) return@withLock false
+        for (row in rows.filter { it.id in discarded && it.batches.isNotEmpty() })
+            if (!project(owner, row, remove = true, ignorePendingIds = discarded)) return@withLock false
+        change(account) { it.filterNot { row -> row.id in discarded } }
+        true
+    }
+
     private suspend fun send(command: InventoryCreateCommand, generation: Long): ResponseDataModel<InventoryCreateCommand> {
         val config = globalAppConfigurationState.payloadValue
         val invalidReply = ResponseDataModel<InventoryCreateCommand>(eventMessage("message.the_batch_result_is_not_confirmed_refresh_branch_stock_before_trying"), null, true, 409)
         if (command.item != null) {
-            val result = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(HttpMethod.Post,
-                endpointUrl = config.addGoodsItemPath.first, body = command.item,
+            val result = networkRequest<GoodsItemDataModel, GoodsItemDataModel>(if (command.editsItem) HttpMethod.Put else HttpMethod.Post,
+                endpointUrl = if (command.editsItem) config.updateGoodsItemPath.first else config.addGoodsItemPath.first, body = command.item,
                 headers = mapOf("store_id" to command.storeId), expectedSessionGeneration = generation)
             if (!result.negative && (result.payload?.id != command.item.id || result.payload.storeId != command.storeId)) return invalidReply
             return ResponseDataModel(result.message, result.payload?.let { command.copy(item = it, failure = null) },
@@ -236,7 +302,7 @@ internal object InventoryCreates {
 
 internal fun <T> mergeById(base: List<T>, pending: List<T>, id: (T) -> String): List<T> {
     val pendingIds = pending.map(id).toSet()
-    return base.filterNot { id(it) in pendingIds } + pending
+    return base.filterNot { id(it) in pendingIds } + pending.associateBy(id).values
 }
 
 internal suspend fun stockItemsWithPendingCreates(owner: InventoryOwner, rows: List<GoodsItemDataModel>) =
@@ -244,4 +310,12 @@ internal suspend fun stockItemsWithPendingCreates(owner: InventoryOwner, rows: L
 internal suspend fun stockBatchesWithPendingCreates(owner: InventoryOwner, rows: List<GoodsBatchDataModel>) =
     StoreCommerceClient.overlayBatches(owner, InventoryCreates.overlayBatches(owner, filterRecentlyDeletedStockBatches(rows)))
 
-suspend fun retryPendingInventoryCreates() { InventoryCreates.flush(force = true) }
+suspend fun retryPendingInventoryCreates() { InventoryCreates.retryRejected() }
+suspend fun discardPendingInventoryChange(id: String): Boolean = try {
+    InventoryCreates.discardRejected(id)
+} catch (cancel: CancellationException) {
+    throw cancel
+} catch (error: Exception) {
+    RuntimeDiagnostics.capture(error, "inventory_rejected_discard")
+    false
+}

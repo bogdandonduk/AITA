@@ -1614,6 +1614,7 @@ fun main() {
 
     val cacheRoot = desktopAitaCacheRootDir()
     val dataRoot = desktopAitaDataRootDir()
+    if (!DesktopSingleInstance.acquire(dataRoot)) return
     cacheDirPath = cacheRoot.absolutePath
     jvmPersistentDataDirPath = dataRoot.absolutePath
     migrateLegacyDesktopPersistentState(dataRoot)
