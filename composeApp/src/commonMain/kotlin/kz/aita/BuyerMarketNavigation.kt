@@ -20,6 +20,9 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
     val appliedCity = mutableStateOf("")
     val categoryId = mutableStateOf<String?>(null)
     val sort = mutableStateOf(MARKET_DISCOVERY_RECENT)
+    val brand = mutableStateOf("")
+    val appliedBrand = mutableStateOf("")
+    val withPhotos = mutableStateOf(false)
     val limit = mutableStateOf(MARKET_DISCOVERY_PAGE_SIZE)
     val shopId = mutableStateOf<String?>(null)
     val returnPoint = mutableStateOf<BuyerReturnPoint?>(null)
@@ -33,11 +36,11 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
 
     val query: MarketDiscoveryQuery get() {
         val raw = MarketDiscoveryQuery(appliedSearch.value, if (shopId.value == null) appliedCity.value else "",
-            shopId.value, categoryId.value, savedOnly && shopId.value == null, sort.value)
+            shopId.value, categoryId.value, savedOnly && shopId.value == null, sort.value, appliedBrand.value, withPhotos.value)
         return raw.normalizedDiscoveryQuery() ?: raw
     }
     val filterCount: Int get() = (if (shopId.value == null && city.value.isNotBlank()) 1 else 0) +
-        (if (categoryId.value != null) 1 else 0) + (if (sort.value != MARKET_DISCOVERY_RECENT) 1 else 0)
+        (if (categoryId.value != null) 1 else 0) + (if (sort.value != MARKET_DISCOVERY_RECENT) 1 else 0) + (if (brand.value.isNotBlank()) 1 else 0) + (if (withPhotos.value) 1 else 0)
 
     fun point(): BuyerReturnPoint {
         val restoring = scrollRestore?.takeIf { it.query == query }
@@ -52,6 +55,7 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
         gridQuery = null; scrollRestore = null
         shopId.value = normalized
         search.value = ""; appliedSearch.value = ""; categoryId.value = null
+        brand.value = ""; appliedBrand.value = ""; withPhotos.value = false
         sort.value = MARKET_DISCOVERY_RECENT; limit.value = MARKET_DISCOVERY_PAGE_SIZE
         return true
     }
@@ -62,6 +66,7 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
         search.value = point?.search.orEmpty(); appliedSearch.value = point?.query?.text.orEmpty()
         city.value = point?.city ?: city.value; appliedCity.value = point?.query?.city ?: city.value
         categoryId.value = point?.query?.categoryId; sort.value = point?.query?.sort ?: MARKET_DISCOVERY_RECENT
+        brand.value = point?.query?.brand.orEmpty(); appliedBrand.value = brand.value; withPhotos.value = point?.query?.withPhotos ?: false
         limit.value = point?.limit ?: MARKET_DISCOVERY_PAGE_SIZE
         scrollRestore = point
         return point
@@ -70,6 +75,7 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
     fun clearFilters() {
         scrollRestore = null
         search.value = ""; appliedSearch.value = ""; city.value = ""; appliedCity.value = ""
+        brand.value = ""; appliedBrand.value = ""; withPhotos.value = false
         categoryId.value = null; sort.value = MARKET_DISCOVERY_RECENT; limit.value = MARKET_DISCOVERY_PAGE_SIZE
     }
 }

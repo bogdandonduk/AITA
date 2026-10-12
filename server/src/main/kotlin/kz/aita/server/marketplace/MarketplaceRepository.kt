@@ -258,11 +258,15 @@ internal class MarketplaceRepository(private val db: Connection,
             val barcode = marketCanonicalGtin(input.text)
             if (barcode != null) { conditions += "l.gtin=?"; args += barcode }
             else input.text.split(' ').distinct().forEach { term ->
-                conditions += "(strpos(lower(l.title),lower(?))>0 OR strpos(lower(l.description),lower(?))>0)"
-                args += term; args += term
+                conditions += """strpos(lower(concat_ws(' ',l.title,l.description,l.product->>'brand',l.product->>'manufacturer',l.product->>'article',
+                    (SELECT string_agg(concat_ws(' ',a->>'name',a->>'value'),' ') FROM jsonb_array_elements(coalesce(l.product->'attributes','[]'::jsonb)) a))),lower(?))>0"""
+                args += term
             }
         }
         if (input.city.isNotEmpty()) { conditions += "lower(f.city)=lower(?)"; args += input.city }
+        if (input.brand.isNotEmpty()) { conditions += "strpos(lower(coalesce(l.product->>'brand','')),lower(?))>0"; args += input.brand }
+        if (input.withPhotos) conditions += "jsonb_array_length(coalesce(l.product->'imageUrls','[]'::jsonb))>0"
+
         input.storefrontId?.let { conditions += "l.store_id=?"; args += marketUuid(it) }
         if (descendants != null) {
             // pgJDBC escapes a literal question mark as ??. The server receives the indexable

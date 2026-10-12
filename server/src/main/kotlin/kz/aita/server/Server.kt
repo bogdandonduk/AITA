@@ -4167,7 +4167,7 @@ internal suspend fun publishAuthenticatorReset(userId: UUID) {
   RealtimeServerBus.publish(entity = "auth/security", userId = userId.toString(), reason = "authenticator_recovered")
 }
 
-private suspend fun publishWorkerRealtimeBundle(storeId: String?, reason: String) {
+internal suspend fun publishWorkerRealtimeBundle(storeId: String?, reason: String) {
   val cleanStoreId = storeId?.trim()?.takeIf { it.isNotBlank() }
   val entities = listOf("workers/requests", "workers/memberships", "workers", "notifications", "stores", "all")
 
@@ -4900,7 +4900,7 @@ private fun stockItemHasPendingTransferInsideTransaction(goodsItemId: UUID): Boo
 
 private fun pendingStockTransferItemChangeMessage(): List<LocalizedStringDataModel> = eventMessage("message.finish_pending_batch_transfers_before_changing_this_item_s_unit_making")
 
-private fun activeRootStoreIdForAccessInsideTransaction(storeId: UUID): UUID? {
+internal fun activeRootStoreIdForAccessInsideTransaction(storeId: UUID): UUID? {
   val storeRow = Stores
     .select(Stores.id, Stores.parentStoreId, Stores.isActive)
     .where { Stores.id eq storeId }
@@ -5062,7 +5062,7 @@ internal fun marketplaceStoreOwnerInsideTransaction(userId: UUID, storeId: UUID)
 internal fun marketplaceStockReaderInsideTransaction(userId: UUID, storeId: UUID): Boolean =
   userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_STOCK_READ, requireWorkshift = false)
 
-private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
+internal fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean {
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return false
   return Stores
     .select(Stores.ownerUserIds)
@@ -5072,7 +5072,7 @@ private fun isStoreOwnerInsideTransaction(userId: UUID, storeId: UUID): Boolean 
     ?.contains(userId.toString()) == true
 }
 
-private fun activeWorkerPermissionsInsideTransaction(userId: UUID, storeId: UUID): List<String> {
+internal fun activeWorkerPermissionsInsideTransaction(userId: UUID, storeId: UUID): List<String> {
   val rootStoreId = activeRootStoreIdForAccessInsideTransaction(storeId) ?: return emptyList()
   return normalizeStorePermissionIds(
     StoreWorkerMemberships
@@ -5086,7 +5086,7 @@ private fun activeWorkerPermissionsInsideTransaction(userId: UUID, storeId: UUID
   )
 }
 
-private fun userHasStorePermissionInsideTransaction(userId: UUID, storeId: UUID, permission: String): Boolean {
+internal fun userHasStorePermissionInsideTransaction(userId: UUID, storeId: UUID, permission: String): Boolean {
   if (isStoreOwnerInsideTransaction(userId, storeId)) return true
   val permissions = activeWorkerPermissionsInsideTransaction(userId, storeId)
   if (permission in permissions) return true
@@ -5178,7 +5178,7 @@ private fun assignableStorePermissionsInsideTransaction(
   return permissions.takeIf { requested -> requested.all { it in actorPermissions } }
 }
 
-private fun actorCanManageExistingWorkerPermissionsInsideTransaction(
+internal fun actorCanManageExistingWorkerPermissionsInsideTransaction(
   actorUserId: UUID,
   storeId: UUID,
   existingPermissions: List<String>
@@ -6405,7 +6405,7 @@ private fun List<ResultRow>.toHierarchicalStoreDataModels(): List<StoreDataModel
   return parentModels + orphanBranchModels
 }
 
-private fun ResultRow.toStoreWorkerDataModel(): StoreWorkerDataModel {
+internal fun ResultRow.toStoreWorkerDataModel(): StoreWorkerDataModel {
   val userName = this[Stores.name]
   return StoreWorkerDataModel(
     id = this[StoreWorkerMemberships.id].toString(),
@@ -16550,7 +16550,7 @@ private fun supplierCanMaintainPriceBookInsideTransaction(
     }
 }
 
-private fun upsertSupplierGoodsPriceInsideTransaction(
+internal fun upsertSupplierGoodsPriceInsideTransaction(
   userId: UUID,
   storeId: UUID,
   supplierId: UUID,
@@ -16561,7 +16561,8 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
   supplierBarcode: String? = null,
   supplierGoodsName: String? = null,
   replaceOptionalFields: Boolean = false,
-  now: Long
+  now: Long,
+  expectedUpdatedAtMillis: Long? = null
 ): UUID {
   val lockIdentity = "supplier_goods_price:$storeId:$supplierId:$goodsItemId"
   val escapedLockIdentity = lockIdentity.replace("'", "''")
@@ -16590,6 +16591,22 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
   val canonicalId = canonicalRow?.get(SupplierGoodsPrices.id) ?: UUID.randomUUID()
   val cleanBarcode = supplierBarcode?.trim()?.takeIf { it.isNotBlank() }
   val cleanGoodsName = supplierGoodsName?.trim()?.takeIf { it.isNotBlank() }
+  if (expectedUpdatedAtMillis != null) {
+    val currentRevision = canonicalRow?.takeIf { it[SupplierGoodsPrices.isActive] }?.get(SupplierGoodsPrices.updatedAtMillis) ?: 0L
+    if (expectedUpdatedAtMillis < 0) throw SupplierOfferConflict()
+    if (currentRevision != expectedUpdatedAtMillis) {
+      // A retry of an acknowledged desired value is harmless; a different value never wins silently.
+      if (canonicalRow != null && canonicalRow[SupplierGoodsPrices.isActive] &&
+        canonicalRow[SupplierGoodsPrices.supplyPrice] == supplyPrice &&
+        canonicalRow[SupplierGoodsPrices.minOrderQuantity] == minOrderQuantity &&
+        canonicalRow[SupplierGoodsPrices.packageQuantity] == packageQuantity &&
+        canonicalRow[SupplierGoodsPrices.supplierBarcode] == cleanBarcode &&
+        canonicalRow[SupplierGoodsPrices.supplierGoodsName] == cleanGoodsName) return canonicalId
+      throw SupplierOfferConflict()
+    }
+  }
+  val revision = maxOf(now, (canonicalRow?.get(SupplierGoodsPrices.updatedAtMillis) ?: 0L) + 1L)
+
 
   if (canonicalRow == null) {
     SupplierGoodsPrices.insert {
@@ -16604,7 +16621,7 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
       it[SupplierGoodsPrices.supplierBarcode] = cleanBarcode
       it[SupplierGoodsPrices.supplierGoodsName] = cleanGoodsName
       it[SupplierGoodsPrices.createdAtMillis] = now
-      it[SupplierGoodsPrices.updatedAtMillis] = now
+      it[SupplierGoodsPrices.updatedAtMillis] = revision
       it[SupplierGoodsPrices.lastUsedAtMillis] = now
       it[SupplierGoodsPrices.isActive] = true
     }
@@ -16642,7 +16659,7 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
         }
       }
 
-      it[SupplierGoodsPrices.updatedAtMillis] = now
+      it[SupplierGoodsPrices.updatedAtMillis] = revision
       it[SupplierGoodsPrices.lastUsedAtMillis] = now
       it[SupplierGoodsPrices.isActive] = true
     }
@@ -16653,7 +16670,7 @@ private fun upsertSupplierGoodsPriceInsideTransaction(
     .map { row -> row[SupplierGoodsPrices.id] }
   if (duplicateIds.isNotEmpty()) {
     SupplierGoodsPrices.update({ SupplierGoodsPrices.id inList duplicateIds }) {
-      it[SupplierGoodsPrices.updatedAtMillis] = now
+      it[SupplierGoodsPrices.updatedAtMillis] = revision
       it[SupplierGoodsPrices.isActive] = false
     }
   }
@@ -21242,7 +21259,7 @@ fun Application.module() {
             )
           }
 
-          val result = newSuspendedTransaction(aitaServerIoContext) {
+          val result = try { newSuspendedTransaction(aitaServerIoContext) {
             lockSupplierProfileInsideTransaction(supplierId)
             if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty())
               return@newSuspendedTransaction null
@@ -21279,6 +21296,7 @@ fun Application.module() {
               supplierBarcode = body.supplierBarcode,
               supplierGoodsName = body.supplierGoodsName,
               replaceOptionalFields = true,
+              expectedUpdatedAtMillis = body.expectedUpdatedAtMillis,
               now = now
             )
 
@@ -21290,6 +21308,10 @@ fun Application.module() {
               }
               .single()
               .toSupplierGoodsPriceDataModel()
+          }
+
+          } catch (_: SupplierOfferConflict) {
+            return@post call.genericResponseNoPayload(HttpStatusCode.Conflict, supplierOfferConflictMessage())
           }
 
           result?.let {
@@ -24111,6 +24133,21 @@ fun Application.module() {
 
     route("/workers") {
       authenticate("auth-jwt") {
+        post("/placement") {
+          val actor = call.checkPrincipal() ?: return@post
+          val command = call.receiveAita<WorkerPlacementCommand>()
+          try {
+            val result = newSuspendedTransaction(aitaServerIoContext) {
+              placeWorkerInsideTransaction(actor, command)
+            }
+            publishWorkerRealtimeBundle(command.sourceStoreId, "worker_placement_changed")
+            publishWorkerRealtimeBundle(command.destinationStoreId, "worker_placement_changed")
+            call.genericResponse(HttpStatusCode.OK, result, workerPlacementMessage("done"))
+          } catch (failure: WorkerPlacementFailure) {
+            call.genericResponseNoPayload(HttpStatusCode.fromValue(failure.status), workerPlacementMessage(failure.key))
+          }
+        }
+
         get("/my/get") {
           val userId = call.checkPrincipal() ?: return@get
           val result = newSuspendedTransaction(aitaServerIoContext) {
@@ -25395,6 +25432,8 @@ fun Application.module() {
 
           val workshift = newSuspendedTransaction(aitaServerIoContext) {
             val rootStoreId = rootStoreIdForAccessInsideTransaction(storeId)
+            Stores.select(Stores.id).where { Stores.id eq rootStoreId }.forUpdate().singleOrNull()
+              ?: return@newSuspendedTransaction null
             val identifier = body.workerIdentifier.trim()
             val identifierUuid = runCatching { UUID.fromString(identifier) }.getOrNull()
 
@@ -25407,6 +25446,7 @@ fun Application.module() {
                    (StoreWorkerMemberships.userId eq userId) and
                    ((StoreWorkerMemberships.storeId eq storeId) or (StoreWorkerMemberships.storeId eq rootStoreId))
               }
+              .sortedWith(compareBy<ResultRow> { it[StoreWorkerMemberships.storeId] != storeId }.thenBy { it[StoreWorkerMemberships.id] })
               .firstOrNull { row ->
                 row[StoreWorkerMemberships.id] == identifierUuid ||
                    row[Users.id] == identifierUuid ||

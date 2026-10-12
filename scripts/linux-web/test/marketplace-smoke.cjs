@@ -32,7 +32,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   else if(p==='/user/app-state')payload={state:{revision:0,enabled:true}};
   else if(p==='/market/discovery'){
    const input=route.request().postDataJSON();const q=input.query;
-   const rows=offers(now).map(o=>({...o,saved:savedOffers.includes(o.id)})).filter(o=>(!q.savedOnly||o.saved)&&(!q.storefrontId||o.storefront.storeId===q.storefrontId)&&(!q.categoryId||o.categoryIds.includes(q.categoryId))&&(!q.text||o.title.toLowerCase().includes(q.text.toLowerCase())));
+   const rows=offers(now).map(o=>({...o,saved:savedOffers.includes(o.id)})).filter(o=>(!q.brand||o.product.brand.toLowerCase().includes(q.brand.toLowerCase()))&&(!q.withPhotos||o.product.imageUrls.length>0)&&(!q.savedOnly||o.saved)&&(!q.storefrontId||o.storefront.storeId===q.storefrontId)&&(!q.categoryId||o.categoryIds.includes(q.categoryId))&&(!q.text||o.title.toLowerCase().includes(q.text.toLowerCase())));
    payload={query:q,limit:input.limit,page:{offers:rows,checkedAtMillis:now},totalOffers:rows.length,totalShops:new Set(rows.map(o=>o.storefront.storeId)).size,categoryVersion:'a'.repeat(64),categories,accountId:account.id,storefront:q.storefrontId?shops.find(s=>s.storeId===q.storefrontId):null};
   } else if(p==='/market/shopping-list' && route.request().method()==='GET')payload=shopping(now);
   else if(p==='/market/shopping-list' || p==='/market/shopping-list/checklist'){
@@ -112,12 +112,25 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   }
   await addOats.click({force:true});
   await until(()=>lines.some(l=>l.offerId===id(104)));assert.equal(shoppingRevision,6);await shot('offer-added');
+  await page.mouse.move(750,500);await page.mouse.wheel(0,-3000);await page.waitForTimeout(900);
+  await page.getByRole('button',{name:'Filters',exact:true}).click({force:true});await page.waitForTimeout(500);
+  // Compose web exposes these field titles separately from their textbox semantics.
+  const brand=page.getByRole('textbox').nth(1);await brand.click({force:true});await page.keyboard.type('Everyday');
+  await until(()=>calls.some(x=>x.path==='/market/discovery'&&JSON.parse(x.body).query.brand==='Everyday'));
+  await page.getByRole('button',{name:'With product photos',exact:true}).click({force:true});
+  await until(()=>calls.some(x=>x.path==='/market/discovery'&&JSON.parse(x.body).query.withPhotos));await shot('brand-photo-filters');
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(800);await shot('brand-photo-filters-phone');
+  await page.reload();await page.waitForTimeout(10000);await page.keyboard.press('Tab');
+  const latest=calls.filter(x=>x.path==='/market/discovery').map(x=>JSON.parse(x.body)).at(-1);
+  assert.equal(latest.query.brand,'Everyday');assert.equal(latest.query.withPhotos,true);
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click({force:true});
+  await until(()=>{const q=JSON.parse(calls.filter(x=>x.path==='/market/discovery').at(-1).body).query;return !q.brand&&!q.withPhotos;});
   assert.deepEqual(errors,[]);
   assert.equal(lines.length,3);assert.deepEqual(savedShops,[id(80)]);
   const changes=calls.filter(x=>x.path==='/market/shopping-list/checklist').map(x=>JSON.parse(x.body));
   assert.deepEqual(changes.map(x=>x.checklistChange.action),['collect','uncheck','collect','remove_collected']);
   assert.ok(changes.every(x=>x.checklistChange.offerIds.length===1 && x.checklistChange.offerIds[0]===id(101)));
   console.log('MARKETPLACE PASS: responsive catalogue, gallery, saved shops, shopping-trip checkmarks, frozen removal review and reload; isolated account only');
- }catch(error){await page.screenshot({path:path.join(output,'failure.png')});throw error;}finally{fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({errors,calls},null,2));await browser.close();server.close();}
+ }catch(error){await page.screenshot({path:path.join(output,'failure.png')});fs.writeFileSync(path.join(output,'failure-aria.txt'),await page.locator('body').ariaSnapshot());throw error;}finally{fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({errors,calls},null,2));await browser.close();server.close();}
  console.log('Marketplace evidence saved:',output);
 })().catch(e=>{console.error(e);process.exitCode=1;});

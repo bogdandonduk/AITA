@@ -21,6 +21,27 @@ windows = module('windows_verify', 'verify-windows-release.py')
 
 
 class ReleasePassTests(unittest.TestCase):
+    def test_pages_propagation_waits_for_exact_bytes_and_wasm_type(self):
+        from email.message import Message
+        def response(data, mime='text/javascript'):
+            headers = Message(); headers['Content-Type'] = mime
+            value = Mock(status=200, headers=headers)
+            value.read.return_value = data
+            value.__enter__ = Mock(return_value=value); value.__exit__ = Mock(return_value=False)
+            return value
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name in ('index.html', 'composeApp.js', 'aita-recovery.js', 'app.wasm'):
+                (root / name).write_bytes(b'correct')
+            answers = [response(b'old'), response(b'correct'), response(b'correct'), response(b'correct'),
+                       response(b'correct', 'text/plain'), response(b'correct', 'application/wasm')]
+            with patch.object(release.urllib.request, 'urlopen', side_effect=answers), patch.object(release.time, 'sleep') as sleep:
+                checks = release.verify_public_web_files(root, root / 'proof.json', Mock())
+                self.assertEqual(4, len(checks)); self.assertEqual(2, sleep.call_count)
+            for value in (response(b'wrong'), response(b'correct', 'text/plain')):
+                with patch.object(release.urllib.request, 'urlopen', return_value=value), patch.object(release.time, 'sleep'):
+                    with self.assertRaises(RuntimeError): release.verify_public_web_files(root, root / 'proof.json', Mock(), attempts=2)
+
     def test_incomplete_platform_never_publishes_a_partial_update_feed(self):
         targets = ['android', 'windows', 'web', 'server']
         for status in (None, 'running', 'failed', 'held'):

@@ -86,7 +86,7 @@ class MarketDiscoveryQueryTest {
         assertFalse(jdbc.queries.any { it.sql.startsWith("SELECT f.*") })
         val scan = jdbc.queries.single { it.sql.startsWith("SELECT l.*") }
         assertTrue(scan.sql.endsWith("LIMIT ?")); assertFalse("%_" in scan.sql)
-        assertEquals(listOf(result.page.checkedAtMillis, result.page.checkedAtMillis, "%_", "%_", "Astana", 80), scan.bindings.values.toList())
+        assertEquals(listOf(result.page.checkedAtMillis, result.page.checkedAtMillis, "%_", "Astana", 80), scan.bindings.values.toList())
         assertNotNull(result.validatedDiscovery(wanted, null, buyer.toString()))
     }
     @Test fun unavailableHeaderStopsBeforeTaxonomyAndOfferQueries() {

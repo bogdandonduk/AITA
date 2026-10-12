@@ -107,4 +107,11 @@ class SupplierCatalogOfferDraftTest {
         val noCurrency = SupplierCatalogOfferDraft(owner, saved, saved.copy(currency = ""))
         assertNull(decodeSupplierCatalogOfferDraft(noCurrency.encoded(), owner))
     }
+    @Test fun aMetadataOnlyRefreshKeepsEditsAndAdoptsTheNewRevision() {
+        val draft = SupplierCatalogOfferDraft(owner, saved, saved.copy(price = "150"), revision = 100)
+        val refreshed = draft.refreshed(saved, 200)
+        assertEquals(draft.fields, refreshed.fields); assertEquals(200L, refreshed.revision)
+        assertTrue(refreshed.edited)
+        assertEquals(refreshed, refreshed.refreshed(saved.copy(price = "160"), 300))
+    }
 }

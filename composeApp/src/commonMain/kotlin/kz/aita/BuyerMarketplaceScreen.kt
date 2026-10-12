@@ -80,11 +80,11 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
     val requests = remember(account, generation, query) { Channel<Unit>(Channel.CONFLATED) }
     val gridState = rememberBuyerBrowseGrid(browse, resultsReady = data.page != null)
     LaunchedEffect(openedId) { if (openedId != null) browse.recentSearches = rememberMarketSearch(browse.recentSearches, appliedSearch) }
-    val inputPending = search != appliedSearch || (shopId == null && city != appliedCity)
-    LaunchedEffect(account, savedOnly, search, city, shopId) {
+    val inputPending = browse.brand.value != browse.appliedBrand.value || search != appliedSearch || (shopId == null && city != appliedCity)
+    LaunchedEffect(account, savedOnly, search, city, shopId, browse.brand.value) {
         delay(350)
-        if (appliedSearch != search || (shopId == null && appliedCity != city)) {
-            appliedSearch = search; appliedCity = city; limit = MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore = null
+        if (appliedSearch != search || browse.brand.value != browse.appliedBrand.value || (shopId == null && appliedCity != city)) {
+            appliedSearch = search; appliedCity = city; browse.appliedBrand.value = browse.brand.value; limit = MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore = null
         }
     }
     fun visitShop(shop: MarketStorefront) {
@@ -149,7 +149,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
     }
     fun catalogueIsCurrent(currentRevision: Long = MarketplaceSignals.revision.value): Boolean =
         data.active && data.fresh && !data.loading && browse.query == query &&
-            browse.search.value == browse.appliedSearch.value && (browse.shopId.value != null || browse.city.value == browse.appliedCity.value) &&
+            browse.brand.value == browse.appliedBrand.value && browse.search.value == browse.appliedSearch.value && (browse.shopId.value != null || browse.city.value == browse.appliedCity.value) &&
             !latestDialogOwnsReads && owner?.isCurrent() == true &&
             data.result?.matchesDiscoveryRead(MarketDiscoveryRequest(query, limit), data.readRevision, currentRevision) == true
 
@@ -179,7 +179,7 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
 
     val catalogueReady = catalogueIsCurrent(revision)
     val rows = data.page?.offers.orEmpty()
-    val home = !savedOnly && shopId == null && categoryId == null && search.isBlank() && city.isBlank()
+    val home = !savedOnly && shopId == null && categoryId == null && search.isBlank() && city.isBlank() && browse.brand.value.isBlank() && !browse.withPhotos.value
     AitaScreenColumn(
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1440.dp,

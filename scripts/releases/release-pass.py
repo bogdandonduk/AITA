@@ -20,6 +20,36 @@ import zipfile
 import functools
 import http.server
 import threading
+import urllib.request
+
+
+def verify_public_web_files(dist, report, announce, attempts=6):
+    """Wait for the uploaded release bytes, without a cache-busting URL hiding stale clients."""
+    names = ['index.html', 'composeApp.js', 'aita-recovery.js'] + sorted(p.name for p in dist.glob('*.wasm'))
+    checks = []
+    for name in names:
+        expected = sha(dist / name)
+        for attempt in range(attempts):
+            try:
+                request = urllib.request.Request('https://aita.kz/' + ('' if name == 'index.html' else name),
+                    headers={'User-Agent': 'AITA-Release-Verification', 'Accept-Encoding': 'identity'})
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    # Pages limits each file to 25 MiB; bound memory even for a bad edge response.
+                    data = response.read(25 * 1024 * 1024 + 1)
+                    digest = hashlib.sha256(data).hexdigest()
+                    mime = response.headers.get_content_type()
+                    correct = response.status == 200 and digest == expected and (not name.endswith('.wasm') or mime == 'application/wasm')
+                if correct:
+                    checks.append(dict(name=name, sha256=digest, bytes=len(data), contentType=mime, checkedAt=utc()))
+                    break
+                reason = 'bytes or content type differ from the verified build'
+            except (OSError, TimeoutError) as failure:
+                reason = type(failure).__name__
+            announce('WAIT', f'Pages delivery of {name}: {reason} ({attempt + 1}/{attempts})')
+            require(attempt + 1 < attempts, 'Public web delivery did not match the release: ' + name)
+            time.sleep(5)
+    report.write_text(json.dumps(checks, indent=2) + '\n')
+    return checks
 
 REPOSITORY = 'bogdandonduk/AITA'
 ACCOUNT = 'eb83f32e0d274f3e81e020d4776f666e'
@@ -324,6 +354,7 @@ class Run:
             '--commit-message', f'AITA {self.tag}', '--force'])
         self.state['webUploadCompleted'] = True; self.save()
         self.command('Check aita.kz HTTPS', ['curl', '--fail', '--show-error', '--silent', '--max-time', '30', '--output', '/dev/null', 'https://aita.kz/'])
+        verify_public_web_files(dist, self.folder / 'pages-delivery.json', self.say)
         self.browser_check()
         self.say('LIVE', 'https://aita.kz/ (HTTPS, app startup, narrow/wide rendering and preference persistence verified)')
 
@@ -354,6 +385,10 @@ class Run:
                              ['node', 'scripts/linux-web/test/profile-photo-smoke.cjs'])
                 self.command('Marketplace browsing, saved shops and shopping trip in the browser',
                              ['node', 'scripts/linux-web/test/marketplace-smoke.cjs'])
+                self.command('Worker branch assignment, transfer and lost-response retry',
+                             ['node', 'scripts/linux-web/test/worker-placement-smoke.cjs'])
+                self.command('Supplier offer drafts, conflict revision and saved shipment checklist',
+                             ['node', 'scripts/linux-web/test/supplier-smoke.cjs'])
                 self.command('Stock prices, batch retry, remembered choices, analytics and mixed payment',
                              ['node', 'scripts/linux-web/test/stock-operations-smoke.cjs'])
                 self.command('Offline item and batch journal survives reload and synchronization',

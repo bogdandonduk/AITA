@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 7,
+  "revision": 8,
   "tutorials": [
     {
       "id": "account.register",
@@ -1032,6 +1032,14 @@
           "text": {
             "en": "After joining, choose Store mode and the intended store where necessary. Employer permissions and subscription access still apply.",
             "ru": "После присоединения при необходимости выберите режим магазина и нужный магазин. Права работодателя и требования подписки продолжают действовать."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "workplaces-and-direction-pass",
+          "text": {
+            "en": "Open My work and choose Workplace in your employment card or before starting a shift. A parent-store employee can choose any available branch; the selected workplace is remembered on this device and synchronized with the account. Finish an open shift before switching to another branch.",
+            "ru": "Откройте «Моя работа» и выберите место работы в карточке трудоустройства или перед началом смены. Сотрудник головного магазина может выбрать любой доступный филиал; выбор сохраняется на устройстве и синхронизируется с аккаунтом. Перед переходом в другой филиал завершите открытую смену."
           },
           "screenshots": []
         }
@@ -2813,6 +2821,14 @@
             "ru": "Сохраните и проверьте список. Попросите работника проверить соответствующий раздел после синхронизации."
           },
           "screenshots": []
+        },
+        {
+          "id": "workplaces-and-direction-pass",
+          "text": {
+            "en": "Use the workplace filter and search to find an employee. Assign to a branch keeps parent employment active. Transfer to a branch ends the former branch assignment while preserving completed shifts. Both stores must belong to one company, and you need sufficient worker-management permissions in both. The employee receives a notification.",
+            "ru": "Используйте поиск и фильтр по месту работы. «Назначить в филиал» сохраняет трудоустройство в головном магазине. «Перевести в филиал» завершает прежнее назначение, сохраняя историю смен. Точки должны принадлежать одной компании; нужны достаточные права управления сотрудниками в обеих. Сотрудник получит уведомление."
+          },
+          "screenshots": []
         }
       ],
       "caution": {}
@@ -2961,6 +2977,14 @@
           "text": {
             "en": "During the next batch or receiving operation, review the prefilled value against the actual delivery before confirming.",
             "ru": "При следующей партии или приёмке сверьте подставленное значение с реальной поставкой до подтверждения."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "workplaces-and-direction-pass",
+          "text": {
+            "en": "When a newer saved offer arrives while you are editing, your draft is kept. Review the current offer before saving; Use saved offer restores its fields. A failed connection can be retried without silently overwriting a different price saved by another editor.",
+            "ru": "Если во время редактирования пришло обновлённое предложение, черновик сохраняется. Проверьте актуальный прайс; «Вернуть сохранённое предложение» восстанавливает его поля. После обрыва связи можно повторить сохранение без незаметного затирания другой цены, сохранённой коллегой."
           },
           "screenshots": []
         }
@@ -4125,6 +4149,14 @@
             "ru": "Подтвердите и проверьте статус. Упаковка не означает доставку в пути или приёмку магазином."
           },
           "screenshots": []
+        },
+        {
+          "id": "workplaces-and-direction-pass",
+          "text": {
+            "en": "In Dispatch, open a store run and its Checklist tab. Check each agreed product and quantity, or filter to items not yet checked. Marks survive navigation and reload through app-state saving. Changed goods or agreed quantities require a new check. These marks do not change the order status: confirm packing with the normal order action.",
+            "ru": "В «Отправках» откройте поставку магазину и вкладку «Чек-лист». Отмечайте проверенные товары и согласованное количество; можно показать только непроверенные позиции. Отметки сохраняются при переходах и перезагрузке через сохранение состояния приложения. Изменение товара или количества требует новой проверки. Отметки не меняют статус заказа: упаковка подтверждается обычным действием заказа."
+          },
+          "screenshots": []
         }
       ],
       "caution": {}
@@ -4429,6 +4461,14 @@
           "text": {
             "en": "Open a matching offer and verify its description, photos, priced amount and availability before comparing.",
             "ru": "Откройте предложение и перед сравнением проверьте описание, фото, количество за цену и наличие."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "workplaces-and-direction-pass",
+          "text": {
+            "en": "Search also matches published brands, manufacturer names, articles and product attributes. Open Filters to enter a brand or show only products with photos. The filters return with you after visiting a shop; Clear filters resets them together.",
+            "ru": "Поиск также учитывает опубликованные бренды, производителей, артикулы и характеристики. Откройте фильтры, чтобы указать бренд или оставить товары с фотографиями. Фильтры сохраняются при возврате из магазина; «Сбросить фильтры» очищает их вместе."
           },
           "screenshots": []
         }

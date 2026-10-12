@@ -5726,7 +5726,8 @@ internal fun AppConfiguration.WorkshiftGateOverlay(
                 .clip(RoundedCornerShape(stateValues.cornerRadius))
                 .background(stateValues.BackgroundColor)
                 .border(stateValues.focusedBorderWidth, stateValues.AccentColor, RoundedCornerShape(stateValues.cornerRadius))
-                .padding(stateValues.marginTextFieldGroup),
+                .padding(stateValues.marginTextFieldGroup)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -5745,6 +5746,8 @@ internal fun AppConfiguration.WorkshiftGateOverlay(
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
+
+            membership?.let { WorkerWorkplacePicker(it) }
 
             Text(
                 text = activeStoreName.ifBlank { stateValues.activeStoreId.orEmpty() },

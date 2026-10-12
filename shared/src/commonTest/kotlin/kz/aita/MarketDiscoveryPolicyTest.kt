@@ -193,4 +193,20 @@ class MarketDiscoveryPolicyTest {
         assertEquals(revision, fence.capture())
     }
 
+
+    @Test fun brandAndPhotoFiltersCannotBeSilentlyIgnoredByAnOlderServer() {
+        assertEquals("Aq Tea", MarketDiscoveryQuery(brand = " Aq\tTea ").normalizedDiscoveryQuery()?.brand)
+        assertNull(MarketDiscoveryQuery(brand = "x".repeat(121)).normalizedDiscoveryQuery())
+        assertNull(MarketDiscoveryQuery(brand = "A\u0000B").normalizedDiscoveryQuery())
+        val request = MarketDiscoveryRequest(MarketDiscoveryQuery(brand = "aq", withPhotos = true))
+        assertNull(result().validatedDiscovery(request, null, account))
+        val response = result(request)
+        assertNull(response.validatedDiscovery(request, null, account))
+        val matched = response.copy(page = response.page.copy(offers = response.page.offers.map { it.copy(
+            product = MarketProductDetails(brand = "Aq Tea", imageUrls = listOf("https://images.example.com/tea.jpg"))) }))
+        assertNotNull(matched.validatedDiscovery(request, null, account))
+        assertNull(matched.copy(page = matched.page.copy(offers = matched.page.offers.map { it.copy(product = it.product.copy(brand = "Other")) }))
+            .validatedDiscovery(request, null, account))
+    }
+
 }

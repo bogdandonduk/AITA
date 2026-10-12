@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -321,6 +322,7 @@ internal fun AppConfiguration.SupplierDispatchRunCompactCard(
             .aitaClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = stateValues.AccentColor),
+                role = Role.Button,
                 onClick = onOpen
             )
             .padding(stateValues.marginTextFieldGroup),
@@ -782,10 +784,8 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
         }
 
         if (section == "checklist") {
-            SupplierDispatchTextPanel(
-                title = localizedStringResource(1746, "Pack checklist"),
-                text = run.packChecklist
-            )
+            if (run.bundles.isNotEmpty()) SupplierPickingChecklist(run)
+            else SupplierDispatchTextPanel(title = localizedStringResource(1746, "Pack checklist"), text = run.packChecklist)
         }
         if (section == "attention") {
             SupplierDispatchTextPanel(

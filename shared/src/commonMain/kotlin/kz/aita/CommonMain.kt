@@ -3950,9 +3950,7 @@ fun activeStoreWorkerMembership(): StoreWorkerDataModel? {
     if (currentUserId.isBlank()) return null
     val stores = storesState.payloadValue.orEmpty()
     val rootStoreId = stores.findStoreOrBranch(activeStoreId)?.parentStoreId ?: activeStoreId
-    return myWorkerMembershipsState.payloadValue.orEmpty().firstOrNull {
-        it.userId == currentUserId && it.isActive && (it.storeId == activeStoreId || it.storeId == rootStoreId)
-    }
+    return preferredWorkerMembership(myWorkerMembershipsState.payloadValue.orEmpty(), currentUserId, activeStoreId, rootStoreId)
 }
 
 fun activeStoreRequiresWorkshift(): Boolean {
@@ -4804,6 +4802,7 @@ fun getMySupplierGoodsPrices(
 
 fun upsertSupplierGoodsPrice(
     price: SupplierGoodsPriceDataModel,
+    notifyOnError: Boolean = true,
     onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
 ) {
     val requestUserScope = currentSupplierNetworkUserScope()
@@ -4825,7 +4824,7 @@ fun upsertSupplierGoodsPrice(
                 if (!requestIsCurrent()) return@withLock DataState.Empty()
 
                 if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
+                    if (notifyOnError) postInAppNotification(response.message, NotificationType.Negative)
                     DataState.Empty(response.message)
                 } else {
                     val nextPriceBookState = DataState.Success(
@@ -4851,7 +4850,7 @@ fun upsertSupplierGoodsPrice(
                 ru = "Не удалось сохранить предложение",
                 kk = "Ұсынысты сақтау мүмкін болмады"
             )
-            postInAppNotification(message, NotificationType.Negative)
+            if (notifyOnError) postInAppNotification(message, NotificationType.Negative)
             DataState.Empty(message)
         }
 
@@ -19446,7 +19445,8 @@ data class SupplierGoodsPriceDataModel(
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = 0L,
 
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val expectedUpdatedAtMillis: Long? = null
 )
 
 @kotlinx.serialization.Serializable

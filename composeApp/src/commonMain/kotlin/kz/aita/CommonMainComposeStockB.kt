@@ -2109,6 +2109,12 @@ fun AppConfiguration.StockSupplierPricesPage(
     var supplyPriceText by rememberSaveable(goodsItem.id, defaultCurrency) { mutableStateOf(goodsItem.supplyPrices.firstOrNull()?.price ?: "0") }
     var minOrderText by rememberSaveable(goodsItem.id) { mutableStateOf("") }
     var packageText by rememberSaveable(goodsItem.id) { mutableStateOf("") }
+    var offerEdited by rememberSaveable(goodsItem.id, selectedSupplierId) { mutableStateOf(false) }
+    var offerRevision by rememberSaveable(goodsItem.id, selectedSupplierId) { mutableStateOf<Long?>(null) }
+    var offerSaving by remember(goodsItem.id, selectedSupplierId) { mutableStateOf(false) }
+    var offerMessage by remember(goodsItem.id, selectedSupplierId) { mutableStateOf<List<LocalizedStringDataModel>>(emptyList()) }
+    val currentOffer = supplierPrices.firstOrNull { it.supplierId == selectedSupplierId }
+    val offerChanged = offerRevision != null && offerRevision != (currentOffer?.updatedAtMillis ?: 0L)
     var showSupplierAddSheet by rememberSaveable(goodsItem.id) { mutableStateOf(false) }
 
     if (showSupplierAddSheet) {
@@ -2127,19 +2133,18 @@ fun AppConfiguration.StockSupplierPricesPage(
         }
     }
 
-    LaunchedEffect(selectedSupplierId, supplierPrices.map { it.id to it.supplyPrice.price }) {
-        val remembered = supplierPrices.find { it.supplierId == selectedSupplierId }
-        remembered?.let {
-            supplierGoodsName = it.supplierGoodsName.orEmpty()
-            supplierBarcode = it.supplierBarcode.orEmpty()
-            supplyPriceText = it.supplyPrice.price
-            minOrderText = it.minOrderQuantity
-                ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
-                .orEmpty()
-            packageText = it.packageQuantity
-                ?.let { quantity -> stockQuantityInputTextFromAmount(quantity.total, quantity) }
-                .orEmpty()
-        }
+    fun useCurrentOffer() {
+        supplierGoodsName = currentOffer?.supplierGoodsName.orEmpty()
+        supplierBarcode = currentOffer?.supplierBarcode.orEmpty()
+        supplyPriceText = currentOffer?.supplyPrice?.price ?: goodsItem.supplyPrices.firstOrNull()?.price.orEmpty()
+        minOrderText = currentOffer?.minOrderQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty()
+        packageText = currentOffer?.packageQuantity?.let { stockQuantityInputTextFromAmount(it.total, it) }.orEmpty()
+        offerRevision = currentOffer?.updatedAtMillis ?: 0L
+        offerEdited = false
+        offerMessage = emptyList()
+    }
+    LaunchedEffect(selectedSupplierId, currentOffer?.updatedAtMillis) {
+        if (!offerEdited) useCurrentOffer()
     }
 
     fun supplierName(id: String): String {
@@ -2280,7 +2285,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                             value = supplierGoodsName,
                             placeholder = localizedStringResource(336, "Supplier goods name / article"),
                             leadingIconPath = stateValues.drawablePathIconStock,
-                            onValueChange = { supplierGoodsName = it }
+                            onValueChange = { supplierGoodsName = it; offerEdited = true }
                         )
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -2289,7 +2294,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                             modifier = Modifier.fillMaxWidth(),
                             value = supplierBarcode,
                             placeholderText = stateValues.stringBarcode,
-                            onValueChange = { supplierBarcode = it }
+                            onValueChange = { supplierBarcode = it; offerEdited = true }
                         )
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextField))
@@ -2297,13 +2302,13 @@ fun AppConfiguration.StockSupplierPricesPage(
                         SimpleTextInput(
                             modifier = Modifier.fillMaxWidth(),
                             value = supplyPriceText,
-                            placeholder = stateValues.stringSupplyPrice,
+                            placeholder = "${stateValues.stringSupplyPrice} · ${currentOffer?.supplyPrice?.currency ?: defaultCurrency}",
                             keyboardType = KeyboardType.Decimal,
                             leadingIconPath = stateValues.drawablePathIconFinances,
                             onTransformValue = { raw -> raw.filter { it.isDigit() || it == '.' || it == ',' }.replace(',', '.') },
-                            onValueChange = { supplyPriceText = it }
+                            onValueChange = { supplyPriceText = it; offerEdited = true }
                         )
-                        SupplyPriceQuickFills(goodsItem.salePrices, defaultCurrency, supplyPriceText) { supplyPriceText = it }
+                        SupplyPriceQuickFills(goodsItem.salePrices, currentOffer?.supplyPrice?.currency ?: defaultCurrency, supplyPriceText) { supplyPriceText = it; offerEdited = true }
 
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -2313,7 +2318,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             goodsItem.supplyPrices
-                                .filter { it.price.isNotBlank() }
+                                .filter { it.price.isNotBlank() && it.currency == (currentOffer?.supplyPrice?.currency ?: defaultCurrency) }
                                 .distinctBy { it.price to it.currency }
                                 .take(4)
                                 .forEach { price ->
@@ -2322,7 +2327,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                                         text = "${price.price} ${price.currency}",
                                         textSize = stateValues.smallTextSize,
                                         iconPath = stateValues.drawablePathIconFinances,
-                                        onClick = { supplyPriceText = price.price }
+                                        onClick = { supplyPriceText = price.price; offerEdited = true }
                                     )
                                 }
                         }
@@ -2342,7 +2347,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 onTransformValue = { raw -> sanitizeStockQuantityInput(raw, supplierQuantityAllowsFraction) },
                                 onValueChange = { value ->
                                     if (value.isStockQuantityInputText(supplierQuantityAllowsFraction)) {
-                                        minOrderText = value
+                                        minOrderText = value; offerEdited = true
                                     }
                                 }
                             )
@@ -2356,7 +2361,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                                 onTransformValue = { raw -> sanitizeStockQuantityInput(raw, supplierQuantityAllowsFraction) },
                                 onValueChange = { value ->
                                     if (value.isStockQuantityInputText(supplierQuantityAllowsFraction)) {
-                                        packageText = value
+                                        packageText = value; offerEdited = true
                                     }
                                 }
                             )
@@ -2364,11 +2369,33 @@ fun AppConfiguration.StockSupplierPricesPage(
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
+                        if (offerChanged) {
+                            Text(supplierOfferDraftText("changed"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                            actionButton(text = supplierOfferDraftText("reset"), autoLoading = false, confirmationRequired = true, onClick = { useCurrentOffer() })
+                            Spacer(Modifier.height(stateValues.marginTextField))
+                        }
+                        if (offerMessage.isNotEmpty()) {
+                            Text(offerMessage.extractLocalizedString(stateValues.appLanguage).orEmpty(), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                            Spacer(Modifier.height(stateValues.marginTextField))
+                        }
                         actionButton(
                             text = localizedStringResource(339, "Save supplier price"),
                             iconPath = stateValues.drawablePathIconCheck,
-                            enabled = selectedSupplierId.isNotBlank() && supplyPriceText.toDoubleOrNull() != null,
-                            onClick = {
+                            enabled = !offerSaving, loading = offerSaving, autoLoading = false,
+                            onClick = save@{
+                                val invalidQuantity = listOf(minOrderText, packageText).any { it.isNotBlank() &&
+                                    parseStockQuantityInputText(it, supplierQuantityUnit)?.let { v -> v.isFinite() && v > 0 } != true }
+                                if (offerChanged) { offerMessage = supplierOfferConflictMessage(); return@save }
+                                if (selectedSupplierId.isBlank() || offerRevision == null || invalidQuantity ||
+                                    supplyPriceText.toDoubleOrNull()?.let { it.isFinite() && it > 0 } != true) {
+                                    offerMessage = eventMessage("message.supplier_price_must_be_greater_than_zero")
+                                    if (invalidQuantity) offerMessage = eventMessage("message.minimum_order_and_package_size_must_be_greater_than_zero")
+                                    return@save
+                                }
+                                offerSaving = true; offerMessage = emptyList()
+                                val submitted = listOf(supplierGoodsName, supplierBarcode, supplyPriceText, minOrderText, packageText)
+                                val submittedSupplier = selectedSupplierId
+                                val submittedGeneration = currentAuthenticatedSessionGeneration()
                                 val unit = supplierQuantityUnit
                                 upsertSupplierGoodsPrice(
                                     SupplierGoodsPriceDataModel(
@@ -2377,7 +2404,7 @@ fun AppConfiguration.StockSupplierPricesPage(
                                         goodsItemId = goodsItem.id,
                                         supplyPrice = PriceDataModel(
                                             price = supplyPriceText.ifBlank { "0" },
-                                            currency = defaultCurrency,
+                                            currency = currentOffer?.supplyPrice?.currency ?: defaultCurrency,
                                             supplierId = selectedSupplierId
                                         ),
                                         minOrderQuantity = parseStockQuantityInputText(minOrderText, unit)
@@ -2387,9 +2414,21 @@ fun AppConfiguration.StockSupplierPricesPage(
                                             ?.takeIf { it > 0.0 }
                                             ?.let { total -> unit.withStockQuantityInputTotalValue(total) },
                                         supplierBarcode = supplierBarcode.takeIf { it.isNotBlank() },
-                                        supplierGoodsName = supplierGoodsName.takeIf { it.isNotBlank() }
-                                    )
-                                )
+                                        supplierGoodsName = supplierGoodsName.takeIf { it.isNotBlank() },
+                                        expectedUpdatedAtMillis = offerRevision
+                                    ), notifyOnError = false
+                                ) completed@{ result ->
+                                    if (!authenticatedSessionGenerationIsCurrent(submittedGeneration) ||
+                                        selectedSupplierId != submittedSupplier) return@completed
+                                    offerSaving = false
+                                    if (result is DataState.Success) {
+                                        offerRevision = result.payload.updatedAtMillis
+                                        offerEdited = submitted != listOf(supplierGoodsName, supplierBarcode, supplyPriceText, minOrderText, packageText)
+                                    } else {
+                                        offerMessage = result.message.orEmpty()
+                                        getSupplierGoodsPrices(storeId)
+                                    }
+                                }
                             }
                         )
                     }

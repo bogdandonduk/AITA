@@ -1339,6 +1339,7 @@ internal fun AppConfiguration.WorkerMembershipCard(
     val permissions = permissionsFromSerialized(permissionsText).ifEmpty {
         if (editable) defaultAssignablePermissionsForRole(roleId) else normalizeStorePermissionIds(worker.permissions.ifEmpty { defaultStorePermissionsForRole(roleId) })
     }
+    var detailsExpanded by rememberSaveable(worker.id) { mutableStateOf(false) }
     var selfWorkshiftPasswordSaving by remember(worker.id) { mutableStateOf(false) }
     val roleOptions = workerRoleOptions(roleTemplates)
     val storeName = worker.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty()
@@ -1420,6 +1421,7 @@ internal fun AppConfiguration.WorkerMembershipCard(
 
         Spacer(modifier = Modifier.height(6.dp))
 
+        if (!editable || detailsExpanded) {
         WorkerOfferDetails(
             roleId = worker.roleId,
             permissions = normalizeStorePermissionIds(worker.permissions),
@@ -1428,6 +1430,11 @@ internal fun AppConfiguration.WorkerMembershipCard(
             salary = worker.salary,
             salaryCurrencyCode = salaryCurrencyCode
         )
+        } else {
+            Text(listOf(workerJobTitleText(worker.jobTitle, worker.jobTitleLocalized),
+                worker.salary.takeIf { it.isNotBlank() }?.let { "$it $salaryCurrencyCode" }.orEmpty())
+                .filter { it.isNotBlank() }.joinToString(" · "), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        }
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -1440,7 +1447,20 @@ internal fun AppConfiguration.WorkerMembershipCard(
 
         Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
+        if (showSelfPasswordEditor) {
+            WorkerWorkplacePicker(worker)
+            Spacer(Modifier.height(stateValues.marginTextField))
+        } else {
+            WorkerPlacementEditor(worker)
+            Spacer(Modifier.height(stateValues.marginTextField))
+        }
+
         if (editable && storeId != null) {
+            actionButton(text = stateValues.stringEdit, iconPath = stateValues.drawablePathIconEdit,
+                autoLoading = false, confirmationRequired = false, onClick = { detailsExpanded = !detailsExpanded })
+            Spacer(Modifier.height(stateValues.marginTextField))
+        }
+        if (editable && storeId != null && detailsExpanded) {
             SimpleTextInput(
                 modifier = Modifier.fillMaxWidth(),
                 value = jobTitle,
@@ -1702,6 +1722,8 @@ fun AppConfiguration.MenuWorkersScreen() {
     val incomingRequestsPayload by incomingWorkerRequestsState.payload.collectAsState()
     val storeWorkersPayload by storeWorkerMembershipsState.payload.collectAsState()
     val roleTemplatesPayload by storeWorkerRoleTemplatesState.payload.collectAsState()
+    var workerSearch by rememberSaveable(stateValues.userAccount?.id, activeStoreId) { mutableStateOf("") }
+    var workerStoreFilter by rememberSaveable(stateValues.userAccount?.id, activeStoreId) { mutableStateOf("all") }
     var storeIdText by rememberSaveable { mutableStateOf("") }
     val inviteRoleTemplates = roleTemplatesPayload.orEmpty()
     val inviteAssignablePermissions = activeStoreId?.let { currentUserAssignableStorePermissions(it) }.orEmpty()
@@ -1754,7 +1776,8 @@ fun AppConfiguration.MenuWorkersScreen() {
     ) {
         WorkerIdentityCard(Modifier.fillMaxWidth().aitaWidthCap(960.dp)
             .align(Alignment.CenterHorizontally).padding(horizontal=stateValues.marginTextField, vertical=6.dp))
-        val selectedTab = tabRowWidget(
+        val selectedTab = sectionTabsWidget(
+            stateKey = "workers-main:${stateValues.userAccount?.id.orEmpty()}:${activeStoreId.orEmpty()}",
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.Start)
@@ -1767,7 +1790,7 @@ fun AppConfiguration.MenuWorkersScreen() {
                 (if (canManageStoreRequests) listOf(TabContent("requests", tabLabelWithCount(localizedStringResource(474, "Requests"), incomingEmploymentRequestsCount))) else emptyList())
         )
 
-        val sectionTabs = when (selectedTab.id) {
+        val sectionTabs = when (selectedTab) {
             "my_work" -> listOf(
                 TabContent("managed", tabLabelWithCount(localizedStringResource(478, "Managed stores"), myMembershipsCount)),
                 TabContent("requests", tabLabelWithCount(localizedStringResource(480, "My employment requests"), myPendingEmploymentRequestsCount)),
@@ -1792,7 +1815,7 @@ fun AppConfiguration.MenuWorkersScreen() {
             else -> emptyList()
         }
         val section = sectionTabsWidget(
-            stateKey = "workers:${stateValues.userAccount?.id.orEmpty()}:${activeStoreId.orEmpty()}:${selectedTab.id}",
+            stateKey = "workers:${stateValues.userAccount?.id.orEmpty()}:${activeStoreId.orEmpty()}:$selectedTab",
             tabs = sectionTabs,
             modifier = Modifier
                 .fillMaxWidth()
@@ -1801,7 +1824,7 @@ fun AppConfiguration.MenuWorkersScreen() {
         )
 
 
-        val workerListState = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, "${selectedTab.id}_$section")
+        val workerListState = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Workers, "${selectedTab}_$section")
         LazyColumn(
             state = workerListState,
             modifier = Modifier
@@ -1812,7 +1835,7 @@ fun AppConfiguration.MenuWorkersScreen() {
             contentPadding = PaddingValues(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
         ) {
-            when (selectedTab.id) {
+            when (selectedTab) {
                 "my_work" -> {
                     if (section == "apply") {
                         item(key = "MenuWorkersScreen:$section:0") {
@@ -2286,13 +2309,24 @@ fun AppConfiguration.MenuWorkersScreen() {
                         }
 
                         if (section == "workers") {
-                            val workers = storeWorkersPayload.orEmpty()
+                            val allWorkers = storeWorkersPayload.orEmpty()
+                            val directoryStores = allWorkers.distinctBy { it.storeId }
+                            val selectedFilter = workerStoreFilter.takeIf { id -> directoryStores.any { it.storeId == id } } ?: "all"
+                            val workers = filterWorkerDirectory(allWorkers, selectedFilter, workerSearch)
+                            item(key = "worker-directory-controls") {
+                                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                                    SimpleTextInput(value = workerSearch, placeholder = stateValues.stringSearchByAnyData,
+                                        leadingIconPath = stateValues.drawablePathIconSearch, onValueChange = { workerSearch = it.take(120) })
+                                    SimpleDropdownField(title = workerPlacementMessage("workplace").extractLocalizedString(stateValues.appLanguage).orEmpty(),
+                                        selectedId = selectedFilter, restoreLastChoice = false, placeholder = "",
+                                        options = listOf(DropdownOption("all", workerPlacementMessage("all_stores").extractLocalizedString(stateValues.appLanguage).orEmpty())) +
+                                            directoryStores.map { DropdownOption(it.storeId, it.storeName.extractLocalizedString(stateValues.appLanguage).orEmpty().ifBlank { it.storePublicId }) },
+                                        onSelected = { workerStoreFilter = it })
+                                }
+                            }
                             if (workers.isEmpty()) {
                                 item(key = "MenuWorkersScreen:$section:18") { MessageText(modifier = Modifier.fillMaxWidth().remainingListSpace(workerListState, "MenuWorkersScreen:$section:18"), text = localizedStringResource(484, "No workers in this store yet")) }
                             } else {
-                                val editable = currentUserCanEditWorkerPermissions(activeStoreId)
-                                val removable = currentUserCanRemoveWorkers(activeStoreId)
-                                val assignablePermissions = currentUserAssignableStorePermissions(activeStoreId)
                                 val pendingRemovalRequests = incomingRequestsPayload.orEmpty()
                                     .filter { it.isPendingWorkerRemovalRequest() }
                                     .distinctBy { it.id }
@@ -2300,13 +2334,13 @@ fun AppConfiguration.MenuWorkersScreen() {
                                     val pendingRemovalRequest = pendingRemovalRequests.firstOrNull { request ->
                                         request.storeId == worker.storeId && request.requesterUserId == worker.userId
                                     }
-                                    val canEditWorker = editable && worker.permissions.all { it in assignablePermissions }
+                                    val canEditWorker = currentUserCanEditWorkerPermissions(worker.storeId) && worker.permissions.all { it in currentUserAssignableStorePermissions(worker.storeId) }
                                     WorkerMembershipCard(
                                         worker = worker,
                                         editable = canEditWorker,
                                         storeId = worker.storeId.ifBlank { activeStoreId },
                                         pendingRemovalRequest = pendingRemovalRequest,
-                                        canRemove = removable
+                                        canRemove = currentUserCanRemoveWorkers(worker.storeId)
                                     )
                                 }
                             }

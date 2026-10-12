@@ -30,4 +30,19 @@ class BuyerNavigationPersistenceTest {
         assertEquals("products", restored.market.section.value)
         assertNull(restored.market.shopId.value)
     }
+
+    @Test fun brandAndPhotosSurviveShopBackReloadAndClearTogether() {
+        val original = BuyerMarketNavigation(null)
+        original.market.brand.value = "Aq Tea"; original.market.appliedBrand.value = "Aq Tea"
+        original.market.withPhotos.value = true
+        original.market.visitShop("00000000-0000-4000-8000-000000000001")
+        assertEquals("", original.market.query.brand); assertFalse(original.market.query.withPhotos)
+        val restored = BuyerMarketNavigation(null)
+        restored.restorePlace(original.savePlace()); restored.market.leaveShop()
+        assertEquals("Aq Tea", restored.market.query.brand); assertTrue(restored.market.query.withPhotos)
+        assertEquals(2, restored.market.filterCount)
+        restored.market.clearFilters()
+        assertEquals(0, restored.market.filterCount); assertFalse(restored.market.query.withPhotos)
+    }
+
 }

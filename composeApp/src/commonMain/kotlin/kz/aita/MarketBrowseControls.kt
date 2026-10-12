@@ -61,8 +61,17 @@ internal fun AppConfiguration.MarketBrowseControls(
             if (browse.shopId.value == null && browse.city.value.isNotBlank()) add(browse.city.value)
             if (browse.categoryId.value != null) add(categoryLabel)
             if (browse.sort.value == MARKET_DISCOVERY_TITLE) add(byName)
+            if (browse.brand.value.isNotBlank()) add(browse.brand.value)
+            if (browse.withPhotos.value) add(directionText("photos"))
         }.joinToString(" · "), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         if (browse.filtersExpanded) {
+            aitaFormTextField(Modifier.fillMaxWidth(), browse.brand.value, { browse.brand.value = it.take(120) },
+                directionText("brand"), identityKey = "market-brand:${stateValues.userAccount?.id}:${browse.savedOnly}",
+                autoFocus = false, parentOwnsValue = true)
+            MarketPublishToggle(directionText("photos"), browse.withPhotos.value, true) {
+                browse.withPhotos.value = it; browse.limit.value = MARKET_DISCOVERY_PAGE_SIZE; browse.scrollRestore = null
+            }
+
             if (browse.shopId.value == null) aitaFormTextField(Modifier.fillMaxWidth(), browse.city.value, { browse.city.value = it.take(100) },
                 authUiText("City · optional", "Город · необязательно", "Қала · міндетті емес", "Шаар · милдеттүү эмес"),
                 identityKey = "market-city:${stateValues.userAccount?.id}:${browse.savedOnly}", autoFocus = false, parentOwnsValue = true)

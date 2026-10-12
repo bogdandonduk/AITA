@@ -20,19 +20,26 @@ internal data class SupplierCatalogOfferFields(
 internal data class SupplierCatalogOfferDraft(
     val owner: String,
     val baseline: SupplierCatalogOfferFields,
-    val fields: SupplierCatalogOfferFields = baseline
+    val fields: SupplierCatalogOfferFields = baseline,
+    val revision: Long? = null
 ) {
     val edited: Boolean get() = fields != baseline
 
-    fun refreshed(latest: SupplierCatalogOfferFields): SupplierCatalogOfferDraft =
-        if (edited && fields != latest) this else copy(baseline = latest, fields = latest)
+    fun refreshed(latest: SupplierCatalogOfferFields, latestRevision: Long? = revision): SupplierCatalogOfferDraft =
+        when {
+            baseline == latest -> copy(revision = latestRevision)
+            edited && fields != latest -> this
+            else -> copy(baseline = latest, fields = latest, revision = latestRevision)
+        }
 
     /** Preserve every field changed after Save, even when the server normalizes the submitted price. */
     fun acknowledged(
         submitted: SupplierCatalogOfferFields,
-        saved: SupplierCatalogOfferFields
+        saved: SupplierCatalogOfferFields,
+        savedRevision: Long? = revision
     ): SupplierCatalogOfferDraft = copy(
         baseline = saved,
+        revision = savedRevision,
         fields = SupplierCatalogOfferFields(
             price = if (fields.price == submitted.price) saved.price else fields.price,
             minimum = if (fields.minimum == submitted.minimum) saved.minimum else fields.minimum,

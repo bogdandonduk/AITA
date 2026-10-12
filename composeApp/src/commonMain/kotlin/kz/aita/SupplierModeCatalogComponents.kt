@@ -622,7 +622,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
     )
     var draft by remember(draftKey, sessionGeneration) {
         mutableStateOf(decodeSupplierCatalogOfferDraft(draftHost.state.value[draftKey], draftKey)
-            ?: SupplierCatalogOfferDraft(draftKey, latestFields))
+            ?: SupplierCatalogOfferDraft(draftKey, latestFields, revision = existingPrice?.updatedAtMillis ?: 0L))
     }
     fun keepDraft(next: SupplierCatalogOfferDraft) {
         if (userAccountState.payloadValue?.id != accountId ||
@@ -631,8 +631,8 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
         if (next.edited) draftHost.setStateNow(draftKey to next.encoded())
         else coroutineScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { draftHost.removeState(draftKey) }
     }
-    LaunchedEffect(latestFields, draftKey) {
-        val next = draft.refreshed(latestFields)
+    LaunchedEffect(latestFields, draftKey, existingPrice?.updatedAtMillis) {
+        val next = draft.refreshed(latestFields, existingPrice?.updatedAtMillis ?: 0L)
         if (next != draft) keepDraft(next)
     }
     val restoredStateRevision by AppStateWorkspace.restoreRevision.collectAsState()
@@ -646,7 +646,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
     val packageText = draft.fields.packageSize
     val supplierGoodsName = draft.fields.name
     val supplierBarcode = draft.fields.barcode
-    val remoteOfferChanged = draft.edited && draft.baseline != latestFields
+    val remoteOfferChanged = draft.edited && (draft.baseline != latestFields || draft.revision != (existingPrice?.updatedAtMillis ?: 0L))
     val minOrderTemplate = draft.fields.minimumTemplate ?: latestMinOrderTemplate
     val packageTemplate = draft.fields.packageTemplate ?: latestPackageTemplate
     val minOrderAllowsFraction = minOrderTemplate.allowsFractionalStockQuantityInput()
@@ -680,7 +680,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
     ).joinToString("\u001F")
     val savedSignature = existingPrice.supplierCatalogEditorSignature()
     val hasChanges = savedSignature == null || savedSignature != currentSignature
-    val saveEnabled = offer.canEdit &&
+    val saveEnabled = !remoteOfferChanged && offer.canEdit &&
             !saving &&
             parsedPrice?.let { it.isFinite() && it > 0.0 } == true &&
             optionalQuantitiesValid &&
@@ -885,7 +885,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                             autoLoading = false,
                             enabled = !saving,
                             onClick = {
-                                keepDraft(SupplierCatalogOfferDraft(draftKey, latestFields))
+                                keepDraft(SupplierCatalogOfferDraft(draftKey, latestFields, revision = existingPrice?.updatedAtMillis ?: 0L))
                                 resultMessage = ""
                             }
                         )
@@ -1005,6 +1005,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                         onDisabledClick = disabledClick@{
                             if (saving) return@disabledClick
                             val message = when {
+                                remoteOfferChanged -> supplierOfferDraftText("changed")
                                 !offer.canEdit -> localizedStringResource(
                                     2332,
                                     "This product has no valid store link yet"
@@ -1024,14 +1025,11 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                 !hasChanges -> localizedStringResource(2329, "No changes to save")
                                 else -> localizedStringResource(2331, "Could not save this offer")
                             }
-                            postInAppNotification(
-                                message,
-                                NotificationType.Neutral,
-                                transient = true
-                            )
+                            resultPositive = false
+                            resultMessage = message
                         },
                         onClick = saveOffer@{
-                            if (saving) return@saveOffer
+                            if (saving || remoteOfferChanged) return@saveOffer
                             val submittedFields = draft.fields
                             val cleanPrice = submittedFields.price.filterSupplierDeskPriceInput().toDoubleOrNull()
                                 ?.takeIf { it.isFinite() && it > 0.0 } ?: return@saveOffer
@@ -1050,6 +1048,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                             upsertSupplierGoodsPrice(
                                 SupplierGoodsPriceDataModel(
                                     id = existingPrice?.id.orEmpty(),
+                                    expectedUpdatedAtMillis = draft.revision,
                                     storeId = offer.storeId,
                                     supplierId = offer.supplierId,
                                     goodsItemId = offer.goodsItemId,
@@ -1076,7 +1075,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                     supplierGoodsName = submittedFields.name
                                         .trim()
                                         .takeIf { it.isNotBlank() }
-                                )
+                                ), notifyOnError = false
                             ) { result ->
                                 coroutineScope.launch {
                                     if (userAccountState.payloadValue?.id != accountId ||
@@ -1095,7 +1094,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                                 minimumTemplate = saved.minOrderQuantity ?: offer.quantityTemplate,
                                                 packageTemplate = saved.packageQuantity ?: offer.quantityTemplate
                                             )
-                                            val acknowledged = draft.acknowledged(submittedFields, savedFields)
+                                            val acknowledged = draft.acknowledged(submittedFields, savedFields, saved.updatedAtMillis)
                                             keepDraft(acknowledged)
                                             resultPositive = true
                                             resultMessage = if (acknowledged.edited) supplierOfferDraftText("kept")
@@ -1103,6 +1102,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                         }
 
                                         is DataState.Empty -> {
+                                            getMySupplierGoodsPrices(offer.supplierId)
                                             resultPositive = false
                                             resultMessage = result.message
                                                 .orEmpty()

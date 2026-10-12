@@ -2079,4 +2079,31 @@ class MarketplaceRepositoryDatabaseTest {
         } finally {c.rollback();c.autoCommit=true}
     }
 
+
+    @Test fun discoveryFindsReviewedBrandArticleAndAttributesBeforeCounting() = fixture { f,_ ->
+        val initial = published(f)
+        val product = MarketProductDetails(brand = "Aq Tea", manufacturer = "Almaty Tea Factory", article = "TEA-42",
+            attributes = listOf(MarketProductAttribute("Package", "metal tin")), imageUrls = listOf("https://images.example.com/tea.jpg"))
+        tx(f) { it.updateListing(f.owner, null, MarketListingUpdate(initial.copy(product = product), replaceProduct = true)) }
+        listOf("aq metal", "TEA-42", "factory", "package tin").forEach { term ->
+            assertEquals(1L, discover(f, MarketDiscoveryQuery(text = term)).totalOffers, term)
+        }
+        val request = MarketDiscoveryRequest(MarketDiscoveryQuery(brand = " aq ", withPhotos = true))
+        val result = tx(f) { it.discover(f.buyer, request) }
+        assertEquals(1L, result.totalOffers)
+        assertNotNull(result.validatedDiscovery(request, null, f.buyer.toString()))
+        assertEquals(0L, discover(f, MarketDiscoveryQuery(brand = "another")).totalOffers)
+        assertEquals(0L, discover(f, MarketDiscoveryQuery(brand = "%_' OR 1=1 --")).totalOffers)
+        assertEquals(0L, discover(f, MarketDiscoveryQuery(text = "NEVER-PUBLIC-SUPPLIER")).totalOffers)
+    }
+    @Test fun discoveryPhotosFilterDoesNotExposeUnpublishedOrPhotolessItems() = fixture { f,_ ->
+        val initial = published(f)
+        assertEquals(0L, discover(f, MarketDiscoveryQuery(withPhotos = true)).totalOffers)
+        val changed = tx(f) { it.updateListing(f.owner, null, MarketListingUpdate(initial.copy(
+            product = MarketProductDetails(imageUrls = listOf("https://images.example.com/tea.jpg"))), true)) }.listings.single()
+        assertEquals(1L, discover(f, MarketDiscoveryQuery(withPhotos = true)).totalOffers)
+        tx(f) { it.updateListing(f.owner, null, MarketListingUpdate(changed.copy(published = false))) }
+        assertEquals(0L, discover(f, MarketDiscoveryQuery(withPhotos = true)).totalOffers)
+    }
+
 }

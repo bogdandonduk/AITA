@@ -32,6 +32,7 @@ private fun BuyerBrowseNavigation.restorePlace(saved: SavedBuyerBrowse) {
     search.value = p.search.take(120); city.value = p.city.take(100)
     appliedSearch.value = q.text; appliedCity.value = q.city
     shopId.value = q.storefrontId; categoryId.value = q.categoryId; sort.value = q.sort
+    brand.value = q.brand; appliedBrand.value = q.brand; withPhotos.value = q.withPhotos
     limit.value = (p.limit.coerceIn(MARKET_DISCOVERY_PAGE_SIZE, MARKET_DISCOVERY_MAX_OFFERS) / MARKET_DISCOVERY_PAGE_SIZE) * MARKET_DISCOVERY_PAGE_SIZE
     section.value = saved.section.takeIf { it in setOf("products", "shops") } ?: "products"
     filtersExpanded = saved.filters

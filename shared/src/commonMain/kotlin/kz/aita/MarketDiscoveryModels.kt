@@ -23,7 +23,9 @@ data class MarketDiscoveryQuery(
     val storefrontId: String? = null,
     val categoryId: String? = null,
     val savedOnly: Boolean = false,
-    val sort: String = MARKET_DISCOVERY_RECENT
+    val sort: String = MARKET_DISCOVERY_RECENT,
+    val brand: String = "",
+    val withPhotos: Boolean = false
 )
 
 /** Refresh the ENTIRE visible window in one server snapshot. More increases limit; it does not
@@ -68,11 +70,12 @@ private fun discoveryText(value: String, max: Int): String? {
 fun MarketDiscoveryQuery.normalizedDiscoveryQuery(): MarketDiscoveryQuery? {
     val search = discoveryText(text, 120) ?: return null
     val place = discoveryText(city, 100) ?: return null
+    val brandName = discoveryText(brand, 120) ?: return null
     if (search.isNotEmpty() && search.split(' ').size > 12) return null
     if (sort !in setOf(MARKET_DISCOVERY_RECENT, MARKET_DISCOVERY_TITLE)) return null
     val shop = storefrontId?.let { marketDiscoveryId(it) ?: return null }
     val category = categoryId?.let { marketDiscoveryId(it) ?: return null }
-    return copy(text = search, city = if (shop == null) place else "", storefrontId = shop, categoryId = category)
+    return copy(text = search, city = if (shop == null) place else "", storefrontId = shop, categoryId = category, brand = brandName)
 }
 
 fun MarketDiscoveryRequest.isValidDiscoveryRequest(): Boolean = query.normalizedDiscoveryQuery() != null &&
@@ -121,6 +124,8 @@ fun MarketDiscoveryResult.validatedDiscovery(
         !offer.storefront.isValidPublicMarketShop() || offer.description.length > 2000 ||
         (offer.gtin != null && marketCanonicalGtin(offer.gtin) != offer.gtin) ||
         (query.city.isNotEmpty() && !query.city.equals(offer.storefront.city, ignoreCase = true)) ||
+        (query.brand.isNotEmpty() && !offer.product.brand.contains(query.brand, ignoreCase = true)) ||
+        (query.withPhotos && offer.product.imageUrls.isEmpty()) ||
         offer.categoryIds.distinct().size != offer.categoryIds.size || offer.checkedAtMillis != page.checkedAtMillis || offer.title.isBlank() || offer.title.length > 180 ||
         offer.sourceUpdatedAtMillis < 0 || offer.categoryIds.size > 16 || offer.categoryIds.any { it !in knownIds } ||
         (selectedIds != null && offer.categoryIds.none { it in selectedIds }) || !offer.hasValidDiscoveryPrice() || !offer.product.isValidMarketProduct() ||

@@ -32,12 +32,13 @@ await context.route('**/*',async route=>{
  else if(p==='/supplierOrders/get')payload=orders;
  else if(p==='/supplierOrders/dashboard')payload=dashboard();
  else if(p==='/supplierGoodsPrices/my'||p==='/supplierGoodsPrices/get')payload=prices;
- else if(p==='/supplierGoodsPrices/upsert'){const b=req.postDataJSON();assert.equal(b.supplierId,profile.id);assert.ok(stores.some(s=>s.id===b.storeId));if(delaySave)await new Promise(r=>setTimeout(r,delaySave));payload={...b,updatedAtMillis:Date.now()};prices=prices.filter(x=>x.id!==b.id).concat(payload);}
+ else if(p==='/supplierGoodsPrices/upsert'){const b=req.postDataJSON();assert.equal(b.supplierId,profile.id);assert.ok(stores.some(s=>s.id===b.storeId));assert.equal(b.expectedUpdatedAtMillis,prices.find(x=>x.id===b.id)?.updatedAtMillis||0);if(delaySave)await new Promise(r=>setTimeout(r,delaySave));payload={...b,updatedAtMillis:Date.now()};prices=prices.filter(x=>x.id!==b.id).concat(payload);}
  else if(p.includes('profile-photo'))payload={accountId:account.id,mode:'SUPPLIER'};
  else if(p.includes('client-updates'))return route.fulfill({status:204,body:''});
  else if(p.includes('global')||p.includes('bootstrap'))return route.fulfill({status:503,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({negative:true,payload:null})});
  return route.fulfill({status:200,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({message:null,negative:false,payload:JSON.stringify(payload)})});
 });
+orders[0].order.status='Confirmed';orders[0].lines[0].supplierAcceptedQuantity=qty;
 const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('crash'));page.setDefaultTimeout(15000);
 const shot=async name=>{await page.screenshot({path:out+'/'+name+'.png'});console.log(out+'/'+name+'.png');};
 try{
@@ -79,10 +80,22 @@ if(malformedCache){
  const changes=calls.filter(c=>c.path==='/supplierGoodsPrices/upsert').map(c=>JSON.parse(c.body));assert.equal(changes.length,1);
  assert.equal(changes[0].storeId,stores[0].id);assert.equal(changes[0].supplierId,profile.id);assert.equal(changes[0].goodsItemId,id(401));assert.equal(changes[0].supplyPrice.price,'137');
  assert.equal(prices.find(p=>p.storeId===stores[1].id).supplyPrice.price,'125');checks.push('Explicit save submits restored137 exactly once to Central; Riverside stays125');
- await shot('saved-central');await page.setViewportSize({width:390,height:844});await page.waitForTimeout(1200);await shot('supplier-phone');
+ await shot('saved-central');
+ await clickName('Dispatch');await page.waitForTimeout(1500);await shot('dispatch-directory');
+ await page.getByRole('list',{name:'Dispatch, Open delivery run',exact:true}).filter({hasText:'Central branch'}).click({force:true});await page.waitForTimeout(800);
+ await clickName('Checklist');await shot('picking-before');
+ await page.getByRole('button',{name:'Mountain honey 12 pc. 4006381333931',exact:true}).click({force:true});await page.waitForTimeout(700);
+ assert.match(await page.locator('body').ariaSnapshot(),/Checked: 1\/1/);await shot('picking-checked');
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);await shot('picking-phone');
+ await page.reload();await page.waitForTimeout(10000);await page.keyboard.press('Tab');await page.setViewportSize({width:1440,height:1100});await page.waitForTimeout(700);
+ await page.getByRole('list',{name:'Dispatch, Open delivery run',exact:true}).filter({hasText:'Central branch'}).click({force:true});await page.waitForTimeout(800);
+ await clickName('Checklist');assert.match(await page.locator('body').ariaSnapshot(),/Checked: 1\/1/);
+ assert.equal(calls.filter(c=>c.path==='/supplierOrders/status').length,0);
+ checks.push('Shipment marks survive local reload without changing order status');await shot('picking-restored');
+
 }
 assert.deepEqual(errors,[]);checks.push('No JavaScript exception or renderer crash');
 console.log('SUPPLIER BROWSER PASS:',checks.join('; '));
-} catch(error){await shot('failure');throw error;
+} catch(error){await shot('failure');fs.writeFileSync(out+'/failure-aria.txt',await page.locator('body').ariaSnapshot());throw error;
 }finally{fs.writeFileSync(out+'/result.json',JSON.stringify({checks,errors,commandErrors,calls,prices,appState},null,2));await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
