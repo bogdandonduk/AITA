@@ -42,6 +42,7 @@ private data class RecordedAitaRequest(
 )
 
 private class AitaFlowTestEnvironment {
+    @Volatile var networkUnavailable = false
     var refreshFailure: ResponseDataModel<TokenPair>? = null
     var beforeRefreshReply: (suspend () -> Unit)? = null
     var storedTokens: TokenPair? = aitaTestTokenPair("initial")
@@ -723,6 +724,11 @@ class AitaSharedJvmFlowTest {
         environment.stores=listOf(store);storesState.emit(DataState.Success(listOf(store)))
         waitUntilAitaFlowCondition {currentStoreHasWorkspaceAccess(store.id)}
         val rows=(1..1500).map {aitaTestGoodsItem(id="large-$it",name="Item $it",barcode="CODE-$it")}
+        // A status value alone does not disconnect the mock: the real health monitor
+        // can correctly restore Reachable between emit() and the asynchronous create.
+        // Keep the transport offline too, even when that monitor runs on a slower host.
+        environment.stock = rows
+        environment.networkUnavailable = true
         stockState.emit(DataState.Success(rows))
         cloudTransportStatusState.value=CLOUD_TRANSPORT_STATUS_UNAVAILABLE
         val result=CompletableDeferred<DataState<GoodsItemDataModel>>()
@@ -731,6 +737,8 @@ class AitaSharedJvmFlowTest {
         assertEquals(1501,stockState.payloadValue!!.size)
         val saved=readJsonCacheText("cache_json:"+inventoryCacheKey("stock",inventoryOwners.current))!!
         assertEquals(1501,jsonBase.decodeFromString<List<GoodsItemDataModel>>(saved).size)
+        assertEquals("large-new", InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).single().item?.id)
+        assertEquals(rows, environment.stock, "An offline create must remain local until reconnect")
     }
 
     @Test
@@ -2049,6 +2057,8 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
             supplierIdHeader = request.headers["supplier_id"],
             queryParameters = queryParameters
         )
+
+        if (environment.networkUnavailable) throw java.io.IOException("Test transport is offline")
 
         if (path == "transactions/complete" && environment.failTransactionCompletions) {
             return@MockEngine respond(
