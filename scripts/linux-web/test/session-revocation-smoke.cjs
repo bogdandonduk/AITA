@@ -70,7 +70,7 @@ try {
  await waitFor(async()=>await b.evaluate(()=>localStorage.getItem('aita.auth_tokens')===null),'revoked client clears durable credentials');
  await b.waitForTimeout(2500);await b.keyboard.press('Tab');await b.screenshot({path:path.join(out,'revocation-inspect.png')});fs.writeFileSync(path.join(out,'revocation-aria.txt'),await b.locator('body').ariaSnapshot());await waitFor(async()=>await b.getByRole('button',{name:/^(Log in|Sign in)$/i}).count()>0,'revoked client returns to authentication');
  assert.notEqual(await a.evaluate(()=>localStorage.getItem('aita.auth_tokens')),null,'other device remains signed in');
- await b.screenshot({path:path.join(out,'revoked-device.png')});await b.reload();await b.waitForTimeout(5000);await b.keyboard.press('Tab');await waitFor(async()=>await b.getByRole('button',{name:/^Log in$/i}).count()>0,'revoked device remains signed out after reload');assert.equal(await b.evaluate(()=>localStorage.getItem('aita.auth_tokens')),null);
+ await b.screenshot({path:path.join(out,'revoked-device.png')});await b.reload();await b.waitForTimeout(5000);await b.keyboard.press('Tab');await waitFor(async()=>await b.getByRole('button',{name:/^(Log in|Sign in)$/i}).count()>0,'revoked device remains signed out after reload');assert.equal(await b.evaluate(()=>localStorage.getItem('aita.auth_tokens')),null);assert.equal(await button(b,'Sale').count(),0,'revoked device cannot restore the protected workspace');
  assert.equal(errors.length,0,errors.join('\n'));
  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:true,calls:calls.map(c=>({path:c.path,method:c.method})),errors},null,2));
  console.log('PASS: saved Store mode, Downloads reload, web action hidden, remote revocation logout');

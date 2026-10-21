@@ -47,11 +47,15 @@ def psql(env,sql):
 
 def category_map_for(schema,rows):
  result={}
+ existing_ids={row['id'] for row in rows}
  for slug,category in schema.items():
   seed=category_id(slug)
+  # Seed identity survives hierarchical display labels and translations.
+  if seed in existing_ids:
+   result[seed]=seed
+   continue
   matches=[row['id'] for row in rows if any(n['language']=='en' and n['value'].strip().casefold()==category['en'].strip().casefold() for n in row['name'])]
-  if seed in matches:result[seed]=seed
-  elif len(matches)==1:result[seed]=matches[0]
+  if len(matches)==1:result[seed]=matches[0]
   else:raise ValueError('Category missing or ambiguous: '+slug+'. Activate the prepared catalogue server release first.')
  return result
 

@@ -46,6 +46,13 @@ class PreparationTests(unittest.TestCase):
   actual=str(uuid.uuid4());schema={'food':SCHEMA['food']}
   self.assertEqual(imp.category_map_for(schema,[{'id':actual,'name':[{'language':'en','value':SCHEMA['food']['en']}]}]),{prep.category_id('food'):actual})
   with self.assertRaises(ValueError):imp.category_map_for(schema,[])
+ def test_seed_identity_survives_hierarchical_names_and_ambiguous_leaf_labels(self):
+  slug='food_fruits_stone';seed=prep.category_id(slug);schema={slug:SCHEMA[slug]}
+  rows=[{'id':seed,'name':[{'language':'en','value':'Food / Fruits / Stone fruit'}]},
+        {'id':str(uuid.uuid4()),'name':[{'language':'en','value':schema[slug]['en']}]},
+        {'id':str(uuid.uuid4()),'name':[{'language':'en','value':schema[slug]['en']}]}]
+  self.assertEqual(imp.category_map_for(schema,rows),{seed:seed})
+  with self.assertRaises(ValueError):imp.category_map_for(schema,rows[1:])
  def test_unknown_sources_and_categories_are_not_imported(self):
   row=item();mapping={prep.category_id('food'):str(uuid.uuid4())}
   self.assertEqual(imp.validate(row,mapping)['categoryIds'],list(mapping.values()))

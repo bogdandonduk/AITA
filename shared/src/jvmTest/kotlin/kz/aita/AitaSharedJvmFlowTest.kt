@@ -802,6 +802,9 @@ class AitaSharedJvmFlowTest {
         assertEquals(2,InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
         assertEquals(latest.name,InventoryCreates.overlayItems(inventoryOwners.current,environment.stock).single().name)
         InventoryCreates.flush(force=true)
+        // Reconnect reconciliation may already own the coalesced sender. Its flush returns
+        // immediately to this caller; observe the durable acknowledgement, not scheduling.
+        waitUntilAitaFlowCondition { InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty() }
         assertEquals(2,environment.acceptedEdits.size)
         assertTrue(InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty())
         assertEquals(latest.name,environment.stock.single().name)
