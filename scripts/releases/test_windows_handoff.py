@@ -75,8 +75,13 @@ ConvertTo-Json -InputObject @($script:phases) | Set-Content -Encoding UTF8 -Lite
             # Windows PowerShell needs the real SystemRoot to initialize .NET.
             # Start-Process is mocked, so keeping this path cannot run an installer.
             # Linux's portable pwsh has no SystemRoot and uses the fixture path.
-            env.setdefault('SystemRoot', str(folder))
-            env.pop('PSModulePath', None)  # Match the shipped handoff launcher.
+            if not any(key.casefold() == 'systemroot' for key in env):
+                env['SystemRoot'] = str(folder)
+            # os.environ uppercases keys on Windows; dict(os.environ) does not
+            # retain that case-insensitive lookup behavior.
+            for key in list(env):
+                if key.casefold() == 'psmodulepath':
+                    del env[key]  # Match the shipped handoff launcher.
             execution = subprocess.run([POWERSHELL, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
                 env=env, capture_output=True, text=True, timeout=30)
             self.assertEqual(execution.returncode, 0, execution.stdout + execution.stderr)
