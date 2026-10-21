@@ -599,10 +599,26 @@ fun AppConfiguration.UserAuthScreen() {
         }
         return
     }
+    var showGuestMarketplace by rememberSaveable { mutableStateOf(getPlatformName().contains("wasm", ignoreCase = true)) }
+    if (showGuestMarketplace && stateValues.userAccount == null) {
+        PublicMarketplaceHome(
+            onLogin = { showGuestMarketplace = false; coroutineScope.launch { Navigation.UserAuth.clearLeft() } },
+            onSignup = { showGuestMarketplace = false; coroutineScope.launch {
+                if (stateValues.isNarrowScreen) Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp)
+                else Navigation.UserAuth.clearRight()
+            } },
+            onDownloads = { openPublicPage(NavigationScreenModel.UserAuth.Downloads) })
+        return
+    }
     Column(
         modifier = Modifier.fillMaxSize().imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (getPlatformName().contains("wasm", ignoreCase = true)) actionButton(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            text = pass29Text("front.back"), enabledColor = stateValues.BackgroundColor,
+            textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false,
+            onClick = { showGuestMarketplace = true })
         val authListState = rememberLazyListState(
             initialFirstVisibleItemIndex = userAuthScreenScrollFirstVisibleItemIndex.coerceAtLeast(0),
             initialFirstVisibleItemScrollOffset = userAuthScreenScrollFirstVisibleItemScrollOffset.coerceAtLeast(0)

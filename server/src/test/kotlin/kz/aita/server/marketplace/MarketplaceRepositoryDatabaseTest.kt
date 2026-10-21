@@ -2106,4 +2106,21 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals(0L, discover(f, MarketDiscoveryQuery(withPhotos = true)).totalOffers)
     }
 
+    @Test fun anonymousDiscoveryUsesOnlyPublishedProjectionAndNeverSavedAccountMarkers() = fixture { f, _ ->
+        val offer = published(f)
+        tx(f) { it.updateSaved(f.buyer, MarketSavedUpdate(offer.id, true)) }
+        val request = MarketDiscoveryRequest(MarketDiscoveryQuery())
+        val response = tx(f) { it.discover(null, request) }
+        assertNull(response.accountId); assertFalse(response.page.offers.single().saved)
+        assertNotNull(PublicMarketDiscovery(response).validated(request, null))
+        val wire = jsonBase.encodeToString(response)
+        assertFalse("NEVER-PUBLIC" in wire); assertFalse(f.buyer.toString() in wire)
+        assertFailsWith<MarketFailure> { tx(f) { it.discover(null, request.copy(query = MarketDiscoveryQuery(savedOnly = true))) } }
+        tx(f) { repository ->
+            val current = repository.dashboard(f.owner, f.parent).storefront
+            repository.updateStorefront(f.owner, null, MarketStorefrontUpdate(current.copy(published = false)))
+        }
+        assertEquals(0L, tx(f) { it.discover(null, request) }.totalOffers)
+    }
+
 }

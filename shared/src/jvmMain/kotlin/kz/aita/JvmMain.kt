@@ -1,6 +1,7 @@
 package kz.aita
 
 import app.cash.sqldelight.async.coroutines.synchronous
+import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
@@ -221,44 +222,52 @@ actual var getPlatformName: () -> String = {
     currentJvmDesktopPlatformName()
 }
 
-actual var getSqlDelightDriver: (() -> SqlDriver?)? = {
-    val dataDirectory = jvmPersistentDataRoot().toPath()
+actual var getSqlDelightDriver: (() -> SqlDriver?)? = { openJvmLocalDatabase(jvmPersistentDataRoot()) }
+
+internal fun openJvmLocalDatabase(directory: File): SqlDriver {
+    val dataDirectory = directory.toPath()
     Files.createDirectories(dataDirectory)
     val dbPath = dataDirectory.resolve("app_database.db").toAbsolutePath()
     val firstRun = !Files.exists(dbPath) || runCatching { Files.size(dbPath) == 0L }.getOrDefault(false)
-    val driver: SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$dbPath")
+    // JDBC opens a connection for each non-transactional call. PRAGMA calls on the initial
+    // connection do not configure subsequent connections, including background cache writers.
+    val driver: SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$dbPath", Properties().apply {
+        setProperty("foreign_keys", "true")
+        setProperty("busy_timeout", "5000")
+    })
 
     try {
-        // These are per-connection protections. They keep foreign-key integrity enabled and avoid
-        // transient "database is locked" failures during short concurrent desktop operations.
-        driver.execute(null, "PRAGMA foreign_keys = ON", 0)
-        driver.execute(null, "PRAGMA busy_timeout = 5000", 0)
-
         val schema = AppDatabase.Schema.synchronous()
-        if (firstRun) {
-            schema.create(driver)
-        } else {
-            val cursor = driver.executeQuery(
-                identifier = null,
-                sql = "PRAGMA user_version",
-                parameters = 0,
-                mapper = { sqlCursor: SqlCursor ->
-                    QueryResult.Value(
-                        if (sqlCursor.next().value) sqlCursor.getLong(0)?.toInt() ?: 0 else 0
+        val transacter = object : TransacterImpl(driver) {}
+        transacter.transaction {
+            if (firstRun) {
+                schema.create(driver)
+            } else {
+                val cursor = driver.executeQuery(
+                    identifier = null,
+                    sql = "PRAGMA user_version",
+                    parameters = 0,
+                    mapper = { sqlCursor: SqlCursor ->
+                        QueryResult.Value(
+                            if (sqlCursor.next().value) sqlCursor.getLong(0)?.toInt() ?: 0 else 0
+                        )
+                    }
+                )
+                val currentVersion = cursor.value
+                val targetVersion = AppDatabase.Schema.version.toInt()
+                when {
+                    currentVersion < targetVersion -> schema.migrate(driver, currentVersion.toLong(), schema.version)
+                    currentVersion > targetVersion -> error(
+                        "AITA local database version $currentVersion is newer than this app supports ($targetVersion)"
                     )
                 }
-            )
-            val currentVersion = cursor.value
-            val targetVersion = AppDatabase.Schema.version.toInt()
-            when {
-                currentVersion < targetVersion -> schema.migrate(driver, currentVersion.toLong(), schema.version)
-                currentVersion > targetVersion -> error(
-                    "AITA local database version $currentVersion is newer than this app supports ($targetVersion)"
-                )
             }
+            // Older desktop builds created version-0 databases but never recorded migrations.
+            // Commit the schema and its version together; future launches must not replay them.
+            driver.execute(null, "PRAGMA user_version = ${schema.version}", 0)
         }
 
-        driver
+        return driver
     } catch (throwable: Throwable) {
         runCatching { driver.close() }
         throw throwable

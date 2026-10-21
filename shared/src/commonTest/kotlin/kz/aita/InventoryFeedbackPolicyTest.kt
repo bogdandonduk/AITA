@@ -1,6 +1,11 @@
 package kz.aita
 import kotlin.test.*
 class InventoryFeedbackPolicyTest {
+    @Test fun unreadableCopyIsNotMisreportedAsNeverDownloadedOrDisconnected() {
+        val status = InventoryLoadStatus(cacheChecked = true, cacheReadFailed = true)
+        assertEquals(InventoryFeedbackKind.CacheReadFailure, inventoryFeedbackKind(status, true, false, true))
+        assertEquals(InventoryFeedbackKind.CacheReadFailure, inventoryFeedbackKind(status, false, false, true))
+    }
     @Test fun cachedStockRemainsVisibleWhileConnectionIsBeingRetried() {
         val status=InventoryLoadStatus(source=InventoryLoadSource.Cache,loading=true,cacheChecked=true)
         assertEquals(InventoryFeedbackKind.SavedOffline,inventoryFeedbackKind(status,true,true,true))

@@ -78,7 +78,7 @@ fun storeSubscriptionRequiredForEndpoint(endpoint: String): Boolean {
     val root = path.substringBefore('/')
     if (root in setOf("stock", "stockbatches", "transactions", "cashregister", "debtors", "analytics", "logs", "operationlogs")) return true
     if (root == "market") return path == "market/seller" || path.startsWith("market/seller/")
-    if (root == "workshifts") return path != "workshifts/end"
+    if (root == "workshifts") return path != "workshifts/end" && path != "workshifts/reports" && !path.startsWith("workshifts/reports/")
     if (root == "workers") return path !in setOf("workers/my/get", "workers/requests/my", "workers/my/password", "workers/removal/confirm", "workers/removal/decline", "workers/invitations/decline")
     // Business identity and branch configuration stay manageable before/after paid operation.
     if (root == "stores") return false

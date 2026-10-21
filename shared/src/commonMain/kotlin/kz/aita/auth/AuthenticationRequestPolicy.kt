@@ -10,10 +10,10 @@ import kz.aita.cloudEndpointRequiresAuthentication
 @PublishedApi
 internal fun HttpRequestBuilder.disableSessionAuthForPublicAuthRequest(endpointUrl: String) {
     val endpoint = endpointUrl.trim('/').lowercase()
-    if (!cloudEndpointRequiresAuthentication(endpointUrl) && (endpoint.startsWith("auth/") || endpoint == "diagnostics/events/anonymous")) {
+    if (!cloudEndpointRequiresAuthentication(endpointUrl) && (endpoint.startsWith("auth/") || endpoint == "diagnostics/events/anonymous" || endpoint == "market/public/discovery")) {
         // sendWithoutRequest(false) disables preemptive credentials, not a retry after 401.
         attributes.put(AuthCircuitBreaker, Unit)
-        if (endpoint == "diagnostics/events/anonymous") headers.remove(HttpHeaders.Authorization)
+        if (endpoint == "diagnostics/events/anonymous" || endpoint == "market/public/discovery") headers.remove(HttpHeaders.Authorization)
     }
 }
 

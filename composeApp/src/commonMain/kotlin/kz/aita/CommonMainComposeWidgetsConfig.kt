@@ -913,16 +913,14 @@ fun AppConfiguration.GoodsItemInStockWidget(
         if(managementStore) batches.sortedWith(compareBy<GoodsBatchDataModel> { it.expirationDateMillis ?: Long.MAX_VALUE }.thenBy { it.createdAtMillis })
         else batches.sortedForShelf(goodsItem)
     }
-    val totalQuantity = remember(shelfBatches) { shelfBatches.availableStockQuantity() }
-    val quantityUnitText = shelfBatches
-        .firstOrNull()
-        ?.quantity
-        ?.immutableUnitName
-        ?.extractLocalizedString(stateValues.appLanguage)
-        .orEmpty()
+    val totalQuantityText = remember(shelfBatches, stateValues.appLanguage) {
+        stockWarehouseQuantityTextForUi(shelfBatches)
+    }
 
     val activeBatch = remember(shelfBatches, goodsItem, managementStore) {
-        if(managementStore) null else shelfBatches.find { it.id == goodsItem.activeShelfBatchId } ?: shelfBatches.bestBatchForSale(goodsItem)
+        if (managementStore) null else shelfBatches.find {
+            it.id == goodsItem.activeShelfBatchId && shelfBatchCanBeActive(it)
+        } ?: shelfBatches.bestBatchForSale(goodsItem)
     }
 
     val expirationStatusText = activeBatch?.expirationDateMillis?.toStockDateInputText()?.let {
@@ -1077,7 +1075,7 @@ fun AppConfiguration.GoodsItemInStockWidget(
                     value = if (shelfBatches.isEmpty()) {
                         localizedStringResource(199, "No batches yet")
                     } else {
-                        (if (totalQuantity.isInfinite()) inventoryExperienceText("unlimited") else "${totalQuantity.quantityAmountText(false)} $quantityUnitText") + " • ${shelfBatches.size} ${localizedStringResource(138, "Batches")}"
+                        "$totalQuantityText • ${shelfBatches.size} ${localizedStringResource(138, "Batches")}"
                     },
                     textColor = if (shelfBatches.isEmpty()) stateValues.ErrorColor else textColor
                 )

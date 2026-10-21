@@ -132,6 +132,19 @@ class TransactionStockDatabaseTest {
         assertEquals(1875.0,total(first),0.000001)
     } }
 
+    @Test fun editingBranchBatchKeepsItsLegacyParentTitleWithoutOpeningOtherCatalogueAccess() = fixture { db -> transaction(db) {
+        assertEquals("0", stockBatchEditMeasurementInsideTransaction(store, item, item))
+        exec("UPDATE stores SET parent_store_id='$otherStore' WHERE id='$store'")
+        StockItems.update({ StockItems.id eq item }) { it[storeId] = otherStore; it[measurementUnitId] = GRAMS_UNIT_ID }
+        assertEquals(GRAMS_UNIT_ID, stockBatchEditMeasurementInsideTransaction(store, item, item),
+            "An existing branch batch can still be edited against its historical parent title")
+        assertNull(stockBatchEditMeasurementInsideTransaction(store, UUID.randomUUID(), item),
+            "A different parent's title must be explicitly imported before reassignment")
+        exec("UPDATE stores SET parent_store_id=NULL WHERE id='$store'")
+        assertNull(stockBatchEditMeasurementInsideTransaction(store, item, item),
+            "A reference outside the current store family cannot be edited")
+    } }
+
     @Test fun saleCapturesMultipleRealSourcesAndReturnDoesNotFollowTheNewShelf() = fixture { db -> transaction(db) {
         val sale = save("purchase", listOf(line(5.0)))
         assertEquals(first.toString(), sale.goodsInTransaction.single().shelfBatchIdAtSale)

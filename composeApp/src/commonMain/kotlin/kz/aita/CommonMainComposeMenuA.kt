@@ -5373,6 +5373,7 @@ internal fun AppConfiguration.NoActiveWorkshiftMenuTile() {
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 NoActiveWorkshiftMenuTileText(modifier = Modifier.fillMaxWidth())
+                ShiftReportShortcuts()
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1091, "Start shift"),
@@ -5388,6 +5389,7 @@ internal fun AppConfiguration.NoActiveWorkshiftMenuTile() {
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 NoActiveWorkshiftMenuTileText(modifier = Modifier.fillMaxWidth())
+                ShiftReportShortcuts()
                 actionButton(
                     autoLoading = false,
                     modifier = Modifier.fillMaxWidth(),
@@ -5447,6 +5449,7 @@ internal fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMo
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 ActiveWorkshiftMenuTileText(workshift = workshift, modifier = Modifier.fillMaxWidth())
+                ShiftReportShortcuts()
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(650, "End workshift"),
@@ -5463,6 +5466,7 @@ internal fun AppConfiguration.ActiveWorkshiftMenuTile(workshift: WorkshiftDataMo
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 ActiveWorkshiftMenuTileText(workshift = workshift, modifier = Modifier.fillMaxWidth())
+                ShiftReportShortcuts()
                 actionButton(
                     autoLoading = false,
                     modifier = Modifier.fillMaxWidth(),

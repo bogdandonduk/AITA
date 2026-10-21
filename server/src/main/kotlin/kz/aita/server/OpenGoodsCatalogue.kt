@@ -3,6 +3,8 @@ package kz.aita.server
 import kz.aita.*
 import org.jetbrains.exposed.sql.*
 import java.util.UUID
+import java.io.File
+import java.util.Locale
 import java.util.zip.GZIPInputStream
 
 internal object OpenGoodsCatalogue : Table("open_goods_catalogue") {
@@ -54,11 +56,48 @@ internal fun validateOpenGoodsEntry(item: GenericGoodsItemDataModel) {
     require(source.url.matches(Regex("https://world\\.open(food|beauty)facts\\.org/product/[0-9]+")))
 }
 
-/** Filter and limit in PostgreSQL; importing more templates does not hydrate them on clients. */
-internal fun searchOpenGoodsInsideTransaction(barcodes: List<String>, tokens: List<String>, limit: Int): List<GenericGoodsItemDataModel> {
+/** Full imports live outside the application JAR and are streamed, never loaded into server RAM. */
+internal fun externalOpenGoodsFile(name: String, root: File = File("/var/lib/aita/catalogues/current")): File? {
+    require(name in setOf("open-goods.jsonl.gz", "open-goods-notice.json"))
+    val archive = File(root, "open-goods.jsonl.gz")
+    val notice = File(root, "open-goods-notice.json")
+    return File(root, name).takeIf { archive.isFile && notice.isFile && it.canRead() }
+}
+
+private class OpenGoodsCodeKey : ExpressionWithColumnType<String>() {
+    override val columnType = TextColumnType()
+    override fun toQueryBuilder(queryBuilder: QueryBuilder) = queryBuilder {
+        append("lpad(", OpenGoodsCatalogue.code, ",14,'0')")
+    }
+}
+
+private class OpenGoodsCategoryMatch(private val categoryId: String) : Op<Boolean>() {
+    override fun toQueryBuilder(queryBuilder: QueryBuilder) = queryBuilder {
+        append("(", OpenGoodsCatalogue.payload, "::jsonb -> 'categoryIds') @> ",
+            QueryParameter("[\"$categoryId\"]", TextColumnType()), "::jsonb")
+    }
+}
+
+/** Filter and limit in PostgreSQL; importing millions of templates does not hydrate them on clients. */
+internal fun searchOpenGoodsInsideTransaction(barcodes: List<String>, tokens: List<String>, limit: Int,
+    categoryIds: Set<String> = emptySet()): List<GenericGoodsItemDataModel> {
     val query = OpenGoodsCatalogue.selectAll()
-    if (barcodes.isNotEmpty()) query.andWhere { OpenGoodsCatalogue.code inList barcodes }
-    tokens.forEach { token -> query.andWhere { OpenGoodsCatalogue.searchText like "%$token%" } }
+    if (barcodes.isNotEmpty()) {
+        val valid = barcodes.filter { it.matches(Regex("[0-9]{8}|[0-9]{12,14}")) }.map { it.padStart(14, '0') }.distinct()
+        if (valid.isEmpty()) return emptyList()
+        query.andWhere { OpenGoodsCodeKey() inList valid }
+    }
+    if (categoryIds.isNotEmpty()) {
+        val valid = categoryIds.take(1000).mapNotNull { runCatching { UUID.fromString(it).toString() }.getOrNull() }
+        if (valid.isEmpty()) return emptyList()
+        query.andWhere { valid.map { OpenGoodsCategoryMatch(it) }.compoundOr() }
+    }
+    tokens.take(8).forEach { raw ->
+        val token = raw.take(120).lowercase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        // Very short contains-searches cannot use trigrams. Use the indexed name prefix instead.
+        if (raw.length < 3) query.andWhere { OpenGoodsCatalogue.sortName like "$token%" }
+        else query.andWhere { OpenGoodsCatalogue.searchText like "%$token%" }
+    }
     return query.orderBy(OpenGoodsCatalogue.sortName to SortOrder.ASC, OpenGoodsCatalogue.id to SortOrder.ASC)
         .limit(limit.coerceIn(1, 10200)).map { jsonBase.decodeFromString<GenericGoodsItemDataModel>(it[OpenGoodsCatalogue.payload]) }
 }

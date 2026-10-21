@@ -4043,8 +4043,10 @@ fun endCurrentWorkshift(
     onCompleted: ((DataState<WorkshiftDataModel>) -> Unit)? = null
 ) {
     val id = storeId?.takeIf { it.isNotBlank() } ?: return
+    val reportOwner = captureMarketRequestScope(id)
     GlobalScope.launch(Dispatchers.ourIo) {
         endWorkshiftMutex.withLock {
+            if (reportOwner?.isCurrent() != true) return@withLock
             val activeWorkshift = activeWorkshiftState.payloadValue
                 ?.takeIf { it.storeId == id && it.isActive && it.endedAtMillis == null }
             val endedAtMillis = getCurrentTimeMillis()
@@ -4059,6 +4061,7 @@ fun endCurrentWorkshift(
                 method = HttpMethod.Post,
                 endpointUrl = globalAppConfigurationState.payloadValue.endWorkshiftPath.first,
                 headers = mapOf("store_id" to id),
+                expectedSessionGeneration = reportOwner.generation,
                 body = WorkshiftEndRequestDataModel(
                     workshiftId = activeWorkshift?.id,
                     endedAtMillis = endedAtMillis,
@@ -4067,6 +4070,7 @@ fun endCurrentWorkshift(
                 )
             )
 
+            if (!reportOwner.isCurrent()) return@withLock
             if (response.negative || response.payload == null) {
                 val shouldQueueWorkshiftEnd = response.transportFailure ||
                     response.httpStatusCode == HttpStatusCode.Unauthorized.value ||
@@ -4079,6 +4083,7 @@ fun endCurrentWorkshift(
                         endedAtMillis = endedAtMillis,
                         clientOperationId = operationId
                     )
+                    reportOwner?.let { ShiftReports.rememberShift(it, ended, offerReport = true) }
                     onCompleted?.invoke(DataState.Success(ended, pendingWorkshiftEndMessage()))
                     return@withLock
                 }
@@ -4089,6 +4094,7 @@ fun endCurrentWorkshift(
                 activeWorkshiftState.emit(DataState.Empty(response.message))
                 dropPendingWorkshiftEnd(operationId)
                 postInAppNotification(response.message, NotificationType.Positive)
+                reportOwner?.let { ShiftReports.rememberShift(it, response.payload, offerReport = true) }
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
             }
         }
@@ -10427,6 +10433,7 @@ internal fun cloudEndpointRequiresAuthentication(endpointUrl: String): Boolean {
         endpoint == "auth/session" -> true
         endpoint.startsWith("auth/security/") -> true
         endpoint == "diagnostics/events/anonymous" -> false
+        endpoint == "market/public/discovery" -> false
         endpoint.startsWith("auth/") -> false
         endpoint.startsWith("config/") -> false
         endpoint.startsWith("res/") -> false
@@ -13058,24 +13065,38 @@ private suspend inline fun <reified T> hydrateInventoryResource(
     }
     // Disk I/O must not hold the ownership lock: logout/store switching can cancel this hydration.
     val key = CACHE_PREFIX + inventoryCacheKey(name, owner)
+    var cacheReadFailed = false
     val cached = try {
         withTimeoutOrNull(30_000L) {
             val denied = getLocalKv(key + ":access-denied") == "1"
-            denied to if (denied) null else getJsonCache<List<T>>(inventoryCacheKey(name, owner))
-        }
+            denied to if (denied) null else readInventorySnapshot<T>(name, owner)
+        }.also { if (it == null) cacheReadFailed = true }
     } catch (failure: Exception) {
         ensureConnectionOwnerActive(failure)
         logCloudConnectionDiagnostic("Inventory cache read failed; cloud loading remains available")
+        cacheReadFailed = true
         null
     }
-    val payload = cached?.second?.let { filter(owner, it) } ?: filter(owner, emptyList()).takeIf { it.isNotEmpty() }
+    val payload = try {
+        if (cacheReadFailed || cached?.first == true) null
+        else cached?.second?.let { filter(owner, it.rows) } ?: filter(owner, emptyList()).takeIf { it.isNotEmpty() }
+    } catch (failure: Exception) {
+        ensureConnectionOwnerActive(failure)
+        logCloudConnectionDiagnostic("Inventory local changes could not be read; saved data retained")
+        cacheReadFailed = true
+        null
+    }
     inventoryStateMutex.withLock {
         if (inventoryAccessRevision != accessAtStart ||
             !canHydrateInventory(state.payloadValue != null || status.value.accessDenied, inventoryOwnerIsCurrent(owner))) return
-        status.value = status.value.copy(cacheChecked = true)
+        status.value = status.value.copy(cacheChecked = true, cacheReadFailed = cacheReadFailed)
         if (cached?.first == true) {
             status.value = status.value.copy(accessDenied = true, failure = inventoryLoadFailureMessage())
         } else if (payload != null) {
+            if (cached?.second?.importedLegacy == true) {
+                val saved = persistInventoryCacheLocked(name, owner, payload)
+                status.value = status.value.copy(cacheWriteFailed = !saved)
+            }
             state.emit(DataState.Success(payload, cacheMessage()))
             status.value = status.value.copy(source = InventoryLoadSource.Cache)
         }

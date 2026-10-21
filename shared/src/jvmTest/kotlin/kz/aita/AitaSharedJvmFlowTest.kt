@@ -51,6 +51,8 @@ private class AitaFlowTestEnvironment {
     var stores: List<StoreDataModel> = emptyList()
     var storesFailureStatus: HttpStatusCode? = null
     var beforeStoresReply: (suspend () -> Unit)? = null
+    var beforeAnalyticsReply: (suspend () -> Unit)? = null
+    var analyticsFailureStatus: HttpStatusCode? = null
     var workerMemberships: List<StoreWorkerDataModel> = emptyList()
     var myWorkerMemberships: List<StoreWorkerDataModel> = emptyList()
     var incomingWorkerRequests: List<StoreWorkerRequestDataModel> = emptyList()
@@ -274,6 +276,95 @@ class AitaSharedJvmFlowTest {
         waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null }
         assertNull(stockState.payloadValue)
         assertTrue(stockLoadStatusState.value.accessDenied)
+    }
+
+    @Test fun upgradeRecoversLegacyStockOnlyForItsRecordedOwnerAndStore() = runBlocking {
+        val item = aitaTestGoodsItem(id = "legacy-item")
+        val batch = aitaTestBatch(id = "legacy-batch", goodsItemId = item.id)
+        putLocalKv("cart-book.legacy-owner.v2", """{"accountId":"$AITA_FLOW_TEST_USER_ID","storeId":"$AITA_FLOW_SOURCE_STORE_ID","imported":true}""")
+        writeJsonCacheText("cache_json:stock:$AITA_FLOW_SOURCE_STORE_ID", jsonBase.encodeToString(listOf(item)))
+        writeJsonCacheText("cache_json:stock_batches:$AITA_FLOW_SOURCE_STORE_ID", jsonBase.encodeToString(listOf(batch)))
+        environment.networkUnavailable = true
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        getStockBatches(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null && stockBatchesLoadStatusState.value.failure != null }
+        assertEquals(listOf(item), stockState.payloadValue)
+        assertEquals(listOf(batch), stockBatchesState.payloadValue)
+        assertNotNull(readJsonCacheText(CACHE_PREFIX + inventoryCacheKey("stock", inventoryOwners.current)))
+        assertNotNull(readJsonCacheText("cache_json:stock:$AITA_FLOW_SOURCE_STORE_ID"), "Retain the recovery source")
+        Unit
+    }
+
+    @Test fun legacyStockCannotCrossAccountsOrStoresOrOverrideANewerEmptySnapshot() = runBlocking {
+        val owner = inventoryOwners.current
+        writeJsonCacheText("cache_json:stock:$AITA_FLOW_SOURCE_STORE_ID", jsonBase.encodeToString(listOf(aitaTestGoodsItem())))
+        for ((account, store) in listOf("other-account" to AITA_FLOW_SOURCE_STORE_ID, AITA_FLOW_TEST_USER_ID to "other-store")) {
+            putLocalKv("cart-book.legacy-owner.v2", """{"accountId":"$account","storeId":"$store"}""")
+            assertNull(readInventorySnapshot<GoodsItemDataModel>("stock", owner))
+        }
+        putLocalKv("cart-book.legacy-owner.v2", """{"accountId":"$AITA_FLOW_TEST_USER_ID","storeId":"$AITA_FLOW_SOURCE_STORE_ID"}""")
+        val key = CACHE_PREFIX + inventoryCacheKey("stock", owner)
+        writeJsonCacheText(key, "[]")
+        assertEquals(emptyList(), readInventorySnapshot<GoodsItemDataModel>("stock", owner)?.rows)
+        putLocalKv(key + ":access-denied", "1")
+        assertFailsWith<IllegalStateException> { readInventorySnapshot<GoodsItemDataModel>("stock", owner) }
+        Unit
+    }
+
+    @Test fun unreadableCacheIsNotAnEmptyCatalogueAndOnlineRefreshCanRepairIt() = runBlocking {
+        val key = CACHE_PREFIX + inventoryCacheKey("stock", inventoryOwners.current)
+        writeJsonCacheText(key, "not valid inventory JSON")
+        environment.networkUnavailable = true
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null }
+        assertNull(stockState.payloadValue)
+        assertTrue(stockLoadStatusState.value.cacheReadFailed)
+        assertEquals("not valid inventory JSON", readJsonCacheText(key))
+        environment.networkUnavailable = false
+        environment.stock = listOf(aitaTestGoodsItem(id = "recovered-item"))
+        waitUntilAitaFlowCondition { !stockLoadStatusState.value.loading }
+        // OwnedScopedRead completes after clearing the UI loading flag.
+        stockRead.cancel()
+        getStock(AITA_FLOW_SOURCE_STORE_ID)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.source == InventoryLoadSource.Cloud }
+        assertFalse(stockLoadStatusState.value.cacheReadFailed)
+        assertEquals(environment.stock, stockState.payloadValue)
+    }
+
+    @Test fun incompleteChunkedSnapshotCannotBeReplacedByAnEmptyLocalBase() = runBlocking {
+        val owner = inventoryOwners.current
+        val key = CACHE_PREFIX + inventoryCacheKey("stock", owner)
+        writeJsonCacheText(key, jsonBase.encodeToString(listOf(aitaTestGoodsItem())))
+        val prefix = "aita-cache-chunks-v1:${key.length}:$key:"
+        val manifest = assertNotNull(getLocalKv(prefix + "manifest"))
+        deleteLocalKv(prefix + manifest.split('|')[1] + ":0")
+        assertFailsWith<IllegalStateException> { readInventorySnapshot<GoodsItemDataModel>("stock", owner) }
+        assertEquals(manifest, getLocalKv(prefix + "manifest"))
+    }
+
+    @Test fun coldOfflineReloadRestoresWholeStockAndBatchesWithQueuedChanges() = runBlocking {
+        val store = aitaTestStore().copy(architectureVersion = 2)
+        environment.stores = listOf(store)
+        storesState.emit(DataState.Success(listOf(store)))
+        environment.stock = (1..150).map { aitaTestGoodsItem(id = "saved-$it", barcode = "SAVED-$it") }
+        environment.batches = environment.stock.map { aitaTestBatch(id = "batch-${it.id}", goodsItemId = it.id) }
+        getStock(store.id); getStockBatches(store.id)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.source == InventoryLoadSource.Cloud && stockBatchesLoadStatusState.value.source == InventoryLoadSource.Cloud }
+        environment.networkUnavailable = true
+        cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
+        val added = CompletableDeferred<DataState<GoodsItemDataModel>>()
+        addGoodsItem(aitaTestGoodsItem(id = "pending-item", barcode = "PENDING")) { added.complete(it) }
+        val pendingItem = requireAitaFlowSuccess(added).payload
+        val newBatch = CompletableDeferred<DataState<List<GoodsBatchDataModel>>>()
+        addGoodsBatches(listOf(aitaTestBatch(id = "pending-batch", goodsItemId = pendingItem.id))) { newBatch.complete(it) }
+        val pendingBatch = requireAitaFlowSuccess(newBatch).payload.single()
+        publishActiveInventoryStoreId(null)
+        publishActiveInventoryStoreId(store.id)
+        getStock(store.id); getStockBatches(store.id)
+        waitUntilAitaFlowCondition { stockLoadStatusState.value.failure != null && stockBatchesLoadStatusState.value.failure != null }
+        assertEquals((environment.stock + pendingItem).toSet(), stockState.payloadValue?.toSet())
+        assertEquals((environment.batches + pendingBatch).toSet(), stockBatchesState.payloadValue?.toSet())
+        assertEquals(2, InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
     }
 
     @Test
@@ -1457,6 +1548,87 @@ class AitaSharedJvmFlowTest {
         assertTrue(environment.requests.any { it.method == "POST" && it.path == "workers/removal/confirm" })
     }
 
+    private suspend fun prepareAnalyticsOwner() {
+        environment.stores = listOf(aitaTestStore(id = AITA_FLOW_SOURCE_STORE_ID))
+        storesState.emit(DataState.Success(environment.stores))
+        waitUntilAitaFlowCondition { currentUserCanViewAnalytics(AITA_FLOW_SOURCE_STORE_ID) }
+        AnalyticsWorkspace.invalidate()
+    }
+
+    @Test fun analyticsUsesServerTotalsWhenOneDetailedListNeverLoaded() = runBlocking {
+        prepareAnalyticsOwner()
+        environment.transactions = aitaAnalyticsFixture().transactions
+        transactionsState.emit(DataState.Empty())
+        stockState.emit(DataState.Success(emptyList()))
+        stockBatchesState.emit(DataState.Success(emptyList()))
+        val selection = AnalyticsSelection("all")
+        AnalyticsWorkspace.select(selection)
+        val report = withTimeout(10_000) { AnalyticsWorkspace.state.first { it != null && it.remoteOnly && AnalyticsWorkspace.isCurrent(it, selection) } }!!
+        assertEquals(environment.transactions.size, report.dashboard.transactionCount)
+        assertFalse(report.saved)
+        assertFalse(AnalyticsWorkspace.failure.value)
+        assertFalse(report.stock.available)
+        transactionsState.emit(DataState.Success(environment.transactions))
+        withTimeout(10_000) { AnalyticsWorkspace.state.first { it != null && !it.remoteOnly && AnalyticsWorkspace.isCurrent(it, selection) } }
+        Unit
+    }
+
+    @Test fun analyticsOfflineFailureEndsLoadingAndRetryFetchesMissingData() = runBlocking {
+        prepareAnalyticsOwner()
+        environment.networkUnavailable = true
+        AnalyticsWorkspace.select(AnalyticsSelection("all"))
+        withTimeout(20_000) { AnalyticsWorkspace.failure.first { it } }
+        assertNull(AnalyticsWorkspace.state.value)
+        environment.networkUnavailable = false
+        environment.stock = listOf(aitaTestGoodsItem("analytics-retry-item"))
+        AnalyticsWorkspace.retry()
+        withTimeout(12_000) { AnalyticsWorkspace.state.first { it != null && !it.remoteOnly } }
+        assertTrue(environment.requests.any { it.path == "transactions/get" })
+        assertTrue(environment.requests.any { it.path == "stock/get" })
+        assertTrue(environment.requests.any { it.path == "stockBatches/get" })
+        assertFalse(AnalyticsWorkspace.failure.value)
+    }
+
+    @Test fun analyticsStalledRequestTimesOutAndUnrelatedUpdatesDoNotRestartIt() = runBlocking {
+        prepareAnalyticsOwner()
+        val never = CompletableDeferred<Unit>()
+        environment.beforeAnalyticsReply = { never.await() }
+        AnalyticsWorkspace.select(AnalyticsSelection("all"))
+        val noise = async {
+            repeat(160) {
+                suppliersState.emit(DataState.Success(listOf(SupplierDataModel(id="noise-$it"))))
+                delay(100)
+            }
+        }
+        withTimeout(19_000) { AnalyticsWorkspace.failure.first { it } }
+        noise.cancel(); noise.join()
+        assertNull(AnalyticsWorkspace.state.value)
+        assertEquals(1, environment.requests.count { it.path == "analytics/store/get" })
+        environment.beforeAnalyticsReply = null
+    }
+
+    @Test fun analyticsKeepsMatchingSavedTotalsOfflineButNeverAcrossStoresOrDeniedAccess() = runBlocking {
+        prepareAnalyticsOwner()
+        val selection = AnalyticsSelection("all")
+        AnalyticsWorkspace.select(selection)
+        withTimeout(10_000) { AnalyticsWorkspace.state.first { it != null && !it.saved } }
+        val cacheKey = inventoryCacheKey("analytics-summary", inventoryOwners.current)
+        withTimeout(5_000) { while (readJsonCacheText(cacheKey).isNullOrBlank()) delay(30) }
+        environment.networkUnavailable = true
+        AnalyticsWorkspace.invalidate()
+        val cached = withTimeout(10_000) { AnalyticsWorkspace.state.first { it != null && it.saved } }!!
+        assertTrue(AnalyticsWorkspace.isCurrent(cached, selection))
+        withTimeout(20_000) { AnalyticsWorkspace.failure.first { it } }
+        environment.networkUnavailable = false
+        environment.analyticsFailureStatus = HttpStatusCode.Forbidden
+        AnalyticsWorkspace.invalidate()
+        withTimeout(10_000) { AnalyticsWorkspace.failure.first { it } }
+        assertNull(AnalyticsWorkspace.state.value)
+        assertTrue(readJsonCacheText(cacheKey).isNullOrBlank())
+        publishActiveInventoryStoreId(AITA_FLOW_DESTINATION_STORE_ID)
+        assertFalse(AnalyticsWorkspace.isCurrent(cached, selection))
+    }
+
     @Test
     fun menuAnalyticsCalculatesTotalsBucketsAndFiltersFromCurrentData() = runBlocking {
         val fixture = aitaAnalyticsFixture()
@@ -2079,6 +2251,11 @@ private fun buildAitaFlowMockEngine(environment: AitaFlowTestEnvironment): MockE
         environment.subscriptionReadFailureStatus?.let { status ->
             if (path == globalAppConfigurationState.payloadValue.getStoreSubscriptionPath.first.trim('/'))
                 return@MockEngine respond(aitaTestNegativeEnvelope("Temporary subscription read failure"), status, aitaFlowResponseHeaders())
+        }
+        if (path == "analytics/store/get") {
+            environment.beforeAnalyticsReply?.invoke()
+            environment.analyticsFailureStatus?.let { status -> return@MockEngine respond(
+                aitaTestNegativeEnvelope("Analytics rejected"), status, aitaFlowResponseHeaders()) }
         }
         if (path == "stores/get") {
             environment.beforeStoresReply?.invoke()

@@ -379,6 +379,10 @@ class Run:
             if dist:
                 self.command('Browser stale-entry and unsupported-engine recovery', ['node', 'scripts/linux-web/test/startup-recovery.test.cjs'])
                 self.env['AITA_WEB_DIST'] = str(dist)
+                self.command('Public marketplace home, sign-in navigation and offline offers',
+                             ['node', 'scripts/linux-web/test/public-marketplace-smoke.cjs'])
+                self.command('Analytics recovery and printable X/Z shift reports',
+                             ['node', 'scripts/linux-web/test/analytics-shift-smoke.cjs'])
                 self.command('Guest registration email confirmation in the browser',
                              ['node', 'scripts/linux-web/test/registration-confirmation-smoke.cjs'])
                 self.command('Profile photo chooser, save and cancellation in the browser',
@@ -530,7 +534,7 @@ class Run:
         require(all(sha(self.assets / e['name']) == e['sha256'] for e in entries), 'Artifact changed after verification')
         manifest = {'version': self.args.version, 'build': self.args.build, 'revision': self.revision,
             'tag': self.tag, 'createdAt': utc(), 'artifacts': entries, 'notes': self.state['notes'],
-            'stages': {k: v for k, v in self.state['stages'].items() if k != 'github'}, 'visibility': 'private GitHub repository; downloads require repository access',
+            'stages': {k: v for k, v in self.state['stages'].items() if k != 'github'}, 'visibility': 'GitHub downloads follow repository visibility; the signed in-app update feed is public',
             'windowsSigning': self.state.get('windowsSigning'), 'updaterFeedPublished': self.state.get('updaterFeedPublished', False)}
         record = self.folder / 'release.json'; record.write_text(json.dumps(manifest, indent=2) + '\n')
         sums = self.folder / 'SHA256SUMS.txt'; sums.write_text(''.join(f"{e['sha256']}  {e['name']}\n" for e in entries))

@@ -33,6 +33,22 @@ class PublicCatalogueDatabaseTest {
             assertTrue(searchOpenGoodsInsideTransaction(listOf(sampleCode + "9"), emptyList(), 20).isEmpty())
             assertEquals(3, searchOpenGoodsInsideTransaction(emptyList(), emptyList(), 3).size)
             assertTrue(searchOpenGoodsInsideTransaction(emptyList(), listOf("no-such-unique-product-xyz"), 20).isEmpty())
+            val categoryId = UUID.randomUUID().toString()
+            val id = UUID.randomUUID()
+            val item = GenericGoodsItemDataModel(id=id.toString(), barcode=listOf("012345678905"),
+                name=listOf(LocalizedStringDataModel("en", "Distinct test toy")), categoryIds=listOf(categoryId),
+                typeIds=null, supplierIds=null, manufacturerIds=null)
+            OpenGoodsCatalogue.insert { row ->
+                row[OpenGoodsCatalogue.id]=id; row[code]="012345678905"; row[sortName]="distinct test toy"
+                row[searchText]="distinct test toy"; row[payload]=jsonBase.encodeToString(GenericGoodsItemDataModel.serializer(),item)
+            }
+            // Legacy snapshots may already contain the padded spelling with another preserved ID.
+            assertTrue(searchOpenGoodsInsideTransaction(listOf("0012345678905"),emptyList(),20).any { it.id == id.toString() })
+            assertEquals(id.toString(), searchOpenGoodsInsideTransaction(emptyList(),listOf("distinct"),20,setOf(categoryId)).single().id)
+            assertTrue(searchOpenGoodsInsideTransaction(emptyList(),listOf("distinct"),20,setOf(UUID.randomUUID().toString())).isEmpty())
+            assertTrue(searchOpenGoodsInsideTransaction(emptyList(),listOf("%_"),20).isEmpty())
+            assertEquals(id.toString(), searchOpenGoodsInsideTransaction(emptyList(),listOf("di"),20,setOf(categoryId)).single().id)
+
         }
     }
 }

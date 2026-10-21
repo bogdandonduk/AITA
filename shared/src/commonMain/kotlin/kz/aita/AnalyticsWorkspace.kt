@@ -5,6 +5,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.datetime.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 /** Kept with the workspace, not the composable; relative periods roll forward at local midnight. */
 data class AnalyticsSelection(
@@ -76,7 +79,8 @@ class PreparedAnalytics internal constructor(
     val returnCash: Double,
     val extractedCash: Double,
     val remoteOnly: Boolean = false,
-    val cashAvailable: Boolean = true
+    val cashAvailable: Boolean = true,
+    val saved: Boolean = false
 ) {
     fun type(id: String): AnalyticsTypeSummary = types[id] ?: AnalyticsTypeSummary()
 }
@@ -156,7 +160,7 @@ internal suspend fun prepareAnalytics(input: AnalyticsInputs): PreparedAnalytics
 }
 
 internal fun prepareRemoteAnalytics(owner: InventoryOwner, selection: AnalyticsSelection, window: AnalyticsWindow,
-    dashboard: StoreAnalyticsDashboardDataModel, events: List<CashRegisterEventDataModel>? = null): PreparedAnalytics {
+    dashboard: StoreAnalyticsDashboardDataModel, events: List<CashRegisterEventDataModel>? = null, saved: Boolean = false): PreparedAnalytics {
     fun summary(count: Int, total: Double, quantity: Double) = AnalyticsTypeSummary(
         count = count, total = total, quantity = quantity, paymentsKnown = false, historyKnown = false)
     val scopedEvents = events.orEmpty().filter {
@@ -170,13 +174,28 @@ internal fun prepareRemoteAnalytics(owner: InventoryOwner, selection: AnalyticsS
         scopedEvents.filter { it.type == CASH_REGISTER_EVENT_SALE_CASH_IN }.sumOf { it.amount },
         scopedEvents.filter { it.type == CASH_REGISTER_EVENT_RETURN_CASH_OUT }.sumOf { it.amount },
         scopedEvents.filter { it.type == CASH_REGISTER_EVENT_EXTRACTION }.sumOf { it.amount },
-        remoteOnly = true, cashAvailable = events != null)
+        remoteOnly = true, cashAvailable = events != null, saved = saved)
 }
 
 private fun analyticsNeedsServerTotals(storeId: String?): Boolean =
     !currentUserCanViewTransactionHistory(storeId) || !currentUserCanViewStock(storeId)
 
-/** One bounded cache for the current account/store and most recently selected filters. */
+/** Snapshot equality compares immutable inputs by identity, never a large ledger by value. */
+private class AnalyticsWork(
+    val owner: InventoryOwner, val selection: AnalyticsSelection, val window: AnalyticsWindow,
+    val revision: Long, val allowed: Boolean, val detailRestricted: Boolean,
+    val cashAllowed: Boolean, val input: AnalyticsInputs?
+) {
+    fun sameAs(other: AnalyticsWork): Boolean = owner == other.owner && selection == other.selection &&
+        window == other.window && revision == other.revision && allowed == other.allowed &&
+        detailRestricted == other.detailRestricted && cashAllowed == other.cashAllowed &&
+        (if (input == null) other.input == null else other.input?.let(input::sameSources) == true)
+}
+
+@Serializable
+private data class SavedAnalytics(val accountId: String, val dashboard: StoreAnalyticsDashboardDataModel)
+
+/** One bounded cache per account/store. Selecting analytics starts work; startup alone does not. */
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 object AnalyticsWorkspace {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -193,48 +212,134 @@ object AnalyticsWorkspace {
         ?.takeIf { it.owner == inventoryOwners.current }?.selection ?: AnalyticsSelection()
 
     fun select(selection: AnalyticsSelection) {
-        val owner = inventoryOwners.current
-        requests.value = SelectionRequest(owner, selection)
+        requests.value = SelectionRequest(inventoryOwners.current, selection)
         start()
     }
 
     fun isCurrent(value: PreparedAnalytics, selection: AnalyticsSelection): Boolean =
         inventoryOwnerIsCurrent(value.owner) && currentUserCanViewAnalytics(value.owner.storeId) &&
             value.selection == selection && value.window == selection.window() &&
-            value.remoteOnly == analyticsNeedsServerTotals(value.owner.storeId) &&
-            value.cashAvailable == (currentUserCanViewCashRegister(value.owner.storeId) && cashRegisterEventsState.payloadValue != null)
+            (!analyticsNeedsServerTotals(value.owner.storeId) || value.remoteOnly) &&
+            (!value.cashAvailable || currentUserCanViewCashRegister(value.owner.storeId))
 
     internal fun invalidate() { result.value = null; failed.value = false; refreshRevision.update { it + 1L } }
 
-    fun retry() { failed.value = false; refreshRevision.update { it + 1L } }
-
-    /** Called by the existing realtime invalidation path, never by a periodic network poll. */
-    fun refreshServerTotalsIfNeeded() {
-        if (analyticsNeedsServerTotals(activeStoreIdState.value)) refreshRevision.update { it + 1L }
+    fun retry() {
+        val owner = inventoryOwners.current
+        if (!inventoryOwnerIsCurrent(owner) || !currentUserCanViewAnalytics(owner.storeId)) return
+        val storeId = requireNotNull(owner.storeId)
+        failed.value = false
+        if (currentUserCanViewTransactionHistory(storeId)) getTransactions(storeId)
+        if (currentUserCanViewStock(storeId)) { getStock(storeId); getStockBatches(storeId) }
+        if (currentUserCanViewCashRegister(storeId)) getCashRegister(storeId)
+        refreshRevision.update { it + 1L }
     }
 
-    private suspend fun remoteTotals(owner: InventoryOwner, selection: AnalyticsSelection, window: AnalyticsWindow): StoreAnalyticsDashboardDataModel? {
-        val response = networkRequest<StoreAnalyticsDashboardDataModel, Unit>(
-            method = HttpMethod.Get,
-            endpointUrl = globalAppConfigurationState.payloadValue.getStoreAnalyticsPath.first,
-            headers = mapOf("store_id" to requireNotNull(owner.storeId)),
-            query = buildMap<String, Any?> {
-                put("startMillis", window.startMillis); put("endMillisExclusive", window.endMillisExclusive)
-                selection.goodsItemId?.takeIf { it.isNotBlank() }?.let { put("goodsItemId", it) }
-                selection.supplierId?.takeIf { it.isNotBlank() }?.let { put("supplierId", it) }
-                selection.categoryId?.takeIf { it.isNotBlank() }?.let { put("categoryId", it) }
-            },
-            expectedSessionGeneration = owner.sessionGeneration
-        )
-        return response.payload?.takeIf { !response.negative && it.storeId == owner.storeId &&
-            it.startMillis == window.startMillis && it.endMillisExclusive == window.endMillisExclusive &&
-            it.goodsItemIdFilter == selection.goodsItemId && it.supplierIdFilter == selection.supplierId &&
-            it.categoryIdFilter == selection.categoryId }
+    /** Realtime invalidation refreshes aggregates too when detailed data has not arrived. */
+    fun refreshServerTotalsIfNeeded() {
+        if (analyticsNeedsServerTotals(activeStoreIdState.value) || transactionsState.payloadValue == null ||
+            stockState.payloadValue == null || stockBatchesState.payloadValue == null) refreshRevision.update { it + 1L }
+    }
+
+    private fun snapshot(): AnalyticsWork {
+        val owner = inventoryOwners.current
+        val selection = selectionForCurrentStore()
+        val window = selection.window()
+        val restricted = analyticsNeedsServerTotals(owner.storeId)
+        val cashAllowed = currentUserCanViewCashRegister(owner.storeId)
+        val transactions = transactionsState.payloadValue
+        val stock = stockState.payloadValue
+        val batches = stockBatchesState.payloadValue
+        val cash = cashRegisterState.payloadValue?.takeIf { it.storeId == owner.storeId }
+        val currency = cash?.currencyCode?.takeIf { it.isNotBlank() }
+            ?: globalAppConfigurationState.payloadValue.countries.getFirstCurrencyByCountry(userAccountState.payloadValue?.countryLocale.orEmpty())?.code.orEmpty()
+        val input = if (!restricted && transactions != null && stock != null && batches != null)
+            AnalyticsInputs(owner, selection, window, transactions, stock, batches,
+                cashRegisterEventsState.payloadValue.orEmpty(), suppliersState.payloadValue.orEmpty(), currency,
+                cashAllowed && cashRegisterEventsState.payloadValue != null,
+                StoreCommerceClient.current().takeIf { it.historyLoaded }?.writeOffs) else null
+        return AnalyticsWork(owner, selection, window, refreshRevision.value,
+            requests.value?.owner == owner && inventoryOwnerIsCurrent(owner) && currentUserCanViewAnalytics(owner.storeId),
+            restricted, cashAllowed, input)
+    }
+
+    private fun matches(dashboard: StoreAnalyticsDashboardDataModel, work: AnalyticsWork): Boolean =
+        dashboard.storeId == work.owner.storeId && dashboard.startMillis == work.window.startMillis &&
+            dashboard.endMillisExclusive == work.window.endMillisExclusive && dashboard.goodsItemIdFilter == work.selection.goodsItemId &&
+            dashboard.supplierIdFilter == work.selection.supplierId && dashboard.categoryIdFilter == work.selection.categoryId
+
+    private fun key(work: AnalyticsWork) = inventoryCacheKey("analytics-summary", work.owner)
+
+    private suspend fun publish(work: AnalyticsWork, prepared: PreparedAnalytics?, failure: Boolean) {
+        inventoryStateMutex.withLock {
+            if (snapshot().sameAs(work)) {
+                if (prepared != null) result.value = prepared
+                failed.value = failure
+            }
+        }
+    }
+
+    private fun remote(work: AnalyticsWork, dashboard: StoreAnalyticsDashboardDataModel, saved: Boolean) =
+        prepareRemoteAnalytics(work.owner, work.selection, work.window, dashboard,
+            cashRegisterEventsState.payloadValue.takeIf { work.cashAllowed }, saved)
+
+    private suspend fun save(work: AnalyticsWork, dashboard: StoreAnalyticsDashboardDataModel) {
+        try {
+            withTimeoutOrNull(2_000) {
+                if (snapshot().sameAs(work)) writeJsonCacheText(key(work), jsonBase.encodeToString(SavedAnalytics(requireNotNull(work.owner.accountId), dashboard)))
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { logCloudConnectionDiagnostic("Analytics cache could not be saved") }
+    }
+
+    private suspend fun prepare(work: AnalyticsWork) {
+        if (!work.allowed) { result.value = null; failed.value = false; return }
+        // Keep a usable same-scope view during refresh. Never mistake unloaded lists for zero sales.
+        if (result.value?.let { isCurrent(it, work.selection) } != true) result.value = null
+        failed.value = false
+        try {
+            work.input?.let { input ->
+                val computed = prepareAnalytics(input)
+                publish(work, computed, false)
+                save(work, computed.dashboard)
+                return
+            }
+            // Inventory/history can fail independently. The authorized totals endpoint does not
+            // require downloading either full list, and offline can use the last saved summary.
+            val cached = try {
+                withTimeoutOrNull(2_000) { readJsonCacheText(key(work))?.let { jsonBase.decodeFromString<SavedAnalytics>(it) } }
+                    ?.takeIf { it.accountId == work.owner.accountId && matches(it.dashboard, work) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+            if (cached != null) publish(work, remote(work, cached.dashboard, true), false)
+            val response = withTimeoutOrNull(15_000) {
+                networkRequest<StoreAnalyticsDashboardDataModel, Unit>(
+                    method = HttpMethod.Get,
+                    endpointUrl = globalAppConfigurationState.payloadValue.getStoreAnalyticsPath.first,
+                    headers = mapOf("store_id" to requireNotNull(work.owner.storeId)),
+                    query = buildMap<String, Any?> {
+                        put("startMillis", work.window.startMillis); put("endMillisExclusive", work.window.endMillisExclusive)
+                        work.selection.goodsItemId?.takeIf { it.isNotBlank() }?.let { put("goodsItemId", it) }
+                        work.selection.supplierId?.takeIf { it.isNotBlank() }?.let { put("supplierId", it) }
+                        work.selection.categoryId?.takeIf { it.isNotBlank() }?.let { put("categoryId", it) }
+                    }, expectedSessionGeneration = work.owner.sessionGeneration)
+            }
+            val dashboard = response?.payload?.takeIf { !response.negative && matches(it, work) }
+            if (response?.httpStatusCode == 403 && !response.transportFailure && snapshot().sameAs(work)) {
+                result.value = null
+                writeJsonCacheText(key(work), "")
+            }
+            publish(work, dashboard?.let { remote(work, it, false) }, dashboard == null)
+            if (dashboard != null) save(work, dashboard)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            publish(work, null, true)
+            logCloudConnectionDiagnostic("Analytics preparation failed; same-scope cached view retained")
+        }
     }
 
     internal fun start() {
         job.startIfIdle(scope, Dispatchers.Default) {
-            // Only a date/time-zone change triggers recomputation; no minute-by-minute network polling.
             val dates = flow {
                 while (currentCoroutineContext().isActive) {
                     val zone = TimeZone.currentSystemDefault()
@@ -242,88 +347,13 @@ object AnalyticsWorkspace {
                     delay(60_000)
                 }
             }.distinctUntilChanged().map { Unit }
-            val changes = merge(
+            merge(
                 transactionsState.payload.map { Unit }, stockState.payload.map { Unit }, stockBatchesState.payload.map { Unit },
                 cashRegisterEventsState.payload.map { Unit }, cashRegisterState.payload.map { Unit }, suppliersState.payload.map { Unit },
                 inventoryOwners.state.map { Unit }, activeStoreIdState.map { Unit }, userAccountState.payload.map { Unit },
-                storesState.payload.map { Unit }, myWorkerMembershipsState.payload.map { Unit },
-                StoreCommerceClient.state.map {Unit}, requests.map { Unit }, refreshRevision.map { Unit }, globalAppConfigurationState.payload.map { Unit }, dates
-            )
-            var last: AnalyticsInputs? = null
-            var lastRemote: Pair<SelectionRequest, Pair<AnalyticsWindow, Long>>? = null
-            changes.debounce(100).collectLatest {
-                val owner = inventoryOwners.current
-                if (!inventoryOwnerIsCurrent(owner) || !currentUserCanViewAnalytics(owner.storeId)) {
-                    result.value = null; last = null; return@collectLatest
-                }
-                val selection = selectionForCurrentStore()
-                val window = selection.window()
-                if (analyticsNeedsServerTotals(owner.storeId)) {
-                    // Analytics permission does not grant transaction-history/stock-read permission.
-                    // Keep the existing authorized aggregate endpoint for those roles.
-                    val remoteKey = SelectionRequest(owner, selection) to (window to refreshRevision.value)
-                    try {
-                        val cached = result.value?.takeIf { lastRemote == remoteKey && it.remoteOnly }
-                        val dashboard = cached?.dashboard ?: remoteTotals(owner, selection, window)
-                        val events = cashRegisterEventsState.payloadValue
-                        val cashAvailable = currentUserCanViewCashRegister(owner.storeId) && events != null
-                        val computed = dashboard?.let { prepareRemoteAnalytics(owner, selection, window, it, events.takeIf { cashAvailable }) }
-                        currentCoroutineContext().ensureActive()
-                        inventoryStateMutex.withLock {
-                            if (inventoryOwnerIsCurrent(owner) && currentUserCanViewAnalytics(owner.storeId) &&
-                                analyticsNeedsServerTotals(owner.storeId) && selectionForCurrentStore() == selection &&
-                                remoteKey.second.second == refreshRevision.value && events === cashRegisterEventsState.payloadValue &&
-                                cashAvailable == (currentUserCanViewCashRegister(owner.storeId) && cashRegisterEventsState.payloadValue != null)) {
-                                if (computed == null) failed.value = true
-                                else {
-                                    result.value = computed
-                                    failed.value = false; lastRemote = remoteKey; last = null
-                                }
-                            }
-                        }
-                    } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { if (inventoryOwnerIsCurrent(owner)) failed.value = true }
-                    return@collectLatest
-                }
-                lastRemote = null
-                val transactions = transactionsState.payloadValue
-                val stock = stockState.payloadValue
-                val batches = stockBatchesState.payloadValue
-                // Unloaded is not an empty ledger. Retain only an already-computed same-owner result.
-                if (transactions == null || stock == null || batches == null) {
-                    if (result.value?.owner != owner) result.value = null
-                    return@collectLatest
-                }
-                val cash = cashRegisterState.payloadValue?.takeIf { it.storeId == owner.storeId }
-                val currency = cash?.currencyCode?.takeIf { it.isNotBlank() }
-                    ?: globalAppConfigurationState.payloadValue.countries.getFirstCurrencyByCountry(userAccountState.payloadValue?.countryLocale.orEmpty())?.code.orEmpty()
-                val input = AnalyticsInputs(owner, selection, window, transactions, stock, batches,
-                    cashRegisterEventsState.payloadValue.orEmpty(), suppliersState.payloadValue.orEmpty(), currency,
-                    currentUserCanViewCashRegister(owner.storeId) && cashRegisterEventsState.payloadValue != null,
-                    StoreCommerceClient.current().takeIf {it.historyLoaded}?.writeOffs)
-                if (last?.sameSources(input) == true && result.value != null) return@collectLatest
-                try {
-                    val computed = prepareAnalytics(input)
-                    currentCoroutineContext().ensureActive()
-                    inventoryStateMutex.withLock {
-                        if (inventoryOwnerIsCurrent(owner) && currentUserCanViewAnalytics(owner.storeId) &&
-                            !analyticsNeedsServerTotals(owner.storeId) && selectionForCurrentStore() == selection && transactionsState.payloadValue === transactions &&
-                            stockState.payloadValue === stock && stockBatchesState.payloadValue === batches &&
-                            input.events === cashRegisterEventsState.payloadValue.orEmpty() &&
-                            input.suppliers === suppliersState.payloadValue.orEmpty() &&
-                            input.cashAvailable == (currentUserCanViewCashRegister(owner.storeId) && cashRegisterEventsState.payloadValue != null)) {
-                            result.value = computed
-                            last = input
-                            failed.value = false
-                        }
-                    }
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) {
-                    if (inventoryOwnerIsCurrent(owner) && selectionForCurrentStore() == selection) failed.value = true
-                    // Keep the last successful same-scope view, never a fabricated zero dashboard.
-                    logCloudConnectionDiagnostic("Analytics preparation failed; cached view retained")
-                }
-            }
+                storesState.payload.map { Unit }, myWorkerMembershipsState.payload.map { Unit }, StoreCommerceClient.state.map { Unit },
+                requests.map { Unit }, refreshRevision.map { Unit }, globalAppConfigurationState.payload.map { Unit }, dates
+            ).debounce(100).map { snapshot() }.distinctUntilChanged { a, b -> a.sameAs(b) }.collectLatest { prepare(it) }
         }
     }
 }

@@ -47,6 +47,7 @@ private val shoppingCancelGate = MarketBasketReadGate()
 private val shoppingActivityReadGate = MarketBasketReadGate(requestsPerMinute = 60)
 
 internal fun Route.marketplaceRoutes() {
+    publicMarketplaceRoutes()
     authenticate("auth-jwt") {
         route("/market") {
             post("/discovery") {

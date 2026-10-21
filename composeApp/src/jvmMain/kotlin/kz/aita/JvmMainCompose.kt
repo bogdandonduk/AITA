@@ -325,22 +325,21 @@ private fun copyDesktopPathIfMissing(source: File, destination: File) {
     }
 }
 
-private fun migrateLegacyDesktopPersistentState(dataRoot: File) {
-    val legacyRoot = legacyDesktopMixedDataRootDir()
+internal fun migrateLegacyDesktopPersistentState(dataRoot: File, legacyRoot: File = legacyDesktopMixedDataRootDir()) {
     if (!legacyRoot.exists() || legacyRoot.toPath() == dataRoot.toPath()) return
 
+    // Database import must finish before opening/creating the destination. A failed import must
+    // not silently start a new empty workspace or copy old WAL/journal files on a later launch.
+    val database = File(dataRoot, "app_database.db")
+    var migratedAny = migrateJvmPersistentDatabase(File(legacyRoot, "app_database.db"), database)
+    if (migratedAny) hardenOwnerOnlyPermissions(database, directory = false)
     val persistentNames = listOf(
-        "app_database.db",
-        "app_database.db-journal",
-        "app_database.db-shm",
-        "app_database.db-wal",
         "ui_drafts",
         "ua.bin",
         "user_account_encryption_key.key",
         "aita_receipt_printer_device.txt",
         "aita_label_printer.properties"
     )
-    var migratedAny = false
     persistentNames.forEach { name ->
         val source = File(legacyRoot, name)
         val destination = File(dataRoot, name)

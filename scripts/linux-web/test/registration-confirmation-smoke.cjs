@@ -25,7 +25,9 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  });
  page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('Renderer crashed'));
  try{
-  await page.goto(base);await page.locator('canvas').waitFor({timeout:90000});await page.keyboard.press('Tab');await page.getByRole('button',{name:/Перейти к подтверждению email|Continue to email confirmation/}).waitFor({timeout:60000});await page.waitForTimeout(4000);
+  await page.goto(base);await page.locator('canvas').waitFor({timeout:90000});await page.keyboard.press('Tab');
+  await page.getByRole('button',{name:/^(Создать аккаунт|Create account)$/}).first().click({force:true});
+  await page.getByRole('button',{name:/Перейти к подтверждению email|Continue to email confirmation/}).waitFor({timeout:60000});await page.waitForTimeout(4000);
   async function enter(loc,text){await loc.click({force:true});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(text);await page.waitForTimeout(150);}
   await enter(page.getByRole('textbox',{name:'',exact:true}).nth(1),'7771234567');
   await enter(page.getByRole('textbox',{name:/^Введите адрес email$|^Enter email address$/}),'probe020@example.invalid');

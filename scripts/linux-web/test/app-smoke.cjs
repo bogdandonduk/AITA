@@ -92,6 +92,11 @@ async function backgroundPixel(page) {
   assert.deepEqual(await backgroundPixel(page), selectedPixel, 'Selected theme must survive page reload');
   const after = await page.evaluate(()=>localStorage.getItem('aita.installation_id'));
   if (!before || before !== after) throw new Error('Browser installation identity did not survive reload');
+  // The public marketplace is now the guest entry point. Visit authentication
+  // through its real sign-in action before exercising the guest download footer.
+  await page.keyboard.press('Tab');
+  await page.getByRole('button', {name:/^(Sign in|Log in|Войти|Кіру|Кирүү|Ворид шудан|Kirish)$/}).first().click({force:true});
+  await page.waitForTimeout(800);
   // The guest footer stays at the bottom, outside the scrolling authentication form.
   // A fresh catalogue request proves the click opened Downloads without signing in.
   async function openGuestDownloads() {
@@ -100,7 +105,7 @@ async function backgroundPixel(page) {
    }
    await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/client-updates/release.json' && response.status() === 200),
-    page.mouse.click(195, 804)
+    page.getByRole('button', {name:/Download AITA for your devices|Скачать AITA для ваших устройств/}).click({force:true})
    ]);
    await page.waitForTimeout(1000);
    await page.waitForLoadState('networkidle');

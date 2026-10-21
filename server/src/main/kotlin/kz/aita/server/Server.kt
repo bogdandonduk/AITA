@@ -166,7 +166,7 @@ private fun hardDeleteStoreOwnedDataInsideTransaction(storeIds: List<UUID>) {
   StockItems.deleteWhere { StockItems.storeId inList cleanStoreIds }
 }
 
-private fun ResultRow.toTransactionDataModel(): TransactionDataModel = TransactionDataModel(
+internal fun ResultRow.toTransactionDataModel(): TransactionDataModel = TransactionDataModel(
   id = this[Transactions.id].toString(),
   workshiftId = this[Transactions.workshiftId],
   type = this[Transactions.type],
@@ -6441,7 +6441,7 @@ private fun accountPasswordRequiredMessage(): List<LocalizedStringDataModel> = e
 
 private fun accountPasswordIncorrectMessage(): List<LocalizedStringDataModel> = eventMessage("message.account_password_is_incorrect")
 
-private fun ResultRow.toWorkshiftDataModel(): WorkshiftDataModel {
+internal fun ResultRow.toWorkshiftDataModel(): WorkshiftDataModel {
   val displayName = "${this[Users.firstName]} ${this[Users.lastName]}".trim()
     .ifBlank { this[Users.phoneNumber] }
     .ifBlank { this[Users.email] }
@@ -16773,6 +16773,18 @@ private fun legacyLocalBatchCatalogueStoreIdsInsideTransaction(storeId: UUID): L
     .map { it[StockItems.storeId] }.distinct().filter { rootStoreIdForAccessInsideTransaction(it) == root }
 }
 
+/** Editing an existing local batch must retain its historical family catalogue reference.
+ * A replacement title still has to belong to this store; this is not a template-import bypass.
+ */
+internal fun stockBatchEditMeasurementInsideTransaction(storeId: UUID, previousItemId: UUID, requestedItemId: UUID): String? {
+  val item = StockItems.select(StockItems.storeId, StockItems.measurementUnitId)
+    .where { StockItems.id eq requestedItemId }.singleOrNull() ?: return null
+  val catalogueStore = item[StockItems.storeId]
+  if (catalogueStore != storeId && (requestedItemId != previousItemId ||
+      rootStoreIdForAccessInsideTransaction(catalogueStore) != rootStoreIdForAccessInsideTransaction(storeId))) return null
+  return item[StockItems.measurementUnitId]
+}
+
 private fun findStockItemRowByTransactionBarcodeInsideTransaction(
   storeId: UUID,
   barcode: String,
@@ -19152,9 +19164,19 @@ fun Application.module() {
     }
 
     get("/catalogue/open-goods.jsonl.gz") {
-      call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=aita-open-goods-20260920.jsonl.gz")
+      call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=aita-open-goods.jsonl.gz")
       call.response.header(HttpHeaders.CacheControl, "public, max-age=3600")
-      call.respondBytes(openGoodsCatalogueBytes(), ContentType("application", "gzip"))
+      val external = externalOpenGoodsFile("open-goods.jsonl.gz")
+      if (external != null) call.respondFile(external)
+      else call.respondBytes(openGoodsCatalogueBytes(), ContentType("application", "gzip"))
+    }
+
+    get("/catalogue/open-goods-notice.json") {
+      call.response.header(HttpHeaders.CacheControl, "no-cache")
+      val external = externalOpenGoodsFile("open-goods-notice.json")
+      if (external != null) call.respondFile(external)
+      else call.respondText(checkNotNull(OpenGoodsCatalogue.javaClass.getResourceAsStream("/catalogue/open-goods-notice.json"))
+        .bufferedReader().use { it.readText() }, ContentType.Application.Json)
     }
 
     route("/generic") {
@@ -19245,9 +19267,8 @@ fun Application.module() {
                        item.categoryIds.orEmpty().any { it in categoryFilterIds }
                     barcodeMatches && categoryMatches && item.matchesGenericGoodsSearchQuery(queryText)
                   }
-                val openMatches = if (categoryFilterIds.isEmpty())
-                  searchOpenGoodsInsideTransaction(barcodeCandidates, genericGoodsSearchTokens(queryText), offset + limit + localMatches.size)
-                else emptyList()
+                val openMatches = searchOpenGoodsInsideTransaction(barcodeCandidates, genericGoodsSearchTokens(queryText),
+                  offset + limit + localMatches.size, categoryFilterIds)
                 val localBarcodes = localMatches.flatMap { it.barcode.orEmpty() }.toSet()
                 val matches = (localMatches + openMatches.filter { item -> item.barcode.orEmpty().none { it in localBarcodes } })
                   .sortedWith(
@@ -20517,8 +20538,8 @@ fun Application.module() {
                 .singleOrNull()
 
               if (!body.quantity.total.isFinite() || body.quantity.total < 0.0 || (!body.tracksQuantity && body.quantity.total != 1.0)) return@newSuspendedTransaction run { rollback(); null }
-              if (inventoryItem == null || (body.displayKind in setOf(StockBatchKindDataModel.UNIVERSAL, StockBatchKindDataModel.UNLIMITED) &&
-                  body.quantity.id != defaultServerQuantityForGoodsItem(inventoryItem[StockItems.measurementUnitId], 0.0).id))
+              if (inventoryItem == null ||
+                  body.quantity.id != defaultServerQuantityForGoodsItem(inventoryItem[StockItems.measurementUnitId], 0.0).id)
                 return@newSuspendedTransaction run { rollback(); null }
 
               val requestedBatchId = body.id
@@ -20742,6 +20763,12 @@ fun Application.module() {
               if (!body.quantity.total.isFinite() || body.quantity.total < 0.0)
                 return@newSuspendedTransaction run { rollback(); null }
 
+              val measurement = stockBatchEditMeasurementInsideTransaction(
+                storeId, previousBatchRow[StockBatchesV2.goodsItemId], goodsItemId)
+                ?: return@newSuspendedTransaction run { rollback(); null }
+              if (body.quantity.id != defaultServerQuantityForGoodsItem(measurement, 0.0).id)
+                return@newSuspendedTransaction run { rollback(); null }
+
               val sanitizedBody = body.copy(
                 expectedUpdatedAtMillis = null,
                 kind = StockBatchKindDataModel.valueOf(previousBatchRow[StockBatchesV2.kind]),
@@ -20756,10 +20783,6 @@ fun Application.module() {
 
               if (sanitizedBody.kind in setOf(StockBatchKindDataModel.UNIVERSAL, StockBatchKindDataModel.UNLIMITED)) {
                 if (sanitizedBody.kind == StockBatchKindDataModel.UNLIMITED && body.quantity.total != 1.0)
-                  return@newSuspendedTransaction run { rollback(); null }
-                val measurement = StockItems.select(StockItems.measurementUnitId).where { StockItems.id eq goodsItemId }
-                  .singleOrNull()?.get(StockItems.measurementUnitId) ?: return@newSuspendedTransaction run { rollback(); null }
-                if (body.quantity.id != defaultServerQuantityForGoodsItem(measurement, 0.0).id)
                   return@newSuspendedTransaction run { rollback(); null }
               }
 
@@ -25395,6 +25418,8 @@ fun Application.module() {
       }
     }
 
+
+    shiftReportRoutes()
 
     route("/workshifts") {
       authenticate("auth-jwt") {

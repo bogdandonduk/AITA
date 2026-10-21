@@ -14,7 +14,8 @@ data class InventoryLoadStatus(
     val failure: List<LocalizedStringDataModel>? = null,
     val accessDenied: Boolean = false,
     val cacheWriteFailed: Boolean = false,
-    val cacheChecked: Boolean = false
+    val cacheChecked: Boolean = false,
+    val cacheReadFailed: Boolean = false
 )
 
 enum class InventoryLoadSource { None, Cache, Cloud, Local }

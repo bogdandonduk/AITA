@@ -2264,7 +2264,7 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
             row(localizedStringResource(706, "Transactions"), d.transactionCount.toString()),
             row(stateValues.stringItems, d.soldQuantity.cleanNumber()),
             row(stateValues.stringCash, d.cashTotal.money(reportCurrency)),
-            row(localizedStringResource(357, "Cashless"), d.cashlessTotal.money(reportCurrency)),
+            row(stateValues.stringCashless, d.cashlessTotal.money(reportCurrency)),
             row(stateValues.stringDebt, d.debtTotal.money(reportCurrency))
         )
     } ?: listOf(
@@ -2273,7 +2273,7 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
         row(localizedStringResource(706, "Transactions"), preparedAnalytics.dashboard.transactionCount.toString()),
         row(stateValues.stringItems, preparedAnalytics.types.values.sumOf { it.quantity }.cleanNumber()),
         row(stateValues.stringCash, preparedAnalytics.types.values.sumOf { it.cash }.money(reportCurrency)),
-        row(localizedStringResource(357, "Cashless"), preparedAnalytics.types.values.sumOf { it.card }.money(reportCurrency))
+        row(stateValues.stringCashless, preparedAnalytics.types.values.sumOf { it.card }.money(reportCurrency))
     )
 
     fun transactionRows(transactions: AnalyticsTypeSummary): List<AnalyticsReportRowDataModel> {
@@ -2285,7 +2285,7 @@ internal fun AppConfiguration.buildAnalyticsReportSnapshotForUi(
             row(localizedStringResource(706, "Transactions"), transactions.count.toString()),
             row(stateValues.stringTotal, total.money(reportCurrency)),
             row(stateValues.stringCash, if (transactions.paymentsKnown) cash.money(reportCurrency) else "—"),
-            row(localizedStringResource(357, "Cashless"), if (transactions.paymentsKnown) cashless.money(reportCurrency) else "—"),
+            row(stateValues.stringCashless, if (transactions.paymentsKnown) cashless.money(reportCurrency) else "—"),
             row(stateValues.stringDebt, if (transactions.paymentsKnown) debt.money(reportCurrency) else "—"),
             row(stateValues.stringItems, transactions.quantity.cleanNumber())
         )
@@ -2682,6 +2682,8 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         )
 
         val periodOptions = listOf(
+            SHIFT_REPORT_X to pass29Text("shift.x"),
+            SHIFT_REPORT_Z to pass29Text("shift.z"),
             "today" to localizedStringResource(260, "Today"),
             "7" to localizedStringResource(261, "7 days"),
             "30" to localizedStringResource(262, "30 days"),
@@ -2697,11 +2699,14 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 .padding(horizontal = stateValues.marginTextField),
             tabs = periodOptions.map { option ->
                 TabContent(option.first, option.second, icon = AitaTabIcon.Calendar) { selectedPeriodId ->
+                    if (selectedPeriodId in setOf(SHIFT_REPORT_X, SHIFT_REPORT_Z)) openShiftReport(selectedPeriodId)
+                    else {
                     periodPresetId = selectedPeriodId
                     if (selectedPeriodId != "custom") {
                         val range = transactionHistoryPresetDates(selectedPeriodId)
                         startDateText = range.first
                         endDateText = range.second
+                    }
                     }
                 }
             },
@@ -2859,17 +2864,17 @@ fun AppConfiguration.MenuAnalyticsScreen() {
                 item("status") {
             MessageText(
                 modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextFieldGroup),
-                text = if (analyticsFailed) authUiText("Could not prepare analytics", "Не удалось подготовить аналитику", "Аналитиканы дайындау мүмкін болмады", "Талдоону даярдоо мүмкүн болгон жок")
-                    else authUiText("Preparing analytics…", "Подготавливаем аналитику…", "Аналитика дайындалуда…", "Талдоо даярдалууда…")
+                text = pass29Text(if (analyticsFailed) "analytics.unavailable" else "analytics.preparing")
             )
-            if (analyticsFailed) actionButton(text = authUiText("Retry", "Повторить", "Қайталау", "Кайталоо"), onClick = { AnalyticsWorkspace.retry() })
+            if (analyticsFailed) actionButton(text = pass29Text("pass29.retry"), onClick = { AnalyticsWorkspace.retry() })
                 }
             }
         } else {
             if (prepared.remoteOnly) MessageText(
                 modifier = Modifier.fillMaxWidth().padding(stateValues.marginTextField),
-                text = authUiText("Server totals; detailed records require additional access", "Итоги сервера; подробные записи требуют дополнительных прав", "Сервер қорытындылары; толық жазбаларға қосымша рұқсат қажет", "Сервердин жалпы жыйынтыктары; толук жазуулар үчүн кошумча укук керек")
+                text = pass29Text(if (prepared.saved) "analytics.saved" else "analytics.summary")
             )
+            if (analyticsFailed) actionButton(text = pass29Text("pass29.retry"), onClick = { AnalyticsWorkspace.retry() })
             if (showAnalyticsReportSheet) {
                 val analyticsReportSnapshot = buildAnalyticsReportSnapshotForUi(
                     selectedTab = selectedTab,
@@ -5439,6 +5444,7 @@ fun AppConfiguration.MainScreen() {
 
         CloudConnectionStatusBanner()
         LocalAppPreferencesPriorityEffect()
+        ShiftReportHost()
 
         LaunchedEffect(stateValues.appModeId, stateValues.navigationScreensMain.last().route) {
             Navigation.awaitAppNavigationRestore()

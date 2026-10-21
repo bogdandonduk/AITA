@@ -59,6 +59,14 @@ object DynamicCarts {
         val storeId = getLocalKv(KEY_ACTIVE_STORE_ID)?.takeIf { it.isNotBlank() } ?: return@withLock
         putLocalKv(LEGACY_OWNER_KEY, jsonBase.encodeToString(LegacyCartOwner.serializer(), LegacyCartOwner(account, storeId)))
     }
+
+    internal suspend fun ownsLegacyInventory(owner: InventoryOwner): Boolean {
+        val raw = getLocalKv(LEGACY_OWNER_KEY) ?: return false
+        val legacy = try { jsonBase.decodeFromString(LegacyCartOwner.serializer(), raw) }
+        catch (_: SerializationException) { return false }
+        return !owner.accountId.isNullOrBlank() && !owner.storeId.isNullOrBlank() &&
+            legacy.accountId == owner.accountId && legacy.storeId == owner.storeId
+    }
     private suspend fun loadBook(owner: CartScope): CartBook? {
         val raw = readJsonCacheText(owner.storageKey)
         if (raw != null) return jsonBase.decodeFromString(CartBook.serializer(), raw).validated()

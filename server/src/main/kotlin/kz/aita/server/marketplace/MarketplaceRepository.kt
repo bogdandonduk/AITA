@@ -240,8 +240,8 @@ internal class MarketplaceRepository(private val db: Connection,
     }
     /** Complete filtered window and counts from the SAME repeatable-read transaction. The legacy
      * browse route remains compatible; new clients never fall back to unfiltered legacy results. */
-    fun discover(user: UUID, request: MarketDiscoveryRequest): MarketDiscoveryResult {
-        if (!request.isValidDiscoveryRequest()) marketFail("market.discovery_invalid")
+    fun discover(user: UUID?, request: MarketDiscoveryRequest): MarketDiscoveryResult {
+        if (!request.isValidDiscoveryRequest() || (user == null && request.query.savedOnly)) marketFail("market.discovery_invalid")
         val input = request.query.normalizedDiscoveryQuery() ?: marketFail("market.discovery_invalid")
         val now = System.currentTimeMillis()
         val shop = input.storefrontId?.let { publicShop(it, now) }
@@ -294,7 +294,7 @@ internal class MarketplaceRepository(private val db: Connection,
         return MarketDiscoveryResult(input, request.limit,
             MarketPage(offers, rows.lastOrNull()?.listing?.id?.takeIf { counts.first > rows.size }, now, unavailable),
             counts.first, counts.second, catalogue.version, catalogue.categories.takeUnless { request.knownCategoryVersion == catalogue.version },
-            accountId = user.toString(), storefront = shop)
+            accountId = user?.toString(), storefront = shop)
     }
 
     private fun discoveryCategories(): MarketCategoryCatalogue {
@@ -634,7 +634,7 @@ internal class MarketplaceRepository(private val db: Connection,
                 updatedAtMillis=row.getLong("updated_at_millis"))
         }
     }
-    private fun project(user: UUID, candidates: List<Candidate>, now: Long, requestedUnits: Map<String, Int> = emptyMap(),
+    private fun project(user: UUID?, candidates: List<Candidate>, now: Long, requestedUnits: Map<String, Int> = emptyMap(),
         publicCategoryIds: Set<String>? = null, selectedCategoryIds: Set<String>? = null): List<MarketOffer> {
         if(candidates.isEmpty()) return emptyList()
         val itemIds=candidates.map { marketUuid(it.listing.goodsItemId) }.distinct()
@@ -643,7 +643,7 @@ internal class MarketplaceRepository(private val db: Connection,
         val stores=query("SELECT * FROM marketplace_storefronts WHERE store_id IN (${storeIds.joinToString(",") { "?" }})",*storeIds.toTypedArray(),map=::storefrontRow).associateBy { it.storeId }
         val branchIds=stores.values.map { marketUuid(it.operatingBranchId) }.distinct()
         val batches=batches(itemIds,branchIds,now).groupBy { it.storeId to it.goodsItemId }
-        val saved=query("SELECT listing_id FROM buyer_saved_offers WHERE user_id=?",user) { it.getString(1) }.toSet()
+        val saved=if (user == null) emptySet() else query("SELECT listing_id FROM buyer_saved_offers WHERE user_id=?",user) { it.getString(1) }.toSet()
         return candidates.mapNotNull { candidate ->
             val listing=candidate.listing; val item=items[listing.goodsItemId] ?: return@mapNotNull null
             val shop=stores[listing.storeId] ?: return@mapNotNull null

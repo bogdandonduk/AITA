@@ -97,8 +97,8 @@ internal object InventoryCreates {
             var durable = true
             command.item?.let { proposed ->
                 val item = if (remove && command.editsItem) command.previousItem ?: proposed else proposed
-                val cached = (if (current) stockState.payloadValue else null) ?: readJsonCacheText(CACHE_PREFIX + inventoryCacheKey("stock", owner))
-                    ?.let { jsonBase.decodeFromString<List<GoodsItemDataModel>>(it) }.orEmpty()
+                val cached = (if (current) stockState.payloadValue else null) ?:
+                    readInventorySnapshot<GoodsItemDataModel>("stock", owner)?.rows.orEmpty()
                 val base = cached.filterNot { it.id == item.id } + if (remove && !command.editsItem) emptyList() else listOf(item)
                 val queue = journal.list(requireNotNull(owner.accountId))
                 val at = queue.indexOfFirst { it.id == command.id }
@@ -113,8 +113,8 @@ internal object InventoryCreates {
             }
             if (command.batches.isNotEmpty()) {
                 val ids = command.batches.map { it.id }.toSet()
-                val cached = (if (current) stockBatchesState.payloadValue else null) ?: readJsonCacheText(CACHE_PREFIX + inventoryCacheKey("stock_batches", owner))
-                    ?.let { jsonBase.decodeFromString<List<GoodsBatchDataModel>>(it) }.orEmpty()
+                val cached = (if (current) stockBatchesState.payloadValue else null) ?:
+                    readInventorySnapshot<GoodsBatchDataModel>("stock_batches", owner)?.rows.orEmpty()
                 val rows = cached.filterNot { it.id in ids } + if (remove) emptyList() else command.batches
                 val saved = persistInventoryCacheLocked("stock_batches", owner, rows)
                 durable = durable && saved

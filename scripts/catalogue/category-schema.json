@@ -1,0 +1,4586 @@
+{
+  "food": {
+    "slug": "food",
+    "en": "Food",
+    "ru": "Продукты питания",
+    "parent": null
+  },
+  "food_fresh_produce": {
+    "slug": "food_fresh_produce",
+    "en": "Food / Fresh produce",
+    "ru": "Продукты / Свежие овощи и фрукты",
+    "parent": "food"
+  },
+  "food_fruits": {
+    "slug": "food_fruits",
+    "en": "Food / Fruits",
+    "ru": "Продукты / Фрукты",
+    "parent": "food"
+  },
+  "food_fruits_apples_pears": {
+    "slug": "food_fruits_apples_pears",
+    "en": "Food / Fruits / Apples and pears",
+    "ru": "Продукты / Фрукты / Яблоки и груши",
+    "parent": "food_fruits"
+  },
+  "food_fruits_citrus": {
+    "slug": "food_fruits_citrus",
+    "en": "Food / Fruits / Citrus",
+    "ru": "Продукты / Фрукты / Цитрусовые",
+    "parent": "food_fruits"
+  },
+  "food_fruits_berries": {
+    "slug": "food_fruits_berries",
+    "en": "Food / Fruits / Berries",
+    "ru": "Продукты / Фрукты / Ягоды",
+    "parent": "food_fruits"
+  },
+  "food_fruits_bananas": {
+    "slug": "food_fruits_bananas",
+    "en": "Food / Fruits / Bananas",
+    "ru": "Продукты / Фрукты / Бананы",
+    "parent": "food_fruits"
+  },
+  "food_fruits_grapes": {
+    "slug": "food_fruits_grapes",
+    "en": "Food / Fruits / Grapes",
+    "ru": "Продукты / Фрукты / Виноград",
+    "parent": "food_fruits"
+  },
+  "food_fruits_melons": {
+    "slug": "food_fruits_melons",
+    "en": "Food / Fruits / Melons",
+    "ru": "Продукты / Фрукты / Дыни и арбузы",
+    "parent": "food_fruits"
+  },
+  "food_vegetables": {
+    "slug": "food_vegetables",
+    "en": "Food / Vegetables",
+    "ru": "Продукты / Овощи",
+    "parent": "food"
+  },
+  "food_vegetables_leafy": {
+    "slug": "food_vegetables_leafy",
+    "en": "Food / Vegetables / Leafy greens",
+    "ru": "Продукты / Овощи / Листовая зелень",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_root": {
+    "slug": "food_vegetables_root",
+    "en": "Food / Vegetables / Root vegetables",
+    "ru": "Продукты / Овощи / Корнеплоды",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_tomatoes_cucumbers": {
+    "slug": "food_vegetables_tomatoes_cucumbers",
+    "en": "Food / Vegetables / Tomatoes and cucumbers",
+    "ru": "Продукты / Овощи / Помидоры и огурцы",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_onion_garlic": {
+    "slug": "food_vegetables_onion_garlic",
+    "en": "Food / Vegetables / Onion and garlic",
+    "ru": "Продукты / Овощи / Лук и чеснок",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_cabbage": {
+    "slug": "food_vegetables_cabbage",
+    "en": "Food / Vegetables / Cabbage",
+    "ru": "Продукты / Овощи / Капуста",
+    "parent": "food_vegetables"
+  },
+  "food_herbs": {
+    "slug": "food_herbs",
+    "en": "Food / Herbs",
+    "ru": "Продукты / Зелень и травы",
+    "parent": "food"
+  },
+  "food_mushrooms": {
+    "slug": "food_mushrooms",
+    "en": "Food / Mushrooms",
+    "ru": "Продукты / Грибы",
+    "parent": "food"
+  },
+  "bakery": {
+    "slug": "bakery",
+    "en": "Bakery",
+    "ru": "Выпечка и хлеб",
+    "parent": null
+  },
+  "bakery_bread": {
+    "slug": "bakery_bread",
+    "en": "Bakery / Bread",
+    "ru": "Выпечка / Хлеб",
+    "parent": "bakery"
+  },
+  "bakery_flatbread": {
+    "slug": "bakery_flatbread",
+    "en": "Bakery / Flatbread and lavash",
+    "ru": "Выпечка / Лепёшки и лаваш",
+    "parent": "bakery"
+  },
+  "bakery_buns": {
+    "slug": "bakery_buns",
+    "en": "Bakery / Buns",
+    "ru": "Выпечка / Булочки",
+    "parent": "bakery"
+  },
+  "bakery_pastry": {
+    "slug": "bakery_pastry",
+    "en": "Bakery / Pastry",
+    "ru": "Выпечка / Слойки и пирожки",
+    "parent": "bakery"
+  },
+  "bakery_cakes": {
+    "slug": "bakery_cakes",
+    "en": "Bakery / Cakes and desserts",
+    "ru": "Выпечка / Торты и десерты",
+    "parent": "bakery"
+  },
+  "bakery_cookies": {
+    "slug": "bakery_cookies",
+    "en": "Bakery / Cookies and biscuits",
+    "ru": "Выпечка / Печенье и бисквиты",
+    "parent": "bakery"
+  },
+  "dairy": {
+    "slug": "dairy",
+    "en": "Dairy and alternatives",
+    "ru": "Молочные продукты и альтернативы",
+    "parent": null
+  },
+  "dairy_milk": {
+    "slug": "dairy_milk",
+    "en": "Dairy / Milk",
+    "ru": "Молочные продукты / Молоко",
+    "parent": "dairy"
+  },
+  "dairy_yogurt": {
+    "slug": "dairy_yogurt",
+    "en": "Dairy / Yogurt and kefir",
+    "ru": "Молочные продукты / Йогурт и кефир",
+    "parent": "dairy"
+  },
+  "dairy_cheese": {
+    "slug": "dairy_cheese",
+    "en": "Dairy / Cheese",
+    "ru": "Молочные продукты / Сыр",
+    "parent": "dairy"
+  },
+  "dairy_cottage_cheese": {
+    "slug": "dairy_cottage_cheese",
+    "en": "Dairy / Cottage cheese",
+    "ru": "Молочные продукты / Творог",
+    "parent": "dairy"
+  },
+  "dairy_butter_cream": {
+    "slug": "dairy_butter_cream",
+    "en": "Dairy / Butter and cream",
+    "ru": "Молочные продукты / Масло и сливки",
+    "parent": "dairy"
+  },
+  "plant_based": {
+    "slug": "plant_based",
+    "en": "Plant-based foods",
+    "ru": "Растительные продукты",
+    "parent": null
+  },
+  "plant_based_milk": {
+    "slug": "plant_based_milk",
+    "en": "Plant-based / Milk alternatives",
+    "ru": "Растительные продукты / Растительное молоко",
+    "parent": "plant_based"
+  },
+  "plant_based_tofu": {
+    "slug": "plant_based_tofu",
+    "en": "Plant-based / Tofu and tempeh",
+    "ru": "Растительные продукты / Тофу и темпе",
+    "parent": "plant_based"
+  },
+  "plant_based_meat": {
+    "slug": "plant_based_meat",
+    "en": "Plant-based / Meat alternatives",
+    "ru": "Растительные продукты / Альтернативы мясу",
+    "parent": "plant_based"
+  },
+  "plant_based_cheese": {
+    "slug": "plant_based_cheese",
+    "en": "Plant-based / Cheese alternatives",
+    "ru": "Растительные продукты / Альтернативы сыру",
+    "parent": "plant_based"
+  },
+  "meat": {
+    "slug": "meat",
+    "en": "Meat",
+    "ru": "Мясо",
+    "parent": null
+  },
+  "meat_beef": {
+    "slug": "meat_beef",
+    "en": "Meat / Beef",
+    "ru": "Мясо / Говядина",
+    "parent": "meat"
+  },
+  "meat_lamb": {
+    "slug": "meat_lamb",
+    "en": "Meat / Lamb",
+    "ru": "Мясо / Баранина",
+    "parent": "meat"
+  },
+  "meat_poultry": {
+    "slug": "meat_poultry",
+    "en": "Meat / Poultry",
+    "ru": "Мясо / Птица",
+    "parent": "meat"
+  },
+  "meat_sausages": {
+    "slug": "meat_sausages",
+    "en": "Meat / Sausages and deli",
+    "ru": "Мясо / Колбасы и деликатесы",
+    "parent": "meat"
+  },
+  "seafood": {
+    "slug": "seafood",
+    "en": "Fish and seafood",
+    "ru": "Рыба и морепродукты",
+    "parent": null
+  },
+  "seafood_fish": {
+    "slug": "seafood_fish",
+    "en": "Seafood / Fish",
+    "ru": "Морепродукты / Рыба",
+    "parent": "seafood"
+  },
+  "seafood_canned": {
+    "slug": "seafood_canned",
+    "en": "Seafood / Canned fish",
+    "ru": "Морепродукты / Рыбные консервы",
+    "parent": "seafood"
+  },
+  "eggs": {
+    "slug": "eggs",
+    "en": "Eggs",
+    "ru": "Яйца",
+    "parent": null
+  },
+  "grocery_staples": {
+    "slug": "grocery_staples",
+    "en": "Grocery staples",
+    "ru": "Бакалея",
+    "parent": null
+  },
+  "grocery_grains": {
+    "slug": "grocery_grains",
+    "en": "Grocery / Grains and cereals",
+    "ru": "Бакалея / Крупы",
+    "parent": "grocery_staples"
+  },
+  "grocery_rice": {
+    "slug": "grocery_rice",
+    "en": "Grocery / Rice",
+    "ru": "Бакалея / Рис",
+    "parent": "grocery_staples"
+  },
+  "grocery_pasta": {
+    "slug": "grocery_pasta",
+    "en": "Grocery / Pasta and noodles",
+    "ru": "Бакалея / Макароны и лапша",
+    "parent": "grocery_staples"
+  },
+  "grocery_flour": {
+    "slug": "grocery_flour",
+    "en": "Grocery / Flour and baking mixes",
+    "ru": "Бакалея / Мука и смеси для выпечки",
+    "parent": "grocery_staples"
+  },
+  "grocery_sugar": {
+    "slug": "grocery_sugar",
+    "en": "Grocery / Sugar and sweeteners",
+    "ru": "Бакалея / Сахар и подсластители",
+    "parent": "grocery_staples"
+  },
+  "grocery_salt": {
+    "slug": "grocery_salt",
+    "en": "Grocery / Salt",
+    "ru": "Бакалея / Соль",
+    "parent": "grocery_staples"
+  },
+  "grocery_spices": {
+    "slug": "grocery_spices",
+    "en": "Grocery / Spices and seasonings",
+    "ru": "Бакалея / Специи и приправы",
+    "parent": "grocery_staples"
+  },
+  "grocery_oil": {
+    "slug": "grocery_oil",
+    "en": "Grocery / Oils",
+    "ru": "Бакалея / Масла",
+    "parent": "grocery_staples"
+  },
+  "grocery_sauces": {
+    "slug": "grocery_sauces",
+    "en": "Grocery / Sauces and dressings",
+    "ru": "Бакалея / Соусы и заправки",
+    "parent": "grocery_staples"
+  },
+  "grocery_canned": {
+    "slug": "grocery_canned",
+    "en": "Grocery / Canned food",
+    "ru": "Бакалея / Консервы",
+    "parent": "grocery_staples"
+  },
+  "grocery_pickles": {
+    "slug": "grocery_pickles",
+    "en": "Grocery / Pickles and marinades",
+    "ru": "Бакалея / Соленья и маринады",
+    "parent": "grocery_staples"
+  },
+  "grocery_breakfast": {
+    "slug": "grocery_breakfast",
+    "en": "Grocery / Breakfast foods",
+    "ru": "Бакалея / Завтраки",
+    "parent": "grocery_staples"
+  },
+  "grocery_instant": {
+    "slug": "grocery_instant",
+    "en": "Grocery / Instant foods",
+    "ru": "Бакалея / Быстрое питание",
+    "parent": "grocery_staples"
+  },
+  "beverages": {
+    "slug": "beverages",
+    "en": "Beverages",
+    "ru": "Напитки",
+    "parent": null
+  },
+  "beverages_water": {
+    "slug": "beverages_water",
+    "en": "Beverages / Water",
+    "ru": "Напитки / Вода",
+    "parent": "beverages"
+  },
+  "beverages_juice": {
+    "slug": "beverages_juice",
+    "en": "Beverages / Juice and nectar",
+    "ru": "Напитки / Соки и нектары",
+    "parent": "beverages"
+  },
+  "beverages_soda": {
+    "slug": "beverages_soda",
+    "en": "Beverages / Soda",
+    "ru": "Напитки / Газировка",
+    "parent": "beverages"
+  },
+  "beverages_tea": {
+    "slug": "beverages_tea",
+    "en": "Beverages / Tea",
+    "ru": "Напитки / Чай",
+    "parent": "beverages"
+  },
+  "beverages_coffee": {
+    "slug": "beverages_coffee",
+    "en": "Beverages / Coffee",
+    "ru": "Напитки / Кофе",
+    "parent": "beverages"
+  },
+  "beverages_energy": {
+    "slug": "beverages_energy",
+    "en": "Beverages / Energy drinks",
+    "ru": "Напитки / Энергетики",
+    "parent": "beverages"
+  },
+  "snacks": {
+    "slug": "snacks",
+    "en": "Snacks",
+    "ru": "Снеки",
+    "parent": null
+  },
+  "snacks_chips": {
+    "slug": "snacks_chips",
+    "en": "Snacks / Chips and crisps",
+    "ru": "Снеки / Чипсы",
+    "parent": "snacks"
+  },
+  "snacks_nuts": {
+    "slug": "snacks_nuts",
+    "en": "Snacks / Nuts and seeds",
+    "ru": "Снеки / Орехи и семечки",
+    "parent": "snacks"
+  },
+  "snacks_crackers": {
+    "slug": "snacks_crackers",
+    "en": "Snacks / Crackers and breadsticks",
+    "ru": "Снеки / Крекеры и хлебцы",
+    "parent": "snacks"
+  },
+  "sweets": {
+    "slug": "sweets",
+    "en": "Sweets",
+    "ru": "Сладости",
+    "parent": null
+  },
+  "sweets_chocolate": {
+    "slug": "sweets_chocolate",
+    "en": "Sweets / Chocolate",
+    "ru": "Сладости / Шоколад",
+    "parent": "sweets"
+  },
+  "sweets_candy": {
+    "slug": "sweets_candy",
+    "en": "Sweets / Candy",
+    "ru": "Сладости / Конфеты",
+    "parent": "sweets"
+  },
+  "sweets_cookies": {
+    "slug": "sweets_cookies",
+    "en": "Sweets / Cookies and wafers",
+    "ru": "Сладости / Печенье и вафли",
+    "parent": "sweets"
+  },
+  "sweets_ice_cream": {
+    "slug": "sweets_ice_cream",
+    "en": "Sweets / Ice cream",
+    "ru": "Сладости / Мороженое",
+    "parent": "sweets"
+  },
+  "frozen": {
+    "slug": "frozen",
+    "en": "Frozen foods",
+    "ru": "Замороженные продукты",
+    "parent": null
+  },
+  "frozen_vegetables": {
+    "slug": "frozen_vegetables",
+    "en": "Frozen / Vegetables and berries",
+    "ru": "Заморозка / Овощи и ягоды",
+    "parent": "frozen"
+  },
+  "frozen_ready_meals": {
+    "slug": "frozen_ready_meals",
+    "en": "Frozen / Ready meals",
+    "ru": "Заморозка / Готовые блюда",
+    "parent": "frozen"
+  },
+  "ready_meals": {
+    "slug": "ready_meals",
+    "en": "Ready meals and salads",
+    "ru": "Готовая еда и салаты",
+    "parent": null
+  },
+  "ready_meals_salads": {
+    "slug": "ready_meals_salads",
+    "en": "Ready meals / Salads",
+    "ru": "Готовая еда / Салаты",
+    "parent": "ready_meals"
+  },
+  "ready_meals_soups": {
+    "slug": "ready_meals_soups",
+    "en": "Ready meals / Soups",
+    "ru": "Готовая еда / Супы",
+    "parent": "ready_meals"
+  },
+  "baby": {
+    "slug": "baby",
+    "en": "Baby products",
+    "ru": "Детские товары",
+    "parent": null
+  },
+  "baby_food": {
+    "slug": "baby_food",
+    "en": "Baby / Food",
+    "ru": "Детские товары / Питание",
+    "parent": "baby"
+  },
+  "baby_diapers": {
+    "slug": "baby_diapers",
+    "en": "Baby / Diapers and wipes",
+    "ru": "Детские товары / Подгузники и салфетки",
+    "parent": "baby"
+  },
+  "baby_care": {
+    "slug": "baby_care",
+    "en": "Baby / Care",
+    "ru": "Детские товары / Уход",
+    "parent": "baby"
+  },
+  "pet": {
+    "slug": "pet",
+    "en": "Pet supplies",
+    "ru": "Товары для животных",
+    "parent": null
+  },
+  "pet_food_cats": {
+    "slug": "pet_food_cats",
+    "en": "Pet / Cat food",
+    "ru": "Животные / Корм для кошек",
+    "parent": "pet"
+  },
+  "pet_food_dogs": {
+    "slug": "pet_food_dogs",
+    "en": "Pet / Dog food",
+    "ru": "Животные / Корм для собак",
+    "parent": "pet"
+  },
+  "pet_litter": {
+    "slug": "pet_litter",
+    "en": "Pet / Litter and hygiene",
+    "ru": "Животные / Наполнители и гигиена",
+    "parent": "pet"
+  },
+  "household": {
+    "slug": "household",
+    "en": "Household goods",
+    "ru": "Хозяйственные товары",
+    "parent": null
+  },
+  "household_cleaning": {
+    "slug": "household_cleaning",
+    "en": "Household / Cleaning products",
+    "ru": "Хозтовары / Чистящие средства",
+    "parent": "household"
+  },
+  "household_laundry": {
+    "slug": "household_laundry",
+    "en": "Household / Laundry",
+    "ru": "Хозтовары / Стирка",
+    "parent": "household"
+  },
+  "household_dishwashing": {
+    "slug": "household_dishwashing",
+    "en": "Household / Dishwashing",
+    "ru": "Хозтовары / Мытьё посуды",
+    "parent": "household"
+  },
+  "household_paper": {
+    "slug": "household_paper",
+    "en": "Household / Paper goods",
+    "ru": "Хозтовары / Бумажные товары",
+    "parent": "household"
+  },
+  "household_bags_foil": {
+    "slug": "household_bags_foil",
+    "en": "Household / Bags, foil and film",
+    "ru": "Хозтовары / Пакеты, фольга и плёнка",
+    "parent": "household"
+  },
+  "personal_care": {
+    "slug": "personal_care",
+    "en": "Personal care",
+    "ru": "Личная гигиена",
+    "parent": null
+  },
+  "personal_care_hair": {
+    "slug": "personal_care_hair",
+    "en": "Personal care / Hair care",
+    "ru": "Личная гигиена / Уход за волосами",
+    "parent": "personal_care"
+  },
+  "personal_care_body": {
+    "slug": "personal_care_body",
+    "en": "Personal care / Body care",
+    "ru": "Личная гигиена / Уход за телом",
+    "parent": "personal_care"
+  },
+  "personal_care_oral": {
+    "slug": "personal_care_oral",
+    "en": "Personal care / Oral care",
+    "ru": "Личная гигиена / Уход за полостью рта",
+    "parent": "personal_care"
+  },
+  "personal_care_shaving": {
+    "slug": "personal_care_shaving",
+    "en": "Personal care / Shaving",
+    "ru": "Личная гигиена / Бритьё",
+    "parent": "personal_care"
+  },
+  "health": {
+    "slug": "health",
+    "en": "Health and wellness",
+    "ru": "Здоровье",
+    "parent": null
+  },
+  "health_first_aid": {
+    "slug": "health_first_aid",
+    "en": "Health / First aid",
+    "ru": "Здоровье / Первая помощь",
+    "parent": "health"
+  },
+  "health_hygiene": {
+    "slug": "health_hygiene",
+    "en": "Health / Hygiene goods",
+    "ru": "Здоровье / Гигиенические товары",
+    "parent": "health"
+  },
+  "stationery": {
+    "slug": "stationery",
+    "en": "Stationery and office",
+    "ru": "Канцелярия и офис",
+    "parent": null
+  },
+  "stationery_paper": {
+    "slug": "stationery_paper",
+    "en": "Stationery / Paper",
+    "ru": "Канцелярия / Бумага",
+    "parent": "stationery"
+  },
+  "stationery_writing": {
+    "slug": "stationery_writing",
+    "en": "Stationery / Pens and writing",
+    "ru": "Канцелярия / Ручки и письмо",
+    "parent": "stationery"
+  },
+  "electronics": {
+    "slug": "electronics",
+    "en": "Electronics",
+    "ru": "Электроника",
+    "parent": null
+  },
+  "electronics_accessories": {
+    "slug": "electronics_accessories",
+    "en": "Electronics / Accessories",
+    "ru": "Электроника / Аксессуары",
+    "parent": "electronics"
+  },
+  "electronics_batteries": {
+    "slug": "electronics_batteries",
+    "en": "Electronics / Batteries",
+    "ru": "Электроника / Батарейки",
+    "parent": "electronics"
+  },
+  "electronics_lighting": {
+    "slug": "electronics_lighting",
+    "en": "Electronics / Lighting",
+    "ru": "Электроника / Освещение",
+    "parent": "electronics"
+  },
+  "clothing": {
+    "slug": "clothing",
+    "en": "Clothing and textiles",
+    "ru": "Одежда и текстиль",
+    "parent": null
+  },
+  "clothing_socks_underwear": {
+    "slug": "clothing_socks_underwear",
+    "en": "Clothing / Socks and underwear",
+    "ru": "Одежда / Носки и бельё",
+    "parent": "clothing"
+  },
+  "clothing_home_textiles": {
+    "slug": "clothing_home_textiles",
+    "en": "Textiles / Home textiles",
+    "ru": "Текстиль / Домашний текстиль",
+    "parent": "clothing"
+  },
+  "toys": {
+    "slug": "toys",
+    "en": "Toys and games",
+    "ru": "Игрушки и игры",
+    "parent": null
+  },
+  "garden": {
+    "slug": "garden",
+    "en": "Garden and plants",
+    "ru": "Сад и растения",
+    "parent": null
+  },
+  "garden_soil": {
+    "slug": "garden_soil",
+    "en": "Garden / Soil and fertilizers",
+    "ru": "Сад / Грунт и удобрения",
+    "parent": "garden"
+  },
+  "tools": {
+    "slug": "tools",
+    "en": "Tools and repair",
+    "ru": "Инструменты и ремонт",
+    "parent": null
+  },
+  "auto": {
+    "slug": "auto",
+    "en": "Auto goods",
+    "ru": "Автотовары",
+    "parent": null
+  },
+  "regulated": {
+    "slug": "regulated",
+    "en": "Age-restricted goods",
+    "ru": "Товары с ограничениями",
+    "parent": null
+  },
+  "regulated_alcohol": {
+    "slug": "regulated_alcohol",
+    "en": "Age-restricted / Alcohol",
+    "ru": "Ограничения / Алкоголь",
+    "parent": "regulated"
+  },
+  "seasonal": {
+    "slug": "seasonal",
+    "en": "Seasonal goods",
+    "ru": "Сезонные товары",
+    "parent": null
+  },
+  "appliances": {
+    "slug": "appliances",
+    "en": "Home appliances",
+    "ru": "Бытовая техника",
+    "parent": null
+  },
+  "furniture": {
+    "slug": "furniture",
+    "en": "Furniture and interiors",
+    "ru": "Мебель и интерьер",
+    "parent": null
+  },
+  "footwear": {
+    "slug": "footwear",
+    "en": "Footwear",
+    "ru": "Обувь",
+    "parent": null
+  },
+  "bags": {
+    "slug": "bags",
+    "en": "Bags and luggage",
+    "ru": "Сумки и багаж",
+    "parent": null
+  },
+  "sports": {
+    "slug": "sports",
+    "en": "Sports and outdoor recreation",
+    "ru": "Спорт и активный отдых",
+    "parent": null
+  },
+  "beauty": {
+    "slug": "beauty",
+    "en": "Cosmetics and beauty",
+    "ru": "Косметика и красота",
+    "parent": null
+  },
+  "jewelry": {
+    "slug": "jewelry",
+    "en": "Jewelry and watches",
+    "ru": "Украшения и часы",
+    "parent": null
+  },
+  "books": {
+    "slug": "books",
+    "en": "Books and printed media",
+    "ru": "Книги и печатные издания",
+    "parent": null
+  },
+  "music": {
+    "slug": "music",
+    "en": "Musical instruments",
+    "ru": "Музыкальные инструменты",
+    "parent": null
+  },
+  "craft": {
+    "slug": "craft",
+    "en": "Arts and crafts",
+    "ru": "Творчество и рукоделие",
+    "parent": null
+  },
+  "construction": {
+    "slug": "construction",
+    "en": "Building materials",
+    "ru": "Строительные материалы",
+    "parent": null
+  },
+  "plumbing": {
+    "slug": "plumbing",
+    "en": "Plumbing and water systems",
+    "ru": "Сантехника и водоснабжение",
+    "parent": null
+  },
+  "electrical": {
+    "slug": "electrical",
+    "en": "Electrical installation supplies",
+    "ru": "Электромонтажные товары",
+    "parent": null
+  },
+  "industry": {
+    "slug": "industry",
+    "en": "Industrial and commercial supplies",
+    "ru": "Промышленные и торговые товары",
+    "parent": null
+  },
+  "agriculture": {
+    "slug": "agriculture",
+    "en": "Agricultural supplies",
+    "ru": "Сельскохозяйственные товары",
+    "parent": null
+  },
+  "party": {
+    "slug": "party",
+    "en": "Celebrations and gifts",
+    "ru": "Праздники и подарки",
+    "parent": null
+  },
+  "optics": {
+    "slug": "optics",
+    "en": "Eyewear and optical supplies",
+    "ru": "Очки и оптика",
+    "parent": null
+  },
+  "food_fruits_stone": {
+    "slug": "food_fruits_stone",
+    "en": "Stone fruit",
+    "ru": "Косточковые фрукты",
+    "parent": "food_fruits"
+  },
+  "food_fruits_tropical": {
+    "slug": "food_fruits_tropical",
+    "en": "Tropical fruit",
+    "ru": "Тропические фрукты",
+    "parent": "food_fruits"
+  },
+  "food_fruits_pomegranates": {
+    "slug": "food_fruits_pomegranates",
+    "en": "Pomegranates",
+    "ru": "Гранаты",
+    "parent": "food_fruits"
+  },
+  "food_fruits_persimmons": {
+    "slug": "food_fruits_persimmons",
+    "en": "Persimmons",
+    "ru": "Хурма",
+    "parent": "food_fruits"
+  },
+  "food_fruits_kiwi": {
+    "slug": "food_fruits_kiwi",
+    "en": "Kiwi fruit",
+    "ru": "Киви",
+    "parent": "food_fruits"
+  },
+  "food_fruits_pineapples": {
+    "slug": "food_fruits_pineapples",
+    "en": "Pineapples",
+    "ru": "Ананасы",
+    "parent": "food_fruits"
+  },
+  "food_fruits_coconuts": {
+    "slug": "food_fruits_coconuts",
+    "en": "Coconuts",
+    "ru": "Кокосы",
+    "parent": "food_fruits"
+  },
+  "food_fruits_fruit_boxes": {
+    "slug": "food_fruits_fruit_boxes",
+    "en": "Assorted fruit boxes",
+    "ru": "Фруктовые наборы",
+    "parent": "food_fruits"
+  },
+  "food_fruits_apples_pears_apples": {
+    "slug": "food_fruits_apples_pears_apples",
+    "en": "Apples",
+    "ru": "Яблоки",
+    "parent": "food_fruits_apples_pears"
+  },
+  "food_fruits_apples_pears_pears": {
+    "slug": "food_fruits_apples_pears_pears",
+    "en": "Pears",
+    "ru": "Груши",
+    "parent": "food_fruits_apples_pears"
+  },
+  "food_fruits_apples_pears_quinces": {
+    "slug": "food_fruits_apples_pears_quinces",
+    "en": "Quinces",
+    "ru": "Айва",
+    "parent": "food_fruits_apples_pears"
+  },
+  "food_fruits_citrus_oranges": {
+    "slug": "food_fruits_citrus_oranges",
+    "en": "Oranges",
+    "ru": "Апельсины",
+    "parent": "food_fruits_citrus"
+  },
+  "food_fruits_citrus_mandarins": {
+    "slug": "food_fruits_citrus_mandarins",
+    "en": "Mandarins",
+    "ru": "Мандарины",
+    "parent": "food_fruits_citrus"
+  },
+  "food_fruits_citrus_lemons_limes": {
+    "slug": "food_fruits_citrus_lemons_limes",
+    "en": "Lemons and limes",
+    "ru": "Лимоны и лаймы",
+    "parent": "food_fruits_citrus"
+  },
+  "food_fruits_citrus_grapefruits": {
+    "slug": "food_fruits_citrus_grapefruits",
+    "en": "Grapefruits and pomelos",
+    "ru": "Грейпфруты и помело",
+    "parent": "food_fruits_citrus"
+  },
+  "food_fruits_berries_strawberries": {
+    "slug": "food_fruits_berries_strawberries",
+    "en": "Strawberries",
+    "ru": "Клубника",
+    "parent": "food_fruits_berries"
+  },
+  "food_fruits_berries_raspberries": {
+    "slug": "food_fruits_berries_raspberries",
+    "en": "Raspberries",
+    "ru": "Малина",
+    "parent": "food_fruits_berries"
+  },
+  "food_fruits_berries_blueberries": {
+    "slug": "food_fruits_berries_blueberries",
+    "en": "Blueberries",
+    "ru": "Голубика и черника",
+    "parent": "food_fruits_berries"
+  },
+  "food_fruits_berries_currants": {
+    "slug": "food_fruits_berries_currants",
+    "en": "Currants and gooseberries",
+    "ru": "Смородина и крыжовник",
+    "parent": "food_fruits_berries"
+  },
+  "food_fruits_berries_cranberries": {
+    "slug": "food_fruits_berries_cranberries",
+    "en": "Cranberries and lingonberries",
+    "ru": "Клюква и брусника",
+    "parent": "food_fruits_berries"
+  },
+  "food_fruits_stone_peaches": {
+    "slug": "food_fruits_stone_peaches",
+    "en": "Peaches and nectarines",
+    "ru": "Персики и нектарины",
+    "parent": "food_fruits_stone"
+  },
+  "food_fruits_stone_apricots": {
+    "slug": "food_fruits_stone_apricots",
+    "en": "Apricots",
+    "ru": "Абрикосы",
+    "parent": "food_fruits_stone"
+  },
+  "food_fruits_stone_plums": {
+    "slug": "food_fruits_stone_plums",
+    "en": "Plums",
+    "ru": "Сливы",
+    "parent": "food_fruits_stone"
+  },
+  "food_fruits_stone_cherries": {
+    "slug": "food_fruits_stone_cherries",
+    "en": "Cherries and sour cherries",
+    "ru": "Черешня и вишня",
+    "parent": "food_fruits_stone"
+  },
+  "food_vegetables_peppers": {
+    "slug": "food_vegetables_peppers",
+    "en": "Peppers",
+    "ru": "Перец",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_squashes": {
+    "slug": "food_vegetables_squashes",
+    "en": "Squashes and pumpkins",
+    "ru": "Кабачки и тыквы",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_legumes": {
+    "slug": "food_vegetables_legumes",
+    "en": "Fresh peas and beans",
+    "ru": "Свежий горох и фасоль",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_avocados": {
+    "slug": "food_vegetables_avocados",
+    "en": "Avocados",
+    "ru": "Авокадо",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_sprouts": {
+    "slug": "food_vegetables_sprouts",
+    "en": "Sprouts and microgreens",
+    "ru": "Проростки и микрозелень",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_prepared": {
+    "slug": "food_vegetables_prepared",
+    "en": "Peeled and cut vegetables",
+    "ru": "Очищенные и нарезанные овощи",
+    "parent": "food_vegetables"
+  },
+  "food_vegetables_root_carrots": {
+    "slug": "food_vegetables_root_carrots",
+    "en": "Carrots",
+    "ru": "Морковь",
+    "parent": "food_vegetables_root"
+  },
+  "food_vegetables_root_beetroot": {
+    "slug": "food_vegetables_root_beetroot",
+    "en": "Beetroot",
+    "ru": "Свёкла",
+    "parent": "food_vegetables_root"
+  },
+  "food_vegetables_root_radishes": {
+    "slug": "food_vegetables_root_radishes",
+    "en": "Radishes and daikon",
+    "ru": "Редис, редька и дайкон",
+    "parent": "food_vegetables_root"
+  },
+  "food_vegetables_root_sweet_potatoes": {
+    "slug": "food_vegetables_root_sweet_potatoes",
+    "en": "Sweet potatoes",
+    "ru": "Батат",
+    "parent": "food_vegetables_root"
+  },
+  "food_vegetables_root_turnips": {
+    "slug": "food_vegetables_root_turnips",
+    "en": "Turnips and root celery",
+    "ru": "Репа и корневой сельдерей",
+    "parent": "food_vegetables_root"
+  },
+  "food_vegetables_leafy_lettuce": {
+    "slug": "food_vegetables_leafy_lettuce",
+    "en": "Lettuce and salad mixes",
+    "ru": "Салат и салатные смеси",
+    "parent": "food_vegetables_leafy"
+  },
+  "food_vegetables_leafy_spinach": {
+    "slug": "food_vegetables_leafy_spinach",
+    "en": "Spinach and sorrel",
+    "ru": "Шпинат и щавель",
+    "parent": "food_vegetables_leafy"
+  },
+  "food_vegetables_leafy_herbs": {
+    "slug": "food_vegetables_leafy_herbs",
+    "en": "Fresh culinary herbs",
+    "ru": "Свежая пряная зелень",
+    "parent": "food_vegetables_leafy"
+  },
+  "bakery_flatbreads": {
+    "slug": "bakery_flatbreads",
+    "en": "Flatbreads and tortillas",
+    "ru": "Лепёшки, лаваш и тортильи",
+    "parent": "bakery"
+  },
+  "bakery_bagels": {
+    "slug": "bakery_bagels",
+    "en": "Bagels and bread rings",
+    "ru": "Бейглы, баранки и сушки",
+    "parent": "bakery"
+  },
+  "bakery_crumbs": {
+    "slug": "bakery_crumbs",
+    "en": "Breadcrumbs and croutons",
+    "ru": "Панировочные сухари и гренки",
+    "parent": "bakery"
+  },
+  "bakery_pies": {
+    "slug": "bakery_pies",
+    "en": "Pies and filled pastries",
+    "ru": "Пироги и пирожки",
+    "parent": "bakery"
+  },
+  "bakery_pastry_sheets": {
+    "slug": "bakery_pastry_sheets",
+    "en": "Pastry sheets and ready dough",
+    "ru": "Коржи и готовое тесто",
+    "parent": "bakery"
+  },
+  "dairy_cream": {
+    "slug": "dairy_cream",
+    "en": "Cream",
+    "ru": "Сливки",
+    "parent": "dairy"
+  },
+  "dairy_sour_cream": {
+    "slug": "dairy_sour_cream",
+    "en": "Sour cream",
+    "ru": "Сметана",
+    "parent": "dairy"
+  },
+  "dairy_fermented_drinks": {
+    "slug": "dairy_fermented_drinks",
+    "en": "Kefir, ayran and fermented milk",
+    "ru": "Кефир, айран и кисломолочные напитки",
+    "parent": "dairy"
+  },
+  "dairy_condensed": {
+    "slug": "dairy_condensed",
+    "en": "Condensed and evaporated milk",
+    "ru": "Сгущённое и концентрированное молоко",
+    "parent": "dairy"
+  },
+  "dairy_powdered": {
+    "slug": "dairy_powdered",
+    "en": "Milk and whey powders",
+    "ru": "Сухое молоко и сыворотка",
+    "parent": "dairy"
+  },
+  "dairy_traditional": {
+    "slug": "dairy_traditional",
+    "en": "Traditional dairy products",
+    "ru": "Традиционные молочные продукты",
+    "parent": "dairy"
+  },
+  "dairy_traditional_kurt": {
+    "slug": "dairy_traditional_kurt",
+    "en": "Kurt",
+    "ru": "Курт",
+    "parent": "dairy_traditional"
+  },
+  "dairy_traditional_kumys": {
+    "slug": "dairy_traditional_kumys",
+    "en": "Kumys",
+    "ru": "Кумыс",
+    "parent": "dairy_traditional"
+  },
+  "dairy_traditional_shubat": {
+    "slug": "dairy_traditional_shubat",
+    "en": "Shubat",
+    "ru": "Шубат",
+    "parent": "dairy_traditional"
+  },
+  "dairy_traditional_irimshik": {
+    "slug": "dairy_traditional_irimshik",
+    "en": "Irimshik",
+    "ru": "Иримшик",
+    "parent": "dairy_traditional"
+  },
+  "plant_based_cream": {
+    "slug": "plant_based_cream",
+    "en": "Plant-based creams",
+    "ru": "Растительные сливки",
+    "parent": "plant_based"
+  },
+  "plant_based_spreads": {
+    "slug": "plant_based_spreads",
+    "en": "Plant-based spreads and butter alternatives",
+    "ru": "Растительные спреды и аналоги масла",
+    "parent": "plant_based"
+  },
+  "plant_based_seitan": {
+    "slug": "plant_based_seitan",
+    "en": "Seitan and wheat protein foods",
+    "ru": "Сейтан и продукты из пшеничного белка",
+    "parent": "plant_based"
+  },
+  "plant_based_tempeh": {
+    "slug": "plant_based_tempeh",
+    "en": "Tempeh",
+    "ru": "Темпе",
+    "parent": "plant_based"
+  },
+  "plant_based_seafood": {
+    "slug": "plant_based_seafood",
+    "en": "Plant-based seafood alternatives",
+    "ru": "Растительные аналоги рыбы и морепродуктов",
+    "parent": "plant_based"
+  },
+  "plant_based_eggs": {
+    "slug": "plant_based_eggs",
+    "en": "Plant-based egg alternatives",
+    "ru": "Растительные заменители яиц",
+    "parent": "plant_based"
+  },
+  "plant_based_protein": {
+    "slug": "plant_based_protein",
+    "en": "Textured plant protein",
+    "ru": "Текстурированный растительный белок",
+    "parent": "plant_based"
+  },
+  "plant_based_desserts": {
+    "slug": "plant_based_desserts",
+    "en": "Plant-based desserts",
+    "ru": "Растительные десерты",
+    "parent": "plant_based"
+  },
+  "meat_horse": {
+    "slug": "meat_horse",
+    "en": "Horse meat",
+    "ru": "Конина",
+    "parent": "meat"
+  },
+  "meat_rabbit": {
+    "slug": "meat_rabbit",
+    "en": "Rabbit meat",
+    "ru": "Крольчатина",
+    "parent": "meat"
+  },
+  "meat_duck_goose": {
+    "slug": "meat_duck_goose",
+    "en": "Duck and goose",
+    "ru": "Утка и гусь",
+    "parent": "meat"
+  },
+  "meat_game": {
+    "slug": "meat_game",
+    "en": "Game meat",
+    "ru": "Мясо дичи",
+    "parent": "meat"
+  },
+  "meat_offal": {
+    "slug": "meat_offal",
+    "en": "Offal",
+    "ru": "Субпродукты",
+    "parent": "meat"
+  },
+  "meat_minced": {
+    "slug": "meat_minced",
+    "en": "Minced meat",
+    "ru": "Фарш",
+    "parent": "meat"
+  },
+  "meat_marinated": {
+    "slug": "meat_marinated",
+    "en": "Marinated meat",
+    "ru": "Маринованное мясо",
+    "parent": "meat"
+  },
+  "meat_broth_bones": {
+    "slug": "meat_broth_bones",
+    "en": "Bones and soup cuts",
+    "ru": "Кости и суповые наборы",
+    "parent": "meat"
+  },
+  "seafood_salmon": {
+    "slug": "seafood_salmon",
+    "en": "Salmon and trout",
+    "ru": "Лосось и форель",
+    "parent": "seafood"
+  },
+  "seafood_white_fish": {
+    "slug": "seafood_white_fish",
+    "en": "White fish",
+    "ru": "Белая рыба",
+    "parent": "seafood"
+  },
+  "seafood_freshwater": {
+    "slug": "seafood_freshwater",
+    "en": "Freshwater fish",
+    "ru": "Пресноводная рыба",
+    "parent": "seafood"
+  },
+  "seafood_shrimp": {
+    "slug": "seafood_shrimp",
+    "en": "Shrimp and prawns",
+    "ru": "Креветки",
+    "parent": "seafood"
+  },
+  "seafood_shellfish": {
+    "slug": "seafood_shellfish",
+    "en": "Mussels, oysters and clams",
+    "ru": "Мидии, устрицы и моллюски",
+    "parent": "seafood"
+  },
+  "seafood_squid_octopus": {
+    "slug": "seafood_squid_octopus",
+    "en": "Squid and octopus",
+    "ru": "Кальмары и осьминоги",
+    "parent": "seafood"
+  },
+  "seafood_crab": {
+    "slug": "seafood_crab",
+    "en": "Crab and lobster",
+    "ru": "Крабы и лобстеры",
+    "parent": "seafood"
+  },
+  "seafood_roe": {
+    "slug": "seafood_roe",
+    "en": "Roe and caviar",
+    "ru": "Икра",
+    "parent": "seafood"
+  },
+  "seafood_surimi": {
+    "slug": "seafood_surimi",
+    "en": "Surimi products",
+    "ru": "Крабовые палочки и сурими",
+    "parent": "seafood"
+  },
+  "seafood_seaweed": {
+    "slug": "seafood_seaweed",
+    "en": "Edible seaweed",
+    "ru": "Пищевые водоросли",
+    "parent": "seafood"
+  },
+  "eggs_chicken": {
+    "slug": "eggs_chicken",
+    "en": "Chicken eggs",
+    "ru": "Куриные яйца",
+    "parent": "eggs"
+  },
+  "eggs_quail": {
+    "slug": "eggs_quail",
+    "en": "Quail eggs",
+    "ru": "Перепелиные яйца",
+    "parent": "eggs"
+  },
+  "eggs_other": {
+    "slug": "eggs_other",
+    "en": "Duck and other food eggs",
+    "ru": "Утиные и другие пищевые яйца",
+    "parent": "eggs"
+  },
+  "eggs_liquid": {
+    "slug": "eggs_liquid",
+    "en": "Liquid and dried egg products",
+    "ru": "Жидкие и сухие яичные продукты",
+    "parent": "eggs"
+  },
+  "grocery_staples_legumes": {
+    "slug": "grocery_staples_legumes",
+    "en": "Dried pulses",
+    "ru": "Сухие бобовые",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_baking": {
+    "slug": "grocery_staples_baking",
+    "en": "Baking ingredients",
+    "ru": "Ингредиенты для выпечки",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_breakfast": {
+    "slug": "grocery_staples_breakfast",
+    "en": "Breakfast cereals and granola",
+    "ru": "Сухие завтраки и гранола",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_spreads": {
+    "slug": "grocery_staples_spreads",
+    "en": "Spreads and preserves",
+    "ru": "Пасты, джемы и варенье",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_vinegar": {
+    "slug": "grocery_staples_vinegar",
+    "en": "Vinegar and cooking wine",
+    "ru": "Уксус и кулинарное вино",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_instant": {
+    "slug": "grocery_staples_instant",
+    "en": "Instant meals",
+    "ru": "Продукты быстрого приготовления",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_broths": {
+    "slug": "grocery_staples_broths",
+    "en": "Stock cubes and soup bases",
+    "ru": "Бульонные кубики и основы для супа",
+    "parent": "grocery_staples"
+  },
+  "grocery_staples_legumes_lentils": {
+    "slug": "grocery_staples_legumes_lentils",
+    "en": "Lentils",
+    "ru": "Чечевица",
+    "parent": "grocery_staples_legumes"
+  },
+  "grocery_staples_legumes_chickpeas": {
+    "slug": "grocery_staples_legumes_chickpeas",
+    "en": "Chickpeas",
+    "ru": "Нут",
+    "parent": "grocery_staples_legumes"
+  },
+  "grocery_staples_legumes_beans": {
+    "slug": "grocery_staples_legumes_beans",
+    "en": "Dried beans",
+    "ru": "Сухая фасоль",
+    "parent": "grocery_staples_legumes"
+  },
+  "grocery_staples_legumes_peas": {
+    "slug": "grocery_staples_legumes_peas",
+    "en": "Dried peas",
+    "ru": "Сухой горох",
+    "parent": "grocery_staples_legumes"
+  },
+  "grocery_staples_legumes_soybeans": {
+    "slug": "grocery_staples_legumes_soybeans",
+    "en": "Soybeans",
+    "ru": "Соевые бобы",
+    "parent": "grocery_staples_legumes"
+  },
+  "grocery_staples_baking_yeast": {
+    "slug": "grocery_staples_baking_yeast",
+    "en": "Yeast",
+    "ru": "Дрожжи",
+    "parent": "grocery_staples_baking"
+  },
+  "grocery_staples_baking_baking_powder": {
+    "slug": "grocery_staples_baking_baking_powder",
+    "en": "Baking powder and baking soda",
+    "ru": "Разрыхлитель и пищевая сода",
+    "parent": "grocery_staples_baking"
+  },
+  "grocery_staples_baking_starch": {
+    "slug": "grocery_staples_baking_starch",
+    "en": "Food starch",
+    "ru": "Пищевой крахмал",
+    "parent": "grocery_staples_baking"
+  },
+  "grocery_staples_baking_cocoa": {
+    "slug": "grocery_staples_baking_cocoa",
+    "en": "Cocoa powder",
+    "ru": "Какао-порошок",
+    "parent": "grocery_staples_baking"
+  },
+  "grocery_staples_baking_thickeners": {
+    "slug": "grocery_staples_baking_thickeners",
+    "en": "Gelatin, agar and pectin",
+    "ru": "Желатин, агар и пектин",
+    "parent": "grocery_staples_baking"
+  },
+  "grocery_staples_baking_flavourings": {
+    "slug": "grocery_staples_baking_flavourings",
+    "en": "Baking flavours and decorations",
+    "ru": "Ароматизаторы и декор для выпечки",
+    "parent": "grocery_staples_baking"
+  },
+  "grocery_staples_baking_mixes": {
+    "slug": "grocery_staples_baking_mixes",
+    "en": "Baking mixes",
+    "ru": "Смеси для выпечки",
+    "parent": "grocery_staples_baking"
+  },
+  "beverages_mineral_water": {
+    "slug": "beverages_mineral_water",
+    "en": "Mineral water",
+    "ru": "Минеральная вода",
+    "parent": "beverages"
+  },
+  "beverages_sparkling_water": {
+    "slug": "beverages_sparkling_water",
+    "en": "Sparkling water",
+    "ru": "Газированная вода",
+    "parent": "beverages"
+  },
+  "beverages_cordials": {
+    "slug": "beverages_cordials",
+    "en": "Syrups and drink concentrates",
+    "ru": "Сиропы и концентраты напитков",
+    "parent": "beverages"
+  },
+  "beverages_kvass": {
+    "slug": "beverages_kvass",
+    "en": "Kvass",
+    "ru": "Квас",
+    "parent": "beverages"
+  },
+  "beverages_kombucha": {
+    "slug": "beverages_kombucha",
+    "en": "Kombucha",
+    "ru": "Комбуча",
+    "parent": "beverages"
+  },
+  "beverages_iced_tea": {
+    "slug": "beverages_iced_tea",
+    "en": "Iced tea and coffee",
+    "ru": "Холодный чай и кофе",
+    "parent": "beverages"
+  },
+  "beverages_sports": {
+    "slug": "beverages_sports",
+    "en": "Sports and electrolyte drinks",
+    "ru": "Спортивные и электролитные напитки",
+    "parent": "beverages"
+  },
+  "beverages_cocoa_drinks": {
+    "slug": "beverages_cocoa_drinks",
+    "en": "Cocoa and chocolate drinks",
+    "ru": "Какао и шоколадные напитки",
+    "parent": "beverages"
+  },
+  "beverages_nonalcoholic": {
+    "slug": "beverages_nonalcoholic",
+    "en": "Non-alcoholic beer and wine",
+    "ru": "Безалкогольные пиво и вино",
+    "parent": "beverages"
+  },
+  "snacks_popcorn": {
+    "slug": "snacks_popcorn",
+    "en": "Popcorn",
+    "ru": "Попкорн",
+    "parent": "snacks"
+  },
+  "snacks_pretzels": {
+    "slug": "snacks_pretzels",
+    "en": "Pretzels and bread snacks",
+    "ru": "Крендельки и хлебные снеки",
+    "parent": "snacks"
+  },
+  "snacks_fruit": {
+    "slug": "snacks_fruit",
+    "en": "Fruit chips and fruit snacks",
+    "ru": "Фруктовые чипсы и снеки",
+    "parent": "snacks"
+  },
+  "snacks_seaweed": {
+    "slug": "snacks_seaweed",
+    "en": "Seaweed snacks",
+    "ru": "Снеки из водорослей",
+    "parent": "snacks"
+  },
+  "snacks_protein": {
+    "slug": "snacks_protein",
+    "en": "Protein and energy bars",
+    "ru": "Протеиновые и энергетические батончики",
+    "parent": "snacks"
+  },
+  "snacks_corn_rice": {
+    "slug": "snacks_corn_rice",
+    "en": "Corn and rice cakes",
+    "ru": "Кукурузные и рисовые хлебцы",
+    "parent": "snacks"
+  },
+  "sweets_gummies": {
+    "slug": "sweets_gummies",
+    "en": "Gummies and jelly sweets",
+    "ru": "Мармелад и желейные конфеты",
+    "parent": "sweets"
+  },
+  "sweets_marshmallows": {
+    "slug": "sweets_marshmallows",
+    "en": "Marshmallows and zephyr",
+    "ru": "Маршмеллоу и зефир",
+    "parent": "sweets"
+  },
+  "sweets_caramels": {
+    "slug": "sweets_caramels",
+    "en": "Caramels and toffees",
+    "ru": "Карамель и ирис",
+    "parent": "sweets"
+  },
+  "sweets_halva": {
+    "slug": "sweets_halva",
+    "en": "Halva and nougat",
+    "ru": "Халва и нуга",
+    "parent": "sweets"
+  },
+  "sweets_waffles": {
+    "slug": "sweets_waffles",
+    "en": "Wafers and waffles",
+    "ru": "Вафли",
+    "parent": "sweets"
+  },
+  "sweets_gum": {
+    "slug": "sweets_gum",
+    "en": "Chewing gum and mints",
+    "ru": "Жевательная резинка и мятные конфеты",
+    "parent": "sweets"
+  },
+  "sweets_gift_boxes": {
+    "slug": "sweets_gift_boxes",
+    "en": "Confectionery gift boxes",
+    "ru": "Подарочные наборы сладостей",
+    "parent": "sweets"
+  },
+  "frozen_fruit": {
+    "slug": "frozen_fruit",
+    "en": "Frozen fruit",
+    "ru": "Замороженные фрукты",
+    "parent": "frozen"
+  },
+  "frozen_berries": {
+    "slug": "frozen_berries",
+    "en": "Frozen berries",
+    "ru": "Замороженные ягоды",
+    "parent": "frozen"
+  },
+  "frozen_mushrooms": {
+    "slug": "frozen_mushrooms",
+    "en": "Frozen mushrooms",
+    "ru": "Замороженные грибы",
+    "parent": "frozen"
+  },
+  "frozen_potatoes": {
+    "slug": "frozen_potatoes",
+    "en": "Frozen potatoes and fries",
+    "ru": "Замороженный картофель и фри",
+    "parent": "frozen"
+  },
+  "frozen_pizza": {
+    "slug": "frozen_pizza",
+    "en": "Frozen pizza",
+    "ru": "Замороженная пицца",
+    "parent": "frozen"
+  },
+  "frozen_dumplings": {
+    "slug": "frozen_dumplings",
+    "en": "Frozen dumplings and filled pasta",
+    "ru": "Замороженные пельмени, вареники и манты",
+    "parent": "frozen"
+  },
+  "frozen_bakery": {
+    "slug": "frozen_bakery",
+    "en": "Frozen bakery products",
+    "ru": "Замороженная выпечка",
+    "parent": "frozen"
+  },
+  "frozen_desserts": {
+    "slug": "frozen_desserts",
+    "en": "Frozen desserts and sorbets",
+    "ru": "Замороженные десерты и сорбеты",
+    "parent": "frozen"
+  },
+  "frozen_ice": {
+    "slug": "frozen_ice",
+    "en": "Food ice",
+    "ru": "Пищевой лёд",
+    "parent": "frozen"
+  },
+  "ready_meals_sandwiches": {
+    "slug": "ready_meals_sandwiches",
+    "en": "Sandwiches and wraps",
+    "ru": "Сэндвичи и роллы",
+    "parent": "ready_meals"
+  },
+  "ready_meals_main_courses": {
+    "slug": "ready_meals_main_courses",
+    "en": "Main courses",
+    "ru": "Вторые блюда",
+    "parent": "ready_meals"
+  },
+  "ready_meals_side_dishes": {
+    "slug": "ready_meals_side_dishes",
+    "en": "Side dishes",
+    "ru": "Гарниры",
+    "parent": "ready_meals"
+  },
+  "ready_meals_sushi": {
+    "slug": "ready_meals_sushi",
+    "en": "Sushi and rolls",
+    "ru": "Суши и роллы",
+    "parent": "ready_meals"
+  },
+  "ready_meals_appetizers": {
+    "slug": "ready_meals_appetizers",
+    "en": "Dips and appetizers",
+    "ru": "Закуски и дипы",
+    "parent": "ready_meals"
+  },
+  "ready_meals_meal_kits": {
+    "slug": "ready_meals_meal_kits",
+    "en": "Meal kits",
+    "ru": "Наборы для приготовления блюд",
+    "parent": "ready_meals"
+  },
+  "baby_feeding": {
+    "slug": "baby_feeding",
+    "en": "Feeding accessories",
+    "ru": "Принадлежности для кормления",
+    "parent": "baby"
+  },
+  "baby_nursery": {
+    "slug": "baby_nursery",
+    "en": "Nursery furniture and equipment",
+    "ru": "Мебель и оборудование для младенцев",
+    "parent": "baby"
+  },
+  "baby_transport": {
+    "slug": "baby_transport",
+    "en": "Strollers and child carriers",
+    "ru": "Коляски и переноски",
+    "parent": "baby"
+  },
+  "baby_safety": {
+    "slug": "baby_safety",
+    "en": "Child safety",
+    "ru": "Детская безопасность",
+    "parent": "baby"
+  },
+  "baby_potty": {
+    "slug": "baby_potty",
+    "en": "Potties and toilet training",
+    "ru": "Горшки и приучение к туалету",
+    "parent": "baby"
+  },
+  "baby_bath": {
+    "slug": "baby_bath",
+    "en": "Baby bathing",
+    "ru": "Купание младенцев",
+    "parent": "baby"
+  },
+  "baby_feeding_bottles": {
+    "slug": "baby_feeding_bottles",
+    "en": "Bottles and nipples",
+    "ru": "Бутылочки и соски",
+    "parent": "baby_feeding"
+  },
+  "baby_feeding_pacifiers": {
+    "slug": "baby_feeding_pacifiers",
+    "en": "Pacifiers",
+    "ru": "Пустышки",
+    "parent": "baby_feeding"
+  },
+  "baby_feeding_utensils": {
+    "slug": "baby_feeding_utensils",
+    "en": "Baby tableware and bibs",
+    "ru": "Детская посуда и нагрудники",
+    "parent": "baby_feeding"
+  },
+  "baby_feeding_pumps": {
+    "slug": "baby_feeding_pumps",
+    "en": "Breast pumps and accessories",
+    "ru": "Молокоотсосы и аксессуары",
+    "parent": "baby_feeding"
+  },
+  "baby_feeding_sterilizers": {
+    "slug": "baby_feeding_sterilizers",
+    "en": "Bottle warmers and sterilizers",
+    "ru": "Подогреватели и стерилизаторы",
+    "parent": "baby_feeding"
+  },
+  "pet_birds": {
+    "slug": "pet_birds",
+    "en": "Bird supplies",
+    "ru": "Товары для птиц",
+    "parent": "pet"
+  },
+  "pet_fish": {
+    "slug": "pet_fish",
+    "en": "Aquarium supplies",
+    "ru": "Аквариумистика",
+    "parent": "pet"
+  },
+  "pet_small_animals": {
+    "slug": "pet_small_animals",
+    "en": "Small animal supplies",
+    "ru": "Товары для мелких животных",
+    "parent": "pet"
+  },
+  "pet_reptiles": {
+    "slug": "pet_reptiles",
+    "en": "Reptile supplies",
+    "ru": "Товары для рептилий",
+    "parent": "pet"
+  },
+  "pet_accessories": {
+    "slug": "pet_accessories",
+    "en": "Pet accessories",
+    "ru": "Аксессуары для животных",
+    "parent": "pet"
+  },
+  "pet_grooming": {
+    "slug": "pet_grooming",
+    "en": "Pet grooming",
+    "ru": "Уход за шерстью и когтями",
+    "parent": "pet"
+  },
+  "pet_beds": {
+    "slug": "pet_beds",
+    "en": "Pet beds and houses",
+    "ru": "Лежанки и домики",
+    "parent": "pet"
+  },
+  "pet_travel": {
+    "slug": "pet_travel",
+    "en": "Pet carriers and travel",
+    "ru": "Переноски и перевозка животных",
+    "parent": "pet"
+  },
+  "pet_accessories_bowls": {
+    "slug": "pet_accessories_bowls",
+    "en": "Bowls and feeders",
+    "ru": "Миски и кормушки",
+    "parent": "pet_accessories"
+  },
+  "pet_accessories_leads": {
+    "slug": "pet_accessories_leads",
+    "en": "Leads, collars and harnesses",
+    "ru": "Поводки, ошейники и шлейки",
+    "parent": "pet_accessories"
+  },
+  "pet_accessories_toys": {
+    "slug": "pet_accessories_toys",
+    "en": "Pet toys",
+    "ru": "Игрушки для животных",
+    "parent": "pet_accessories"
+  },
+  "pet_accessories_scratching": {
+    "slug": "pet_accessories_scratching",
+    "en": "Scratching posts and climbing trees",
+    "ru": "Когтеточки и игровые комплексы",
+    "parent": "pet_accessories"
+  },
+  "household_cleaning_tools": {
+    "slug": "household_cleaning_tools",
+    "en": "Cleaning tools",
+    "ru": "Инвентарь для уборки",
+    "parent": "household"
+  },
+  "household_storage": {
+    "slug": "household_storage",
+    "en": "Home storage and organization",
+    "ru": "Хранение и организация дома",
+    "parent": "household"
+  },
+  "household_kitchenware": {
+    "slug": "household_kitchenware",
+    "en": "Kitchenware",
+    "ru": "Кухонные принадлежности",
+    "parent": "household"
+  },
+  "household_tableware": {
+    "slug": "household_tableware",
+    "en": "Tableware",
+    "ru": "Столовая посуда",
+    "parent": "household"
+  },
+  "household_disposable": {
+    "slug": "household_disposable",
+    "en": "Disposable tableware",
+    "ru": "Одноразовая посуда",
+    "parent": "household"
+  },
+  "household_pest_control": {
+    "slug": "household_pest_control",
+    "en": "Household pest control",
+    "ru": "Средства от бытовых вредителей",
+    "parent": "household"
+  },
+  "household_air_care": {
+    "slug": "household_air_care",
+    "en": "Air fresheners and odour absorbers",
+    "ru": "Освежители и поглотители запаха",
+    "parent": "household"
+  },
+  "household_shoe_care": {
+    "slug": "household_shoe_care",
+    "en": "Shoe and leather care",
+    "ru": "Уход за обувью и кожей",
+    "parent": "household"
+  },
+  "household_cleaning_tools_mops": {
+    "slug": "household_cleaning_tools_mops",
+    "en": "Mops and buckets",
+    "ru": "Швабры и вёдра",
+    "parent": "household_cleaning_tools"
+  },
+  "household_cleaning_tools_brushes": {
+    "slug": "household_cleaning_tools_brushes",
+    "en": "Brushes and brooms",
+    "ru": "Щётки и веники",
+    "parent": "household_cleaning_tools"
+  },
+  "household_cleaning_tools_cloths": {
+    "slug": "household_cleaning_tools_cloths",
+    "en": "Cloths and sponges",
+    "ru": "Тряпки и губки",
+    "parent": "household_cleaning_tools"
+  },
+  "household_cleaning_tools_gloves": {
+    "slug": "household_cleaning_tools_gloves",
+    "en": "Cleaning gloves",
+    "ru": "Перчатки для уборки",
+    "parent": "household_cleaning_tools"
+  },
+  "household_cleaning_tools_bins": {
+    "slug": "household_cleaning_tools_bins",
+    "en": "Waste bins",
+    "ru": "Мусорные вёдра",
+    "parent": "household_cleaning_tools"
+  },
+  "household_kitchenware_cookware": {
+    "slug": "household_kitchenware_cookware",
+    "en": "Pots and pans",
+    "ru": "Кастрюли и сковороды",
+    "parent": "household_kitchenware"
+  },
+  "household_kitchenware_bakeware": {
+    "slug": "household_kitchenware_bakeware",
+    "en": "Baking trays and moulds",
+    "ru": "Противни и формы для выпечки",
+    "parent": "household_kitchenware"
+  },
+  "household_kitchenware_cutlery": {
+    "slug": "household_kitchenware_cutlery",
+    "en": "Cutlery",
+    "ru": "Столовые приборы",
+    "parent": "household_kitchenware"
+  },
+  "household_kitchenware_utensils": {
+    "slug": "household_kitchenware_utensils",
+    "en": "Cooking utensils",
+    "ru": "Кухонные инструменты",
+    "parent": "household_kitchenware"
+  },
+  "household_kitchenware_cutting_boards": {
+    "slug": "household_kitchenware_cutting_boards",
+    "en": "Cutting boards",
+    "ru": "Разделочные доски",
+    "parent": "household_kitchenware"
+  },
+  "household_kitchenware_food_storage": {
+    "slug": "household_kitchenware_food_storage",
+    "en": "Food storage containers",
+    "ru": "Контейнеры для продуктов",
+    "parent": "household_kitchenware"
+  },
+  "household_kitchenware_thermoses": {
+    "slug": "household_kitchenware_thermoses",
+    "en": "Thermoses and reusable bottles",
+    "ru": "Термосы и многоразовые бутылки",
+    "parent": "household_kitchenware"
+  },
+  "personal_care_soap": {
+    "slug": "personal_care_soap",
+    "en": "Hand soap and sanitizing gels",
+    "ru": "Мыло для рук и очищающие гели",
+    "parent": "personal_care"
+  },
+  "personal_care_deodorants": {
+    "slug": "personal_care_deodorants",
+    "en": "Deodorants and antiperspirants",
+    "ru": "Дезодоранты и антиперспиранты",
+    "parent": "personal_care"
+  },
+  "personal_care_menstrual": {
+    "slug": "personal_care_menstrual",
+    "en": "Menstrual care",
+    "ru": "Менструальная гигиена",
+    "parent": "personal_care"
+  },
+  "personal_care_incontinence": {
+    "slug": "personal_care_incontinence",
+    "en": "Incontinence care",
+    "ru": "Средства при недержании",
+    "parent": "personal_care"
+  },
+  "personal_care_cotton": {
+    "slug": "personal_care_cotton",
+    "en": "Cotton pads and swabs",
+    "ru": "Ватные диски и палочки",
+    "parent": "personal_care"
+  },
+  "personal_care_sun": {
+    "slug": "personal_care_sun",
+    "en": "Sun protection and after-sun care",
+    "ru": "Защита от солнца и уход после загара",
+    "parent": "personal_care"
+  },
+  "personal_care_travel": {
+    "slug": "personal_care_travel",
+    "en": "Travel toiletries",
+    "ru": "Дорожные средства гигиены",
+    "parent": "personal_care"
+  },
+  "personal_care_oral_toothpaste": {
+    "slug": "personal_care_oral_toothpaste",
+    "en": "Toothpaste",
+    "ru": "Зубная паста",
+    "parent": "personal_care_oral"
+  },
+  "personal_care_oral_brushes": {
+    "slug": "personal_care_oral_brushes",
+    "en": "Toothbrushes",
+    "ru": "Зубные щётки",
+    "parent": "personal_care_oral"
+  },
+  "personal_care_oral_floss": {
+    "slug": "personal_care_oral_floss",
+    "en": "Dental floss and interdental brushes",
+    "ru": "Зубная нить и межзубные ёршики",
+    "parent": "personal_care_oral"
+  },
+  "personal_care_oral_mouthwash": {
+    "slug": "personal_care_oral_mouthwash",
+    "en": "Mouthwash",
+    "ru": "Ополаскиватели для рта",
+    "parent": "personal_care_oral"
+  },
+  "personal_care_oral_dentures": {
+    "slug": "personal_care_oral_dentures",
+    "en": "Denture care",
+    "ru": "Уход за зубными протезами",
+    "parent": "personal_care_oral"
+  },
+  "health_medical_devices": {
+    "slug": "health_medical_devices",
+    "en": "Home medical devices",
+    "ru": "Домашние медицинские приборы",
+    "parent": "health"
+  },
+  "health_mobility": {
+    "slug": "health_mobility",
+    "en": "Mobility aids",
+    "ru": "Средства реабилитации и передвижения",
+    "parent": "health"
+  },
+  "health_orthopedic": {
+    "slug": "health_orthopedic",
+    "en": "Orthopedic supports",
+    "ru": "Ортопедические изделия",
+    "parent": "health"
+  },
+  "health_medical_consumables": {
+    "slug": "health_medical_consumables",
+    "en": "Medical consumables",
+    "ru": "Медицинские расходные материалы",
+    "parent": "health"
+  },
+  "health_medicines": {
+    "slug": "health_medicines",
+    "en": "Medicines",
+    "ru": "Лекарственные средства",
+    "parent": "health"
+  },
+  "health_nutrition": {
+    "slug": "health_nutrition",
+    "en": "Specialized nutrition",
+    "ru": "Специализированное питание",
+    "parent": "health"
+  },
+  "health_medical_devices_thermometers": {
+    "slug": "health_medical_devices_thermometers",
+    "en": "Thermometers",
+    "ru": "Термометры",
+    "parent": "health_medical_devices"
+  },
+  "health_medical_devices_blood_pressure": {
+    "slug": "health_medical_devices_blood_pressure",
+    "en": "Blood pressure monitors",
+    "ru": "Тонометры",
+    "parent": "health_medical_devices"
+  },
+  "health_medical_devices_glucose": {
+    "slug": "health_medical_devices_glucose",
+    "en": "Glucose meters and test strips",
+    "ru": "Глюкометры и тест-полоски",
+    "parent": "health_medical_devices"
+  },
+  "health_medical_devices_nebulizers": {
+    "slug": "health_medical_devices_nebulizers",
+    "en": "Nebulizers",
+    "ru": "Небулайзеры",
+    "parent": "health_medical_devices"
+  },
+  "health_medical_devices_pulse_oximeters": {
+    "slug": "health_medical_devices_pulse_oximeters",
+    "en": "Pulse oximeters",
+    "ru": "Пульсоксиметры",
+    "parent": "health_medical_devices"
+  },
+  "beauty_face_care": {
+    "slug": "beauty_face_care",
+    "en": "Facial skin care",
+    "ru": "Уход за кожей лица",
+    "parent": "beauty"
+  },
+  "beauty_makeup": {
+    "slug": "beauty_makeup",
+    "en": "Makeup",
+    "ru": "Декоративная косметика",
+    "parent": "beauty"
+  },
+  "beauty_fragrance": {
+    "slug": "beauty_fragrance",
+    "en": "Fragrances",
+    "ru": "Парфюмерия",
+    "parent": "beauty"
+  },
+  "beauty_nails": {
+    "slug": "beauty_nails",
+    "en": "Nail care and colour",
+    "ru": "Маникюр и средства для ногтей",
+    "parent": "beauty"
+  },
+  "beauty_hair_colour": {
+    "slug": "beauty_hair_colour",
+    "en": "Hair colour and styling",
+    "ru": "Окрашивание и укладка волос",
+    "parent": "beauty"
+  },
+  "beauty_accessories": {
+    "slug": "beauty_accessories",
+    "en": "Beauty tools and accessories",
+    "ru": "Косметические инструменты и аксессуары",
+    "parent": "beauty"
+  },
+  "beauty_salon": {
+    "slug": "beauty_salon",
+    "en": "Salon supplies",
+    "ru": "Товары для салонов красоты",
+    "parent": "beauty"
+  },
+  "beauty_face_care_cleansers": {
+    "slug": "beauty_face_care_cleansers",
+    "en": "Face cleansers",
+    "ru": "Средства для умывания",
+    "parent": "beauty_face_care"
+  },
+  "beauty_face_care_moisturizers": {
+    "slug": "beauty_face_care_moisturizers",
+    "en": "Face moisturizers",
+    "ru": "Увлажняющие кремы для лица",
+    "parent": "beauty_face_care"
+  },
+  "beauty_face_care_serums": {
+    "slug": "beauty_face_care_serums",
+    "en": "Serums and treatments",
+    "ru": "Сыворотки и средства специального ухода",
+    "parent": "beauty_face_care"
+  },
+  "beauty_face_care_masks": {
+    "slug": "beauty_face_care_masks",
+    "en": "Face masks",
+    "ru": "Маски для лица",
+    "parent": "beauty_face_care"
+  },
+  "beauty_face_care_lip_care": {
+    "slug": "beauty_face_care_lip_care",
+    "en": "Lip care",
+    "ru": "Уход за губами",
+    "parent": "beauty_face_care"
+  },
+  "beauty_makeup_face": {
+    "slug": "beauty_makeup_face",
+    "en": "Foundation, powder and concealer",
+    "ru": "Тональные средства, пудры и консилеры",
+    "parent": "beauty_makeup"
+  },
+  "beauty_makeup_eyes": {
+    "slug": "beauty_makeup_eyes",
+    "en": "Eye makeup",
+    "ru": "Косметика для глаз",
+    "parent": "beauty_makeup"
+  },
+  "beauty_makeup_lips": {
+    "slug": "beauty_makeup_lips",
+    "en": "Lip makeup",
+    "ru": "Косметика для губ",
+    "parent": "beauty_makeup"
+  },
+  "beauty_makeup_brows": {
+    "slug": "beauty_makeup_brows",
+    "en": "Brow makeup",
+    "ru": "Косметика для бровей",
+    "parent": "beauty_makeup"
+  },
+  "beauty_makeup_sets": {
+    "slug": "beauty_makeup_sets",
+    "en": "Makeup sets",
+    "ru": "Наборы декоративной косметики",
+    "parent": "beauty_makeup"
+  },
+  "stationery_notebooks": {
+    "slug": "stationery_notebooks",
+    "en": "Notebooks and diaries",
+    "ru": "Тетради и ежедневники",
+    "parent": "stationery"
+  },
+  "stationery_filing": {
+    "slug": "stationery_filing",
+    "en": "Folders and document filing",
+    "ru": "Папки и хранение документов",
+    "parent": "stationery"
+  },
+  "stationery_adhesives": {
+    "slug": "stationery_adhesives",
+    "en": "Office tapes and adhesives",
+    "ru": "Канцелярские ленты и клеи",
+    "parent": "stationery"
+  },
+  "stationery_desk": {
+    "slug": "stationery_desk",
+    "en": "Desk accessories",
+    "ru": "Настольные канцелярские принадлежности",
+    "parent": "stationery"
+  },
+  "stationery_school": {
+    "slug": "stationery_school",
+    "en": "School supplies",
+    "ru": "Школьные принадлежности",
+    "parent": "stationery"
+  },
+  "stationery_mailing": {
+    "slug": "stationery_mailing",
+    "en": "Mailing supplies",
+    "ru": "Почтовые принадлежности",
+    "parent": "stationery"
+  },
+  "stationery_presentation": {
+    "slug": "stationery_presentation",
+    "en": "Whiteboards and presentation supplies",
+    "ru": "Доски и товары для презентаций",
+    "parent": "stationery"
+  },
+  "stationery_labels": {
+    "slug": "stationery_labels",
+    "en": "Labels and stickers",
+    "ru": "Этикетки и наклейки",
+    "parent": "stationery"
+  },
+  "electronics_computers": {
+    "slug": "electronics_computers",
+    "en": "Computers",
+    "ru": "Компьютеры",
+    "parent": "electronics"
+  },
+  "electronics_components": {
+    "slug": "electronics_components",
+    "en": "Computer components",
+    "ru": "Компьютерные комплектующие",
+    "parent": "electronics"
+  },
+  "electronics_peripherals": {
+    "slug": "electronics_peripherals",
+    "en": "Computer peripherals",
+    "ru": "Компьютерная периферия",
+    "parent": "electronics"
+  },
+  "electronics_phones": {
+    "slug": "electronics_phones",
+    "en": "Phones and tablets",
+    "ru": "Телефоны и планшеты",
+    "parent": "electronics"
+  },
+  "electronics_network": {
+    "slug": "electronics_network",
+    "en": "Networking equipment",
+    "ru": "Сетевое оборудование",
+    "parent": "electronics"
+  },
+  "electronics_audio": {
+    "slug": "electronics_audio",
+    "en": "Audio equipment",
+    "ru": "Аудиотехника",
+    "parent": "electronics"
+  },
+  "electronics_tv": {
+    "slug": "electronics_tv",
+    "en": "Televisions and video",
+    "ru": "Телевизоры и видеотехника",
+    "parent": "electronics"
+  },
+  "electronics_photo": {
+    "slug": "electronics_photo",
+    "en": "Photo and video cameras",
+    "ru": "Фото- и видеокамеры",
+    "parent": "electronics"
+  },
+  "electronics_gaming": {
+    "slug": "electronics_gaming",
+    "en": "Gaming equipment",
+    "ru": "Игровое оборудование",
+    "parent": "electronics"
+  },
+  "electronics_wearables": {
+    "slug": "electronics_wearables",
+    "en": "Wearable electronics",
+    "ru": "Носимая электроника",
+    "parent": "electronics"
+  },
+  "electronics_smart_home": {
+    "slug": "electronics_smart_home",
+    "en": "Smart home",
+    "ru": "Умный дом",
+    "parent": "electronics"
+  },
+  "electronics_parts": {
+    "slug": "electronics_parts",
+    "en": "Electronic components",
+    "ru": "Электронные компоненты",
+    "parent": "electronics"
+  },
+  "electronics_computers_laptops": {
+    "slug": "electronics_computers_laptops",
+    "en": "Laptops",
+    "ru": "Ноутбуки",
+    "parent": "electronics_computers"
+  },
+  "electronics_computers_desktops": {
+    "slug": "electronics_computers_desktops",
+    "en": "Desktop computers",
+    "ru": "Настольные компьютеры",
+    "parent": "electronics_computers"
+  },
+  "electronics_computers_servers": {
+    "slug": "electronics_computers_servers",
+    "en": "Servers and workstations",
+    "ru": "Серверы и рабочие станции",
+    "parent": "electronics_computers"
+  },
+  "electronics_computers_single_board": {
+    "slug": "electronics_computers_single_board",
+    "en": "Single-board computers",
+    "ru": "Одноплатные компьютеры",
+    "parent": "electronics_computers"
+  },
+  "electronics_components_processors": {
+    "slug": "electronics_components_processors",
+    "en": "Processors",
+    "ru": "Процессоры",
+    "parent": "electronics_components"
+  },
+  "electronics_components_motherboards": {
+    "slug": "electronics_components_motherboards",
+    "en": "Motherboards",
+    "ru": "Материнские платы",
+    "parent": "electronics_components"
+  },
+  "electronics_components_memory": {
+    "slug": "electronics_components_memory",
+    "en": "Memory modules",
+    "ru": "Оперативная память",
+    "parent": "electronics_components"
+  },
+  "electronics_components_storage": {
+    "slug": "electronics_components_storage",
+    "en": "Internal drives",
+    "ru": "Внутренние накопители",
+    "parent": "electronics_components"
+  },
+  "electronics_components_graphics": {
+    "slug": "electronics_components_graphics",
+    "en": "Graphics cards",
+    "ru": "Видеокарты",
+    "parent": "electronics_components"
+  },
+  "electronics_components_power": {
+    "slug": "electronics_components_power",
+    "en": "Computer power supplies",
+    "ru": "Блоки питания для компьютеров",
+    "parent": "electronics_components"
+  },
+  "electronics_components_cooling": {
+    "slug": "electronics_components_cooling",
+    "en": "Cooling systems",
+    "ru": "Системы охлаждения",
+    "parent": "electronics_components"
+  },
+  "electronics_components_cases": {
+    "slug": "electronics_components_cases",
+    "en": "Computer cases",
+    "ru": "Корпуса компьютеров",
+    "parent": "electronics_components"
+  },
+  "electronics_peripherals_monitors": {
+    "slug": "electronics_peripherals_monitors",
+    "en": "Monitors",
+    "ru": "Мониторы",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_peripherals_keyboards": {
+    "slug": "electronics_peripherals_keyboards",
+    "en": "Keyboards",
+    "ru": "Клавиатуры",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_peripherals_mice": {
+    "slug": "electronics_peripherals_mice",
+    "en": "Mice and pointing devices",
+    "ru": "Мыши и устройства ввода",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_peripherals_printers": {
+    "slug": "electronics_peripherals_printers",
+    "en": "Printers and scanners",
+    "ru": "Принтеры и сканеры",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_peripherals_ink": {
+    "slug": "electronics_peripherals_ink",
+    "en": "Ink, toner and cartridges",
+    "ru": "Чернила, тонер и картриджи",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_peripherals_external_storage": {
+    "slug": "electronics_peripherals_external_storage",
+    "en": "External drives and memory cards",
+    "ru": "Внешние накопители и карты памяти",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_peripherals_webcams": {
+    "slug": "electronics_peripherals_webcams",
+    "en": "Webcams",
+    "ru": "Веб-камеры",
+    "parent": "electronics_peripherals"
+  },
+  "electronics_phones_smartphones": {
+    "slug": "electronics_phones_smartphones",
+    "en": "Smartphones",
+    "ru": "Смартфоны",
+    "parent": "electronics_phones"
+  },
+  "electronics_phones_feature_phones": {
+    "slug": "electronics_phones_feature_phones",
+    "en": "Feature phones",
+    "ru": "Кнопочные телефоны",
+    "parent": "electronics_phones"
+  },
+  "electronics_phones_tablets": {
+    "slug": "electronics_phones_tablets",
+    "en": "Tablets",
+    "ru": "Планшеты",
+    "parent": "electronics_phones"
+  },
+  "electronics_phones_cases": {
+    "slug": "electronics_phones_cases",
+    "en": "Phone and tablet cases",
+    "ru": "Чехлы для телефонов и планшетов",
+    "parent": "electronics_phones"
+  },
+  "electronics_phones_screen_protection": {
+    "slug": "electronics_phones_screen_protection",
+    "en": "Screen protectors",
+    "ru": "Защита экранов",
+    "parent": "electronics_phones"
+  },
+  "electronics_phones_chargers": {
+    "slug": "electronics_phones_chargers",
+    "en": "Chargers and power banks",
+    "ru": "Зарядные устройства и пауэрбанки",
+    "parent": "electronics_phones"
+  },
+  "electronics_network_routers": {
+    "slug": "electronics_network_routers",
+    "en": "Routers and access points",
+    "ru": "Роутеры и точки доступа",
+    "parent": "electronics_network"
+  },
+  "electronics_network_switches": {
+    "slug": "electronics_network_switches",
+    "en": "Network switches",
+    "ru": "Сетевые коммутаторы",
+    "parent": "electronics_network"
+  },
+  "electronics_network_modems": {
+    "slug": "electronics_network_modems",
+    "en": "Modems",
+    "ru": "Модемы",
+    "parent": "electronics_network"
+  },
+  "electronics_network_adapters": {
+    "slug": "electronics_network_adapters",
+    "en": "Network adapters",
+    "ru": "Сетевые адаптеры",
+    "parent": "electronics_network"
+  },
+  "electronics_network_cables": {
+    "slug": "electronics_network_cables",
+    "en": "Network cables and connectors",
+    "ru": "Сетевые кабели и разъёмы",
+    "parent": "electronics_network"
+  },
+  "electronics_audio_headphones": {
+    "slug": "electronics_audio_headphones",
+    "en": "Headphones and headsets",
+    "ru": "Наушники и гарнитуры",
+    "parent": "electronics_audio"
+  },
+  "electronics_audio_speakers": {
+    "slug": "electronics_audio_speakers",
+    "en": "Speakers",
+    "ru": "Колонки",
+    "parent": "electronics_audio"
+  },
+  "electronics_audio_microphones": {
+    "slug": "electronics_audio_microphones",
+    "en": "Microphones",
+    "ru": "Микрофоны",
+    "parent": "electronics_audio"
+  },
+  "electronics_audio_amplifiers": {
+    "slug": "electronics_audio_amplifiers",
+    "en": "Amplifiers and receivers",
+    "ru": "Усилители и ресиверы",
+    "parent": "electronics_audio"
+  },
+  "electronics_audio_players": {
+    "slug": "electronics_audio_players",
+    "en": "Audio players and turntables",
+    "ru": "Аудиоплееры и проигрыватели",
+    "parent": "electronics_audio"
+  },
+  "electronics_parts_passive": {
+    "slug": "electronics_parts_passive",
+    "en": "Resistors, capacitors and inductors",
+    "ru": "Резисторы, конденсаторы и катушки",
+    "parent": "electronics_parts"
+  },
+  "electronics_parts_semiconductors": {
+    "slug": "electronics_parts_semiconductors",
+    "en": "Semiconductors and integrated circuits",
+    "ru": "Полупроводники и микросхемы",
+    "parent": "electronics_parts"
+  },
+  "electronics_parts_controllers": {
+    "slug": "electronics_parts_controllers",
+    "en": "Microcontrollers and development boards",
+    "ru": "Микроконтроллеры и отладочные платы",
+    "parent": "electronics_parts"
+  },
+  "electronics_parts_sensors": {
+    "slug": "electronics_parts_sensors",
+    "en": "Sensors and modules",
+    "ru": "Датчики и модули",
+    "parent": "electronics_parts"
+  },
+  "electronics_parts_connectors": {
+    "slug": "electronics_parts_connectors",
+    "en": "Electronic connectors",
+    "ru": "Электронные разъёмы",
+    "parent": "electronics_parts"
+  },
+  "electronics_parts_prototyping": {
+    "slug": "electronics_parts_prototyping",
+    "en": "Prototyping supplies",
+    "ru": "Макетирование электроники",
+    "parent": "electronics_parts"
+  },
+  "appliances_refrigeration": {
+    "slug": "appliances_refrigeration",
+    "en": "Refrigerators and freezers",
+    "ru": "Холодильники и морозильники",
+    "parent": "appliances"
+  },
+  "appliances_cooking": {
+    "slug": "appliances_cooking",
+    "en": "Cooking appliances",
+    "ru": "Техника для приготовления пищи",
+    "parent": "appliances"
+  },
+  "appliances_laundry": {
+    "slug": "appliances_laundry",
+    "en": "Laundry appliances",
+    "ru": "Техника для стирки и сушки",
+    "parent": "appliances"
+  },
+  "appliances_cleaning": {
+    "slug": "appliances_cleaning",
+    "en": "Cleaning appliances",
+    "ru": "Техника для уборки",
+    "parent": "appliances"
+  },
+  "appliances_climate": {
+    "slug": "appliances_climate",
+    "en": "Heating and climate control",
+    "ru": "Климатическая техника",
+    "parent": "appliances"
+  },
+  "appliances_small_kitchen": {
+    "slug": "appliances_small_kitchen",
+    "en": "Small kitchen appliances",
+    "ru": "Мелкая кухонная техника",
+    "parent": "appliances"
+  },
+  "appliances_personal": {
+    "slug": "appliances_personal",
+    "en": "Personal care appliances",
+    "ru": "Техника для личного ухода",
+    "parent": "appliances"
+  },
+  "appliances_parts": {
+    "slug": "appliances_parts",
+    "en": "Appliance spare parts",
+    "ru": "Запчасти для бытовой техники",
+    "parent": "appliances"
+  },
+  "appliances_small_kitchen_kettles": {
+    "slug": "appliances_small_kitchen_kettles",
+    "en": "Electric kettles",
+    "ru": "Электрочайники",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_coffee": {
+    "slug": "appliances_small_kitchen_coffee",
+    "en": "Coffee machines and grinders",
+    "ru": "Кофемашины и кофемолки",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_blenders": {
+    "slug": "appliances_small_kitchen_blenders",
+    "en": "Blenders and mixers",
+    "ru": "Блендеры и миксеры",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_multicookers": {
+    "slug": "appliances_small_kitchen_multicookers",
+    "en": "Multicookers and rice cookers",
+    "ru": "Мультиварки и рисоварки",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_toasters": {
+    "slug": "appliances_small_kitchen_toasters",
+    "en": "Toasters and sandwich makers",
+    "ru": "Тостеры и сэндвичницы",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_air_fryers": {
+    "slug": "appliances_small_kitchen_air_fryers",
+    "en": "Air fryers and countertop ovens",
+    "ru": "Аэрогрили и мини-печи",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_juicers": {
+    "slug": "appliances_small_kitchen_juicers",
+    "en": "Juicers",
+    "ru": "Соковыжималки",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_small_kitchen_scales": {
+    "slug": "appliances_small_kitchen_scales",
+    "en": "Kitchen scales",
+    "ru": "Кухонные весы",
+    "parent": "appliances_small_kitchen"
+  },
+  "appliances_climate_air_conditioners": {
+    "slug": "appliances_climate_air_conditioners",
+    "en": "Air conditioners",
+    "ru": "Кондиционеры",
+    "parent": "appliances_climate"
+  },
+  "appliances_climate_fans": {
+    "slug": "appliances_climate_fans",
+    "en": "Fans",
+    "ru": "Вентиляторы",
+    "parent": "appliances_climate"
+  },
+  "appliances_climate_heaters": {
+    "slug": "appliances_climate_heaters",
+    "en": "Heaters",
+    "ru": "Обогреватели",
+    "parent": "appliances_climate"
+  },
+  "appliances_climate_humidifiers": {
+    "slug": "appliances_climate_humidifiers",
+    "en": "Humidifiers and dehumidifiers",
+    "ru": "Увлажнители и осушители",
+    "parent": "appliances_climate"
+  },
+  "appliances_climate_air_purifiers": {
+    "slug": "appliances_climate_air_purifiers",
+    "en": "Air purifiers",
+    "ru": "Очистители воздуха",
+    "parent": "appliances_climate"
+  },
+  "clothing_women": {
+    "slug": "clothing_women",
+    "en": "Women's clothing",
+    "ru": "Женская одежда",
+    "parent": "clothing"
+  },
+  "clothing_men": {
+    "slug": "clothing_men",
+    "en": "Men's clothing",
+    "ru": "Мужская одежда",
+    "parent": "clothing"
+  },
+  "clothing_children": {
+    "slug": "clothing_children",
+    "en": "Children's clothing",
+    "ru": "Детская одежда",
+    "parent": "clothing"
+  },
+  "clothing_infant": {
+    "slug": "clothing_infant",
+    "en": "Infant clothing",
+    "ru": "Одежда для младенцев",
+    "parent": "clothing"
+  },
+  "clothing_sportswear": {
+    "slug": "clothing_sportswear",
+    "en": "Sportswear",
+    "ru": "Спортивная одежда",
+    "parent": "clothing"
+  },
+  "clothing_workwear": {
+    "slug": "clothing_workwear",
+    "en": "Workwear and uniforms",
+    "ru": "Спецодежда и униформа",
+    "parent": "clothing"
+  },
+  "clothing_accessories": {
+    "slug": "clothing_accessories",
+    "en": "Clothing accessories",
+    "ru": "Аксессуары к одежде",
+    "parent": "clothing"
+  },
+  "clothing_fabric": {
+    "slug": "clothing_fabric",
+    "en": "Fabric and haberdashery",
+    "ru": "Ткани и галантерея",
+    "parent": "clothing"
+  },
+  "clothing_women_tops": {
+    "slug": "clothing_women_tops",
+    "en": "T-shirts and tops",
+    "ru": "Футболки и топы",
+    "parent": "clothing_women"
+  },
+  "clothing_women_shirts": {
+    "slug": "clothing_women_shirts",
+    "en": "Shirts and blouses",
+    "ru": "Рубашки и блузки",
+    "parent": "clothing_women"
+  },
+  "clothing_women_trousers": {
+    "slug": "clothing_women_trousers",
+    "en": "Trousers and jeans",
+    "ru": "Брюки и джинсы",
+    "parent": "clothing_women"
+  },
+  "clothing_women_knitwear": {
+    "slug": "clothing_women_knitwear",
+    "en": "Sweaters and knitwear",
+    "ru": "Свитеры и трикотаж",
+    "parent": "clothing_women"
+  },
+  "clothing_women_outerwear": {
+    "slug": "clothing_women_outerwear",
+    "en": "Coats and jackets",
+    "ru": "Пальто и куртки",
+    "parent": "clothing_women"
+  },
+  "clothing_women_sleepwear": {
+    "slug": "clothing_women_sleepwear",
+    "en": "Sleepwear and loungewear",
+    "ru": "Одежда для сна и дома",
+    "parent": "clothing_women"
+  },
+  "clothing_women_swimwear": {
+    "slug": "clothing_women_swimwear",
+    "en": "Swimwear",
+    "ru": "Купальная одежда",
+    "parent": "clothing_women"
+  },
+  "clothing_men_tops": {
+    "slug": "clothing_men_tops",
+    "en": "T-shirts and tops",
+    "ru": "Футболки и топы",
+    "parent": "clothing_men"
+  },
+  "clothing_men_shirts": {
+    "slug": "clothing_men_shirts",
+    "en": "Shirts and blouses",
+    "ru": "Рубашки и блузки",
+    "parent": "clothing_men"
+  },
+  "clothing_men_trousers": {
+    "slug": "clothing_men_trousers",
+    "en": "Trousers and jeans",
+    "ru": "Брюки и джинсы",
+    "parent": "clothing_men"
+  },
+  "clothing_men_knitwear": {
+    "slug": "clothing_men_knitwear",
+    "en": "Sweaters and knitwear",
+    "ru": "Свитеры и трикотаж",
+    "parent": "clothing_men"
+  },
+  "clothing_men_outerwear": {
+    "slug": "clothing_men_outerwear",
+    "en": "Coats and jackets",
+    "ru": "Пальто и куртки",
+    "parent": "clothing_men"
+  },
+  "clothing_men_sleepwear": {
+    "slug": "clothing_men_sleepwear",
+    "en": "Sleepwear and loungewear",
+    "ru": "Одежда для сна и дома",
+    "parent": "clothing_men"
+  },
+  "clothing_men_swimwear": {
+    "slug": "clothing_men_swimwear",
+    "en": "Swimwear",
+    "ru": "Купальная одежда",
+    "parent": "clothing_men"
+  },
+  "clothing_children_tops": {
+    "slug": "clothing_children_tops",
+    "en": "T-shirts and tops",
+    "ru": "Футболки и топы",
+    "parent": "clothing_children"
+  },
+  "clothing_children_shirts": {
+    "slug": "clothing_children_shirts",
+    "en": "Shirts and blouses",
+    "ru": "Рубашки и блузки",
+    "parent": "clothing_children"
+  },
+  "clothing_children_trousers": {
+    "slug": "clothing_children_trousers",
+    "en": "Trousers and jeans",
+    "ru": "Брюки и джинсы",
+    "parent": "clothing_children"
+  },
+  "clothing_children_knitwear": {
+    "slug": "clothing_children_knitwear",
+    "en": "Sweaters and knitwear",
+    "ru": "Свитеры и трикотаж",
+    "parent": "clothing_children"
+  },
+  "clothing_children_outerwear": {
+    "slug": "clothing_children_outerwear",
+    "en": "Coats and jackets",
+    "ru": "Пальто и куртки",
+    "parent": "clothing_children"
+  },
+  "clothing_children_sleepwear": {
+    "slug": "clothing_children_sleepwear",
+    "en": "Sleepwear and loungewear",
+    "ru": "Одежда для сна и дома",
+    "parent": "clothing_children"
+  },
+  "clothing_children_swimwear": {
+    "slug": "clothing_children_swimwear",
+    "en": "Swimwear",
+    "ru": "Купальная одежда",
+    "parent": "clothing_children"
+  },
+  "clothing_women_dresses": {
+    "slug": "clothing_women_dresses",
+    "en": "Dresses and skirts",
+    "ru": "Платья и юбки",
+    "parent": "clothing_women"
+  },
+  "clothing_women_maternity": {
+    "slug": "clothing_women_maternity",
+    "en": "Maternity clothing",
+    "ru": "Одежда для беременных",
+    "parent": "clothing_women"
+  },
+  "clothing_accessories_hats": {
+    "slug": "clothing_accessories_hats",
+    "en": "Hats and headwear",
+    "ru": "Шапки и головные уборы",
+    "parent": "clothing_accessories"
+  },
+  "clothing_accessories_scarves": {
+    "slug": "clothing_accessories_scarves",
+    "en": "Scarves and shawls",
+    "ru": "Шарфы и платки",
+    "parent": "clothing_accessories"
+  },
+  "clothing_accessories_gloves": {
+    "slug": "clothing_accessories_gloves",
+    "en": "Gloves and mittens",
+    "ru": "Перчатки и варежки",
+    "parent": "clothing_accessories"
+  },
+  "clothing_accessories_belts": {
+    "slug": "clothing_accessories_belts",
+    "en": "Belts and suspenders",
+    "ru": "Ремни и подтяжки",
+    "parent": "clothing_accessories"
+  },
+  "clothing_accessories_umbrellas": {
+    "slug": "clothing_accessories_umbrellas",
+    "en": "Umbrellas",
+    "ru": "Зонты",
+    "parent": "clothing_accessories"
+  },
+  "footwear_women": {
+    "slug": "footwear_women",
+    "en": "Women's footwear",
+    "ru": "Женская обувь",
+    "parent": "footwear"
+  },
+  "footwear_men": {
+    "slug": "footwear_men",
+    "en": "Men's footwear",
+    "ru": "Мужская обувь",
+    "parent": "footwear"
+  },
+  "footwear_children": {
+    "slug": "footwear_children",
+    "en": "Children's footwear",
+    "ru": "Детская обувь",
+    "parent": "footwear"
+  },
+  "footwear_sports": {
+    "slug": "footwear_sports",
+    "en": "Sports footwear",
+    "ru": "Спортивная обувь",
+    "parent": "footwear"
+  },
+  "footwear_work": {
+    "slug": "footwear_work",
+    "en": "Work and safety footwear",
+    "ru": "Рабочая и защитная обувь",
+    "parent": "footwear"
+  },
+  "footwear_accessories": {
+    "slug": "footwear_accessories",
+    "en": "Footwear accessories",
+    "ru": "Аксессуары для обуви",
+    "parent": "footwear"
+  },
+  "footwear_women_trainers": {
+    "slug": "footwear_women_trainers",
+    "en": "Trainers",
+    "ru": "Кроссовки",
+    "parent": "footwear_women"
+  },
+  "footwear_women_boots": {
+    "slug": "footwear_women_boots",
+    "en": "Boots",
+    "ru": "Ботинки и сапоги",
+    "parent": "footwear_women"
+  },
+  "footwear_women_sandals": {
+    "slug": "footwear_women_sandals",
+    "en": "Sandals",
+    "ru": "Сандалии",
+    "parent": "footwear_women"
+  },
+  "footwear_women_shoes": {
+    "slug": "footwear_women_shoes",
+    "en": "Shoes",
+    "ru": "Туфли",
+    "parent": "footwear_women"
+  },
+  "footwear_women_slippers": {
+    "slug": "footwear_women_slippers",
+    "en": "Slippers",
+    "ru": "Домашние тапочки",
+    "parent": "footwear_women"
+  },
+  "footwear_men_trainers": {
+    "slug": "footwear_men_trainers",
+    "en": "Trainers",
+    "ru": "Кроссовки",
+    "parent": "footwear_men"
+  },
+  "footwear_men_boots": {
+    "slug": "footwear_men_boots",
+    "en": "Boots",
+    "ru": "Ботинки и сапоги",
+    "parent": "footwear_men"
+  },
+  "footwear_men_sandals": {
+    "slug": "footwear_men_sandals",
+    "en": "Sandals",
+    "ru": "Сандалии",
+    "parent": "footwear_men"
+  },
+  "footwear_men_shoes": {
+    "slug": "footwear_men_shoes",
+    "en": "Shoes",
+    "ru": "Туфли",
+    "parent": "footwear_men"
+  },
+  "footwear_men_slippers": {
+    "slug": "footwear_men_slippers",
+    "en": "Slippers",
+    "ru": "Домашние тапочки",
+    "parent": "footwear_men"
+  },
+  "footwear_children_trainers": {
+    "slug": "footwear_children_trainers",
+    "en": "Trainers",
+    "ru": "Кроссовки",
+    "parent": "footwear_children"
+  },
+  "footwear_children_boots": {
+    "slug": "footwear_children_boots",
+    "en": "Boots",
+    "ru": "Ботинки и сапоги",
+    "parent": "footwear_children"
+  },
+  "footwear_children_sandals": {
+    "slug": "footwear_children_sandals",
+    "en": "Sandals",
+    "ru": "Сандалии",
+    "parent": "footwear_children"
+  },
+  "footwear_children_shoes": {
+    "slug": "footwear_children_shoes",
+    "en": "Shoes",
+    "ru": "Туфли",
+    "parent": "footwear_children"
+  },
+  "footwear_children_slippers": {
+    "slug": "footwear_children_slippers",
+    "en": "Slippers",
+    "ru": "Домашние тапочки",
+    "parent": "footwear_children"
+  },
+  "bags_handbags": {
+    "slug": "bags_handbags",
+    "en": "Handbags",
+    "ru": "Сумки",
+    "parent": "bags"
+  },
+  "bags_backpacks": {
+    "slug": "bags_backpacks",
+    "en": "Backpacks",
+    "ru": "Рюкзаки",
+    "parent": "bags"
+  },
+  "bags_suitcases": {
+    "slug": "bags_suitcases",
+    "en": "Suitcases",
+    "ru": "Чемоданы",
+    "parent": "bags"
+  },
+  "bags_travel_bags": {
+    "slug": "bags_travel_bags",
+    "en": "Travel and sports bags",
+    "ru": "Дорожные и спортивные сумки",
+    "parent": "bags"
+  },
+  "bags_wallets": {
+    "slug": "bags_wallets",
+    "en": "Wallets and card holders",
+    "ru": "Кошельки и визитницы",
+    "parent": "bags"
+  },
+  "bags_laptop": {
+    "slug": "bags_laptop",
+    "en": "Laptop bags and sleeves",
+    "ru": "Сумки и чехлы для ноутбуков",
+    "parent": "bags"
+  },
+  "bags_accessories": {
+    "slug": "bags_accessories",
+    "en": "Luggage accessories",
+    "ru": "Дорожные аксессуары",
+    "parent": "bags"
+  },
+  "furniture_living": {
+    "slug": "furniture_living",
+    "en": "Living room furniture",
+    "ru": "Мебель для гостиной",
+    "parent": "furniture"
+  },
+  "furniture_bedroom": {
+    "slug": "furniture_bedroom",
+    "en": "Bedroom furniture",
+    "ru": "Мебель для спальни",
+    "parent": "furniture"
+  },
+  "furniture_kitchen": {
+    "slug": "furniture_kitchen",
+    "en": "Kitchen and dining furniture",
+    "ru": "Мебель для кухни и столовой",
+    "parent": "furniture"
+  },
+  "furniture_office": {
+    "slug": "furniture_office",
+    "en": "Office furniture",
+    "ru": "Офисная мебель",
+    "parent": "furniture"
+  },
+  "furniture_children": {
+    "slug": "furniture_children",
+    "en": "Children's furniture",
+    "ru": "Детская мебель",
+    "parent": "furniture"
+  },
+  "furniture_bathroom": {
+    "slug": "furniture_bathroom",
+    "en": "Bathroom furniture",
+    "ru": "Мебель для ванной",
+    "parent": "furniture"
+  },
+  "furniture_outdoor": {
+    "slug": "furniture_outdoor",
+    "en": "Outdoor furniture",
+    "ru": "Уличная и садовая мебель",
+    "parent": "furniture"
+  },
+  "furniture_decor": {
+    "slug": "furniture_decor",
+    "en": "Home decor",
+    "ru": "Декор для дома",
+    "parent": "furniture"
+  },
+  "furniture_lighting": {
+    "slug": "furniture_lighting",
+    "en": "Decorative lighting",
+    "ru": "Декоративное освещение",
+    "parent": "furniture"
+  },
+  "furniture_hardware": {
+    "slug": "furniture_hardware",
+    "en": "Furniture fittings",
+    "ru": "Мебельная фурнитура",
+    "parent": "furniture"
+  },
+  "furniture_living_sofas": {
+    "slug": "furniture_living_sofas",
+    "en": "Sofas and armchairs",
+    "ru": "Диваны и кресла",
+    "parent": "furniture_living"
+  },
+  "furniture_living_tables": {
+    "slug": "furniture_living_tables",
+    "en": "Coffee and side tables",
+    "ru": "Журнальные и приставные столы",
+    "parent": "furniture_living"
+  },
+  "furniture_living_shelving": {
+    "slug": "furniture_living_shelving",
+    "en": "Shelves and bookcases",
+    "ru": "Полки и стеллажи",
+    "parent": "furniture_living"
+  },
+  "furniture_living_cabinets": {
+    "slug": "furniture_living_cabinets",
+    "en": "Cabinets and TV stands",
+    "ru": "Шкафы и тумбы под телевизор",
+    "parent": "furniture_living"
+  },
+  "furniture_bedroom_beds": {
+    "slug": "furniture_bedroom_beds",
+    "en": "Beds",
+    "ru": "Кровати",
+    "parent": "furniture_bedroom"
+  },
+  "furniture_bedroom_mattresses": {
+    "slug": "furniture_bedroom_mattresses",
+    "en": "Mattresses",
+    "ru": "Матрасы",
+    "parent": "furniture_bedroom"
+  },
+  "furniture_bedroom_wardrobes": {
+    "slug": "furniture_bedroom_wardrobes",
+    "en": "Wardrobes",
+    "ru": "Платяные шкафы",
+    "parent": "furniture_bedroom"
+  },
+  "furniture_bedroom_dressers": {
+    "slug": "furniture_bedroom_dressers",
+    "en": "Dressers and bedside tables",
+    "ru": "Комоды и прикроватные тумбы",
+    "parent": "furniture_bedroom"
+  },
+  "furniture_decor_mirrors": {
+    "slug": "furniture_decor_mirrors",
+    "en": "Mirrors",
+    "ru": "Зеркала",
+    "parent": "furniture_decor"
+  },
+  "furniture_decor_rugs": {
+    "slug": "furniture_decor_rugs",
+    "en": "Rugs and mats",
+    "ru": "Ковры и коврики",
+    "parent": "furniture_decor"
+  },
+  "furniture_decor_curtains": {
+    "slug": "furniture_decor_curtains",
+    "en": "Curtains and blinds",
+    "ru": "Шторы и жалюзи",
+    "parent": "furniture_decor"
+  },
+  "furniture_decor_frames": {
+    "slug": "furniture_decor_frames",
+    "en": "Picture frames and wall art",
+    "ru": "Рамки и настенный декор",
+    "parent": "furniture_decor"
+  },
+  "furniture_decor_vases": {
+    "slug": "furniture_decor_vases",
+    "en": "Vases and decorative bowls",
+    "ru": "Вазы и декоративные чаши",
+    "parent": "furniture_decor"
+  },
+  "furniture_decor_candles": {
+    "slug": "furniture_decor_candles",
+    "en": "Candles and candle holders",
+    "ru": "Свечи и подсвечники",
+    "parent": "furniture_decor"
+  },
+  "furniture_decor_clocks": {
+    "slug": "furniture_decor_clocks",
+    "en": "Wall and table clocks",
+    "ru": "Настенные и настольные часы",
+    "parent": "furniture_decor"
+  },
+  "toys_building": {
+    "slug": "toys_building",
+    "en": "Building sets",
+    "ru": "Конструкторы",
+    "parent": "toys"
+  },
+  "toys_dolls": {
+    "slug": "toys_dolls",
+    "en": "Dolls and accessories",
+    "ru": "Куклы и аксессуары",
+    "parent": "toys"
+  },
+  "toys_plush": {
+    "slug": "toys_plush",
+    "en": "Plush toys",
+    "ru": "Мягкие игрушки",
+    "parent": "toys"
+  },
+  "toys_vehicles": {
+    "slug": "toys_vehicles",
+    "en": "Toy vehicles",
+    "ru": "Игрушечный транспорт",
+    "parent": "toys"
+  },
+  "toys_figures": {
+    "slug": "toys_figures",
+    "en": "Action figures and playsets",
+    "ru": "Фигурки и игровые наборы",
+    "parent": "toys"
+  },
+  "toys_puzzles": {
+    "slug": "toys_puzzles",
+    "en": "Puzzles",
+    "ru": "Пазлы и головоломки",
+    "parent": "toys"
+  },
+  "toys_board_games": {
+    "slug": "toys_board_games",
+    "en": "Board games",
+    "ru": "Настольные игры",
+    "parent": "toys"
+  },
+  "toys_educational": {
+    "slug": "toys_educational",
+    "en": "Educational toys",
+    "ru": "Развивающие игрушки",
+    "parent": "toys"
+  },
+  "toys_outdoor": {
+    "slug": "toys_outdoor",
+    "en": "Outdoor toys",
+    "ru": "Уличные игрушки",
+    "parent": "toys"
+  },
+  "toys_ride_on": {
+    "slug": "toys_ride_on",
+    "en": "Ride-on toys",
+    "ru": "Каталки и детский транспорт",
+    "parent": "toys"
+  },
+  "toys_pretend": {
+    "slug": "toys_pretend",
+    "en": "Pretend play",
+    "ru": "Сюжетно-ролевые игры",
+    "parent": "toys"
+  },
+  "toys_infant": {
+    "slug": "toys_infant",
+    "en": "Infant toys",
+    "ru": "Игрушки для младенцев",
+    "parent": "toys"
+  },
+  "sports_fitness": {
+    "slug": "sports_fitness",
+    "en": "Fitness and strength training",
+    "ru": "Фитнес и силовые тренировки",
+    "parent": "sports"
+  },
+  "sports_running": {
+    "slug": "sports_running",
+    "en": "Running",
+    "ru": "Бег",
+    "parent": "sports"
+  },
+  "sports_cycling": {
+    "slug": "sports_cycling",
+    "en": "Cycling",
+    "ru": "Велоспорт",
+    "parent": "sports"
+  },
+  "sports_camping": {
+    "slug": "sports_camping",
+    "en": "Camping and hiking",
+    "ru": "Туризм и походы",
+    "parent": "sports"
+  },
+  "sports_swimming": {
+    "slug": "sports_swimming",
+    "en": "Swimming",
+    "ru": "Плавание",
+    "parent": "sports"
+  },
+  "sports_team": {
+    "slug": "sports_team",
+    "en": "Team sports",
+    "ru": "Командные виды спорта",
+    "parent": "sports"
+  },
+  "sports_racket": {
+    "slug": "sports_racket",
+    "en": "Racket sports",
+    "ru": "Ракеточные виды спорта",
+    "parent": "sports"
+  },
+  "sports_winter": {
+    "slug": "sports_winter",
+    "en": "Winter sports",
+    "ru": "Зимние виды спорта",
+    "parent": "sports"
+  },
+  "sports_skating": {
+    "slug": "sports_skating",
+    "en": "Skating and skateboarding",
+    "ru": "Ролики и скейтбординг",
+    "parent": "sports"
+  },
+  "sports_fishing": {
+    "slug": "sports_fishing",
+    "en": "Fishing",
+    "ru": "Рыбалка",
+    "parent": "sports"
+  },
+  "sports_martial_arts": {
+    "slug": "sports_martial_arts",
+    "en": "Martial arts",
+    "ru": "Единоборства",
+    "parent": "sports"
+  },
+  "sports_water": {
+    "slug": "sports_water",
+    "en": "Water sports",
+    "ru": "Водные виды спорта",
+    "parent": "sports"
+  },
+  "sports_fitness_weights": {
+    "slug": "sports_fitness_weights",
+    "en": "Weights and dumbbells",
+    "ru": "Гири и гантели",
+    "parent": "sports_fitness"
+  },
+  "sports_fitness_benches": {
+    "slug": "sports_fitness_benches",
+    "en": "Benches and racks",
+    "ru": "Скамьи и стойки",
+    "parent": "sports_fitness"
+  },
+  "sports_fitness_cardio": {
+    "slug": "sports_fitness_cardio",
+    "en": "Cardio machines",
+    "ru": "Кардиотренажёры",
+    "parent": "sports_fitness"
+  },
+  "sports_fitness_bands": {
+    "slug": "sports_fitness_bands",
+    "en": "Resistance bands",
+    "ru": "Фитнес-резинки и эспандеры",
+    "parent": "sports_fitness"
+  },
+  "sports_fitness_yoga": {
+    "slug": "sports_fitness_yoga",
+    "en": "Yoga and pilates",
+    "ru": "Йога и пилатес",
+    "parent": "sports_fitness"
+  },
+  "sports_fitness_recovery": {
+    "slug": "sports_fitness_recovery",
+    "en": "Exercise recovery accessories",
+    "ru": "Аксессуары для восстановления после тренировок",
+    "parent": "sports_fitness"
+  },
+  "sports_cycling_bicycles": {
+    "slug": "sports_cycling_bicycles",
+    "en": "Bicycles",
+    "ru": "Велосипеды",
+    "parent": "sports_cycling"
+  },
+  "sports_cycling_parts": {
+    "slug": "sports_cycling_parts",
+    "en": "Bicycle parts",
+    "ru": "Велозапчасти",
+    "parent": "sports_cycling"
+  },
+  "sports_cycling_tyres": {
+    "slug": "sports_cycling_tyres",
+    "en": "Bicycle tyres and tubes",
+    "ru": "Велопокрышки и камеры",
+    "parent": "sports_cycling"
+  },
+  "sports_cycling_helmets": {
+    "slug": "sports_cycling_helmets",
+    "en": "Cycling helmets",
+    "ru": "Велошлемы",
+    "parent": "sports_cycling"
+  },
+  "sports_cycling_lights": {
+    "slug": "sports_cycling_lights",
+    "en": "Bicycle lights",
+    "ru": "Велосипедные фонари",
+    "parent": "sports_cycling"
+  },
+  "sports_cycling_locks": {
+    "slug": "sports_cycling_locks",
+    "en": "Bicycle locks",
+    "ru": "Велозамки",
+    "parent": "sports_cycling"
+  },
+  "sports_cycling_pumps": {
+    "slug": "sports_cycling_pumps",
+    "en": "Bicycle pumps and tools",
+    "ru": "Велонасосы и инструменты",
+    "parent": "sports_cycling"
+  },
+  "sports_camping_tents": {
+    "slug": "sports_camping_tents",
+    "en": "Tents",
+    "ru": "Палатки",
+    "parent": "sports_camping"
+  },
+  "sports_camping_sleeping": {
+    "slug": "sports_camping_sleeping",
+    "en": "Sleeping bags and mats",
+    "ru": "Спальные мешки и коврики",
+    "parent": "sports_camping"
+  },
+  "sports_camping_backpacks": {
+    "slug": "sports_camping_backpacks",
+    "en": "Hiking backpacks",
+    "ru": "Туристические рюкзаки",
+    "parent": "sports_camping"
+  },
+  "sports_camping_cooking": {
+    "slug": "sports_camping_cooking",
+    "en": "Camping cooking equipment",
+    "ru": "Походное кухонное оборудование",
+    "parent": "sports_camping"
+  },
+  "sports_camping_lamps": {
+    "slug": "sports_camping_lamps",
+    "en": "Camping lamps and headlamps",
+    "ru": "Походные и налобные фонари",
+    "parent": "sports_camping"
+  },
+  "sports_camping_poles": {
+    "slug": "sports_camping_poles",
+    "en": "Trekking poles",
+    "ru": "Трекинговые палки",
+    "parent": "sports_camping"
+  },
+  "sports_camping_hydration": {
+    "slug": "sports_camping_hydration",
+    "en": "Hydration and water filters",
+    "ru": "Походные ёмкости и фильтры для воды",
+    "parent": "sports_camping"
+  },
+  "sports_team_football": {
+    "slug": "sports_team_football",
+    "en": "Football",
+    "ru": "Футбол",
+    "parent": "sports_team"
+  },
+  "sports_team_basketball": {
+    "slug": "sports_team_basketball",
+    "en": "Basketball",
+    "ru": "Баскетбол",
+    "parent": "sports_team"
+  },
+  "sports_team_volleyball": {
+    "slug": "sports_team_volleyball",
+    "en": "Volleyball",
+    "ru": "Волейбол",
+    "parent": "sports_team"
+  },
+  "sports_team_hockey": {
+    "slug": "sports_team_hockey",
+    "en": "Hockey",
+    "ru": "Хоккей",
+    "parent": "sports_team"
+  },
+  "sports_team_rugby": {
+    "slug": "sports_team_rugby",
+    "en": "Rugby",
+    "ru": "Регби",
+    "parent": "sports_team"
+  },
+  "sports_winter_skiing": {
+    "slug": "sports_winter_skiing",
+    "en": "Skiing",
+    "ru": "Лыжи",
+    "parent": "sports_winter"
+  },
+  "sports_winter_snowboarding": {
+    "slug": "sports_winter_snowboarding",
+    "en": "Snowboarding",
+    "ru": "Сноубординг",
+    "parent": "sports_winter"
+  },
+  "sports_winter_ice_skates": {
+    "slug": "sports_winter_ice_skates",
+    "en": "Ice skates",
+    "ru": "Коньки",
+    "parent": "sports_winter"
+  },
+  "sports_winter_sledges": {
+    "slug": "sports_winter_sledges",
+    "en": "Sledges and snow tubes",
+    "ru": "Санки и тюбинги",
+    "parent": "sports_winter"
+  },
+  "garden_plants": {
+    "slug": "garden_plants",
+    "en": "Live plants",
+    "ru": "Живые растения",
+    "parent": "garden"
+  },
+  "garden_seeds": {
+    "slug": "garden_seeds",
+    "en": "Garden seeds",
+    "ru": "Семена для сада",
+    "parent": "garden"
+  },
+  "garden_pots": {
+    "slug": "garden_pots",
+    "en": "Pots and planters",
+    "ru": "Горшки и кашпо",
+    "parent": "garden"
+  },
+  "garden_watering": {
+    "slug": "garden_watering",
+    "en": "Watering supplies",
+    "ru": "Товары для полива",
+    "parent": "garden"
+  },
+  "garden_hand_tools": {
+    "slug": "garden_hand_tools",
+    "en": "Garden hand tools",
+    "ru": "Ручные садовые инструменты",
+    "parent": "garden"
+  },
+  "garden_power_tools": {
+    "slug": "garden_power_tools",
+    "en": "Garden power equipment",
+    "ru": "Садовая техника",
+    "parent": "garden"
+  },
+  "garden_greenhouses": {
+    "slug": "garden_greenhouses",
+    "en": "Greenhouses and crop covers",
+    "ru": "Теплицы и укрывные материалы",
+    "parent": "garden"
+  },
+  "garden_compost": {
+    "slug": "garden_compost",
+    "en": "Composting",
+    "ru": "Компостирование",
+    "parent": "garden"
+  },
+  "garden_pest_control": {
+    "slug": "garden_pest_control",
+    "en": "Plant protection supplies",
+    "ru": "Средства защиты растений",
+    "parent": "garden"
+  },
+  "tools_hand": {
+    "slug": "tools_hand",
+    "en": "Hand tools",
+    "ru": "Ручные инструменты",
+    "parent": "tools"
+  },
+  "tools_power": {
+    "slug": "tools_power",
+    "en": "Power tools",
+    "ru": "Электроинструменты",
+    "parent": "tools"
+  },
+  "tools_measuring": {
+    "slug": "tools_measuring",
+    "en": "Measuring and marking",
+    "ru": "Измерение и разметка",
+    "parent": "tools"
+  },
+  "tools_consumables": {
+    "slug": "tools_consumables",
+    "en": "Tool consumables",
+    "ru": "Расходники для инструментов",
+    "parent": "tools"
+  },
+  "tools_storage": {
+    "slug": "tools_storage",
+    "en": "Tool storage",
+    "ru": "Хранение инструментов",
+    "parent": "tools"
+  },
+  "tools_ladders": {
+    "slug": "tools_ladders",
+    "en": "Ladders and access equipment",
+    "ru": "Лестницы и стремянки",
+    "parent": "tools"
+  },
+  "tools_workshop": {
+    "slug": "tools_workshop",
+    "en": "Workshop equipment",
+    "ru": "Оборудование мастерских",
+    "parent": "tools"
+  },
+  "tools_safety": {
+    "slug": "tools_safety",
+    "en": "Personal protective equipment",
+    "ru": "Средства индивидуальной защиты",
+    "parent": "tools"
+  },
+  "tools_hand_screwdrivers": {
+    "slug": "tools_hand_screwdrivers",
+    "en": "Screwdrivers and bits",
+    "ru": "Отвёртки и биты",
+    "parent": "tools_hand"
+  },
+  "tools_hand_wrenches": {
+    "slug": "tools_hand_wrenches",
+    "en": "Wrenches and sockets",
+    "ru": "Ключи и торцевые головки",
+    "parent": "tools_hand"
+  },
+  "tools_hand_pliers": {
+    "slug": "tools_hand_pliers",
+    "en": "Pliers and cutters",
+    "ru": "Пассатижи и кусачки",
+    "parent": "tools_hand"
+  },
+  "tools_hand_hammers": {
+    "slug": "tools_hand_hammers",
+    "en": "Hammers and mallets",
+    "ru": "Молотки и киянки",
+    "parent": "tools_hand"
+  },
+  "tools_hand_saws": {
+    "slug": "tools_hand_saws",
+    "en": "Hand saws",
+    "ru": "Ручные пилы",
+    "parent": "tools_hand"
+  },
+  "tools_hand_clamps": {
+    "slug": "tools_hand_clamps",
+    "en": "Clamps and vices",
+    "ru": "Струбцины и тиски",
+    "parent": "tools_hand"
+  },
+  "tools_hand_sets": {
+    "slug": "tools_hand_sets",
+    "en": "Hand tool sets",
+    "ru": "Наборы ручных инструментов",
+    "parent": "tools_hand"
+  },
+  "tools_power_drills": {
+    "slug": "tools_power_drills",
+    "en": "Drills and drivers",
+    "ru": "Дрели и шуруповёрты",
+    "parent": "tools_power"
+  },
+  "tools_power_rotary_hammers": {
+    "slug": "tools_power_rotary_hammers",
+    "en": "Rotary hammers",
+    "ru": "Перфораторы",
+    "parent": "tools_power"
+  },
+  "tools_power_grinders": {
+    "slug": "tools_power_grinders",
+    "en": "Grinders and sanders",
+    "ru": "Болгарки и шлифмашины",
+    "parent": "tools_power"
+  },
+  "tools_power_saws": {
+    "slug": "tools_power_saws",
+    "en": "Powered saws",
+    "ru": "Электропилы",
+    "parent": "tools_power"
+  },
+  "tools_power_routers": {
+    "slug": "tools_power_routers",
+    "en": "Routers and planers",
+    "ru": "Фрезеры и рубанки",
+    "parent": "tools_power"
+  },
+  "tools_power_welding": {
+    "slug": "tools_power_welding",
+    "en": "Welding equipment",
+    "ru": "Сварочное оборудование",
+    "parent": "tools_power"
+  },
+  "tools_power_soldering": {
+    "slug": "tools_power_soldering",
+    "en": "Soldering tools",
+    "ru": "Паяльные инструменты",
+    "parent": "tools_power"
+  },
+  "tools_power_batteries": {
+    "slug": "tools_power_batteries",
+    "en": "Tool batteries and chargers",
+    "ru": "Аккумуляторы и зарядки для инструментов",
+    "parent": "tools_power"
+  },
+  "construction_cement": {
+    "slug": "construction_cement",
+    "en": "Cement and dry building mixes",
+    "ru": "Цемент и сухие смеси",
+    "parent": "construction"
+  },
+  "construction_masonry": {
+    "slug": "construction_masonry",
+    "en": "Bricks and masonry blocks",
+    "ru": "Кирпич и строительные блоки",
+    "parent": "construction"
+  },
+  "construction_lumber": {
+    "slug": "construction_lumber",
+    "en": "Lumber and wood panels",
+    "ru": "Пиломатериалы и древесные плиты",
+    "parent": "construction"
+  },
+  "construction_metal": {
+    "slug": "construction_metal",
+    "en": "Metal stock and profiles",
+    "ru": "Металлопрокат и профили",
+    "parent": "construction"
+  },
+  "construction_insulation": {
+    "slug": "construction_insulation",
+    "en": "Insulation materials",
+    "ru": "Изоляционные материалы",
+    "parent": "construction"
+  },
+  "construction_roofing": {
+    "slug": "construction_roofing",
+    "en": "Roofing materials",
+    "ru": "Кровельные материалы",
+    "parent": "construction"
+  },
+  "construction_flooring": {
+    "slug": "construction_flooring",
+    "en": "Flooring",
+    "ru": "Напольные покрытия",
+    "parent": "construction"
+  },
+  "construction_tiles": {
+    "slug": "construction_tiles",
+    "en": "Tiles and tile supplies",
+    "ru": "Плитка и материалы для укладки",
+    "parent": "construction"
+  },
+  "construction_wall": {
+    "slug": "construction_wall",
+    "en": "Wall coverings",
+    "ru": "Настенные покрытия",
+    "parent": "construction"
+  },
+  "construction_paint": {
+    "slug": "construction_paint",
+    "en": "Paints and coatings",
+    "ru": "Краски и покрытия",
+    "parent": "construction"
+  },
+  "construction_doors": {
+    "slug": "construction_doors",
+    "en": "Doors and windows",
+    "ru": "Двери и окна",
+    "parent": "construction"
+  },
+  "construction_fasteners": {
+    "slug": "construction_fasteners",
+    "en": "Fasteners and hardware",
+    "ru": "Крепёж и метизы",
+    "parent": "construction"
+  },
+  "construction_sealants": {
+    "slug": "construction_sealants",
+    "en": "Sealants and construction adhesives",
+    "ru": "Герметики и строительные клеи",
+    "parent": "construction"
+  },
+  "construction_flooring_laminate": {
+    "slug": "construction_flooring_laminate",
+    "en": "Laminate flooring",
+    "ru": "Ламинат",
+    "parent": "construction_flooring"
+  },
+  "construction_flooring_wood": {
+    "slug": "construction_flooring_wood",
+    "en": "Wood flooring",
+    "ru": "Паркет и деревянный пол",
+    "parent": "construction_flooring"
+  },
+  "construction_flooring_vinyl": {
+    "slug": "construction_flooring_vinyl",
+    "en": "Vinyl flooring and linoleum",
+    "ru": "Виниловые покрытия и линолеум",
+    "parent": "construction_flooring"
+  },
+  "construction_flooring_carpet": {
+    "slug": "construction_flooring_carpet",
+    "en": "Carpet flooring",
+    "ru": "Ковролин",
+    "parent": "construction_flooring"
+  },
+  "construction_flooring_underlay": {
+    "slug": "construction_flooring_underlay",
+    "en": "Underlay and skirting",
+    "ru": "Подложка и плинтусы",
+    "parent": "construction_flooring"
+  },
+  "plumbing_pipes": {
+    "slug": "plumbing_pipes",
+    "en": "Pipes and fittings",
+    "ru": "Трубы и фитинги",
+    "parent": "plumbing"
+  },
+  "plumbing_valves": {
+    "slug": "plumbing_valves",
+    "en": "Valves and taps",
+    "ru": "Вентили и краны",
+    "parent": "plumbing"
+  },
+  "plumbing_faucets": {
+    "slug": "plumbing_faucets",
+    "en": "Mixer taps",
+    "ru": "Смесители",
+    "parent": "plumbing"
+  },
+  "plumbing_sinks": {
+    "slug": "plumbing_sinks",
+    "en": "Sinks and washbasins",
+    "ru": "Раковины и мойки",
+    "parent": "plumbing"
+  },
+  "plumbing_toilets": {
+    "slug": "plumbing_toilets",
+    "en": "Toilets and cisterns",
+    "ru": "Унитазы и бачки",
+    "parent": "plumbing"
+  },
+  "plumbing_baths": {
+    "slug": "plumbing_baths",
+    "en": "Baths and showers",
+    "ru": "Ванны и душевые",
+    "parent": "plumbing"
+  },
+  "plumbing_heating": {
+    "slug": "plumbing_heating",
+    "en": "Heating and radiators",
+    "ru": "Отопление и радиаторы",
+    "parent": "plumbing"
+  },
+  "plumbing_water_heaters": {
+    "slug": "plumbing_water_heaters",
+    "en": "Water heaters",
+    "ru": "Водонагреватели",
+    "parent": "plumbing"
+  },
+  "plumbing_pumps": {
+    "slug": "plumbing_pumps",
+    "en": "Water pumps",
+    "ru": "Водяные насосы",
+    "parent": "plumbing"
+  },
+  "plumbing_filters": {
+    "slug": "plumbing_filters",
+    "en": "Water filters",
+    "ru": "Фильтры для воды",
+    "parent": "plumbing"
+  },
+  "plumbing_drainage": {
+    "slug": "plumbing_drainage",
+    "en": "Drainage and sewerage",
+    "ru": "Водоотведение и канализация",
+    "parent": "plumbing"
+  },
+  "electrical_cables": {
+    "slug": "electrical_cables",
+    "en": "Electrical wires and cables",
+    "ru": "Провода и кабели",
+    "parent": "electrical"
+  },
+  "electrical_sockets": {
+    "slug": "electrical_sockets",
+    "en": "Sockets and switches",
+    "ru": "Розетки и выключатели",
+    "parent": "electrical"
+  },
+  "electrical_protection": {
+    "slug": "electrical_protection",
+    "en": "Circuit protection",
+    "ru": "Автоматы и устройства защиты",
+    "parent": "electrical"
+  },
+  "electrical_panels": {
+    "slug": "electrical_panels",
+    "en": "Electrical panels and enclosures",
+    "ru": "Электрощиты и корпуса",
+    "parent": "electrical"
+  },
+  "electrical_conduit": {
+    "slug": "electrical_conduit",
+    "en": "Cable management and conduits",
+    "ru": "Кабель-каналы и гофры",
+    "parent": "electrical"
+  },
+  "electrical_connectors": {
+    "slug": "electrical_connectors",
+    "en": "Terminals and wiring connectors",
+    "ru": "Клеммы и соединители проводов",
+    "parent": "electrical"
+  },
+  "electrical_extension": {
+    "slug": "electrical_extension",
+    "en": "Extension leads and power strips",
+    "ru": "Удлинители и сетевые фильтры",
+    "parent": "electrical"
+  },
+  "electrical_power": {
+    "slug": "electrical_power",
+    "en": "Power conversion and backup",
+    "ru": "Преобразование и резервирование питания",
+    "parent": "electrical"
+  },
+  "electrical_solar": {
+    "slug": "electrical_solar",
+    "en": "Solar power components",
+    "ru": "Компоненты солнечных электростанций",
+    "parent": "electrical"
+  },
+  "auto_parts": {
+    "slug": "auto_parts",
+    "en": "Vehicle parts",
+    "ru": "Автозапчасти",
+    "parent": "auto"
+  },
+  "auto_tyres": {
+    "slug": "auto_tyres",
+    "en": "Tyres and wheels",
+    "ru": "Шины и диски",
+    "parent": "auto"
+  },
+  "auto_fluids": {
+    "slug": "auto_fluids",
+    "en": "Vehicle fluids",
+    "ru": "Автомобильные жидкости",
+    "parent": "auto"
+  },
+  "auto_care": {
+    "slug": "auto_care",
+    "en": "Vehicle cleaning and care",
+    "ru": "Уход за автомобилем",
+    "parent": "auto"
+  },
+  "auto_accessories": {
+    "slug": "auto_accessories",
+    "en": "Vehicle accessories",
+    "ru": "Автоаксессуары",
+    "parent": "auto"
+  },
+  "auto_electronics": {
+    "slug": "auto_electronics",
+    "en": "Vehicle electronics",
+    "ru": "Автоэлектроника",
+    "parent": "auto"
+  },
+  "auto_tools": {
+    "slug": "auto_tools",
+    "en": "Vehicle tools and workshop supplies",
+    "ru": "Автоинструменты и сервисное оборудование",
+    "parent": "auto"
+  },
+  "auto_motorcycles": {
+    "slug": "auto_motorcycles",
+    "en": "Motorcycle parts and accessories",
+    "ru": "Мотозапчасти и аксессуары",
+    "parent": "auto"
+  },
+  "auto_parts_filters": {
+    "slug": "auto_parts_filters",
+    "en": "Vehicle filters",
+    "ru": "Автомобильные фильтры",
+    "parent": "auto_parts"
+  },
+  "auto_parts_brakes": {
+    "slug": "auto_parts_brakes",
+    "en": "Braking systems",
+    "ru": "Тормозная система",
+    "parent": "auto_parts"
+  },
+  "auto_parts_suspension": {
+    "slug": "auto_parts_suspension",
+    "en": "Suspension and steering",
+    "ru": "Подвеска и рулевое управление",
+    "parent": "auto_parts"
+  },
+  "auto_parts_engine": {
+    "slug": "auto_parts_engine",
+    "en": "Engine parts",
+    "ru": "Детали двигателя",
+    "parent": "auto_parts"
+  },
+  "auto_parts_transmission": {
+    "slug": "auto_parts_transmission",
+    "en": "Transmission parts",
+    "ru": "Детали трансмиссии",
+    "parent": "auto_parts"
+  },
+  "auto_parts_cooling": {
+    "slug": "auto_parts_cooling",
+    "en": "Cooling system parts",
+    "ru": "Система охлаждения",
+    "parent": "auto_parts"
+  },
+  "auto_parts_body": {
+    "slug": "auto_parts_body",
+    "en": "Body parts and mirrors",
+    "ru": "Кузовные детали и зеркала",
+    "parent": "auto_parts"
+  },
+  "auto_parts_lighting": {
+    "slug": "auto_parts_lighting",
+    "en": "Vehicle lighting",
+    "ru": "Автомобильное освещение",
+    "parent": "auto_parts"
+  },
+  "auto_parts_batteries": {
+    "slug": "auto_parts_batteries",
+    "en": "Vehicle batteries",
+    "ru": "Автомобильные аккумуляторы",
+    "parent": "auto_parts"
+  },
+  "auto_parts_wipers": {
+    "slug": "auto_parts_wipers",
+    "en": "Wipers and washer systems",
+    "ru": "Дворники и стеклоомыватели",
+    "parent": "auto_parts"
+  },
+  "auto_accessories_mats": {
+    "slug": "auto_accessories_mats",
+    "en": "Vehicle mats",
+    "ru": "Автомобильные коврики",
+    "parent": "auto_accessories"
+  },
+  "auto_accessories_covers": {
+    "slug": "auto_accessories_covers",
+    "en": "Seat covers",
+    "ru": "Чехлы для сидений",
+    "parent": "auto_accessories"
+  },
+  "auto_accessories_child_seats": {
+    "slug": "auto_accessories_child_seats",
+    "en": "Child car seats",
+    "ru": "Детские автокресла",
+    "parent": "auto_accessories"
+  },
+  "auto_accessories_roof_racks": {
+    "slug": "auto_accessories_roof_racks",
+    "en": "Roof racks and cargo boxes",
+    "ru": "Багажники и боксы",
+    "parent": "auto_accessories"
+  },
+  "auto_accessories_emergency": {
+    "slug": "auto_accessories_emergency",
+    "en": "Roadside emergency supplies",
+    "ru": "Аварийные дорожные принадлежности",
+    "parent": "auto_accessories"
+  },
+  "books_fiction": {
+    "slug": "books_fiction",
+    "en": "Fiction",
+    "ru": "Художественная литература",
+    "parent": "books"
+  },
+  "books_nonfiction": {
+    "slug": "books_nonfiction",
+    "en": "Non-fiction",
+    "ru": "Нехудожественная литература",
+    "parent": "books"
+  },
+  "books_children": {
+    "slug": "books_children",
+    "en": "Children's books",
+    "ru": "Детские книги",
+    "parent": "books"
+  },
+  "books_education": {
+    "slug": "books_education",
+    "en": "Textbooks and learning aids",
+    "ru": "Учебники и учебные пособия",
+    "parent": "books"
+  },
+  "books_languages": {
+    "slug": "books_languages",
+    "en": "Language learning and dictionaries",
+    "ru": "Изучение языков и словари",
+    "parent": "books"
+  },
+  "books_professional": {
+    "slug": "books_professional",
+    "en": "Professional and technical books",
+    "ru": "Профессиональная и техническая литература",
+    "parent": "books"
+  },
+  "books_magazines": {
+    "slug": "books_magazines",
+    "en": "Magazines and newspapers",
+    "ru": "Журналы и газеты",
+    "parent": "books"
+  },
+  "books_maps": {
+    "slug": "books_maps",
+    "en": "Maps and atlases",
+    "ru": "Карты и атласы",
+    "parent": "books"
+  },
+  "music_strings": {
+    "slug": "music_strings",
+    "en": "String instruments",
+    "ru": "Струнные инструменты",
+    "parent": "music"
+  },
+  "music_keyboards": {
+    "slug": "music_keyboards",
+    "en": "Keyboard instruments",
+    "ru": "Клавишные инструменты",
+    "parent": "music"
+  },
+  "music_percussion": {
+    "slug": "music_percussion",
+    "en": "Percussion instruments",
+    "ru": "Ударные инструменты",
+    "parent": "music"
+  },
+  "music_wind": {
+    "slug": "music_wind",
+    "en": "Wind instruments",
+    "ru": "Духовые инструменты",
+    "parent": "music"
+  },
+  "music_traditional": {
+    "slug": "music_traditional",
+    "en": "Traditional instruments",
+    "ru": "Народные инструменты",
+    "parent": "music"
+  },
+  "music_accessories": {
+    "slug": "music_accessories",
+    "en": "Instrument accessories",
+    "ru": "Аксессуары для инструментов",
+    "parent": "music"
+  },
+  "music_recording": {
+    "slug": "music_recording",
+    "en": "Recording and live sound",
+    "ru": "Звукозапись и концертный звук",
+    "parent": "music"
+  },
+  "music_traditional_dombra": {
+    "slug": "music_traditional_dombra",
+    "en": "Dombra",
+    "ru": "Домбра",
+    "parent": "music_traditional"
+  },
+  "music_traditional_kobyz": {
+    "slug": "music_traditional_kobyz",
+    "en": "Kobyz",
+    "ru": "Кобыз",
+    "parent": "music_traditional"
+  },
+  "music_traditional_other": {
+    "slug": "music_traditional_other",
+    "en": "Other traditional instruments",
+    "ru": "Другие народные инструменты",
+    "parent": "music_traditional"
+  },
+  "craft_drawing": {
+    "slug": "craft_drawing",
+    "en": "Drawing and painting",
+    "ru": "Рисование и живопись",
+    "parent": "craft"
+  },
+  "craft_sewing": {
+    "slug": "craft_sewing",
+    "en": "Sewing supplies",
+    "ru": "Швейные принадлежности",
+    "parent": "craft"
+  },
+  "craft_knitting": {
+    "slug": "craft_knitting",
+    "en": "Knitting and crochet",
+    "ru": "Вязание",
+    "parent": "craft"
+  },
+  "craft_beads": {
+    "slug": "craft_beads",
+    "en": "Beads and jewelry making",
+    "ru": "Бисер и создание украшений",
+    "parent": "craft"
+  },
+  "craft_modelling": {
+    "slug": "craft_modelling",
+    "en": "Clay and modelling",
+    "ru": "Лепка и моделирование",
+    "parent": "craft"
+  },
+  "craft_paper": {
+    "slug": "craft_paper",
+    "en": "Paper crafts",
+    "ru": "Творчество из бумаги",
+    "parent": "craft"
+  },
+  "craft_embroidery": {
+    "slug": "craft_embroidery",
+    "en": "Embroidery",
+    "ru": "Вышивка",
+    "parent": "craft"
+  },
+  "craft_kits": {
+    "slug": "craft_kits",
+    "en": "Craft kits",
+    "ru": "Наборы для творчества",
+    "parent": "craft"
+  },
+  "jewelry_rings": {
+    "slug": "jewelry_rings",
+    "en": "Rings",
+    "ru": "Кольца",
+    "parent": "jewelry"
+  },
+  "jewelry_earrings": {
+    "slug": "jewelry_earrings",
+    "en": "Earrings",
+    "ru": "Серьги",
+    "parent": "jewelry"
+  },
+  "jewelry_necklaces": {
+    "slug": "jewelry_necklaces",
+    "en": "Necklaces and pendants",
+    "ru": "Колье и подвески",
+    "parent": "jewelry"
+  },
+  "jewelry_bracelets": {
+    "slug": "jewelry_bracelets",
+    "en": "Bracelets",
+    "ru": "Браслеты",
+    "parent": "jewelry"
+  },
+  "jewelry_brooches": {
+    "slug": "jewelry_brooches",
+    "en": "Brooches",
+    "ru": "Броши",
+    "parent": "jewelry"
+  },
+  "jewelry_watches": {
+    "slug": "jewelry_watches",
+    "en": "Watches",
+    "ru": "Наручные часы",
+    "parent": "jewelry"
+  },
+  "jewelry_accessories": {
+    "slug": "jewelry_accessories",
+    "en": "Jewelry boxes and watch accessories",
+    "ru": "Шкатулки и аксессуары для часов",
+    "parent": "jewelry"
+  },
+  "optics_frames": {
+    "slug": "optics_frames",
+    "en": "Eyeglass frames",
+    "ru": "Оправы для очков",
+    "parent": "optics"
+  },
+  "optics_sunglasses": {
+    "slug": "optics_sunglasses",
+    "en": "Sunglasses",
+    "ru": "Солнцезащитные очки",
+    "parent": "optics"
+  },
+  "optics_reading": {
+    "slug": "optics_reading",
+    "en": "Reading glasses",
+    "ru": "Очки для чтения",
+    "parent": "optics"
+  },
+  "optics_contacts": {
+    "slug": "optics_contacts",
+    "en": "Contact lenses",
+    "ru": "Контактные линзы",
+    "parent": "optics"
+  },
+  "optics_care": {
+    "slug": "optics_care",
+    "en": "Lens care supplies",
+    "ru": "Уход за линзами",
+    "parent": "optics"
+  },
+  "optics_accessories": {
+    "slug": "optics_accessories",
+    "en": "Eyewear accessories",
+    "ru": "Аксессуары для очков",
+    "parent": "optics"
+  },
+  "industry_retail": {
+    "slug": "industry_retail",
+    "en": "Retail equipment",
+    "ru": "Торговое оборудование",
+    "parent": "industry"
+  },
+  "industry_packaging": {
+    "slug": "industry_packaging",
+    "en": "Packaging materials",
+    "ru": "Упаковочные материалы",
+    "parent": "industry"
+  },
+  "industry_storage": {
+    "slug": "industry_storage",
+    "en": "Warehouse equipment",
+    "ru": "Складское оборудование",
+    "parent": "industry"
+  },
+  "industry_catering": {
+    "slug": "industry_catering",
+    "en": "Catering equipment",
+    "ru": "Оборудование для общепита",
+    "parent": "industry"
+  },
+  "industry_manufacturing": {
+    "slug": "industry_manufacturing",
+    "en": "Manufacturing supplies",
+    "ru": "Производственные материалы",
+    "parent": "industry"
+  },
+  "industry_lab": {
+    "slug": "industry_lab",
+    "en": "Laboratory supplies",
+    "ru": "Лабораторные принадлежности",
+    "parent": "industry"
+  },
+  "industry_safety": {
+    "slug": "industry_safety",
+    "en": "Workplace safety supplies",
+    "ru": "Промышленная безопасность",
+    "parent": "industry"
+  },
+  "industry_cleaning": {
+    "slug": "industry_cleaning",
+    "en": "Commercial cleaning equipment",
+    "ru": "Профессиональное уборочное оборудование",
+    "parent": "industry"
+  },
+  "industry_retail_pos": {
+    "slug": "industry_retail_pos",
+    "en": "POS terminals",
+    "ru": "POS-терминалы",
+    "parent": "industry_retail"
+  },
+  "industry_retail_scanners": {
+    "slug": "industry_retail_scanners",
+    "en": "Barcode scanners",
+    "ru": "Сканеры штрихкодов",
+    "parent": "industry_retail"
+  },
+  "industry_retail_printers": {
+    "slug": "industry_retail_printers",
+    "en": "Receipt and label printers",
+    "ru": "Принтеры чеков и этикеток",
+    "parent": "industry_retail"
+  },
+  "industry_retail_scales": {
+    "slug": "industry_retail_scales",
+    "en": "Commercial scales",
+    "ru": "Торговые весы",
+    "parent": "industry_retail"
+  },
+  "industry_retail_cash_drawers": {
+    "slug": "industry_retail_cash_drawers",
+    "en": "Cash drawers",
+    "ru": "Денежные ящики",
+    "parent": "industry_retail"
+  },
+  "industry_retail_displays": {
+    "slug": "industry_retail_displays",
+    "en": "Retail displays and shelves",
+    "ru": "Витрины и торговые стеллажи",
+    "parent": "industry_retail"
+  },
+  "industry_retail_receipt_paper": {
+    "slug": "industry_retail_receipt_paper",
+    "en": "Receipt rolls and label stock",
+    "ru": "Чековые ленты и этикет-ленты",
+    "parent": "industry_retail"
+  },
+  "industry_packaging_boxes": {
+    "slug": "industry_packaging_boxes",
+    "en": "Boxes and cartons",
+    "ru": "Коробки и картонная тара",
+    "parent": "industry_packaging"
+  },
+  "industry_packaging_bags": {
+    "slug": "industry_packaging_bags",
+    "en": "Packaging bags",
+    "ru": "Упаковочные пакеты",
+    "parent": "industry_packaging"
+  },
+  "industry_packaging_film": {
+    "slug": "industry_packaging_film",
+    "en": "Packaging films",
+    "ru": "Упаковочные плёнки",
+    "parent": "industry_packaging"
+  },
+  "industry_packaging_cushioning": {
+    "slug": "industry_packaging_cushioning",
+    "en": "Protective packaging",
+    "ru": "Защитная упаковка",
+    "parent": "industry_packaging"
+  },
+  "industry_packaging_tapes": {
+    "slug": "industry_packaging_tapes",
+    "en": "Packaging tape",
+    "ru": "Упаковочные ленты",
+    "parent": "industry_packaging"
+  },
+  "industry_packaging_containers": {
+    "slug": "industry_packaging_containers",
+    "en": "Bulk containers and drums",
+    "ru": "Промышленные ёмкости и бочки",
+    "parent": "industry_packaging"
+  },
+  "industry_manufacturing_bearings": {
+    "slug": "industry_manufacturing_bearings",
+    "en": "Bearings",
+    "ru": "Подшипники",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_belts": {
+    "slug": "industry_manufacturing_belts",
+    "en": "Drive belts and chains",
+    "ru": "Приводные ремни и цепи",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_motors": {
+    "slug": "industry_manufacturing_motors",
+    "en": "Electric motors and drives",
+    "ru": "Электродвигатели и приводы",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_pneumatics": {
+    "slug": "industry_manufacturing_pneumatics",
+    "en": "Pneumatic components",
+    "ru": "Пневматические компоненты",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_hydraulics": {
+    "slug": "industry_manufacturing_hydraulics",
+    "en": "Hydraulic components",
+    "ru": "Гидравлические компоненты",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_seals": {
+    "slug": "industry_manufacturing_seals",
+    "en": "Seals and gaskets",
+    "ru": "Уплотнения и прокладки",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_abrasives": {
+    "slug": "industry_manufacturing_abrasives",
+    "en": "Industrial abrasives",
+    "ru": "Промышленные абразивы",
+    "parent": "industry_manufacturing"
+  },
+  "industry_manufacturing_raw_materials": {
+    "slug": "industry_manufacturing_raw_materials",
+    "en": "Production raw materials",
+    "ru": "Производственное сырьё",
+    "parent": "industry_manufacturing"
+  },
+  "agriculture_seeds": {
+    "slug": "agriculture_seeds",
+    "en": "Field crop seeds",
+    "ru": "Семена полевых культур",
+    "parent": "agriculture"
+  },
+  "agriculture_feed": {
+    "slug": "agriculture_feed",
+    "en": "Animal feed",
+    "ru": "Корма для сельхозживотных",
+    "parent": "agriculture"
+  },
+  "agriculture_livestock": {
+    "slug": "agriculture_livestock",
+    "en": "Livestock equipment",
+    "ru": "Оборудование для животноводства",
+    "parent": "agriculture"
+  },
+  "agriculture_poultry": {
+    "slug": "agriculture_poultry",
+    "en": "Poultry equipment",
+    "ru": "Оборудование для птицеводства",
+    "parent": "agriculture"
+  },
+  "agriculture_beekeeping": {
+    "slug": "agriculture_beekeeping",
+    "en": "Beekeeping supplies",
+    "ru": "Пчеловодство",
+    "parent": "agriculture"
+  },
+  "agriculture_irrigation": {
+    "slug": "agriculture_irrigation",
+    "en": "Agricultural irrigation",
+    "ru": "Сельскохозяйственное орошение",
+    "parent": "agriculture"
+  },
+  "agriculture_machinery": {
+    "slug": "agriculture_machinery",
+    "en": "Agricultural machinery parts",
+    "ru": "Запчасти для сельхозтехники",
+    "parent": "agriculture"
+  },
+  "agriculture_fertilizers": {
+    "slug": "agriculture_fertilizers",
+    "en": "Agricultural fertilizers",
+    "ru": "Сельскохозяйственные удобрения",
+    "parent": "agriculture"
+  },
+  "party_gift_wrap": {
+    "slug": "party_gift_wrap",
+    "en": "Gift wrapping",
+    "ru": "Подарочная упаковка",
+    "parent": "party"
+  },
+  "party_greeting_cards": {
+    "slug": "party_greeting_cards",
+    "en": "Greeting cards",
+    "ru": "Открытки",
+    "parent": "party"
+  },
+  "party_balloons": {
+    "slug": "party_balloons",
+    "en": "Balloons",
+    "ru": "Воздушные шары",
+    "parent": "party"
+  },
+  "party_decorations": {
+    "slug": "party_decorations",
+    "en": "Party decorations",
+    "ru": "Праздничный декор",
+    "parent": "party"
+  },
+  "party_costumes": {
+    "slug": "party_costumes",
+    "en": "Costumes and accessories",
+    "ru": "Карнавальные костюмы и аксессуары",
+    "parent": "party"
+  },
+  "party_souvenirs": {
+    "slug": "party_souvenirs",
+    "en": "Souvenirs",
+    "ru": "Сувениры",
+    "parent": "party"
+  },
+  "party_flowers": {
+    "slug": "party_flowers",
+    "en": "Cut flowers and bouquets",
+    "ru": "Срезанные цветы и букеты",
+    "parent": "party"
+  },
+  "seasonal_new_year": {
+    "slug": "seasonal_new_year",
+    "en": "New Year decorations",
+    "ru": "Новогодние украшения",
+    "parent": "seasonal"
+  },
+  "seasonal_nauryz": {
+    "slug": "seasonal_nauryz",
+    "en": "Nauryz celebration goods",
+    "ru": "Товары к Наурызу",
+    "parent": "seasonal"
+  },
+  "seasonal_summer": {
+    "slug": "seasonal_summer",
+    "en": "Summer seasonal goods",
+    "ru": "Летние сезонные товары",
+    "parent": "seasonal"
+  },
+  "seasonal_winter": {
+    "slug": "seasonal_winter",
+    "en": "Winter seasonal goods",
+    "ru": "Зимние сезонные товары",
+    "parent": "seasonal"
+  },
+  "seasonal_school": {
+    "slug": "seasonal_school",
+    "en": "Back-to-school collections",
+    "ru": "Товары к началу учебного года",
+    "parent": "seasonal"
+  }
+}

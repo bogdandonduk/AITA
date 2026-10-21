@@ -83,6 +83,27 @@ class WorkerPlacementDatabaseTest {
             assertEquals(root, Users.selectAll().where { Users.id eq worker }.single()[Users.activeStoreId])
         }
     }
+    @Test fun standardParentEmployeesInheritOnlyStandardPermissionsAndKeepTheirChosenWorkplace() = fixture(true) { db ->
+        transaction(db) {
+            StoreWorkerMemberships.update({ StoreWorkerMemberships.id eq membership }) {
+                it[permissions] = STANDARD_STORE_PERMISSION_IDS
+            }
+            Users.update({ Users.id eq worker }) { it[activeStoreId] = first }
+            assertTrue(userCanUseStoreActionInsideTransaction(worker, root, STORE_PERMISSION_STOCK_READ),
+                "A management parent's stock does not require a paid branch or an active shift")
+            assertFalse(userCanUseStoreActionInsideTransaction(worker, root, STORE_PERMISSION_SALE_TRANSACTION))
+            listOf(first, second).forEach { branch ->
+                assertEquals(STANDARD_STORE_PERMISSION_IDS, activeWorkerPermissionsInsideTransaction(worker, branch))
+                assertFalse(isStoreOwnerInsideTransaction(worker, branch))
+                assertFalse(userHasStorePermissionInsideTransaction(worker, branch, STORE_PERMISSION_WORKERS_INVITE))
+            }
+            val placed = placeWorkerInsideTransaction(owner, command(root))
+            assertEquals(WORKER_ROLE_STANDARD, placed.roleId)
+            assertEquals(STANDARD_STORE_PERMISSION_IDS, placed.permissions)
+            assertEquals(first, Users.selectAll().where { Users.id eq worker }.single()[Users.activeStoreId],
+                "Adding a branch assignment does not overwrite a parent's worker's chosen workplace")
+        }
+    }
     @Test fun cannotMoveAcrossCompaniesOrIntoParentOrWithoutBothStorePermissions() = fixture { db ->
         assertEquals("invalid", assertFailsWith<WorkerPlacementFailure> { transaction(db) { placeWorkerInsideTransaction(owner, command(target = stranger)) } }.key)
         assertEquals("invalid", assertFailsWith<WorkerPlacementFailure> { transaction(db) { placeWorkerInsideTransaction(owner, command(target = root)) } }.key)
@@ -123,6 +144,31 @@ class WorkerPlacementDatabaseTest {
         transaction(db) { Stores.update({ Stores.id eq root }) { it[ownerUserIds] = emptyList() }
             Stores.update({ Stores.id inList listOf(first, second) }) { it[ownerUserIds] = emptyList() } }
         assertEquals("denied", assertFailsWith<WorkerPlacementFailure> { transaction(db) { placeWorkerInsideTransaction(owner, c) } }.key)
+    }
+
+    @Test fun shiftReportsAreScopedToTheEmployeeAndManagerWithoutGrantingGeneralAnalytics() = fixture(true) { db ->
+        val shift = UUID.randomUUID()
+        transaction(db) {
+            SchemaUtils.create(Transactions)
+            Workshifts.insert {
+                it[id] = shift; it[storeId] = first; it[workerMembershipId] = membership; it[workerUserId] = worker
+                it[startedAtMillis] = 1000L; it[startedByUserId] = worker; it[metadata] = emptyMap()
+            }
+            listOf(worker to 1500L, owner to 1500L, worker to 1600L).forEach { (actor, at) -> Transactions.insert {
+                it[id] = UUID.randomUUID(); it[userId] = actor; it[storeId] = first; it[workshiftId] = 0L; it[type] = "purchase"
+                it[goodsInTransaction] = listOf(GoodsItemInTransactionDataModel("123", 1.0, 50.0, currencyCode = "KZT"))
+                it[paidCash] = 50.0; it[paidCard] = 0.0; it[cardPaymentOptionId] = 0; it[timeMillis] = at
+            } }
+            assertFalse(userHasStorePermissionInsideTransaction(worker, first, STORE_PERMISSION_ANALYTICS_VIEW))
+            assertEquals(2, shiftReportInsideTransaction(worker, first, shift, SHIFT_REPORT_X, 1600)!!.transactionCount)
+            assertEquals(2, shiftReportInsideTransaction(owner, first, shift, SHIFT_REPORT_X, 1600)!!.transactionCount)
+            assertNull(shiftReportInsideTransaction(worker, second, shift, SHIFT_REPORT_X, 1600))
+            assertNull(shiftReportInsideTransaction(UUID.randomUUID(), first, shift, SHIFT_REPORT_X, 1600))
+            assertNull(shiftReportInsideTransaction(worker, first, shift, SHIFT_REPORT_Z, 1600))
+            Workshifts.update({ Workshifts.id eq shift }) { it[endedAtMillis] = 1600; it[isActive] = false }
+            assertEquals(1, shiftReportInsideTransaction(worker, first, shift, SHIFT_REPORT_Z, 9000)!!.transactionCount)
+            assertEquals(1, shiftReportsInsideTransaction(worker, first)!!.size)
+        }
     }
 
 }

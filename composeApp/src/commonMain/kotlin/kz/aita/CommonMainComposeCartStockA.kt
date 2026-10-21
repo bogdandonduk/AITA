@@ -2135,8 +2135,38 @@ internal fun stockWarehouseActiveBatchesForUi(batches: List<GoodsBatchDataModel>
                 batch.status != StockBatchStatusDataModel.InTransit &&
                 batch.status != StockBatchStatusDataModel.SoldOut &&
                 batch.status != StockBatchStatusDataModel.WrittenOff &&
+                batch.quantity.total.isFinite() &&
                 batch.quantity.total > 0.0
     }
+
+/** Do not add quantities expressed in different units into one misleading stock total. */
+internal fun AppConfiguration.stockWarehouseQuantityTextForUi(
+    batches: List<GoodsBatchDataModel>
+): String {
+    val included = stockWarehouseActiveBatchesForUi(batches)
+    if (included.isEmpty()) {
+        val unit = batches.firstOrNull()?.quantity?.immutableUnitName
+            ?.extractLocalizedString(stateValues.appLanguage).orEmpty()
+        return "0 $unit".trim()
+    }
+    if (included.any { !it.tracksQuantity }) return inventoryExperienceText("unlimited")
+
+    return included
+        .groupBy { batch ->
+            val quantity = batch.quantity
+            Triple(
+                quantity.id,
+                quantity.roundTotal,
+                quantity.immutableUnitName.extractLocalizedString(stateValues.appLanguage).orEmpty()
+            )
+        }
+        .map { (unit, unitBatches) ->
+            val total = unitBatches.availableStockQuantity()
+            if (total.isFinite()) "${total.quantityAmountText(unit.second)} ${unit.third}".trim()
+            else inventoryExperienceText("invalid_quantity")
+        }
+        .joinToString(" + ")
+}
 
 internal fun stockWarehouseBatchesByItemForUi(batches: List<GoodsBatchDataModel>): Map<String, List<GoodsBatchDataModel>> =
     stockWarehouseActiveBatchesForUi(batches).groupBy { it.goodsItemId }
