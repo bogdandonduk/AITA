@@ -312,6 +312,10 @@ class AitaSharedJvmFlowTest {
     }
 
     @Test fun unreadableCacheIsNotAnEmptyCatalogueAndOnlineRefreshCanRepairIt() = runBlocking {
+        // A health refresh also reads the store directory. This account must still own
+        // its selected store while repairing stock, rather than simulate its deletion.
+        environment.stores = listOf(aitaTestStore())
+        storesState.emit(DataState.Success(environment.stores))
         val key = CACHE_PREFIX + inventoryCacheKey("stock", inventoryOwners.current)
         writeJsonCacheText(key, "not valid inventory JSON")
         environment.networkUnavailable = true
@@ -322,6 +326,9 @@ class AitaSharedJvmFlowTest {
         assertEquals("not valid inventory JSON", readJsonCacheText(key))
         environment.networkUnavailable = false
         environment.stock = listOf(aitaTestGoodsItem(id = "recovered-item"))
+        getStores()
+        waitUntilAitaFlowCondition { !storesLoadingState.value }
+        assertEquals(AITA_FLOW_SOURCE_STORE_ID, activeStoreIdState.value)
         waitUntilAitaFlowCondition { !stockLoadStatusState.value.loading }
         // OwnedScopedRead completes after clearing the UI loading flag.
         stockRead.cancel()
