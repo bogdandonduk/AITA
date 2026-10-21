@@ -65,15 +65,21 @@ ConvertTo-Json -InputObject @($script:phases) | Set-Content -Encoding UTF8 -Lite
 '''
             helper.write_text(script + tail)
             last = folder / 'last-result'; last.write_text('previous_result')
-            env = dict(os.environ, SystemRoot=str(folder), AITA_UPDATE_READY=str(folder/'ready'), AITA_UPDATE_LAUNCHER=str(launcher),
+            env = dict(os.environ, AITA_UPDATE_READY=str(folder/'ready'), AITA_UPDATE_LAUNCHER=str(launcher),
                 AITA_UPDATE_INSTALLER=str(installer), AITA_UPDATE_PARENT='99999999', AITA_UPDATE_LOG=str(folder/'install.log'),
                 AITA_UPDATE_SHA256=hashlib.sha256(installer.read_bytes()).hexdigest() if matching else '0'*64,
                 AITA_UPDATE_ACTIVE=str(folder/'active'), AITA_UPDATE_RESULT=str(folder/'result'), AITA_UPDATE_LAST_RESULT=str(last),
                 AITA_UPDATE_LOCK=str(folder/'lock'), AITA_UPDATE_RELAUNCH=str(relaunch).lower(), AITA_TEST_EXIT=str(exit_code),
                 AITA_TEST_CALLS=str(output), AITA_TEST_PHASES=str(folder/'phases'), AITA_TEST_INSTALL_ARGS=str(folder/'args.txt'),
                 AITA_TEST_SCENARIO=scenario, AITA_UPDATE_STAGED=str(staged).lower())
+            # Windows PowerShell needs the real SystemRoot to initialize .NET.
+            # Start-Process is mocked, so keeping this path cannot run an installer.
+            # Linux's portable pwsh has no SystemRoot and uses the fixture path.
+            env.setdefault('SystemRoot', str(folder))
+            env.pop('PSModulePath', None)  # Match the shipped handoff launcher.
             execution = subprocess.run([POWERSHELL, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(helper)],
-                env=env, check=True, capture_output=True, text=True, timeout=30)
+                env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(execution.returncode, 0, execution.stdout + execution.stderr)
             calls = json.loads(output.read_text(encoding='utf-8-sig'))
             phases = json.loads((folder/'phases').read_text(encoding='utf-8-sig'))
             success = matching and exit_code in (0,3010) and scenario == 'normal'
