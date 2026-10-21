@@ -1,0 +1,164 @@
+{
+  "version": "1.2.8",
+  "build": 29,
+  "revision": "e8e5d6d4a95edf54ed1d983f26ebf0df8dbd2f8a",
+  "tag": "v1.2.8-b29",
+  "createdAt": "2026-10-21T10:55:00Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.2.8-29-android.apk",
+      "sha256": "0f34d6f330cf84ae3561b4a5f7eaf066884df6a2bfd34c337e91f7985d301445",
+      "bytes": 73126071,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-android.apk"
+    },
+    {
+      "name": "AITA-1.2.8-29-android.aab",
+      "sha256": "0bcba6e9964586623fd3579e050e79ba80b52415a4ab74e3f9bb0f33bb36e459",
+      "bytes": 47783532,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "ce5a9e789c303ab86f1ac6963b82c7118e8480ded0669b6945462cdccd70d074",
+      "bytes": 857,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.8-29-linux-x64.deb",
+      "sha256": "fc0ac668de66707fed3840313a62daba4949dc28da1e09d5d21fed1f21014972",
+      "bytes": 117075902,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-linux-x64.deb"
+    },
+    {
+      "name": "AITA-1.2.8-29-linux-x64.rpm",
+      "sha256": "a7a887208d4af15cdc90700c0b69bc56a3161b2382b7f5b12df6713f30d1d020",
+      "bytes": 128498430,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-linux-x64.rpm"
+    },
+    {
+      "name": "linux-client-build.json",
+      "sha256": "ce5a9e789c303ab86f1ac6963b82c7118e8480ded0669b6945462cdccd70d074",
+      "bytes": 857,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/linux-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.8-29-web.zip",
+      "sha256": "384f2e2ba5cd5cd7c70726a6f3d8227c01924447bbe2292bbd906d4f2845a123",
+      "bytes": 13144265,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "ce5a9e789c303ab86f1ac6963b82c7118e8480ded0669b6945462cdccd70d074",
+      "bytes": 857,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/web-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.8-29-windows.exe",
+      "sha256": "7495b3a4f25a869a1446e9f18b79250ecbfd01a99d3b4bd6eff4f65ac44e53f8",
+      "bytes": 138716672,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-windows.exe"
+    },
+    {
+      "name": "AITA-1.2.8-29-windows.msi",
+      "sha256": "ac61641ffd5eb7b55623aa2682685493d6469490dc77a83aee37f506556be5f9",
+      "bytes": 138117580,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/AITA-1.2.8-29-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "838e8a8856e85e54be06474ee5fcd047dc2b9996e08f0050d5ceda6a79e28e28",
+      "bytes": 1727,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "5345cf0e1ba55c89fd92df9ee40e8fb06d205ca648dcf522ddab343925971b3c",
+      "bytes": 857,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.8-b29/windows-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Stock remains available from account-scoped offline caches, including across desktop upgrades. More reliable inventory loading and queued offline changes. X/Z workshift reports with preview and printing; analytics recovers from interrupted loading. A public marketplace home welcomes web visitors without requiring sign-in. Windows updates now show installation progress and prevent duplicate installers. Expanded global-product import and indexed search support.",
+    "ru": "\u0421\u043a\u043b\u0430\u0434 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d \u0438\u0437 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u043e\u0433\u043e \u043a\u044d\u0448\u0430 \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430, \u0432 \u0442\u043e\u043c \u0447\u0438\u0441\u043b\u0435 \u043f\u043e\u0441\u043b\u0435 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f \u043d\u0430 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0435. \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043e\u0441\u0442\u0430\u0442\u043a\u043e\u0432 \u0438 \u043e\u0447\u0435\u0440\u0435\u0434\u044c \u043e\u0444\u043b\u0430\u0439\u043d-\u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0439. \u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b X/Z-\u043e\u0442\u0447\u0451\u0442\u044b \u0441\u043c\u0435\u043d \u0441 \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u043e\u043c \u0438 \u043f\u0435\u0447\u0430\u0442\u044c\u044e; \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u0430\u0432\u043b\u0438\u0432\u0430\u0435\u0442\u0441\u044f \u043f\u043e\u0441\u043b\u0435 \u043e\u0448\u0438\u0431\u043e\u043a \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438. \u0413\u043b\u0430\u0432\u043d\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0430 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u043f\u043e\u0441\u0435\u0442\u0438\u0442\u0435\u043b\u044f\u043c \u0441\u0430\u0439\u0442\u0430 \u0431\u0435\u0437 \u0432\u0445\u043e\u0434\u0430. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 Windows \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u0445\u043e\u0434 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0438 \u0438 \u043f\u0440\u0435\u0434\u043e\u0442\u0432\u0440\u0430\u0449\u0430\u0435\u0442 \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u044b\u0439 \u0437\u0430\u043f\u0443\u0441\u043a \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u0449\u0438\u043a\u043e\u0432. \u041f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u043b\u0435\u043d \u0438\u043c\u043f\u043e\u0440\u0442 \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u043e\u0433\u043e \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u0430 \u0442\u043e\u0432\u0430\u0440\u043e\u0432 \u0441 \u0438\u043d\u0434\u0435\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u043c \u043f\u043e\u0438\u0441\u043a\u043e\u043c.",
+    "kk": "\u049a\u043e\u0439\u043c\u0430 \u0434\u0435\u0440\u0435\u043a\u0442\u0435\u0440\u0456 \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u044b\u04a3 \u0436\u0435\u0440\u0433\u0456\u043b\u0456\u043a\u0442\u0456 \u043a\u044d\u0448\u0456\u043d\u0435\u043d, \u0441\u043e\u043d\u044b\u04a3 \u0456\u0448\u0456\u043d\u0434\u0435 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0434\u0435\u0433\u0456 \u049b\u043e\u043b\u0434\u0430\u043d\u0431\u0430\u043d\u044b \u0436\u0430\u04a3\u0430\u0440\u0442\u049b\u0430\u043d\u043d\u0430\u043d \u043a\u0435\u0439\u0456\u043d \u0434\u0435 \u049b\u043e\u043b\u0436\u0435\u0442\u0456\u043c\u0434\u0456. \u049a\u0430\u043b\u0434\u044b\u049b\u0442\u0430\u0440\u0434\u044b \u0436\u04af\u043a\u0442\u0435\u0443 \u0436\u04d9\u043d\u0435 \u043e\u0444\u043b\u0430\u0439\u043d \u04e9\u0437\u0433\u0435\u0440\u0456\u0441\u0442\u0435\u0440 \u043a\u0435\u0437\u0435\u0433\u0456 \u0436\u0430\u049b\u0441\u0430\u0440\u0442\u044b\u043b\u0434\u044b. \u0410\u0443\u044b\u0441\u044b\u043c\u043d\u044b\u04a3 X/Z \u0435\u0441\u0435\u043f\u0442\u0435\u0440\u0456\u043d \u049b\u0430\u0440\u0430\u0443 \u0436\u04d9\u043d\u0435 \u0431\u0430\u0441\u044b\u043f \u0448\u044b\u0493\u0430\u0440\u0443 \u049b\u043e\u0441\u044b\u043b\u0434\u044b; \u0442\u0430\u043b\u0434\u0430\u0443 \u0436\u04af\u043a\u0442\u0435\u0443 \u049b\u0430\u0442\u0435\u0441\u0456\u043d\u0435\u043d \u043a\u0435\u0439\u0456\u043d \u049b\u0430\u043b\u043f\u044b\u043d\u0430 \u043a\u0435\u043b\u0435\u0434\u0456. \u041c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0442\u0456\u04a3 \u0431\u0430\u0441\u0442\u044b \u0431\u0435\u0442\u0456 \u0441\u0430\u0439\u0442 \u049b\u043e\u043d\u0430\u049b\u0442\u0430\u0440\u044b\u043d\u0430 \u043a\u0456\u0440\u0443\u0441\u0456\u0437 \u0430\u0448\u044b\u043b\u0430\u0434\u044b. Windows \u0436\u0430\u04a3\u0430\u0440\u0442\u0443\u044b \u043e\u0440\u043d\u0430\u0442\u0443 \u0431\u0430\u0440\u044b\u0441\u044b\u043d \u043a\u04e9\u0440\u0441\u0435\u0442\u0456\u043f, \u043e\u0440\u043d\u0430\u0442\u049b\u044b\u0448\u0442\u044b\u04a3 \u049b\u0430\u0439\u0442\u0430\u043b\u0430\u043d\u044b\u043f \u0456\u0441\u043a\u0435 \u049b\u043e\u0441\u044b\u043b\u0443\u044b\u043d\u0430 \u0436\u043e\u043b \u0431\u0435\u0440\u043c\u0435\u0439\u0434\u0456. \u041a\u0435\u04a3\u0435\u0439\u0442\u0456\u043b\u0433\u0435\u043d \u0442\u0430\u0443\u0430\u0440 \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u044b\u043d \u0438\u043c\u043f\u043e\u0440\u0442\u0442\u0430\u0443 \u0436\u04d9\u043d\u0435 \u0438\u043d\u0434\u0435\u043a\u0441\u0442\u0435\u043b\u0433\u0435\u043d \u0456\u0437\u0434\u0435\u0443 \u0434\u0430\u0439\u044b\u043d\u0434\u0430\u043b\u0434\u044b.",
+    "ky": "\u041a\u0430\u043c\u043f\u0430 \u043c\u0430\u0430\u043b\u044b\u043c\u0430\u0442\u044b \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0442\u0443\u043d \u0436\u0435\u0440\u0433\u0438\u043b\u0438\u043a\u0442\u04af\u04af \u043a\u044d\u0448\u0438\u043d\u0435\u043d, \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0434\u0435\u0433\u0438 \u043a\u043e\u043b\u0434\u043e\u043d\u043c\u043e \u0436\u0430\u04a3\u044b\u0440\u0442\u044b\u043b\u0433\u0430\u043d\u0434\u0430\u043d \u043a\u0438\u0439\u0438\u043d \u0434\u0430 \u0436\u0435\u0442\u043a\u0438\u043b\u0438\u043a\u0442\u04af\u04af. \u041a\u0430\u043b\u0434\u044b\u043a\u0442\u0430\u0440\u0434\u044b \u0436\u04af\u043a\u0442\u04e9\u04e9 \u0436\u0430\u043d\u0430 \u043e\u0444\u043b\u0430\u0439\u043d \u04e9\u0437\u0433\u04e9\u0440\u0442\u04af\u04af\u043b\u04e9\u0440 \u043a\u0435\u0437\u0435\u0433\u0438 \u0436\u0430\u043a\u0448\u044b\u0440\u0442\u044b\u043b\u0434\u044b. \u0421\u043c\u0435\u043d\u0430\u043d\u044b\u043d X/Z \u043e\u0442\u0447\u0451\u0442\u0442\u043e\u0440\u0443\u043d \u043a\u04e9\u0440\u04af\u04af \u0436\u0430\u043d\u0430 \u0431\u0430\u0441\u044b\u043f \u0447\u044b\u0433\u0430\u0440\u0443\u0443 \u043a\u043e\u0448\u0443\u043b\u0434\u0443; \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 \u0436\u04af\u043a\u0442\u04e9\u04e9 \u043a\u0430\u0442\u0430\u0441\u044b\u043d\u0430\u043d \u043a\u0438\u0439\u0438\u043d \u043a\u0430\u043b\u044b\u0431\u044b\u043d\u0430 \u043a\u0435\u043b\u0435\u0442. \u041c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441\u0442\u0438\u043d \u0431\u0430\u0448\u043a\u044b \u0431\u0435\u0442\u0438 \u0441\u0430\u0439\u0442\u0442\u044b\u043d \u043a\u043e\u043d\u043e\u043a\u0442\u043e\u0440\u0443\u043d\u0430 \u043a\u0438\u0440\u04af\u04af\u0441\u04af\u0437 \u0430\u0447\u044b\u043b\u0430\u0442. Windows \u0436\u0430\u04a3\u044b\u0440\u0442\u0443\u0443\u0441\u0443 \u043e\u0440\u043d\u043e\u0442\u0443\u0443\u043d\u0443\u043d \u0436\u04af\u0440\u04af\u0448\u04af\u043d \u043a\u04e9\u0440\u0441\u04e9\u0442\u04e9\u0442 \u0436\u0430\u043d\u0430 \u043e\u0440\u043d\u043e\u0442\u043a\u0443\u0447\u0442\u0443\u043d \u043a\u0430\u0439\u0442\u0430\u043b\u0430\u043d\u044b\u043f \u0430\u0447\u044b\u043b\u044b\u0448\u044b\u043d \u0442\u043e\u043a\u0442\u043e\u0442\u043e\u0442. \u041a\u0435\u04a3\u0435\u0439\u0442\u0438\u043b\u0433\u0435\u043d \u0442\u043e\u0432\u0430\u0440 \u043a\u0430\u0442\u0430\u043b\u043e\u0433\u0443\u043d \u0438\u043c\u043f\u043e\u0440\u0442\u0442\u043e\u043e \u0436\u0430\u043d\u0430 \u0438\u043d\u0434\u0435\u043a\u0441\u0442\u0435\u043b\u0433\u0435\u043d \u0438\u0437\u0434\u04e9\u04e9 \u0434\u0430\u044f\u0440\u0434\u0430\u043b\u0434\u044b.",
+    "tg": "\u041c\u0430\u044a\u043b\u0443\u043c\u043e\u0442\u0438 \u0430\u043d\u0431\u043e\u0440 \u0430\u0437 \u043a\u044d\u0448\u0438 \u043c\u0430\u04b3\u0430\u043b\u043b\u0438\u0438 \u04b3\u0438\u0441\u043e\u0431, \u0430\u0437 \u04b7\u0443\u043c\u043b\u0430 \u043f\u0430\u0441 \u0430\u0437 \u043d\u0430\u0432\u0441\u043e\u0437\u0438\u0438 \u0431\u0430\u0440\u043d\u043e\u043c\u0430 \u0434\u0430\u0440 \u043a\u043e\u043c\u043f\u044e\u0442\u0435\u0440, \u0434\u0430\u0441\u0442\u0440\u0430\u0441 \u043c\u0435\u043c\u043e\u043d\u0430\u0434. \u0411\u043e\u0440\u043a\u0443\u043d\u0438\u0438 \u0431\u0430\u049b\u0438\u044f \u0432\u0430 \u043d\u0430\u0432\u0431\u0430\u0442\u0438 \u0442\u0430\u0493\u0439\u0438\u0440\u043e\u0442\u0438 \u043e\u0444\u043b\u0430\u0439\u043d \u0431\u0435\u04b3\u0442\u0430\u0440 \u0448\u0443\u0434\u0430\u043d\u0434. \u04b2\u0438\u0441\u043e\u0431\u043e\u0442\u0438 X/Z-\u0438 \u0431\u0430\u0441\u0442 \u0431\u043e \u0434\u0438\u0434\u0430\u043d \u0432\u0430 \u0447\u043e\u043f \u0438\u043b\u043e\u0432\u0430 \u0448\u0443\u0434; \u0442\u0430\u04b3\u043b\u0438\u043b \u043f\u0430\u0441 \u0430\u0437 \u0445\u0430\u0442\u043e\u0438 \u0431\u043e\u0440\u043a\u0443\u043d\u04e3 \u0431\u0430\u0440\u049b\u0430\u0440\u043e\u0440 \u043c\u0435\u0448\u0430\u0432\u0430\u0434. \u0421\u0430\u04b3\u0438\u0444\u0430\u0438 \u0430\u0441\u043e\u0441\u0438\u0438 \u0431\u043e\u0437\u043e\u0440 \u0431\u0430\u0440\u043e\u0438 \u043c\u0435\u04b3\u043c\u043e\u043d\u043e\u043d\u0438 \u0441\u043e\u043c\u043e\u043d\u0430 \u0431\u0435 \u0432\u043e\u0440\u0438\u0434\u0448\u0430\u0432\u04e3 \u0434\u0430\u0441\u0442\u0440\u0430\u0441 \u0430\u0441\u0442. \u041d\u0430\u0432\u0441\u043e\u0437\u0438\u0438 Windows \u0440\u0430\u0432\u0430\u043d\u0434\u0438 \u043d\u0430\u0441\u0431\u0440\u043e \u043d\u0438\u0448\u043e\u043d \u043c\u0435\u0434\u0438\u04b3\u0430\u0434 \u0432\u0430 \u043e\u0493\u043e\u0437\u0438 \u0442\u0430\u043a\u0440\u043e\u0440\u0438\u0438 \u043d\u0430\u0441\u0431\u043a\u0443\u043d\u0430\u043d\u0434\u0430\u0440\u043e \u043f\u0435\u0448\u0433\u0438\u0440\u04e3 \u043c\u0435\u043a\u0443\u043d\u0430\u0434. \u0412\u043e\u0440\u0438\u0434\u043a\u0443\u043d\u0438\u0438 \u0444\u0435\u04b3\u0440\u0438\u0441\u0442\u0438 \u0432\u0430\u0441\u0435\u0438 \u043c\u043e\u043b\u04b3\u043e \u0432\u0430 \u04b7\u0443\u0441\u0442\u0443\u04b7\u04ef\u0438 \u0438\u043d\u0434\u0435\u043a\u0441\u0448\u0443\u0434\u0430 \u043e\u043c\u043e\u0434\u0430 \u0448\u0443\u0434.",
+    "uz": "Ombor ma\u2019lumotlari hisobning mahalliy keshidan, jumladan kompyuterdagi ilova yangilangandan keyin ham ochiladi. Qoldiqlarni yuklash va oflayn o\u2018zgarishlar navbati yaxshilandi. Smenaning X/Z hisobotlarini ko\u2018rish va chop etish qo\u2018shildi; tahlil yuklash xatosidan keyin tiklanadi. Marketpleys bosh sahifasi sayt mehmonlariga tizimga kirmasdan ochiladi. Windows yangilanishi o\u2018rnatish jarayonini ko\u2018rsatadi va o\u2018rnatuvchining takroran ishga tushishini oldini oladi. Kengaytirilgan tovar katalogi importi va indeksli qidiruv tayyorlandi."
+  },
+  "stages": {
+    "source": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:19:45Z",
+      "finishedAt": "2026-10-21T10:19:45Z"
+    },
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:19:45Z",
+      "finishedAt": "2026-10-21T10:24:40Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:24:40Z",
+      "finishedAt": "2026-10-21T10:24:49Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:24:49Z",
+      "finishedAt": "2026-10-21T10:26:13Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:26:13Z",
+      "finishedAt": "2026-10-21T10:34:20Z"
+    },
+    "linux": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:34:20Z",
+      "finishedAt": "2026-10-21T10:34:54Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:34:54Z",
+      "finishedAt": "2026-10-21T10:49:35Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:50:51Z",
+      "finishedAt": "2026-10-21T10:54:26Z",
+      "verificationRevision": "9de6b87ef77d9e7095e29e0e702fde6ace34655b"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-10-21T10:54:26Z",
+      "finishedAt": "2026-10-21T10:55:00Z"
+    }
+  },
+  "visibility": "GitHub downloads follow repository visibility; the signed in-app update feed is public",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
