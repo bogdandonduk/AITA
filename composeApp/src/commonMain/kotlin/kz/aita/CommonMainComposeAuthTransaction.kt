@@ -569,6 +569,8 @@ internal var userAuthScreenScrollFirstVisibleItemScrollOffset: Int = 0
 
 @Composable
 fun AppConfiguration.UserAuthScreen() {
+    // Retain the guest entry page while Downloads temporarily replaces its content.
+    var showGuestMarketplace by rememberSaveable { mutableStateOf(getPlatformName().contains("wasm", ignoreCase = true)) }
     val publicDestination = (if (stateValues.isNarrowScreen) stateValues.navigationScreensUserAuthLeft
         else stateValues.navigationScreensUserAuthRight).lastOrNull()
     val openPublicPage: (NavigationScreenModel.UserAuth) -> Unit = { destination ->
@@ -599,7 +601,6 @@ fun AppConfiguration.UserAuthScreen() {
         }
         return
     }
-    var showGuestMarketplace by rememberSaveable { mutableStateOf(getPlatformName().contains("wasm", ignoreCase = true)) }
     if (showGuestMarketplace && stateValues.userAccount == null) {
         PublicMarketplaceHome(
             onLogin = { showGuestMarketplace = false; coroutineScope.launch { Navigation.UserAuth.clearLeft() } },

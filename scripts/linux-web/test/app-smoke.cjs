@@ -27,7 +27,12 @@ async function backgroundPixel(page) {
  await page.route('**/*.wasm*', async route => { await startupGate; await route.fallback(); });
  const errors=[], failed=[], responses=[], emptyUpdateResponses=[];
  const responseStatuses = new WeakMap(), activeRequests = new Set(), reloadRequests = new WeakSet();
- const reloadCancellations=[], authNavigationCancellations=[], authNavigationRequests=new WeakSet();
+ const reloadCancellations=[], pageNavigationCancellations=[], pageNavigationRequests=new WeakSet();
+ function markPendingPublicRead() {
+  for (const request of activeRequests) {
+   if (request.method() === 'POST' && new URL(request.url()).pathname === '/market/public/discovery') pageNavigationRequests.add(request);
+  }
+ }
  page.on('request', request => activeRequests.add(request));
  page.on('requestfinished', request => activeRequests.delete(request));
  page.on('response', response => responseStatuses.set(response.request(), response.status()));
@@ -39,10 +44,11 @@ async function backgroundPixel(page) {
   if (entry.error === 'net::ERR_ABORTED' && responseStatuses.get(request) === 204 &&
       /^\/client-updates\/(release|test)\.json$/.test(entry.path)) emptyUpdateResponses.push(entry);
   else if (entry.error === 'net::ERR_ABORTED' && reloadRequests.has(request)) reloadCancellations.push(entry);
-  // Leaving the login composable cancels its read-only capability lookup. Only
+  // Guest navigation, theme changes and responsive layout can replace a composable
+  // and cancel its pending read-only lookup. Only
   // requests already pending at our own navigation gesture qualify; never hide
   // an authentication mutation, a timeout, or an unrelated transport failure.
-  else if (entry.error === 'net::ERR_ABORTED' && authNavigationRequests.has(request)) authNavigationCancellations.push(entry);
+  else if (entry.error === 'net::ERR_ABORTED' && pageNavigationRequests.has(request)) pageNavigationCancellations.push(entry);
   else failed.push(entry);
   activeRequests.delete(request);
  });
@@ -55,11 +61,15 @@ async function backgroundPixel(page) {
   assert(Math.abs(splash.x + splash.width/2 - 640) < 2 && Math.abs(splash.y + splash.height/2 - 450) < 2,
    'Startup image must be centered');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-startup.png'});
+  markPendingPublicRead();
   await page.setViewportSize({width:390,height:844});
+  markPendingPublicRead();
   await page.emulateMedia({colorScheme:'dark'});
   assert.equal(await page.locator('#aita-startup').evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(18, 21, 26)');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-startup-narrow-dark.png'});
+  markPendingPublicRead();
   await page.emulateMedia({colorScheme:'light'});
+  markPendingPublicRead();
   await page.setViewportSize({width:1280,height:900});
   resumeStartup();
   await page.locator('canvas').first().waitFor({state:'visible',timeout:60000});
@@ -67,6 +77,7 @@ async function backgroundPixel(page) {
   await page.waitForTimeout(5000);
   await page.waitForLoadState('networkidle');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-wide.png'});
+  markPendingPublicRead();
   await page.setViewportSize({width:390,height:844});
   await page.waitForTimeout(1500);
   await page.waitForLoadState('networkidle');
@@ -74,6 +85,7 @@ async function backgroundPixel(page) {
   const lightPixel = await backgroundPixel(page);
   await page.keyboard.press('Tab');
   await page.getByRole('button', {name: /^(App theme|Тема приложения|Қолданба тақырыбы|Мавзӯи барнома|Колдонмонун темасы|Ilova mavzusi)$/}).click({force:true});
+  markPendingPublicRead();
   await page.getByRole('button', {name: /Obsidian Black|Обсидиановый чёрный|Обсидиан қара|Обсидиан кара|Сиёҳи обсидианӣ|Obsidian qora/}).click({force:true});
   await page.getByRole('button', {name: /^(Close|Cancel|Отменить|Болдырмау|Бекор кардан|Жокко чыгаруу|Bekor qilish)$/}).last().click({force:true});
   await page.waitForTimeout(1000);
@@ -95,17 +107,20 @@ async function backgroundPixel(page) {
   // The public marketplace is now the guest entry point. Visit authentication
   // through its real sign-in action before exercising the guest download footer.
   await page.keyboard.press('Tab');
+  for (const request of activeRequests) {
+   if (request.method() === 'POST' && new URL(request.url()).pathname === '/market/public/discovery') pageNavigationRequests.add(request);
+  }
   await page.getByRole('button', {name:/^(Sign in|Log in|Войти|Кіру|Кирүү|Ворид шудан|Kirish)$/}).first().click({force:true});
   await page.waitForTimeout(800);
   // The guest footer stays at the bottom, outside the scrolling authentication form.
   // A fresh catalogue request proves the click opened Downloads without signing in.
   async function openGuestDownloads() {
    for (const request of activeRequests) {
-    if (request.method() === 'GET' && new URL(request.url()).pathname === '/auth/capabilities') authNavigationRequests.add(request);
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/auth/capabilities') pageNavigationRequests.add(request);
    }
    await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/client-updates/release.json' && response.status() === 200),
-    page.getByRole('button', {name:/Download AITA for your devices|Скачать AITA для ваших устройств/}).click({force:true})
+    page.mouse.click(195, 804)
    ]);
    await page.waitForTimeout(1000);
    await page.waitForLoadState('networkidle');
@@ -116,6 +131,7 @@ async function backgroundPixel(page) {
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-back.png'});
   await openGuestDownloads();
+  markPendingPublicRead();
   await page.setViewportSize({width:1280,height:900});
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-downloads-wide.png'});
@@ -128,11 +144,11 @@ async function backgroundPixel(page) {
    page.mouse.click(20, 58)
   ]);
   await page.waitForLoadState('networkidle');
-  console.log(JSON.stringify({url:page.url(),canvasCount:await page.locator('canvas').count(),text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,authNavigationCancellations,responses},null,2));
+  console.log(JSON.stringify({url:page.url(),canvasCount:await page.locator('canvas').count(),text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,pageNavigationCancellations,responses},null,2));
   if(errors.length || failed.length) process.exitCode=1;
  } catch(error) {
   resumeStartup();
-  console.log(JSON.stringify({failure:error.message,text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,authNavigationCancellations,responses},null,2));
+  console.log(JSON.stringify({failure:error.message,text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,pageNavigationCancellations,responses},null,2));
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-failure.png'});
   process.exitCode=1;
  } finally {resumeStartup(); await context.unrouteAll({behavior:'ignoreErrors'}); await browser.close();}
