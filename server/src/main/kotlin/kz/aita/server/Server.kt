@@ -21850,6 +21850,10 @@ fun Application.module() {
                 .map { it[Stores.id] }
               val storeIdsToDelete = listOf(id) + branchIds
 
+              if (kz.aita.server.marketplace.hasOpenStoreDeliveries(
+                  org.jetbrains.exposed.sql.transactions.TransactionManager.current().connection.connection as java.sql.Connection,
+                  storeIdsToDelete)) return@newSuspendedTransaction 4
+
               val ownedItemIds = StockItems.select(StockItems.id)
                 .where { StockItems.storeId inList storeIdsToDelete }.map { it[StockItems.id] }
               if (ownedItemIds.isNotEmpty() && !StockBatchesV2.select(StockBatchesV2.id).where {

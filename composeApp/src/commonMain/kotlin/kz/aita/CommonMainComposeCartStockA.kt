@@ -1678,10 +1678,11 @@ fun AppConfiguration.StoreWidget(
     textColor: Color = stateValues.TextColor,
     onDelete: ((StoreDataModel) -> Unit)? = null,
     onEdit: ((StoreDataModel) -> Unit)? = null,
-    onSetActive: ((StoreDataModel) -> Unit)? = null,
+    onSetActive: ((StoreDataModel, ActiveStoreSelectionScope) -> Unit)? = null,
     onSetInactive: ((StoreDataModel) -> Unit)? = null
 ) {
     val isActiveWidget = onSetInactive != null
+    val selectionScope by activeStoreSelectionScopeState.collectAsState()
 
     Row(
         modifier
@@ -1736,7 +1737,7 @@ fun AppConfiguration.StoreWidget(
                     }
 
                     Text(
-                        text = stateValues.stringActiveStore,
+                        text = stateValues.stringActiveStore + " · " + activeStoreScopeText(selectionScope),
                         fontSize = stateValues.titleTextSize,
                         fontWeight = FontWeight.Bold,
                         color = stateValues.OkayColor
@@ -1900,24 +1901,25 @@ fun AppConfiguration.StoreWidget(
                     .height(stateValues.marginTextField)
             )
 
-            onSetActive?.let {
-                actionButton(
-                    text = "",
-                    enabledColor = stateValues.OkayColor,
-                    iconPath = stateValues.drawablePathIconCheck,
-                    iconContentDescription = stateValues.stringSelect,
-                ) {
-                    onSetActive(store)
+            onSetActive?.let { select ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
+                    listOf(ActiveStoreSelectionScope.DEVICE, ActiveStoreSelectionScope.ACCOUNT).forEach { target ->
+                        val icon = if (target == ActiveStoreSelectionScope.DEVICE) AitaTabIcon.DeviceCheck else AitaTabIcon.CloudCheck
+                        actionButton(text = "",
+                            enabledColor = if (isActiveWidget && selectionScope == target) stateValues.OkayColor else stateValues.AccentColor,
+                            iconPath = marketIconPath(icon.family), iconRes = tabIconResource(icon),
+                            iconContentDescription = activeStoreScopeText(target, action = true),
+                            autoLoading = false, confirmationRequired = false,
+                            onClick = { select(store, target) })
+                    }
                 }
-            } ?: onSetInactive?.let {
-                actionButton(
-                    text = "",
-                    enabledColor = stateValues.ErrorColor,
+            }
+            onSetInactive?.let {
+                Spacer(Modifier.height(8.dp))
+                actionButton(text = "", enabledColor = stateValues.ErrorColor,
                     iconPath = stateValues.drawablePathIconCancel,
-                    iconContentDescription = stateValues.stringMakeInactive
-                ) {
-                    onSetInactive(store)
-                }
+                    iconContentDescription = stateValues.stringMakeInactive,
+                    onClick = { onSetInactive(store) })
             }
         }
     }

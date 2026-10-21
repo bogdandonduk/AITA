@@ -1,0 +1,125 @@
+{
+  "note": "Official unmodified artwork; PNG copies are raster renderings for consistent cross-platform decoding. Preserve brand proportions and colors. AITA store listings are pending; destinations currently open the storefront with that explanation.",
+  "assets": [
+    {
+      "file": "app_store_en.svg",
+      "source": "https://developer.apple.com/app-store/marketing/guidelines/",
+      "retrieved": "2026-10-21",
+      "sha256": "a26fc5b38380272c92e9019a2eb8b45542a66814b3e2b203772db8904b9fb99f",
+      "displayResource": "badge_app_store_en.png",
+      "displaySha256": "c911ea925ee77a8c0e595b0ccb2740b545877fe4c5658ce6c2039508dd10dcff"
+    },
+    {
+      "file": "flathub_en.svg",
+      "source": "https://flathub.org/en/badges",
+      "retrieved": "2026-10-21",
+      "sha256": "5bb9a5134ea318ce82dfd8c28a21effd67ad5d19929db63346d030405933f391",
+      "displayResource": "badge_flathub_en.png",
+      "displaySha256": "c95713c1cc808e86ec9786d2404b25febbd32ea0a93f5dd355e1eaa5ef56b8f7"
+    },
+    {
+      "file": "flathub_ru.svg",
+      "source": "https://flathub.org/en/badges",
+      "retrieved": "2026-10-21",
+      "sha256": "dcaac2527e732cd4943d4feaf4cb442553d883c29e21ef7ddd75444c54c99dba",
+      "displayResource": "badge_flathub_ru.png",
+      "displaySha256": "bab70a0325dc715056c2cdbd4643d5b4bd7b435224abf09a6f799781fc0eaa01"
+    },
+    {
+      "file": "google_play_en.svg",
+      "source": "https://partnermarketinghub.withgoogle.com/brands/google-play/google-play/lockups-icons-badges/",
+      "retrieved": "2026-10-21",
+      "sha256": "4ffa4c7edd2f10b297ca4de2131eddaa00d03b2278d1e178fe512920d824ca34",
+      "displayResource": "badge_google_play_en.png",
+      "displaySha256": "a921a31f4cc0515fc3731591d47805e26c6e8e80f2eae189c5e752a74e105e62"
+    },
+    {
+      "file": "google_play_kk.svg",
+      "source": "https://partnermarketinghub.withgoogle.com/brands/google-play/google-play/lockups-icons-badges/",
+      "retrieved": "2026-10-21",
+      "sha256": "22e047c514fbf87059b9e842d6b4f2a9952c92cd76fa5c7a91a0b2f25ac8f70e",
+      "displayResource": "badge_google_play_kk.png",
+      "displaySha256": "c73ec2a996e0bd838ba510cd371f725b594c84cc65caba7dacc4f68ee7bb812d"
+    },
+    {
+      "file": "google_play_ky.svg",
+      "source": "https://partnermarketinghub.withgoogle.com/brands/google-play/google-play/lockups-icons-badges/",
+      "retrieved": "2026-10-21",
+      "sha256": "0240c5e226f29fc29754fe8fdc3032cae4dba4a5692dea8cb47d0bc32bf8bcba",
+      "displayResource": "badge_google_play_ky.png",
+      "displaySha256": "13d97cc909873cc1bdbc3e5d6049951287557effa2fa6e61bf0eb9e903d6bf5e"
+    },
+    {
+      "file": "google_play_ru.svg",
+      "source": "https://partnermarketinghub.withgoogle.com/brands/google-play/google-play/lockups-icons-badges/",
+      "retrieved": "2026-10-21",
+      "sha256": "a33a1e94cdb08e10e5ea6768df57ca31afbc6feb0dd2d30e33a6282f88ee78ed",
+      "displayResource": "badge_google_play_ru.png",
+      "displaySha256": "fb3ed06ad20de16c90c94418dc66fee56810c4f7f1a6886569f3b3ee8ba4d81f"
+    },
+    {
+      "file": "google_play_uz.svg",
+      "source": "https://partnermarketinghub.withgoogle.com/brands/google-play/google-play/lockups-icons-badges/",
+      "retrieved": "2026-10-21",
+      "sha256": "70a9b46dbba15e6db5a85034b1982ccccce1ac5c27f3f5b7a997b951f9a52cb7",
+      "displayResource": "badge_google_play_uz.png",
+      "displaySha256": "d1c227dee0a080d1b90a64aff4616bbae754d7d715d456225fcbff3874cb644d"
+    },
+    {
+      "file": "mac_app_store_en.svg",
+      "source": "https://developer.apple.com/app-store/marketing/guidelines/",
+      "retrieved": "2026-10-21",
+      "sha256": "15111cd04380b58d95307dcb07f0b6b06304dbc7504c57fd9cdbf0a2f78e3a92",
+      "displayResource": "badge_mac_app_store_en.png",
+      "displaySha256": "ab8c15202c79f674087f1b48f1090cc4ac593b332f29fd18be706679545e23da"
+    },
+    {
+      "file": "microsoft_store_en.svg",
+      "source": "https://github.com/microsoft/app-store-badge",
+      "retrieved": "2026-10-21",
+      "sha256": "4dd60ab7da78074387efdb36ccc4ef0fe25abb45130f4ba812b99dee52ccfe17",
+      "displayResource": "badge_microsoft_store_en.png",
+      "displaySha256": "ddb11ba616681d6ccebe184de51e3f8231dd066134b49e5042b920891fd7fbcf"
+    },
+    {
+      "file": "microsoft_store_kk.svg",
+      "source": "https://github.com/microsoft/app-store-badge",
+      "retrieved": "2026-10-21",
+      "sha256": "0a7e46f233595df437335b3e62dba9e1ebac29427d30bdbea8f082c1b1e7cb4b",
+      "displayResource": "badge_microsoft_store_kk.png",
+      "displaySha256": "1446f5a1c13db9b08dbea03b1bcbc6c58e4d506ddba6111db5dca7ee71f1a7b4"
+    },
+    {
+      "file": "microsoft_store_ru.svg",
+      "source": "https://github.com/microsoft/app-store-badge",
+      "retrieved": "2026-10-21",
+      "sha256": "cb30c2f66c2588529ae07890d6c46ca10d67b5477a11b243984975f32a1498d7",
+      "displayResource": "badge_microsoft_store_ru.png",
+      "displaySha256": "61dcbfcc26cf22b73023cc81c380c99f6df39f0a72cd5e11d8753fb667a0f801"
+    },
+    {
+      "file": "microsoft_store_uz.svg",
+      "source": "https://github.com/microsoft/app-store-badge",
+      "retrieved": "2026-10-21",
+      "sha256": "3391a8df76d94ed2b494f897b386066a8192e8602edc7e71e97b84bea9969ead",
+      "displayResource": "badge_microsoft_store_uz.png",
+      "displaySha256": "4e4b9453b7f042b74e8c84fafa06de0b9a1edd6a12b8a736fdd9ca1c8e7759cc"
+    },
+    {
+      "file": "app_store_ru.svg",
+      "source": "https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/ru-ru?size=250x83",
+      "retrieved": "2026-10-21",
+      "sha256": "27f35c64f2a984ecb4546982889d5514a46666b7aba55909d052e4036862e725",
+      "displayResource": "badge_app_store_ru.png",
+      "displaySha256": "115a170ef5dd38a3294e804d6e8d17cdf8e49a2f365a89202f832bcef2107434"
+    },
+    {
+      "file": "mac_app_store_ru.svg",
+      "source": "https://tools.applemediaservices.com/api/badges/download-on-the-mac-app-store/black/ru-ru?size=250x83",
+      "retrieved": "2026-10-21",
+      "sha256": "909ba64429b79f0bdb4c8a4fb3daee0dfa951e8c97d647c5f67fbe9917726f0b",
+      "displayResource": "badge_mac_app_store_ru.png",
+      "displaySha256": "47bde5439ca88aab5bfb12b2b6937bac02009bd74f8c6f958ecb9512d0b29fc6"
+    }
+  ]
+}

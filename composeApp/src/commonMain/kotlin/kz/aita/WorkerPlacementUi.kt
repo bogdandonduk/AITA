@@ -20,6 +20,7 @@ internal fun AppConfiguration.WorkerWorkplacePicker(worker: StoreWorkerDataModel
         .flatMap { workerWorkplaces(it, catalogue) }.distinctBy { it.id }
     if (stores.isEmpty()) return
     val active = stateValues.activeStoreId
+    val selectionScope by activeStoreSelectionScopeState.collectAsState()
     val shift by activeWorkshiftState.payload.collectAsState()
     var error by remember { mutableStateOf(false) }
     fun text(key: String) = workerPlacementMessage(key).extractLocalizedString(stateValues.appLanguage).orEmpty()
@@ -31,7 +32,7 @@ internal fun AppConfiguration.WorkerWorkplacePicker(worker: StoreWorkerDataModel
                 if (shift?.let { it.isActive && it.endedAtMillis == null && it.storeId != id } == true) error = true
                 else { error = false; setActiveStoreId(id) }
             })
-        Text(text(if (error) "shift" else "saved"), color = if (error) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
+        Text(if (error) text("shift") else activeStoreScopeText(selectionScope), color = if (error) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize)
     }
 }

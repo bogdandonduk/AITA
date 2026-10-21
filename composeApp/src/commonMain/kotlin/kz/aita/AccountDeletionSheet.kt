@@ -45,7 +45,11 @@ import kz.aita.auth.AitaSecurityEmailAction
                             val response=withTimeoutOrNull(45_000) { AitaAdvancedAuthenticationClient.deleteAccount(request) }
                             if (response?.negative==false && response.payload=="deleted") {
                                 // Cleanup completes even when removing this UI cancels its composition scope.
-                                withContext(NonCancellable) { finishDeletedAccountLocally(owner,generation) }
+                                withContext(NonCancellable) {
+                                    finishDeletedAccountLocally(owner,generation)
+                                    val shopping=NavigationScreenModel.Buyer.Main.Shopping
+                                    shopping.state.value.keys.filter { it.startsWith("delivery-draft:$owner:") }.forEach { shopping.removeState(it) }
+                                }
                                 password.reset();onDismiss()
                             } else if (authenticatedSessionGenerationIsCurrent(generation)) {
                                 error=response?.message?.extractLocalizedString(stateValues.appLanguage)?.takeIf { it.isNotBlank() } ?: text("network")

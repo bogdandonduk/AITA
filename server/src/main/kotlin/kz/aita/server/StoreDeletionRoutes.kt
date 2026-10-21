@@ -17,6 +17,7 @@ internal fun Route.storeDeletionActions(deleteOwnedStore: suspend (UUID, String)
                 call.genericResponseNoPayload(HttpStatusCode.OK, getResponse("12").message)
             }
             3 -> call.genericResponseNoPayload(HttpStatusCode.Conflict, eventMessage("store.shared_catalogue_in_use"))
+            4 -> call.genericResponseNoPayload(HttpStatusCode.Conflict, eventMessage("delivery.store_open"))
             1, 2 -> call.respondAitaUnauthorized()
             else -> call.genericResponseNoPayload(HttpStatusCode.InternalServerError, getResponse("3").message)
         }

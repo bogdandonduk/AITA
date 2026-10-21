@@ -1785,11 +1785,18 @@ fun AppConfiguration.MenuWorkersScreen() {
             tabs = listOf(
                 TabContent("my_work", tabLabelWithCount(localizedStringResource(472, "My work"), myMembershipsCount + myPendingEmploymentRequestsCount)),
                 TabContent("invites", tabLabelWithCount(localizedStringResource(651, "Invites"), myInvitesCount)),
-                TabContent("responses", tabLabelWithCount(localizedStringResource(1092, "Responses"), myResponsesCount))
-            ) + (if (canViewStoreWorkers) listOf(TabContent("store_workers", tabLabelWithCount(localizedStringResource(473, "Store workers"), storeWorkersCount))) else emptyList()) +
+                TabContent("responses", tabLabelWithCount(localizedStringResource(1092, "Responses"), myResponsesCount)),
+                TabContent("courier", deliveryText("courier_jobs"), icon = AitaTabIcon.Truck)
+            ) + (if (activeStoreId != null && currentUserOwnsStore(activeStoreId)) listOf(TabContent("delivery_orders", deliveryText("orders"), icon=AitaTabIcon.Orders)) else emptyList()) +
+                (if (canViewStoreWorkers) listOf(TabContent("store_workers", tabLabelWithCount(localizedStringResource(473, "Store workers"), storeWorkersCount))) else emptyList()) +
                 (if (canManageStoreRequests) listOf(TabContent("requests", tabLabelWithCount(localizedStringResource(474, "Requests"), incomingEmploymentRequestsCount))) else emptyList())
         )
 
+        if (selectedTab == "courier" || selectedTab == "delivery_orders") {
+            MarketDeliveryPanel(Modifier.fillMaxWidth().weight(1f), view = if(selectedTab=="courier") "courier" else "seller",
+                store=activeStoreId.takeIf { selectedTab=="delivery_orders" })
+            return@AitaScreenColumn
+        }
         val sectionTabs = when (selectedTab) {
             "my_work" -> listOf(
                 TabContent("managed", tabLabelWithCount(localizedStringResource(478, "Managed stores"), myMembershipsCount)),
@@ -4794,8 +4801,8 @@ fun AppConfiguration.MenuStoresScreen() {
                                                 }
                                             }
                                         } else null,
-                                        onSetActive = if (!isActive && canBeActive) {
-                                            { setActiveStoreId(it.id) }
+                                        onSetActive = if (isActive || canBeActive) {
+                                            { selected, scope -> setActiveStoreId(selected.id, selectionScope = scope) }
                                         } else null,
                                         onSetInactive = if (isActive) {
                                             { setActiveStoreId(null) }
@@ -4819,9 +4826,7 @@ fun AppConfiguration.MenuStoresScreen() {
                                                         }
                                                     }
                                                 } else null,
-                                                onSetActive = if (!branchIsActive) {
-                                                    { setActiveStoreId(branch.id) }
-                                                } else null,
+                                                onSetActive = { selected, scope -> setActiveStoreId(selected.id, selectionScope = scope) },
                                                 onSetInactive = if (branchIsActive) {
                                                     { setActiveStoreId(null) }
                                                 } else null

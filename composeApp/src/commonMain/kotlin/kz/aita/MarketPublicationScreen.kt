@@ -120,16 +120,26 @@ internal fun AppConfiguration.MarketPublicationScreen() {
         val section=sectionTabsWidget(stateKey="market-publisher:$account:$store",tabs=listOf(
             TabContent("storefront",authUiText("Storefront","Магазин","Дүкен", "Витрина")),
             TabContent("listings",authUiText("Listings","Товары","Тауарлар", "Жарыялар")),
-            TabContent("locations",marketProductText("market.locations_tab"),icon=AitaTabIcon.Branches)),modifier=Modifier.fillMaxWidth().padding(12.dp))
+            TabContent("locations",marketProductText("market.locations_tab"),icon=AitaTabIcon.Branches),
+            TabContent("orders",deliveryText("orders"),icon=AitaTabIcon.Orders),
+            TabContent("delivery",deliveryText("policy"),icon=AitaTabIcon.Truck)),modifier=Modifier.fillMaxWidth().padding(12.dp))
+        if (section == "orders" && store != null) {
+            MarketDeliveryPanel(Modifier.weight(1f).fillMaxWidth(),view="seller",store=store)
+            return@AitaScreenColumn
+        }
+        if (section == "delivery" && store != null) {
+            MarketDeliveryPolicyEditor(store,Modifier.weight(1f).fillMaxWidth())
+            return@AitaScreenColumn
+        }
         // Keep loading separate from the selected tab. Mixing a nullable dashboard check
         // into a string if/else dispatch can lower to a null String.hashCode in Wasm.
         val visibleSection = if (dashboard == null) "loading" else section
         LazyColumn(Modifier.weight(1f).fillMaxWidth().aitaWidthCap(760.dp).padding(horizontal=16.dp),
             contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item("notice") {
-                Text(authUiText("Opt-in preview. Publish only public shop information. A listing shares its title, description, barcode, categories and current retail price/availability—not your costs, private notes or exact stock count. It does not accept orders.",
-                    "Предварительная версия с добровольной публикацией. Указывайте только публичные данные. Витрина показывает название, описание, штрихкод, категории, розничную цену и наличие — не закупочные цены, заметки или точные остатки. Заказы пока не принимаются.",
-                    "Ерікті жариялауы бар алдын ала нұсқа. Тек жария деректерді көрсетіңіз. Витрина атауды, сипаттаманы, штрихкодты, санаттарды, бөлшек бағаны және бар-жоғын көрсетеді — өзіндік құнды, жеке жазбаларды не нақты қор санын емес. Тапсырыс әзірге қабылданбайды.", "Ыктыярдуу алдын ала мүмкүнчүлүк. Дүкөн жөнүндө коомдук маалыматты гана жарыялаңыз. Жарыя аталышын, сүрөттөмөсүн, штрихкодун, категорияларын жана учурдагы чекене баасын/бар-жогун бөлүшөт; чыгымдарыңызды, купуя эскертмелерди же так товар санын эмес. Ал тапшырык кабыл албайт."),
+                Text(authUiText("Opt-in preview. Publish only public shop information. A listing shares its title, description, barcode, categories and current retail price/availability—not your costs, private notes or exact stock count. Delivery requests can be enabled in Delivery settings.",
+                    "Предварительная версия с добровольной публикацией. Указывайте только публичные данные. Витрина показывает название, описание, штрихкод, категории, розничную цену и наличие — не закупочные цены, заметки или точные остатки. Приём заявок включается в настройках доставки.",
+                    "Ерікті жариялауы бар алдын ала нұсқа. Тек жария деректерді көрсетіңіз. Витрина атауды, сипаттаманы, штрихкодты, санаттарды, бөлшек бағаны және бар-жоғын көрсетеді — өзіндік құнды, жеке жазбаларды не нақты қор санын емес. Өтінімдерді жеткізу баптауларында қосуға болады.", "Ыктыярдуу алдын ала мүмкүнчүлүк. Дүкөн жөнүндө коомдук маалыматты гана жарыялаңыз. Жарыя аталышын, сүрөттөмөсүн, штрихкодун, категорияларын жана учурдагы чекене баасын/бар-жогун бөлүшөт; чыгымдарыңызды, купуя эскертмелерди же так товар санын эмес. Өтүнмөлөрдү жеткирүү жөндөөлөрүндө күйгүзсө болот."),
                     color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
             }
             if(feedback!=null) item("feedback") { Text(feedback.orEmpty().visibleLocalizedString(stateValues.appLanguage,""),

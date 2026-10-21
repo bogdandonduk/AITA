@@ -73,6 +73,8 @@ enum class AitaTabIcon(val family: Int) {
     Web(220),
     MacOS(221),
     Ios(222),
+    DeviceCheck(228),
+    CloudCheck(229),
     Linux(227)
 }
 
@@ -210,6 +212,8 @@ AitaTabIcon.Ios -> if (dark) Res.drawable._222_1 else Res.drawable._222_0
         AitaTabIcon.Checklist -> if (dark) Res.drawable._195_1 else Res.drawable._195_0
         AitaTabIcon.Search -> if (dark) Res.drawable._196_1 else Res.drawable._196_0
         AitaTabIcon.Edit -> if (dark) Res.drawable._197_1 else Res.drawable._197_0
+        AitaTabIcon.DeviceCheck -> if (dark) Res.drawable._228_1 else Res.drawable._228_0
+        AitaTabIcon.CloudCheck -> if (dark) Res.drawable._229_1 else Res.drawable._229_0
         AitaTabIcon.Check -> if (dark) Res.drawable._198_1 else Res.drawable._198_0
         AitaTabIcon.Cancel -> if (dark) Res.drawable._199_1 else Res.drawable._199_0
         AitaTabIcon.Warning -> if (dark) Res.drawable._200_1 else Res.drawable._200_0

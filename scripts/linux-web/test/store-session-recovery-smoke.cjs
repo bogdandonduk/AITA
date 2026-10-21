@@ -61,7 +61,7 @@ try {
  await button(a,'Menu').click({force:true});await a.waitForTimeout(600);await a.getByText('Stores',{exact:true}).first().click({force:true});await a.waitForTimeout(800);
  // Reproduce a store disappearing while another already-open device still offers its selection.
  rejectTarget=parent.id;let before=calls.length;
- await button(a,'Select').first().click({force:true});await a.waitForTimeout(600);
+ await button(a,'Set active across account devices').first().click({force:true});await a.waitForTimeout(600);
  const yes=button(a,'Yes');if(await yes.count())await yes.click({force:true});
  await waitFor(()=>calls.slice(before).some(c=>c.device==='first'&&c.path==='/stores/active'),'rejected selection attempted');
  await a.waitForTimeout(2500);
@@ -70,7 +70,7 @@ try {
  assert.equal(await button(b,'Sale').count(),1,'other already-open client retained its branch');
  console.log('PASS: rejected selection leaves the server and the other client intact');
  rejectTarget=null;
- await button(a,'Select').first().click({force:true});await a.waitForTimeout(600);if(await yes.count())await yes.click({force:true});
+ await button(a,'Set active across account devices').first().click({force:true});await a.waitForTimeout(600);if(await yes.count())await yes.click({force:true});
  await waitFor(()=>account.activeStoreId===parent.id,'first client saved parent');
  await waitFor(async()=>await preference(b,'key_activeStoreId')===parent.id,'second client persisted parent without reload');
  await button(b,'Menu').click({force:true});await b.waitForTimeout(500);await b.getByText('Devices',{exact:true}).first().click({force:true});await b.waitForTimeout(1200);

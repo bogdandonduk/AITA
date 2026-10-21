@@ -14000,6 +14000,7 @@ private fun launchCloudConnectionReconciliation(
                     force = forceBroadRefresh
                 )
             }
+            runCloudConnectionReconciliationStep("market_delivery") { retryPendingMarketDelivery() }
         } finally {
             cloudConnectionReconciliationJob.clear(thisJob)
         }
@@ -16505,6 +16506,7 @@ suspend fun finishDeletedAccountLocally(owner: String, generation: Long) {
     stopRealtimeUpdates()
     try {
         clearAuthenticatedSessionStorage(expectedGeneration = generation)
+        runCatching { clearMarketDeliveryDeviceData(owner) }
         SavedLoginUsers.forget(owner)
         setActiveStoreId(null, syncServer = false)
     } finally {
@@ -17630,8 +17632,8 @@ fun deleteStore(store: StoreDataModel, onCompleted: ((DataState<Unit>) -> Unit)?
     }
 }
 
-fun setActiveStoreId(id: String?, syncServer: Boolean = true) {
-    ActiveStores.select(id, syncServer)
+fun setActiveStoreId(id: String?, syncServer: Boolean = true, selectionScope: ActiveStoreSelectionScope? = null) {
+    ActiveStores.select(id, syncServer, selectionScope)
 }
 
 val suppliersState = MutableDataStateFlow<List<SupplierDataModel>>(GlobalScope)

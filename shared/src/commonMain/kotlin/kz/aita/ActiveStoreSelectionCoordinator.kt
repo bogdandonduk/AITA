@@ -5,9 +5,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+enum class ActiveStoreSelectionScope { ACCOUNT, DEVICE }
+
 internal data class ActiveStoreOwner(val accountId: String, val sessionGeneration: Long)
 internal data class ActiveStoreChoice(val storeId: String? = null, val explicitNone: Boolean = false,
-    val parentStoreId: String? = null)
+    val parentStoreId: String? = null, val scope: ActiveStoreSelectionScope = ActiveStoreSelectionScope.ACCOUNT)
 internal data class SavedActiveStoreChoice(val choice: ActiveStoreChoice, val pendingSync: Boolean)
 internal data class ActiveStoreSelectionSnapshot(
     val owner: ActiveStoreOwner? = null,
@@ -57,16 +59,21 @@ internal class ActiveStoreSelectionCoordinator(
         }
     }
 
-    fun select(owner: ActiveStoreOwner?, storeId: String?, syncServer: Boolean, parentStoreId: String? = null): Job {
+    fun select(owner: ActiveStoreOwner?, storeId: String?, syncServer: Boolean, parentStoreId: String? = null,
+        selectionScope: ActiveStoreSelectionScope? = null): Job {
         val id = storeId?.trim()?.takeIf { it.isNotEmpty() }
         // Reserve synchronously before launching. Comparing only the displayed ID loses a fast B -> A.
         update { old ->
             val parent = parentStoreId?.takeIf { id != null && it.isNotBlank() && it != id }
                 ?: old.choice.parentStoreId.takeIf { old.owner == owner && old.choice.storeId == id && id != null }
-            val choice = ActiveStoreChoice(id, explicitNone = id == null && syncServer, parentStoreId = parent)
+            // Automatic recovery keeps this device's policy. Only an explicit scope action changes it.
+            val selectedScope = selectionScope ?: old.choice.scope.takeIf { old.owner == owner }
+                ?: ActiveStoreSelectionScope.ACCOUNT
+            val choice = ActiveStoreChoice(id, explicitNone = id == null && (syncServer || selectionScope != null),
+                parentStoreId = parent, scope = selectedScope)
             if (old.owner == owner && old.hydrated && old.choice == choice) old
             else ActiveStoreSelectionSnapshot(owner, choice, old.revision + 1L, hydrated = true,
-                pendingSync = syncServer && owner != null)
+                pendingSync = syncServer && owner != null && selectedScope == ActiveStoreSelectionScope.ACCOUNT)
         }
         return scope.launch(start = CoroutineStart.UNDISPATCHED) {
             flush()
@@ -86,10 +93,11 @@ internal class ActiveStoreSelectionCoordinator(
             if (!isCurrent(reserved)) return@withLock
             val serverId = serverStoreId?.trim()?.takeIf { it.isNotEmpty() && applyServerSelection }
             val adopted = reserved.copy(
-                choice = if (preferServerSelection && applyServerSelection && saved?.pendingSync != true) ActiveStoreChoice(serverId)
+                choice = if (preferServerSelection && applyServerSelection && saved?.pendingSync != true &&
+                    saved?.choice?.scope != ActiveStoreSelectionScope.DEVICE) ActiveStoreChoice(serverId)
                     else saved?.choice ?: ActiveStoreChoice(serverId),
                 hydrated = true,
-                pendingSync = saved?.pendingSync == true
+                pendingSync = saved?.pendingSync == true && saved.choice.scope == ActiveStoreSelectionScope.ACCOUNT
             )
             if (state.compareAndSet(reserved, adopted)) flushLocked()
         }
@@ -102,7 +110,7 @@ internal class ActiveStoreSelectionCoordinator(
         storageMutex.withLock {
             val current = state.value
             if (!isCurrent(current) || current.owner != owner || !current.hydrated || current.pendingSync ||
-                current.revision != revisionAtRequest) return@withLock
+                current.revision != revisionAtRequest || current.choice.scope == ActiveStoreSelectionScope.DEVICE) return@withLock
             val id = serverStoreId?.trim()?.takeIf(String::isNotEmpty)
             // An echo of an intentional deselection acknowledges it; it must not turn it into
             // a missing selection that the store-list recovery immediately fills again.
@@ -152,7 +160,7 @@ internal class ActiveStoreSelectionCoordinator(
                 ActiveStoreSyncOutcome.REJECTED -> storageMutex.withLock {
                     // A removed store is not a command to clear the ACCOUNT's selection. Another
                     // device/server deletion may already have selected its surviving parent.
-                    val cleared = selected.copy(choice = ActiveStoreChoice(parentStoreId = selected.choice.parentStoreId),
+                    val cleared = selected.copy(choice = ActiveStoreChoice(parentStoreId = selected.choice.parentStoreId, scope = selected.choice.scope),
                         revision = selected.revision + 1L, pendingSync = false)
                     if (state.compareAndSet(selected, cleared)) {
                         flushLocked()

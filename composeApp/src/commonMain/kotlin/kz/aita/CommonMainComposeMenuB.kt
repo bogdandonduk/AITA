@@ -5030,9 +5030,7 @@ fun AppConfiguration.MenuAddEditStoreScreen() {
                                     Navigation.Menu.go(NavigationScreenModel.Menu.AddEditStore)
                                 }
                             },
-                            onSetActive = if (branch.id != stateValues.activeStoreId) {
-                                { setActiveStoreId(branch.id) }
-                            } else null,
+                            onSetActive = { selected, scope -> setActiveStoreId(selected.id, selectionScope = scope) },
                             onSetInactive = if (branch.id == stateValues.activeStoreId) {
                                 { setActiveStoreId(null) }
                             } else null

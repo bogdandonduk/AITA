@@ -119,11 +119,13 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
     val activityNavigation = remember(account, generation) { MarketShoppingActivityNavigation() }
     var removal by remember(account, generation) { mutableStateOf<MarketShoppingLineReview?>(null) }
     var quantityEdit by remember(account, generation) { mutableStateOf<MarketShoppingLineReview?>(null) }
-    fun listDialogIsOpen(): Boolean = quantityEdit != null || removal != null || openedId != null || comparison != null || planning
+    var deliveryGroup by remember(account, generation) { mutableStateOf<Pair<String,String>?>(null) }
+    fun listDialogIsOpen(): Boolean = quantityEdit != null || removal != null || openedId != null || comparison != null || planning || deliveryGroup != null
     val displayed = state.snapshot
     val groups = displayed?.shoppingGroups().orEmpty()
     val view = navigation.shoppingList
     val visibleRows = view.rows(displayed)
+
     AitaScreenColumn(
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1120.dp,
@@ -131,7 +133,7 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
             ScreenAppBarWidget(title = authUiText("Shopping list", "Список покупок", "Сатып алу тізімі", "Сатып алуу тизмеси"), iconPath = marketIconPath(143))
         }
     ) {
-        Text(authUiText("Plan by shop. These are item estimates, not orders or reservations.",
+        Text(if (view.section in setOf("deliveries", "courier")) deliveryText("orders") else authUiText("Plan by shop. These are item estimates, not orders or reservations.",
             "Планируйте покупки по магазинам. Это расчёт товаров, не заказ и не резерв.",
             "Сатып алуды дүкен бойынша жоспарлаңыз. Бұл — тауар есебі, тапсырыс не резерв емес.", "Дүкөндөр боюнча пландаңыз. Бул тапшырык же резерв эмес, товарлардын болжолдуу суммалары."),
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -143,10 +145,14 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
             TabContent("list", authUiText("Items", "Товары", "Тауарлар", "Товарлар")),
             TabContent("trip", marketBrowseText("market.trip_title"), icon=AitaTabIcon.Checklist),
             TabContent("estimate", authUiText("By shop", "По магазинам", "Дүкен бойынша", "Дүкөн боюнча")),
-            TabContent("activity", authUiText("Activity", "История", "Тарих", "Аракеттер"))),
+            TabContent("activity", authUiText("Activity", "История", "Тарих", "Аракеттер")),
+            TabContent("deliveries", deliveryText("my_orders"), icon=AitaTabIcon.Orders),
+            TabContent("courier", deliveryText("courier_jobs"), icon=AitaTabIcon.Truck)),
             selectedId = view.section, onSelected = { view.section = it })
         MarketShoppingFeedback(state)
-        if (section == "trip") {
+        if (section == "deliveries" || section == "courier") {
+            MarketDeliveryPanel(Modifier.weight(1f).fillMaxWidth(), view=if (section=="courier") "courier" else "buyer")
+        } else if (section == "trip") {
             MarketShoppingTrip(state, Modifier.weight(1f).fillMaxWidth(), ::continueBrowsing)
         } else if (section == "activity") {
             MarketShoppingActivityPanel(activityNavigation, Modifier.weight(1f).fillMaxWidth())
@@ -169,6 +175,13 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
                         iconPath = marketIconPath(141), iconRes = marketIconFallback(141),
                         enabled = state.canChange, autoLoading = false, confirmationRequired = false,
                         onClick = { if (!listDialogIsOpen() && state.canChange) planning = true })
+                }
+                groups.filter { group -> group.lines.any { !it.line.collected } }.forEach { group ->
+                    item(key="delivery:${group.storeId}:${group.currencyCode}") {
+                        actionButton(text=deliveryText("action.REQUEST")+" · "+group.shopName+" · "+group.currencyCode,
+                            iconPath=marketIconPath(186),iconRes=tabIconResource(AitaTabIcon.Truck),autoLoading=false,confirmationRequired=false,
+                            onClick={deliveryGroup=group.storeId to group.currencyCode})
+                    }
                 }
                 if (section == "list") {
                     if (!displayed?.lines.isNullOrEmpty()) item(key = "list-filters") { MarketShoppingListControls(view, displayed) }
@@ -246,6 +259,9 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
             }
         }
     }
+    deliveryGroup?.let { (shop,currency) -> displayed?.let { quote ->
+        MarketDeliveryCheckout(quote,shop,currency,onDismiss={deliveryGroup=null},onSent={deliveryGroup=null;view.section="deliveries"})
+    } }
     quantityEdit?.let { review ->
         MarketShoppingQuantityDialog(review, state, onDismiss = { quantityEdit = null })
     }

@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.sql.Connection
 
-private suspend inline fun <reified T> RoutingCall.marketResult(
+internal suspend inline fun <reified T> RoutingCall.marketResult(
     readOnly: Boolean = false,
     transactionIsolation: Int = Connection.TRANSACTION_REPEATABLE_READ,
     noinline after: suspend (T) -> Unit = {},
@@ -50,6 +50,7 @@ internal fun Route.marketplaceRoutes() {
     publicMarketplaceRoutes()
     authenticate("auth-jwt") {
         route("/market") {
+            marketDeliveryRoutes()
             post("/discovery") {
                 val user = call.checkPrincipal() ?: return@post
                 call.response.header("Cache-Control", "private, no-store, max-age=0")

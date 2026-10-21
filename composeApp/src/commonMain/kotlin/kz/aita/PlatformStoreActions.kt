@@ -1,6 +1,14 @@
 package kz.aita
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import aita.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
+import kotlinx.coroutines.CoroutineStart
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -47,11 +55,11 @@ internal fun AppConfiguration.PlatformStoreAction(platform: String, modifier: Mo
     val scope = rememberCoroutineScope()
     var failed by remember(platform) { mutableStateOf(false) }
     Column(modifier) {
-        actionButton(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp), text = store.name, subText = pass27Text("open_store"),
-            iconPath = downloadPlatformIconPath(platform), iconRes = downloadPlatformIconResource(platform),
-            enabledColor = stateValues.TextColor, textColor = stateValues.BackgroundColor,
-            autoLoading = false, confirmationRequired = false, onClick = {
-                scope.launch {
+        Image(painterResource(platformStoreBadge(platform, stateValues.appLanguage)),
+            contentDescription = "${pass27Text("open_store")} · ${store.name}", contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxWidth().height(64.dp).clickable(role = Role.Button) {
+                failed = false
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     try { failed = openExternalUrlPlatformAction?.invoke(store.url)?.success != true }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { failed = true }
@@ -59,4 +67,29 @@ internal fun AppConfiguration.PlatformStoreAction(platform: String, modifier: Mo
             })
         if (failed) Text(updateText("error.unavailable"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
     }
+}
+
+/** Official artwork is bundled, never tinted or downloaded during an app launch. Missing official
+ * translations use the official English badge; surrounding explanation remains localized. */
+internal fun platformStoreBadge(platform: String, language: String): DrawableResource {
+    val locale=if(canonicalLanguageCode(language)=="system") effectiveAppLanguage(language) else canonicalLanguageCode(language)
+    return when (platform) {
+    "android" -> when (locale) {
+        "ru" -> Res.drawable.badge_google_play_ru
+        "kk" -> Res.drawable.badge_google_play_kk
+        "ky" -> Res.drawable.badge_google_play_ky
+        "uz" -> Res.drawable.badge_google_play_uz
+        else -> Res.drawable.badge_google_play_en
+    }
+    "windows" -> when (locale) {
+        "ru" -> Res.drawable.badge_microsoft_store_ru
+        "kk" -> Res.drawable.badge_microsoft_store_kk
+        "uz" -> Res.drawable.badge_microsoft_store_uz
+        else -> Res.drawable.badge_microsoft_store_en
+    }
+    "linux" -> if (locale == "ru") Res.drawable.badge_flathub_ru else Res.drawable.badge_flathub_en
+    "macos" -> if (locale == "ru") Res.drawable.badge_mac_app_store_ru else Res.drawable.badge_mac_app_store_en
+    else -> if (locale == "ru") Res.drawable.badge_app_store_ru else Res.drawable.badge_app_store_en
+}
+
 }

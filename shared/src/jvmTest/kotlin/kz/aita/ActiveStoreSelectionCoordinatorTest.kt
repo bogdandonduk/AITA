@@ -321,4 +321,73 @@ class ActiveStoreSelectionCoordinatorTest {
         }
     }
 
+    @Test fun deviceSelectionSurvivesRemoteChangesRestartAndAutomaticRepair() = fixture {
+        adopt("A")
+        controller.select(owner, "local", true, selectionScope = ActiveStoreSelectionScope.DEVICE).join()
+        controller.acceptRemote(owner, "remote", controller.snapshot.revision)
+        assertEquals("local", shown.last())
+        assertTrue(calls.isEmpty())
+        owner = owner.copy(sessionGeneration = 2L)
+        controller.adopt(owner, "remote", preferServerSelection = true)
+        assertEquals("local", shown.last())
+        select("parent").join() // Automatic fallback after removal respects the device policy.
+        assertEquals(ActiveStoreSelectionScope.DEVICE, controller.snapshot.choice.scope)
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun sameStoreCanSwitchFromDeviceOnlyToAccountAndBack() = fixture {
+        adopt("A")
+        controller.select(owner, "A", true, selectionScope = ActiveStoreSelectionScope.DEVICE).join()
+        assertTrue(calls.isEmpty())
+        controller.select(owner, "A", true, selectionScope = ActiveStoreSelectionScope.ACCOUNT).join()
+        assertEquals(listOf("A"), calls.map { it.second })
+        controller.acceptRemote(owner, "B", controller.snapshot.revision)
+        assertEquals("B", shown.last())
+        controller.select(owner, "B", true, selectionScope = ActiveStoreSelectionScope.DEVICE).join()
+        controller.acceptRemote(owner, "C", controller.snapshot.revision)
+        assertEquals("B", shown.last())
+    }
+
+    @Test fun deviceScopeRetiresPendingAccountChoiceWithoutSendingItAgain() = fixture {
+        adopt("A")
+        sendAction = { ActiveStoreSyncOutcome.RETRY_LATER }
+        select("B").join()
+        controller.select(owner, "C", true, selectionScope = ActiveStoreSelectionScope.DEVICE).join()
+        controller.retryPending().join()
+        assertEquals(listOf("B"), calls.map { it.second })
+        assertFalse(controller.snapshot.pendingSync)
+        assertEquals("C", disk.getValue(owner.accountId).choice.storeId)
+    }
+
+    @Test fun inFlightAccountAcknowledgementCannotOverwriteNewDeviceSelection() = fixture {
+        adopt("A")
+        val gate = CompletableDeferred<Unit>()
+        sendAction = { gate.await(); ActiveStoreSyncOutcome.SAVED }
+        val remote = select("B")
+        controller.select(owner, "C", true, selectionScope = ActiveStoreSelectionScope.DEVICE)
+        gate.complete(Unit); remote.join()
+        assertEquals("C", shown.last())
+        assertTrue(acknowledgements.isEmpty())
+        assertEquals(ActiveStoreSelectionScope.DEVICE, disk.getValue(owner.accountId).choice.scope)
+    }
+
+    @Test fun deviceDeselectAndAccountIsolationSurviveRelaunch() = fixture {
+        adopt("A")
+        controller.select(owner, null, true, selectionScope = ActiveStoreSelectionScope.DEVICE).join()
+        owner = owner.copy(sessionGeneration = 2L)
+        controller.adopt(owner, "A", preferServerSelection = true)
+        assertNull(shown.last())
+        assertTrue(controller.snapshot.choice.explicitNone)
+        owner = ActiveStoreOwner("other", 3L)
+        controller.adopt(owner, "other-store", preferServerSelection = true)
+        assertEquals(ActiveStoreSelectionScope.ACCOUNT, controller.snapshot.choice.scope)
+        assertEquals("other-store", shown.last())
+    }
+
+    @Test fun deviceJournalNeverReplaysAccountMutation() {
+        val saved = requireNotNull(decodeSavedActiveStoreSelection("""{"schemaVersion":4,"storeId":"local","deviceOnly":true,"pendingSync":true}"""))
+        assertEquals(ActiveStoreSelectionScope.DEVICE, saved.choice.scope)
+        assertFalse(saved.pendingSync)
+    }
+
 }

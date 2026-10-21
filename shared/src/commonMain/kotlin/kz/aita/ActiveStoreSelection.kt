@@ -10,7 +10,8 @@ private data class ActiveStoreSelectionJournal(
     val explicitNone: Boolean = false,
     val pendingSync: Boolean = false,
     val parentStoreId: String? = null,
-    val schemaVersion: Int = 2
+    val schemaVersion: Int = 2,
+    val deviceOnly: Boolean = false
 )
 
 internal fun decodeSavedActiveStoreSelection(raw: String): SavedActiveStoreChoice? {
@@ -20,8 +21,12 @@ internal fun decodeSavedActiveStoreSelection(raw: String): SavedActiveStoreChoic
     val id = saved.storeId?.trim()?.takeIf { it.isNotEmpty() }
     val legacyEmpty = saved.schemaVersion < 3 && id == null
     return SavedActiveStoreChoice(ActiveStoreChoice(id,
-        saved.explicitNone && !legacyEmpty, saved.parentStoreId), saved.pendingSync && !legacyEmpty)
+        saved.explicitNone && !legacyEmpty, saved.parentStoreId,
+        if (saved.deviceOnly) ActiveStoreSelectionScope.DEVICE else ActiveStoreSelectionScope.ACCOUNT),
+        saved.pendingSync && !legacyEmpty && !saved.deviceOnly)
 }
+
+val activeStoreSelectionScopeState = kotlinx.coroutines.flow.MutableStateFlow(ActiveStoreSelectionScope.ACCOUNT)
 
 internal object ActiveStores {
     private val failedRestoreOwner = kotlinx.coroutines.flow.MutableStateFlow<ActiveStoreOwner?>(null)
@@ -63,7 +68,7 @@ internal object ActiveStores {
                 putLocalKv(key(expected), jsonBase.encodeToString(ActiveStoreSelectionJournal.serializer(),
                     ActiveStoreSelectionJournal(selected.choice.storeId, selected.choice.explicitNone, selected.pendingSync,
                         selected.choice.parentStoreId ?: storesState.payloadValue.orEmpty().findStoreOrBranch(selected.choice.storeId)?.parentStoreId,
-                        schemaVersion = 3)))
+                        schemaVersion = 4, deviceOnly = selected.choice.scope == ActiveStoreSelectionScope.DEVICE)))
             }
             DynamicCarts.prepareLegacyImport()
             // Retain compatibility keys, but never observe them as commands.
@@ -74,6 +79,7 @@ internal object ActiveStores {
             }
         },
         publish = { selected ->
+            if (coordinator.isCurrent(selected)) activeStoreSelectionScopeState.value = selected.choice.scope
             publishActiveInventoryStoreId(selected.choice.storeId) { coordinator.isCurrent(selected) }
         },
         sync = { selected ->
@@ -110,8 +116,8 @@ internal object ActiveStores {
     val hydrated: Boolean get() = coordinator.snapshot.let { it.hydrated && it.owner == owner() }
     val parentStoreHint: String? get() = coordinator.snapshot.takeIf { it.owner == owner() }?.choice?.parentStoreId
 
-    fun select(id: String?, syncServer: Boolean) {
-        coordinator.select(owner(), id, syncServer, storesState.payloadValue.orEmpty().findStoreOrBranch(id)?.parentStoreId)
+    fun select(id: String?, syncServer: Boolean, selectionScope: ActiveStoreSelectionScope? = null) {
+        coordinator.select(owner(), id, syncServer, storesState.payloadValue.orEmpty().findStoreOrBranch(id)?.parentStoreId, selectionScope)
     }
     fun retryPending() { coordinator.retryPending() }
 

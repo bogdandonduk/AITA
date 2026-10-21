@@ -4,6 +4,9 @@ import kz.aita.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.util.UUID
+import java.sql.Connection
+import kz.aita.server.marketplace.hasOpenMarketDeliveries
+import kz.aita.server.marketplace.eraseMarketDeliveryContacts
 
 /** Caller holds the user row lock and validates password + configured second factor first.
  * Keep a tombstone rather than CASCADE deleting other people's business history. */
@@ -18,10 +21,12 @@ internal fun accountDeletionBlockerInside(userId: UUID): String? {
     if (UserWallets.selectAll().where { UserWallets.userId eq userId }.any { it[UserWallets.balanceMinor] != 0L || it[UserWallets.reservedMinor] != 0L }) return "balance"
     if (UserBalances.selectAll().where { UserBalances.userId eq userId }.any { it[UserBalances.value].toDoubleOrNull()?.let { v -> v != 0.0 } != false }) return "balance"
     if (Workshifts.selectAll().where { (Workshifts.workerUserId eq userId) and (Workshifts.isActive eq true) and Workshifts.endedAtMillis.isNull() }.any()) return "workshift"
+    if (hasOpenMarketDeliveries(TransactionManager.current().connection.connection as Connection, userId)) return "delivery"
     return null
 }
 internal fun eraseAccountPersonalDataInside(userId: UUID) {
     val tx=TransactionManager.current()
+    eraseMarketDeliveryContacts(tx.connection.connection as Connection, userId)
     // UUID is parsed by authentication; table/column identifiers below are fixed program constants.
     val owner="'$userId'::uuid"
     tx.exec("UPDATE users SET is_active=false, deleted_at_millis=(extract(epoch FROM clock_timestamp())*1000)::bigint, " +

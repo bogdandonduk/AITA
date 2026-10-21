@@ -37,7 +37,8 @@ class MarketplaceRepositoryDatabaseTest {
             exec(c,"CREATE SCHEMA ${f.schema}")
             try {
                 exec(c,"SET search_path TO ${f.schema},public")
-                exec(c,"""CREATE TABLE users(id UUID PRIMARY KEY,is_active BOOLEAN NOT NULL DEFAULT TRUE,country_locale TEXT NOT NULL DEFAULT 'kz');
+                exec(c,"""CREATE TABLE users(id UUID PRIMARY KEY,is_active BOOLEAN NOT NULL DEFAULT TRUE,country_locale TEXT NOT NULL DEFAULT 'kz',public_id TEXT UNIQUE,first_name TEXT,last_name TEXT);
+                    CREATE TABLE store_worker_memberships(user_id UUID,store_id UUID,is_active BOOLEAN NOT NULL DEFAULT TRUE);
                     CREATE TABLE stores(id UUID PRIMARY KEY,parent_store_id UUID REFERENCES stores(id),branch_type TEXT,owner_user_ids JSONB NOT NULL,
                         name JSONB NOT NULL DEFAULT '[{"language":"en","value":"Branch"}]',address TEXT NOT NULL DEFAULT 'Public branch door',
                         country_locales JSONB NOT NULL DEFAULT '["kz"]',is_active BOOLEAN NOT NULL DEFAULT TRUE);
@@ -65,7 +66,7 @@ class MarketplaceRepositoryDatabaseTest {
                             'NEVER-PUBLIC-NOTE','[{"price":"77.77","currency":"KZT","supplierId":"NEVER-PUBLIC-SUPPLIER"}]');
                 """)
                 listOf("V46__paging_user_finances_and_store_subscriptions.sql","V101__per_location_subscriptions_and_promocodes.sql",
-                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql","V124__internet_branch_marketplace_locations.sql").forEach {
+                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql","V124__internet_branch_marketplace_locations.sql","V138__market_delivery_requests_and_tracking.sql").forEach {
                     if(it=="V124__internet_branch_marketplace_locations.sql") beforeBranchMigration?.invoke(f,c)
                     exec(c,resource(it))
                 }
@@ -2123,4 +2124,129 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals(0L, tx(f) { it.discover(null, request) }.totalOffers)
     }
 
+    private fun <T> deliveryTx(f:Fixture,block:(MarketDeliveryRepository,Connection)->T):T = DriverManager.getConnection(f.url,f.props).use { c ->
+        c.autoCommit=false;c.transactionIsolation=Connection.TRANSACTION_REPEATABLE_READ
+        try {
+            exec(c,"SET LOCAL search_path TO ${f.schema},public");exec(c,"SET LOCAL statement_timeout='8s'");exec(c,"SET LOCAL lock_timeout='5s'")
+            val owns:(UUID,UUID)->Boolean={user,store->user==f.owner && store in setOf(f.parent,f.management,f.otherParent,f.otherManagement,f.branch)}
+            block(MarketDeliveryRepository(c,MarketplaceRepository(c,owns),owns),c).also {c.commit()}
+        } catch(failure:Throwable){c.rollback();throw failure}
+    }
+    private fun deliveryRequest(f:Fixture,c:Connection,mode:MarketDeliveryMode=MarketDeliveryMode.EXPRESS):MarketDeliveryCommand {
+        batch(f,c,total=20.0);val listing=published(f)
+        shoppingTx(f){it.apply(f.buyer,null,listCommand(f,listing,units=2))}
+        val snapshot=shoppingTx(f){it.snapshot(f.buyer)}
+        val policy=deliveryTx(f){r,_->r.savePolicy(f.owner,MarketDeliveryPolicy(f.parent.toString(),modes=setOf(mode),expressFeeMinor=500,serviceArea="Astana"))}
+        val row=snapshot.lines.single()
+        return MarketDeliveryCommand(UUID.randomUUID().toString(),MarketDeliveryAction.REQUEST,request=MarketDeliveryRequest(
+            row.line.storeId,snapshot.revision,policy.revision,mode,MarketDeliveryAddress("Buyer","+77000000000","Astana, test 1"),
+            listOf(MarketDeliveryLine(row.line,requireNotNull(row.unitPriceMinor))),"KZT",policy.fee(mode)))
+    }
+    private fun deliveryStep(f:Fixture,user:UUID,order:MarketDeliveryOrder,action:MarketDeliveryAction,
+        courier:String?=null,code:String?=null,note:String="")=deliveryTx(f){r,_->r.command(user,MarketDeliveryCommand(
+            UUID.randomUUID().toString(),action,order.id,order.revision,courierPublicId=courier,handoverCode=code,note=note)).order}
+
+    @Test fun deliveryRequestReplayAndOwnershipDoNotCreateDuplicatesOrExposeContacts()=fixture {f,c->
+        val command=deliveryRequest(f,c)
+        val first=deliveryTx(f){r,_->r.command(f.buyer,command)}
+        val replay=deliveryTx(f){r,_->r.command(f.buyer,command)}
+        assertTrue(replay.replayed);assertEquals(first.order.id,replay.order.id)
+        assertEquals("1",scalar(c,"SELECT count(*) FROM market_delivery_orders"))
+        assertEquals(40498L,first.order.totalMinor);assertNotNull(first.order.handoverCode)
+        assertNull(deliveryTx(f){r,_->r.get(f.owner,first.order.id)}.handoverCode)
+        val stranger=UUID.randomUUID();exec(c,"INSERT INTO users(id) VALUES ('$stranger')")
+        assertEquals(403,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.get(stranger,first.order.id)}}.status)
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.command(f.buyer,command.copy(request=command.request!!.copy(feeMinor=0)))}}.status)
+        assertTrue(deliveryTx(f){_,db->hasOpenStoreDeliveries(db,listOf(f.parent))})
+        assertTrue(deliveryTx(f){_,db->hasOpenMarketDeliveries(db,f.buyer)})
+    }
+    @Test fun deliveryPricePolicyAndListRevisionAreCheckedBeforeCreatingOrder()=fixture {f,c->
+        val command=deliveryRequest(f,c);val request=command.request!!
+        for(changed in listOf(request.copy(shoppingRevision=request.shoppingRevision+1),request.copy(policyRevision=0),
+            request.copy(feeMinor=1),request.copy(lines=request.lines.map { it.copy(unitPriceMinor=1) }),request.copy(lines=emptyList()))) {
+            assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.command(f.buyer,command.copy(request=changed))}}
+        }
+        assertEquals("0",scalar(c,"SELECT count(*) FROM market_delivery_orders"))
+        val created=deliveryTx(f){r,_->r.command(f.buyer,command)}.order
+        exec(c,"UPDATE stock_items SET sale_prices='[{\"price\":\"250.00\",\"currency\":\"KZT\",\"supplierId\":\"\"}]' WHERE id='${f.item}'")
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryStep(f,f.owner,created,MarketDeliveryAction.CONFIRM)}.status)
+        assertEquals(MarketDeliveryStatus.REQUESTED,deliveryTx(f){r,_->r.get(f.buyer,created.id)}.status)
+    }
+    @Test fun expressDeliveryRunsFromMerchantThroughParentEmployeeToBuyerProof()=fixture {f,c->
+        val command=deliveryRequest(f,c)
+        val worker=UUID.randomUUID();exec(c,"INSERT INTO users(id,public_id,first_name,last_name) VALUES ('$worker','12345678','Test','Courier')")
+        exec(c,"INSERT INTO store_worker_memberships(user_id,store_id,is_active) VALUES ('$worker','${f.management}',TRUE)")
+        var order=deliveryTx(f){r,_->r.command(f.buyer,command)}.order;val code=order.handoverCode!!
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.CONFIRM)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.ASSIGN,courier="12345678")
+        assertNull(order.handoverCode)
+        order=deliveryStep(f,worker,order,MarketDeliveryAction.ACCEPT_ASSIGNMENT)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.PACK)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.READY)
+        order=deliveryStep(f,worker,order,MarketDeliveryAction.DISPATCH)
+        val point=MarketCourierPosition(51.1,71.4,20.0,System.currentTimeMillis())
+        deliveryTx(f){r,_->r.location(worker,order.id,MarketCourierLocationUpdate(order.revision,point))}
+        assertTrue(deliveryTx(f){r,_->r.get(f.buyer,order.id)}.position!!.isFresh(System.currentTimeMillis()))
+        assertNull(deliveryTx(f){r,_->r.page(f.buyer,"buyer",null,null)}.orders.single().position)
+        order=deliveryStep(f,worker,order,MarketDeliveryAction.ARRIVE)
+        assertFailsWith<MarketFailure>{deliveryStep(f,worker,order,MarketDeliveryAction.DELIVER,code="wrong")}
+        order=deliveryStep(f,worker,order,MarketDeliveryAction.DELIVER,code=code)
+        assertEquals(MarketDeliveryStatus.DELIVERED,order.status);assertNull(order.position)
+        assertNull(deliveryTx(f){r,_->r.get(f.buyer,order.id)}.handoverCode)
+        assertFalse(deliveryTx(f){_,db->hasOpenMarketDeliveries(db,f.buyer)})
+        deliveryTx(f){_,db->eraseMarketDeliveryContacts(db,f.buyer)}
+        val redacted=deliveryTx(f){r,_->r.get(f.owner,order.id)}
+        assertEquals(MarketDeliveryAddress(),redacted.request.address);assertTrue(redacted.contactsRemoved);assertTrue(redacted.isValidDeliveryOrder())
+    }
+    @Test fun removedCourierCannotReadOrSendPositionAndStaleRevisionCannotMutate()=fixture {f,c->
+        val command=deliveryRequest(f,c)
+        val worker=UUID.randomUUID();exec(c,"INSERT INTO users(id,public_id) VALUES ('$worker','87654321')")
+        exec(c,"INSERT INTO store_worker_memberships(user_id,store_id,is_active) VALUES ('$worker','${f.parent}',TRUE)")
+        val requested=deliveryTx(f){r,_->r.command(f.buyer,command)}.order
+        val confirmed=deliveryStep(f,f.owner,requested,MarketDeliveryAction.CONFIRM)
+        val assigned=deliveryStep(f,f.owner,confirmed,MarketDeliveryAction.ASSIGN,courier="87654321")
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryStep(f,f.owner,confirmed,MarketDeliveryAction.PACK)}.status)
+        exec(c,"UPDATE store_worker_memberships SET is_active=FALSE WHERE user_id='$worker'")
+        assertEquals(403,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.get(worker,assigned.id)}}.status)
+        assertTrue(deliveryTx(f){r,_->r.page(worker,"courier",null,null)}.orders.isEmpty())
+        assertEquals(403,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.location(worker,assigned.id,MarketCourierLocationUpdate(assigned.revision,MarketCourierPosition(51.0,71.0,1.0,System.currentTimeMillis())))}}.status)
+    }
+    @Test fun pickupAndCancellationNeedExplicitConfirmationAndReason()=fixture {f,c->
+        val command=deliveryRequest(f,c,MarketDeliveryMode.PICKUP)
+        var order=deliveryTx(f){r,_->r.command(f.buyer,command)}.order
+        assertFailsWith<MarketFailure>{deliveryStep(f,f.buyer,order,MarketDeliveryAction.CANCEL)}
+        assertFailsWith<IllegalStateException>{deliveryTx(f){_,db->eraseMarketDeliveryContacts(db,f.buyer)}}
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.CONFIRM)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.PACK)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.READY)
+        assertFailsWith<MarketFailure>{deliveryStep(f,f.owner,order,MarketDeliveryAction.DISPATCH)}
+        order=deliveryStep(f,f.buyer,order,MarketDeliveryAction.DELIVER)
+        assertEquals(MarketDeliveryStatus.DELIVERED,order.status);assertEquals(0L,order.request.feeMinor)
+    }
+
+
+    @Test fun courierCanBeReassignedDuringTransitWithoutLeakingPreviousTracking()=fixture {f,c->
+        val command=deliveryRequest(f,c)
+        val workers=listOf(UUID.randomUUID(),UUID.randomUUID())
+        workers.forEachIndexed { i,worker ->
+            exec(c,"INSERT INTO users(id,public_id) VALUES ('$worker','9000000$i')")
+            exec(c,"INSERT INTO store_worker_memberships(user_id,store_id,is_active) VALUES ('$worker','${f.management}',TRUE)")
+        }
+        var order=deliveryTx(f){r,_->r.command(f.buyer,command)}.order
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.CONFIRM)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.ASSIGN,courier="90000000")
+        order=deliveryStep(f,workers[0],order,MarketDeliveryAction.ACCEPT_ASSIGNMENT)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.PACK)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.READY)
+        order=deliveryStep(f,workers[0],order,MarketDeliveryAction.DISPATCH)
+        deliveryTx(f){r,_->r.location(workers[0],order.id,MarketCourierLocationUpdate(order.revision,MarketCourierPosition(51.0,71.0,10.0,System.currentTimeMillis())))}
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.ASSIGN,courier="90000001")
+        assertEquals(MarketDeliveryStatus.ON_THE_WAY,order.status);assertFalse(order.courierAccepted);assertNull(order.position)
+        assertNull(deliveryTx(f){r,_->r.get(f.buyer,order.id)}.position)
+        assertEquals(403,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.get(workers[0],order.id)}}.status)
+        order=deliveryStep(f,workers[1],order,MarketDeliveryAction.ACCEPT_ASSIGNMENT)
+        order=deliveryStep(f,workers[1],order,MarketDeliveryAction.ARRIVE)
+        order=deliveryStep(f,f.buyer,order,MarketDeliveryAction.DELIVER)
+        assertEquals(MarketDeliveryStatus.DELIVERED,order.status)
+    }
 }
