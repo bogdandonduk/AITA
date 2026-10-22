@@ -1602,19 +1602,34 @@ class AitaSharedJvmFlowTest {
     @Test fun analyticsStalledRequestTimesOutAndUnrelatedUpdatesDoNotRestartIt() = runBlocking {
         prepareAnalyticsOwner()
         val never = CompletableDeferred<Unit>()
-        environment.beforeAnalyticsReply = { never.await() }
-        AnalyticsWorkspace.select(AnalyticsSelection("all"))
+        val requestStarted = CompletableDeferred<Unit>()
+        environment.beforeAnalyticsReply = { requestStarted.complete(Unit); never.await() }
+        val noiseStarted = CompletableDeferred<Unit>()
         val noise = async {
-            repeat(160) {
-                suppliersState.emit(DataState.Success(listOf(SupplierDataModel(id="noise-$it"))))
-                delay(100)
+            var index = 0
+            while (true) {
+                suppliersState.emit(DataState.Success(listOf(SupplierDataModel(id="noise-${index++}"))))
+                noiseStarted.complete(Unit)
+                // Faster than the workspace debounce, and continuous until failure is observed.
+                // The old 100ms/100ms race could pass simply because scheduling left a quiet gap.
+                delay(20)
             }
         }
-        withTimeout(19_000) { AnalyticsWorkspace.failure.first { it } }
-        noise.cancel(); noise.join()
-        assertNull(AnalyticsWorkspace.state.value)
-        assertEquals(1, environment.requests.count { it.path == "analytics/store/get" })
-        environment.beforeAnalyticsReply = null
+        try {
+            noiseStarted.await()
+            AnalyticsWorkspace.select(AnalyticsSelection("all"))
+            // A separate start deadline detects initial starvation instead of only extending a
+            // watchdog around the 15-second network timeout.
+            withTimeout(3_000) { requestStarted.await() }
+            withTimeout(18_000) { AnalyticsWorkspace.failure.first { it } }
+            assertTrue(noise.isActive)
+            assertNull(AnalyticsWorkspace.state.value)
+            assertEquals(1, environment.requests.count { it.path == "analytics/store/get" })
+        } finally {
+            noise.cancel(); noise.join()
+            environment.beforeAnalyticsReply = null
+            never.cancel()
+        }
     }
 
     @Test fun analyticsKeepsMatchingSavedTotalsOfflineButNeverAcrossStoresOrDeniedAccess() = runBlocking {

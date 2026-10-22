@@ -353,7 +353,11 @@ object AnalyticsWorkspace {
                 inventoryOwners.state.map { Unit }, activeStoreIdState.map { Unit }, userAccountState.payload.map { Unit },
                 storesState.payload.map { Unit }, myWorkerMembershipsState.payload.map { Unit }, StoreCommerceClient.state.map { Unit },
                 requests.map { Unit }, refreshRevision.map { Unit }, globalAppConfigurationState.payload.map { Unit }, dates
-            ).debounce(100).map { snapshot() }.distinctUntilChanged { a, b -> a.sameAs(b) }.collectLatest { prepare(it) }
+            // Discard unrelated notifications before debouncing. Otherwise a steady stream of
+            // supplier updates can indefinitely postpone even the first remote totals request.
+            // Genuine owner, authorization, selection and input changes still replace the work;
+            // publish() also rechecks its complete source fingerprint before exposing a result.
+            ).map { snapshot() }.distinctUntilChanged { a, b -> a.sameAs(b) }.debounce(100).collectLatest { prepare(it) }
         }
     }
 }
