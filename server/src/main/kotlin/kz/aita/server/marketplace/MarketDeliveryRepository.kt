@@ -24,11 +24,35 @@ internal class MarketDeliveryRepository(private val db: Connection, private val 
         if (query("SELECT id FROM users WHERE id=? AND is_active FOR UPDATE", user) { it.getObject(1) }.isEmpty()) fail("forbidden", 403)
     }
     private fun fail(key: String, status: Int = 400): Nothing = marketFail("delivery.$key", status)
+    /** C/POSIX databases only lowercase ASCII. Pick an installed Unicode collation for this
+     * expression, without changing database defaults or requiring ICU on every installation. */
+    private fun deliverySearchCollation(): String {
+        val candidates=query("""SELECT c.collname FROM pg_catalog.pg_collation c
+            JOIN pg_catalog.pg_namespace n ON n.oid=c.collnamespace
+            WHERE n.nspname='pg_catalog' AND c.collname IN ('unicode','und-x-icu','C.utf8','C.UTF-8')
+            AND c.collencoding IN (-1,pg_catalog.pg_char_to_encoding(current_setting('server_encoding')))
+            ORDER BY CASE c.collname WHEN 'unicode' THEN 0 WHEN 'und-x-icu' THEN 1 WHEN 'C.utf8' THEN 2 ELSE 3 END""") { it.getString(1) }
+        val probe="НАБОР ӘҒҚҢӨҰҮҺІ ӨҮҢ ҒӢҚӮҲҶ OʻZBEK GʻISHT ÄÖÜ É Ñ"
+        for(name in candidates + "default") {
+            // Only fixed names from the allowlist above can enter SQL identifier position.
+            val collation=when(name) {
+                "unicode" -> " COLLATE pg_catalog.\"unicode\""
+                "und-x-icu" -> " COLLATE pg_catalog.\"und-x-icu\""
+                "C.utf8" -> " COLLATE pg_catalog.\"C.utf8\""
+                "C.UTF-8" -> " COLLATE pg_catalog.\"C.UTF-8\""
+                else -> ""
+            }
+            if(query("SELECT lower(?$collation)",probe) { it.getString(1) }.single()==probe.lowercase()) return collation
+        }
+        // Silently returning an empty list would incorrectly suggest that the order is missing.
+        fail("search_unavailable",503)
+    }
     private fun manager(user: UUID, store: String) = ownsStore(user, marketUuid(store))
     private fun courierEligible(user: UUID, store: String): Boolean = manager(user, store) || query(
         """SELECT 1 FROM store_worker_memberships m JOIN stores s ON s.id=? AND s.is_active
+           JOIN stores root ON root.id=coalesce(s.parent_store_id,s.id) AND root.is_active
            JOIN users u ON u.id=m.user_id AND u.is_active
-           WHERE m.user_id=? AND m.is_active AND (m.store_id=s.id OR m.store_id=s.parent_store_id) LIMIT 1""",
+           WHERE m.user_id=? AND m.is_active AND (m.store_id=s.id OR m.store_id=root.id) LIMIT 1""",
         marketUuid(store), user) { true }.isNotEmpty()
 
     fun policy(user: UUID, store: String, seller: Boolean): MarketDeliveryPolicy {
@@ -64,7 +88,7 @@ internal class MarketDeliveryRepository(private val db: Connection, private val 
     private fun visible(user: UUID, value: Pair<MarketDeliveryOrder, String>): MarketDeliveryOrder {
         val (order, code) = value
         val buyer = user.toString() == order.buyerId
-        val seller = manager(user, order.branchStoreId)
+        val seller = !buyer && manager(user, order.branchStoreId)
         val courier = user.toString() == order.courierId && courierEligible(user, order.branchStoreId)
         if (!buyer && !seller && !courier) fail("forbidden", 403)
         return order.copy(handoverCode = code.takeIf { buyer && !order.terminal },
@@ -72,25 +96,64 @@ internal class MarketDeliveryRepository(private val db: Connection, private val 
     }
     fun get(user: UUID, id: String) = visible(user, raw(id))
 
-    fun page(user: UUID, view: String, store: String?, before: String?): MarketDeliveryPage {
-        val filter: String; val key: UUID
+    fun page(user: UUID, view: String, store: String?, before: String?, filter: MarketDeliveryFilter = MarketDeliveryFilter()): MarketDeliveryPage {
+        if (!filter.isValid()) fail("invalid")
+        val selected = filter.normalized()
+        val column: String; val key: UUID
         when (view) {
-            "buyer" -> { filter = "buyer_id"; key = user }
-            "courier" -> { filter = "courier_id"; key = user }
-            "seller" -> { if (store == null || !manager(user, store)) fail("forbidden", 403); filter = "branch_store_id"; key = marketUuid(store) }
+            "buyer" -> { column = "buyer_id"; key = user }
+            "courier" -> { column = "courier_id"; key = user }
+            "seller" -> { if (store == null || !manager(user, store)) fail("forbidden", 403); column = "branch_store_id"; key = marketUuid(store) }
             else -> fail("invalid")
         }
+        val time = now()
         val args = mutableListOf<Any?>(key)
-        before?.let { args += marketUuid(it); args += key }
-        val ids = query("SELECT id::text FROM market_delivery_orders WHERE $filter=?" + (if (before != null) " AND (created_at_millis,id) < (SELECT created_at_millis,id FROM market_delivery_orders WHERE id=? AND $filter=?)" else "") + " ORDER BY created_at_millis DESC,id DESC LIMIT 41",
-            *args.toTypedArray()) { it.getString(1) }
-        val rows = ids.take(40).mapNotNull { id ->
-            val order = raw(id)
-            if (view == "courier" && !courierEligible(user, order.first.branchStoreId)) null
-            else visible(user, order).copy(position = null, handoverCode = null)
+        val clauses = mutableListOf("d.$column=?")
+        if (view == "courier") {
+            // Check authorization BEFORE LIMIT: revoked jobs must not consume an entire page and
+            // hide older work. Root ownership has the same meaning as isStoreOwnerInsideTransaction.
+            clauses += """EXISTS (SELECT 1 FROM stores s JOIN stores root ON root.id=coalesce(s.parent_store_id,s.id)
+                JOIN users courier ON courier.id=d.courier_id AND courier.is_active
+                WHERE s.id=d.branch_store_id AND s.is_active AND root.is_active AND (
+                    root.owner_user_ids @> jsonb_build_array(courier.id::text) OR EXISTS (
+                        SELECT 1 FROM store_worker_memberships m WHERE m.user_id=courier.id AND m.is_active
+                        AND (m.store_id=s.id OR m.store_id=root.id))))"""
         }
-        return MarketDeliveryPage(user.toString(), view, store.takeIf { view == "seller" }, rows,
-            ids.takeIf { it.size > 40 }?.get(39), now())
+        val active = "d.status NOT IN ('DELIVERED','CANCELLED')"
+        when (selected.queue) {
+            MarketDeliveryQueue.ALL -> Unit
+            MarketDeliveryQueue.ACTIVE -> clauses += active
+            MarketDeliveryQueue.HISTORY -> clauses += "d.status IN ('DELIVERED','CANCELLED')"
+            MarketDeliveryQueue.ATTENTION -> {
+                clauses += active
+                val roleAttention = when (view) {
+                    "seller" -> """d.status='REQUESTED' OR (d.payload#>>'{request,mode}'<>'PICKUP' AND (
+                        d.courier_id IS NULL OR NOT coalesce((d.payload->>'courierAccepted')::boolean,false) OR d.status='READY'))"""
+                    "buyer" -> "d.status='ARRIVED' OR (d.status='READY' AND d.payload#>>'{request,mode}'='PICKUP')"
+                    else -> "NOT coalesce((d.payload->>'courierAccepted')::boolean,false) OR d.status IN ('READY','ARRIVED')"
+                }
+                clauses += "((d.payload->>'estimatedToMillis')::bigint < ? OR $roleAttention)"
+                args += time
+            }
+        }
+        selected.mode?.let { clauses += "d.payload#>>'{request,mode}'=?"; args += it.name }
+        if (selected.search.isNotEmpty()) {
+            val collation=deliverySearchCollation()
+            // strpos treats %, _, quotes and backslashes literally. Contacts and handover codes
+            // are deliberately not searchable. Live position and handover proof are detail-only.
+            clauses += """(strpos(lower(d.id::text$collation),lower(?$collation))>0 OR strpos(lower((d.payload->>'shopName')$collation),lower(?$collation))>0
+                OR EXISTS (SELECT 1 FROM jsonb_array_elements(d.payload#>'{request,lines}') line
+                    WHERE strpos(lower((line#>>'{line,title}')$collation),lower(?$collation))>0))"""
+            repeat(3) { args += selected.search }
+        }
+        before?.let {
+            clauses += "(d.created_at_millis,d.id) < (SELECT cursor.created_at_millis,cursor.id FROM market_delivery_orders cursor WHERE cursor.id=? AND cursor.$column=?)"
+            args += marketUuid(it); args += key
+        }
+        val rows = query("SELECT d.payload::text FROM market_delivery_orders d WHERE ${clauses.joinToString(" AND ")} ORDER BY d.created_at_millis DESC,d.id DESC LIMIT 41",
+            *args.toTypedArray()) { row -> jsonBase.decodeFromString<MarketDeliveryOrder>(row.getString(1)).copy(position=null,handoverCode=null) }
+        return MarketDeliveryPage(user.toString(), view, store.takeIf { view == "seller" }, rows.take(40),
+            rows.takeIf { it.size > 40 }?.get(39)?.id, time, selected)
     }
 
     fun command(user: UUID, command: MarketDeliveryCommand): MarketDeliveryOutcome {

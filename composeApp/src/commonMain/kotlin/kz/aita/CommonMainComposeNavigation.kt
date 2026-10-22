@@ -2169,13 +2169,14 @@ fun AppConfiguration.searchTextField(
     barcodeCamScanner: Boolean = false,
     placeholderText: String = stateValues.stringSearchByAnyData,
     onBarcodeScanned: ((String) -> Unit)? = null,
+    onSubmitInput: ((String) -> Unit)? = null,
     captureTransactionBarcodeInput: Boolean = false,
     focusedBorderWidth: Dp = stateValues.focusedBorderWidth,
     unfocusedBorderWidth: Dp = stateValues.unfocusedBorderWidth,
     focusedBorderColor: Color = stateValues.AccentColor,
     unfocusedBorderColor: Color = stateValues.PlaceholderTextColor
 ): GenericTextFieldContent {
-    var textFieldContent: GenericTextFieldContent? = null
+    val textFieldContent = remember { GenericTextFieldContentReference() }
     val appConfiguration = this
 
     Column(
@@ -2272,7 +2273,7 @@ fun AppConfiguration.searchTextField(
             )
         }
 
-        textFieldContent = genericTextField(
+        textFieldContent.current = genericTextField(
             valueInitial = valueInitial,
             retainTextAcrossRecreation = retainTextAcrossRecreation,
             persistTextDraft = persistTextDraft,
@@ -2283,6 +2284,7 @@ fun AppConfiguration.searchTextField(
             updateIsFocusedAction = updateIsFocusedAction,
             forceRefocus = forceRefocus,
             placeholderText = placeholderText,
+            onSubmitInput = onSubmitInput,
             focusedBorderWidth = focusedBorderWidth,
             unfocusedBorderWidth = unfocusedBorderWidth,
             focusedBorderColor = focusedBorderColor,
@@ -2335,7 +2337,7 @@ fun AppConfiguration.searchTextField(
                             )
                         }
                     } else {
-                        textFieldContent?.replaceText(candidate, applyTransform = false)
+                        textFieldContent.current?.replaceText(candidate, applyTransform = false)
                     }
                     closeScanner()
                 }
@@ -2372,7 +2374,7 @@ fun AppConfiguration.searchTextField(
         }
     }
 
-    return textFieldContent!!
+    return requireNotNull(textFieldContent.current)
 }
 
 @Composable

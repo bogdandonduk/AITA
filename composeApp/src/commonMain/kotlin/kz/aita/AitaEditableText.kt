@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +29,16 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import kotlinx.coroutines.flow.collect
 
+/** Optional live-editor access for adjacent action buttons. Never retains a disposed editor. */
+internal class AitaTextFieldReadHandle {
+    private var reader: (() -> String)? = null
+    fun read(): String? = reader?.invoke()
+    fun attach(current: () -> String): () -> Unit {
+        reader = current
+        return { if (reader === current) reader = null }
+    }
+}
+
 /**
  * The editor, not a recomposed TextFieldValue, owns the live cursor, IME composition and scroll.
  * AITA's existing draft/payment owners still own accepted text. Never save this second state:
@@ -40,6 +51,12 @@ internal class AitaTextFieldBridge(initialValue: TextFieldValue) {
     private var awaitingParentValue: TextFieldValue? = null
 
     fun editorValue(): TextFieldValue = TextFieldValue(state.text.toString(), state.selection)
+
+    fun submitEditorValue(clearOnHandled: Boolean, submit: (String) -> Boolean): Boolean {
+        if (!submit(editorValue().text)) return false
+        if (clearOnHandled) resetFromParent(TextFieldValue(""))
+        return true
+    }
 
     fun resetFromParent(value: TextFieldValue) {
         parentValue = value.editorSnapshot()
@@ -130,7 +147,9 @@ internal fun AitaEditableText(
     inputFilter: ((String) -> Boolean)?,
     inputTransform: ((String) -> String)?,
     onSubmitText: ((String) -> Boolean)? = null,
+    clearOnHandledSubmission: Boolean = true,
     resetRevision: Int = 0,
+    liveReadHandle: AitaTextFieldReadHandle? = null,
     decorationBox: @Composable (@Composable () -> Unit) -> Unit
 ) {
     val bridge = remember(identityKey) { AitaTextFieldBridge(value) }
@@ -147,6 +166,15 @@ internal fun AitaEditableText(
             appliedResetRevision = resetRevision
         } else bridge.updateFromParent(value)
     }
+    DisposableEffect(bridge, liveReadHandle) {
+        val detach = liveReadHandle?.attach {
+            // An adjacent button can be clicked before snapshotFlow publishes a scanner burst.
+            // Flush through the same validation path as Enter, then return the accepted live value.
+            if (bridge.reportEditorChange(accept)) acceptanceRevision++
+            bridge.editorValue().text
+        }
+        onDispose { detach?.invoke() }
+    }
     LaunchedEffect(bridge) {
         snapshotFlow { bridge.editorValue() }.collect {
             if (bridge.reportEditorChange(accept)) acceptanceRevision++
@@ -160,9 +188,8 @@ internal fun AitaEditableText(
                 // Flush the live editor before Enter, including scanners that deliver the
                 // entire barcode and terminator before the parent has recomposed.
                 if (bridge.reportEditorChange(accept)) acceptanceRevision++
-                if (submit?.invoke(bridge.editorValue().text) == true) {
-                    bridge.resetFromParent(TextFieldValue(""))
-                    acceptanceRevision++
+                if (bridge.submitEditorValue(clearOnHandledSubmission) { submit?.invoke(it) == true }) {
+                    if (clearOnHandledSubmission) acceptanceRevision++
                     true
                 } else false
             } else false

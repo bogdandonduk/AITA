@@ -13,9 +13,9 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun AppConfiguration.SupplierCatalogScreen() {
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val supplierPrices by supplierGoodsPricesState.payload.collectAsState()
+    val orders by supplierSideOrdersState.payload.collectAsState()
+    val lines by supplierSideOrderLinesState.payload.collectAsState()
+    val supplierPrices by supplierSideGoodsPricesState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     val catalogNavigationState by NavigationScreenModel.Supplier.Catalog.Main.state.collectAsState()

@@ -1671,9 +1671,9 @@ internal fun AppConfiguration.SupplierInsightsRecoveryWaveMiniCard(
 
 @Composable
 internal fun AppConfiguration.SupplierInsightsScreen() {
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    val orders by supplierSideOrdersState.payload.collectAsState()
+    val lines by supplierSideOrderLinesState.payload.collectAsState()
+    val contracts by supplierSideContractsState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }

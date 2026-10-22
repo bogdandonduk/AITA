@@ -302,7 +302,8 @@ internal fun AppConfiguration.patchSupplierDeskOrder(
                 updatedAtMillis = getCurrentTimeMillis()
             ),
             lines = patchedLines
-        )
+        ),
+        supplierSide = true
     )
 }
 

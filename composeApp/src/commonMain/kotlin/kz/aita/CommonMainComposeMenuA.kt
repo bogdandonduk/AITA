@@ -5497,10 +5497,10 @@ internal fun AppConfiguration.SupplierWorkspaceMenuTile() {
         .distinctBy { it.route }
     val currentRoute = stateValues.navigationScreensMain.last().route
     val manufacturerMode = stateValues.appModeId == APP_MODE_MANUFACTURER
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val supplierPrices by supplierGoodsPricesState.payload.collectAsState()
-    val supplierContracts by supplierPartnershipContractsState.payload.collectAsState()
+    val orders by supplierSideOrdersState.payload.collectAsState()
+    val lines by supplierSideOrderLinesState.payload.collectAsState()
+    val supplierPrices by supplierSideGoodsPricesState.payload.collectAsState()
+    val supplierContracts by supplierSideContractsState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     val coroutineScope = rememberCoroutineScope()

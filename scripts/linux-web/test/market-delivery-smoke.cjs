@@ -2,7 +2,8 @@
 const {chromium}=require('playwright');
 const fs=require('fs'),http=require('http'),path=require('path');
 const dist=process.env.AITA_WEB_DIST;if(!dist)throw Error('Set AITA_WEB_DIST to the built distribution');
-const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke','delivery');
+const workspaceTest=process.env.AITA_DELIVERY_WORKSPACE==='1';
+const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke',workspaceTest?'delivery-workspace':'delivery');
 fs.mkdirSync(output,{recursive:true});
 const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
 const account={id:id(99),publicId:'MARKET-TEST',phoneNumber:'',email:'market@example.test',firstName:'Aida',lastName:'',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:process.env.AITA_TEST_LANGUAGE||'en',appThemeId:Number(process.env.AITA_TEST_THEME||0),appModeId:1};
@@ -17,16 +18,27 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
  const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US'});
  await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-market-token',refreshToken:'isolated-market-refresh'}));localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-market-device');localStorage.setItem('aita.key_appTheme','7');},account);
  await context.routeWebSocket('**',ws=>ws.close());const calls=[],errors=[];
- let orders=[],deliveryCommands=[],loseDeliveryReply=true;
+ let orders=[],deliveryCommands=[],loseDeliveryReply=true,deliveryOffline=false;
+ const listResponses=[];let heldListReply=null;
  let shoppingRevision=1,savedRevision=0,savedShops=[],savedOffers=[id(103)],records={};
  let lines=offers(Date.now()).slice(0,3).map((o,i)=>({offerId:o.id,storeId:o.storefront.storeId,title:o.title,shopName:o.storefront.displayName,units:i+1,basis:{gtin:null,currencyCode:o.currencyCode,unitId:o.unitId,pricedAmount:o.pricedAmount},unitName:o.unitName,updatedAtMillis:1,collected:false}));
  function shopping(now){return {userId:account.id,revision:shoppingRevision,lines:lines.map(line=>{const o=offers(now).find(x=>x.id===line.offerId);return {line,offer:o,unitPriceMinor:o.priceMinor,subtotalMinor:o.priceMinor*line.units,status:'estimated'};}),checkedAtMillis:now};}
+
+ if(workspaceTest){
+  const now=Date.now();
+  orders=[['REQUESTED','STANDARD','New essentials'],['ARRIVED','EXPRESS','Express vegetables'],['DELIVERED','STANDARD','Old honey'],['CANCELLED','PICKUP','Cancelled bread'],['READY','PICKUP','Pickup oats']].map(([status,mode,title],i)=>({
+   id:id(500+i),buyerId:account.id,branchStoreId:shops[0].branchStoreId,shopName:shops[0].displayName,
+   request:{storefrontId:shops[0].storeId,shoppingRevision:1,policyRevision:1,mode,address:{recipient:'Aida',phone:'+77000000000',address:'Almaty, Abay 42'},lines:[{line:{...lines[0],title},unitPriceMinor:100000}],currency:'KZT',feeMinor:mode==='PICKUP'?0:50000},
+   revision:0,status,createdAtMillis:now-100000-i*1000,updatedAtMillis:now-50000,estimatedFromMillis:now-10000,estimatedToMillis:i===1?now-1000:now+3600000,handoverCode:['DELIVERED','CANCELLED'].includes(status)?null:'123456',
+   events:[{action:'REQUEST',status:'REQUESTED',atMillis:now-100000}]}));
+ }
 
  await context.route('**/*',async route=>{
   const u=new URL(route.request().url());if(u.origin===origin)return route.continue();
   if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname});return route.fulfill({response});}
   if(u.hostname==='media.example.com')return route.fulfill({contentType:'image/svg+xml',body:picture(parseInt(u.pathname.match(/\d+/)[0]))});
-  const p=u.pathname.replace(/^\/api\//,'/');calls.push({path:p,body:route.request().postData()});
+  const p=u.pathname.replace(/^\/api\//,'/');calls.push({path:p,query:u.search,body:route.request().postData()});
+  if(deliveryOffline&&p.startsWith('/market/delivery/'))return route.abort('internetdisconnected');
   let payload=[];const now=Date.now();
   if(p==='/user/get')payload=account;
   else if(p==='/user/app-mode')payload={accountId:account.id,appModeId:1};
@@ -63,7 +75,28 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
    if(loseDeliveryReply){loseDeliveryReply=false;return route.abort('internetdisconnected');}
    payload={commandId:command.commandId,order,replayed:deliveryCommands.filter(x=>x.commandId===command.commandId).length>1};
   }
-  else if(p==='/market/delivery/orders')payload={accountId:account.id,view:u.searchParams.get('view')||'buyer',orders:orders.map(o=>({...o,handoverCode:null,position:null})),checkedAtMillis:now};
+  else if(p==='/market/delivery/orders'){
+   const filter={queue:u.searchParams.get('queue')||'ALL',mode:u.searchParams.get('mode')||null,search:u.searchParams.get('search')||''};
+   const active=o=>!['DELIVERED','CANCELLED'].includes(o.status);
+   const attention=o=>active(o)&&(o.estimatedToMillis<now||o.status==='ARRIVED'||o.status==='READY'&&o.request.mode==='PICKUP');
+   const selected=orders.filter(o=>(filter.queue==='ALL'||filter.queue==='ACTIVE'&&active(o)||filter.queue==='HISTORY'&&!active(o)||filter.queue==='ATTENTION'&&attention(o))&&(!filter.mode||o.request.mode===filter.mode)&&(!filter.search||(o.id+' '+o.shopName+' '+o.request.lines.map(x=>x.line.title).join(' ')).toLowerCase().includes(filter.search.toLowerCase())));
+   payload={accountId:account.id,view:u.searchParams.get('view')||'buyer',filter,orders:selected.map(o=>({...o,handoverCode:null,position:null})),checkedAtMillis:now};
+   // Exercise a real overlapping transport response, not just fast filter toggles. Capture the
+   // old payload now, let a newer query finish, then attempt to deliver this stale response.
+   const responseBody=JSON.stringify({negative:false,payload:JSON.stringify(payload)});
+   const held=workspaceTest&&heldListReply&&!heldListReply.captured&&filter.queue==='HISTORY'&&!filter.mode&&!filter.search?heldListReply:null;
+   if(held){held.captured=true;held.filter=filter;await held.wait;}
+   try {
+    await route.fulfill({status:200,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:responseBody});
+    listResponses.push({filter,held:!!held,finishedAt:Date.now(),result:'fulfilled'});
+   } catch(failure) {
+    // Cancellation of the old query is also correct. Do not hide unrelated harness errors.
+    const cancelled=route.request().failure()?.errorText||'';
+    if(!held||!/abort|cancel/i.test(cancelled))throw failure;
+    listResponses.push({filter,held:true,finishedAt:Date.now(),result:'cancelled',failure:cancelled});
+   } finally {if(held)held.finished=true;}
+   return;
+  }
   else if(p.startsWith('/market/delivery/orders/'))payload=orders.find(o=>o.id===p.split('/').at(-1));
   else if(p.includes('profile-photo'))payload={accountId:account.id,mode:'MARKETPLACE'};
   else if(p.includes('client-updates'))return route.fulfill({status:204,body:''});
@@ -78,6 +111,40 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
  try {
   await page.goto('https://aita.kz/');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(7000);await page.keyboard.press('Tab');await page.waitForTimeout(700);
   await page.mouse.click(810,1005);await page.waitForTimeout(2000);
+  if(workspaceTest){
+   await button('My orders').click({force:true});await page.waitForTimeout(1800);
+   const rows=()=>page.getByRole('button').filter({hasText:'Green Basket Standard delivery'});
+   let aria=await page.locator('body').ariaSnapshot();assert.match(aria,/New essentials/);assert.doesNotMatch(aria,/Old honey/);
+   heldListReply={captured:false,finished:false};heldListReply.wait=new Promise(resolve=>{heldListReply.release=resolve;});
+   await button('History').click({force:true});await until(()=>heldListReply.captured,'Old history query reached the held transport');
+   await button('Needs attention').click({force:true});
+   await until(()=>listResponses.some(r=>!r.held&&r.filter.queue==='ATTENTION'),'New attention query completed while history is still delayed');
+   assert.equal(heldListReply.finished,false,'Old response must still be delayed when the new query completes');
+   await page.waitForTimeout(700);aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Express vegetables/);assert.match(aria,/Pickup oats/);assert.doesNotMatch(aria,/Old honey/);
+   heldListReply.release();await until(()=>heldListReply.finished,'Stale history response released after the newer attention response');
+   await page.waitForTimeout(1000);aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Express vegetables/);assert.match(aria,/Pickup oats/);assert.doesNotMatch(aria,/New essentials|Old honey|Cancelled bread/);
+   const staleCompletion=listResponses.findIndex(r=>r.held),newCompletion=listResponses.findIndex(r=>r.filter.queue==='ATTENTION');
+   assert.ok(staleCompletion>newCompletion,'Regression requires the old response to finish after the new one');await shot('late-query-isolation');
+   await button('Express courier').click({force:true});await page.waitForTimeout(900);aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Express vegetables/);assert.doesNotMatch(aria,/Pickup oats/);
+   assert.ok(listResponses.some(r=>r.filter.queue==='ATTENTION'&&r.filter.mode==='EXPRESS'),'Stale history completion must not restore the old filter');
+   await shot('attention-express');
+   await button('History').click({force:true});await button('All delivery types').click({force:true});await page.waitForTimeout(900);
+   const search=page.getByRole('textbox').and(page.locator(':not(textarea):not(input)')).first();
+   await search.click({force:true});await page.keyboard.type('Old honey');await page.waitForTimeout(1100);
+   aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Old honey/);assert.doesNotMatch(aria,/Cancelled bread/);
+   await shot('history-search');
+   deliveryOffline=true;await button('Refresh').last().click({force:true});await page.waitForTimeout(1600);
+   aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Saved copy/);assert.match(aria,/Old honey/);
+   await page.reload();await page.waitForTimeout(8000);await page.keyboard.press('Tab');await page.waitForTimeout(500);
+   aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Old honey/);assert.match(aria,/Saved copy/);await shot('offline-restart');
+   deliveryOffline=false;await button('Refresh').last().click({force:true});await page.waitForTimeout(1200);
+   await page.getByRole('button',{name:/^Green Basket Standard delivery/}).last().click({force:true});await page.waitForTimeout(1000);
+   await button('Items').last().click({force:true});await page.waitForTimeout(400);assert.match(await page.locator('body').ariaSnapshot(),/Old honey/);await shot('items');
+   await button('Timeline').click({force:true});await page.waitForTimeout(400);assert.match(await page.locator('body').ariaSnapshot(),/Request delivery/);await shot('timeline');
+   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(700);await shot('phone');
+   assert.deepEqual(errors,[]);assert.equal(deliveryCommands.length,0);console.log('PASS: active/history/attention, delayed overlapping query isolation, mode/search filters, saved filter and offline restart, item totals and order timeline');
+   return;
+  }
   await button('Request delivery · Green Basket · KZT').click({force:true});await page.waitForTimeout(1400);
   await shot('delivery-checkout');fs.writeFileSync(path.join(output,'checkout-aria.txt'),await page.locator('body').ariaSnapshot());
   await button('Express courier').click({force:true});await page.waitForTimeout(400);
@@ -86,10 +153,10 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await button('Request delivery').last().click({force:true});await until(()=>orders.length===1,'Delivery created');await page.waitForTimeout(2400);await page.keyboard.press('Tab');await page.waitForTimeout(400);
   await shot('delivery-pending');fs.writeFileSync(path.join(output,'pending-aria.txt'),await page.locator('body').ariaSnapshot());
   // Compose accessibility can retain a disposed dialog until focus changes; exercise its visible canvas control.
-  await page.mouse.click(720,326);await until(()=>deliveryCommands.length>=2,'Same command retried');await page.waitForTimeout(1800);
+  await page.mouse.click(720,534);await until(()=>deliveryCommands.length>=2,'Same command retried');await page.waitForTimeout(1800);
   assert.equal(new Set(deliveryCommands.map(c=>c.commandId)).size,1);assert.equal(orders.length,1);
   assert.equal(orders[0].request.mode,'EXPRESS');assert.equal(orders[0].request.address.address,'Almaty, Abay 42');
-  await page.mouse.click(650,420);await page.waitForTimeout(1200);
+  await page.mouse.click(650,540);await page.waitForTimeout(1200);
   await shot('delivery-tracking');fs.writeFileSync(path.join(output,'tracking-aria.txt'),await page.locator('body').ariaSnapshot());
   assert.match(await page.locator('body').ariaSnapshot(),/123456/);
   orders[0]={...orders[0],status:'ARRIVED',revision:6,courierId:id(98),courierName:'Courier',courierAccepted:true,updatedAtMillis:Date.now(),position:{latitude:43.25,longitude:76.95,accuracyMeters:20,capturedAtMillis:Date.now(),receivedAtMillis:Date.now()}};
@@ -99,5 +166,5 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await page.keyboard.press('Escape');await page.waitForTimeout(600);await page.setViewportSize({width:390,height:844});await page.waitForTimeout(700);await shot('delivery-phone');
   assert.deepEqual(errors,[]);console.log('PASS: checkout, durable lost-reply recovery, private handover code, live status and buyer completion');
  } catch(e){await shot('failure');fs.writeFileSync(path.join(output,'failure-aria.txt'),await page.locator('body').ariaSnapshot());throw e;}
- finally{fs.writeFileSync(path.join(output,'calls.json'),JSON.stringify(calls,null,2));await browser.close();server.close();}
+ finally{heldListReply?.release?.();fs.writeFileSync(path.join(output,'calls.json'),JSON.stringify(calls,null,2));fs.writeFileSync(path.join(output,'list-responses.json'),JSON.stringify(listResponses,null,2));await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

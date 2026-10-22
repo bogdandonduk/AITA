@@ -17,10 +17,10 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun AppConfiguration.SupplierCustomersScreen() {
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val contracts by supplierPartnershipContractsState.payload.collectAsState()
-    val supplierPrices by supplierGoodsPricesState.payload.collectAsState()
+    val orders by supplierSideOrdersState.payload.collectAsState()
+    val lines by supplierSideOrderLinesState.payload.collectAsState()
+    val contracts by supplierSideContractsState.payload.collectAsState()
+    val supplierPrices by supplierSideGoodsPricesState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     val navigationState by NavigationScreenModel.Supplier.Customers.Main.state.collectAsState()

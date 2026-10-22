@@ -11,6 +11,7 @@ import java.util.UUID
 
 private val deliveryReadGate = MarketBasketReadGate(requestsPerMinute = 100)
 private val deliveryWriteGate = MarketBasketReadGate(requestsPerMinute = 60)
+private val deliveryProofGate = MarketDeliveryProofGate()
 
 private suspend fun RoutingCall.deliveryGuard(user: UUID, write: Boolean, block: suspend () -> Unit) {
     response.header("Cache-Control", "private, no-store, max-age=0")
@@ -56,8 +57,13 @@ internal fun Route.marketDeliveryRoutes() {
         get("/orders") {
             val user=call.checkPrincipal() ?: return@get
             call.deliveryGuard(user,false) { call.marketResult(readOnly=true) {
+                val parameters=call.request.queryParameters
+                val queue=parameters["queue"]?.let { raw -> MarketDeliveryQueue.entries.find { it.name==raw }
+                    ?: marketFail("delivery.invalid",400) } ?: MarketDeliveryQueue.ALL
+                val mode=parameters["mode"]?.let { raw -> MarketDeliveryMode.entries.find { it.name==raw }
+                    ?: marketFail("delivery.invalid",400) }
                 deliveries().page(user,call.request.queryParameters["view"] ?: "buyer",
-                    call.request.queryParameters["store"],call.request.queryParameters["before"])
+                    parameters["store"],parameters["before"],MarketDeliveryFilter(queue,mode,parameters["search"].orEmpty()))
             } }
         }
         get("/orders/{id}") {
@@ -68,6 +74,16 @@ internal fun Route.marketDeliveryRoutes() {
             val user=call.checkPrincipal() ?: return@post
             call.deliveryGuard(user,true) {
                 val body=call.receiveAita<MarketDeliveryCommand>()
+                val proof = try { deliveryProofGate.check(user,body,System.nanoTime()/1_000_000) }
+                catch (invalid: MarketFailure) {
+                    call.genericResponseNoPayload(HttpStatusCode.BadRequest,eventMessage("delivery.invalid"))
+                    return@deliveryGuard
+                }
+                if (!proof.allowed) {
+                    call.response.header("Retry-After",proof.retryAfterSeconds.toString())
+                    call.genericResponseNoPayload(HttpStatusCode.TooManyRequests,eventMessage("delivery.proof_rate_limited"))
+                    return@deliveryGuard
+                }
                 call.marketResult(after={ outcome: MarketDeliveryOutcome -> if (!outcome.replayed) deliveryChanged(outcome.order) }) {
                     deliveries().command(user,body)
                 }

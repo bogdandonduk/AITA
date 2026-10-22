@@ -19,9 +19,9 @@ internal fun supplierOrderNeedsAttentionInInbox(
 
 @Composable
 internal fun AppConfiguration.SupplierOrdersInboxScreen() {
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val supplierPrices by supplierGoodsPricesState.payload.collectAsState()
+    val orders by supplierSideOrdersState.payload.collectAsState()
+    val lines by supplierSideOrderLinesState.payload.collectAsState()
+    val supplierPrices by supplierSideGoodsPricesState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     val supplierOrderNavigationState by NavigationScreenModel.Supplier.Orders.Main.state.collectAsState()

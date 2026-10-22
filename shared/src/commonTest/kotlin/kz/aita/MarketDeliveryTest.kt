@@ -24,6 +24,11 @@ class MarketDeliveryTest {
         suspend fun get(key:String)=values[key]
         suspend fun put(key:String,value:String?){ check(!failWrite);values[key]=value }
     }
+    private suspend fun savePage(cache: MarketDeliveryPageCache, owner: MarketAccountScope, page: MarketDeliveryPage) {
+        val token=assertNotNull(cache.beginRead(owner,page.view,page.storeId,page.filter))
+        try { cache.accept(owner,page.view,page.storeId,ok(page),page.filter,token) }
+        finally { cache.finishRead(token) }
+    }
     @Test fun feesUseExactMinorUnitsAndRejectAmbiguousInput() {
         assertEquals(12345L,parseDeliveryFeeMinor("123,45"));assertEquals(0L,parseDeliveryFeeMinor("0"))
         for(input in listOf("","-1","1e6","1.009","1,2.3","9999999999.99"))assertNull(parseDeliveryFeeMinor(input),input)
@@ -107,7 +112,7 @@ class MarketDeliveryTest {
     @Test fun deliveryCacheCannotCrossAccountsOrKeepLivePositionsAndCodes()=runTest {
         val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put);val owner=Owner(id(2))
         val page=MarketDeliveryPage(id(2),"buyer",orders=listOf(order().copy(position=MarketCourierPosition(51.0,71.0,20.0,1000,1000))),checkedAtMillis=1000)
-        cache.accept(owner,"buyer",null,ok(page))
+        savePage(cache,owner,page)
         assertNull(cache.cached(owner,"buyer",null)!!.orders.single().handoverCode)
         assertNull(cache.cached(owner,"buyer",null)!!.orders.single().position)
         assertNull(cache.cached(Owner(id(9)),"buyer",null))
@@ -125,5 +130,139 @@ class MarketDeliveryTest {
         assertTrue(readOwnedMarketDeliveryOrder(owner,id(7)){ok(order())}.negative)
         val response=readOwnedMarketDeliveryOrder(owner,id(1)){owner.current=false;ok(order())}
         assertTrue(response.negative);assertNull(response.payload)
+    }
+    @Test fun operationalAttentionIsRoleAwareAndTerminalHistoryNeverNeedsAction() {
+        val request=order()
+        assertEquals(setOf(MarketDeliveryAttention.WAITING_CONFIRMATION),request.attentionReasons("seller",2000))
+        assertTrue(request.attentionReasons("buyer",2000).isEmpty())
+        assertEquals(setOf(MarketDeliveryAttention.WAITING_CONFIRMATION,MarketDeliveryAttention.OVERDUE),request.attentionReasons("seller",3001))
+        val ready=request.copy(status=MarketDeliveryStatus.READY,courierId=id(5))
+        assertEquals(setOf(MarketDeliveryAttention.NEEDS_COURIER),ready.attentionReasons("seller",2000))
+        assertEquals(setOf(MarketDeliveryAttention.ACCEPT_JOB),ready.attentionReasons("courier",2000))
+        assertEquals(setOf(MarketDeliveryAttention.READY_TO_DISPATCH),ready.copy(courierAccepted=true).attentionReasons("seller",2000))
+        assertEquals(setOf(MarketDeliveryAttention.READY_TO_RECEIVE),ready.copy(request=ready.request.copy(mode=MarketDeliveryMode.PICKUP)).attentionReasons("buyer",2000))
+        assertEquals(setOf(MarketDeliveryAttention.READY_TO_HAND_OVER),ready.copy(courierAccepted=true,status=MarketDeliveryStatus.ARRIVED).attentionReasons("courier",2000))
+        assertTrue(ready.copy(status=MarketDeliveryStatus.DELIVERED).attentionReasons("seller",4000).isEmpty())
+        assertTrue(MarketDeliveryAction.DELAY in request.availableActions(false,true,false))
+    }
+    @Test fun deliveryFiltersAreLiteralBoundedAndMatchOnlyTheChosenQueue() {
+        val item=order().copy(shopName="100% Cotton_Магазин")
+        assertTrue(item.matchesFilter(MarketDeliveryFilter(search="  %  "),"buyer",2000))
+        assertTrue(item.matchesFilter(MarketDeliveryFilter(search="_магазин"),"buyer",2000))
+        assertFalse(item.matchesFilter(MarketDeliveryFilter(search="%not-a-pattern%"),"buyer",2000))
+        assertFalse(item.matchesFilter(MarketDeliveryFilter(mode=MarketDeliveryMode.PICKUP),"buyer",2000))
+        assertFalse(item.matchesFilter(MarketDeliveryFilter(queue=MarketDeliveryQueue.HISTORY),"buyer",2000))
+        assertFalse(item.matchesFilter(MarketDeliveryFilter(queue=MarketDeliveryQueue.ATTENTION),"buyer",2000))
+        assertTrue(item.matchesFilter(MarketDeliveryFilter(queue=MarketDeliveryQueue.ATTENTION),"seller",2000))
+        assertFalse(MarketDeliveryFilter(search="x".repeat(121)).isValid())
+        assertFalse(MarketDeliveryFilter(search="new\nline").isValid())
+    }
+    @Test fun queryCacheCannotShowHistoryAsActiveOrGrowWithSearchTerms()=runTest {
+        val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put);val owner=Owner(id(2))
+        val active=MarketDeliveryFilter(queue=MarketDeliveryQueue.ACTIVE)
+        val page=MarketDeliveryPage(id(2),"buyer",orders=listOf(order()),checkedAtMillis=2000,filter=active)
+        savePage(cache,owner,page)
+        assertEquals(page.orders.size,cache.cached(owner,"buyer",null,active)!!.orders.size)
+        assertNull(cache.cached(owner,"buyer",null,MarketDeliveryFilter(queue=MarketDeliveryQueue.HISTORY)))
+        assertFalse(cache.valid(page.copy(filter=MarketDeliveryFilter()),owner,"buyer",null,active))
+        assertFalse(cache.valid(page.copy(orders=listOf(order().copy(status=MarketDeliveryStatus.CANCELLED))),owner,"buyer",null,active))
+        for(search in listOf("Item","Shop",id(1))) {
+            val filtered=active.copy(search=search)
+            savePage(cache,owner,page.copy(filter=filtered))
+        }
+        assertEquals(1,memory.values.size)
+        assertNull(cache.cached(owner,"buyer",null,active.copy(search="Item")))
+        assertNotNull(cache.cached(owner,"buyer",null,active.copy(search=id(1))))
+    }
+    @Test fun preUpdateAllCacheRemainsUsableAsExplicitlyPartialReadOnlyOfflineSubset()=runTest {
+        val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put);val owner=Owner(id(2))
+        val page=MarketDeliveryPage(id(2),"buyer",orders=listOf(order(),order().copy(id=id(8),status=MarketDeliveryStatus.DELIVERED)),
+            checkedAtMillis=2000,nextBefore=id(8))
+        savePage(cache,owner,page)
+        val saved=memory.values.toMap()
+        val active=MarketDeliveryFilter(MarketDeliveryQueue.ACTIVE)
+        assertNull(cache.cached(owner,"buyer",null,active))
+        val subset=assertNotNull(cache.cachedSubset(owner,"buyer",null,active))
+        assertEquals(listOf(id(1)),subset.orders.map { it.id });assertNull(subset.nextBefore)
+        assertEquals(2000L,subset.checkedAtMillis);assertEquals(active,subset.filter)
+        assertTrue(cache.cachedSubset(owner,"buyer",null,active.copy(search="unmatched"))!!.orders.isEmpty())
+        assertEquals(saved,memory.values)
+        assertNull(cache.cachedSubset(Owner(id(9)),"buyer",null,active))
+        cache.accept(owner,"buyer",null,ResponseDataModel(null,null,true,403),active)
+        assertNull(cache.cachedSubset(owner,"buyer",null,active))
+        owner.current=false;assertNull(cache.cachedSubset(owner,"buyer",null,active))
+    }
+    @Test fun lateOldQueryCannotOverwriteTheNewerQuerySavedForOfflineUse()=runTest {
+        val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put);val owner=Owner(id(2))
+        val active=MarketDeliveryFilter(MarketDeliveryQueue.ACTIVE)
+        val history=MarketDeliveryFilter(MarketDeliveryQueue.HISTORY)
+        val newer=MarketDeliveryPage(id(2),"buyer",orders=listOf(order()),checkedAtMillis=2000,filter=active)
+        val older=newer.copy(filter=history,orders=listOf(order().copy(id=id(8),status=MarketDeliveryStatus.DELIVERED)))
+        val started=CompletableDeferred<Unit>();val release=CompletableDeferred<Unit>()
+        val delayed=async {
+            val token=assertNotNull(cache.beginRead(owner,"buyer",null,history))
+            started.complete(Unit);release.await()
+            try { cache.accept(owner,"buyer",null,ok(older),history,token) }
+            finally { cache.finishRead(token) }
+        }
+        started.await();savePage(cache,owner,newer)
+        release.complete(Unit);delayed.await()
+        assertEquals(newer.orders.map { it.id },cache.cached(owner,"buyer",null,active)!!.orders.map { it.id })
+        assertNull(cache.cached(owner,"buyer",null,history))
+        assertEquals(1,memory.values.size)
+    }
+    @Test fun transientOrQueryFailureKeepsLatestGoodCacheAndCannotLetAnOlderReadReplaceIt()=runTest {
+        val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put);val owner=Owner(id(2))
+        val active=MarketDeliveryFilter(MarketDeliveryQueue.ACTIVE)
+        val page=MarketDeliveryPage(id(2),"buyer",orders=listOf(order()),checkedAtMillis=2000,filter=active)
+        savePage(cache,owner,page)
+        val saved=memory.values.toMap()
+        for(status in listOf(400,503)) {
+            val old=assertNotNull(cache.beginRead(owner,"buyer",null,active))
+            val filter=active.copy(search="Shop")
+            val newer=assertNotNull(cache.beginRead(owner,"buyer",null,filter))
+            cache.accept(owner,"buyer",null,ResponseDataModel(null,null,true,status),filter,newer)
+            cache.finishRead(newer)
+            cache.accept(owner,"buyer",null,ok(page.copy(checkedAtMillis=3000)),active,old)
+            cache.finishRead(old)
+            assertEquals(saved,memory.values)
+        }
+    }
+    @Test fun deniedOldOrPaginatedReadErasesCacheAndCannotBeUndoneByAnAlreadyRunningSuccess()=runTest {
+        val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put);val owner=Owner(id(2))
+        val page=MarketDeliveryPage(id(2),"buyer",orders=listOf(order()),checkedAtMillis=2000)
+        for(status in listOf(401,403)) {
+            savePage(cache,owner,page)
+            val old=assertNotNull(cache.beginRead(owner,"buyer",null))
+            val newer=assertNotNull(cache.beginRead(owner,"buyer",null))
+            // Exercise both a stale first-page denial and pagination without a cache token.
+            cache.accept(owner,"buyer",null,ResponseDataModel(null,null,true,status),token=old.takeIf { status==401 })
+            cache.accept(owner,"buyer",null,ok(page),token=old);cache.finishRead(old)
+            cache.accept(owner,"buyer",null,ok(page),token=newer);cache.finishRead(newer)
+            assertNull(cache.cached(owner,"buyer",null))
+            savePage(cache,owner,page)
+            assertNotNull(cache.cached(owner,"buyer",null))
+        }
+    }
+    @Test fun cacheReadTokensAreBoundedAndFinishingAnOldReadCannotRetireItsReplacement()=runTest {
+        val memory=Memory();val cache=MarketDeliveryPageCache(memory::get,memory::put,maximumInFlightSlots=1)
+        val first=Owner(id(2));val second=Owner(id(9))
+        val firstPage=MarketDeliveryPage(id(2),"buyer",orders=listOf(order()),checkedAtMillis=2000)
+        val secondPage=firstPage.copy(accountId=id(9),orders=listOf(order().copy(buyerId=id(9))))
+        val evicted=assertNotNull(cache.beginRead(first,"buyer",null))
+        val other=assertNotNull(cache.beginRead(second,"buyer",null))
+        cache.accept(first,"buyer",null,ok(firstPage),token=evicted);cache.finishRead(evicted)
+        assertNull(cache.cached(first,"buyer",null))
+        cache.accept(second,"buyer",null,ok(secondPage),token=other);cache.finishRead(other)
+        assertNotNull(cache.cached(second,"buyer",null))
+        val old=assertNotNull(cache.beginRead(first,"buyer",null))
+        val replacement=assertNotNull(cache.beginRead(first,"buyer",null))
+        cache.finishRead(old)
+        cache.accept(first,"buyer",null,ok(firstPage),token=replacement);cache.finishRead(replacement)
+        assertNotNull(cache.cached(first,"buyer",null))
+        val completed=assertNotNull(cache.beginRead(second,"buyer",null))
+        cache.finishRead(completed)
+        cache.accept(second,"buyer",null,ok(secondPage.copy(checkedAtMillis=3000)),token=completed)
+        assertEquals(2000L,cache.cached(second,"buyer",null)!!.checkedAtMillis)
     }
 }

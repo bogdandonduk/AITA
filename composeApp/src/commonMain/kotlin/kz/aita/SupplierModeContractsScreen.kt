@@ -55,10 +55,11 @@ internal fun AppConfiguration.SupplierContractsBoardContent(
         if (stateValues.userAccount != null) refreshWorkspace()
     }
 
-    val contracts by supplierPartnershipContractsState.payload.collectAsState()
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val supplierPrices by supplierGoodsPricesState.payload.collectAsState()
+    val supplierActor = actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER
+    val contracts by (if (supplierActor) supplierSideContractsState else supplierPartnershipContractsState).payload.collectAsState()
+    val orders by (if (supplierActor) supplierSideOrdersState else supplierOrdersState).payload.collectAsState()
+    val lines by (if (supplierActor) supplierSideOrderLinesState else supplierOrderLinesState).payload.collectAsState()
+    val supplierPrices by (if (supplierActor) supplierSideGoodsPricesState else supplierGoodsPricesState).payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val navigationState by NavigationScreenModel.Supplier.Contracts.Main.state.collectAsState()
 

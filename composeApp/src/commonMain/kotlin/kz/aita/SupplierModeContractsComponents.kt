@@ -720,7 +720,7 @@ internal fun AppConfiguration.SupplierContractEditorCard(
                 createdAtMillis = existingContract?.createdAtMillis ?: 0L,
                 updatedAtMillis = existingContract?.updatedAtMillis ?: 0L,
                 isActive = true
-            )
+            ), supplierSide = actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER
         ) { result ->
             coroutineScope.launch {
                 saving = false
@@ -1345,7 +1345,8 @@ internal fun AppConfiguration.SupplierContractDetail(
                     onClick = {
                         operation = "accept"
                         resultMessage = ""
-                        acceptSupplierContract(contract.id, contract.revision, ::completeMutation)
+                        acceptSupplierContract(contract.id, contract.revision,
+                            supplierSide = actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER, onCompleted = ::completeMutation)
                     }
                 )
             } else if (contract.waitsForOtherContractSide(actorSide)) {
@@ -1375,7 +1376,8 @@ internal fun AppConfiguration.SupplierContractDetail(
                     onClick = {
                         operation = "decline"
                         resultMessage = ""
-                        declineSupplierContract(contract.id, contract.revision, ::completeMutation)
+                        declineSupplierContract(contract.id, contract.revision,
+                            supplierSide = actorSide == SUPPLIER_CONTRACT_SIDE_SUPPLIER, onCompleted = ::completeMutation)
                     }
                 )
             }

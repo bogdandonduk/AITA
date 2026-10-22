@@ -6,6 +6,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.focus.FocusRequester
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -79,6 +80,76 @@ class AitaTextFieldBridgeTest {
         bridge.edit("12345678")
         bridge.resetFromParent(TextFieldValue(""))
         assertEquals(TextFieldValue(""), bridge.editorValue())
+    }
+    @Test fun asyncScannerSubmissionUsesLiveBurstAndKeepsTextUntilDurableAcknowledgement() {
+        val bridge = AitaTextFieldBridge(TextFieldValue(""))
+        bridge.edit("4006381333931")
+        var submitted = ""
+        assertTrue(bridge.submitEditorValue(clearOnHandled = false) { submitted = it; true })
+        assertEquals("4006381333931", submitted)
+        assertEquals(submitted, bridge.editorValue().text)
+        // A failed or still-pending save must leave the barcode available to retry.
+        assertTrue(bridge.submitEditorValue(clearOnHandled = false) { it == submitted })
+        assertEquals(submitted, bridge.editorValue().text)
+        bridge.resetFromParent(TextFieldValue(""))
+        assertEquals("", bridge.editorValue().text)
+    }
+    @Test fun normalSubmissionStillClearsOnlyWhenHandled() {
+        val bridge = AitaTextFieldBridge(TextFieldValue("123"))
+        assertFalse(bridge.submitEditorValue(clearOnHandled = true) { false })
+        assertEquals("123", bridge.editorValue().text)
+        assertTrue(bridge.submitEditorValue(clearOnHandled = true) { true })
+        assertEquals("", bridge.editorValue().text)
+    }
+    @Test fun actionCanReadEditedTextFromAFieldHandleCreatedBeforeRecomposition() {
+        var current = "rejected-barcode"
+        val handle = GenericTextFieldContent(TextFieldValue(current), false, FocusRequester(), true,
+            onReadCurrentText = { current })
+        current = "4006381333931"
+        assertEquals("rejected-barcode", handle.value.text)
+        assertEquals("4006381333931", handle.liveText())
+        current = ""
+        assertEquals("", handle.liveText())
+    }
+    @Test fun adjacentButtonFlushesUnpublishedEditorBurstAndPreservesLaterTyping() {
+        var parent = TextFieldValue("old")
+        val bridge = AitaTextFieldBridge(parent)
+        val reader = AitaTextFieldReadHandle()
+        reader.attach {
+            bridge.reportEditorChange { parent = it; it }
+            bridge.editorValue().text
+        }
+        bridge.edit("TEA-123")
+        assertEquals("old", parent.text)
+        val submitted = reader.read()
+        assertEquals("TEA-123", submitted)
+        assertEquals("TEA-123", parent.text)
+        // Durable acknowledgement for the first barcode must not clear the next pending burst.
+        bridge.edit("RICE-WEIGHT")
+        if (reader.read() == submitted) bridge.resetFromParent(TextFieldValue(""))
+        assertEquals("RICE-WEIGHT", bridge.editorValue().text)
+    }
+    @Test fun liveReaderDetachCannotClearAReplacementEditor() {
+        val reader = AitaTextFieldReadHandle()
+        val detachOld = reader.attach { "old" }
+        val detachNew = reader.attach { "new" }
+        detachOld()
+        assertEquals("new", reader.read())
+        detachNew()
+        assertEquals(null, reader.read())
+    }
+    @Test fun adjacentButtonReadsValidatedValueAndFlushesOnlyOnce() {
+        val bridge = AitaTextFieldBridge(TextFieldValue("10"))
+        val reader = AitaTextFieldReadHandle()
+        var calls = 0
+        reader.attach {
+            bridge.reportEditorChange { calls++; TextFieldValue("10") }
+            bridge.editorValue().text
+        }
+        bridge.edit("100")
+        assertEquals("10", reader.read())
+        assertEquals("10", reader.read())
+        assertEquals(1, calls)
     }
     @Test fun perCharacterPasswordFormattingNeverChangesLength() {
         val bridge = AitaTextFieldBridge(TextFieldValue("a🛒б", TextRange(2)))

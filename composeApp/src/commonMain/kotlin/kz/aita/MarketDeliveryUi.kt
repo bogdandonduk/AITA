@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import kotlinx.coroutines.channels.Channel
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,80 +32,8 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
         verticalArrangement=Arrangement.spacedBy(10.dp),content=content)
 }
 
-@Composable internal fun AppConfiguration.MarketDeliveryPanel(modifier: Modifier = Modifier, view: String = "buyer", store: String? = null) {
-    val account=stateValues.userAccount?.id
-    val generation=currentAuthenticatedSessionGeneration()
-    val owner=remember(account,generation,store) { captureMarketRequestScope(store) }
-    val revision by MarketplaceSignals.revision.collectAsState()
-    val ui=rememberCoroutineScope()
-    var page by remember(account,generation,view,store) { mutableStateOf<MarketDeliveryPage?>(null) }
-    var busy by remember(account,generation,view,store) { mutableStateOf(false) }
-    var fresh by remember(account,generation,view,store) { mutableStateOf(false) }
-    var error by remember(account,generation,view,store) { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
-    var pending by remember(account,generation,view,store) { mutableStateOf<MarketDeliverySendResult?>(null) }
-    var refresh by remember(account,generation,view,store) { mutableStateOf(0) }
-    var before by remember(account,generation,view,store) { mutableStateOf<String?>(null) }
-    var opened by rememberSaveable(account,view,store) { mutableStateOf<String?>(null) }
-    LaunchedEffect(owner,view,store) { if (owner != null) {
-        val cached=cachedMarketDeliveryPage(owner,view,store)
-        if(owner.isCurrent() && page==null) page=cached
-    } }
-    LaunchedEffect(owner,view,store,revision,refresh,before,opened) {
-        if (owner == null || opened != null) return@LaunchedEffect
-        busy=true
-        try {
-            pending=cachedMarketDeliveryCommand(owner)
-            val result=withTimeoutOrNull(15_000) { loadMarketDeliveryPage(owner,view,store,before) }
-            if (owner.isCurrent()) {
-                fresh=result?.negative == false && result.payload != null
-                if (fresh) { page=result?.payload;error=result?.message }
-                else {
-                    error=result?.message ?: eventMessage("delivery.refresh_failed")
-                    if (result?.httpStatusCode in setOf(401,403) && result?.transportFailure == false) page=null
-                }
-            }
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { if (owner.isCurrent()) { fresh=false;error=eventMessage("delivery.refresh_failed") } }
-        finally { busy=false }
-    }
-    LaunchedEffect(owner,opened) { while (isActive) { delay(30_000); if (opened == null && !busy) refresh++ } }
-    LazyColumn(modifier,contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item("controls") {
-            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                if (!fresh && page != null) Text(deliveryText("cached"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-                error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
-                actionButton(text=deliveryText("refresh"),iconPath=stateValues.drawablePathIconRefresh,
-                    enabled=!busy,loading=busy,autoLoading=false,confirmationRequired=false,onClick={refresh++})
-                if (pending?.pending != null) {
-                    Text(deliveryText("pending"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
-                    actionButton(text=deliveryText("retry"),enabled=!busy,loading=busy,autoLoading=false,confirmationRequired=false,onClick={
-                        if (owner != null) { busy=true;ui.launch { try {
-                            val result=sendMarketDeliveryCommand(owner)
-                            if (owner.isCurrent()) { pending=result;error=result.error;refresh++ }
-                        } finally { busy=false } } }
-                    })
-                }
-                if (before != null) actionButton(text=stateValues.stringBack,autoLoading=false,confirmationRequired=false,onClick={before=null})
-            }
-        }
-        if (!busy && page?.orders.isNullOrEmpty()) item("empty") { Text(deliveryText("empty"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.textSize) }
-        items(page?.orders.orEmpty(),key={it.id}) { order ->
-            DeliveryCard(Modifier.clickable { opened=order.id }) {
-                Text(order.shopName,color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
-                Text("${deliveryText(order.request.mode.name)} · ${deliveryText(order.status.name)}",color=stateValues.AccentColor,fontSize=stateValues.textSize)
-                Text(receiptUiDateTime(order.createdAtMillis)+" · "+order.id.take(8).uppercase(),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-                Text(order.request.lines.take(3).joinToString(" · ") { it.line.title },color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
-                order.totalMinor?.let { Text(marketMoneyLabel(it,order.request.currency),color=stateValues.TextColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold) }
-                if (!order.terminal) Text(deliveryText("estimate")+": "+receiptUiDateTime(order.estimatedFromMillis)+" — "+receiptUiDateTime(order.estimatedToMillis),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-            }
-        }
-        page?.nextBefore?.let { cursor -> item("more") { actionButton(text=deliveryText("next"),autoLoading=false,confirmationRequired=false,onClick={before=cursor}) } }
-    }
-    opened?.let { id -> MarketDeliveryOrderSheet(id,store,page?.orders?.firstOrNull { it.id==id },onDismiss={opened=null;refresh++}) }
-}
-
 @OptIn(ExperimentalUuidApi::class)
-@Composable private fun AppConfiguration.MarketDeliveryOrderSheet(id: String, store: String?, cached: MarketDeliveryOrder?, onDismiss: ()->Unit) {
+@Composable internal fun AppConfiguration.MarketDeliveryOrderSheet(id: String, store: String?, cached: MarketDeliveryOrder?, onDismiss: ()->Unit) {
     val account=stateValues.userAccount?.id
     val generation=currentAuthenticatedSessionGeneration()
     val owner=remember(account,generation,store) { captureMarketRequestScope(store) }
@@ -113,7 +43,12 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
     var busy by remember { mutableStateOf(false) }
     var fresh by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<List<LocalizedStringDataModel>?>(null) }
+    var commandError by remember { mutableStateOf(false) }
     var refresh by remember { mutableStateOf(0) }
+    var mutationEpoch by remember { mutableStateOf(0L) }
+    var pending by remember { mutableStateOf<MarketDeliveryCommand?>(null) }
+    var detail by rememberSaveable(account,id) { mutableStateOf("overview") }
+    val reads = remember(owner,id) { Channel<Unit>(Channel.CONFLATED) }
     var action by remember { mutableStateOf<MarketDeliveryAction?>(null) }
     var note by rememberSaveable(account,id) { mutableStateOf("") }
     var courierId by rememberSaveable(account,id) { mutableStateOf("") }
@@ -125,30 +60,44 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
     var lastSent by remember { mutableStateOf(0L) }
     var clock by remember { mutableStateOf(getCurrentTimeMillis()) }
     var fetching by remember { mutableStateOf(false) }
-    LaunchedEffect(owner,id,revision,refresh) {
-        if (owner == null) return@LaunchedEffect
-        fetching=true
-        try {
-            val result=withTimeoutOrNull(15_000) { loadMarketDeliveryOrder(owner,id) }
-            if (owner.isCurrent()) {
-                val next=result?.payload
-                fresh=result?.negative == false && next?.isValidDeliveryOrder() == true
-                if (fresh && next != null && order?.revision?.let { next.revision >= it } != false) {
-                    order=next
-                    if(action != null && action !in next.availableActions(account==next.buyerId,currentUserOwnsStore(next.branchStoreId),account==next.courierId)) { action=null;code="" }
+    DisposableEffect(reads) { onDispose { reads.close() } }
+    LaunchedEffect(owner,id,revision,refresh) { reads.trySend(Unit) }
+    LaunchedEffect(owner,id) {
+        val owned = owner ?: return@LaunchedEffect
+        for (ignored in reads) {
+            delay(200)
+            awaitClientBackgroundWork()
+            while (reads.tryReceive().isSuccess) { /* keep one trailing read after a burst */ }
+            fetching=true
+            val readEpoch=mutationEpoch
+            try {
+                val saved = cachedMarketDeliveryCommand(owned)
+                val result=withTimeoutOrNull(15_000) { loadMarketDeliveryOrder(owned,id) }
+                if (owned.isCurrent()) {
+                    if(readEpoch==mutationEpoch && !busy) pending=saved.pending?.takeIf { (it.orderId ?: it.commandId)==id }
+                    val next=result?.payload
+                    fresh=result?.negative == false && next?.isValidDeliveryOrder() == true
+                    if (fresh && next != null) {
+                        clock=getCurrentTimeMillis()
+                        if (order?.revision?.let { next.revision >= it } != false) {
+                            order=next
+                            if(action != null && action !in next.availableActions(account==next.buyerId,currentUserOwnsStore(next.branchStoreId),account==next.courierId)) { action=null;code="" }
+                        }
+                        // Do not erase validation feedback while the user is correcting a form.
+                        if(readEpoch==mutationEpoch && !busy && action==null && pending==null && !commandError) error=null
+                    } else {
+                        if(readEpoch==mutationEpoch && !busy && !commandError) error=result?.message ?: eventMessage("delivery.refresh_failed")
+                        if (result?.httpStatusCode in setOf(401,403,404) && result?.transportFailure == false) { order=null;sharing=false }
+                    }
                 }
-                else {
-                    error=result?.message ?: eventMessage("delivery.refresh_failed")
-                    if (result?.httpStatusCode in setOf(401,403,404) && result?.transportFailure == false) { order=null;sharing=false }
-                }
-            }
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { if (owner.isCurrent()) { fresh=false;error=eventMessage("delivery.refresh_failed") } }
-        finally { fetching=false }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { if (owned.isCurrent()) { fresh=false;if(readEpoch==mutationEpoch && !busy && !commandError)error=eventMessage("delivery.refresh_failed") } }
+            finally { fetching=false }
+        }
     }
-    LaunchedEffect(owner,id) { while (isActive) { delay(10_000);clock=getCurrentTimeMillis();if(!fetching && !busy)refresh++ } }
+    LaunchedEffect(owner,id) { while (isActive) { delay(10_000);awaitClientBackgroundWork();clock=getCurrentTimeMillis();if(!fetching && !busy)reads.trySend(Unit) } }
     val current=order
-    val canTrack=current?.let { !it.terminal && it.courierId==account && it.courierAccepted && it.request.mode==MarketDeliveryMode.EXPRESS &&
+    val canTrack=fresh && owner?.isCurrent()==true && current?.let { !it.terminal && it.courierId==account && it.courierAccepted && it.request.mode==MarketDeliveryMode.EXPRESS &&
         it.status in setOf(MarketDeliveryStatus.ON_THE_WAY,MarketDeliveryStatus.ARRIVED) } == true
     LaunchedEffect(canTrack) { if (!canTrack) sharing=false }
     CourierLocationSharing(sharing && canTrack, onPosition={ point ->
@@ -167,19 +116,24 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
     AitaBottomSheet(deliveryText("orders"),iconPath=marketIconPath(186),iconRes=tabIconResource(AitaTabIcon.Truck),onDismiss=onDismiss) {
         val actionFocus = LocalFocusManager.current
         Column(Modifier.fillMaxWidth().weight(1f,false).verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            if (!fresh) Text(deliveryText("cached"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
+            if (!fresh && current != null) Text(deliveryText("cached"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
             current?.let { value ->
                 Text(value.shopName,color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
                 Text(deliveryText(value.request.mode.name)+" · "+deliveryText(value.status.name),color=stateValues.AccentColor,fontSize=stateValues.textSize,fontWeight=FontWeight.Bold)
-                Text(deliveryText("estimate")+": "+receiptUiDateTime(value.estimatedFromMillis)+" — "+receiptUiDateTime(value.estimatedToMillis),color=stateValues.TextColor,fontSize=stateValues.textSize)
-                value.request.lines.forEach { row ->
-                    Text("${row.line.title} · ${row.line.units} × ${row.line.basis.pricedAmount.toString().removeSuffix(".0")} ${row.line.unitName.visibleLocalizedString(stateValues.appLanguage,row.line.basis.unitId)} · ${marketMoneyLabel(row.unitPriceMinor,row.line.basis.currencyCode)}",
-                        color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
-                }
-                Text(deliveryText("fee")+": "+marketMoneyLabel(value.request.feeMinor,value.request.currency),color=stateValues.TextColor,fontSize=stateValues.textSize)
+                MarketDeliveryOrderReference(value)
+                sectionTabsWidget("delivery-detail:$account:$id", listOf(
+                    TabContent("overview",deliveryText("overview"),icon=AitaTabIcon.Truck),
+                    TabContent("items",deliveryText("items"),icon=AitaTabIcon.Stock),
+                    TabContent("timeline",deliveryText("timeline"),icon=AitaTabIcon.Recent)),selectedId=detail,onSelected={detail=it;action=null;code=""})
+                if(detail=="items") MarketDeliveryItems(value)
+                else if(detail=="timeline") MarketDeliveryTimeline(value)
+                else {
+                if(!value.terminal) Text(deliveryText("estimate")+": "+receiptUiDateTime(value.estimatedFromMillis)+" — "+receiptUiDateTime(value.estimatedToMillis),color=stateValues.TextColor,fontSize=stateValues.textSize)
                 value.totalMinor?.let { Text(marketMoneyLabel(it,value.request.currency),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold) }
-                Text(listOf(value.request.address.recipient,value.request.address.phone,value.request.address.address,value.request.address.note).filter(String::isNotBlank).joinToString("\n"),color=stateValues.TextColor,fontSize=stateValues.textSize)
+                if(value.contactsRemoved) Text(deliveryText("contacts_removed"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
+                else SelectionContainer { Text(listOf(value.request.address.recipient,value.request.address.phone,value.request.address.address,value.request.address.note).filter(String::isNotBlank).joinToString("\n"),color=stateValues.TextColor,fontSize=stateValues.textSize) }
                 value.courierName?.let { Text(deliveryText("courier")+": "+it,color=stateValues.TextColor,fontSize=stateValues.textSize) }
+                if(value.courierId!=null && !value.courierAccepted && !value.terminal) Text(deliveryText("courier_not_accepted"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                 value.handoverCode?.let { handover ->
                     DeliveryCard {
                         Text(deliveryText("code")+": "+handover,color=stateValues.AccentColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
@@ -194,18 +148,22 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                     })
                     if (canTrack) MarketPublishToggle(deliveryText("share_location"),sharing,true) { sharing=it }
                 }
-                value.events.forEach { event ->
-                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                        Text("•",color=stateValues.AccentColor,fontSize=stateValues.textSize)
-                        Column {
-                            Text(deliveryText("action.${event.action.name}"),color=stateValues.TextColor,fontSize=stateValues.smallTextSize)
-                            Text(receiptUiDateTime(event.atMillis)+event.note.takeIf(String::isNotBlank)?.let { " · $it" }.orEmpty(),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
-                        }
-                    }
+                if(pending!=null) DeliveryCard {
+                    Text(deliveryText("pending_order"),color=stateValues.AccentColor,fontSize=stateValues.smallTextSize)
+                    actionButton(text=deliveryText("retry"),enabled=!busy,loading=busy,autoLoading=false,confirmationRequired=false,onClick={
+                        if(owner!=null && !busy) { mutationEpoch++;busy=true;ui.launch { try {
+                            val result=sendMarketDeliveryCommand(owner)
+                            if(owner.isCurrent()) {
+                                pending=result.pending?.takeIf { (it.orderId ?: it.commandId)==id };error=result.error;commandError=result.error!=null
+                                result.acknowledged?.order?.takeIf { it.id==id && it.revision >= (order?.revision ?: -1) }?.let { order=it }
+                                refresh++
+                            }
+                        } finally { busy=false } } }
+                    })
                 }
                 val actions=value.availableActions(account==value.buyerId,currentUserOwnsStore(value.branchStoreId),account==value.courierId)
-                if (action == null) actions.forEach { option ->
-                    actionButton(text=deliveryText("action.${option.name}"),autoLoading=false,confirmationRequired=false,onClick={action=option;error=null;code=""})
+                if (action == null && pending == null) actions.forEach { option ->
+                    actionButton(text=deliveryText("action.${option.name}"),autoLoading=false,confirmationRequired=false,onClick={action=option;error=null;commandError=false;code=""})
                 }
                 action?.takeIf { it in actions }?.let { selected ->
                     DeliveryCard {
@@ -227,7 +185,7 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                         actionButton(text=stateValues.stringConfirm,enabled=!busy,loading=busy,autoLoading=false,confirmationRequired=false,onClick={
                             if (owner != null && !busy) {
                                 actionFocus.clearFocus(force=true)
-                                busy=true;error=null
+                                mutationEpoch++;busy=true;error=null;commandError=false
                                 val time=getCurrentTimeMillis()
                                 val command=MarketDeliveryCommand(Uuid.random().toString(),selected,value.id,value.revision,courierPublicId=courierId.takeIf(String::isNotBlank),
                                     note=note,handoverCode=code.takeIf(String::isNotBlank),
@@ -237,7 +195,12 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                                     val result=sendMarketDeliveryCommand(owner,command)
                                     if (owner.isCurrent()) {
                                         error=result.error
-                                        result.acknowledged?.let { order=it.order;action=null;code="";note="" }
+                                        commandError=result.error!=null
+                                        result.acknowledged?.takeIf { it.order.id==id }?.let {
+                                            if(it.order.revision >= (order?.revision ?: -1)) order=it.order
+                                            action=null;code="";note=""
+                                        }
+                                        pending=result.pending?.takeIf { (it.orderId ?: it.commandId)==id }
                                         if (result.pending != null) { action=null;error=eventMessage("delivery.pending") }
                                         refresh++
                                     }
@@ -248,8 +211,9 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                     }
                 }
             }
+            }
             if (action == null) error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
-            actionButton(text=deliveryText("refresh"),iconPath=stateValues.drawablePathIconRefresh,autoLoading=false,confirmationRequired=false,onClick={refresh++})
+            actionButton(text=deliveryText("refresh"),iconPath=stateValues.drawablePathIconRefresh,enabled=!fetching && !busy,loading=fetching,autoLoading=false,confirmationRequired=false,onClick={refresh++})
         }
     }
 }

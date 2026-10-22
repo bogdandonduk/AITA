@@ -528,10 +528,12 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
     mutationKey: String?,
     feedbackMessage: List<LocalizedStringDataModel>?,
     feedbackType: NotificationType?,
-    onMarkPacked: () -> Unit,
+    onMarkPacked: (List<String>) -> Unit,
     onStartDelivery: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val picking = rememberSupplierPickingSession(run)
+    val pickedOrderIds = supplierPickingReadyOrderIds(run.bundles, run.packableOrderIds, picking.entries)
     val amountText = run.estimatedAmount.supplierDeskMoneyText()
     val statusSummary = run.statusMix
         .take(6)
@@ -548,6 +550,8 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
     val packDisabledMessage = when {
         !run.contractSafetyReady -> contractSafetyPendingMessage
         anyMutation -> localizedStringResource(2460, "Updating orders…")
+        !picking.loaded || picking.busy -> supplierPickingText("loading")
+        pickedOrderIds.isEmpty() && run.packableOrderIds.isNotEmpty() -> supplierPickingText("pack_help")
         else -> localizedStringResource(1576, "No packable orders in this lane")
     }
     val dispatchDisabledMessage = when {
@@ -784,7 +788,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
         }
 
         if (section == "checklist") {
-            if (run.bundles.isNotEmpty()) SupplierPickingChecklist(run)
+            if (run.bundles.isNotEmpty()) SupplierPickingChecklist(run, picking)
             else SupplierDispatchTextPanel(title = localizedStringResource(1746, "Pack checklist"), text = run.packChecklist)
         }
         if (section == "attention") {
@@ -799,6 +803,12 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                 title = localizedStringResource(1757, "Driver handoff"),
                 text = run.driverHandoff
             )
+        }
+
+        if (run.packableOrderIds.isNotEmpty() && section == "actions") {
+            Text("${supplierPickingText("ready")}: ${pickedOrderIds.size}/${run.packableOrderIds.size}",
+                color = stateValues.AccentColor, fontSize = stateValues.textSize)
+            Text(supplierPickingText("pack_help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
         }
 
         if (!run.contractSafetyReady) {
@@ -906,7 +916,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                     actionButton(
                         modifier = Modifier.fillMaxWidth(),
                         text = localizedStringResource(1570, "Mark packed"),
-                        enabled = run.contractSafetyReady && run.packableOrderIds.isNotEmpty() && !anyMutation,
+                        enabled = run.contractSafetyReady && pickedOrderIds.isNotEmpty() && picking.loaded && !picking.busy && !anyMutation,
                         loading = mutatingPacked,
                         loadingText = localizedStringResource(2460, "Updating orders…"),
                         autoLoading = false,
@@ -920,7 +930,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                                 transient = true
                             )
                         },
-                        onClick = onMarkPacked
+                        onClick = { onMarkPacked(pickedOrderIds) }
                     )
                     actionButton(
                         modifier = Modifier.fillMaxWidth(),
@@ -1021,7 +1031,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                         actionButton(
                             modifier = Modifier.fillMaxWidth(),
                             text = localizedStringResource(1570, "Mark packed"),
-                            enabled = run.contractSafetyReady && run.packableOrderIds.isNotEmpty() && !anyMutation,
+                            enabled = run.contractSafetyReady && pickedOrderIds.isNotEmpty() && picking.loaded && !picking.busy && !anyMutation,
                             loading = mutatingPacked,
                             loadingText = localizedStringResource(2460, "Updating orders…"),
                             autoLoading = false,
@@ -1036,7 +1046,7 @@ internal fun AppConfiguration.SupplierDispatchRunDetail(
                                     transient = true
                                 )
                             },
-                            onClick = onMarkPacked
+                            onClick = { onMarkPacked(pickedOrderIds) }
                         )
                         actionButton(
                             modifier = Modifier.fillMaxWidth(),

@@ -1075,7 +1075,7 @@ internal fun AppConfiguration.SupplierCatalogOfferEditor(
                                     supplierGoodsName = submittedFields.name
                                         .trim()
                                         .takeIf { it.isNotBlank() }
-                                ), notifyOnError = false
+                                ), notifyOnError = false, supplierSide = true
                             ) { result ->
                                 coroutineScope.launch {
                                     if (userAccountState.payloadValue?.id != accountId ||

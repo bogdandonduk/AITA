@@ -54,6 +54,8 @@ internal fun AppConfiguration.SupplierOrdersWorkspaceHeader(
     onIdentitySelected: (String?) -> Unit = {}
 ) {
     var refreshCoolingDown by remember { mutableStateOf(false) }
+    val restoredSnapshot by supplierWorkspaceOfflineSnapshotState.collectAsState()
+    val cacheWarning by supplierWorkspaceCacheWarningState.collectAsState()
 
     LaunchedEffect(refreshCoolingDown) {
         if (refreshCoolingDown) {
@@ -145,6 +147,12 @@ internal fun AppConfiguration.SupplierOrdersWorkspaceHeader(
                     }
                 }
             )
+        }
+
+        if (restoredSnapshot || cacheWarning) {
+            Text(supplierWorkspaceCacheText(cacheWarning),
+                color = if (cacheWarning) stateValues.ErrorColor else stateValues.PlaceholderTextColor,
+                fontSize = stateValues.smallTextSize)
         }
 
         identityPresentation?.let { presentation ->

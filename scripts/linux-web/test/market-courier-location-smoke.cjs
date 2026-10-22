@@ -67,7 +67,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
    if(loseDeliveryReply){loseDeliveryReply=false;return route.abort('internetdisconnected');}
    payload={commandId:command.commandId,order,replayed:deliveryCommands.filter(x=>x.commandId===command.commandId).length>1};
   }
-  else if(p==='/market/delivery/orders')payload={accountId:account.id,view:u.searchParams.get('view')||'buyer',orders:orders.map(o=>({...o,handoverCode:null,position:null})),checkedAtMillis:now};
+  else if(p==='/market/delivery/orders')payload={accountId:account.id,view:u.searchParams.get('view')||'buyer',filter:{queue:u.searchParams.get('queue')||'ALL',mode:u.searchParams.get('mode')||null,search:u.searchParams.get('search')||''},orders:orders.map(o=>({...o,handoverCode:null,position:null})),checkedAtMillis:now};
   else if(p.endsWith('/position')){const point=route.request().postDataJSON();orders[0].position={...point.position,receivedAtMillis:now};payload=orders[0];}
   else if(p.startsWith('/market/delivery/orders/'))payload=orders.find(o=>o.id===p.split('/').at(-1));
   else if(p.includes('profile-photo'))payload={accountId:account.id,mode:'MARKETPLACE'};

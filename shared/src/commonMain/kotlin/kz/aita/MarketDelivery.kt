@@ -5,6 +5,18 @@ import kotlinx.serialization.Serializable
 @Serializable enum class MarketDeliveryMode { STANDARD, EXPRESS, PICKUP }
 @Serializable enum class MarketDeliveryStatus { REQUESTED, CONFIRMED, PREPARING, READY, ON_THE_WAY, ARRIVED, DELIVERED, CANCELLED }
 @Serializable enum class MarketDeliveryAction { REQUEST, CONFIRM, PACK, READY, ASSIGN, ACCEPT_ASSIGNMENT, DISPATCH, ARRIVE, DELIVER, CANCEL, DELAY }
+@Serializable enum class MarketDeliveryQueue { ALL, ACTIVE, HISTORY, ATTENTION }
+@Serializable enum class MarketDeliveryAttention { WAITING_CONFIRMATION, NEEDS_COURIER, ACCEPT_JOB, READY_TO_DISPATCH, READY_TO_RECEIVE, READY_TO_HAND_OVER, OVERDUE }
+
+/** Filters apply before server pagination. Search is literal text, never a SQL pattern. */
+@Serializable data class MarketDeliveryFilter(
+    val queue: MarketDeliveryQueue = MarketDeliveryQueue.ALL,
+    val mode: MarketDeliveryMode? = null,
+    val search: String = ""
+) {
+    fun normalized() = copy(search = search.trim())
+    fun isValid(): Boolean = search.length <= 120 && search.none { it.code < 32 || it.code == 127 }
+}
 
 /** Explicit merchant opt-in. Fees are in the same currency as the reviewed goods quote. */
 @Serializable data class MarketDeliveryPolicy(
@@ -122,8 +134,43 @@ fun parseDeliveryFeeMinor(raw: String): Long? {
 )
 @Serializable data class MarketDeliveryOutcome(val commandId: String, val order: MarketDeliveryOrder, val replayed: Boolean = false)
 @Serializable data class MarketDeliveryPage(val accountId: String, val view: String, val storeId: String? = null,
-    val orders: List<MarketDeliveryOrder> = emptyList(), val nextBefore: String? = null, val checkedAtMillis: Long)
+    val orders: List<MarketDeliveryOrder> = emptyList(), val nextBefore: String? = null, val checkedAtMillis: Long,
+    val filter: MarketDeliveryFilter = MarketDeliveryFilter())
 @Serializable data class MarketCourierLocationUpdate(val assignmentRevision: Long, val position: MarketCourierPosition)
+
+/** The same operational meaning is used by server queues and the visible attention badges. */
+fun MarketDeliveryOrder.attentionReasons(view: String, now: Long): Set<MarketDeliveryAttention> = buildSet {
+    if (terminal || view !in setOf("buyer", "seller", "courier")) return@buildSet
+    if (estimatedToMillis < now) add(MarketDeliveryAttention.OVERDUE)
+    when (view) {
+        "seller" -> {
+            if (status == MarketDeliveryStatus.REQUESTED) add(MarketDeliveryAttention.WAITING_CONFIRMATION)
+            else if (request.mode != MarketDeliveryMode.PICKUP && (courierId == null || !courierAccepted)) add(MarketDeliveryAttention.NEEDS_COURIER)
+            if (status == MarketDeliveryStatus.READY && request.mode != MarketDeliveryMode.PICKUP && courierAccepted) add(MarketDeliveryAttention.READY_TO_DISPATCH)
+        }
+        "buyer" -> if (status == MarketDeliveryStatus.ARRIVED || (status == MarketDeliveryStatus.READY && request.mode == MarketDeliveryMode.PICKUP))
+            add(MarketDeliveryAttention.READY_TO_RECEIVE)
+        "courier" -> if (courierId != null) {
+            if (!courierAccepted) add(MarketDeliveryAttention.ACCEPT_JOB)
+            else if (status == MarketDeliveryStatus.READY) add(MarketDeliveryAttention.READY_TO_DISPATCH)
+            else if (status == MarketDeliveryStatus.ARRIVED) add(MarketDeliveryAttention.READY_TO_HAND_OVER)
+        }
+    }
+}
+
+/** Also useful for a clearly marked cached/offline subset; never implies a complete server list. */
+fun MarketDeliveryOrder.matchesFilter(filter: MarketDeliveryFilter, view: String, now: Long): Boolean {
+    val query = filter.normalized()
+    if (!query.isValid() || (query.mode != null && request.mode != query.mode)) return false
+    if (!when (query.queue) {
+        MarketDeliveryQueue.ALL -> true
+        MarketDeliveryQueue.ACTIVE -> !terminal
+        MarketDeliveryQueue.HISTORY -> terminal
+        MarketDeliveryQueue.ATTENTION -> attentionReasons(view, now).isNotEmpty()
+    }) return false
+    return query.search.isEmpty() || id.contains(query.search, ignoreCase = true) ||
+        shopName.contains(query.search, ignoreCase = true) || request.lines.any { it.line.title.contains(query.search, ignoreCase = true) }
+}
 
 /** Server and UI share the transition graph. Permission checks and handover proof stay server-side. */
 fun MarketDeliveryOrder.availableActions(buyer: Boolean, manager: Boolean, courier: Boolean): Set<MarketDeliveryAction> = buildSet {
@@ -138,7 +185,8 @@ fun MarketDeliveryOrder.availableActions(buyer: Boolean, manager: Boolean, couri
         }
         if (status != MarketDeliveryStatus.REQUESTED && request.mode != MarketDeliveryMode.PICKUP)
             add(MarketDeliveryAction.ASSIGN)
-        if (status != MarketDeliveryStatus.REQUESTED) add(MarketDeliveryAction.DELAY)
+        // An expired request still needs a way to propose a new delivery window before confirmation.
+        add(MarketDeliveryAction.DELAY)
         if (status !in setOf(MarketDeliveryStatus.ON_THE_WAY, MarketDeliveryStatus.ARRIVED)) add(MarketDeliveryAction.CANCEL)
     }
     if (buyer) {

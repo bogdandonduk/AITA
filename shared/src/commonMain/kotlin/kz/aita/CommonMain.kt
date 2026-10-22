@@ -4611,6 +4611,114 @@ private fun currentSupplierNetworkUserScope(): String {
 private fun supplierNetworkUserScopeIsCurrent(expectedScope: String): Boolean =
     expectedScope.isNotBlank() && currentSupplierNetworkUserScope() == expectedScope
 
+private fun captureSupplierSessionOwner(): SupplierSessionOwner? {
+    val account = userAccountState.payloadValue?.id?.trim()?.takeIf(String::isNotBlank) ?: return null
+    return SupplierSessionOwner(account, currentAuthenticatedSessionGeneration(), currentSupplierNetworkUserScope(),
+        ::currentSupplierNetworkUserScope, ::currentAuthenticatedSessionGeneration).takeIf { it.isCurrent() }
+}
+
+private val supplierWorkspaceCache by lazy {
+    SupplierWorkspaceCache(::readJsonCacheText, ::writeJsonCacheText, ::deleteJsonCacheText)
+}
+val supplierWorkspaceCacheWarningState = MutableStateFlow(false)
+val supplierWorkspaceOfflineSnapshotState = MutableStateFlow(false)
+private val supplierWorkspaceCachedSections = MutableStateFlow<Set<String>>(emptySet())
+private fun markSupplierWorkspaceSection(owner: SupplierSessionOwner, section: String, cached: Boolean) {
+    if (!owner.isCurrent()) return
+    supplierWorkspaceCachedSections.update { if (cached) it + section else it - section }
+    supplierWorkspaceOfflineSnapshotState.value = supplierWorkspaceCachedSections.value.isNotEmpty()
+}
+private val supplierWorkspaceCacheFailedSections = MutableStateFlow<Set<String>>(emptySet())
+private fun recordSupplierCacheWrite(owner: SupplierSessionOwner, section: String, saved: Boolean) {
+    if (!owner.isCurrent()) return
+    supplierWorkspaceCacheFailedSections.update { if (saved) it - section else it + section }
+    supplierWorkspaceCacheWarningState.value = supplierWorkspaceCacheFailedSections.value.isNotEmpty()
+}
+private val supplierWorkspaceRestoreMutex = Mutex()
+@Volatile
+private var supplierWorkspaceRestoredScope: String? = null
+private fun supplierWorkspaceRestoreScope(owner: SupplierSessionOwner) = owner.userScope + ":" + owner.sessionGeneration
+private fun supplierWorkspacePersistenceReady(owner: SupplierSessionOwner) =
+    owner.isCurrent() && supplierWorkspaceRestoredScope == supplierWorkspaceRestoreScope(owner)
+private val supplierWorkspaceCachedSources = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+private fun restoreSupplierCachedSources(owner: SupplierSessionOwner, section: String, sources: SupplierWorkspaceSources) {
+    if (!owner.isCurrent()) return
+    val keys = sources.storeRows.keys.map { "store/$it" }.toSet() + sources.supplierRows.keys.map { "supplier/$it" } +
+        if (sources.allSuppliersLoaded) setOf("supplier/*") else emptySet()
+    supplierWorkspaceCachedSources.update { it + (section to keys) }
+    markSupplierWorkspaceSection(owner, section, cached = keys.isNotEmpty())
+}
+private fun markSupplierSourceFresh(owner: SupplierSessionOwner, section: String, scope: SupplierCommercialScope) {
+    if (!owner.isCurrent() || scope.peer != null) return // A partnership subset cannot refresh the whole identity.
+    val keys = supplierWorkspaceCachedSources.value[section].orEmpty()
+    val next = if (scope.supplierSide && scope.owner == null) keys.filterNot { it.startsWith("supplier/") }.toSet()
+        else keys - "${if (scope.supplierSide) "supplier" else "store"}/${scope.owner}"
+    supplierWorkspaceCachedSources.update { it + (section to next) }
+    markSupplierWorkspaceSection(owner, section, cached = next.isNotEmpty())
+}
+private fun markSupplierOrderSourceFresh(owner: SupplierSessionOwner, scope: SupplierOrderReadScope) =
+    markSupplierSourceFresh(owner, "orders", when (scope) {
+        is SupplierOrderReadScope.Store -> SupplierCommercialScope(false, scope.id)
+        is SupplierOrderReadScope.Supplier -> SupplierCommercialScope(true, scope.id)
+        SupplierOrderReadScope.AllSuppliers -> SupplierCommercialScope(true)
+    })
+
+private suspend fun restoreSupplierWorkspaceCache() = supplierWorkspaceRestoreMutex.withLock restore@ {
+    val owner = captureSupplierSessionOwner() ?: return@restore
+    val scope = supplierWorkspaceRestoreScope(owner)
+    if (supplierWorkspaceRestoredScope == scope) return@restore
+    val restored = supplierWorkspaceCache.restore(owner)
+    if (!owner.isCurrent()) return@restore
+    if (!restored.readable) {
+        // Keep network work usable, but never overwrite a temporarily unreadable or future cache.
+        // The next workspace operation retries this read and merges its newer in-memory work.
+        recordSupplierCacheWrite(owner, "restore", false)
+        return@restore
+    }
+    val cached = restored.snapshot
+    // Fixed lock order; normal operations hold only one family lock. No cache mutex is held here.
+    // Acquire all before enabling persistence so an in-flight fetch cannot skip recovery.
+    supplierOrderOperationMutex.withLock {
+        supplierContractOperationMutex.withLock {
+            supplierGoodsPriceOperationMutex.withLock {
+                if (!owner.isCurrent()) return@restore
+                val liveOrders = currentSupplierOrderWorkspace(owner)
+                val liveContracts = currentSupplierContractWorkspace(owner)
+                val livePrices = currentSupplierPriceWorkspace(owner)
+                val diskOrders = cached?.orderWorkspace()
+                val diskContracts = cached?.contractWorkspace()
+                val diskPrices = cached?.priceWorkspace()
+                val orders = if (liveOrders != null && diskOrders != null) liveOrders.recoverFrom(diskOrders) else liveOrders ?: diskOrders
+                val contracts = if (liveContracts != null && diskContracts != null) liveContracts.recoverFrom(diskContracts, ::preferSupplierContract) else liveContracts ?: diskContracts
+                val prices = if (livePrices != null && diskPrices != null) livePrices.recoverFrom(diskPrices, ::preferSupplierPrice) else livePrices ?: diskPrices
+                if ((liveOrders != null && diskOrders != null && orders == null) ||
+                    (liveContracts != null && diskContracts != null && contracts == null) ||
+                    (livePrices != null && diskPrices != null && prices == null)) {
+                    recordSupplierCacheWrite(owner, "restore", false)
+                    return@restore
+                }
+                supplierWorkspaceRestoredScope = scope
+                recordSupplierCacheWrite(owner, "restore", true)
+                orders?.let {
+                    publishSupplierOrderWorkspace(owner, it, cacheMessage(), persist = liveOrders != null)
+                    diskOrders?.let { disk -> restoreSupplierCachedSources(owner, "orders", disk.sources) }
+                    liveOrders?.readScopes?.forEach { read -> markSupplierOrderSourceFresh(owner, read) }
+                }
+                contracts?.let {
+                    publishSupplierContracts(owner, it, cacheMessage(), persist = liveContracts != null)
+                    diskContracts?.let { disk -> restoreSupplierCachedSources(owner, "contracts", disk.sources) }
+                    liveContracts?.readScopes?.forEach { read -> markSupplierSourceFresh(owner, "contracts", read) }
+                }
+                prices?.let {
+                    publishSupplierPrices(owner, it, cacheMessage(), persist = livePrices != null)
+                    diskPrices?.let { disk -> restoreSupplierCachedSources(owner, "prices", disk.sources) }
+                    livePrices?.readScopes?.forEach { read -> markSupplierSourceFresh(owner, "prices", read) }
+                }
+            }
+        }
+    }
+}
+
 private fun invalidateSupplierNetworkSessionScope() {
     // The exact value is not business data; it is only a generation marker. Any change invalidates
     // reads started before logout, even if the same account signs in again immediately.
@@ -4623,15 +4731,41 @@ private fun invalidateSupplierNetworkSessionScope() {
 
 val supplierGoodsPricesState =
     MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
+val supplierSideGoodsPricesState =
+    MutableDataStateFlow<List<SupplierGoodsPriceDataModel>>(GlobalScope)
+private var supplierPriceWorkspaceOwner: SupplierSessionOwner? = null
+private var supplierPriceWorkspace: SupplierCommercialWorkspace<SupplierGoodsPriceDataModel>? = null
+private fun currentSupplierPriceWorkspace(owner: SupplierSessionOwner) = supplierPriceWorkspace.takeIf {
+    supplierWorkspaceOwnerMatches(owner, supplierPriceWorkspaceOwner)
+}
 
+// Store procurement and the Supplier seller desk have independent authoritative memberships.
 val supplierOrdersState =
     MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
-
 val supplierOrderLinesState =
     MutableDataStateFlow<List<SupplierOrderLineDataModel>>(GlobalScope)
+val supplierSideOrdersState =
+    MutableDataStateFlow<List<SupplierOrderDataModel>>(GlobalScope)
+val supplierSideOrderLinesState =
+    MutableDataStateFlow<List<SupplierOrderLineDataModel>>(GlobalScope)
+private var supplierOrderWorkspaceOwner: SupplierSessionOwner? = null
+private var supplierOrderWorkspace: SupplierOrderWorkspace? = null
+private fun currentSupplierOrderWorkspace(owner: SupplierSessionOwner): SupplierOrderWorkspace? =
+    supplierOrderWorkspace.takeIf { owner.isCurrent() && supplierOrderWorkspaceOwner?.isCurrent() == true &&
+        supplierOrderWorkspaceOwner?.accountId == owner.accountId &&
+        supplierOrderWorkspaceOwner?.sessionGeneration == owner.sessionGeneration }
 
 val supplierPartnershipContractsState =
     MutableDataStateFlow<List<SupplierPartnershipContractDataModel>>(GlobalScope)
+val supplierSideContractsState =
+    MutableDataStateFlow<List<SupplierPartnershipContractDataModel>>(GlobalScope)
+private var supplierContractWorkspaceOwner: SupplierSessionOwner? = null
+private var supplierContractWorkspace: SupplierCommercialWorkspace<SupplierPartnershipContractDataModel>? = null
+private fun currentSupplierContractWorkspace(owner: SupplierSessionOwner) = supplierContractWorkspace.takeIf {
+    supplierWorkspaceOwnerMatches(owner, supplierContractWorkspaceOwner)
+}
+private fun supplierWorkspaceOwnerMatches(owner: SupplierSessionOwner, stored: SupplierSessionOwner?): Boolean =
+    owner.isCurrent() && stored?.isCurrent() == true && stored.accountId == owner.accountId && stored.sessionGeneration == owner.sessionGeneration
 
 val supplierModeDashboardState =
     MutableDataStateFlow<SupplierModeDashboardDataModel>(GlobalScope)
@@ -4662,13 +4796,39 @@ private val supplierContractReadCoordinator =
 // newer proposal/accept/decline result, and two lifecycle actions must never race each other.
 private val supplierContractOperationMutex = Mutex()
 
-private suspend fun emitSupplierContractsAndAwait(
-    state: DataState.Success<List<SupplierPartnershipContractDataModel>>
+private suspend fun publishSupplierContracts(
+    owner: SupplierSessionOwner,
+    workspace: SupplierCommercialWorkspace<SupplierPartnershipContractDataModel>,
+    message: List<LocalizedStringDataModel>? = null,
+    persist: Boolean = true
 ) {
-    supplierPartnershipContractsState.emit(state)
-    // Publication is synchronous. Retain this explicit visibility barrier at the operation boundary
-    // so a future state implementation change cannot quietly release the lock before the list is visible.
-    supplierPartnershipContractsState.payload.first { current -> current == state.payload }
+    if (!owner.isCurrent() || !workspace.valid()) return
+    supplierContractWorkspaceOwner = owner; supplierContractWorkspace = if (supplierWorkspacePersistenceReady(owner)) workspace.withoutRecovery() else workspace
+    val buyers = workspace.buyerValues.takeIf { workspace.sources.storeLoaded }
+    val sellers = workspace.sellerValues.takeIf { workspace.sources.supplierLoaded }
+    supplierPartnershipContractsState.emit(buyers?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent()) return
+    supplierSideContractsState.emit(sellers?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent() || !persist) return
+    if (!supplierWorkspacePersistenceReady(owner)) {
+        recordSupplierCacheWrite(owner, "contracts", false)
+        return
+    }
+    recordSupplierCacheWrite(owner, "contracts", supplierWorkspaceCache.update(owner) {
+        it.copy(contracts = workspace.values, contractSources = workspace.sources)
+    })
+}
+
+private fun preferSupplierContract(previous: SupplierPartnershipContractDataModel, incoming: SupplierPartnershipContractDataModel) =
+    listOf(previous).upsertSupplierContractByRevision(incoming).single()
+
+private suspend fun publishSupplierContractMutation(owner: SupplierSessionOwner, contract: SupplierPartnershipContractDataModel,
+    supplierSide: Boolean, message: List<LocalizedStringDataModel>?): Boolean {
+    if (!owner.isCurrent()) return false
+    val next = (currentSupplierContractWorkspace(owner) ?: SupplierCommercialWorkspace()).upsert(contract.commercialRow(), supplierSide, ::preferSupplierContract)
+        ?: return false
+    publishSupplierContracts(owner, next, message)
+    return owner.isCurrent()
 }
 
 private fun logSupplierContractDiagnostic(message: String) {
@@ -4704,13 +4864,53 @@ private val getSecuritySessionHistoryMutex = Mutex()
 private val revokeSecuritySessionMutex = Mutex()
 private val revokeOtherSecuritySessionsMutex = Mutex()
 
-private suspend fun emitSupplierGoodsPricesAndAwait(
-    state: DataState.Success<List<SupplierGoodsPriceDataModel>>
+private suspend fun publishSupplierPrices(
+    owner: SupplierSessionOwner,
+    workspace: SupplierCommercialWorkspace<SupplierGoodsPriceDataModel>,
+    message: List<LocalizedStringDataModel>? = null,
+    persist: Boolean = true
 ) {
-    supplierGoodsPricesState.emit(state)
-    // Publication is synchronous. Keep the explicit payload barrier before releasing the operation
-    // mutex so a future state implementation change cannot let a queued operation lose the prior save.
-    supplierGoodsPricesState.payload.first { current -> current == state.payload }
+    if (!owner.isCurrent() || !workspace.valid()) return
+    supplierPriceWorkspaceOwner = owner; supplierPriceWorkspace = if (supplierWorkspacePersistenceReady(owner)) workspace.withoutRecovery() else workspace
+    val buyers = workspace.buyerValues.takeIf { workspace.sources.storeLoaded }
+    val sellers = workspace.sellerValues.takeIf { workspace.sources.supplierLoaded }
+    supplierGoodsPricesState.emit(buyers?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent()) return
+    supplierSideGoodsPricesState.emit(sellers?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent() || !persist) return
+    if (!supplierWorkspacePersistenceReady(owner)) {
+        recordSupplierCacheWrite(owner, "prices", false)
+        return
+    }
+    recordSupplierCacheWrite(owner, "prices", supplierWorkspaceCache.update(owner) {
+        it.copy(prices = workspace.values, priceSources = workspace.sources)
+    })
+}
+private fun preferSupplierPrice(previous: SupplierGoodsPriceDataModel, incoming: SupplierGoodsPriceDataModel): SupplierGoodsPriceDataModel =
+    if (previous.supplierPriceBookFreshnessMillis() > incoming.supplierPriceBookFreshnessMillis()) previous else incoming
+
+private suspend fun applySupplierPriceRead(owner: SupplierSessionOwner, scope: SupplierCommercialScope,
+    response: ResponseDataModel<List<SupplierGoodsPriceDataModel>>): DataState<List<SupplierGoodsPriceDataModel>> {
+    if (!owner.isCurrent()) return DataState.Empty()
+    val current = currentSupplierPriceWorkspace(owner) ?: SupplierCommercialWorkspace()
+    if (response.negative || response.payload == null) {
+        if (!response.transportFailure && response.httpStatusCode == HttpStatusCode.Forbidden.value) {
+            current.replace(scope, emptyList())?.let { publishSupplierPrices(owner, it, response.message); markSupplierSourceFresh(owner, "prices", scope) }
+        }
+        if (!owner.isCurrent()) return DataState.Empty()
+        postInAppNotification(response.message, NotificationType.Negative)
+        return DataState.Empty(response.message)
+    }
+    val prices = response.payload.normalizedSupplierGoodsPriceBook()
+    val next = current.replace(scope, prices.map { it.commercialRow() }, ::preferSupplierPrice)
+    if (next == null) {
+        val message = supplierWorkspaceSnapshotInvalidMessage()
+        postInAppNotification(message, NotificationType.Negative)
+        return DataState.Empty(message)
+    }
+    publishSupplierPrices(owner, next, response.message)
+    markSupplierSourceFresh(owner, "prices", scope)
+    return if (owner.isCurrent()) DataState.Success(prices, response.message) else DataState.Empty()
 }
 
 fun getSupplierGoodsPrices(
@@ -4718,39 +4918,27 @@ fun getSupplierGoodsPrices(
     onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
 ) {
     val cleanStoreId = storeId.trim()
+    val requestOwner = captureSupplierSessionOwner() ?: return
     val requestUserScope = currentSupplierNetworkUserScope()
     if (requestUserScope.isBlank()) return
     val requestKey = "$requestUserScope|store:${cleanStoreId.lowercase()}"
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = supplierGoodsPriceReadCoordinator.run(requestKey) {
             supplierGoodsPriceOperationMutex.withLock {
                 val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierGoodsPricesPath.first,
-                    headers = mapOf("store_id" to cleanStoreId)
+                    headers = mapOf("store_id" to cleanStoreId),
+                    expectedSessionGeneration = requestOwner.sessionGeneration
                 )
 
-                if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
-                    DataState.Empty()
-                } else if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    DataState.Empty(response.message)
-                } else {
-                    val normalizedStoreId = cleanStoreId.lowercase()
-                    val scopedPrices = response.payload
-                        .filter { price -> price.storeId.trim().lowercase() == normalizedStoreId }
-                        .normalizedSupplierGoodsPriceBook()
-                    val mergedPrices = (
-                        supplierGoodsPricesState.payloadValue.orEmpty().filterNot { price ->
-                            price.storeId.trim().lowercase() == normalizedStoreId
-                        } + scopedPrices
-                        ).normalizedSupplierGoodsPriceBook()
-                    emitSupplierGoodsPricesAndAwait(DataState.Success(mergedPrices, response.message))
-                    DataState.Success(scopedPrices, response.message)
-                }
+                applySupplierPriceRead(requestOwner, SupplierCommercialScope(false, cleanStoreId), response)
             }
         }
-        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
@@ -4759,6 +4947,7 @@ fun getMySupplierGoodsPrices(
     onCompleted: ((DataState<List<SupplierGoodsPriceDataModel>>) -> Unit)? = null
 ) {
     val cleanSupplierId = normalizeSupplierProfileIdentityId(supplierId).orEmpty()
+    val requestOwner = captureSupplierSessionOwner() ?: return
     val requestUserScope = currentSupplierNetworkUserScope()
     if (requestUserScope.isBlank()) return
     val requestKey = if (cleanSupplierId.isBlank()) {
@@ -4767,6 +4956,9 @@ fun getMySupplierGoodsPrices(
         "$requestUserScope|supplier:$cleanSupplierId"
     }
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = supplierGoodsPriceReadCoordinator.run(requestKey) {
             supplierGoodsPriceOperationMutex.withLock {
                 val response = networkRequest<List<SupplierGoodsPriceDataModel>, Unit>(
@@ -4774,48 +4966,29 @@ fun getMySupplierGoodsPrices(
                     endpointUrl = globalAppConfigurationState.payloadValue.getMySupplierGoodsPricesPath.first,
                     headers = buildMap {
                         cleanSupplierId.takeIf { it.isNotBlank() }?.let { put("supplier_id", it) }
-                    }
+                    },
+                    expectedSessionGeneration = requestOwner.sessionGeneration
                 )
 
-                if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
-                    DataState.Empty()
-                } else if (response.negative || response.payload == null) {
-                    postInAppNotification(response.message, NotificationType.Negative)
-                    DataState.Empty(response.message)
-                } else {
-                    val scopedPrices = response.payload
-                        .filter { price -> price.matchesSupplierProfileFocus(cleanSupplierId.takeIf { it.isNotBlank() }) }
-                        .normalizedSupplierGoodsPriceBook()
-                    if (cleanSupplierId.isBlank()) {
-                        DataState.Success(scopedPrices, response.message).also { state ->
-                            emitSupplierGoodsPricesAndAwait(state)
-                        }
-                    } else {
-                        val mergedPrices = (
-                            supplierGoodsPricesState.payloadValue.orEmpty().filterNot { price ->
-                                price.matchesSupplierProfileFocus(cleanSupplierId)
-                            } + scopedPrices
-                            ).normalizedSupplierGoodsPriceBook()
-                        emitSupplierGoodsPricesAndAwait(DataState.Success(mergedPrices, response.message))
-                        DataState.Success(scopedPrices, response.message)
-                    }
-                }
+                applySupplierPriceRead(requestOwner, SupplierCommercialScope(true, cleanSupplierId), response)
             }
         }
-        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
 fun upsertSupplierGoodsPrice(
     price: SupplierGoodsPriceDataModel,
     notifyOnError: Boolean = true,
+    supplierSide: Boolean = false,
     onCompleted: ((DataState<SupplierGoodsPriceDataModel>) -> Unit)? = null
 ) {
-    val requestUserScope = currentSupplierNetworkUserScope()
-    val requestSessionGeneration = currentAuthenticatedSessionGeneration()
-    fun requestIsCurrent() = supplierNetworkUserScopeIsCurrent(requestUserScope) &&
-        currentAuthenticatedSessionGeneration() == requestSessionGeneration
+    val requestOwner = captureSupplierSessionOwner() ?: return
+    val requestSessionGeneration = requestOwner.sessionGeneration
+    fun requestIsCurrent() = requestOwner.isCurrent()
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestIsCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
         if (!requestIsCurrent()) return@launch
         val result: DataState<SupplierGoodsPriceDataModel> = try {
             supplierGoodsPriceOperationMutex.withLock {
@@ -4833,13 +5006,11 @@ fun upsertSupplierGoodsPrice(
                     if (notifyOnError) postInAppNotification(response.message, NotificationType.Negative)
                     DataState.Empty(response.message)
                 } else {
-                    val nextPriceBookState = DataState.Success(
-                        supplierGoodsPricesState.payloadValue
-                            .orEmpty()
-                            .upsertSupplierGoodsPriceByIdentity(response.payload),
-                        response.message
-                    )
-                    emitSupplierGoodsPricesAndAwait(nextPriceBookState)
+                    val next = (currentSupplierPriceWorkspace(requestOwner) ?: SupplierCommercialWorkspace())
+                        .upsert(response.payload.commercialRow(), supplierSide, ::preferSupplierPrice)
+                    if (next == null) return@withLock DataState.Empty(supplierWorkspaceSnapshotInvalidMessage())
+                    publishSupplierPrices(requestOwner, next, response.message)
+                    if (!requestOwner.isCurrent()) return@withLock DataState.Empty()
                     DataState.Success(response.payload, response.message)
                 }
             }
@@ -5726,43 +5897,95 @@ data class SupplierModeDashboardDataModel(
     val recoveryDesk: SupplierDashboardRecoveryDeskDataModel = SupplierDashboardRecoveryDeskDataModel()
 )
 
-private suspend fun emitSupplierOrderSnapshotAndAwait(
-    orders: List<SupplierOrderDataModel>,
-    lines: List<SupplierOrderLineDataModel>,
-    message: List<LocalizedStringDataModel>? = null
+private suspend fun publishSupplierOrderWorkspace(
+    owner: SupplierSessionOwner,
+    workspace: SupplierOrderWorkspace,
+    message: List<LocalizedStringDataModel>? = null,
+    persist: Boolean = true
 ) {
-    supplierOrdersState.emit(DataState.Success(orders, message))
-    supplierOrderLinesState.emit(DataState.Success(lines, message))
-    // Publication is synchronous. Keep the two explicit visibility barriers at the operation
-    // boundary so a future state implementation change cannot expose a half-updated order snapshot.
-    supplierOrdersState.payload.first { current -> current == orders }
-    supplierOrderLinesState.payload.first { current -> current == lines }
+    if (!owner.isCurrent() || !workspace.valid()) return
+    supplierOrderWorkspaceOwner = owner
+    supplierOrderWorkspace = if (supplierWorkspacePersistenceReady(owner)) workspace.withoutRecovery() else workspace
+    val buyerOrders = workspace.buyerOrders.takeIf { workspace.sources.storeLoaded }
+    val buyerLines = workspace.buyerLines.takeIf { workspace.sources.storeLoaded }
+    val sellerOrders = workspace.sellerOrders.takeIf { workspace.sources.supplierLoaded }
+    val sellerLines = workspace.sellerLines.takeIf { workspace.sources.supplierLoaded }
+    supplierOrdersState.emit(buyerOrders?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent()) return
+    supplierOrderLinesState.emit(buyerLines?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent()) return
+    supplierSideOrdersState.emit(sellerOrders?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    if (!owner.isCurrent()) return
+    supplierSideOrderLinesState.emit(sellerLines?.let { DataState.Success(it, message) } ?: DataState.Empty())
+    supplierOrdersState.payload.first { !owner.isCurrent() || it == buyerOrders }
+    supplierOrderLinesState.payload.first { !owner.isCurrent() || it == buyerLines }
+    supplierSideOrdersState.payload.first { !owner.isCurrent() || it == sellerOrders }
+    supplierSideOrderLinesState.payload.first { !owner.isCurrent() || it == sellerLines }
+    if (!owner.isCurrent() || !persist) return
+    if (!supplierWorkspacePersistenceReady(owner)) {
+        recordSupplierCacheWrite(owner, "orders", false)
+        return
+    }
+    recordSupplierCacheWrite(owner, "orders", supplierWorkspaceCache.update(owner) {
+        it.copy(orders = workspace.orders, lines = workspace.lines, orderSources = workspace.sources)
+    })
+}
+
+private fun supplierWorkspaceSnapshotInvalidMessage(): List<LocalizedStringDataModel> = listOf(
+    LocalizedStringDataModel("main", "The server response is incomplete. Your saved data remain available; refresh to try again."),
+    LocalizedStringDataModel("en", "The server response is incomplete. Your saved data remain available; refresh to try again."),
+    LocalizedStringDataModel("ru", "Ответ сервера неполный. Сохранённые данные доступны; обновите список, чтобы повторить попытку."),
+    LocalizedStringDataModel("kk", "Сервер жауабы толық емес. Сақталған деректер қолжетімді; қайталау үшін тізімді жаңартыңыз."),
+    LocalizedStringDataModel("ky", "Сервердин жообу толук эмес. Сакталган маалыматтар жеткиликтүү; кайра аракет кылуу үчүн тизмени жаңыртыңыз."),
+    LocalizedStringDataModel("tg", "Ҷавоби сервер нопурра аст. Маълумоти захирашуда дастрас аст; барои кӯшиши дубора рӯйхатро нав кунед."),
+    LocalizedStringDataModel("uz", "Server javobi to‘liq emas. Saqlangan ma’lumotlar mavjud; qayta urinish uchun ro‘yxatni yangilang.")
+)
+
+private suspend fun publishSupplierOrderMutation(
+    owner: SupplierSessionOwner,
+    bundles: List<SupplierOrderWithLinesDataModel>,
+    side: SupplierOrderMutationSide,
+    message: List<LocalizedStringDataModel>?
+): Boolean {
+    if (!owner.isCurrent()) return false
+    val next = (currentSupplierOrderWorkspace(owner) ?: SupplierOrderWorkspace()).upsert(bundles, side)
+    if (next == null) {
+        postInAppNotification(supplierWorkspaceSnapshotInvalidMessage(), NotificationType.Negative)
+        return false
+    }
+    publishSupplierOrderWorkspace(owner, next, message)
+    return owner.isCurrent()
 }
 
 fun getSupplierOrders(
     storeId: String,
     onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
-    val cleanStoreId = storeId.trim()
+    val cleanStoreId = storeId.trim().takeIf(String::isNotBlank) ?: return
+    val requestOwner = captureSupplierSessionOwner() ?: return
     val requestUserScope = currentSupplierNetworkUserScope()
     if (requestUserScope.isBlank()) return
     val requestKey = "$requestUserScope|store:${cleanStoreId.lowercase()}"
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = supplierOrderReadCoordinator.run(requestKey) {
             supplierOrderOperationMutex.withLock {
                 val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
-                    headers = mapOf("store_id" to cleanStoreId)
+                    headers = mapOf("store_id" to cleanStoreId),
+                    expectedSessionGeneration = requestOwner.sessionGeneration
                 )
                 applySupplierOrderReadResponse(
                     response = response,
-                    scope = SupplierOrderReadScope(storeId = cleanStoreId),
-                    expectedUserScope = requestUserScope
+                    scope = SupplierOrderReadScope.Store(cleanStoreId),
+                    owner = requestOwner
                 )
             }
         }
-        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
@@ -5770,137 +5993,91 @@ fun getSupplierOrdersForSupplier(
     supplierId: String,
     onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
-    val cleanSupplierId = supplierId.trim()
+    val cleanSupplierId = supplierId.trim().takeIf(String::isNotBlank) ?: return
+    val requestOwner = captureSupplierSessionOwner() ?: return
     val requestUserScope = currentSupplierNetworkUserScope()
     if (requestUserScope.isBlank()) return
     val requestKey = "$requestUserScope|supplier:${cleanSupplierId.lowercase()}"
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = supplierOrderReadCoordinator.run(requestKey) {
             supplierOrderOperationMutex.withLock {
                 val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
                     method = HttpMethod.Get,
                     endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
-                    headers = mapOf("supplier_id" to cleanSupplierId)
+                    headers = mapOf("supplier_id" to cleanSupplierId),
+                    expectedSessionGeneration = requestOwner.sessionGeneration
                 )
                 applySupplierOrderReadResponse(
                     response = response,
-                    scope = SupplierOrderReadScope(supplierId = cleanSupplierId),
-                    expectedUserScope = requestUserScope
+                    scope = SupplierOrderReadScope.Supplier(cleanSupplierId),
+                    owner = requestOwner
                 )
             }
         }
-        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
 fun getMySupplierSideOrders(
     onCompleted: ((DataState<List<SupplierOrderWithLinesDataModel>>) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
     val requestUserScope = currentSupplierNetworkUserScope()
     if (requestUserScope.isBlank()) return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = supplierOrderReadCoordinator.run("$requestUserScope|my") {
             supplierOrderOperationMutex.withLock {
                 val response = networkRequest<List<SupplierOrderWithLinesDataModel>, Unit>(
                     method = HttpMethod.Get,
-                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first
+                    endpointUrl = globalAppConfigurationState.payloadValue.getSupplierOrdersPath.first,
+                    expectedSessionGeneration = requestOwner.sessionGeneration
                 )
                 applySupplierOrderReadResponse(
                     response = response,
-                    scope = SupplierOrderReadScope(replaceAll = true),
-                    expectedUserScope = requestUserScope
+                    scope = SupplierOrderReadScope.AllSuppliers,
+                    owner = requestOwner
                 )
             }
         }
-        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
-    }
-}
-
-private data class SupplierOrderReadScope(
-    val storeId: String = "",
-    val supplierId: String = "",
-    val replaceAll: Boolean = false
-) {
-    private val normalizedStoreId: String = storeId.trim().lowercase()
-    private val normalizedSupplierId: String = supplierId.trim().lowercase()
-
-    fun contains(order: SupplierOrderDataModel): Boolean {
-        if (replaceAll) return true
-        if (normalizedStoreId.isBlank() && normalizedSupplierId.isBlank()) return false
-
-        val storeMatches = normalizedStoreId.isBlank() ||
-            order.storeId.trim().lowercase() == normalizedStoreId
-        val supplierMatches = normalizedSupplierId.isBlank() ||
-            order.supplierId.trim().lowercase() == normalizedSupplierId
-        return storeMatches && supplierMatches
-    }
-}
-
-private fun List<SupplierOrderLineDataModel>.distinctSupplierOrderLinesByStableId(): List<SupplierOrderLineDataModel> {
-    val seenIds = mutableSetOf<String>()
-    return filter { line ->
-        val cleanId = line.id.trim().lowercase()
-        // A proper server row always has an ID. Preserve every malformed legacy row without an ID
-        // instead of accidentally merging two genuinely separate goods lines by a weak fallback key.
-        cleanId.isBlank() || seenIds.add(cleanId)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
 private suspend fun applySupplierOrderReadResponse(
     response: ResponseDataModel<List<SupplierOrderWithLinesDataModel>>,
     scope: SupplierOrderReadScope,
-    expectedUserScope: String
+    owner: SupplierSessionOwner
 ): DataState<List<SupplierOrderWithLinesDataModel>> {
-    if (!supplierNetworkUserScopeIsCurrent(expectedUserScope)) {
-        return DataState.Empty()
-    }
+    if (!owner.isCurrent()) return DataState.Empty()
+    val current = currentSupplierOrderWorkspace(owner) ?: SupplierOrderWorkspace()
     if (response.negative || response.payload == null) {
+        // A confirmed permission revocation invalidates only this source. Timeouts, offline mode,
+        // and all other unsuccessful reads retain the complete last-good offline snapshot.
+        if (!response.transportFailure && response.httpStatusCode == HttpStatusCode.Forbidden.value) {
+            current.replace(scope, emptyList())?.let {
+                publishSupplierOrderWorkspace(owner, it, response.message)
+                markSupplierOrderSourceFresh(owner, scope)
+            }
+        }
+        if (!owner.isCurrent()) return DataState.Empty()
         postInAppNotification(response.message, NotificationType.Negative)
         return DataState.Empty(response.message)
     }
-
-    // A scoped Store/Supplier read replaces only that commercial scope. Otherwise opening one Store
-    // could erase another Store's cached orders or the Supplier workspace while both modes share the
-    // same state flows. The unscoped "my Supplier side" read remains authoritative for its payload.
-    val scopedBundles = response.payload
-        .filter { bundle -> scope.contains(bundle.order) }
-        .distinctBy { bundle -> bundle.order.id.trim().lowercase() }
-    val incomingOrders = scopedBundles.map { it.order }
-    val incomingLines = scopedBundles
-        .flatMap { it.lines }
-        .distinctSupplierOrderLinesByStableId()
-
-    if (scope.replaceAll) {
-        emitSupplierOrderSnapshotAndAwait(
-            orders = incomingOrders,
-            lines = incomingLines,
-            message = response.message
-        )
-    } else {
-        val existingOrders = supplierOrdersState.payloadValue.orEmpty()
-        val replacedOrderIds = (
-            existingOrders.asSequence().filter(scope::contains).map { it.id } +
-                incomingOrders.asSequence().map { it.id }
-            )
-            .map { it.trim().lowercase() }
-            .filter { it.isNotBlank() }
-            .toSet()
-        val nextOrders = (
-            existingOrders.filterNot(scope::contains) + incomingOrders
-            ).distinctBy { order -> order.id.trim().lowercase() }
-        val nextLines = (
-            supplierOrderLinesState.payloadValue.orEmpty().filterNot { line ->
-                line.orderId.trim().lowercase() in replacedOrderIds
-            } + incomingLines
-            ).distinctSupplierOrderLinesByStableId()
-        emitSupplierOrderSnapshotAndAwait(
-            orders = nextOrders,
-            lines = nextLines,
-            message = response.message
-        )
+    val next = current.replace(scope, response.payload)
+    if (next == null) {
+        val message = supplierWorkspaceSnapshotInvalidMessage()
+        postInAppNotification(message, NotificationType.Negative)
+        return DataState.Empty(message)
     }
-
-    return DataState.Success(scopedBundles, response.message)
+    publishSupplierOrderWorkspace(owner, next, response.message)
+    markSupplierOrderSourceFresh(owner, scope)
+    return if (owner.isCurrent()) DataState.Success(response.payload, response.message) else DataState.Empty()
 }
 
 fun getSupplierModeDashboard(
@@ -6007,8 +6184,13 @@ fun refreshSupplierModeWorkspace(
     includeContracts: Boolean = false,
     force: Boolean = false
 ) {
+    val owner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!owner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!owner.isCurrent()) return@launch
         supplierWorkspaceRefreshScheduleMutex.withLock {
+            if (!owner.isCurrent()) return@withLock
             val currentUserId = userAccountState.payloadValue?.id.orEmpty().trim()
             val currentUserScope = currentSupplierNetworkUserScope()
             if (currentUserId.isBlank() || currentUserScope.isBlank()) return@withLock
@@ -6063,27 +6245,32 @@ fun addSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         supplierOrderOperationMutex.withLock {
-            val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
-                method = HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
-                body = orderWithLines
-            )
+            val response = requestOwner.request { requestGeneration ->
+                networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
+                    body = orderWithLines,
+                    expectedSessionGeneration = requestGeneration
+                )
+            } ?: return@withLock
 
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
-                emitSupplierOrderSnapshotAndAwait(
-                    orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                    lines = supplierOrderLinesState.payloadValue.orEmpty()
-                        .filterNot { line ->
-                            line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
-                        } + response.payload.lines,
-                    message = response.message
-                )
+                if (!publishSupplierOrderMutation(requestOwner, listOf(response.payload),
+                    SupplierOrderMutationSide.Store, response.message)) {
+                    if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
+                    return@withLock
+                }
 
+                if (!requestOwner.isCurrent()) return@withLock
                 getSupplierModeDashboard(force = true)
                 postInAppNotification(response.message, NotificationType.Positive)
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
@@ -6094,28 +6281,35 @@ fun addSupplierOrder(
 
 fun updateSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
+    supplierSide: Boolean = false,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
+    val mutationSide = if (supplierSide) SupplierOrderMutationSide.Supplier else SupplierOrderMutationSide.Store
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         supplierOrderOperationMutex.withLock {
-            val response = networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
-                method = HttpMethod.Put,
-                endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
-                body = orderWithLines
-            )
+            val response = requestOwner.request { requestGeneration ->
+                networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
+                    method = HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
+                    body = orderWithLines,
+                    expectedSessionGeneration = requestGeneration
+                )
+            } ?: return@withLock
 
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
-                emitSupplierOrderSnapshotAndAwait(
-                    orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                    lines = supplierOrderLinesState.payloadValue.orEmpty()
-                        .filterNot { line ->
-                            line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
-                        } + response.payload.lines,
-                    message = response.message
-                )
+                if (!publishSupplierOrderMutation(requestOwner, listOf(response.payload),
+                    mutationSide, response.message)) {
+                    if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
+                    return@withLock
+                }
+                if (!requestOwner.isCurrent()) return@withLock
                 getSupplierModeDashboard(force = true)
                 postInAppNotification(response.message, NotificationType.Positive)
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
@@ -6124,22 +6318,6 @@ fun updateSupplierOrder(
     }
 }
 
-private suspend fun emitSupplierOrderBundlesFromServerResponse(
-    bundles: List<SupplierOrderWithLinesDataModel>,
-    message: List<LocalizedStringDataModel>?
-) {
-    val changedOrderIds = bundles
-        .map { it.order.id.trim().lowercase() }
-        .filter { it.isNotBlank() }
-        .toSet()
-    emitSupplierOrderSnapshotAndAwait(
-        orders = supplierOrdersState.payloadValue.orEmpty()
-            .filterNot { it.id.trim().lowercase() in changedOrderIds } + bundles.map { it.order },
-        lines = supplierOrderLinesState.payloadValue.orEmpty()
-            .filterNot { line -> line.orderId.trim().lowercase() in changedOrderIds } + bundles.flatMap { it.lines },
-        message = message
-    )
-}
 
 data class SupplierOrderStatusUpdateOutcome(
     val requestedOrderIds: List<String> = emptyList(),
@@ -6173,7 +6351,19 @@ suspend fun updateSupplierOrdersSupplierStatusByIdsAwait(
     orderIds: List<String>,
     status: SupplierOrderStatusDataModel,
     comment: String? = null
+): SupplierOrderStatusUpdateOutcome = updateSupplierOrdersSupplierStatusOwned(
+    orderIds, status, comment, captureSupplierSessionOwner()
+)
+
+private suspend fun updateSupplierOrdersSupplierStatusOwned(
+    orderIds: List<String>,
+    status: SupplierOrderStatusDataModel,
+    comment: String?,
+    requestOwner: SupplierSessionOwner?
 ): SupplierOrderStatusUpdateOutcome {
+    fun stale() = SupplierOrderStatusUpdateOutcome(requestedOrderIds = orderIds,
+        message = cloudSessionExpiredResponse<Unit>().message, negative = true)
+    if (requestOwner == null || !requestOwner.isCurrent()) return stale()
     val cleanOrderIds = orderIds
         .map { it.trim() }
         .filter { it.isNotBlank() }
@@ -6192,17 +6382,23 @@ suspend fun updateSupplierOrdersSupplierStatusByIdsAwait(
         )
     }
 
+    restoreSupplierWorkspaceCache()
+    if (!requestOwner.isCurrent()) return stale()
     return supplierOrderOperationMutex.withLock {
+        if (!requestOwner.isCurrent()) return@withLock stale()
         try {
-            val response = networkRequest<List<SupplierOrderWithLinesDataModel>, SupplierOrderStatusUpdateRequestDataModel>(
-                method = HttpMethod.Put,
-                endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrdersStatusPath.first,
-                body = SupplierOrderStatusUpdateRequestDataModel(
-                    orderIds = cleanOrderIds,
-                    status = status,
-                    comment = comment?.trim()?.takeIf { it.isNotBlank() }
+            val response = requestOwner.request { requestGeneration ->
+                networkRequest<List<SupplierOrderWithLinesDataModel>, SupplierOrderStatusUpdateRequestDataModel>(
+                    method = HttpMethod.Put,
+                    endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrdersStatusPath.first,
+                    body = SupplierOrderStatusUpdateRequestDataModel(
+                        orderIds = cleanOrderIds,
+                        status = status,
+                        comment = comment?.trim()?.takeIf { it.isNotBlank() }
+                    ),
+                    expectedSessionGeneration = requestGeneration
                 )
-            )
+            } ?: return@withLock stale()
 
             if (response.negative || response.payload == null) {
                 SupplierOrderStatusUpdateOutcome(
@@ -6234,7 +6430,10 @@ suspend fun updateSupplierOrdersSupplierStatusByIdsAwait(
                         negative = true
                     )
                 } else {
-                    emitSupplierOrderBundlesFromServerResponse(updatedBundles, response.message)
+                    if (!publishSupplierOrderMutation(requestOwner, updatedBundles,
+                        SupplierOrderMutationSide.Supplier, response.message)) return@withLock if (!requestOwner.isCurrent()) stale()
+                            else SupplierOrderStatusUpdateOutcome(requestedOrderIds = cleanOrderIds,
+                                message = supplierWorkspaceSnapshotInvalidMessage(), negative = true)
                     getSupplierModeDashboard(force = true)
 
                     val updatedIds = updatedBundles.mapNotNull { bundle ->
@@ -6263,6 +6462,7 @@ suspend fun updateSupplierOrdersSupplierStatusByIdsAwait(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
+            if (!requestOwner.isCurrent()) return@withLock stale()
             println("AITA supplier dispatch: status update failed: ${throwable.message ?: throwable::class.simpleName}")
             SupplierOrderStatusUpdateOutcome(
                 requestedOrderIds = cleanOrderIds,
@@ -6302,12 +6502,16 @@ fun updateSupplierOrdersSupplierStatusByIds(
     onCompleted: ((Int) -> Unit)? = null,
     onOutcome: ((SupplierOrderStatusUpdateOutcome) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
-        val outcome = updateSupplierOrdersSupplierStatusByIdsAwait(
+        if (!requestOwner.isCurrent()) return@launch
+        val outcome = updateSupplierOrdersSupplierStatusOwned(
             orderIds = orderIds,
             status = status,
-            comment = comment
+            comment = comment,
+            requestOwner = requestOwner
         )
+        if (!requestOwner.isCurrent()) return@launch
         val notificationType = when {
             outcome.negative -> NotificationType.Negative
             outcome.partial -> NotificationType.Neutral
@@ -6327,27 +6531,28 @@ fun deleteSupplierOrder(
     orderId: String,
     onCompleted: ((DataState<String>) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         supplierOrderOperationMutex.withLock {
-            val response = networkRequest<String, String>(
-                method = HttpMethod.Delete,
-                endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierOrdersPath.first,
-                body = orderId
-            )
+            val response = requestOwner.request { requestGeneration ->
+                networkRequest<String, String>(
+                    method = HttpMethod.Delete,
+                    endpointUrl = globalAppConfigurationState.payloadValue.deleteSupplierOrdersPath.first,
+                    body = orderId,
+                    expectedSessionGeneration = requestGeneration
+                )
+            } ?: return@withLock
 
             if (response.negative) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
-                emitSupplierOrderSnapshotAndAwait(
-                    orders = supplierOrdersState.payloadValue.orEmpty().filterNot {
-                        it.id.trim().equals(orderId.trim(), ignoreCase = true)
-                    },
-                    lines = supplierOrderLinesState.payloadValue.orEmpty().filterNot {
-                        it.orderId.trim().equals(orderId.trim(), ignoreCase = true)
-                    },
-                    message = response.message
-                )
+                publishSupplierOrderWorkspace(requestOwner,
+                    (currentSupplierOrderWorkspace(requestOwner) ?: SupplierOrderWorkspace()).remove(orderId), response.message)
+                if (!requestOwner.isCurrent()) return@withLock
                 getSupplierModeDashboard(force = true)
                 postInAppNotification(response.message, NotificationType.Positive)
                 onCompleted?.invoke(DataState.Success(orderId, response.message))
@@ -6360,27 +6565,33 @@ fun receiveSupplierOrder(
     request: ReceiveSupplierOrderRequestDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         supplierOrderOperationMutex.withLock {
-            val response = networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
-                method = HttpMethod.Post,
-                endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
-                body = request
-            )
+            val response = requestOwner.request { requestGeneration ->
+                networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
+                    method = HttpMethod.Post,
+                    endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
+                    body = request,
+                    expectedSessionGeneration = requestGeneration
+                )
+            } ?: return@withLock
 
             if (response.negative || response.payload == null) {
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
-                emitSupplierOrderSnapshotAndAwait(
-                    orders = supplierOrdersState.payloadValue.orEmpty().upsertById(response.payload.order),
-                    lines = supplierOrderLinesState.payloadValue.orEmpty()
-                        .filterNot { line ->
-                            line.orderId.trim().equals(response.payload.order.id.trim(), ignoreCase = true)
-                        } + response.payload.lines,
-                    message = response.message
-                )
+                if (!publishSupplierOrderMutation(requestOwner, listOf(response.payload),
+                    SupplierOrderMutationSide.Store, response.message)) {
+                    if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
+                    return@withLock
+                }
+                if (!requestOwner.isCurrent()) return@withLock
                 response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
+                if (!requestOwner.isCurrent()) return@withLock
                 getSupplierModeDashboard(force = true)
                 postInAppNotification(response.message, NotificationType.Positive)
                 onCompleted?.invoke(DataState.Success(response.payload, response.message))
@@ -6397,10 +6608,14 @@ fun getSupplierContracts(
 ) {
     val cleanStoreId = storeId.orEmpty().trim().lowercase()
     val cleanSupplierId = supplierId.orEmpty().trim().lowercase()
+    val requestOwner = captureSupplierSessionOwner() ?: return
     val requestUserScope = currentSupplierNetworkUserScope()
     if (requestUserScope.isBlank()) return
     val requestKey = "$requestUserScope|store=$cleanStoreId|supplier=$cleanSupplierId"
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = try {
             supplierContractReadCoordinator.run(requestKey) {
                 supplierContractOperationMutex.withLock {
@@ -6411,24 +6626,35 @@ fun getSupplierContracts(
                     val response = networkRequest<List<SupplierPartnershipContractDataModel>, Unit>(
                         method = HttpMethod.Get,
                         endpointUrl = globalAppConfigurationState.payloadValue.getSupplierContractsPath.first,
-                        headers = headers
+                        headers = headers,
+                    expectedSessionGeneration = requestOwner.sessionGeneration
                     )
 
-                    if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
-                        DataState.Empty()
-                    } else if (response.negative || response.payload == null) {
-                        postInAppNotification(response.message, NotificationType.Negative)
-                        DataState.Empty(response.message)
-                    } else {
-                        val mergedContracts = supplierPartnershipContractsState.payloadValue
-                            .orEmpty()
-                            .mergedWithSupplierContractRead(
-                                incoming = response.payload,
-                                storeId = cleanStoreId,
-                                supplierId = cleanSupplierId
-                            )
-                        DataState.Success(mergedContracts, response.message).also { state ->
-                            emitSupplierContractsAndAwait(state)
+                    val scope = if (cleanStoreId.isNotBlank()) SupplierCommercialScope(false, cleanStoreId, cleanSupplierId)
+                        else SupplierCommercialScope(true, cleanSupplierId)
+                    if (!requestOwner.isCurrent()) DataState.Empty()
+                    else {
+                        val current = currentSupplierContractWorkspace(requestOwner) ?: SupplierCommercialWorkspace()
+                        if (response.negative || response.payload == null) {
+                            if (!response.transportFailure && response.httpStatusCode == HttpStatusCode.Forbidden.value) {
+                                current.replace(scope, emptyList())?.let {
+                                    publishSupplierContracts(requestOwner, it, response.message)
+                                    markSupplierSourceFresh(requestOwner, "contracts", scope)
+                                }
+                            }
+                            if (requestOwner.isCurrent()) postInAppNotification(response.message, NotificationType.Negative)
+                            DataState.Empty(response.message)
+                        } else {
+                            val next = current.replace(scope, response.payload.map { it.commercialRow() }, ::preferSupplierContract)
+                            if (next == null) {
+                                val message = supplierWorkspaceSnapshotInvalidMessage()
+                                postInAppNotification(message, NotificationType.Negative)
+                                DataState.Empty(message)
+                            } else {
+                                publishSupplierContracts(requestOwner, next, response.message)
+                                markSupplierSourceFresh(requestOwner, "contracts", scope)
+                                if (requestOwner.isCurrent()) DataState.Success(response.payload, response.message) else DataState.Empty()
+                            }
                         }
                     }
                 }
@@ -6436,7 +6662,7 @@ fun getSupplierContracts(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
-            if (!supplierNetworkUserScopeIsCurrent(requestUserScope)) {
+            if (!requestOwner.isCurrent()) {
                 return@launch
             }
             logSupplierContractDiagnostic("Supplier contracts read failed: ${throwable.message ?: throwable::class.simpleName}")
@@ -6449,34 +6675,38 @@ fun getSupplierContracts(
             postInAppNotification(message, NotificationType.Negative)
             DataState.Empty(message)
         }
-        if (supplierNetworkUserScopeIsCurrent(requestUserScope)) onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
 fun upsertSupplierContract(
     contract: SupplierPartnershipContractDataModel,
+    supplierSide: Boolean = false,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = try {
             supplierContractOperationMutex.withLock {
-                val response = networkRequest<SupplierPartnershipContractDataModel, SupplierPartnershipContractDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierContractPath.first,
-                    body = contract
-                )
+                val response = requestOwner.request { requestGeneration ->
+                    networkRequest<SupplierPartnershipContractDataModel, SupplierPartnershipContractDataModel>(
+                        method = HttpMethod.Post,
+                        endpointUrl = globalAppConfigurationState.payloadValue.upsertSupplierContractPath.first,
+                        body = contract,
+                        expectedSessionGeneration = requestGeneration
+                    )
+                } ?: return@withLock DataState.Empty()
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
                     DataState.Empty(response.message)
                 } else {
-                    emitSupplierContractsAndAwait(
-                        DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty()
-                                .upsertSupplierContractByRevision(response.payload),
-                            response.message
-                        )
-                    )
+                    if (!publishSupplierContractMutation(requestOwner, response.payload, supplierSide, response.message))
+                        return@withLock DataState.Empty(supplierWorkspaceSnapshotInvalidMessage())
+                    if (!requestOwner.isCurrent()) return@withLock DataState.Empty()
                     refreshSupplierDashboardAfterContractMutationIfNeeded()
                     postInAppNotification(response.message, NotificationType.Positive)
                     DataState.Success(response.payload, response.message)
@@ -6485,6 +6715,7 @@ fun upsertSupplierContract(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
+            if (!requestOwner.isCurrent()) return@launch
             logSupplierContractDiagnostic("Supplier contract save failed: ${throwable.message ?: throwable::class.simpleName}")
             val message = localizedStringResourceMessage(
                 id = 2409,
@@ -6495,18 +6726,20 @@ fun upsertSupplierContract(
             postInAppNotification(message, NotificationType.Negative)
             DataState.Empty(message)
         }
-        onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
 fun acceptSupplierContract(
     contractId: String,
     revision: Int,
+    supplierSide: Boolean = false,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
     mutateSupplierContract(
         contractId = contractId,
         revision = revision,
+        supplierSide = supplierSide,
         endpointUrl = globalAppConfigurationState.payloadValue.acceptSupplierContractPath.first,
         diagnosticAction = "accept",
         onCompleted = onCompleted
@@ -6516,11 +6749,13 @@ fun acceptSupplierContract(
 fun declineSupplierContract(
     contractId: String,
     revision: Int,
+    supplierSide: Boolean = false,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)? = null
 ) {
     mutateSupplierContract(
         contractId = contractId,
         revision = revision,
+        supplierSide = supplierSide,
         endpointUrl = globalAppConfigurationState.payloadValue.declineSupplierContractPath.first,
         diagnosticAction = "decline",
         onCompleted = onCompleted
@@ -6530,6 +6765,7 @@ fun declineSupplierContract(
 private fun mutateSupplierContract(
     contractId: String,
     revision: Int,
+    supplierSide: Boolean,
     endpointUrl: String,
     diagnosticAction: String,
     onCompleted: ((DataState<SupplierPartnershipContractDataModel>) -> Unit)?
@@ -6546,32 +6782,35 @@ private fun mutateSupplierContract(
         return
     }
 
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = try {
             supplierContractOperationMutex.withLock {
-                val response = networkRequest<
-                    SupplierPartnershipContractDataModel,
-                    SupplierContractRevisionActionRequestDataModel
-                    >(
-                    method = HttpMethod.Post,
-                    endpointUrl = endpointUrl,
-                    body = SupplierContractRevisionActionRequestDataModel(
-                        contractId = cleanContractId,
-                        revision = revision
+                val response = requestOwner.request { requestGeneration ->
+                    networkRequest<
+                        SupplierPartnershipContractDataModel,
+                        SupplierContractRevisionActionRequestDataModel
+                        >(
+                        method = HttpMethod.Post,
+                        endpointUrl = endpointUrl,
+                        body = SupplierContractRevisionActionRequestDataModel(
+                            contractId = cleanContractId,
+                            revision = revision
+                        ),
+                        expectedSessionGeneration = requestGeneration
                     )
-                )
+                } ?: return@withLock DataState.Empty()
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
                     DataState.Empty(response.message)
                 } else {
-                    emitSupplierContractsAndAwait(
-                        DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty()
-                                .upsertSupplierContractByRevision(response.payload),
-                            response.message
-                        )
-                    )
+                    if (!publishSupplierContractMutation(requestOwner, response.payload, supplierSide, response.message))
+                        return@withLock DataState.Empty(supplierWorkspaceSnapshotInvalidMessage())
+                    if (!requestOwner.isCurrent()) return@withLock DataState.Empty()
                     refreshSupplierDashboardAfterContractMutationIfNeeded()
                     postInAppNotification(response.message, NotificationType.Positive)
                     DataState.Success(response.payload, response.message)
@@ -6580,6 +6819,7 @@ private fun mutateSupplierContract(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
+            if (!requestOwner.isCurrent()) return@launch
             logSupplierContractDiagnostic("Supplier contract $diagnosticAction failed: ${throwable.message ?: throwable::class.simpleName}")
             val message = localizedStringResourceMessage(
                 id = 2411,
@@ -6590,7 +6830,7 @@ private fun mutateSupplierContract(
             postInAppNotification(message, NotificationType.Negative)
             DataState.Empty(message)
         }
-        onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
@@ -6611,31 +6851,34 @@ fun archiveSupplierContract(
         return
     }
 
+    val requestOwner = captureSupplierSessionOwner() ?: return
     GlobalScope.launch(Dispatchers.ourIo) {
+        if (!requestOwner.isCurrent()) return@launch
+        restoreSupplierWorkspaceCache()
+        if (!requestOwner.isCurrent()) return@launch
         val result = try {
             supplierContractOperationMutex.withLock {
-                val response = networkRequest<String, SupplierContractRevisionActionRequestDataModel>(
-                    method = HttpMethod.Post,
-                    endpointUrl = globalAppConfigurationState.payloadValue.archiveSupplierContractPath.first,
-                    body = SupplierContractRevisionActionRequestDataModel(
-                        contractId = cleanContractId,
-                        revision = revision
+                val response = requestOwner.request { requestGeneration ->
+                    networkRequest<String, SupplierContractRevisionActionRequestDataModel>(
+                        method = HttpMethod.Post,
+                        endpointUrl = globalAppConfigurationState.payloadValue.archiveSupplierContractPath.first,
+                        body = SupplierContractRevisionActionRequestDataModel(
+                            contractId = cleanContractId,
+                            revision = revision
+                        ),
+                        expectedSessionGeneration = requestGeneration
                     )
-                )
+                } ?: return@withLock DataState.Empty()
 
                 if (response.negative || response.payload == null) {
                     postInAppNotification(response.message, NotificationType.Negative)
                     DataState.Empty(response.message)
                 } else {
                     val archivedId = response.payload.trim()
-                    emitSupplierContractsAndAwait(
-                        DataState.Success(
-                            supplierPartnershipContractsState.payloadValue.orEmpty().filterNot { contract ->
-                                contract.id.trim().equals(archivedId, ignoreCase = true)
-                            },
-                            response.message
-                        )
-                    )
+                    publishSupplierContracts(requestOwner,
+                        (currentSupplierContractWorkspace(requestOwner) ?: SupplierCommercialWorkspace()).remove(supplierOrderIdentity(archivedId)),
+                        response.message)
+                    if (!requestOwner.isCurrent()) return@withLock DataState.Empty()
                     refreshSupplierDashboardAfterContractMutationIfNeeded()
                     postInAppNotification(response.message, NotificationType.Positive)
                     DataState.Success(response.payload, response.message)
@@ -6644,6 +6887,7 @@ fun archiveSupplierContract(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (throwable: Throwable) {
+            if (!requestOwner.isCurrent()) return@launch
             logSupplierContractDiagnostic("Supplier contract archive failed: ${throwable.message ?: throwable::class.simpleName}")
             val message = localizedStringResourceMessage(
                 id = 2411,
@@ -6654,7 +6898,7 @@ fun archiveSupplierContract(
             postInAppNotification(message, NotificationType.Negative)
             DataState.Empty(message)
         }
-        onCompleted?.invoke(result)
+        if (requestOwner.isCurrent()) onCompleted?.invoke(result)
     }
 }
 
@@ -16437,10 +16681,23 @@ private suspend fun clearAuthenticatedAccountRuntimeState() {
 
     suppliersState.emit(DataState.Empty())
     supplierGoodsPricesState.emit(DataState.Empty())
+    supplierSideGoodsPricesState.emit(DataState.Empty())
+    supplierPriceWorkspace = null; supplierPriceWorkspaceOwner = null
     supplierOrdersState.emit(DataState.Empty())
     supplierOrderLinesState.emit(DataState.Empty())
+    supplierSideOrdersState.emit(DataState.Empty())
+    supplierSideOrderLinesState.emit(DataState.Empty())
+    supplierOrderWorkspace = null
+    supplierOrderWorkspaceOwner = null
     supplierPartnershipContractsState.emit(DataState.Empty())
+    supplierSideContractsState.emit(DataState.Empty())
+    supplierContractWorkspace = null; supplierContractWorkspaceOwner = null
     supplierModeDashboardState.emit(DataState.Empty())
+    supplierWorkspaceCachedSections.value = emptySet()
+    supplierWorkspaceCachedSources.value = emptyMap()
+    supplierWorkspaceOfflineSnapshotState.value = false
+    supplierWorkspaceCacheFailedSections.value = emptySet()
+    supplierWorkspaceCacheWarningState.value = false
     clearSupplierIdentityFocusForLogout()
     supplierDashboardCacheMutex.withLock {
         supplierDashboardCacheByScope.clear()
@@ -16507,6 +16764,13 @@ suspend fun finishDeletedAccountLocally(owner: String, generation: Long) {
     try {
         clearAuthenticatedSessionStorage(expectedGeneration = generation)
         runCatching { clearMarketDeliveryDeviceData(owner) }
+        runCatching { supplierWorkspaceCache.clear(owner) }
+        runCatching {
+            val prefix = "supplier-picking-v2:$owner:"
+            // Supplier identities are UUIDs; include the chunk namespace, not just legacy rows.
+            for (keyPrefix in listOf(prefix, "aita-cache-chunks-v1:${prefix.length + 36}:$prefix"))
+                appDatabase.app_databaseQueries.deleteKvPrefixExcept(prefix = keyPrefix, manifestKey = "", keepPrefix = "")
+        }
         SavedLoginUsers.forget(owner)
         setActiveStoreId(null, syncServer = false)
     } finally {

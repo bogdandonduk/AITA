@@ -16,9 +16,9 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun AppConfiguration.SupplierDispatchScreen() {
-    val orders by supplierOrdersState.payload.collectAsState()
-    val lines by supplierOrderLinesState.payload.collectAsState()
-    val contracts by supplierPartnershipContractsState.payload.collectAsState()
+    val orders by supplierSideOrdersState.payload.collectAsState()
+    val lines by supplierSideOrderLinesState.payload.collectAsState()
+    val contracts by supplierSideContractsState.payload.collectAsState()
     val supplierDashboard by supplierModeDashboardState.payload.collectAsState()
     val activeSupplierProfileId by activeSupplierProfileIdState.collectAsState()
     val navigationState by NavigationScreenModel.Supplier.Dispatch.Main.state.collectAsState()
@@ -429,11 +429,11 @@ internal fun AppConfiguration.SupplierDispatchScreen() {
                             mutationKey = activeMutationKey,
                             feedbackMessage = feedbackMessage,
                             feedbackType = feedbackType,
-                            onMarkPacked = {
+                            onMarkPacked = { checkedOrderIds ->
                                 runStatusMutation(
                                     run = selectedRun,
                                     status = SupplierOrderStatusDataModel.Packed,
-                                    orderIds = selectedRun.packableOrderIds
+                                    orderIds = checkedOrderIds.filter { it in selectedRun.packableOrderIds }
                                 )
                             },
                             onStartDelivery = {

@@ -1656,6 +1656,8 @@ fun AppConfiguration.genericTextField(
     // For synchronous parent-owned inputs, e.g. payment amounts edited by AITA's keypad.
     // The parent owns persistence too; no second field draft may restore over its value.
     parentOwnsValue: Boolean = false,
+    // Consume submission inside the focused editor, retaining text until the caller confirms its save.
+    onSubmitInput: ((String) -> Unit)? = null,
     onValueChange: ((String, () -> Unit) -> Unit)? = null
 ): GenericTextFieldContent {
     require(!parentOwnsValue || (valueInitial != null && stateHost == null && stateKey == null)) {
@@ -1822,6 +1824,8 @@ fun AppConfiguration.genericTextField(
         savePersistentTextDraft("")
         savePersistentTextFieldMeta(emptyValue, isFocused)
     }
+    val liveEditorReadHandle = remember(textFieldIdentityKey) { AitaTextFieldReadHandle() }
+    fun currentEditorText(): String = liveEditorReadHandle.read() ?: textFieldValue.text
     val latestClearScannedSearch by rememberUpdatedState(::clearScannedSearch)
     val scannerInventoryOwner = if (captureTransactionBarcodeInput) inventoryViewScopeKey() else null
     DisposableEffect(captureTransactionBarcodeInput, textFieldIdentityKey, scannerInventoryOwner) {
@@ -2209,6 +2213,7 @@ fun AppConfiguration.genericTextField(
         CompositionLocalProvider(LocalTextSelectionColors provides textSelectionColors) {
             AitaEditableText(
                 identityKey = textFieldIdentityKey,
+                liveReadHandle = liveEditorReadHandle,
                 resetRevision = editorResetRevision,
                 value = displayedTextFieldValue,
                 onValueChange = onValueChange@ { rawValue ->
@@ -2280,12 +2285,18 @@ fun AppConfiguration.genericTextField(
 
                         updateIsFocusedAction?.invoke(it)
                     },
-                onSubmitText = if (captureTransactionBarcodeInput) { text ->
+                onSubmitText = if (onSubmitInput != null) { text ->
+                    if (text.isBlank()) false else {
+                        onSubmitInput(text)
+                        true
+                    }
+                } else if (captureTransactionBarcodeInput) { text ->
                     pendingBarcodeScan = null
                     barcodeBurst.reset()
                     val handled = text.isNotBlank() && activeTransactionBarcodeHandler?.invoke(text + "\n") == true
                     handled
                 } else null,
+                clearOnHandledSubmission = onSubmitInput == null,
                 keyboardOptions = KeyboardOptions.Default.copy(
                     keyboardType = keyboardType,
                     imeAction = (imeWithAction ?: ImeWithAction(ime = ImeAction.Default)).ime
@@ -2645,10 +2656,11 @@ fun AppConfiguration.genericTextField(
 
     val content = GenericTextFieldContent(
         value = displayedTextFieldValue,
+        onReadCurrentText = ::currentEditorText,
         editedSinceCreation = draftRestoreGuard.revision > 0,
         onCaptureCompletion = {
-            val submitted = textFieldValue.text
-            val complete: () -> Unit = { if (textFieldValue.text == submitted) clearScannedSearch() }
+            val submitted = currentEditorText()
+            val complete: () -> Unit = { if (currentEditorText() == submitted) clearScannedSearch() }
             complete
         },
         isFocused = isFocused,
@@ -2781,6 +2793,12 @@ internal fun AppConfiguration.aitaFormTextField(
     )
 }
 
+/** A non-observable handoff for child fields and sibling actions. A local nullable variable
+ * belongs to one composition frame, which can be replaced while a child restarts independently. */
+internal class GenericTextFieldContentReference {
+    var current: GenericTextFieldContent? = null
+}
+
 class GenericTextFieldContent(
     var value: TextFieldValue,
     var isFocused: Boolean,
@@ -2790,8 +2808,12 @@ class GenericTextFieldContent(
     val onReset: (() -> Unit)? = null,
     val onReplaceText: ((String, Boolean) -> Unit)? = null,
     val editedSinceCreation: Boolean = false,
-    val onCaptureCompletion: (() -> (() -> Unit))? = null
+    val onCaptureCompletion: (() -> (() -> Unit))? = null,
+    private val onReadCurrentText: (() -> String)? = null
 ) {
+
+    /** Action closures may outlive a field recomposition; read its owner state instead of that snapshot. */
+    fun liveText(): String = onReadCurrentText?.invoke() ?: value.text
 
     fun captureCompletion(): () -> Unit = onCaptureCompletion?.invoke() ?: {}
 

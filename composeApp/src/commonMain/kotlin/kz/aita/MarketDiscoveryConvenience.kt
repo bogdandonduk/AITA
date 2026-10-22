@@ -25,7 +25,7 @@ internal fun rememberMarketSearch(previous: List<String>, query: String): List<S
 @Composable internal fun AppConfiguration.MarketPromotionPrice(offer: MarketOffer) {
     val percent = marketPromotionPercent(offer) ?: return
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("−$percent%", color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
+        Text("-$percent%", color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
         Text(marketMoneyLabel(offer.originalPriceMinor!!, offer.currencyCode.orEmpty()),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize,
             textDecoration = TextDecoration.LineThrough)

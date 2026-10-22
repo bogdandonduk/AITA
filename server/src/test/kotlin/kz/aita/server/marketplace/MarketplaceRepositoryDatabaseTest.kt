@@ -66,7 +66,7 @@ class MarketplaceRepositoryDatabaseTest {
                             'NEVER-PUBLIC-NOTE','[{"price":"77.77","currency":"KZT","supplierId":"NEVER-PUBLIC-SUPPLIER"}]');
                 """)
                 listOf("V46__paging_user_finances_and_store_subscriptions.sql","V101__per_location_subscriptions_and_promocodes.sql",
-                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql","V124__internet_branch_marketplace_locations.sql","V138__market_delivery_requests_and_tracking.sql").forEach {
+                    "V102__single_use_promo_archive.sql","V104__opt_in_buyer_shop_windows.sql","V105__buyer_shopping_lists.sql","V106__buyer_reviewed_offer_replacements.sql","V107__market_category_discovery_indexes.sql","V108__reviewed_basket_list_changes.sql","V109__buyer_shopping_activity.sql","V110__public_shop_directory_order.sql","V112__marketplace_product_profiles_parent_storefronts.sql","V120__buyer_shopping_trip_checklist.sql","V121__buyer_saved_shops.sql","V124__internet_branch_marketplace_locations.sql","V138__market_delivery_requests_and_tracking.sql","V139__market_delivery_work_queues.sql").forEach {
                     if(it=="V124__internet_branch_marketplace_locations.sql") beforeBranchMigration?.invoke(f,c)
                     exec(c,resource(it))
                 }
@@ -2248,5 +2248,96 @@ class MarketplaceRepositoryDatabaseTest {
         order=deliveryStep(f,workers[1],order,MarketDeliveryAction.ARRIVE)
         order=deliveryStep(f,f.buyer,order,MarketDeliveryAction.DELIVER)
         assertEquals(MarketDeliveryStatus.DELIVERED,order.status)
+    }
+
+    private fun seedDeliveryOrder(c:Connection,order:MarketDeliveryOrder) {
+        c.prepareStatement("""INSERT INTO market_delivery_orders(id,buyer_id,branch_store_id,courier_id,revision,status,created_at_millis,updated_at_millis,handover_code,payload)
+            VALUES(?,?,?,?,?,?,?,?, '123456',?::jsonb) ON CONFLICT(id) DO UPDATE SET courier_id=EXCLUDED.courier_id,status=EXCLUDED.status,
+            created_at_millis=EXCLUDED.created_at_millis,updated_at_millis=EXCLUDED.updated_at_millis,payload=EXCLUDED.payload""").use { s ->
+            listOf(UUID.fromString(order.id),UUID.fromString(order.buyerId),UUID.fromString(order.branchStoreId),order.courierId?.let(UUID::fromString),
+                order.revision,order.status.name,order.createdAtMillis,order.updatedAtMillis,jsonBase.encodeToString(order.copy(handoverCode=null,position=null)))
+                .forEachIndexed { i,value -> s.setObject(i+1,value) }
+            s.executeUpdate()
+        }
+    }
+
+    @Test fun activeDeliveryQueueFindsOldWorkBeyondHistoryAndKeysetsDoNotDuplicateTies()=fixture { f,c ->
+        val base=deliveryTx(f){r,_->r.command(f.buyer,deliveryRequest(f,c))}.order.copy(createdAtMillis=1000,updatedAtMillis=1000)
+        seedDeliveryOrder(c,base)
+        val completed=(0 until 45).map { base.copy(id=UUID.randomUUID().toString(),status=MarketDeliveryStatus.DELIVERED,createdAtMillis=2000,updatedAtMillis=2000) }
+        completed.forEach { seedDeliveryOrder(c,it) }
+        val active=deliveryTx(f){r,_->r.page(f.buyer,"buyer",null,null,MarketDeliveryFilter(MarketDeliveryQueue.ACTIVE))}
+        assertEquals(listOf(base.id),active.orders.map { it.id });assertNull(active.nextBefore)
+        val filter=MarketDeliveryFilter(MarketDeliveryQueue.HISTORY)
+        val first=deliveryTx(f){r,_->r.page(f.buyer,"buyer",null,null,filter)}
+        val second=deliveryTx(f){r,_->r.page(f.buyer,"buyer",null,first.nextBefore,filter)}
+        assertEquals(40,first.orders.size);assertEquals(5,second.orders.size);assertNull(second.nextBefore)
+        assertEquals(completed.map { it.id }.toSet(),(first.orders+second.orders).map { it.id }.toSet())
+        assertEquals(45,(first.orders+second.orders).map { it.id }.distinct().size)
+        assertTrue(first.orders.all { it.handoverCode==null && it.position==null })
+        val stranger=UUID.randomUUID();exec(c,"INSERT INTO users(id) VALUES ('$stranger')")
+        assertTrue(deliveryTx(f){r,_->r.page(stranger,"buyer",null,first.nextBefore,filter)}.orders.isEmpty())
+    }
+
+    @Test fun deliveryFiltersMatchRoleAttentionModesAndLiteralSearchOnTheServer()=fixture { f,c ->
+        val base=deliveryTx(f){r,_->r.command(f.buyer,deliveryRequest(f,c))}.order
+        val worker=UUID.randomUUID();exec(c,"INSERT INTO users(id,public_id) VALUES ('$worker','90000002')")
+        exec(c,"INSERT INTO store_worker_memberships(user_id,store_id) VALUES ('$worker','${f.management}')")
+        val now=System.currentTimeMillis()
+        val seeded=MarketDeliveryStatus.entries.flatMap { status -> MarketDeliveryMode.entries.map { mode ->
+            base.copy(id=UUID.randomUUID().toString(),status=status,request=base.request.copy(mode=mode),
+                courierId=worker.toString(),courierAccepted=status.ordinal%2==0,estimatedToMillis=now+86_400_000,
+                estimatedFromMillis=now,shopName="100% Cotton_Набор ӘҒҚҢӨҰҮҺІ ӨҮҢ ҒӢҚӮҲҶ OʻZBEK GʻISHT")
+        } } + base.copy(id=UUID.randomUUID().toString(),status=MarketDeliveryStatus.PREPARING,
+            courierId=worker.toString(),courierAccepted=true,estimatedFromMillis=1000,estimatedToMillis=2000)
+        seeded.forEach { seedDeliveryOrder(c,it) }
+        val all=seeded+base
+        for((view,user) in listOf("buyer" to f.buyer,"seller" to f.owner,"courier" to worker)) {
+            val visible=all.filter { view!="courier" || it.courierId==worker.toString() }
+            for(queue in MarketDeliveryQueue.entries) for(mode in listOf(null,MarketDeliveryMode.EXPRESS,MarketDeliveryMode.PICKUP)) {
+                val filter=MarketDeliveryFilter(queue,mode)
+                val page=deliveryTx(f){r,_->r.page(user,view,f.parent.toString().takeIf { view=="seller" },null,filter)}
+                assertEquals(visible.filter { it.matchesFilter(filter,view,page.checkedAtMillis) }.map { it.id }.toSet(),page.orders.map { it.id }.toSet(),"$view/$filter")
+                assertEquals(filter,page.filter)
+            }
+        }
+        for(search in listOf("  %  ","_","набор","әғқңөұүһі","өүң","ғӣқӯҳҷ","oʻzbek","gʻisht","Public product",base.id.take(12),"%not-a-pattern%","Buyer","123456")) {
+            val filter=MarketDeliveryFilter(search=search)
+            val page=deliveryTx(f){r,_->r.page(f.buyer,"buyer",null,null,filter)}
+            assertEquals(all.filter { it.matchesFilter(filter,"buyer",page.checkedAtMillis) }.map { it.id }.toSet(),page.orders.map { it.id }.toSet(),search)
+            assertEquals(filter.normalized(),page.filter)
+        }
+        assertEquals(400,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.page(f.buyer,"buyer",null,null,MarketDeliveryFilter(search="x".repeat(121)))}}.status)
+    }
+
+    @Test fun revokedCourierJobsAreRemovedBeforePagingInsteadOfHidingAccessibleOlderJobs()=fixture { f,c ->
+        val base=deliveryTx(f){r,_->r.command(f.buyer,deliveryRequest(f,c))}.order
+        val worker=UUID.randomUUID();exec(c,"INSERT INTO users(id,public_id) VALUES ('$worker','90000003')")
+        exec(c,"INSERT INTO store_worker_memberships(user_id,store_id) VALUES ('$worker','${f.parent}')")
+        val visible=base.copy(id=UUID.randomUUID().toString(),courierId=worker.toString(),createdAtMillis=1000,updatedAtMillis=1000)
+        seedDeliveryOrder(c,visible)
+        repeat(45) { seedDeliveryOrder(c,base.copy(id=UUID.randomUUID().toString(),branchStoreId=f.otherParent.toString(),
+            courierId=worker.toString(),createdAtMillis=2000,updatedAtMillis=2000)) }
+        val page=deliveryTx(f){r,_->r.page(worker,"courier",null,null,MarketDeliveryFilter(MarketDeliveryQueue.ACTIVE))}
+        assertEquals(listOf(visible.id),page.orders.map { it.id });assertNull(page.nextBefore)
+        exec(c,"UPDATE stores SET is_active=FALSE WHERE id='${f.management}'")
+        assertTrue(deliveryTx(f){r,_->r.page(worker,"courier",null,null)}.orders.isEmpty())
+        assertEquals(403,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.get(worker,visible.id)}}.status)
+        exec(c,"UPDATE stores SET is_active=TRUE WHERE id='${f.management}'")
+        exec(c,"UPDATE store_worker_memberships SET is_active=FALSE WHERE user_id='$worker'")
+        assertTrue(deliveryTx(f){r,_->r.page(worker,"courier",null,null)}.orders.isEmpty())
+    }
+
+    @Test fun expiredUnconfirmedRequestCanBeRescheduledWithReasonThenConfirmed()=fixture { f,c ->
+        val base=deliveryTx(f){r,_->r.command(f.buyer,deliveryRequest(f,c))}.order.copy(estimatedFromMillis=1000,estimatedToMillis=2000)
+        seedDeliveryOrder(c,base)
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryStep(f,f.owner,base,MarketDeliveryAction.CONFIRM)}.status)
+        val time=System.currentTimeMillis()
+        val delay=MarketDeliveryCommand(UUID.randomUUID().toString(),MarketDeliveryAction.DELAY,base.id,base.revision,
+            note="Shop reopened; new delivery window",estimatedFromMillis=time+60_000,estimatedToMillis=time+120_000)
+        val rescheduled=deliveryTx(f){r,_->r.command(f.owner,delay)}.order
+        assertEquals(MarketDeliveryStatus.REQUESTED,rescheduled.status)
+        assertEquals(delay.note,deliveryTx(f){r,_->r.get(f.buyer,base.id)}.events.last().note)
+        assertEquals(MarketDeliveryStatus.CONFIRMED,deliveryStep(f,f.owner,rescheduled,MarketDeliveryAction.CONFIRM).status)
     }
 }
