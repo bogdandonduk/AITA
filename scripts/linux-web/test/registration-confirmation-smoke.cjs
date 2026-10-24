@@ -26,32 +26,32 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('Renderer crashed'));
  try{
   await page.goto(base);await page.locator('canvas').waitFor({timeout:90000});await page.keyboard.press('Tab');
-  await page.getByRole('button',{name:/^(Создать аккаунт|Create account)$/}).first().click({force:true});
+  await page.getByRole('button',{name:/^(Создать аккаунт|Create account)$/}).first().click({force:true,delay:60});
   await page.getByRole('button',{name:/Перейти к подтверждению email|Continue to email confirmation/}).waitFor({timeout:60000});await page.waitForTimeout(4000);
-  async function enter(loc,text){await loc.click({force:true});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(text);await page.waitForTimeout(150);}
+  async function enter(loc,text){await loc.waitFor({state:'visible',timeout:15000});await loc.click({force:true,delay:60});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(text);await page.waitForTimeout(150);}
   await enter(page.getByRole('textbox',{name:'',exact:true}).nth(1),'7771234567');
   await enter(page.getByRole('textbox',{name:/^Введите адрес email$|^Enter email address$/}),'probe020@example.invalid');
   await enter(page.getByRole('textbox',{name:/^Введите имя$|^Enter first name$/}),'Test');
   await enter(page.getByRole('textbox',{name:/^Введите фамилию$|^Enter last name$/}),'Registration');
   await enter(page.getByRole('textbox',{name:/^Введите пароль$|^Enter password$/}).last(),'Test-Local-020!');
   await enter(page.getByRole('textbox',{name:/^Повторите пароль$|^Repeat password$/}),'Test-Local-020!');
-  await page.getByRole('button',{name:/Перейти к подтверждению email|Continue to email confirmation/}).click({force:true});
+  await page.getByRole('button',{name:/Перейти к подтверждению email|Continue to email confirmation/}).click({force:true,delay:60});
   const send=page.getByRole('button',{name:/^Отправить код подтверждения$|^Send confirmation code$/});
-  await send.waitFor({timeout:15000});assert(await send.isEnabled());await send.click({force:true});
+  await send.waitFor({timeout:15000});assert(await send.isEnabled());await send.click({force:true,delay:60});
   await page.getByRole('textbox',{name:'000000',exact:true}).waitFor();
   await enter(page.getByRole('textbox',{name:'000000',exact:true}),'１２３４５６');
-  const confirm=page.getByRole('button',{name:/^Подтвердить email$|^Confirm email$/});await confirm.click({force:true});
+  const confirm=page.getByRole('button',{name:/^Подтвердить email$|^Confirm email$/});await confirm.click({force:true,delay:60});
   // Actions remain pressable before validation; wait for the actual confirmation result.
   await page.getByText(/Email confirmed|Email подтверждён/).first().waitFor();
-  const create=page.getByRole('button',{name:/^Создать аккаунт$|^Create account$/});await create.waitFor();assert(await create.isEnabled());await create.click({force:true});
+  const create=page.getByRole('button',{name:/^Создать аккаунт$|^Create account$/});await create.waitFor();assert(await create.isEnabled());await create.click({force:true,delay:60});
   await page.waitForTimeout(1000);assert.deepEqual(calls,['/auth/registration/email/request','/auth/registration/email/verify','/auth/signUp']);assert.deepEqual(errors,[]);
   await page.getByRole('button',{name:/^Войти в существующий аккаунт$|^Sign in to existing account$/}).waitFor();
-  await page.getByRole('button',{name:/^Войти в существующий аккаунт$|^Sign in to existing account$/}).click({force:true});
+  await page.getByRole('button',{name:/^Войти в существующий аккаунт$|^Sign in to existing account$/}).click({force:true,delay:60});
   await page.waitForTimeout(500);
   await page.getByRole('textbox',{name:/^Введите адрес email$|^Enter email address$/}).first().waitFor();
-  await page.getByRole('button',{name:/^Забыли пароль\?$|^Forgot password\?$/}).first().click({force:true});
+  await page.getByRole('button',{name:/^Забыли пароль\?$|^Forgot password\?$/}).first().click({force:true,delay:60});
   await page.getByText(/^(Восстановить пароль|Restore password)$/).first().waitFor();
-  await page.getByRole('button',{name:/^Получить код$|^Get code$/}).click({force:true});
+  await page.getByRole('button',{name:/^Получить код$|^Get code$/}).click({force:true,delay:60});
   await page.waitForTimeout(500);
   assert(calls.includes('/auth/password-recovery/request'),'recovery sends the prefilled identifier through the normal recovery endpoint');
   assert.equal(calls.filter(p=>p==='/auth/signUp').length,1,'recovery must not attempt another registration');

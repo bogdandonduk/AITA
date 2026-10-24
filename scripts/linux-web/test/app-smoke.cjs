@@ -27,13 +27,39 @@ async function backgroundPixel(page) {
  await page.route('**/*.wasm*', async route => { await startupGate; await route.fallback(); });
  const errors=[], failed=[], responses=[], emptyUpdateResponses=[];
  const responseStatuses = new WeakMap(), activeRequests = new Set(), reloadRequests = new WeakSet();
+ const requestDocuments = new WeakMap(), completedPublicDocuments = new Set(), publicBodyCancellations = [];
+ let documentNumber = 0, priorPublicGeneration = null;
+ async function verifyPublicCatalogueCommitted() {
+  const worker = page.workers().find(worker => new URL(worker.url()).pathname === '/aita-db-worker.js');
+  assert(worker, 'Browser database worker is available');
+  const saved = await worker.evaluate(async () => {
+   await ready;
+   const key='public-market-home-v1', prefix=`aita-cache-chunks-v1:${key.length}:${key}:`;
+   const get=key=>database.exec('SELECT value FROM key_value WHERE key = ?', [key])[0]?.values[0]?.[0];
+   const manifest=get(prefix+'manifest');
+   if(!manifest)return null;
+   const [format,generation,length,count,checksum]=manifest.split('|');
+   if(format!=='1' || !/^[a-f0-9]{1,64}$/.test(generation) || +count<1 || +count>2048)return null;
+   let raw='';
+   for(let i=0;i<+count;i++){const chunk=get(prefix+generation+':'+i);if(typeof chunk!=='string')return null;raw+=chunk;}
+   let hash=0x811c9dc5;for(let i=0;i<raw.length;i++)hash=Math.imul(hash^raw.charCodeAt(i),0x01000193)>>>0;
+   if(raw.length!==+length || hash.toString(16)!==checksum)return null;
+   const value=JSON.parse(raw);
+   return {generation,publicVersion:value.publicVersion,accountId:value.discovery.accountId,
+    categories:Array.isArray(value.discovery.categories),offers:Array.isArray(value.discovery.page.offers)};
+  });
+  assert(saved && saved.publicVersion===1 && saved.accountId==null && saved.categories && saved.offers,
+   'The app must parse and commit a valid public catalogue');
+  assert.notEqual(saved.generation,priorPublicGeneration,'Reload must commit a fresh response, not reuse stale fallback');
+  priorPublicGeneration=saved.generation;completedPublicDocuments.add(documentNumber);
+ }
  const reloadCancellations=[], pageNavigationCancellations=[], pageNavigationRequests=new WeakSet();
  function markPendingPublicRead() {
   for (const request of activeRequests) {
    if (request.method() === 'POST' && new URL(request.url()).pathname === '/market/public/discovery') pageNavigationRequests.add(request);
   }
  }
- page.on('request', request => activeRequests.add(request));
+ page.on('request', request => {activeRequests.add(request);requestDocuments.set(request,documentNumber);});
  page.on('requestfinished', request => activeRequests.delete(request));
  page.on('response', response => responseStatuses.set(response.request(), response.status()));
  page.on('pageerror', error => errors.push(error.message));
@@ -49,6 +75,12 @@ async function backgroundPixel(page) {
   // requests already pending at our own navigation gesture qualify; never hide
   // an authentication mutation, a timeout, or an unrelated transport failure.
   else if (entry.error === 'net::ERR_ABORTED' && pageNavigationRequests.has(request)) pageNavigationCancellations.push(entry);
+  // Ktor may cancel fetch's body stream after parsing it. Only accept that cleanup
+  // for a 200 public read whose current document independently committed a fresh,
+  // checksum-valid catalogue. Truncation, stale fallback and other errors still fail.
+  else if(entry.error==='net::ERR_ABORTED' && responseStatuses.get(request)===200 &&
+    request.method()==='POST' && entry.path==='/market/public/discovery')
+    publicBodyCancellations.push({...entry,document:requestDocuments.get(request)});
   else failed.push(entry);
   activeRequests.delete(request);
  });
@@ -76,6 +108,7 @@ async function backgroundPixel(page) {
   assert.equal(await page.locator('#aita-startup').count(), 0, 'Startup must disappear when the app starts');
   await page.waitForTimeout(5000);
   await page.waitForLoadState('networkidle');
+  await verifyPublicCatalogueCommitted();
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-wide.png'});
   markPendingPublicRead();
   await page.setViewportSize({width:390,height:844});
@@ -84,10 +117,10 @@ async function backgroundPixel(page) {
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow.png'});
   const lightPixel = await backgroundPixel(page);
   await page.keyboard.press('Tab');
-  await page.getByRole('button', {name: /^(App theme|Тема приложения|Қолданба тақырыбы|Мавзӯи барнома|Колдонмонун темасы|Ilova mavzusi)$/}).click({force:true});
+  await page.getByRole('button', {name: /^(App theme|Тема приложения|Қолданба тақырыбы|Мавзӯи барнома|Колдонмонун темасы|Ilova mavzusi)$/}).click({force:true,delay:60});
   markPendingPublicRead();
-  await page.getByRole('button', {name: /Obsidian Black|Обсидиановый чёрный|Обсидиан қара|Обсидиан кара|Сиёҳи обсидианӣ|Obsidian qora/}).click({force:true});
-  await page.getByRole('button', {name: /^(Close|Cancel|Отменить|Болдырмау|Бекор кардан|Жокко чыгаруу|Bekor qilish)$/}).last().click({force:true});
+  await page.getByRole('button', {name: /Obsidian Black|Обсидиановый чёрный|Обсидиан қара|Обсидиан кара|Сиёҳи обсидианӣ|Obsidian qora/}).click({force:true,delay:60});
+  await page.getByRole('button', {name: /^(Close|Cancel|Отменить|Болдырмау|Бекор кардан|Жокко чыгаруу|Bekor qilish)$/}).last().click({force:true,delay:60});
   await page.waitForTimeout(1000);
   await page.waitForLoadState('networkidle');
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow-theme.png'});
@@ -96,10 +129,12 @@ async function backgroundPixel(page) {
   const before = await page.evaluate(()=>localStorage.getItem('aita.installation_id'));
   // Reload deliberately interrupts requests already belonging to the old document.
   for (const request of activeRequests) reloadRequests.add(request);
+  documentNumber++;
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('canvas').first().waitFor({state:'visible',timeout:60000});
   await page.waitForTimeout(1500);
   await page.waitForLoadState('networkidle');
+  await verifyPublicCatalogueCommitted();
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-narrow-reloaded.png'});
   assert.deepEqual(await backgroundPixel(page), selectedPixel, 'Selected theme must survive page reload');
   const after = await page.evaluate(()=>localStorage.getItem('aita.installation_id'));
@@ -110,7 +145,7 @@ async function backgroundPixel(page) {
   for (const request of activeRequests) {
    if (request.method() === 'POST' && new URL(request.url()).pathname === '/market/public/discovery') pageNavigationRequests.add(request);
   }
-  await page.getByRole('button', {name:/^(Sign in|Log in|Войти|Кіру|Кирүү|Ворид шудан|Kirish)$/}).first().click({force:true});
+  await page.getByRole('button', {name:/^(Sign in|Log in|Войти|Кіру|Кирүү|Ворид шудан|Kirish)$/}).first().click({force:true,delay:60});
   await page.waitForTimeout(800);
   // The guest footer stays at the bottom, outside the scrolling authentication form.
   // A fresh catalogue request proves the click opened Downloads without signing in.
@@ -120,14 +155,14 @@ async function backgroundPixel(page) {
    }
    await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/client-updates/release.json' && response.status() === 200),
-    page.mouse.click(195, 804)
+    page.mouse.click(195, 804, {delay:60})
    ]);
    await page.waitForTimeout(1000);
    await page.waitForLoadState('networkidle');
   }
   await openGuestDownloads();
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-downloads.png'});
-  await page.mouse.click(20, 58);
+  await page.mouse.click(20, 58, {delay:60});
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-back.png'});
   await openGuestDownloads();
@@ -136,15 +171,16 @@ async function backgroundPixel(page) {
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-downloads-wide.png'});
   await page.keyboard.press('Tab');
-  await page.getByRole('button', {name:/^(Download folder|Папка загрузок)$/}).click({force:true});
+  await page.getByRole('button', {name:/^(Download folder|Папка загрузок)$/}).click({force:true,delay:60});
   await page.waitForTimeout(1000);
   await page.screenshot({path:process.env.AITA_ARTIFACTS+'/web-guest-download-folder.png'});
   await Promise.all([
    page.waitForResponse(response => new URL(response.url()).pathname === '/client-updates/release.json' && response.status() === 200),
-   page.mouse.click(20, 58)
+   page.mouse.click(20, 58, {delay:60})
   ]);
   await page.waitForLoadState('networkidle');
-  console.log(JSON.stringify({url:page.url(),canvasCount:await page.locator('canvas').count(),text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,pageNavigationCancellations,responses},null,2));
+  for(const entry of publicBodyCancellations)if(!completedPublicDocuments.has(entry.document))failed.push(entry);
+  console.log(JSON.stringify({publicBodyCancellations,publicDocumentsCommitted:[...completedPublicDocuments],url:page.url(),canvasCount:await page.locator('canvas').count(),text:await page.locator('body').innerText(),errors,failed,emptyUpdateResponses,reloadCancellations,pageNavigationCancellations,responses},null,2));
   if(errors.length || failed.length) process.exitCode=1;
  } catch(error) {
   resumeStartup();

@@ -80,7 +80,7 @@ const reveal=async(locator)=>{for(let i=0;i<12;i++){const b=await locator.boundi
 try {
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(8000);await page.keyboard.press('Tab');
  await button('Menu').click({force:true});await page.waitForTimeout(700);
- await button('Workers').click({force:true});await page.waitForTimeout(1200);
+ const workersTarget=await button('Workers').boundingBox();assert.ok(workersTarget);await page.mouse.click(workersTarget.x+workersTarget.width/2,workersTarget.y+workersTarget.height/2,{delay:60});await page.waitForTimeout(1200);
  fs.writeFileSync(out+'/workers-initial.txt',await page.locator('body').ariaSnapshot());
  if(employee){
   await button('Management warehouse').click({force:true});await page.waitForTimeout(400);
