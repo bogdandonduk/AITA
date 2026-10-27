@@ -21,6 +21,8 @@
   Cache-Control: no-cache
 /aita-recovery.js
   Cache-Control: no-cache
+/aita-browser-compat.js
+  Cache-Control: no-cache
 /downloads.html
   Cache-Control: no-cache
 /downloads.js

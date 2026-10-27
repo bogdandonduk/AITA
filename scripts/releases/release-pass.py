@@ -25,7 +25,7 @@ import urllib.request
 
 def verify_public_web_files(dist, report, announce, attempts=6):
     """Wait for the uploaded release bytes, without a cache-busting URL hiding stale clients."""
-    names = ['index.html', 'composeApp.js', 'aita-recovery.js'] + sorted(p.name for p in dist.glob('*.wasm'))
+    names = ['index.html', 'composeApp.js', 'aita-recovery.js', 'aita-browser-compat.js'] + sorted(p.name for p in dist.glob('*.wasm'))
     checks = []
     for name in names:
         expected = sha(dist / name)

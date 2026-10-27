@@ -6,12 +6,15 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 
 const index = fs.readFileSync(path.resolve(__dirname, '../../../composeApp/src/wasmJsMain/resources/index.html'), 'utf8');
+const compatibility = fs.readFileSync(path.resolve(__dirname, '../../../composeApp/src/wasmJsMain/resources/aita-browser-compat.js'), 'utf8');
 
 test('update reload bypasses a previously cached entry script without changing local data', async () => {
   let version = 1;
   const requested = [];
   const server = http.createServer((req, res) => {
-    if (req.url.startsWith('/composeApp.js')) {
+    if (req.url === '/aita-browser-compat.js') {
+      res.setHeader('Content-Type', 'text/javascript'); res.end(compatibility);
+    } else if (req.url.startsWith('/composeApp.js')) {
       requested.push(req.url);
       res.setHeader('Content-Type', 'text/javascript');
       // Reproduce the old deployment's cache header, still held by returning browsers.
@@ -66,7 +69,9 @@ test('update reload bypasses a previously cached entry script without changing l
 
 test('cleanup waits for app startup and preserves unrelated query bytes and history entries', async () => {
   const server = http.createServer((req, res) => {
-    if (req.url.startsWith('/composeApp.js')) {
+    if (req.url === '/aita-browser-compat.js') {
+      res.setHeader('Content-Type', 'text/javascript'); res.end(compatibility);
+    } else if (req.url.startsWith('/composeApp.js')) {
       res.setHeader('Content-Type', 'text/javascript'); res.end('window.entryLoaded = true;');
     } else if (req.url.endsWith('.js') || req.url.startsWith('/styles.css')) res.end('');
     else { res.setHeader('Content-Type', 'text/html'); res.end(index); }

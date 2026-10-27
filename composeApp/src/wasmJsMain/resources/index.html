@@ -20,6 +20,7 @@
     <noscript>AITA requires JavaScript and WebAssembly support.</noscript>
 </main>
     <script src="aita-recovery.js"></script>
+    <script src="aita-browser-compat.js"></script>
     <script src="aita-page-lifecycle.js"></script>
     <script src="aita-print.js"></script>
     <script>
@@ -38,6 +39,14 @@
                 uz: ['AITA hali yuklanmoqda. Ulanishni tekshiring va kerak boʻlsa qayta urining.', 'AITA ni ochish uchun brauzerni yangilang. Yangi Chrome, Edge, Firefox yoki Safari dan foydalaning.', 'AITA yuklanmadi. Yangi nusxani olish uchun qayta urining. Saqlangan maʼlumotlar qoladi.', 'Qayta urinish', 'AITA ni yuklab olish']
             }[language] || null;
             const words = copy || ['AITA is still loading. Check your connection, then retry if needed.', 'Update your browser to open AITA. Use a current Chrome, Edge, Firefox or Safari.', 'AITA could not finish loading. Retry to fetch a fresh copy. Your saved data will stay.', 'Retry', 'Download AITA'];
+            const graphicsMessage = {
+                en: 'The browser could not start AITA graphics. Update your browser and graphics driver, or use another browser or the AITA app. Your saved data has not been cleared.',
+                ru: 'Браузер не смог запустить графику AITA. Обновите браузер и драйвер видеокарты либо используйте другой браузер или приложение AITA. Сохранённые данные не удалены.',
+                kk: 'Браузер AITA графикасын іске қоса алмады. Браузер мен бейнекарта драйверін жаңартыңыз немесе басқа браузерді не AITA қолданбасын пайдаланыңыз. Сақталған деректер жойылған жоқ.',
+                ky: 'Браузер AITA графикасын иштете алган жок. Браузерди жана видеокартанын драйверин жаңыртыңыз же башка браузерди же AITA колдонмосун колдонуңуз. Сакталган маалымат өчүрүлгөн жок.',
+                tg: 'Браузер графикаи AITA-ро оғоз карда натавонист. Браузер ва драйвери видеокортро нав кунед ё браузери дигар ё барномаи AITA-ро истифода баред. Маълумоти захирашуда нест нашудааст.',
+                uz: 'Brauzer AITA grafikasini ishga tushira olmadi. Brauzer va videokarta drayverini yangilang yoki boshqa brauzer yoxud AITA ilovasidan foydalaning. Saqlangan maʼlumotlar o‘chirilmagan.'
+            };
             let finished = false;
             let timer;
             function showRecovery(message) {
@@ -61,7 +70,10 @@
                 downloads.textContent = words[4]; host.appendChild(downloads);
             }
             function loadingFailed() { showRecovery(words[2]); }
-            // Test features rather than guessing from the browser name or an embedded-browser UA.
+            const compatibility = globalThis.aitaBrowserCompatibility;
+            if (!compatibility) { loadingFailed(); return; }
+            // A known engine crash requires a version guard in addition to feature checks.
+            if (compatibility.needsBrowserUpdate(navigator.userAgent)) { showRecovery(words[1]); return; }
             let compatible = false;
             try {
                 compatible = typeof WebAssembly === 'object' && typeof WebAssembly.Tag === 'function' &&
@@ -69,6 +81,10 @@
                     !!navigator.locks && !!globalThis.crypto?.subtle && typeof indexedDB !== 'undefined';
             } catch (_) {}
             if (!compatible) { showRecovery(words[1]); return; }
+            // New Chrome versions no longer silently fall back to software WebGL on
+            // machines without a working graphics driver. Explain this before Skiko
+            // can fail asynchronously and leave an empty canvas over the splash.
+            if (!compatibility.hasGraphics(document)) { showRecovery(graphicsMessage[language] || graphicsMessage.en); return; }
             if (globalThis.aitaRecovery?.blocked) { showRecovery(words[2]); return; }
             globalThis.aitaRecovery?.begin();
             window.addEventListener('error', loadingFailed);

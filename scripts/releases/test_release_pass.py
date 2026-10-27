@@ -31,13 +31,13 @@ class ReleasePassTests(unittest.TestCase):
             return value
         with TemporaryDirectory() as folder:
             root = Path(folder)
-            for name in ('index.html', 'composeApp.js', 'aita-recovery.js', 'app.wasm'):
+            for name in ('index.html', 'composeApp.js', 'aita-recovery.js', 'aita-browser-compat.js', 'app.wasm'):
                 (root / name).write_bytes(b'correct')
-            answers = [response(b'old'), response(b'correct'), response(b'correct'), response(b'correct'),
+            answers = [response(b'old'), response(b'correct'), response(b'correct'), response(b'correct'), response(b'correct'),
                        response(b'correct', 'text/plain'), response(b'correct', 'application/wasm')]
             with patch.object(release.urllib.request, 'urlopen', side_effect=answers), patch.object(release.time, 'sleep') as sleep:
                 checks = release.verify_public_web_files(root, root / 'proof.json', Mock())
-                self.assertEqual(4, len(checks)); self.assertEqual(2, sleep.call_count)
+                self.assertEqual(5, len(checks)); self.assertEqual(2, sleep.call_count)
             for value in (response(b'wrong'), response(b'correct', 'text/plain')):
                 with patch.object(release.urllib.request, 'urlopen', return_value=value), patch.object(release.time, 'sleep'):
                     with self.assertRaises(RuntimeError): release.verify_public_web_files(root, root / 'proof.json', Mock(), attempts=2)
