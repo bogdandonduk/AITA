@@ -14,7 +14,13 @@
     function hasGraphics(document) {
         let context;
         try {
-            context = document.createElement('canvas').getContext('webgl2');
+            // Match Skiko's context. The default browser probe requests MSAA,
+            // which can fail on devices where the actual non-MSAA renderer works.
+            context = document.createElement('canvas').getContext('webgl2', {
+                alpha: true, depth: true, stencil: true, antialias: false,
+                premultipliedAlpha: true, preserveDrawingBuffer: false,
+                failIfMajorPerformanceCaveat: false
+            });
             return !!context && !context.isContextLost();
         } catch (_) {
             return false;
@@ -25,5 +31,20 @@
         }
     }
 
-    globalThis.aitaBrowserCompatibility = Object.freeze({needsBrowserUpdate, hasGraphics});
+    function startupIssue(environment) {
+        const {navigator, document} = environment;
+        if (needsBrowserUpdate(navigator?.userAgent)) return 'engine';
+        if (!environment.isSecureContext) return 'secure';
+        try {
+            const wasm = environment.WebAssembly;
+            if (typeof wasm !== 'object' || typeof wasm.Tag !== 'function' ||
+                !wasm.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,3,1,95,0]))) return 'wasm';
+        } catch (_) { return 'wasm'; }
+        try {
+            if (!navigator?.locks || !environment.crypto?.subtle || !environment.indexedDB) return 'storage';
+        } catch (_) { return 'storage'; }
+        return hasGraphics(document) ? null : 'graphics';
+    }
+
+    globalThis.aitaBrowserCompatibility = Object.freeze({needsBrowserUpdate, hasGraphics, startupIssue});
 })();

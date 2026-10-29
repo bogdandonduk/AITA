@@ -31,21 +31,57 @@
         (() => {
             const language = (navigator.language || 'en').split('-')[0];
             const copy = {
-                en: ['AITA is still loading. Check your connection, then retry if needed.', 'This browser needs an update to open AITA. Use a current Chrome, Edge, Firefox or Safari.', 'AITA could not finish loading. Retry to fetch a fresh app copy. Your saved data will stay.', 'Retry', 'Download AITA'],
-                ru: ['AITA ещё загружается. Проверьте соединение; при необходимости повторите.', 'Обновите браузер для открытия AITA. Используйте актуальный Chrome, Edge, Firefox или Safari.', 'Не удалось загрузить AITA. Повторите, чтобы получить свежую версию. Сохранённые данные останутся.', 'Повторить', 'Скачать AITA'],
-                kk: ['AITA әлі жүктелуде. Байланысты тексеріп, қажет болса қайталаңыз.', 'AITA ашу үшін браузерді жаңартыңыз. Жаңа Chrome, Edge, Firefox немесе Safari қолданыңыз.', 'AITA жүктелмеді. Жаңа нұсқаны алу үшін қайталаңыз. Сақталған деректер қалады.', 'Қайталау', 'AITA жүктеу'],
-                ky: ['AITA жүктөлүп жатат. Байланышты текшерип, керек болсо кайталаңыз.', 'AITA ачуу үчүн браузерди жаңыртыңыз. Жаңы Chrome, Edge, Firefox же Safari колдонуңуз.', 'AITA жүктөлгөн жок. Жаңы нуска үчүн кайталаңыз. Сакталган маалымат калат.', 'Кайталоо', 'AITA жүктөө'],
-                tg: ['AITA ҳанӯз бор шуда истодааст. Пайвастшавиро санҷида, агар лозим бошад такрор кунед.', 'Барои кушодани AITA браузерро нав кунед. Chrome, Edge, Firefox ё Safari-и навро истифода баред.', 'AITA бор нашуд. Барои нусхаи нав такрор кунед. Маълумоти сабтшуда боқӣ мемонад.', 'Такрор', 'Боргирии AITA'],
-                uz: ['AITA hali yuklanmoqda. Ulanishni tekshiring va kerak boʻlsa qayta urining.', 'AITA ni ochish uchun brauzerni yangilang. Yangi Chrome, Edge, Firefox yoki Safari dan foydalaning.', 'AITA yuklanmadi. Yangi nusxani olish uchun qayta urining. Saqlangan maʼlumotlar qoladi.', 'Qayta urinish', 'AITA ni yuklab olish']
+                en: ['AITA is still loading. Check your connection, then retry if needed.', 'AITA could not finish loading. Retry to fetch a fresh app copy. Your saved data will stay.', 'Retry', 'Download AITA'],
+                ru: ['AITA ещё загружается. Проверьте соединение; при необходимости повторите.', 'Не удалось загрузить AITA. Повторите, чтобы получить свежую версию. Сохранённые данные останутся.', 'Повторить', 'Скачать AITA'],
+                kk: ['AITA әлі жүктелуде. Байланысты тексеріп, қажет болса қайталаңыз.', 'AITA жүктелмеді. Жаңа нұсқаны алу үшін қайталаңыз. Сақталған деректер қалады.', 'Қайталау', 'AITA жүктеу'],
+                ky: ['AITA жүктөлүп жатат. Байланышты текшерип, керек болсо кайталаңыз.', 'AITA жүктөлгөн жок. Жаңы нуска үчүн кайталаңыз. Сакталган маалымат калат.', 'Кайталоо', 'AITA жүктөө'],
+                tg: ['AITA ҳанӯз бор шуда истодааст. Пайвастшавиро санҷида, агар лозим бошад такрор кунед.', 'AITA бор нашуд. Барои нусхаи нав такрор кунед. Маълумоти сабтшуда боқӣ мемонад.', 'Такрор', 'Боргирии AITA'],
+                uz: ['AITA hali yuklanmoqda. Ulanishni tekshiring va kerak boʻlsa qayta urining.', 'AITA yuklanmadi. Yangi nusxani olish uchun qayta urining. Saqlangan maʼlumotlar qoladi.', 'Qayta urinish', 'AITA ni yuklab olish']
             }[language] || null;
-            const words = copy || ['AITA is still loading. Check your connection, then retry if needed.', 'Update your browser to open AITA. Use a current Chrome, Edge, Firefox or Safari.', 'AITA could not finish loading. Retry to fetch a fresh copy. Your saved data will stay.', 'Retry', 'Download AITA'];
-            const graphicsMessage = {
-                en: 'The browser could not start AITA graphics. Update your browser and graphics driver, or use another browser or the AITA app. Your saved data has not been cleared.',
-                ru: 'Браузер не смог запустить графику AITA. Обновите браузер и драйвер видеокарты либо используйте другой браузер или приложение AITA. Сохранённые данные не удалены.',
-                kk: 'Браузер AITA графикасын іске қоса алмады. Браузер мен бейнекарта драйверін жаңартыңыз немесе басқа браузерді не AITA қолданбасын пайдаланыңыз. Сақталған деректер жойылған жоқ.',
-                ky: 'Браузер AITA графикасын иштете алган жок. Браузерди жана видеокартанын драйверин жаңыртыңыз же башка браузерди же AITA колдонмосун колдонуңуз. Сакталган маалымат өчүрүлгөн жок.',
-                tg: 'Браузер графикаи AITA-ро оғоз карда натавонист. Браузер ва драйвери видеокортро нав кунед ё браузери дигар ё барномаи AITA-ро истифода баред. Маълумоти захирашуда нест нашудааст.',
-                uz: 'Brauzer AITA grafikasini ishga tushira olmadi. Brauzer va videokarta drayverini yangilang yoki boshqa brauzer yoxud AITA ilovasidan foydalaning. Saqlangan maʼlumotlar o‘chirilmagan.'
+            const words = copy || ['AITA is still loading. Check your connection, then retry if needed.', 'AITA could not finish loading. Retry to fetch a fresh copy. Your saved data will stay.', 'Retry', 'Download AITA'];
+            const startupMessages = {
+                en: {
+                    engine: 'AITA needs Chrome / Edge 123 or later to avoid a browser startup crash. The newest version is not required. You can also use another compatible browser.',
+                    wasm: 'This browser is missing WebAssembly features needed by AITA. Use Chrome / Edge 123+, Firefox 120+ or Safari 18.2+.',
+                    secure: 'Open AITA at https://aita.kz so the browser can safely access your saved data.',
+                    storage: 'AITA could not access browser storage. Allow this site to save data in browser settings, then retry. Your saved data has not been cleared.',
+                    graphics: 'Your browser version is supported, but WebGL 2 graphics are unavailable. Check browser hardware acceleration and the graphics driver, then restart the browser. You can also use another browser or the AITA app. Your saved data has not been cleared.'
+                },
+                ru: {
+                    engine: 'Для AITA нужен Chrome / Edge 123 или новее: в старых версиях возможен сбой при запуске. Самая новая версия не обязательна. Можно использовать другой совместимый браузер.',
+                    wasm: 'В браузере нет функций WebAssembly, необходимых AITA. Подойдут Chrome / Edge 123+, Firefox 120+ или Safari 18.2+.',
+                    secure: 'Откройте AITA по адресу https://aita.kz, чтобы браузер мог безопасно работать с сохранёнными данными.',
+                    storage: 'AITA не получила доступ к хранилищу браузера. Разрешите этому сайту сохранять данные в настройках браузера и повторите. Сохранённые данные не удалены.',
+                    graphics: 'Версия браузера подходит, но графика WebGL 2 недоступна. Проверьте аппаратное ускорение в браузере и драйвер видеокарты, затем перезапустите браузер. Можно использовать другой браузер или приложение AITA. Сохранённые данные не удалены.'
+                },
+                kk: {
+                    engine: 'Іске қосылу қатесін болдырмау үшін AITA-ға Chrome / Edge 123 немесе одан жаңа нұсқа қажет. Ең соңғы нұсқа міндетті емес. Басқа үйлесімді браузерді де пайдалануға болады.',
+                    wasm: 'Браузерде AITA-ға қажетті WebAssembly мүмкіндіктері жоқ. Chrome / Edge 123+, Firefox 120+ немесе Safari 18.2+ қолданыңыз.',
+                    secure: 'Браузер сақталған деректермен қауіпсіз жұмыс істеуі үшін AITA-ны https://aita.kz мекенжайынан ашыңыз.',
+                    storage: 'AITA браузер қоймасына қол жеткізе алмады. Браузер баптауларында осы сайтқа деректерді сақтауға рұқсат беріп, қайталаңыз. Сақталған деректер жойылған жоқ.',
+                    graphics: 'Браузер нұсқасы жарамды, бірақ WebGL 2 графикасы қолжетімсіз. Браузердің аппараттық жеделдетуін және бейнекарта драйверін тексеріп, браузерді қайта іске қосыңыз. Басқа браузерді не AITA қолданбасын пайдалануға болады. Сақталған деректер жойылған жоқ.'
+                },
+                ky: {
+                    engine: 'Ишке кирүүдө ката болбошу үчүн AITA-га Chrome / Edge 123 же андан жаңы нуска керек. Эң акыркы нуска милдеттүү эмес. Башка шайкеш браузерди да колдонсоңуз болот.',
+                    wasm: 'Браузерде AITA-га керектүү WebAssembly мүмкүнчүлүктөрү жок. Chrome / Edge 123+, Firefox 120+ же Safari 18.2+ колдонуңуз.',
+                    secure: 'Браузер сакталган маалымат менен коопсуз иштеши үчүн AITA-ны https://aita.kz дарегинен ачыңыз.',
+                    storage: 'AITA браузердин сактагычына кире алган жок. Браузердин жөндөөлөрүндө бул сайтка маалымат сактоого уруксат берип, кайталаңыз. Сакталган маалымат өчүрүлгөн жок.',
+                    graphics: 'Браузердин нускасы жарайт, бирок WebGL 2 графикасы жеткиликсиз. Браузердин аппараттык ылдамдатуусун жана видеокартанын драйверин текшерип, браузерди кайра иштетиңиз. Башка браузерди же AITA колдонмосун колдонсоңуз болот. Сакталган маалымат өчүрүлгөн жок.'
+                },
+                tg: {
+                    engine: 'Барои пешгирии хатои оғоз AITA ба Chrome / Edge 123 ё навтар ниёз дорад. Насби навтарин нусха ҳатмӣ нест. Браузери дигари мувофиқро низ истифода бурдан мумкин аст.',
+                    wasm: 'Дар браузер имкониятҳои WebAssembly-и зарурӣ барои AITA нестанд. Chrome / Edge 123+, Firefox 120+ ё Safari 18.2+-ро истифода баред.',
+                    secure: 'AITA-ро аз https://aita.kz кушоед, то браузер бо маълумоти захирашуда бехатар кор кунад.',
+                    storage: 'AITA ба анбори браузер дастрасӣ надорад. Дар танзимоти браузер ба ин сомона иҷозаи захираи маълумот диҳед ва такрор кунед. Маълумоти захирашуда нест нашудааст.',
+                    graphics: 'Нусхаи браузер мувофиқ аст, вале графикаи WebGL 2 дастрас нест. Шитоби сахтафзории браузер ва драйвери видеокортро санҷида, браузерро аз нав оғоз кунед. Браузери дигар ё барномаи AITA-ро низ истифода бурдан мумкин аст. Маълумоти захирашуда нест нашудааст.'
+                },
+                uz: {
+                    engine: 'Ishga tushishdagi xatoni oldini olish uchun AITA ga Chrome / Edge 123 yoki undan yangi versiya kerak. Eng so‘nggi versiya majburiy emas. Boshqa mos brauzerdan ham foydalanishingiz mumkin.',
+                    wasm: 'Brauzerda AITA uchun zarur WebAssembly imkoniyatlari yo‘q. Chrome / Edge 123+, Firefox 120+ yoki Safari 18.2+ dan foydalaning.',
+                    secure: 'Brauzer saqlangan maʼlumotlar bilan xavfsiz ishlashi uchun AITA ni https://aita.kz manzilidan oching.',
+                    storage: 'AITA brauzer xotirasiga kira olmadi. Brauzer sozlamalarida bu saytga maʼlumotlarni saqlashga ruxsat bering va qayta urining. Saqlangan maʼlumotlar o‘chirilmagan.',
+                    graphics: 'Brauzer versiyasi mos, lekin WebGL 2 grafikasi mavjud emas. Brauzerning apparat tezlashtirishini va videokarta drayverini tekshirib, brauzerni qayta ishga tushiring. Boshqa brauzer yoki AITA ilovasidan ham foydalanishingiz mumkin. Saqlangan maʼlumotlar o‘chirilmagan.'
+                }
             };
             let finished = false;
             let timer;
@@ -56,7 +92,7 @@
                 document.getElementById('aita-startup-message').textContent = message;
                 if (document.getElementById('aita-startup-retry')) return;
                 const retry = document.createElement('button');
-                retry.id = 'aita-startup-retry'; retry.textContent = words[3];
+                retry.id = 'aita-startup-retry'; retry.textContent = words[2];
                 retry.onclick = () => {
                     retry.disabled = true;
                     globalThis.aitaRecovery?.retry();
@@ -67,25 +103,20 @@
                 host.appendChild(retry);
                 const downloads = document.createElement('a');
                 downloads.href = 'downloads.html';
-                downloads.textContent = words[4]; host.appendChild(downloads);
+                downloads.textContent = words[3]; host.appendChild(downloads);
             }
-            function loadingFailed() { showRecovery(words[2]); }
+            function loadingFailed() { showRecovery(words[1]); }
             const compatibility = globalThis.aitaBrowserCompatibility;
             if (!compatibility) { loadingFailed(); return; }
-            // A known engine crash requires a version guard in addition to feature checks.
-            if (compatibility.needsBrowserUpdate(navigator.userAgent)) { showRecovery(words[1]); return; }
-            let compatible = false;
-            try {
-                compatible = typeof WebAssembly === 'object' && typeof WebAssembly.Tag === 'function' &&
-                    WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,3,1,95,0])) &&
-                    !!navigator.locks && !!globalThis.crypto?.subtle && typeof indexedDB !== 'undefined';
-            } catch (_) {}
-            if (!compatible) { showRecovery(words[1]); return; }
-            // New Chrome versions no longer silently fall back to software WebGL on
-            // machines without a working graphics driver. Explain this before Skiko
-            // can fail asynchronously and leave an empty canvas over the splash.
-            if (!compatibility.hasGraphics(document)) { showRecovery(graphicsMessage[language] || graphicsMessage.en); return; }
-            if (globalThis.aitaRecovery?.blocked) { showRecovery(words[2]); return; }
+            // Report the missing capability, not a blanket request for the newest browser.
+            // A known V8 crash still needs a minimum-version guard before running Wasm.
+            if (typeof compatibility.startupIssue !== 'function') { loadingFailed(); return; }
+            const issue = compatibility.startupIssue(globalThis);
+            if (issue) {
+                showRecovery((startupMessages[language] || startupMessages.en)[issue]);
+                return;
+            }
+            if (globalThis.aitaRecovery?.blocked) { showRecovery(words[1]); return; }
             globalThis.aitaRecovery?.begin();
             window.addEventListener('error', loadingFailed);
             window.addEventListener('unhandledrejection', loadingFailed);
@@ -111,7 +142,7 @@
                 try { localStorage.setItem(storageKey, JSON.stringify(refresh)); } catch (_) {}
             }
             globalThis.aitaWebEntry = Object.freeze({
-                failed(message) { clearTimeout(timer); showRecovery(message || words[2]); },
+                failed(message) { clearTimeout(timer); showRecovery(message || words[1]); },
                 ready() {
                     finished = true; clearTimeout(timer);
                     globalThis.aitaRecovery?.ready();

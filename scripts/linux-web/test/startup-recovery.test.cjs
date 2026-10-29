@@ -37,7 +37,7 @@ test('unsupported Wasm receives a browser explanation and a usable native downlo
   const context = await browser.newContext({locale:'ru-RU'});
   await context.addInitScript(() => { WebAssembly.validate = () => false; });
   const page = await context.newPage(); await page.goto(origin);
-  assert.match(await page.locator('#aita-startup-message').textContent(), /Обновите браузер/);
+  assert.match(await page.locator('#aita-startup-message').textContent(), /WebAssembly/);
   assert.equal(await page.locator('#aita-startup a').getAttribute('href'), 'downloads.html');
   assert.equal(await page.evaluate(() => window.aitaWebEntry), undefined);
 }));
@@ -48,7 +48,7 @@ test('Chrome 122 never starts Wasm or touches account/cart storage, even after r
   page.on('request', request => { if (request.url().includes('/composeApp.js')) appRequests++; });
   await page.goto(origin);
   await page.evaluate(() => { localStorage.setItem('unsent-test-cart', 'keep'); localStorage.setItem('account-test', 'keep'); });
-  assert.match(await page.locator('#aita-startup-message').textContent(), /Обновите браузер/);
+  assert.match(await page.locator('#aita-startup-message').textContent(), /Самая новая версия не обязательна/);
   await page.locator('#aita-startup-retry').click();
   await page.waitForURL(/_aita_refresh=/);
   await page.locator('#aita-startup-retry').waitFor();
@@ -64,6 +64,39 @@ test('unavailable WebGL has an immediate localized explanation instead of a blan
   page.on('request', request => { if (request.url().includes('/composeApp.js')) appRequests++; });
   await page.goto(origin);
   assert.match(await page.locator('#aita-startup-message').textContent(), /драйвер видеокарты/);
+  assert.match(await page.locator('#aita-startup-message').textContent(), /Версия браузера подходит/);
   assert.equal(appRequests, 0);
   assert.equal(await page.locator('#aita-startup a').getAttribute('href'), 'downloads.html');
+}));
+
+test('Chrome 123 starts normally and does not require the latest Chrome', async () => fixture(async (browser, origin) => {
+  const context = await browser.newContext({userAgent: 'Mozilla/5.0 Chrome/123.0.6312.122 Safari/537.36'});
+  const page = await context.newPage();
+  await page.goto(origin + '/?_aita_refresh=123');
+  await page.waitForFunction(() => window.appReady);
+  assert.equal(await page.locator('#aita-startup-retry').count(), 0);
+}));
+
+test('blocked storage explains the capability failure without asking for a browser update', async () => fixture(async (browser, origin) => {
+  const context = await browser.newContext({locale: 'ru-RU'});
+  await context.addInitScript(() => Object.defineProperty(window, 'indexedDB', {get() { throw new DOMException('Blocked', 'SecurityError'); }}));
+  const page = await context.newPage();
+  let appRequests = 0;
+  page.on('request', request => { if (request.url().includes('/composeApp.js')) appRequests++; });
+  await page.goto(origin);
+  const message = await page.locator('#aita-startup-message').textContent();
+  assert.match(message, /хранилищу браузера/);
+  assert.doesNotMatch(message, /Обновите браузер/);
+  assert.equal(appRequests, 0);
+}));
+
+test('all supported UI languages distinguish a graphics failure from a browser update', async () => fixture(async (browser, origin) => {
+  const expected = {en: /version is supported/, ru: /Версия браузера подходит/, kk: /нұсқасы жарамды/, ky: /нускасы жарайт/, tg: /Нусхаи браузер мувофиқ/, uz: /versiyasi mos/};
+  for (const [locale, pattern] of Object.entries(expected)) {
+    const context = await browser.newContext({locale});
+    await context.addInitScript(() => { HTMLCanvasElement.prototype.getContext = () => null; });
+    const page = await context.newPage(); await page.goto(origin);
+    assert.match(await page.locator('#aita-startup-message').textContent(), pattern);
+    await context.close();
+  }
 }));
