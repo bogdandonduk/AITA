@@ -26,8 +26,6 @@ done
 readonly local_only
 aita_load_env "$env_file"
 aita_validate_production_env
-aita_require_command pg_dump
-aita_require_command pg_restore
 aita_require_command flock
 
 auto_backup_dir="${AITA_BACKUP_DIR:-/srv/aita/backups}"
@@ -59,8 +57,9 @@ trap 'exit 129' HUP
 
 export PGPASSWORD="$DB_PASS"
 export PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-10}"
+aita_select_postgres_backup_clients
 aita_info "Creating a consistent PostgreSQL snapshot. Normal app reads/writes may continue."
-pg_dump \
+"$AITA_PG_DUMP" \
   --host "$AITA_PARSED_DB_HOST" \
   --port "$AITA_PARSED_DB_PORT" \
   --username "$DB_USER" \
@@ -72,7 +71,7 @@ pg_dump \
   --no-privileges \
   --file "$plain_tmp"
 
-pg_restore --list "$plain_tmp" >/dev/null
+"$AITA_PG_RESTORE" --list "$plain_tmp" >/dev/null
 [[ -s "$plain_tmp" ]] || aita_die "PostgreSQL produced an empty backup"
 
 recipient="${AITA_BACKUP_AGE_RECIPIENT-}"

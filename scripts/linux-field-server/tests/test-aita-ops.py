@@ -633,7 +633,13 @@ BACKUP_DOUBLE = r'''import os, pathlib, sys
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 mode = os.environ.get('FIXTURE_MODE', '')
-if name == 'pg_dump':
+if name in ('pg_dump', 'pg_restore') and args == ['--version']:
+    version = '18.1' if mode == 'wrong-restore-major' and name == 'pg_restore' else '16.15'
+    print(name + ' (PostgreSQL) ' + version)
+elif name == 'psql':
+    if mode == 'server-version-fails': raise SystemExit(1)
+    print('unknown' if mode == 'invalid-server-version' else '160015')
+elif name == 'pg_dump':
     if mode == 'dump-fails': raise SystemExit(1)
     pathlib.Path(args[args.index('--file') + 1]).write_bytes(b'PGDMP fixture data')
 elif name == 'pg_restore':
@@ -653,7 +659,7 @@ class BackupShellTests(TempCase):
         super().setUp()
         self.bin = self.base / "bin"
         self.bin.mkdir()
-        for name in ("pg_dump", "pg_restore", "age", "rclone"):
+        for name in ("pg_dump", "pg_restore", "psql", "age", "rclone"):
             path = self.bin / name
             path.write_text(f"#!{sys.executable}\n" + BACKUP_DOUBLE)
             path.chmod(0o755)
@@ -665,6 +671,7 @@ class BackupShellTests(TempCase):
             "AITA_BACKUP_DIR=" + str(self.base / "backups"),
             "AITA_BACKUP_LOCK_FILE=" + str(self.base / "backup.lock"),
             "AITA_BACKUP_LOCK_WAIT_SECONDS=0",
+            "AITA_PG_CLIENT_BIN=" + str(self.bin),
             "AITA_BACKUP_RCLONE_CONFIG=" + str(self.base / "service-rclone.conf"),
         ]) + "\n").encode())
 
@@ -726,13 +733,27 @@ class BackupShellTests(TempCase):
     def test_local_backup_failures_preserve_previous_snapshot(self):
         old = self.file("backups/aita_latest.dump.age", b"age-encryption.org/v1\nprevious backup")
         before = old.read_bytes()
-        for mode in ("dump-fails", "invalid-dump", "age-fails"):
+        for mode in ("dump-fails", "invalid-dump", "age-fails", "wrong-restore-major",
+                     "server-version-fails", "invalid-server-version"):
             with self.subTest(mode=mode):
                 result = self.run_backup(mode=mode, remote="gdrive:fixture", local_only=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(old.read_bytes(), before)
                 self.assertFalse((self.base / "events").exists())
                 self.assertFalse(list((self.base / "backups/.tmp").iterdir()))
+
+    def test_client_pair_must_match_the_live_server(self):
+        result = self.run_backup(mode="wrong-restore-major", local_only=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("pg_restore must match PostgreSQL server major 16", result.stderr)
+        self.assertFalse((self.base / "backups/aita_latest.dump.age").exists())
+
+    def test_missing_matching_client_never_publishes_backup(self):
+        (self.bin / "pg_restore").unlink()
+        result = self.run_backup(local_only=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("pg_restore is missing", result.stderr)
+        self.assertFalse((self.base / "backups/aita_latest.dump.age").exists())
 
     def test_local_flag_still_honors_shared_backup_lock(self):
         with ops.file_lock(self.base / "backup.lock"):

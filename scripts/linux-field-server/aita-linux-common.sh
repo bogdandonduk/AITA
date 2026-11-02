@@ -125,6 +125,44 @@ aita_parse_jdbc_url() {
   fi
 }
 
+# Debian's pg_wrapper can choose the newest pg_dump for an explicit host, but an
+# older pg_restore for a local archive. Pin both real binaries to the live server
+# major before creating a backup; a successful dump alone is not a usable backup.
+aita_select_postgres_backup_clients() {
+  aita_require_command psql
+  local server_version major client_dir tool description binary
+  server_version="$(psql -X -w -qAt --host "$AITA_PARSED_DB_HOST" \
+    --port "$AITA_PARSED_DB_PORT" --username "$DB_USER" \
+    --dbname "$AITA_PARSED_DB_NAME" -c 'SHOW server_version_num')" \
+    || aita_die "Cannot determine the PostgreSQL server version; no backup was published"
+  [[ "$server_version" =~ ^[1-9][0-9]{5}$ ]] \
+    || aita_die "Unsupported PostgreSQL server version; no backup was published"
+  major=$((10#$server_version / 10000))
+  client_dir="${AITA_PG_CLIENT_BIN:-}"
+  if [[ -z "$client_dir" && -d "/usr/lib/postgresql/$major/bin" ]]; then
+    client_dir="/usr/lib/postgresql/$major/bin"
+  fi
+  for tool in pg_dump pg_restore; do
+    if [[ -n "$client_dir" ]]; then
+      [[ "$client_dir" == /* ]] || aita_die "AITA_PG_CLIENT_BIN must be an absolute directory"
+      binary="$client_dir/$tool"
+    else
+      binary="$(command -v "$tool" || true)"
+    fi
+    [[ -n "$binary" && -x "$binary" ]] \
+      || aita_die "Install PostgreSQL $major client tools or configure AITA_PG_CLIENT_BIN; $tool is missing"
+    [[ "$(basename "$(readlink -f "$binary")")" != pg_wrapper ]] \
+      || aita_die "Use real PostgreSQL $major client binaries, not pg_wrapper; configure AITA_PG_CLIENT_BIN"
+    description="$("$binary" --version)" || aita_die "Cannot inspect $tool version"
+    [[ "$description" =~ \(PostgreSQL\)[[:space:]]+([0-9]+)\. ]] \
+      || aita_die "Cannot identify $tool PostgreSQL version"
+    [[ "${BASH_REMATCH[1]}" == "$major" ]] \
+      || aita_die "$tool must match PostgreSQL server major $major; no backup was published"
+    if [[ "$tool" == pg_dump ]]; then AITA_PG_DUMP="$binary"; else AITA_PG_RESTORE="$binary"; fi
+  done
+  aita_info "Using PostgreSQL $major dump and restore tools for the PostgreSQL $major server."
+}
+
 aita_curl_status() {
   local url="${1:?URL is required}"
   local timeout="${2:-10}"
