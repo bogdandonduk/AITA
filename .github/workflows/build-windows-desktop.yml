@@ -19,6 +19,9 @@ on:
   push:
     tags:
       - "v*"
+      # Version/build releases already have verified EXE/MSI artifacts from
+      # build-windows-release.yml. Do not launch this legacy numeric-tag build.
+      - "!v*-b*"
 
 permissions:
   contents: read

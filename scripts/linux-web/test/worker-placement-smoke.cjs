@@ -76,7 +76,7 @@ const physicalNav=async label=>{await page.mouse.click(scene==='parent'?(label==
 const clickText=async label=>{const target=page.getByText(label,{exact:true});await target.first().waitFor({timeout:15000});await target.first().click({force:true});await page.waitForTimeout(650);};
 const tab=async pattern=>{await page.getByRole('button').filter({hasText:pattern}).click({force:true});await page.waitForTimeout(600);};
 const until=async(check,label)=>{for(let i=0;i<60&&!check();i++)await page.waitForTimeout(250);assert.ok(check(),label);};
-const reveal=async(locator)=>{for(let i=0;i<12;i++){const b=await locator.boundingBox().catch(()=>null);if(b && b.y>350 && b.y+b.height<965)return;await page.mouse.move(1100,700);await page.mouse.wheel(0,b&&b.y<350?-250:250);await page.waitForTimeout(350);}throw Error('Control did not become visible');};
+const reveal=async(locator)=>{for(let i=0;i<12;i++){const b=await locator.boundingBox().catch(()=>null);const measurable=b&&b.width>0&&b.height>0;if(measurable && b.y>350 && b.y+b.height<965)return;await page.mouse.move(1100,700);await page.mouse.wheel(0,measurable&&b.y<350?-250:250);await page.waitForTimeout(350);}throw Error('Control did not become visible');};
 try {
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(8000);await page.keyboard.press('Tab');
  await button('Menu').click({force:true});await page.waitForTimeout(700);

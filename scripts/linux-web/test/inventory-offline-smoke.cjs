@@ -89,7 +89,7 @@ try {
  await page.getByText(/Stock changes waiting to sync: 1/).first().waitFor({timeout:60000});
  await shot('offline-item');assert.equal(addedItems.length,0);
  await typeIn(page.getByRole('textbox',{name:'Search by any data',exact:true}).first(),'Offline toy');await page.waitForTimeout(1000);
- const offlineItem=page.getByRole('button',{name:/^Offline toy Barcode:/});
+ const offlineItem=page.getByRole('button',{name:/^Offline toy .*Barcode: 2618000001248 /});
  await offlineItem.getByRole('button',{name:'Add batch',exact:true}).click({force:true});await page.waitForTimeout(900);
  await typeIn(page.getByRole('textbox',{name:'Quantity',exact:true}),'5');
  await button('Confirm').click({force:true});await page.waitForTimeout(1500);
