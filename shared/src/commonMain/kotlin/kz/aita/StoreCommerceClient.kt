@@ -148,9 +148,11 @@ object StoreCommerceClient {
         start();val owner=inventoryOwners.current
         if(!buyer.valid()) return ResponseDataModel(commerceMessage("bad_buyer"),null,true)
         if(!inventoryOwnerIsCurrent(owner) || owner.storeId!=buyer.storeId || !canManageStoreBuyers(owner.storeId)) return ResponseDataModel(commerceMessage("denied"),null,true)
-        val id=newDiagnosticId();val write=BuyerWrite(id,buyer)
+        val now=getCurrentTimeMillis()
+        val datedBuyer=buyer.copy(createdAtMillis=buyer.createdAtMillis.takeIf {it>0} ?: if(buyer.revision==0L) now else 0L,updatedAtMillis=maxOf(now,buyer.updatedAtMillis+1))
+        val id=newDiagnosticId();val write=BuyerWrite(id,datedBuyer)
         val result=submit(owner,PendingStoreCommerce(id,buyer.storeId,buyer=write))
-        return ResponseDataModel(result.message,result.payload?.acceptedBuyer ?: buyer.takeUnless {result.negative},result.negative,result.httpStatusCode,result.transportFailure)
+        return ResponseDataModel(result.message,result.payload?.acceptedBuyer ?: datedBuyer.takeUnless {result.negative},result.negative,result.httpStatusCode,result.transportFailure)
     }
     suspend fun writeOff(batch:GoodsBatchDataModel,quantity:Double,reason:WriteOffReason,note:String):ResponseDataModel<StockWriteOffResult> {
         start();val owner=inventoryOwners.current

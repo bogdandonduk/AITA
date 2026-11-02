@@ -1413,11 +1413,13 @@ internal fun AppConfiguration.WorkerMembershipCard(
             )
         }
 
-        Text(
-            text = "${localizedStringResource(470, "Accepted")}: ${receiptUiDateTime(worker.acceptedAtMillis)}",
-            color = stateValues.PlaceholderTextColor,
-            fontSize = stateValues.smallTextSize
-        )
+        RecordDates(worker.createdAtMillis.takeIf { it > 0 } ?: worker.acceptedAtMillis, worker.updatedAtMillis)
+        // A returning employee can be accepted again without recreating their historical membership.
+        if (worker.createdAtMillis > 0 && worker.acceptedAtMillis > 0 &&
+            worker.createdAtMillis / 1000 != worker.acceptedAtMillis / 1000) {
+            Text("${localizedStringResource(470, "Accepted")}: ${receiptUiDateTime(worker.acceptedAtMillis)}",
+                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        }
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -1722,6 +1724,7 @@ fun AppConfiguration.MenuWorkersScreen() {
     val incomingRequestsPayload by incomingWorkerRequestsState.payload.collectAsState()
     val storeWorkersPayload by storeWorkerMembershipsState.payload.collectAsState()
     val roleTemplatesPayload by storeWorkerRoleTemplatesState.payload.collectAsState()
+    var workerDateOptions by rememberRecordOptions(stateValues.userAccount?.id, activeStoreId)
     var workerSearch by rememberSaveable(stateValues.userAccount?.id, activeStoreId) { mutableStateOf("") }
     var workerStoreFilter by rememberSaveable(stateValues.userAccount?.id, activeStoreId) { mutableStateOf("all") }
     var storeIdText by rememberSaveable { mutableStateOf("") }
@@ -1883,7 +1886,11 @@ fun AppConfiguration.MenuWorkersScreen() {
                         }
                     }
 
-                    val memberships = myMembershipsPayload.orEmpty()
+                    val memberships = recordDateList(myMembershipsPayload.orEmpty(), workerDateOptions,
+                        { it.createdAtMillis.takeIf { date -> date > 0 } ?: it.acceptedAtMillis }, { it.updatedAtMillis }, { it.id })
+                    if (section == "managed") item("my-membership-dates") {
+                        RecordListTools(workerDateOptions, { workerDateOptions = it })
+                    }
                     val requests = myRequestsPayload.orEmpty()
                         .filter { it.direction == WORKER_REQUEST_DIRECTION_USER_TO_STORE && it.status == WORKER_REQUEST_STATUS_PENDING }
 
@@ -2319,9 +2326,11 @@ fun AppConfiguration.MenuWorkersScreen() {
                             val allWorkers = storeWorkersPayload.orEmpty()
                             val directoryStores = allWorkers.distinctBy { it.storeId }
                             val selectedFilter = workerStoreFilter.takeIf { id -> directoryStores.any { it.storeId == id } } ?: "all"
-                            val workers = filterWorkerDirectory(allWorkers, selectedFilter, workerSearch)
+                            val workers = recordDateList(filterWorkerDirectory(allWorkers, selectedFilter, workerSearch), workerDateOptions,
+                                { it.createdAtMillis.takeIf { date -> date > 0 } ?: it.acceptedAtMillis }, { it.updatedAtMillis }, { it.id })
                             item(key = "worker-directory-controls") {
                                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                                    RecordListTools(workerDateOptions, { workerDateOptions = it })
                                     SimpleTextInput(value = workerSearch, placeholder = stateValues.stringSearchByAnyData,
                                         leadingIconPath = stateValues.drawablePathIconSearch, onValueChange = { workerSearch = it.take(120) })
                                     SimpleDropdownField(title = workerPlacementMessage("workplace").extractLocalizedString(stateValues.appLanguage).orEmpty(),
@@ -2507,6 +2516,9 @@ fun AppConfiguration.MenuUserAccountScreen() {
                 .padding(horizontal = stateValues.marginTextField, vertical = 24.dp)
         ) {
             item(key = "account-profile-photo") { UserProfilePhotoCard() }
+            item(key = "account-record-dates") {
+                stateValues.userAccount?.let { RecordDates(it.createdAt, it.updatedAt, registration = true) }
+            }
             item {
                 val outerSpace = 16.dp
                 val innerSpace = 8.dp
@@ -4097,6 +4109,8 @@ internal fun AppConfiguration.SupplierCard(
             }
         }
 
+        RecordDates(supplier.addedAt, supplier.updatedAt)
+
         supplier.catalogueSource?.let { source ->
             Spacer(Modifier.height(6.dp))
             Text(source.countryCodes.joinToString(" · ") + " · " + source.sectors.extractLocalizedString(stateValues.appLanguage).orEmpty(),
@@ -4441,6 +4455,7 @@ fun AppConfiguration.MenuSuppliersScreen() {
     var selectedTab by rememberSaveable { mutableStateOf("mine") }
     var search by rememberSaveable { mutableStateOf("") }
     var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var supplierDateOptions by rememberRecordOptions(currentUserId, activeStoreId)
     var sortId by rememberSaveable { mutableStateOf("name") }
     var sortAscending by rememberSaveable { mutableStateOf(true) }
 
@@ -4506,7 +4521,8 @@ fun AppConfiguration.MenuSuppliersScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     tabs = listOf(
                         TabContent("name", stateValues.stringName) { sortId = it },
-                        TabContent("added", localizedStringResource(514, "Time added")) { sortId = it }
+                        TabContent("added", localizedStringResource(514, "Time added")) { sortId = it },
+                        TabContent("modified", recordDateText("modified", stateValues.appLanguage), icon = AitaTabIcon.Clock) { sortId = it }
                     ),
                     selectedIndexInitial = sortId,
                     compact = true, textSize = stateValues.smallTextSize
@@ -4577,14 +4593,15 @@ fun AppConfiguration.MenuSuppliersScreen() {
             )
         }
 
+        val supplierDateMatcher = remember(supplierDateOptions) { RecordDateMatcher(supplierDateOptions) }
         val shownSuppliers = (if (selectedTab == "mine") mineSuppliers else genericSuppliers)
-            .filter { supplier -> supplierMatchesSearch(supplier) }
+            .filter { supplier -> supplierMatchesSearch(supplier) && supplierDateMatcher.matches(supplier.addedAt, supplier.updatedAt) }
             .let { list ->
-                val sorted = when (sortId) {
-                    "added" -> list.sortedBy { it.addedAt }
-                    else -> list.sortedBy { it.visibleSupplierName(stateValues.appLanguage).lowercase() }
-                }
-                if (sortAscending) sorted else sorted.reversed()
+                if (sortId in setOf("added", "modified")) recordDateList(list,
+                    RecordListOptions(sort = if (sortId == "added") "created" else "modified", ascending = sortAscending),
+                    { it.addedAt }, { it.updatedAt }, { it.id })
+                else list.sortedBy { it.visibleSupplierName(stateValues.appLanguage).lowercase() }
+                    .let { if (sortAscending) it else it.reversed() }
             }
 
         if (selectedTab == "contracts") {
@@ -4604,6 +4621,9 @@ fun AppConfiguration.MenuSuppliersScreen() {
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
                 contentPadding = PaddingValues(bottom = stateValues.screenHeight / 5)
             ) {
+                item("supplier-record-dates") {
+                    RecordListTools(supplierDateOptions, { supplierDateOptions = it }, includeSort = false)
+                }
                 if (shownSuppliers.isEmpty()) {
                     item {
                         MessageText(
@@ -4678,6 +4698,7 @@ fun AppConfiguration.MenuStoresScreen() {
         val currentUserId = stateValues.userAccount?.id.orEmpty()
         var storeTabId by rememberSaveable { mutableStateOf("owned") }
         var storeSearchQuery by rememberSaveable { mutableStateOf("") }
+        var storeDateOptions by rememberRecordOptions(currentUserId)
 
         val storesListState = rememberMenuScreenLazyListState(NavigationScreenModel.Menu.Stores, storeTabId)
         LazyColumn(
@@ -4726,7 +4747,8 @@ fun AppConfiguration.MenuStoresScreen() {
                             .takeIf { it.isNotBlank() }
                             ?.let { storesStateValue.payload.search<StoreDataModel>(it).first.flattenStoresWithBranches() }
                             ?: allStores
-                        val topLevelStores = searchedItems.storeDirectoryRoots()
+                        item("store-record-dates") { RecordListTools(storeDateOptions, { storeDateOptions = it }) }
+                        val topLevelStores = searchedItems.storeDirectoryRoots().storeDirectoryByDates(storeDateOptions)
 
                         item {
                             tabRowWidget(
@@ -4747,7 +4769,7 @@ fun AppConfiguration.MenuStoresScreen() {
                             topLevelStores.filter { it.storeDirectoryFamilyOwnedBy(currentUserId) }
                         }
 
-                        if (searchedItems.isEmpty()) {
+                        if (searchedItems.isEmpty() || topLevelStores.isEmpty()) {
                             item(key = "stores-empty-2") {
                                 MessageText(
                                     modifier = Modifier.fillMaxWidth().remainingListSpace(storesListState, "stores-empty-2"),

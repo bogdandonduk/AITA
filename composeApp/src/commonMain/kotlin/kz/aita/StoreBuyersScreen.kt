@@ -46,6 +46,7 @@ internal fun AppConfiguration.MenuBuyersScreen() {
     val scope=rememberCoroutineScope()
     var tab by rememberSaveable(store) {mutableStateOf("active")}
     var query by rememberSaveable(store) {mutableStateOf("")}
+    var dateOptions by rememberRecordOptions(stateValues.userAccount?.id, store)
     var editing by remember(store) {mutableStateOf<StoreBuyer?>(null)}
     var busy by remember {mutableStateOf(false)}
     LaunchedEffect(store) {StoreCommerceClient.start();StoreCommerceClient.refreshBuyers()}
@@ -65,16 +66,18 @@ internal fun AppConfiguration.MenuBuyersScreen() {
         })},selectedId=tab,onSelected={tab=it})
         Spacer(Modifier.height(8.dp))
         SimpleTextInput(Modifier.fillMaxWidth(),query,commerceText("search"),autoFocus=false,onValueChange={query=it})
-        val rows=(if(tab=="parent") data.directory?.parentBuyers.orEmpty().filter {p->own.none {it.sourceParentBuyerId==p.id}} else own.filter {it.isActive==(tab=="active")})
+        val namedRows=(if(tab=="parent") data.directory?.parentBuyers.orEmpty().filter {p->own.none {it.sourceParentBuyerId==p.id}} else own.filter {it.isActive==(tab=="active")})
             .filter {query.isBlank() || listOf(it.name,it.phone,it.email).any {field->field.contains(query,true)}}.sortedBy {it.name.lowercase()}
+        val rows = recordDateList(namedRows, dateOptions, { it.createdAtMillis }, { it.updatedAtMillis }, { it.id })
         LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(vertical=10.dp)) {
+            item {RecordListTools(dateOptions, { dateOptions = it })}
             item {CommercePendingStatus()}
             if(tab=="parent") item {Text(commerceText("parent_help"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)}
             if(rows.isEmpty()) item {Text(commerceText("empty"),color=stateValues.TextColor)}
             items(rows,key={it.id}) {buyer ->
                 BuyerCard(buyer) {
                     if(canManageStoreBuyers(store)) actionButton(text=commerceText(if(tab=="parent") "pull" else "edit_buyer"),autoLoading=false,confirmationRequired=false,onClick={
-                        editing=if(tab=="parent") buyer.copy(id=newDiagnosticId(),storeId=requireNotNull(store),sourceParentBuyerId=buyer.id,revision=0,updatedAtMillis=0) else buyer
+                        editing=if(tab=="parent") buyer.copy(id=newDiagnosticId(),storeId=requireNotNull(store),sourceParentBuyerId=buyer.id,revision=0,createdAtMillis=0,updatedAtMillis=0) else buyer
                     })
                 }
             }
@@ -91,6 +94,7 @@ internal fun AppConfiguration.MenuBuyersScreen() {
 private fun AppConfiguration.BuyerCard(buyer:StoreBuyer,actions:@Composable ColumnScope.()->Unit) {
     Column(Modifier.fillMaxWidth().border(stateValues.unfocusedBorderWidth,stateValues.PlaceholderTextColor,RoundedCornerShape(stateValues.cornerRadius))
         .background(stateValues.BackgroundColor,RoundedCornerShape(stateValues.cornerRadius)).padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        RecordDates(buyer.createdAtMillis, buyer.updatedAtMillis)
         Text(buyer.name,color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
         listOf(buyer.phone,buyer.email).filter {it.isNotBlank()}.forEach {Text(it,color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)}
         if(buyer.discountPercent>0) Text("${buyer.promoTitle.ifBlank {commerceText("promo")}} · ${buyer.discountPercent.moneyText()}%"+

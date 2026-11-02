@@ -54,8 +54,9 @@ internal fun saveBuyerInsideTransaction(user: UUID, store: UUID, request: BuyerW
         // The user reviews and may override the copied promotion; linkage cannot point outside the parent.
         if(!source.valid()) throw CommerceProblem("changed")
     } else if(old!=null && incoming.sourceParentBuyerId!=old[StoreBuyers.payload].sourceParentBuyerId) throw CommerceProblem("changed")
-    val saved=incoming.copy(name=incoming.name.trim(),phone=incoming.phone.trim(),email=incoming.email.trim(),note=incoming.note.trim(),
-        promoTitle=incoming.promoTitle.trim(),revision=incoming.revision+1,updatedAtMillis=System.currentTimeMillis())
+    val now=System.currentTimeMillis()
+    val saved=incoming.copy(createdAtMillis=if(old==null) now else old[StoreBuyers.payload].createdAtMillis,name=incoming.name.trim(),phone=incoming.phone.trim(),email=incoming.email.trim(),note=incoming.note.trim(),
+        promoTitle=incoming.promoTitle.trim(),revision=incoming.revision+1,updatedAtMillis=maxOf(now,(old?.get(StoreBuyers.payload)?.updatedAtMillis ?: 0L)+1))
     if(old==null) StoreBuyers.insert {it[StoreBuyers.id]=id;it[storeId]=store;it[payload]=saved;it[revision]=saved.revision}
     else StoreBuyers.update({StoreBuyers.id eq id}) {it[payload]=saved;it[revision]=saved.revision}
     BuyerCommands.insert {it[BuyerCommands.id]=commandId;it[storeId]=store;it[actor]=user;it[BuyerCommands.request]=request;it[result]=saved}

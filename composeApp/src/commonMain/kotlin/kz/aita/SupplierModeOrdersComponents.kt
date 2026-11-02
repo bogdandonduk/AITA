@@ -353,6 +353,7 @@ internal fun AppConfiguration.SupplierOrdersCompactCard(
             .padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        RecordDates(order.createdAtMillis, order.updatedAtMillis)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

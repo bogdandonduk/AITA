@@ -38,6 +38,7 @@ internal fun AppConfiguration.SupplierProfileWorkspaceCard(
             .padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
+        RecordDates(item.supplier.addedAt, item.supplier.updatedAt)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

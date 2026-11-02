@@ -385,6 +385,7 @@ internal fun AppConfiguration.SupplierContractCompactCard(
             .padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
     ) {
+        RecordDates(contract.createdAtMillis, contract.updatedAtMillis)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,

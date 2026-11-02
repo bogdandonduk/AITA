@@ -1052,6 +1052,8 @@ fun AppConfiguration.GoodsItemInStockWidget(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                if (transactionTypeIndex == null) RecordDates(goodsItem.createdAtMillis, goodsItem.updatedAtMillis)
+
                 if (barcodesText.isNotBlank()) {
                     StockCardInfoLine(
                         title = stateValues.stringBarcode,

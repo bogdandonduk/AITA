@@ -35,9 +35,10 @@ class StoreCommerceDatabaseTest {
         val db = Database.connect("$url?currentSchema=$schema", driver = "org.postgresql.Driver", user = user, password = "")
         try {
             transaction(db) {
-                SchemaUtils.create(Users,Stores,StoreUsers,StoreWorkerMemberships,Workshifts,OperationLogs,StockItems,StockBatchesV2,Transactions,TransactionReturnItems,StockBatchMovements)
+                SchemaUtils.create(Users,Stores,StoreUsers,StoreWorkerMemberships,StoreWorkerRequests,Suppliers,Workshifts,OperationLogs,StockItems,StockBatchesV2,Transactions,TransactionReturnItems,StockBatchMovements)
                 exec("ALTER TABLE transactions DROP COLUMN buyer")
                 exec(javaClass.getResource("/db/migration/V132__store_buyers_and_stock_writeoffs.sql")!!.readText())
+                exec(javaClass.getResource("/db/migration/V140__record_audit_dates.sql")!!.readText())
                 Users.insert {
                     it[Users.id]=owner;it[publicId]="COMMERCE";it[phoneNumber]="test-commerce";it[email]="commerce@example.invalid"
                     it[firstName]="Test";it[lastName]="Owner";it[countryLocale]="KZ";it[passwordHash]="not-a-real-hash"
@@ -150,10 +151,15 @@ class StoreCommerceDatabaseTest {
         val request=BuyerWrite(UUID.randomUUID().toString(),buyer())
         val saved=transaction(db){saveBuyerInsideTransaction(owner,store,request)}
         assertEquals(1L,saved.revision)
+        assertTrue(saved.createdAtMillis > 0)
+        assertEquals(saved.createdAtMillis,saved.updatedAtMillis)
         assertEquals(saved,transaction(db){saveBuyerInsideTransaction(owner,store,request)})
         assertFailsWith<CommerceProblem>{transaction(db){saveBuyerInsideTransaction(owner,store,request.copy(operationId=UUID.randomUUID().toString()))}}
-        val changed=transaction(db){saveBuyerInsideTransaction(owner,store,BuyerWrite(UUID.randomUUID().toString(),saved.copy(discountPercent=20.0)))}
+        val changed=transaction(db){saveBuyerInsideTransaction(owner,store,BuyerWrite(UUID.randomUUID().toString(),saved.copy(discountPercent=20.0,createdAtMillis=1L,updatedAtMillis=Long.MAX_VALUE)))}
         assertEquals(2L,changed.revision)
+        assertEquals(saved.createdAtMillis,changed.createdAtMillis)
+        assertTrue(changed.updatedAtMillis > saved.updatedAtMillis)
+        assertTrue(changed.updatedAtMillis < Long.MAX_VALUE)
         assertEquals(saved,transaction(db){saveBuyerInsideTransaction(owner,store,request)})
         assertFailsWith<CommerceProblem>{transaction(db){canonicalBuyerInsideTransaction(store,saved.receiptSnapshot())}}
         assertEquals(20.0,transaction(db){canonicalBuyerInsideTransaction(store,changed.receiptSnapshot())}?.discountPercent)

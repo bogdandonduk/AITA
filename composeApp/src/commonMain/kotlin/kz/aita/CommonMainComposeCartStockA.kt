@@ -1757,6 +1757,8 @@ fun AppConfiguration.StoreWidget(
                     )
                 }
 
+                RecordDates(store.createdAt, store.updatedAt)
+
                 store.alias.takeIf { it.any { item -> item.value.isNotEmpty() && item.value.isNotBlank() } }
                     ?.extractLocalizedString(stateValues.appLanguage)?.let {
                         Text(
@@ -1927,6 +1929,7 @@ fun AppConfiguration.StoreWidget(
 
 @Composable
 fun AppConfiguration.StockWarehouseScreen() {
+    var recordOptions by rememberRecordOptions(stateValues.userAccount?.id, stateValues.activeStoreId)
     var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
     var sortMode by rememberSaveable { mutableStateOf("name") }
     var sortAscending by rememberSaveable { mutableStateOf(true) }
@@ -2001,6 +2004,7 @@ fun AppConfiguration.StockWarehouseScreen() {
                         add(TabContent("quantity", localizedStringResource(513, "Quantity")) { sortMode = it })
                     }
                     add(TabContent("created", localizedStringResource(514, "Time added")) { sortMode = it })
+                    add(TabContent("modified", recordDateText("modified", stateValues.appLanguage), icon = AitaTabIcon.Clock) { sortMode = it })
                 }
 
                 tabRowWidget(
@@ -2019,6 +2023,7 @@ fun AppConfiguration.StockWarehouseScreen() {
                     selectedIndexInitial = if (sortAscending) "asc" else "desc",
                     compact = true, textSize = stateValues.smallTextSize
                 )
+                RecordListTools(recordOptions, { recordOptions = it }, includeSort = false, collapsible = false)
             }
         }
 
@@ -2087,7 +2092,8 @@ fun AppConfiguration.StockWarehouseScreen() {
             onAddBatch = if (canCreateStockBatch) openAddBatch else null,
             onPrintLabel = { item -> labelPrintItemId = item.id },
             sortMode = sortMode,
-            sortAscending = sortAscending
+            sortAscending = sortAscending,
+            dateOptions = recordOptions
         )
 
         if (stateValues.isNarrowScreen && canCreateStockItem) {
@@ -2235,6 +2241,10 @@ internal fun stockWarehouseDefaultSortedItems(
     sortAscending: Boolean,
     language: String
 ): List<GoodsItemDataModel> {
+    if (preferredOrder.isEmpty() && sortMode in setOf("created", "modified")) {
+        return recordDateList(items, RecordListOptions(sort = sortMode!!, ascending = sortAscending),
+            { it.createdAtMillis }, { it.updatedAtMillis }, { it.id })
+    }
     // Decorate once instead of localizing/lowercasing on every comparator invocation.
     // Keep the key with the item rather than indexing by ID (draft IDs can be empty).
     val namedItems = items.map { it to it.name.extractLocalizedString(language).orEmpty().lowercase() }
@@ -2621,7 +2631,8 @@ fun AppConfiguration.StockWarehouseScreenContent(
     scrollStateHost: StateHost = NavigationScreenModel.Stock.Warehouse,
     scrollStateKey: String = "stock_warehouse_scroll",
     onExactSearchHit: ((GoodsItemDataModel) -> Unit)? = null,
-    onExactSearchHitWithQuery: ((GoodsItemDataModel, String) -> Unit)? = null
+    onExactSearchHitWithQuery: ((GoodsItemDataModel, String) -> Unit)? = null,
+    dateOptions: RecordListOptions = RecordListOptions()
 ){
     val stockLoadStatus by stockLoadStatusState.collectAsState()
     val batchesLoadStatus by stockBatchesLoadStatusState.collectAsState()
@@ -2773,12 +2784,12 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 val language = stateValues.appLanguage
                 val fallbackOrderIds = if (selectedSortMode == "quantity") lastNonQuantitySortOrderIds else emptyList()
                 val projectionRequest = remember(
-                    baseItems, appliedSearchQuery, preferredOrderIds, selectedSortMode, sortAscending,
+                    baseItems, dateOptions, appliedSearchQuery, preferredOrderIds, selectedSortMode, sortAscending,
                     language, warehouseQuantityByItem, warehouseBatchesByItem, selectedWarehouseFilterId,
                     showWarehouseInfoTile, fallbackOrderIds, activeStoreId
                 ) { Any() }
                 val projectionQuery = if (scannedBarcodeMatches?.first == appliedSearchQuery) "" else appliedSearchQuery
-                val useWarmWarehouse = scannedBarcodeMatches == null && showWarehouseInfoTile && stockItemsOverride == null && onFilter == null && preferredOrderIds.isEmpty()
+                val useWarmWarehouse = dateOptions.fromDate.isBlank() && dateOptions.throughDate.isBlank() && scannedBarcodeMatches == null && showWarehouseInfoTile && stockItemsOverride == null && onFilter == null && preferredOrderIds.isEmpty()
                 val warmWarehouse by LiveCollectionWorkspace.warehouse.collectAsState()
                 val requestedSelection = WarehouseSelection(projectionQuery, selectedSortMode, sortAscending,
                     if (showWarehouseInfoTile) selectedWarehouseFilterId else STOCK_WAREHOUSE_FILTER_TOTAL, fallbackOrderIds)
@@ -2792,7 +2803,9 @@ fun AppConfiguration.StockWarehouseScreenContent(
                 LaunchedEffect(projectionRequest, useWarmWarehouse) {
                     if (!useWarmWarehouse) {
                         val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                            buildStockWarehouseProjection(baseItems, projectionQuery, preferredOrderIds, selectedSortMode,
+                            val datedItems = recordDateList(baseItems, dateOptions.copy(sort = "default"),
+                                { it.createdAtMillis }, { it.updatedAtMillis }, { it.id })
+                            buildStockWarehouseProjection(datedItems, projectionQuery, preferredOrderIds, selectedSortMode,
                                 sortAscending, language, warehouseQuantityByItem, warehouseBatchesByItem,
                                 requestedSelection.filter, fallbackOrderIds)
                         }

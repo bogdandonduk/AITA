@@ -1514,6 +1514,7 @@ private fun ResultRow.toUserAccountDataModel(): UserAccountDataModel {
     appFontId = this[Users.appFontId],
     appModeId = this[Users.appModeId],
     createdAt = this[Users.createdAt].toEpochMilli(),
+    updatedAt = this[Users.updatedAt]?.toEpochMilli() ?: 0L,
     isActive = this[Users.isActive]
   )
 }
@@ -1622,6 +1623,7 @@ object Users: Table("users") {
   val appModeId = integer("app_mode_id").nullable().default(DEFAULT_NEW_ACCOUNT_APP_MODE)
   val passwordHash = varchar("password_hash", 100) // BCrypt ~60 chars, give some headroom
   val createdAt = timestamp("created_at").defaultExpression(CurrentTimestamp)
+  val updatedAt = timestamp("updated_at").nullable()
   val isActive = bool("is_active").default(true)
 
   override val primaryKey = PrimaryKey(id)
@@ -1740,6 +1742,7 @@ object Suppliers: Table("suppliers") {
   val emails = text("emails").nullable().default(null)
 
   val addedAt = timestamp("added_at").defaultExpression(CurrentTimestamp)
+  val updatedAt = timestamp("updated_at").nullable()
   val isActive = bool("is_active").default(true)
 
   override val primaryKey = PrimaryKey(id)
@@ -6377,6 +6380,7 @@ private fun ResultRow.toStoreDataModel(branches: List<StoreDataModel> = emptyLis
     emails = this[Stores.emails],
     countryLocales = this[Stores.countryLocales],
     createdAt = this[Stores.createdAt].toEpochMilli(),
+    updatedAt = this[Stores.updatedAt].toEpochMilli(),
     branches = branches
   )
 }
@@ -6428,7 +6432,9 @@ internal fun ResultRow.toStoreWorkerDataModel(): StoreWorkerDataModel {
     acceptedAtMillis = this[StoreWorkerMemberships.acceptedAtMillis],
     acceptedByUserId = this[StoreWorkerMemberships.acceptedByUserId].toString(),
     isActive = this[StoreWorkerMemberships.isActive],
-    hasWorkshiftPassword = !this[StoreWorkerMemberships.workshiftPasswordHash].isNullOrBlank()
+    hasWorkshiftPassword = !this[StoreWorkerMemberships.workshiftPasswordHash].isNullOrBlank(),
+    createdAtMillis = this[StoreWorkerMemberships.createdAt].toEpochMilli(),
+    updatedAtMillis = this[StoreWorkerMemberships.updatedAt].toEpochMilli()
   )
 }
 
@@ -6802,6 +6808,7 @@ private fun ResultRow.toSupplierDataModel(): SupplierDataModel {
     phoneNumbers = decodeSupplierStringList(this[Suppliers.phoneNumbers]),
     emails = decodeSupplierStringList(this[Suppliers.emails]),
     addedAt = this[Suppliers.addedAt].toEpochMilli(),
+    updatedAt = this[Suppliers.updatedAt]?.toEpochMilli() ?: 0L,
     isActive = this[Suppliers.isActive],
     catalogueSource = if (decodeSupplierStringList(this[Suppliers.userIds]).isEmpty())
       PublicSupplierCatalogue.byId[this[Suppliers.id].toString()]?.catalogueSource else null

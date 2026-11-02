@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
     val discountPercent: Double = 0.0, val promoTitle: String = "",
     val promoStartsAtMillis: Long? = null, val promoEndsAtMillis: Long? = null,
     val sourceParentBuyerId: String? = null, val revision: Long = 0,
-    val isActive: Boolean = true, val updatedAtMillis: Long = 0
+    val isActive: Boolean = true, val updatedAtMillis: Long = 0, val createdAtMillis: Long = 0
 ) {
     fun valid(): Boolean = validStorePersonId(id) && validStorePersonId(storeId) && name.isNotBlank() && name.length <= 160 &&
         phone.length <= 64 && email.length <= 254 && (email.isBlank() || Regex("[^\\s@]+@[^\\s@]+\\.[^\\s@]+").matches(email)) &&

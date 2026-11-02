@@ -758,6 +758,8 @@ class AitaSharedJvmFlowTest {
         storesState.emit(DataState.Success(listOf(store)))
         waitUntilAitaFlowCondition { currentStoreHasWorkspaceAccess(store.id) }
         environment.echoCreatedInventoryBodies = true
+        // Make the mock transport offline too; the health monitor can otherwise reconnect it.
+        environment.networkUnavailable = true
         cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_UNAVAILABLE
         val itemResult = CompletableDeferred<DataState<GoodsItemDataModel>>()
         addGoodsItem(aitaTestGoodsItem(id = "", name = "Offline toy", barcode = "2618000001248")) { itemResult.complete(it) }
@@ -770,13 +772,15 @@ class AitaSharedJvmFlowTest {
         assertEquals(item, InventoryCreates.overlayItems(inventoryOwners.current, emptyList()).single())
         assertEquals(batch, InventoryCreates.overlayBatches(inventoryOwners.current, emptyList()).single())
         assertTrue(InventoryCreates.pending("unrelated-account").isEmpty())
-        cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_REACHABLE
         environment.loseNextCreatedItemReply = true
+        environment.networkUnavailable = false
+        cloudTransportStatusState.value = CLOUD_TRANSPORT_STATUS_REACHABLE
         InventoryCreates.flush()
         assertEquals(1, environment.stock.size)
         assertEquals(2, InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).size)
         assertTrue(environment.batches.isEmpty())
         InventoryCreates.flush(force = true)
+        waitUntilAitaFlowCondition { InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty() }
         assertEquals(listOf(item.id), environment.stock.map { it.id })
         assertEquals(listOf(batch.id), environment.batches.map { it.id })
         assertTrue(InventoryCreates.pending(AITA_FLOW_TEST_USER_ID).isEmpty())

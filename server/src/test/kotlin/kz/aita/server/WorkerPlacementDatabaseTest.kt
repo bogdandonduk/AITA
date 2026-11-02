@@ -28,7 +28,8 @@ class WorkerPlacementDatabaseTest {
         val db = Database.connect("$url?currentSchema=$schema", driver = "org.postgresql.Driver", user = user, password = "")
         try {
             transaction(db) {
-                SchemaUtils.create(Users, Stores, StoreUsers, StoreWorkerMemberships, StoreWorkerRequests, Workshifts, OperationLogs, Notifications)
+                SchemaUtils.create(Users, Stores, StoreUsers, StoreWorkerMemberships, StoreWorkerRequests, Workshifts, OperationLogs, Notifications, Suppliers, StoreBuyers)
+                exec(javaClass.getResource("/db/migration/V140__record_audit_dates.sql")!!.readText())
                 val subscriptionMigration = javaClass.getResource("/db/migration/V46__paging_user_finances_and_store_subscriptions.sql")!!.readText()
                 exec("CREATE TABLE store_subscription_states (" + subscriptionMigration.substringAfter("CREATE TABLE IF NOT EXISTS store_subscription_states (").substringBefore("CREATE TABLE IF NOT EXISTS store_subscription_charge_events"))
                 exec("ALTER TABLE store_subscription_states ADD access_kind TEXT DEFAULT 'lifetime', ADD region_code TEXT DEFAULT 'KZ', ADD renewal_price_minor BIGINT DEFAULT 0, ADD currency_code TEXT DEFAULT 'KZT', ADD revision BIGINT DEFAULT 1")

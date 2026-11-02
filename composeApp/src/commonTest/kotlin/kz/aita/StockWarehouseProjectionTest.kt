@@ -44,6 +44,13 @@ class StockWarehouseProjectionTest {
         assertEquals(listOf("high", "low", "none"), project(stock, sort = "price", ascending = false).sortedItems.map { it.id })
     }
 
+    @Test fun modificationSortUsesEditDatesAndLeavesUnknownDatesLast() {
+        val stock = listOf(item("unknown", "A"), item("old", "B").copy(updatedAtMillis = 10), item("new", "C").copy(updatedAtMillis = 20))
+        assertEquals(listOf("new", "old", "unknown"), project(stock, sort = "modified", ascending = false).sortedItems.map { it.id })
+        assertEquals(listOf("old", "new", "unknown"), project(stock, sort = "modified").sortedItems.map { it.id })
+        assertEquals(listOf("unknown", "old", "new"), project(stock, sort = "modified", preferred = listOf("unknown", "old", "new")).sortedItems.map { it.id })
+    }
+
     @Test fun equalQuantitiesPreserveLastNonQuantityOrder() {
         val stock = listOf(item("b", "B"), item("a", "A"), item("c", "C"))
         val sorted = project(stock, sort = "quantity", quantities = mapOf("a" to 2.0, "b" to 2.0), fallback = listOf("b", "a", "c"))

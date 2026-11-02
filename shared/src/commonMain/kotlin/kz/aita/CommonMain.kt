@@ -20503,7 +20503,8 @@ data class StoreDataModel(
     val contactVerificationId: String = "",
     val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList(),
     val branchType: StoreBranchType? = null,
-    val architectureVersion: Int = 1
+    val architectureVersion: Int = 1,
+    val updatedAt: Long = 0L
 ): Searchable {
 
     override val exactSearchOperands: List<String>
@@ -20730,7 +20731,8 @@ data class SupplierDataModel(
     val isActive: Boolean = true,
     val contactVerificationId: String = "",
     val contactEmailProofs: List<kz.aita.auth.AitaVerifiedContactProof> = emptyList(),
-    val catalogueSource: CatalogueSource? = null
+    val catalogueSource: CatalogueSource? = null,
+    val updatedAt: Long = 0L
 ) {
     fun isMineForUser(userId: String?): Boolean = !userId.isNullOrBlank() && userIds.contains(userId)
     fun isGenericSupplier(): Boolean = userIds.isEmpty()
@@ -21679,7 +21681,8 @@ data class UserAccountDataModel(
     val createdAt: Long,
     val isActive: Boolean,
     val appModeId: Int? = null,
-    val appFontId: String? = null
+    val appFontId: String? = null,
+    val updatedAt: Long = 0L
 )
 
 @kotlinx.serialization.Serializable
@@ -21750,7 +21753,9 @@ data class StoreWorkerDataModel(
     val acceptedAtMillis: Long = 0L,
     val acceptedByUserId: String = "",
     val isActive: Boolean = true,
-    val hasWorkshiftPassword: Boolean = false
+    val hasWorkshiftPassword: Boolean = false,
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L
 ) {
     val displayName: String
         get() = "${firstName.trim()} ${lastName.trim()}".trim().ifBlank { phoneNumber.asDisplayPhoneNumber().ifBlank { email.ifBlank { userId } } }

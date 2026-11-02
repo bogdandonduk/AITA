@@ -121,7 +121,7 @@ fun AppConfiguration.StockBatchCard(
                 },
                 RoundedCornerShape(stateValues.cornerRadius)
             )
-            .pointerInput(batch.id, allBatchesCount, currentIndex) {
+            .pointerInput(batch.id, allBatchesCount, currentIndex, onDragFinished != null) {
                 if (onDragFinished == null) return@pointerInput
 
                 detectDragGesturesAfterLongPress(
@@ -196,6 +196,8 @@ fun AppConfiguration.StockBatchCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            if (!compact && onDragFinished == null) RecordDates(batch.createdAtMillis, batch.updatedAtMillis)
 
             val batchPriceLines = buildList {
                 goodsItem?.promotedPriceForTransaction(
@@ -511,6 +513,7 @@ fun AppConfiguration.StockBatchEditor(
                 .padding(stateValues.marginTextField)
         ) {
             item {
+                existingBatch?.let { RecordDates(it.createdAtMillis, it.updatedAtMillis) }
                 if (existingBatch == null) SimpleDropdownField(
                     title = returnFlowText("batch_kind"), selectedId = draft.kind.name, placeholder = stateValues.stringSelect,
                     rememberChoiceKey = "batch-kind", restoreLastChoice = freshBatchOperation,
@@ -1775,6 +1778,8 @@ fun AppConfiguration.StockAddEditBatchesPage(
     val canDecideBatchTransfers = currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_TRANSFER_DECIDE)
     val canSetActiveShelfBatch = !managementStore && currentUserHasStorePermission(activeStoreIdForBatches, STORE_PERMISSION_STOCK_BATCH_SET_ACTIVE_SHELF)
 
+    var batchDateOptions by rememberRecordOptions(editorScope)
+    val batchDateView = batchDateOptions.fromDate.isNotBlank() || batchDateOptions.throughDate.isNotBlank() || batchDateOptions.sort != "default"
     val batches = stateValues.stockBatches
         .orEmpty()
         .filter {
@@ -1782,6 +1787,7 @@ fun AppConfiguration.StockAddEditBatchesPage(
         }
         .let { if(managementStore) it.sortedWith(compareBy<GoodsBatchDataModel> { batch -> batch.expirationDateMillis ?: Long.MAX_VALUE }.thenBy { batch -> batch.createdAtMillis }) else it.sortedForShelf(goodsItem) }
 
+    val visibleBatches = recordDateList(batches, batchDateOptions, { it.createdAtMillis }, { it.updatedAtMillis }, { it.id })
     val editingBatch = batches.find { it.id == currentEditId }
     val addingBatch = currentMode == "add"
     val editing = currentMode == "edit" && editingBatch != null
@@ -1923,12 +1929,16 @@ fun AppConfiguration.StockAddEditBatchesPage(
                 }
             }
             if(section=="shelf" || section=="warehouse") {
-                if(!managementStore) item("shelf_hint") {
+                item("batch-date-tools") {
+                    RecordListTools(batchDateOptions, { batchDateOptions = it })
+                    Spacer(Modifier.height(stateValues.marginTextField))
+                }
+                if(!managementStore && !batchDateView) item("shelf_hint") {
                     Text(localizedStringResource(198,"The first batch is the active shelf batch. Long-press and drag a batch up or down to change shelf order."),
                         color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                     Spacer(Modifier.height(stateValues.marginTextField))
                 }
-            if (batches.isEmpty()) {
+            if (visibleBatches.isEmpty()) {
                 item {
                     MessageText(
                         modifier = Modifier
@@ -1938,11 +1948,11 @@ fun AppConfiguration.StockAddEditBatchesPage(
                     )
                 }
             } else {
-                itemsIndexed(batches, key = { _, batch -> batch.id }) { index, batch ->
+                itemsIndexed(visibleBatches, key = { _, batch -> batch.id }) { index, batch ->
                     StockBatchCard(
                         batch = batch,
                         activeShelfBatchId = goodsItem.activeShelfBatchId.takeUnless { managementStore },
-                        shelfIndex = index.takeUnless { managementStore },
+                        shelfIndex = batches.indexOfFirst { it.id == batch.id }.takeUnless { managementStore },
                         compact = false,
                         draggedBatchId = draggedBatchId,
                         draggedBatchIndex = draggedBatchId?.let { id -> batches.indexOfFirst { it.id == id }.takeIf { it >= 0 } },
@@ -1978,18 +1988,18 @@ fun AppConfiguration.StockAddEditBatchesPage(
                                 }
                             }
                         } else null,
-                        onDragStart = if (canSetActiveShelfBatch) {
+                        onDragStart = if (canSetActiveShelfBatch && !batchDateView) {
                             { id ->
                                 draggedBatchId = id
                                 dragTargetIndex = index
                             }
                         } else null,
-                        onDragTargetChanged = if (canSetActiveShelfBatch) {
+                        onDragTargetChanged = if (canSetActiveShelfBatch && !batchDateView) {
                             { target ->
                                 dragTargetIndex = target
                             }
                         } else null,
-                        onDragFinished = if (canSetActiveShelfBatch) {
+                        onDragFinished = if (canSetActiveShelfBatch && !batchDateView) {
                             { target ->
                                 val from = index
                                 draggedBatchId = null
