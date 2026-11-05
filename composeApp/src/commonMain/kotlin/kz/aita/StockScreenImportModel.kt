@@ -83,6 +83,23 @@ internal fun ScreenStockRow.hasExistingBarcode(existing: List<GoodsItemDataModel
     existing.any { it.isActive && it.storeId == storeId && it.id != itemId &&
         it.allBarcodeValues().any { code -> code.normalizedBarcodeToken() == barcode.normalizedBarcodeToken() } }
 
+/** The durable outbox owns a write even when its visible stock projection failed or is still
+ * hydrating. Resuming the same review row must not enqueue another command for that identity.
+ * Prefer a rejection if an older client left multiple matching commands: never conceal it as saved.
+ */
+internal fun ScreenStockRow.pendingItemWrite(pending: List<InventoryCreateCommand>, storeId: String): InventoryCreateCommand? {
+    val matching = pending.filter { command -> command.storeId == storeId &&
+        command.item?.let { it.id == itemId && it.storeId == storeId } == true }
+    return matching.firstOrNull { it.rejected } ?: matching.firstOrNull()
+}
+
+internal fun ScreenStockRow.pendingBatchWrite(pending: List<InventoryCreateCommand>, storeId: String): InventoryCreateCommand? {
+    val matching = pending.filter { command -> command.storeId == storeId && command.batches.any {
+        it.id == batchId && it.goodsItemId == itemId && it.storeId == storeId
+    } }
+    return matching.firstOrNull { it.rejected } ?: matching.firstOrNull()
+}
+
 internal fun ScreenStockRow.canCorrectRejectedCreate(confirmedFailure: Boolean, ownerCurrent: Boolean,
     existing: List<GoodsItemDataModel>, pending: List<InventoryCreateCommand>): Boolean =
     confirmedFailure && ownerCurrent && !itemSaved && !complete &&

@@ -103,14 +103,18 @@ private fun AppConfiguration.StockScreenImportSheet(recorder: StockScreenRecorde
         try {
             val saved = withContext(Dispatchers.ourIo) { readStockImportDraft(accountId, storeId) }
             if (saved != null) {
-                val draft = stockScreenImportJson.decodeFromString<StockScreenImportDraft>(saved)
-                validateStockScreenImportDraft(draft, accountId, storeId)
+                val draft = withContext(Dispatchers.Default) {
+                    stockScreenImportJson.decodeFromString<StockScreenImportDraft>(saved).also {
+                        validateStockScreenImportDraft(it, accountId, storeId)
+                    }
+                }
                 val progress = withContext(Dispatchers.ourIo) { readStockImportProgress(accountId, storeId, draft.rows.map { it.id }) }
-                val restored = draft.rows.map { row -> progress[row.id]?.let { saved ->
-                    row.copy(importStarted = row.importStarted || saved.started, itemSaved = row.itemSaved || saved.itemSaved,
-                        complete = row.complete || saved.complete, selected = row.selected && !saved.complete)
-                } ?: row }
-                validateStockScreenImportDraft(draft.copy(rows = restored), accountId, storeId)
+                val restored = withContext(Dispatchers.Default) {
+                    draft.rows.map { row -> progress[row.id]?.let { saved ->
+                        row.copy(importStarted = row.importStarted || saved.started, itemSaved = row.itemSaved || saved.itemSaved,
+                            complete = row.complete || saved.complete, selected = row.selected && !saved.complete)
+                    } ?: row }.also { validateStockScreenImportDraft(draft.copy(rows = it), accountId, storeId) }
+                }
                 rows = restored
             }
         } catch (cancel: CancellationException) { throw cancel }
@@ -178,7 +182,13 @@ private fun AppConfiguration.StockScreenImportSheet(recorder: StockScreenRecorde
                     var row = rows.first { it.id == source.id }
                     if (row.hasExistingBarcode(stockState.payloadValue.orEmpty(), storeId)) { error = text("duplicate"); break }
                     row = row.copy(importStarted = true); checkpoint(row); update(row)
-                    if (!row.itemSaved && stockState.payloadValue.orEmpty().none { it.id == row.itemId && it.storeId == storeId }) {
+                    // Read the journal projection first: an acknowledgement projects accepted stock
+                    // before removing its pending command, so either side safely owns a retry.
+                    val pendingItem = row.pendingItemWrite(inventoryCreatePendingState.value, storeId)
+                    if (pendingItem?.rejected == true) {
+                        error = pendingItem.failure?.extractLocalizedString(language)?.takeIf { it.isNotBlank() } ?: text("save_error"); break
+                    }
+                    if (!row.itemSaved && pendingItem == null && stockState.payloadValue.orEmpty().none { it.id == row.itemId && it.storeId == storeId }) {
                         val result = CompletableDeferred<DataState<GoodsItemDataModel>>()
                         addGoodsItem(row.toStockItem(accountId, storeId, language, config)) { result.complete(it) }
                         val response = withTimeoutOrNull(90_000) { result.await() }
@@ -198,7 +208,11 @@ private fun AppConfiguration.StockScreenImportSheet(recorder: StockScreenRecorde
                     if (stopImport) break
                     if (!current()) { error = text("owner_changed"); break }
                     val batch = row.toStockBatch(accountId, storeId, config)
-                    if (batch != null && stockBatchesState.payloadValue.orEmpty().none { it.id == batch.id && it.storeId == storeId }) {
+                    val pendingBatch = row.pendingBatchWrite(inventoryCreatePendingState.value, storeId)
+                    if (pendingBatch?.rejected == true) {
+                        error = pendingBatch.failure?.extractLocalizedString(language)?.takeIf { it.isNotBlank() } ?: text("save_error"); break
+                    }
+                    if (batch != null && pendingBatch == null && stockBatchesState.payloadValue.orEmpty().none { it.id == batch.id && it.storeId == storeId }) {
                         val result = CompletableDeferred<DataState<List<GoodsBatchDataModel>>>()
                         addGoodsBatches(listOf(batch)) { result.complete(it) }
                         val response = withTimeoutOrNull(90_000) { result.await() }

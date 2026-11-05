@@ -100,4 +100,41 @@ class StockScreenImportModelTest {
         }
     }
 
+    @Test fun pendingWritesOwnRetryEvenWhenVisibleStockHasNotHydrated() {
+        val row = row().copy(quantity = "5", importStarted = true)
+        val item = row.toStockItem("u", "s", "en", config)
+        val batch = requireNotNull(row.toStockBatch("u", "s", config))
+        val itemWrite = InventoryCreateCommand("item-write", "s", item = item)
+        val batchWrite = InventoryCreateCommand("batch-write", "s", batches = listOf(batch))
+        val pending = listOf(itemWrite, batchWrite)
+        assertEquals(itemWrite, row.pendingItemWrite(pending, "s"))
+        assertEquals(batchWrite, row.pendingBatchWrite(pending, "s"))
+        assertNull(row.pendingItemWrite(pending, "other"))
+        assertNull(row.pendingBatchWrite(pending, "other"))
+        assertNull(row.copy(itemId = "different-item").pendingItemWrite(pending, "s"))
+        assertNull(row.copy(itemId = "different-item").pendingBatchWrite(pending, "s"))
+        assertNull(row.copy(batchId = "different-batch").pendingBatchWrite(pending, "s"))
+        assertNull(row.pendingItemWrite(listOf(itemWrite.copy(item = item.copy(storeId = "other"))), "s"))
+        assertNull(row.pendingBatchWrite(listOf(batchWrite.copy(batches = listOf(batch.copy(storeId = "other")))), "s"))
+    }
+
+    @Test fun rejectedPendingWriteCannotBeAcknowledgedAsSuccessfulRetry() {
+        val row = row().copy(quantity = "5", importStarted = true)
+        val item = row.toStockItem("u", "s", "en", config)
+        val batch = requireNotNull(row.toStockBatch("u", "s", config))
+        val failure = listOf(LocalizedStringDataModel("en", "Check store access"))
+        val itemWrite = InventoryCreateCommand("item-write", "s", item = item)
+        val itemRejected = itemWrite.copy(id = "rejected-item", rejected = true, failure = failure)
+        val batchWrite = InventoryCreateCommand("batch-write", "s", batches = listOf(batch))
+        val batchRejected = batchWrite.copy(id = "rejected-batch", rejected = true, failure = failure)
+        val pending = listOf(itemWrite, batchWrite, itemRejected, batchRejected)
+        assertEquals(itemRejected, row.pendingItemWrite(pending, "s"))
+        assertEquals(batchRejected, row.pendingBatchWrite(pending, "s"))
+        assertEquals(failure, row.pendingItemWrite(pending, "s")?.failure)
+        assertEquals(failure, row.pendingBatchWrite(pending, "s")?.failure)
+        // A different branch's rejection must not block this branch's already queued command.
+        assertEquals(itemWrite, row.pendingItemWrite(listOf(itemRejected.copy(storeId = "other"), itemWrite), "s"))
+        assertEquals(batchWrite, row.pendingBatchWrite(listOf(batchRejected.copy(storeId = "other"), batchWrite), "s"))
+    }
+
 }

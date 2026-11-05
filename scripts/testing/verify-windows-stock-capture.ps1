@@ -61,7 +61,13 @@ if ($AppImage) {
     $child = New-Object System.Diagnostics.Process
     $child.StartInfo = $info
     try {
-        if (-not $child.Start()) { throw 'Packaged OCR worker did not start' }
+        # .NET Framework creates and AutoFlush-es its stdin StreamWriter inside
+        # Process.Start. Prevent a BOM there, before touching BaseStream below.
+        $previousInputEncoding = [Console]::InputEncoding
+        try {
+            [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+            if (-not $child.Start()) { throw 'Packaged OCR worker did not start' }
+        } finally { [Console]::InputEncoding = $previousInputEncoding }
         $outputTask = $child.StandardOutput.ReadToEndAsync()
         $errorTask = $child.StandardError.ReadToEndAsync()
         # Windows PowerShell's default StreamWriter can add an encoding preamble.
