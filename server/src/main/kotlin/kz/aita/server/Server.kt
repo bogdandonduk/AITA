@@ -2110,6 +2110,7 @@ object SupplierOrderLines: Table("supplier_order_lines") {
   val substituteGoodsItemId = uuid("substitute_goods_item_id").nullable()
 
   val deliveredBatchIds = jsonb("delivered_batch_ids", Json, ListSerializer(String.serializer()))
+  val receivedQuantityTotal = double("received_quantity_total").nullable()
   val isActive = bool("is_active")
 
   override val primaryKey = PrimaryKey(id)
@@ -6854,10 +6855,11 @@ private fun ResultRow.toSupplierOrderLineDataModel(): SupplierOrderLineDataModel
   supplierOfferedSupplyPrice = this[SupplierOrderLines.supplierOfferedSupplyPrice],
   substituteGoodsItemId = this[SupplierOrderLines.substituteGoodsItemId]?.toString(),
   deliveredBatchIds = this[SupplierOrderLines.deliveredBatchIds],
+  receivedQuantityTotal = this[SupplierOrderLines.receivedQuantityTotal],
   isActive = this[SupplierOrderLines.isActive]
 )
 
-private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, supplierId: UUID, now: Long): SupplierOrderDataModel = copy(
+internal fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, supplierId: UUID, now: Long): SupplierOrderDataModel = copy(
   userId = userId.toString(),
   storeId = storeId.toString(),
   supplierId = supplierId.toString(),
@@ -6879,7 +6881,7 @@ private fun SupplierOrderDataModel.cleanForStorage(userId: UUID, storeId: UUID, 
   isActive = isActive
 )
 
-private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
+internal fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierOrderLineDataModel = copy(
   orderId = orderId.toString(),
   requestedQuantity = requestedQuantity.copy(total = requestedQuantity.total.coerceAtLeast(0.0)),
   supplierAcceptedQuantity = supplierAcceptedQuantity?.let { quantity ->
@@ -6903,7 +6905,7 @@ private fun SupplierOrderLineDataModel.cleanForStorage(orderId: UUID): SupplierO
     .distinctBy { it.language }
 )
 
-private fun supplierResponseAmountForStorage(
+internal fun supplierResponseAmountForStorage(
   lines: List<SupplierOrderLineDataModel>,
   supplierId: UUID,
   fallbackCurrency: String? = null
@@ -6913,7 +6915,8 @@ private fun supplierResponseAmountForStorage(
       ?: return@mapNotNull null
     val offeredPrice = line.supplierOfferedSupplyPrice?.takeIf { it.hasPositiveSupplierDeskPrice() }
       ?: return@mapNotNull null
-    acceptedQuantity to offeredPrice
+    val pricedAmount = line.supplierAcceptedQuantity?.pricedAmount?.takeIf { it.isFinite() && it > 0.0 } ?: return@mapNotNull null
+    (acceptedQuantity / pricedAmount) to offeredPrice
   }
   val normalizedFallbackCurrency = fallbackCurrency?.trim()?.uppercase()?.takeIf { it.isNotBlank() } ?: "KZT"
   val currencies = amountLines
@@ -6933,7 +6936,7 @@ private fun supplierResponseAmountForStorage(
   )
 }
 
-private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrderWithLinesDataModel? {
+internal fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrderWithLinesDataModel? {
   val order = SupplierOrders
     .selectAll()
     .where { SupplierOrders.id eq orderId }
@@ -6949,7 +6952,7 @@ private fun supplierOrderWithLinesInsideTransaction(orderId: UUID): SupplierOrde
   return SupplierOrderWithLinesDataModel(order, lines)
 }
 
-private fun lockSupplierOrdersInsideTransaction(orderIds: Collection<UUID>) {
+internal fun lockSupplierOrdersInsideTransaction(orderIds: Collection<UUID>) {
   orderIds
     .distinct()
     .sortedBy { it.toString() }
@@ -15736,7 +15739,7 @@ private fun supplierContractBlocksStoreSupplyInsideTransaction(
     .firstOrNull { contract -> contract.blocksSupplierSupplyForGoods(goodsIdStrings) }
 }
 
-private fun InsertStatement<Number>.setSupplierOrderColumns(
+internal fun InsertStatement<Number>.setSupplierOrderColumns(
   orderId: UUID,
   clean: SupplierOrderDataModel,
   userId: UUID,
@@ -15784,7 +15787,7 @@ private fun UpdateBuilder<*>.setSupplierOrderUpdateColumns(clean: SupplierOrderD
   this[SupplierOrders.isActive] = clean.isActive
 }
 
-private fun InsertStatement<Number>.setSupplierOrderLineColumns(
+internal fun InsertStatement<Number>.setSupplierOrderLineColumns(
   lineId: UUID,
   clean: SupplierOrderLineDataModel,
   orderId: UUID,
@@ -15804,6 +15807,7 @@ private fun InsertStatement<Number>.setSupplierOrderLineColumns(
   this[SupplierOrderLines.supplierOfferedSupplyPrice] = clean.supplierOfferedSupplyPrice
   this[SupplierOrderLines.substituteGoodsItemId] = clean.substituteGoodsItemId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
   this[SupplierOrderLines.deliveredBatchIds] = clean.deliveredBatchIds
+  this[SupplierOrderLines.receivedQuantityTotal] = clean.receivedQuantityTotal
   this[SupplierOrderLines.isActive] = clean.isActive
 }
 
@@ -16685,7 +16689,7 @@ internal fun upsertSupplierGoodsPriceInsideTransaction(
   return canonicalId
 }
 
-private fun learnSupplierPriceFromResponseLineInsideTransaction(
+internal fun learnSupplierPriceFromResponseLineInsideTransaction(
   userId: UUID,
   storeId: UUID,
   supplierId: UUID,
@@ -16716,7 +16720,7 @@ private fun learnSupplierPriceFromResponseLineInsideTransaction(
     storeId = storeId,
     supplierId = supplierId,
     goodsItemId = effectiveGoodsItemId,
-    supplyPrice = offeredPrice.copy(supplierId = supplierId.toString()),
+    supplyPrice = supplierPriceOnConfiguredBasis(offeredPrice, acceptedQuantity, defaultServerQuantityForGoodsItem(goodsRow[StockItems.measurementUnitId], acceptedQuantity.total)).copy(supplierId = supplierId.toString()),
     supplierBarcode = goodsRow.stockBarcodeValues().firstOrNull { it.isNotBlank() },
     supplierGoodsName = goodsRow[StockItems.name].operationLogVisibleText(effectiveGoodsItemId.toString()),
     now = now
@@ -16731,7 +16735,7 @@ private val configuredServerQuantityUnits: List<QuantityDataModel> by lazy {
     .filter { it.id.isNotBlank() && it.pricedAmount.isFinite() && it.pricedAmount > 0.0 }.withGramUnit()
 }
 
-private fun defaultServerQuantityForGoodsItem(
+internal fun defaultServerQuantityForGoodsItem(
   measurementUnitId: String,
   total: Double
 ): QuantityDataModel {
@@ -17885,6 +17889,7 @@ fun Application.module() {
     allowHeader(HttpHeaders.Pragma)
     allowHeader("store_id")
     allowHeader("store-id")
+    allowSupplierWorkspaceHeaders()
     allowHeader("worker_job_password")
     allowHeader(AITA_DEVICE_INSTALLATION_ID_HEADER)
     allowHeader(AITA_DEVICE_NAME_HEADER)
@@ -22793,66 +22798,44 @@ fun Application.module() {
           val body = call.receiveAita<SupplierOrderWithLinesDataModel>()
           var failureMessage: List<LocalizedStringDataModel>? = null
 
-          val result = newSuspendedTransaction(aitaServerIoContext) {
+          var failureStatus = HttpStatusCode.BadRequest
+          val result = try { newSuspendedTransaction(aitaServerIoContext) {
             val storeId = runCatching { UUID.fromString(body.order.storeId) }.getOrNull()
               ?: return@newSuspendedTransaction null
             val supplierId = runCatching { UUID.fromString(body.order.supplierId) }.getOrNull()
               ?: return@newSuspendedTransaction null
 
-            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = true)) return@newSuspendedTransaction null
+            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = true)) {
+              failureStatus = HttpStatusCode.Forbidden; return@newSuspendedTransaction null
+            }
             lockSupplierProfileInsideTransaction(supplierId)
-            if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) return@newSuspendedTransaction null
-            val requestedGoodsItemIds = body.lines.mapNotNull { line -> runCatching { UUID.fromString(line.goodsItemId) }.getOrNull() }
-            if (supplierContractBlocksStoreSupplyInsideTransaction(storeId, supplierId, requestedGoodsItemIds) != null) {
-              failureMessage = supplierContractGuardFailureMessage()
-              return@newSuspendedTransaction null
+            createSupplierOrderInsideTransaction(userId, storeId, supplierId, body, System.currentTimeMillis()) {
+              if (Suppliers.select(Suppliers.id).where { (Suppliers.id eq supplierId) and (Suppliers.isActive eq true) }.empty()) throw SupplierProcurementFailure("closed")
+              val requestedGoodsItemIds = body.lines.mapNotNull { line -> runCatching { UUID.fromString(line.goodsItemId) }.getOrNull() }
+              if (supplierContractBlocksStoreSupplyInsideTransaction(storeId, supplierId, requestedGoodsItemIds) != null) throw SupplierProcurementFailure("contract")
             }
+              .let { write -> write.copy(bundle = listOf(write.bundle).withSupplierDeskSnapshotsInsideTransaction().first()) }
 
-            val now = System.currentTimeMillis()
-            val orderId = UUID.randomUUID()
-            val cleanOrder = body.order.cleanForStorage(userId, storeId, supplierId, now)
-
-            SupplierOrders.insert {
-              it.setSupplierOrderColumns(orderId, cleanOrder, userId, storeId, supplierId)
-            }
-
-            body.lines
-              .mapNotNull { line ->
-                val goodsItemId = runCatching { UUID.fromString(line.goodsItemId) }.getOrNull()
-                  ?: return@mapNotNull null
-                val itemBelongsToStore = StockItems
-                  .select(StockItems.id)
-                  .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
-                  .empty()
-                  .not()
-                if (!itemBelongsToStore) return@mapNotNull null
-                line.cleanForStorage(orderId) to goodsItemId
-              }
-              .filter { (line, _) -> line.requestedQuantity.total > 0.0 }
-              .forEach { (line, goodsItemId) ->
-                val lineId = UUID.randomUUID()
-                SupplierOrderLines.insert {
-                  it.setSupplierOrderLineColumns(lineId, line, orderId, goodsItemId)
-                }
-              }
-
-            supplierOrderWithLinesInsideTransaction(orderId)
-              ?.let { listOf(it).withSupplierDeskSnapshotsInsideTransaction().firstOrNull() }
+          } } catch (failure: SupplierProcurementFailure) {
+            failureMessage = if (failure.kind == "contract") supplierContractGuardFailureMessage() else supplierProcurementProblemMessage(failure.kind)
+            if (failure.kind == "conflict") failureStatus = HttpStatusCode.Conflict
+            null
           }
 
-          result?.let {
-            publishSupplierOrderRealtime(
+          result?.let { write ->
+            val it = write.bundle
+            if (write.changed) publishSupplierOrderRealtime(
               storeId = it.order.storeId,
               reason = "supplier_order_created",
               mutationId = it.order.id
             )
             call.genericResponse(
-              status = HttpStatusCode.Created,
+              status = if (write.changed) HttpStatusCode.Created else HttpStatusCode.OK,
               payload = it,
               message = eventMessage("message.supplier_order_created")
             )
           } ?: call.genericResponseNoPayload(
-            HttpStatusCode.BadRequest,
+            failureStatus,
             failureMessage ?: eventMessage("message.cannot_create_supplier_order")
           )
         }
@@ -22861,8 +22844,10 @@ fun Application.module() {
           val userId = call.checkPrincipal() ?: return@put
           val body = call.receiveAita<SupplierOrderWithLinesDataModel>()
           var failureMessage: List<LocalizedStringDataModel>? = null
+          var failureStatus = HttpStatusCode.BadRequest
+          val requestedSupplierSide = call.request.headers["supplier_side"]?.equals("true", ignoreCase = true) == true
 
-          val result = newSuspendedTransaction(aitaServerIoContext) {
+          val result = try { newSuspendedTransaction(aitaServerIoContext) {
             val orderId = runCatching { UUID.fromString(body.order.id) }.getOrNull()
               ?: return@newSuspendedTransaction null
             lockSupplierOrdersInsideTransaction(listOf(orderId))
@@ -22872,11 +22857,16 @@ fun Application.module() {
             val supplierId = existing[SupplierOrders.supplierId]
             val canEditFromStore = userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_MANAGE, requireWorkshift = true)
             val canEditFromSupplier = userHasSupplierAccessInsideTransaction(userId, supplierId)
-            if (!canEditFromStore && !canEditFromSupplier) return@newSuspendedTransaction null
+            if ((!canEditFromStore && !canEditFromSupplier) || (requestedSupplierSide && !canEditFromSupplier)) return@newSuspendedTransaction null
+            val supplierEditing = canEditFromSupplier && (requestedSupplierSide || !canEditFromStore)
 
-            val now = System.currentTimeMillis()
+            validateSupplierOrderEditInsideTransaction(
+              supplierOrderWithLinesInsideTransaction(orderId) ?: return@newSuspendedTransaction null,
+              body, supplierSide = supplierEditing)
 
-            if (canEditFromSupplier && !canEditFromStore) {
+            val now = maxOf(System.currentTimeMillis(), existing[SupplierOrders.updatedAtMillis] + 1L)
+
+            if (supplierEditing) {
               val existingOrder = existing.toSupplierOrderDataModel()
               val requestedOrder = body.order
               val requestedActiveLines = body.lines
@@ -22977,12 +22967,15 @@ fun Application.module() {
               return@newSuspendedTransaction null
             }
 
-            val cleanOrder = body.order.cleanForStorage(existing[SupplierOrders.userId], storeId, supplierId, now)
+            val cleanOrder = body.order.cleanForStorage(existing[SupplierOrders.userId], storeId, supplierId, now).copy(
+              amount = supplierRequestedAmountForStorage(body.lines.filter { it.isActive }, supplierId),
+              deliveredAtMillis = existing[SupplierOrders.deliveredAtMillis],
+              confirmedDeliveryTimeMillis = existing[SupplierOrders.confirmedDeliveryTimeMillis])
             SupplierOrders.update({ SupplierOrders.id eq orderId }) {
               it.setSupplierOrderUpdateColumns(cleanOrder)
             }
 
-            val requestedLineIds = body.lines.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }.toSet()
+            val requestedLineIds = body.lines.filter { it.isActive }.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }.toSet()
             SupplierOrderLines
               .select(SupplierOrderLines.id)
               .where { SupplierOrderLines.orderId eq orderId }
@@ -22993,6 +22986,7 @@ fun Application.module() {
               }
 
             body.lines
+              .filter { it.isActive }
               .mapNotNull { line ->
                 val goodsItemId = runCatching { UUID.fromString(line.goodsItemId) }.getOrNull()
                   ?: return@mapNotNull null
@@ -23041,6 +23035,10 @@ fun Application.module() {
 
             supplierOrderWithLinesInsideTransaction(orderId)
               ?.let { listOf(it).withSupplierDeskSnapshotsInsideTransaction().firstOrNull() }
+          } } catch (failure: SupplierProcurementFailure) {
+            failureMessage = supplierProcurementProblemMessage(failure.kind)
+            if (failure.kind == "conflict") failureStatus = HttpStatusCode.Conflict
+            null
           }
 
           result?.let {
@@ -23055,7 +23053,7 @@ fun Application.module() {
               message = eventMessage("message.supplier_order_updated")
             )
           } ?: call.genericResponseNoPayload(
-            HttpStatusCode.BadRequest,
+            failureStatus,
             failureMessage ?: eventMessage("message.cannot_update_supplier_order")
           )
         }
@@ -23245,7 +23243,8 @@ fun Application.module() {
           val request = call.receiveAita<ReceiveSupplierOrderRequestDataModel>()
           var failureMessage: List<LocalizedStringDataModel>? = null
 
-          val result = newSuspendedTransaction(aitaServerIoContext) {
+          var failureStatus = HttpStatusCode.BadRequest
+          val result = try { newSuspendedTransaction(aitaServerIoContext) {
             val orderId = runCatching { UUID.fromString(request.orderId) }.getOrNull()
               ?: return@newSuspendedTransaction null
             lockSupplierOrdersInsideTransaction(listOf(orderId))
@@ -23253,102 +23252,35 @@ fun Application.module() {
               ?: return@newSuspendedTransaction null
             val storeId = orderRow[SupplierOrders.storeId]
             val supplierId = orderRow[SupplierOrders.supplierId]
-            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE, requireWorkshift = true)) return@newSuspendedTransaction null
-            val receivingGoodsItemIds = request.receivedLines.mapNotNull { received -> runCatching { UUID.fromString(received.goodsItemId) }.getOrNull() }
-            if (supplierContractBlocksStoreSupplyInsideTransaction(storeId, supplierId, receivingGoodsItemIds) != null) {
-              failureMessage = supplierContractGuardFailureMessage()
-              return@newSuspendedTransaction null
+            if (!userCanUseStoreActionInsideTransaction(userId, storeId, STORE_PERMISSION_SUPPLIER_ORDERS_RECEIVE, requireWorkshift = true)) {
+              failureStatus = HttpStatusCode.Forbidden; return@newSuspendedTransaction null
+            }
+            receiveSupplierOrderInsideTransaction(userId, request, System.currentTimeMillis()) {
+              val receivingGoodsItemIds = request.receivedLines.mapNotNull { received -> runCatching { UUID.fromString(received.goodsItemId) }.getOrNull() }
+              if (supplierContractBlocksStoreSupplyInsideTransaction(storeId, supplierId, receivingGoodsItemIds) != null) throw SupplierProcurementFailure("contract")
             }
 
-            val now = System.currentTimeMillis()
-            request.receivedLines.forEach { received ->
-              val lineId = runCatching { UUID.fromString(received.orderLineId) }.getOrNull() ?: return@forEach
-              val lineRow = SupplierOrderLines
-                .selectAll()
-                .where { (SupplierOrderLines.id eq lineId) and (SupplierOrderLines.orderId eq orderId) and (SupplierOrderLines.isActive eq true) }
-                .singleOrNull()
-                ?: return@forEach
-              val goodsItemId = runCatching { UUID.fromString(received.goodsItemId) }.getOrNull() ?: lineRow[SupplierOrderLines.goodsItemId]
-              val itemRow = StockItems
-                .selectAll()
-                .where { (StockItems.id eq goodsItemId) and (StockItems.storeId eq storeId) and (StockItems.isActive eq true) }
-                .singleOrNull()
-                ?: return@forEach
-              val quantity = received.receivedQuantity.copy(total = received.receivedQuantity.total.coerceAtLeast(0.0))
-              if (!quantity.total.isFinite() || quantity.total <= 0.0) return@forEach
-
-              val batchId = UUID.randomUUID()
-              val shelfPriority = StockBatchesV2
-                .select(StockBatchesV2.id)
-                .where { (StockBatchesV2.goodsItemId eq goodsItemId) and (StockBatchesV2.storeId eq storeId) and (StockBatchesV2.isActive eq true) }
-                .count()
-                .toInt()
-
-              StockBatchesV2.insert {
-                it[StockBatchesV2.id] = batchId
-                it[StockBatchesV2.goodsItemId] = goodsItemId
-                it[StockBatchesV2.userId] = userId
-                it[StockBatchesV2.storeId] = storeId
-                it[StockBatchesV2.supplierId] = supplierId
-                it[StockBatchesV2.supplierOrderId] = orderId
-                it[StockBatchesV2.quantity] = quantity
-                it[StockBatchesV2.supplyPrice] = received.actualSupplyPrice.copy(supplierId = supplierId.toString())
-                it[StockBatchesV2.salePriceOverride] = null
-                it[StockBatchesV2.returnPriceOverride] = null
-                it[StockBatchesV2.wholesalePriceOverride] = null
-                it[StockBatchesV2.deliveredAtMillis] = now
-                it[StockBatchesV2.manufacturedAtMillis] = received.manufacturedAtMillis
-                it[StockBatchesV2.expirationDateMillis] = received.expirationDateMillis
-                it[StockBatchesV2.discounts] = received.discounts
-                it[StockBatchesV2.promotions] = received.promotions.sanitizedStockPromotions()
-                it[StockBatchesV2.shelfPosition] = (shelfPriority + 1).toString()
-                it[StockBatchesV2.shelfPriority] = shelfPriority
-                it[StockBatchesV2.status] = StockBatchStatusDataModel.Delivered.name
-                it[StockBatchesV2.additionalNotes] = received.notes?.takeIf { note -> note.isNotBlank() }
-                it[StockBatchesV2.additionalNotesLocalized] = received.notesLocalized
-                  .map { note -> note.copy(language = note.language.trim(), value = note.value.trim()) }
-                  .filter { note -> note.language.isNotBlank() && note.value.isNotBlank() }
-                  .distinctBy { note -> note.language }
-                it[StockBatchesV2.createdAtMillis] = now
-                it[StockBatchesV2.updatedAtMillis] = now
-                it[StockBatchesV2.createdByUserId] = userId
-                it[StockBatchesV2.isActive] = true
-              }
-
-              val deliveredBatchIds = (lineRow[SupplierOrderLines.deliveredBatchIds] + batchId.toString()).distinct()
-              SupplierOrderLines.update({ SupplierOrderLines.id eq lineId }) {
-                it[SupplierOrderLines.deliveredBatchIds] = deliveredBatchIds
-              }
-            }
-
-            val activeLines = SupplierOrderLines
-              .selectAll()
-              .where { (SupplierOrderLines.orderId eq orderId) and (SupplierOrderLines.isActive eq true) }
-              .map { it.toSupplierOrderLineDataModel() }
-            val fullyDelivered = activeLines.isNotEmpty() && activeLines.all { it.deliveredBatchIds.isNotEmpty() }
-            SupplierOrders.update({ SupplierOrders.id eq orderId }) {
-              it[SupplierOrders.status] = if (fullyDelivered) SupplierOrderStatusDataModel.Delivered.name else SupplierOrderStatusDataModel.PartiallyDelivered.name
-              it[SupplierOrders.deliveredAtMillis] = if (fullyDelivered) now else null
-              it[SupplierOrders.updatedAtMillis] = now
-            }
-
-            supplierOrderWithLinesInsideTransaction(orderId)
+          } } catch (failure: SupplierProcurementFailure) {
+            failureMessage = if (failure.kind == "contract") supplierContractGuardFailureMessage() else supplierProcurementProblemMessage(failure.kind)
+            if (failure.kind == "conflict") failureStatus = HttpStatusCode.Conflict
+            null
           }
 
-          result?.let {
-            publishSupplierOrderRealtime(
+          result?.let { write ->
+            val it = write.bundle
+            if (write.changed) publishSupplierOrderRealtime(
               storeId = it.order.storeId,
               reason = "supplier_order_received",
               mutationId = it.order.id
             )
-            publishStockRealtimeBundle(it.order.storeId, "supplier_order_received")
+            if (write.changed) publishStockRealtimeBundle(it.order.storeId, "supplier_order_received")
             call.genericResponse(
               status = HttpStatusCode.OK,
               payload = it,
               message = eventMessage("message.supplier_order_received")
             )
           } ?: call.genericResponseNoPayload(
-            HttpStatusCode.BadRequest,
+            failureStatus,
             failureMessage ?: eventMessage("message.cannot_receive_supplier_order")
           )
         }

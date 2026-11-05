@@ -2,7 +2,8 @@
 const {chromium}=require('playwright');
 const fs=require('fs'),http=require('http'),path=require('path');
 const dist=process.env.AITA_WEB_DIST;if(!dist)throw Error('Set AITA_WEB_DIST to the built distribution');
-const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke','marketplace');
+const detailOfflineTest=process.env.AITA_MARKET_DETAIL_OFFLINE==='1';
+const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke',detailOfflineTest?'marketplace-offline-detail':'marketplace');
 fs.mkdirSync(output,{recursive:true});
 const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
 const account={id:id(99),publicId:'MARKET-TEST',phoneNumber:'',email:'market@example.test',firstName:'Aida',lastName:'',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:process.env.AITA_TEST_LANGUAGE||'en',appThemeId:Number(process.env.AITA_TEST_THEME||0),appModeId:1};
@@ -17,7 +18,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
  const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US'});
  await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-market-token',refreshToken:'isolated-market-refresh'}));localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-market-device');localStorage.setItem('aita.key_appTheme','7');},account);
  await context.routeWebSocket('**',ws=>ws.close());const calls=[],errors=[];
- let shoppingRevision=1,savedRevision=0,savedShops=[],savedOffers=[id(103)],records={};
+ let shoppingRevision=1,savedRevision=0,savedShops=[],savedOffers=[id(103)],records={},detailOffline=false,detailWithdrawn=false;
  let lines=offers(Date.now()).slice(0,3).map((o,i)=>({offerId:o.id,storeId:o.storefront.storeId,title:o.title,shopName:o.storefront.displayName,units:i+1,basis:{gtin:null,currencyCode:o.currencyCode,unitId:o.unitId,pricedAmount:o.pricedAmount},unitName:o.unitName,updatedAtMillis:1,collected:false}));
  function shopping(now){return {userId:account.id,revision:shoppingRevision,lines:lines.map(line=>{const o=offers(now).find(x=>x.id===line.offerId);return {line,offer:o,unitPriceMinor:o.priceMinor,subtotalMinor:o.priceMinor*line.units,status:'estimated'};}),checkedAtMillis:now};}
  
@@ -26,6 +27,10 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname});return route.fulfill({response});}
   if(u.hostname==='media.example.com')return route.fulfill({contentType:'image/svg+xml',body:picture(parseInt(u.pathname.match(/\d+/)[0]))});
   const p=u.pathname.replace(/^\/api\//,'/');calls.push({path:p,body:route.request().postData()});
+  if(p.startsWith('/market/offers/')&&p.endsWith('/detail')){
+   if(detailOffline)return route.abort('internetdisconnected');
+   if(detailWithdrawn)return route.fulfill({status:404,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({negative:true,payload:null,message:[{language:'main',value:'This offer is no longer published or available to view.',messageTemplate:{key:'market.unavailable',arguments:{}}}]})});
+  }
   let payload=[];const now=Date.now();
   if(p==='/user/get')payload=account;
   else if(p==='/user/app-mode')payload={accountId:account.id,appModeId:1};
@@ -75,6 +80,37 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await page.mouse.move(750,800);await page.mouse.wheel(0,450);await page.waitForTimeout(1000);await shot('home-promos');
   fs.writeFileSync(path.join(output,'promos-aria.txt'),await page.locator('body').ariaSnapshot());
   await page.getByRole('button').filter({hasText:/Mountain honey/}).first().click({force:true});await until(()=>calls.some(x=>x.path.endsWith('/detail')));await shot('product-detail');
+  if(detailOfflineTest){
+   await global.aitaGuidedStep?.('Open product information online and retain its verified public facts');
+   await page.waitForTimeout(800);
+   assert.match(await page.locator('body').ariaSnapshot(),/Local producer/);
+   await page.keyboard.press('Escape');detailOffline=true;
+   await global.aitaGuidedStep?.('Reload the app and open the same product while its detail endpoint is offline');
+   await page.reload();await page.locator('canvas').first().waitFor({timeout:90000});await page.waitForTimeout(8000);await page.keyboard.press('Tab');
+   await page.mouse.move(750,600);await page.mouse.wheel(0,-3000);await page.waitForTimeout(300);await page.mouse.wheel(0,450);await page.waitForTimeout(600);
+   await page.getByRole('button').filter({hasText:/Mountain honey/}).first().click({force:true});await page.waitForTimeout(1800);
+   let aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Local producer/);assert.match(aria,/These details need a refresh/);
+   await shot('saved-product-after-reload');
+   await page.getByRole('button',{name:/^Locations/}).last().click({force:true});
+   const visit=page.getByRole('button',{name:'Visit shop',exact:true});
+   assert.equal(await visit.isEnabled(),false,'Saved details must not authorize price-dependent shop actions');
+   detailOffline=false;
+   await global.aitaGuidedStep?.('Refresh current availability and re-enable verified actions');
+   await page.getByRole('button',{name:'Refresh',exact:true}).last().click({force:true});
+   for(let n=0;n<40&&!await visit.isEnabled();n++)await page.waitForTimeout(250);
+   assert.equal(await visit.isEnabled(),true);await shot('product-revalidated');
+   await global.aitaGuidedStep?.('Withdraw the offer and confirm its saved copy cannot reappear offline');
+   detailWithdrawn=true;await page.getByRole('button',{name:'Refresh',exact:true}).last().click({force:true});await page.waitForTimeout(1000);
+   aria=await page.locator('body').ariaSnapshot();assert.match(aria,/This offer is no longer available/);assert.doesNotMatch(aria,/Local producer/);
+   await page.keyboard.press('Escape');detailWithdrawn=false;detailOffline=true;await page.waitForTimeout(500);
+   await page.getByRole('button').filter({hasText:/Mountain honey/}).first().click({force:true});await page.waitForTimeout(1400);
+   aria=await page.locator('body').ariaSnapshot();assert.match(aria,/Connect to view this offer/);assert.doesNotMatch(aria,/Local producer/);
+   await shot('withdrawn-copy-not-restored');
+   assert.equal(shoppingRevision,1);assert.equal(Object.keys(records).length,0);assert.deepEqual(errors,[]);
+   console.log('PASS: product facts survive offline restart, stale actions stay guarded, explicit withdrawal removes cached facts');
+   return;
+  }
+
   await click(460,483);await page.waitForTimeout(400);await shot('product-photo-two');
   await click(610,142);
   await shot('product-locations');

@@ -23,6 +23,7 @@ import kotlinx.serialization.encodeToString
     var busy by mutableStateOf(true)
     var fresh by mutableStateOf(false)
     var partial by mutableStateOf(false)
+    var accessDenied by mutableStateOf(false)
     var error by mutableStateOf<List<LocalizedStringDataModel>?>(null)
 }
 
@@ -59,13 +60,24 @@ import kotlinx.serialization.encodeToString
     }
     DisposableEffect(data) { onDispose { data.active = false; requests.close() } }
     LaunchedEffect(data) { scroll.scrollToItem(0) }
-    LaunchedEffect(data, signal, opened) { if (opened == null) requests.trySend(Unit) }
+    LaunchedEffect(data, signal, opened) {
+        data.fresh = false
+        if (opened == null) requests.trySend(Unit)
+    }
     LaunchedEffect(data) {
         val owned = owner ?: run { data.busy = false; return@LaunchedEffect }
         if (before == null) {
             val exact = cachedMarketDeliveryPage(owned, view, store, filter)
             val saved = exact ?: cachedMarketDeliverySubset(owned, view, store, filter)
             if (data.active && owned.isCurrent()) { data.page = saved; data.partial = exact == null && saved != null }
+        }
+        val savedEpoch = mutationEpoch
+        val savedSignal = MarketplaceSignals.revision.value
+        val savedCommand = cachedMarketDeliveryCommand(owned)
+        if (data.active && owned.isCurrent() && !sending && savedEpoch == mutationEpoch &&
+            savedSignal == MarketplaceSignals.revision.value) {
+            pending = savedCommand
+            pendingError = savedCommand.error
         }
         for (ignored in requests) {
             delay(200)
@@ -75,23 +87,37 @@ import kotlinx.serialization.encodeToString
             if (detailOpen) continue
             data.busy = true
             val readEpoch = mutationEpoch
+            val readSignal = MarketplaceSignals.revision.value
+            fun currentRead() = readEpoch == mutationEpoch && readSignal == MarketplaceSignals.revision.value
             try {
                 val savedPending = cachedMarketDeliveryCommand(owned)
+                if (data.active && owned.isCurrent() && currentRead() && !sending) {
+                    pending = savedPending
+                    pendingError = savedPending.error
+                }
                 val result = withTimeoutOrNull(15_000) { loadMarketDeliveryPage(owned, view, store, before, filter) }
                 if (data.active && owned.isCurrent()) {
-                    if (readEpoch == mutationEpoch && !sending) {
-                        pending = savedPending
-                        pendingError = savedPending.error
-                    }
-                    data.fresh = result?.negative == false && result.payload != null
-                    if (data.fresh) { data.page = result?.payload; data.partial = false; data.error = result?.message }
-                    else {
+                    if (result?.httpStatusCode in setOf(401, 403) && result?.transportFailure == false) {
+                        // Even an older authoritative denial revokes saved customer details.
+                        data.fresh = false; data.page = null; data.accessDenied = true
                         data.error = result?.message ?: eventMessage("delivery.refresh_failed")
-                        if (result?.httpStatusCode in setOf(401, 403) && result?.transportFailure == false) data.page = null
+                    } else if (!currentRead()) {
+                        // A pre-mutation empty page must not hide a durably acknowledged order.
+                        // Keep one trailing read after local actions or background invalidation.
+                        requests.trySend(Unit)
+                    } else {
+                        data.fresh = result?.negative == false && result.payload != null
+                        if (data.fresh) { data.page = result?.payload; data.partial = false; data.accessDenied = false; data.error = result?.message }
+                        else data.error = result?.message ?: eventMessage("delivery.refresh_failed")
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (data.active && owned.isCurrent()) { data.fresh = false; data.error = eventMessage("delivery.refresh_failed") } }
+            catch (_: Exception) {
+                if (data.active && owned.isCurrent()) {
+                    if (currentRead()) { data.fresh = false; data.error = eventMessage("delivery.refresh_failed") }
+                    else requests.trySend(Unit)
+                }
+            }
             finally { if (data.active) data.busy = false }
         }
     }
@@ -101,6 +127,8 @@ import kotlinx.serialization.encodeToString
             if (!detailOpen && before == null) requests.trySend(Unit)
         }
     }
+    val confirmedFallback = pending?.confirmedBuyerFallback(account.orEmpty(), view, filter, data.page,
+        data.fresh, data.accessDenied, before, clock)
     LazyColumn(modifier, state = scroll, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item("controls") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -131,7 +159,7 @@ import kotlinx.serialization.encodeToString
                     Text(deliveryText("pending"), color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
                     actionButton(text = deliveryText("retry"), enabled = !sending, loading = sending, autoLoading = false, confirmationRequired = false, onClick = {
                         if (owner != null && !sending) {
-                            mutationEpoch++; sending = true
+                            mutationEpoch++; sending = true; data.fresh = false
                             ui.launch { try {
                                 val result = sendMarketDeliveryCommand(owner)
                                 if (owner.isCurrent()) { pending = result; pendingError = result.error; requests.trySend(Unit) }
@@ -142,7 +170,19 @@ import kotlinx.serialization.encodeToString
                 if (before != null) actionButton(text = deliveryText("latest"), autoLoading = false, confirmationRequired = false, onClick = { before = null })
             }
         }
-        if (!data.busy && data.page?.orders.isNullOrEmpty()) item("empty") {
+        if (confirmedFallback != null) item("last-confirmed") {
+            DeliveryCard {
+                Text(deliveryText("last_confirmed"), color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
+                Text(confirmedFallback.shopName, color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                Text(deliveryText(confirmedFallback.status.name) + " · " + receiptUiDateTime(confirmedFallback.updatedAtMillis),
+                    color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                confirmedFallback.totalMinor?.let { Text(marketMoneyLabel(it, confirmedFallback.request.currency),
+                    color = stateValues.TextColor, fontSize = stateValues.textSize) }
+                actionButton(text = deliveryText("view_order"), autoLoading = false, confirmationRequired = false,
+                    onClick = { opened = confirmedFallback.id })
+            }
+        }
+        if (!data.busy && data.page?.orders.isNullOrEmpty() && confirmedFallback == null) item("empty") {
             Text(deliveryText(if (data.fresh) "empty_filter" else if (data.page != null) "empty_saved" else "unavailable_filter"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.textSize)
         }
         items(data.page?.orders.orEmpty(), key = { it.id }) { order ->
@@ -160,5 +200,5 @@ import kotlinx.serialization.encodeToString
         data.page?.nextBefore?.let { cursor -> item("more") { actionButton(text = deliveryText("next"), autoLoading = false,
             confirmationRequired = false, enabled = !data.busy, onClick = { before = cursor }) } }
     }
-    opened?.let { id -> key(account,generation,id,store) { MarketDeliveryOrderSheet(id, store, data.page?.orders?.firstOrNull { it.id == id }, onDismiss = { opened = null }) } }
+    opened?.let { id -> key(account,generation,id,store) { MarketDeliveryOrderSheet(id, store, data.page?.orders?.firstOrNull { it.id == id } ?: confirmedFallback?.takeIf { it.id == id }, onDismiss = { opened = null }) } }
 }

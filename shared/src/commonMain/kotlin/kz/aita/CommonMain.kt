@@ -2759,7 +2759,8 @@ fun List<StockPromotionDataModel>.bestPromotedPrice(
 @kotlinx.serialization.Serializable
 data class ReceiveSupplierOrderRequestDataModel(
     val orderId: String,
-    val receivedLines: List<ReceiveSupplierOrderLineDataModel>
+    val receivedLines: List<ReceiveSupplierOrderLineDataModel>,
+    val receiptId: String = ""
 )
 
 @kotlinx.serialization.Serializable
@@ -6241,6 +6242,16 @@ private fun refreshSupplierModeWorkspaceIfActive(includeContracts: Boolean = fal
     }
 }
 
+suspend fun pendingSupplierOrderDraft(storeId: String, goodsItemId: String): SupplierOrderWithLinesDataModel? {
+    val owner = captureSupplierSessionOwner() ?: return null
+    return withContext(Dispatchers.ourIo) { supplierPendingRequests.pendingCreate(owner, storeId, goodsItemId) }
+}
+
+suspend fun pendingSupplierReceipt(orderId: String): ReceiveSupplierOrderRequestDataModel? {
+    val owner = captureSupplierSessionOwner() ?: return null
+    return withContext(Dispatchers.ourIo) { supplierPendingRequests.pendingReceipt(owner, orderId) }
+}
+
 fun addSupplierOrder(
     orderWithLines: SupplierOrderWithLinesDataModel,
     onCompleted: ((DataState<SupplierOrderWithLinesDataModel>) -> Unit)? = null
@@ -6251,25 +6262,45 @@ fun addSupplierOrder(
         restoreSupplierWorkspaceCache()
         if (!requestOwner.isCurrent()) return@launch
         supplierOrderOperationMutex.withLock {
+            val prepared = try { supplierPendingRequests.prepareCreate(requestOwner, orderWithLines) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierProcurementProblemMessage(
+                    if (failure is SupplierPendingRequestConflict) "pending" else "storage")))
+                return@withLock
+            }
             val response = requestOwner.request { requestGeneration ->
                 networkRequest<SupplierOrderWithLinesDataModel, SupplierOrderWithLinesDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.addSupplierOrderPath.first,
-                    body = orderWithLines,
+                    body = prepared,
                     expectedSessionGeneration = requestGeneration
                 )
             } ?: return@withLock
 
             if (response.negative || response.payload == null) {
+                if (!response.transportFailure && response.httpStatusCode in setOf(400, 422))
+                    try { supplierPendingRequests.completeCreate(requestOwner, prepared) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { /* Keep the request identity for a safe repeat if storage is unavailable. */ }
+                if (!requestOwner.isCurrent()) return@withLock
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
+                if (!response.payload.acknowledgesSupplierCreate(prepared)) {
+                    if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
+                    return@withLock
+                }
                 if (!publishSupplierOrderMutation(requestOwner, listOf(response.payload),
                     SupplierOrderMutationSide.Store, response.message)) {
                     if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
                     return@withLock
                 }
 
+                if (!requestOwner.isCurrent()) return@withLock
+                try { supplierPendingRequests.completeCreate(requestOwner, prepared) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { /* Keep the request identity for a safe repeat if storage is unavailable. */ }
                 if (!requestOwner.isCurrent()) return@withLock
                 getSupplierModeDashboard(force = true)
                 postInAppNotification(response.message, NotificationType.Positive)
@@ -6296,6 +6327,7 @@ fun updateSupplierOrder(
                     method = HttpMethod.Put,
                     endpointUrl = globalAppConfigurationState.payloadValue.updateSupplierOrderPath.first,
                     body = orderWithLines,
+                    headers = if (supplierSide) mapOf("supplier_side" to "true") else emptyMap(),
                     expectedSessionGeneration = requestGeneration
                 )
             } ?: return@withLock
@@ -6571,24 +6603,44 @@ fun receiveSupplierOrder(
         restoreSupplierWorkspaceCache()
         if (!requestOwner.isCurrent()) return@launch
         supplierOrderOperationMutex.withLock {
+            val prepared = try { supplierPendingRequests.prepareReceipt(requestOwner, request) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierProcurementProblemMessage(
+                    if (failure is SupplierPendingRequestConflict) "pending" else "storage")))
+                return@withLock
+            }
             val response = requestOwner.request { requestGeneration ->
                 networkRequest<SupplierOrderWithLinesDataModel, ReceiveSupplierOrderRequestDataModel>(
                     method = HttpMethod.Post,
                     endpointUrl = globalAppConfigurationState.payloadValue.receiveSupplierOrderPath.first,
-                    body = request,
+                    body = prepared,
                     expectedSessionGeneration = requestGeneration
                 )
             } ?: return@withLock
 
             if (response.negative || response.payload == null) {
+                if (!response.transportFailure && response.httpStatusCode in setOf(400, 422))
+                    try { supplierPendingRequests.completeReceipt(requestOwner, prepared) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { /* Keep the request identity for a safe repeat if storage is unavailable. */ }
+                if (!requestOwner.isCurrent()) return@withLock
                 postInAppNotification(response.message, NotificationType.Negative)
                 onCompleted?.invoke(DataState.Empty(response.message))
             } else {
+                if (!response.payload.acknowledgesSupplierReceipt(prepared)) {
+                    if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
+                    return@withLock
+                }
                 if (!publishSupplierOrderMutation(requestOwner, listOf(response.payload),
                     SupplierOrderMutationSide.Store, response.message)) {
                     if (requestOwner.isCurrent()) onCompleted?.invoke(DataState.Empty(supplierWorkspaceSnapshotInvalidMessage()))
                     return@withLock
                 }
+                if (!requestOwner.isCurrent()) return@withLock
+                try { supplierPendingRequests.completeReceipt(requestOwner, prepared) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { /* Keep the request identity for a safe repeat if storage is unavailable. */ }
                 if (!requestOwner.isCurrent()) return@withLock
                 response.payload.order.storeId.takeIf { it.isNotBlank() }?.let { getStockBatches(it) }
                 if (!requestOwner.isCurrent()) return@withLock
@@ -16764,7 +16816,9 @@ suspend fun finishDeletedAccountLocally(owner: String, generation: Long) {
     try {
         clearAuthenticatedSessionStorage(expectedGeneration = generation)
         runCatching { clearMarketDeliveryDeviceData(owner) }
+        runCatching { clearMarketOfferDetailDeviceData(owner) }
         runCatching { supplierWorkspaceCache.clear(owner) }
+        runCatching { clearSupplierPendingRequests(owner) }
         runCatching {
             val prefix = "supplier-picking-v2:$owner:"
             // Supplier identities are UUIDs; include the chunk namespace, not just legacy rows.
@@ -19673,6 +19727,7 @@ data class SupplierOrderLineDataModel(
     val substituteGoodsItemMeasurementUnitIdSnapshot: String? = null,
 
     val deliveredBatchIds: List<String> = emptyList(),
+    val receivedQuantityTotal: Double? = null,
 
     val isActive: Boolean = true
 )

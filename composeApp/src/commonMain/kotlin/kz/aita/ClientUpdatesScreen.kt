@@ -186,6 +186,14 @@ internal fun AppConfiguration.ClientUpdatesScreen() {
             }
         }
         UpdateCheckFooter(current)
+        // Keep the recovery method available even if the automatic catalogue check failed.
+        val helperPlatform = current.platform?.os?.name?.lowercase() ?: when {
+            getPlatformName().contains("windows", ignoreCase = true) -> "windows"
+            getPlatformName().contains("linux", ignoreCase = true) -> "linux"
+            else -> ""
+        }
+        InstallerHelperAction(helperPlatform)
+        InstallerGuideAction()
     }
 }
 

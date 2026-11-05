@@ -146,7 +146,10 @@ fun MarketDeliveryOrder.attentionReasons(view: String, now: Long): Set<MarketDel
         "seller" -> {
             if (status == MarketDeliveryStatus.REQUESTED) add(MarketDeliveryAttention.WAITING_CONFIRMATION)
             else if (request.mode != MarketDeliveryMode.PICKUP && (courierId == null || !courierAccepted)) add(MarketDeliveryAttention.NEEDS_COURIER)
-            if (status == MarketDeliveryStatus.READY && request.mode != MarketDeliveryMode.PICKUP && courierAccepted) add(MarketDeliveryAttention.READY_TO_DISPATCH)
+            if (status == MarketDeliveryStatus.READY) {
+                if (request.mode == MarketDeliveryMode.PICKUP) add(MarketDeliveryAttention.READY_TO_HAND_OVER)
+                else if (courierAccepted) add(MarketDeliveryAttention.READY_TO_DISPATCH)
+            }
         }
         "buyer" -> if (status == MarketDeliveryStatus.ARRIVED || (status == MarketDeliveryStatus.READY && request.mode == MarketDeliveryMode.PICKUP))
             add(MarketDeliveryAttention.READY_TO_RECEIVE)
@@ -180,7 +183,11 @@ fun MarketDeliveryOrder.availableActions(buyer: Boolean, manager: Boolean, couri
             MarketDeliveryStatus.REQUESTED -> add(MarketDeliveryAction.CONFIRM)
             MarketDeliveryStatus.CONFIRMED -> add(MarketDeliveryAction.PACK)
             MarketDeliveryStatus.PREPARING -> add(MarketDeliveryAction.READY)
-            MarketDeliveryStatus.READY -> if (request.mode != MarketDeliveryMode.PICKUP && courierAccepted) add(MarketDeliveryAction.DISPATCH)
+            MarketDeliveryStatus.READY -> if (request.mode == MarketDeliveryMode.PICKUP) {
+                // Counter staff can close a collected order only with the recipient's proof.
+                // The server verifies the handover code for every actor except the buyer.
+                add(MarketDeliveryAction.DELIVER)
+            } else if (courierAccepted) add(MarketDeliveryAction.DISPATCH)
             else -> Unit
         }
         if (status != MarketDeliveryStatus.REQUESTED && request.mode != MarketDeliveryMode.PICKUP)

@@ -58,6 +58,21 @@ class MarketplacePolicyTest {
             assertFalse(batch().copy(quantity=batch().quantity.copy(pricedAmount=it)).isMarketSellableAt("branch",100))
         }
     }
+    @Test fun unlimitedStockKeepsAvailabilityWithoutInventingStoredQuantity() {
+        val zero = batch().copy(quantity = batch().quantity.copy(total = 0.0))
+        assertTrue(zero.copy(kind = StockBatchKindDataModel.UNLIMITED).isMarketSellableAt("branch", 100))
+        assertTrue(zero.copy(unlimitedQuantity = true).isMarketSellableAt("branch", 100))
+        assertFalse(zero.copy(kind = StockBatchKindDataModel.UNIVERSAL).isMarketSellableAt("branch", 100))
+        val unlimited = zero.copy(kind = StockBatchKindDataModel.UNLIMITED)
+        assertFalse(unlimited.isMarketSellableAt("other", 100))
+        assertFalse(unlimited.copy(expirationDateMillis = 100).isMarketSellableAt("branch", 100))
+        assertFalse(unlimited.copy(isActive = false).isMarketSellableAt("branch", 100))
+        assertFalse(unlimited.copy(status = StockBatchStatusDataModel.Ordered).isMarketSellableAt("branch", 100))
+        listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY).forEach { invalid ->
+            assertFalse(unlimited.copy(quantity = unlimited.quantity.copy(total = invalid)).isMarketSellableAt("branch", 100))
+        }
+        assertFalse(unlimited.copy(quantity = unlimited.quantity.copy(pricedAmount = 0.0)).isMarketSellableAt("branch", 100))
+    }
     @Test fun buyerRecoveryNeverDependsOnSelectedStoreSubscription() {
         listOf("market/offers","market/saved","market/saved/clear-unavailable","market/shopping-list","market/shopping-list/replace","market/compare","market/shops/example","market/offers/example").forEach{assertFalse(storeSubscriptionRequiredForEndpoint(it))}
         listOf("market/seller","market/seller/listing","/MARKET/seller/storefront?test=1").forEach{assertTrue(storeSubscriptionRequiredForEndpoint(it))}

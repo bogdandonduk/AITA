@@ -51,6 +51,19 @@ class MarketDeliveryTest {
         assertTrue(order().copy(status=MarketDeliveryStatus.DELIVERED).availableActions(true,true,true).isEmpty())
         assertTrue(MarketDeliveryAction.ASSIGN in ready.copy(status=MarketDeliveryStatus.ON_THE_WAY).availableActions(false,true,false))
     }
+    @Test fun merchantCanCompletePickupOnlyAtTheCounterReadyStage() {
+        val pickup=order().copy(request=order().request.copy(mode=MarketDeliveryMode.PICKUP))
+        for(status in MarketDeliveryStatus.entries) {
+            val current=pickup.copy(status=status)
+            assertEquals(status==MarketDeliveryStatus.READY,
+                MarketDeliveryAction.DELIVER in current.availableActions(false,true,false),status.name)
+        }
+        assertFalse(MarketDeliveryAction.DELIVER in order().copy(status=MarketDeliveryStatus.READY).availableActions(false,true,false))
+        assertEquals(setOf(MarketDeliveryAttention.READY_TO_HAND_OVER),
+            pickup.copy(status=MarketDeliveryStatus.READY).attentionReasons("seller",2000))
+        assertTrue(pickup.copy(status=MarketDeliveryStatus.READY).matchesFilter(
+            MarketDeliveryFilter(MarketDeliveryQueue.ATTENTION),"seller",2000))
+    }
     @Test fun staleInaccurateOrInvalidCoordinatesAreNeverLive() {
         val point=MarketCourierPosition(51.1,71.4,20.0,1_000_000,1_000_000)
         assertTrue(point.isValid(1_000_000));assertTrue(point.isFresh(1_060_000))
@@ -64,6 +77,22 @@ class MarketDeliveryTest {
         assertTrue(redacted.isValidDeliveryOrder());assertTrue(redacted.events.all { it.note.isEmpty() })
         assertFalse(redacted.copy(status=MarketDeliveryStatus.REQUESTED).isValidDeliveryOrder())
         assertFailsWith<IllegalArgumentException>{order().withoutDeletedAccountContacts(id(2))}
+    }
+    @Test fun acknowledgedCheckoutRemainsVisibleOnlyAsAnOwnedFilteredOfflineFallback() {
+        val confirmed=order().copy(position=MarketCourierPosition(51.0,71.0,5.0,1000,1000))
+        val result=MarketDeliverySendResult(acknowledged=MarketDeliveryOutcome(id(1),confirmed))
+        val filter=MarketDeliveryFilter(MarketDeliveryQueue.ACTIVE)
+        fun fallback(account:String=id(2),view:String="buyer",query:MarketDeliveryFilter=filter,
+            page:MarketDeliveryPage?=null,fresh:Boolean=false,denied:Boolean=false,before:String?=null)=
+            result.confirmedBuyerFallback(account,view,query,page,fresh,denied,before,2000)
+        val saved=assertNotNull(fallback())
+        assertEquals(id(1),saved.id);assertNull(saved.position);assertNull(saved.handoverCode)
+        assertNull(fallback(account=id(9)));assertNull(fallback(view="seller"));assertNull(fallback(view="courier"))
+        assertNull(fallback(fresh=true));assertNull(fallback(denied=true));assertNull(fallback(before=id(8)))
+        assertNull(fallback(query=filter.copy(search="other")))
+        assertNull(fallback(query=filter.copy(queue=MarketDeliveryQueue.HISTORY)))
+        assertNull(fallback(page=MarketDeliveryPage(id(2),"buyer",orders=listOf(confirmed),checkedAtMillis=2000)))
+        assertNull(MarketDeliverySendResult(pending=command()).confirmedBuyerFallback(id(2),"buyer",filter,null,false,false,null,2000))
     }
     @Test fun lostReplyRetriesSameDurableIntentAcrossRestart()=runTest {
         val owner=Owner(id(2));val memory=Memory();val sent=mutableListOf<MarketDeliveryCommand>()

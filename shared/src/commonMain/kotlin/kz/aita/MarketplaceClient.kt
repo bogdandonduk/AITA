@@ -1,6 +1,8 @@
 package kz.aita
 
 import io.ktor.http.HttpMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -52,19 +54,25 @@ suspend fun clearUnavailableMarketSaved(scope: MarketRequestScope): ResponseData
     }
 suspend fun loadMarketPublication(scope: MarketRequestScope): ResponseDataModel<MarketPublicationDashboard> {
     if(!scope.isCurrent() || scope.storeId==null) return cloudSessionExpiredResponse()
-    return networkRequest<MarketPublicationDashboard,Unit>(HttpMethod.Get,endpointUrl="market/seller",
-        headers=mapOf("store_id" to scope.storeId),expectedSessionGeneration=scope.generation)
+    return readOwnedMarketPublication(scope, scope.storeId) {
+        networkRequest<MarketPublicationDashboard,Unit>(HttpMethod.Get,endpointUrl="market/seller",
+            headers=mapOf("store_id" to scope.storeId),expectedSessionGeneration=scope.generation)
+    }
 }
 suspend fun saveMarketStorefront(scope: MarketRequestScope, value: MarketStorefront,
     locationStoreIds: List<String>? = null): ResponseDataModel<MarketPublicationDashboard> {
     if(!scope.isCurrent() || scope.storeId!=value.operatingBranchId) return cloudSessionExpiredResponse()
-    return networkRequest(HttpMethod.Put,endpointUrl="market/seller/storefront",headers=mapOf("store_id" to value.operatingBranchId),
-        body=MarketStorefrontUpdate(value, locationStoreIds),expectedSessionGeneration=scope.generation)
+    return readOwnedMarketPublication(scope, value.operatingBranchId) {
+        networkRequest(HttpMethod.Put,endpointUrl="market/seller/storefront",headers=mapOf("store_id" to value.operatingBranchId),
+            body=MarketStorefrontUpdate(value, locationStoreIds),expectedSessionGeneration=scope.generation)
+    }
 }
 suspend fun saveMarketListing(scope: MarketRequestScope, value: MarketListing): ResponseDataModel<MarketPublicationDashboard> {
     if(!scope.isCurrent() || scope.storeId==null) return cloudSessionExpiredResponse()
-    return networkRequest(HttpMethod.Put,endpointUrl="market/seller/listing",headers=mapOf("store_id" to scope.storeId),
-        body=MarketListingUpdate(value, replaceProduct=true, branchStoreId=scope.storeId),expectedSessionGeneration=scope.generation)
+    return readOwnedMarketPublication(scope, scope.storeId) {
+        networkRequest(HttpMethod.Put,endpointUrl="market/seller/listing",headers=mapOf("store_id" to scope.storeId),
+            body=MarketListingUpdate(value, replaceProduct=true, branchStoreId=scope.storeId),expectedSessionGeneration=scope.generation)
+    }
 }
 
 suspend fun loadMarketOffer(scope: MarketRequestScope, id: String): ResponseDataModel<MarketOffer> {
@@ -75,9 +83,11 @@ suspend fun loadMarketOffer(scope: MarketRequestScope, id: String): ResponseData
 }
 /** Details require a validated account-bound response; legacy card reads remain for old callers. */
 suspend fun loadMarketOfferDetail(scope: MarketRequestScope, id: String): ResponseDataModel<MarketOfferDetailResult> =
-    readOwnedMarketOfferDetail(scope, id) { normalizedId ->
-        networkRequest<MarketOfferDetailResult, Unit>(HttpMethod.Get, endpointUrl = "market/offers/$normalizedId/detail",
-            expectedSessionGeneration = scope.generation)
+    withContext(Dispatchers.ourIo) {
+        marketOfferDetailCache.refresh(scope, id) { normalizedId ->
+            networkRequest<MarketOfferDetailResult, Unit>(HttpMethod.Get, endpointUrl = "market/offers/$normalizedId/detail",
+                expectedSessionGeneration = scope.generation)
+        }
     }
 
 suspend fun loadMarketShop(scope: MarketRequestScope, id: String): ResponseDataModel<MarketStorefront> {

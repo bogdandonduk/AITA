@@ -2344,17 +2344,67 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
             .sortedByDescending { it.updatedAtMillis.takeIf { value -> value > 0L } ?: it.orderedAtMillis }
     }
 
-    var selectedSupplierId by rememberSaveable(goodsItem?.id, stateValues.suppliers?.size ?: 0) {
+    var selectedSupplierId by rememberSaveable(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) {
         mutableStateOf(stateValues.suppliers.orEmpty().firstOrNull()?.id.orEmpty())
     }
     var sendingOrder by remember(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) { mutableStateOf(false) }
-    var quantityText by rememberSaveable(goodsItem?.id) { mutableStateOf("1") }
-    var expectedPriceText by rememberSaveable(goodsItem?.id) {
+    var quantityText by rememberSaveable(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) { mutableStateOf("1") }
+    var expectedPriceText by rememberSaveable(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) {
         mutableStateOf(goodsItem?.supplyPrices?.firstOrNull()?.price.orEmpty())
     }
-    var desiredDeliveryDateText by rememberSaveable(goodsItem?.id) { mutableStateOf("") }
-    var desiredExpirationDateText by rememberSaveable(goodsItem?.id) { mutableStateOf("") }
+    var desiredDeliveryDateText by rememberSaveable(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) { mutableStateOf("") }
+    var desiredExpirationDateText by rememberSaveable(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) { mutableStateOf("") }
     var notesLocalized by remember(goodsItem?.id, stateValues.appLanguage) { mutableStateOf(emptyLocalizedItemForCurrentLanguage()) }
+
+    val procurementScope = rememberCoroutineScope()
+    var orderError by remember(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) { mutableStateOf("") }
+    var pendingDraft by remember(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) { mutableStateOf<SupplierOrderWithLinesDataModel?>(null) }
+    var receivingIds by remember(activeStoreId, stateValues.userAccount?.id) { mutableStateOf(emptySet<String>()) }
+    var receivingErrors by remember(activeStoreId, stateValues.userAccount?.id) { mutableStateOf(emptyMap<String, String>()) }
+    var pendingReceipts by remember(activeStoreId, stateValues.userAccount?.id) { mutableStateOf(emptyMap<String, ReceiveSupplierOrderRequestDataModel>()) }
+    suspend fun readPendingReceiptSafely(orderId: String): ReceiveSupplierOrderRequestDataModel? = try {
+        pendingSupplierReceipt(orderId)
+    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+    catch (_: Exception) {
+        receivingErrors = receivingErrors + (orderId to supplierProcurementProblemMessage("storage").extractLocalizedString(stateValues.appLanguage).orEmpty())
+        null
+    }
+    LaunchedEffect(activeStoreId, stateValues.userAccount?.id, itemOrders.map { it.id }) {
+        for (order in itemOrders) {
+            val saved = readPendingReceiptSafely(order.id)
+            pendingReceipts = if (saved == null) pendingReceipts - order.id else pendingReceipts + (order.id to saved)
+        }
+    }
+    fun submitOrder(request: SupplierOrderWithLinesDataModel) {
+        if (sendingOrder) return
+        sendingOrder = true; orderError = ""
+        addSupplierOrder(request) { result ->
+            sendingOrder = false
+            if (result is DataState.Success) {
+                pendingDraft = null; quantityText = "1"
+                expectedPriceText = goodsItem?.supplyPrices?.firstOrNull()?.price.orEmpty()
+                desiredDeliveryDateText = ""; desiredExpirationDateText = ""; notesLocalized = emptyLocalizedItemForCurrentLanguage()
+            } else {
+                orderError = (result.message ?: supplierProcurementProblemMessage("pending")).extractLocalizedString(stateValues.appLanguage).orEmpty()
+                procurementScope.launch {
+                    pendingDraft = runCatching { pendingSupplierOrderDraft(activeStoreId.orEmpty(), goodsItem?.id.orEmpty()) }.getOrNull()
+                }
+            }
+        }
+    }
+    LaunchedEffect(activeStoreId, goodsItem?.id, stateValues.userAccount?.id) {
+        val draft = runCatching { pendingSupplierOrderDraft(activeStoreId.orEmpty(), goodsItem?.id.orEmpty()) }.getOrNull()
+        pendingDraft = draft
+        draft?.let { saved ->
+            val line = saved.lines.firstOrNull { it.goodsItemId == goodsItem?.id } ?: return@let
+            selectedSupplierId = saved.order.supplierId
+            quantityText = stockQuantityInputTextFromAmount(line.requestedQuantity.total, line.requestedQuantity)
+            expectedPriceText = line.expectedSupplyPrice?.price.orEmpty()
+            desiredDeliveryDateText = saved.order.desiredDeliveryTimeMillis?.toStockDateInputText().orEmpty()
+            desiredExpirationDateText = line.desiredExpirationDateMillis?.toStockDateInputText().orEmpty()
+            notesLocalized = saved.order.additionalNotesLocalized
+        }
+    }
 
     LaunchedEffect(stateValues.suppliers, selectedSupplierId) {
         if (selectedSupplierId.isBlank()) {
@@ -2416,7 +2466,7 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
 
                         Text(
                             modifier = Modifier.padding(top = 4.dp),
-                            text = localizedStringResource(964, "This order keeps store-side data ready for the future supplier app: supplier, quantities, expected price, delivery dates, notes and receiving batches."),
+                            text = authUiText("Send an order to your supplier, follow its confirmation and receive deliveries into stock in full or in parts.", "Отправьте заказ поставщику, следите за подтверждением и принимайте поставки на склад целиком или частями.", "Жеткізушіге тапсырыс жіберіп, расталуын қадағалаңыз және жеткізілімді қоймаға толық не бөліп қабылдаңыз.", "Жеткирүүчүгө тапшырык жөнөтүп, ырастоону байкап, товарды кампага толук же бөлүп кабыл алыңыз."),
                             color = stateValues.PlaceholderTextColor,
                             fontSize = stateValues.smallTextSize
                         )
@@ -2497,6 +2547,13 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
 
                         Spacer(modifier = Modifier.height(stateValues.marginTextFieldGroup))
 
+                        if (orderError.isNotBlank()) Text(orderError, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                        pendingDraft?.let { saved ->
+                            Text(authUiText("Saved request awaiting confirmation. Retry safely when connected.", "Сохранённый запрос ждёт подтверждения. При подключении его можно безопасно повторить.", "Сақталған сұрау растауды күтуде. Қосылғанда қауіпсіз қайталаңыз.", "Сакталган суроо ырастоону күтүүдө. Туташканда коопсуз кайталаңыз."), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            Spacer(Modifier.height(stateValues.marginTextField))
+                            actionButton(text = authUiText("Retry saved request", "Повторить сохранённый запрос", "Сақталған сұрауды қайталау", "Сакталган суроону кайталоо"), loading = sendingOrder, autoLoading = false, enabled = !sendingOrder, confirmationRequired = false, onClick = { submitOrder(saved) })
+                            Spacer(Modifier.height(stateValues.marginTextField))
+                        }
                         actionButton(
                             text = localizedStringResource(955, "Send to supplier"),
                             iconPath = stateValues.drawablePathIconTransactionSupply,
@@ -2513,7 +2570,7 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                                 storeId = activeStoreId,
                                 supplierId = selectedSupplierId,
                                 amount = expectedPriceText.toMoneyDouble().takeIf { it > 0.0 }?.let { amount ->
-                                    PriceDataModel((amount * quantity.total).roundMoney().toStockMoneyText(), defaultCurrency, selectedSupplierId)
+                                    PriceDataModel((amount * quantity.total / quantity.pricedAmount).roundMoney().toStockMoneyText(), defaultCurrency, selectedSupplierId)
                                 },
                                 orderedAtMillis = now,
                                 desiredDeliveryTimeMillis = stockDateInputTextToMillis(desiredDeliveryDateText),
@@ -2535,17 +2592,7 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                                 isActive = true
                             )
 
-                            sendingOrder = true
-                            addSupplierOrder(SupplierOrderWithLinesDataModel(order, listOf(line))) { result ->
-                                sendingOrder = false
-                                if (result is DataState.Success) {
-                                    quantityText = "1"
-                                    expectedPriceText = goodsItem.supplyPrices.firstOrNull()?.price.orEmpty()
-                                    desiredDeliveryDateText = ""
-                                    desiredExpirationDateText = ""
-                                    notesLocalized = emptyLocalizedItemForCurrentLanguage()
-                                }
-                            }
+                            submitOrder(SupplierOrderWithLinesDataModel(order, listOf(line)))
                         }
                     }
 
@@ -2568,16 +2615,20 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                             order = order,
                             lines = orderLines,
                             goodsItem = goodsItem,
-                            onReceive = {
+                            receiving = order.id in receivingIds,
+                            pendingReceipt = pendingReceipts[order.id],
+                            receiveError = receivingErrors[order.id],
+                            onReceive = { receiveAmount ->
                                 val receivedLines = orderLines
-                                    .filter { it.goodsItemId == goodsItem.id }
+                                    .filter { it.goodsItemId == goodsItem.id && it.remainingReceivableQuantity() > 0.0 }
+                                    .take(1)
                                     .map { line ->
                                         val receivedGoodsItemId = line.substituteGoodsItemId?.takeIf { it.isNotBlank() } ?: line.goodsItemId
                                         val receivedGoodsItem = stateValues.stock.orEmpty().firstOrNull { stockItem -> stockItem.id == receivedGoodsItemId } ?: goodsItem
                                         ReceiveSupplierOrderLineDataModel(
                                             orderLineId = line.id,
                                             goodsItemId = receivedGoodsItemId,
-                                            receivedQuantity = line.supplierAcceptedQuantity ?: line.requestedQuantity,
+                                            receivedQuantity = line.receivableQuantity().copy(total = receiveAmount),
                                             actualSupplyPrice = line.supplierOfferedSupplyPrice ?: line.expectedSupplyPrice ?: PriceDataModel(expectedPriceText.ifBlank { "0" }, defaultCurrency, selectedSupplierId),
                                             expirationDateMillis = line.desiredExpirationDateMillis,
                                             discounts = emptyList(),
@@ -2586,7 +2637,28 @@ internal fun AppConfiguration.SupplierOrdersForGoodsItemContent(
                                             notesLocalized = line.supplierCommentLocalized.ifEmpty { line.additionalNotesLocalized }
                                         )
                                     }
-                                receiveSupplierOrder(ReceiveSupplierOrderRequestDataModel(order.id, receivedLines))
+                                if (order.id !in receivingIds) {
+                                    receivingIds = receivingIds + order.id; receivingErrors = receivingErrors - order.id
+                                    procurementScope.launch {
+                                        val saved = readPendingReceiptSafely(order.id)
+                                        if (saved != null && pendingReceipts[order.id] == null) {
+                                            pendingReceipts = pendingReceipts + (order.id to saved)
+                                            receivingIds = receivingIds - order.id
+                                            return@launch // Reveal the saved quantity; the next explicit tap retries it.
+                                        }
+                                        val request = saved ?: ReceiveSupplierOrderRequestDataModel(order.id, receivedLines)
+                                        receiveSupplierOrder(request) { result ->
+                                            receivingIds = receivingIds - order.id
+                                            if (result is DataState.Success) pendingReceipts = pendingReceipts - order.id
+                                            else {
+                                                receivingErrors = receivingErrors + (order.id to (result.message ?: supplierProcurementProblemMessage("pending")).extractLocalizedString(stateValues.appLanguage).orEmpty())
+                                                procurementScope.launch {
+                                                    readPendingReceiptSafely(order.id)?.let { pendingReceipts = pendingReceipts + (order.id to it) }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             },
                             onCancel = { deleteSupplierOrder(order.id) }
                         )

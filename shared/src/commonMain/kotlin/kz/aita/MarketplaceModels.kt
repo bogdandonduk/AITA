@@ -112,7 +112,7 @@ fun MarketOffer.comparisonKey(): String? {
 
 fun GoodsBatchDataModel.isMarketSellableAt(storeId: String, nowMillis: Long): Boolean =
     this.storeId == storeId && isActive && status in setOf(StockBatchStatusDataModel.Delivered, StockBatchStatusDataModel.OnShelf) &&
-        quantity.total.isFinite() && quantity.total > 0.0 && quantity.pricedAmount.isFinite() && quantity.pricedAmount > 0.0 &&
+        quantity.total.isFinite() && quantity.total >= 0.0 && (!tracksQuantity || quantity.total > 0.0) && quantity.pricedAmount.isFinite() && quantity.pricedAmount > 0.0 &&
         (expirationDateMillis == null || expirationDateMillis > nowMillis)
 
 /** Small editor journal only; no catalogue arrays, secrets, or pending purchases in navigation state. */

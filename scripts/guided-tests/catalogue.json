@@ -1,7 +1,7 @@
 [
   {
     "id": "journey",
-    "title": "Register \u2192 store \u2192 stock \u2192 sale \u2192 delete",
+    "title": "Register → store → stock → sale → delete",
     "file": "journey.cjs",
     "areas": [
       "registration",
@@ -17,7 +17,7 @@
   },
   {
     "id": "returns",
-    "title": "Receipt scan \u2192 linked return \u2192 Returned batch",
+    "title": "Receipt scan → linked return → Returned batch",
     "file": "returns.cjs",
     "areas": [
       "returns",
@@ -281,6 +281,19 @@
     "kind": "fixture-ui"
   },
   {
+    "id": "marketplace-offline-detail",
+    "title": "Product details offline, refresh and withdrawal",
+    "file": "../linux-web/test/marketplace-offline-detail-smoke.cjs",
+    "areas": [
+      "marketplace",
+      "offline",
+      "cache",
+      "catalogue"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
     "id": "public-marketplace",
     "title": "Guest marketplace landing page",
     "file": "../linux-web/test/public-marketplace-smoke.cjs",
@@ -311,6 +324,19 @@
     "kind": "fixture-ui"
   },
   {
+    "id": "delivery-recovery",
+    "title": "Delivery retry, offline confirmation and action validation",
+    "file": "../linux-web/test/market-delivery-recovery-smoke.cjs",
+    "areas": [
+      "delivery",
+      "offline",
+      "retry",
+      "validation"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
     "id": "courier-location",
     "title": "Courier location and tracking",
     "file": "../linux-web/test/market-courier-location-smoke.cjs",
@@ -320,5 +346,19 @@
       "tracking"
     ],
     "kind": "fixture-ui"
+  },
+  {
+    "id": "supplier-procurement",
+    "title": "Supplier order retry → partial receiving → complete stock delivery",
+    "file": "../linux-web/test/supplier-procurement-smoke.cjs",
+    "areas": [
+      "supplier orders",
+      "procurement",
+      "stock batches",
+      "partial delivery",
+      "lost-response recovery"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
   }
 ]

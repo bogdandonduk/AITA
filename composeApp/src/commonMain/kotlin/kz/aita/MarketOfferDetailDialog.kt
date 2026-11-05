@@ -61,6 +61,13 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
     LaunchedEffect(requests, remote) { requestRefresh() }
     LaunchedEffect(requests) {
         val owned = owner ?: run { loading = false; return@LaunchedEffect }
+        cachedMarketOfferDetail(owned, offerId)?.let { saved ->
+            if (owned.isCurrent()) {
+                offer = saved.offer; branches = saved.branchAvailability; branchesTruncated = saved.branchAvailabilityTruncated
+                // No loadedStamp/receivedAt: saved data never enables price-dependent actions.
+                fresh = false
+            }
+        }
         for (ignored in requests) {
             delay(100)
             while (requests.tryReceive().isSuccess) { /* keep a trailing request only for changes during I/O */ }
@@ -76,13 +83,13 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                     } else {
                         val data = response.payload
                         if (!response.negative && data != null) {
-                            offer = data.offer; branches = data.branchAvailability; branchesTruncated = data.branchAvailabilityTruncated; unavailable = false; error = null
+                            offer = data.offer; branches = data.branchAvailability; branchesTruncated = data.branchAvailabilityTruncated; unavailable = false; error = response.message
                             loadedStamp = stamp; receivedAt = TimeSource.Monotonic.markNow(); fresh = true
                         } else {
                             error = response.message ?: eventMessage("market.detail_failed")
                             // A missing new route is an upgrade problem, not a withdrawn offer.
-                            if (!response.transportFailure && response.httpStatusCode == 404 &&
-                                response.message?.eventMessageReferenceOrNull()?.key == "market.unavailable") {
+                            if (!response.transportFailure && (response.httpStatusCode in setOf(401, 403) ||
+                                (response.httpStatusCode == 404 && response.message?.eventMessageReferenceOrNull()?.key == "market.unavailable"))) {
                                 offer = null; branches = emptyList(); branchesTruncated = false; loadedStamp = null; receivedAt = null; unavailable = true
                             }
                         }

@@ -108,7 +108,6 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
     val installerDetails by clientInstallerDetailsState.collectAsState()
     val scope = rememberCoroutineScope()
     var webOpenFailed by remember { mutableStateOf(false) }
-    var installGuideFailed by remember { mutableStateOf(false) }
     val platforms = listOf("android" to "Android", "windows" to "Windows", "linux" to "Linux", "web" to "Web", "macos" to "macOS", "ios" to "iOS")
     var selectedPlatform by rememberNavigationSection("downloads:platform", when {
         getPlatformName().contains("wasm",ignoreCase=true) -> "web"
@@ -165,14 +164,7 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                         actionButton(text = updateText("check"), iconPath = stateValues.drawablePathIconRefresh, iconRes = stateValues.drawableResIconRefresh.value, autoLoading = false, confirmationRequired = false,
                             enabled = !downloads.loading && !downloads.folderChanging && downloads.savingId == null, loading = downloads.loading,
                             unavailableText = localizedStringResource(1141, "Please wait…"), onClick = DownloadsWorkspace::refresh)
-                        actionButton(text = installGuideTitle(stateValues.appLanguage), iconPath = downloadsIconPath(),
-                            autoLoading = false, confirmationRequired = false, onClick = {
-                                val language = if (stateValues.appLanguage.startsWith("ru")) "ru" else "en"
-                                scope.launch {
-                                    installGuideFailed = openExternalUrlPlatformAction?.invoke("https://aita.kz/install/#$language")?.success != true
-                                }
-                            })
-                        if (installGuideFailed) Text(updateText("error.unavailable"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                        InstallerGuideAction()
                     }
                 }
                 item("platform_tabs") {
@@ -202,6 +194,7 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
                                     Text(if (platform == "linux") pass23Text("linux") else downloadsText(platform), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                                 }
                             }
+                            if (releaseTab == "current_release") InstallerHelperAction(platform)
                             when (platform) {
                                 "web" -> if (releaseTab == "previous_releases") {
                                     Text(visualText("downloads.older_empty"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
@@ -263,12 +256,3 @@ internal fun AppConfiguration.DownloadsScreen(onBack: (() -> Unit)? = null, onOp
 }
 
 private fun downloadFileSize(bytes: Long): String = if (bytes >= 1_048_576) "${bytes / 1_048_576}.${bytes % 1_048_576 * 10 / 1_048_576} MiB" else "${bytes / 1024} KiB"
-
-private fun installGuideTitle(language: String) = when (language.substringBefore('-')) {
-    "ru" -> "Установка и обновление: инструкции"
-    "kk" -> "Орнату және жаңарту нұсқаулығы"
-    "ky" -> "Орнотуу жана жаңыртуу нускамасы"
-    "tg" -> "Дастури насб ва навсозӣ"
-    "uz" -> "O‘rnatish va yangilash yo‘riqnomasi"
-    else -> "Installation and update guide"
-}

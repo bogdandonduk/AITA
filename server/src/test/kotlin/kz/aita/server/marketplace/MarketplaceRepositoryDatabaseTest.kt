@@ -53,7 +53,7 @@ class MarketplaceRepositoryDatabaseTest {
                     CREATE TABLE stock_batches(id UUID PRIMARY KEY,store_id UUID NOT NULL,goods_item_id UUID NOT NULL REFERENCES stock_items(id),
                         created_at_millis BIGINT NOT NULL DEFAULT 0,updated_at_millis BIGINT NOT NULL DEFAULT 0,quantity JSONB NOT NULL,
                         sale_price_override JSONB,expiration_date_millis BIGINT,discounts JSONB NOT NULL DEFAULT '[]',promotions JSONB NOT NULL DEFAULT '[]',
-                        shelf_priority INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'Delivered',is_active BOOLEAN NOT NULL DEFAULT TRUE);
+                        shelf_priority INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'Delivered',kind TEXT NOT NULL DEFAULT 'NORMAL',is_active BOOLEAN NOT NULL DEFAULT TRUE);
                     INSERT INTO users(id) VALUES ('${f.owner}'),('${f.buyer}');
                     INSERT INTO stores(id,owner_user_ids) VALUES ('${f.management}','["${f.owner}"]'),('${f.otherManagement}','["${f.owner}"]');
                     INSERT INTO stores(id,parent_store_id,branch_type,owner_user_ids) VALUES
@@ -1619,6 +1619,43 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals(404, assertFailsWith<MarketFailure> { tx(f) { it.offerDetail(f.buyer, listing.id) } }.status)
     }
 
+    @Test fun unlimitedStockSurvivesPublicProjectionAndBuyerQuantityReview() = fixture { f,c ->
+        val listing = published(f)
+        batch(f,c,total=0.0)
+        exec(c,"UPDATE stock_batches SET kind='UNLIMITED'")
+        val offer=tx(f){it.offerDetail(f.buyer,listing.id)}.offer
+        assertEquals(19999L,offer.priceMinor)
+        assertEquals(MARKET_AVAILABILITY_RECORDED,offer.availability)
+        assertEquals(1.0,offer.pricedAmount)
+        val added=shoppingTx(f){it.apply(f.buyer,null,listCommand(f,listing,units=100))}
+        assertTrue(added.accepted)
+        assertEquals(MARKET_QUOTE_ESTIMATED,added.snapshot.lines.single().status)
+        assertEquals(1_999_900L,added.snapshot.lines.single().subtotalMinor)
+        assertEquals(0.0,scalar(c,"SELECT quantity->>'total' FROM stock_batches").toDouble())
+        exec(c,"UPDATE stock_batches SET kind='UNIVERSAL'")
+        assertNull(tx(f){it.offer(f.buyer,listing.id)}.priceMinor)
+        exec(c,"UPDATE stock_batches SET kind='UNLIMITED',expiration_date_millis=1")
+        assertNull(tx(f){it.offer(f.buyer,listing.id)}.priceMinor)
+    }
+
+    @Test fun parentTemplateChangesInvalidateItsPublishedInternetBranchWithoutExposingPickup() = fixture { f,c ->
+        val listing = published(f)
+        exec(c,"UPDATE stock_items SET store_id='${f.management}' WHERE id='${f.item}'")
+        assertTrue(hasPublishedMarketplaceStockDependency(c,f.management))
+        assertTrue(hasPublishedMarketplaceStockDependency(c,f.parent))
+        assertFalse(hasPublishedMarketplaceStockDependency(c,f.otherManagement))
+        assertFalse(hasPublishedMarketplaceStockDependency(c,f.branch))
+        exec(c,"UPDATE marketplace_storefronts SET share_branch_availability=TRUE,location_store_ids='[\"${f.branch}\"]'")
+        assertTrue(hasPublishedMarketplaceStockDependency(c,f.branch))
+        exec(c,"UPDATE marketplace_listings SET is_published=FALSE WHERE id='${listing.id}'")
+        assertFalse(hasPublishedMarketplaceStockDependency(c,f.management))
+        assertFalse(hasPublishedMarketplaceStockDependency(c,f.parent))
+        assertFalse(hasPublishedMarketplaceStockDependency(c,f.branch))
+        exec(c,"UPDATE marketplace_listings SET is_published=TRUE WHERE id='${listing.id}'")
+        exec(c,"UPDATE marketplace_storefronts SET is_published=FALSE")
+        assertFalse(hasPublishedMarketplaceStockDependency(c,f.management))
+    }
+
     @Test fun detailWithNoSellableStockIsVisibleWithoutAnInventedPrice() = fixture { f, c ->
         val listing = published(f)
         batch(f, c, expires = System.currentTimeMillis() - 1)
@@ -2224,6 +2261,44 @@ class MarketplaceRepositoryDatabaseTest {
         assertEquals(MarketDeliveryStatus.DELIVERED,order.status);assertEquals(0L,order.request.feeMinor)
     }
 
+
+    @Test fun pickupCounterHandoverRequiresBuyerCodeAndCompletesExactlyOnce()=fixture {f,c->
+        val request=deliveryRequest(f,c,MarketDeliveryMode.PICKUP)
+        var order=deliveryTx(f){r,_->r.command(f.buyer,request)}.order
+        val buyerCode=requireNotNull(order.handoverCode)
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryStep(f,f.owner,order,MarketDeliveryAction.DELIVER,code=buyerCode)}.status)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.CONFIRM)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.PACK)
+        order=deliveryStep(f,f.owner,order,MarketDeliveryAction.READY)
+        assertNull(order.handoverCode)
+        val attention=deliveryTx(f){r,_->r.page(f.owner,"seller",f.parent.toString(),null,MarketDeliveryFilter(MarketDeliveryQueue.ATTENTION))}
+        assertEquals(listOf(order.id),attention.orders.map { it.id })
+        for(code in listOf(null,if(buyerCode=="000000") "111111" else "000000")) {
+            assertEquals(400,assertFailsWith<MarketFailure>{deliveryStep(f,f.owner,order,MarketDeliveryAction.DELIVER,code=code)}.status)
+            assertEquals(order.revision,deliveryTx(f){r,_->r.get(f.owner,order.id)}.revision)
+        }
+        val command=MarketDeliveryCommand(UUID.randomUUID().toString(),MarketDeliveryAction.DELIVER,order.id,order.revision,handoverCode=buyerCode)
+        val complete=deliveryTx(f){r,_->r.command(f.owner,command)}
+        assertEquals(MarketDeliveryStatus.DELIVERED,complete.order.status)
+        assertTrue(deliveryTx(f){r,_->r.command(f.owner,command)}.replayed)
+        assertEquals(order.revision+1,deliveryTx(f){r,_->r.get(f.buyer,order.id)}.revision)
+        assertTrue(deliveryTx(f){r,_->r.page(f.owner,"seller",f.parent.toString(),null,MarketDeliveryFilter(MarketDeliveryQueue.ATTENTION))}.orders.isEmpty())
+    }
+
+    @Test fun lostDeliveryPolicySaveReplyCanBeRetriedWithoutOverwritingConcurrentChanges()=fixture {f,_->
+        val draft=MarketDeliveryPolicy(f.parent.toString(),modes=setOf(MarketDeliveryMode.PICKUP),instructions="  Collect at counter  ")
+        val first=deliveryTx(f){r,_->r.savePolicy(f.owner,draft)}
+        assertEquals(1L,first.revision)
+        assertEquals("Collect at counter",first.instructions)
+        assertEquals(first,deliveryTx(f){r,_->r.savePolicy(f.owner,draft)})
+        assertEquals(first,deliveryTx(f){r,_->r.savePolicy(f.owner,first)})
+        val second=deliveryTx(f){r,_->r.savePolicy(f.owner,first.copy(instructions="Use the entrance on the right"))}
+        assertEquals(2L,second.revision)
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.savePolicy(f.owner,draft)}}.status)
+        assertEquals(409,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.savePolicy(f.owner,second.copy(revision=0))}}.status)
+        assertEquals(second,deliveryTx(f){r,_->r.policy(f.owner,f.parent.toString(),true)})
+        assertEquals(403,assertFailsWith<MarketFailure>{deliveryTx(f){r,_->r.savePolicy(f.buyer,second)}}.status)
+    }
 
     @Test fun courierCanBeReassignedDuringTransitWithoutLeakingPreviousTracking()=fixture {f,c->
         val command=deliveryRequest(f,c)

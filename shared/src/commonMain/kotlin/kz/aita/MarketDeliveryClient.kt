@@ -27,6 +27,20 @@ fun MarketDeliveryOrder.isValidDeliveryOrder(): Boolean =
 data class MarketDeliverySendResult(val pending: MarketDeliveryCommand? = null, val acknowledged: MarketDeliveryOutcome? = null,
     val error: List<LocalizedStringDataModel>? = null)
 
+/** A successful checkout is already durably known even if the following list refresh fails.
+ * Expose that single buyer-owned receipt as a labelled fallback, never as a complete/fresh page.
+ * Merchant/courier contacts must not be resurrected from an acknowledgement after access denial.
+ */
+fun MarketDeliverySendResult.confirmedBuyerFallback(accountId: String, view: String,
+    filter: MarketDeliveryFilter, page: MarketDeliveryPage?, fresh: Boolean, accessDenied: Boolean,
+    before: String?, now: Long): MarketDeliveryOrder? {
+    if (view != "buyer" || fresh || accessDenied || before != null || !filter.isValid()) return null
+    val order = acknowledged?.order ?: return null
+    if (order.buyerId != accountId || !order.isValidDeliveryOrder() || !order.matchesFilter(filter, view, now) ||
+        page?.orders?.any { it.id == order.id } == true) return null
+    return order.copy(position = null, handoverCode = null)
+}
+
 /** Persist before sending, retire only after a matching acknowledgement is durably stored.
  * A network retry never invents a new order ID. One writer also survives screen disposal. */
 class MarketDeliveryOutbox(

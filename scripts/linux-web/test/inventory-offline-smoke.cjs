@@ -1,4 +1,4 @@
-// Offline goods and batch creation, restart durability and reconnect synchronization. Set AITA_AUTO_SYNC=1 to omit the manual Retry action. All APIs use isolated fixtures.
+// Offline goods and batch creation, restart durability, reconnect synchronization and connection-banner lifetime. Set AITA_AUTO_SYNC=1 to omit the manual Retry action. All APIs use isolated fixtures.
 // Set NODE_PATH to Playwright, AITA_WEB_DIST and AITA_ARTIFACTS.
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
@@ -21,7 +21,7 @@ const browser=await chromium.launch({headless:true,channel:'chromium',args:['--e
 await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-store-token',refreshToken:'isolated-store-refresh'}));localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-store-test');},account);
 let addedBatches=[],addedItems=[],batchAttempts=0,offline=false;
 const editedItems=new Map(),acceptedEdits=new Map();
-const calls=[],errors=[],memory=[],rendererCrashes=[],consoleErrors=[],lifecycle=[];const browserCdp=await browser.newBrowserCDPSession();await browserCdp.send('Target.setDiscoverTargets',{discover:true});browserCdp.on('Target.targetCrashed',event=>rendererCrashes.push(event));await context.routeWebSocket('**',ws=>ws.close());
+const calls=[],errors=[],memory=[],rendererCrashes=[],consoleErrors=[],lifecycle=[],bannerChecks=[];const browserCdp=await browser.newBrowserCDPSession();await browserCdp.send('Target.setDiscoverTargets',{discover:true});browserCdp.on('Target.targetCrashed',event=>rendererCrashes.push(event));await context.routeWebSocket('**',ws=>ws.close());
 await context.route('**/*',async route=>{
  const u=new URL(route.request().url());if(u.origin===origin)return route.continue();if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname});return route.fulfill({response});}
  const p=u.pathname.replace(/^\/api\//,'/'),req=route.request(),headers=req.headers(),storeId=headers.store_id||account.activeStoreId;calls.push({path:p,method:req.method(),storeId,body:req.postData()});if(offline)return route.abort('internetdisconnected');let payload=[];
@@ -69,6 +69,27 @@ const physicalNav=async label=>{await page.mouse.click(scene==='parent'?(label==
 const clickText=async label=>{const target=page.getByText(label,{exact:true});await target.first().waitFor({timeout:15000});await target.first().click({force:true});await page.waitForTimeout(650);};
 const tab=async pattern=>{await page.getByRole('button').filter({hasText:pattern}).click({force:true});await page.waitForTimeout(600);};
 const until=async(check,label)=>{for(let i=0;i<240&&!check();i++)await page.waitForTimeout(250);assert.ok(check(),label);};
+const connectedBanner=()=>page.getByText('Server connected',{exact:true});
+const offlineBanner=()=>page.getByText("Can't reach server. Offline mode",{exact:true});
+const assertOfflineBannerPersists=async label=>{
+ await offlineBanner().waitFor({state:'visible',timeout:30000});
+ const appearedAt=Date.now();await page.waitForTimeout(4600);
+ assert.equal(await offlineBanner().isVisible(),true,'Offline warning must remain after the connected-banner timeout');
+ assert.equal(await connectedBanner().isVisible(),false,'Offline state must not also display connected acknowledgement');
+ bannerChecks.push({label,offlineVisibleAfterMillis:Date.now()-appearedAt});
+};
+// Start observing before reconnect, without moving the clock or changing app state. The four
+// second acknowledgement must be visible long enough to read and then release its screen space.
+const observeConnectedAcknowledgement=async label=>{
+ await connectedBanner().waitFor({state:'visible',timeout:30000});
+ const appearedAt=Date.now();await page.waitForTimeout(2500);
+ assert.equal(await connectedBanner().isVisible(),true,'Connected acknowledgement must not disappear immediately');
+ await connectedBanner().waitFor({state:'hidden',timeout:7500});
+ const visibleMillis=Date.now()-appearedAt;
+ assert.ok(visibleMillis>=3200&&visibleMillis<10000,'Connected acknowledgement should hide around four seconds: '+visibleMillis+'ms');
+ assert.equal(await offlineBanner().isVisible(),false,'Recovery must remove the old offline warning');
+ bannerChecks.push({label,connectedVisibleMillis:visibleMillis});
+};
 try {
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(7000);await page.keyboard.press('Tab');
  await button('Stock').click({force:true});await page.waitForTimeout(1500);
@@ -87,6 +108,7 @@ try {
  offline=true;await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
  await button('Confirm').click({force:true});
  await page.getByText(/Stock changes waiting to sync: 1/).first().waitFor({timeout:60000});
+ await assertOfflineBannerPersists('offline-item');
  await shot('offline-item');assert.equal(addedItems.length,0);
  await typeIn(page.getByRole('textbox',{name:'Search by any data',exact:true}).first(),'Offline toy');await page.waitForTimeout(1000);
  const offlineItem=page.getByRole('button',{name:/^Offline toy .*Barcode: 2618000001248 /});
@@ -99,12 +121,23 @@ try {
  await button('Stock').click({force:true});await page.waitForTimeout(1200);
  assert.match(await page.locator('body').ariaSnapshot(),/Stock changes waiting to sync: 2/);
  assert.match(await page.locator('body').ariaSnapshot(),/Offline toy/);
+ await assertOfflineBannerPersists('offline-reload');
  await shot('offline-after-reload');
+ const connectedAcknowledgement=observeConnectedAcknowledgement('item-and-batch-reconnect');
+ // Keep an observer rejection handled while the existing stock synchronization assertions run.
+ connectedAcknowledgement.catch(()=>{});
  offline=false;console.log('RECONNECT',Date.now());await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  const retry=button('Retry').first();if(!process.env.AITA_AUTO_SYNC && await retry.count())await retry.click({force:true});
  await until(()=>addedItems.length===1 && addedBatches.length===1,'Item and batch synchronized');await page.waitForTimeout(1800);
  assert.deepEqual(addedItems[0].barcodes,['2618000001248']);assert.equal(addedBatches[0].goodsItemId,addedItems[0].id);assert.equal(addedBatches[0].quantity.total,5);
  assert.doesNotMatch(await page.locator('body').ariaSnapshot(),/Stock changes waiting to sync/);
+ await connectedAcknowledgement;
+ // Navigating performs more authenticated reads; none should resurrect the same connection.
+ await button('Menu').click({force:true});await page.waitForTimeout(700);
+ assert.equal(await connectedBanner().isVisible(),false,'Menu navigation must not restart a settled connected banner');
+ await button('Stock').click({force:true});await page.waitForTimeout(1300);
+ assert.equal(await connectedBanner().isVisible(),false,'Stock navigation and healthy requests must keep the banner hidden');
+ bannerChecks.push({label:'healthy-navigation',connectedHidden:true});
  assert.deepEqual(errors,[]);await shot('synchronized');
  console.log('PASS: field-specific errors; offline item and batch survive reload; reconnect syncs the same item and batch IDs');
  // Edit the same durable card offline, then restart before the server sees the edit.
@@ -125,5 +158,5 @@ try {
 
 
 } catch(e){await shot('failure');fs.writeFileSync(out+'/failure-aria.txt',await page.locator('body').ariaSnapshot());throw e;}
-finally {fs.writeFileSync(out+'/calls.json',JSON.stringify(calls,null,2));await browser.close();server.close();}
+finally {fs.writeFileSync(out+'/calls.json',JSON.stringify(calls,null,2));fs.writeFileSync(out+'/connection-banner-checks.json',JSON.stringify(bannerChecks,null,2));await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

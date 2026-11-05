@@ -8,11 +8,11 @@ The import must always be reviewed before writing stock. Recognition is imperfec
 
 ## Recognition and privacy
 
-1. `UIAutomationClient` reads only the selected window's bounded control tree. Password controls, offscreen controls and partially clipped/out-of-window cell rectangles are excluded; the reader never clamps a rectangle while keeping hidden full-cell text. UI Automation does not change the source application.
+1. `UIAutomationClient` reads only the selected window's bounded control tree. Depth-first traversal reaches visible cell values without enumerating every row first; WinForms `Header` and `HeaderItem` labels are supported. Password controls, offscreen controls and partially clipped/out-of-window cell rectangles are excluded; the reader never clamps a rectangle while keeping hidden full-cell text. UI Automation does not change the source application.
 2. Custom-painted tables can expose only toolbar text. Every fifth sampled view receives an OCR check regardless of barcode-like toolbar text, and sparse accessibility views use OCR immediately. Identical PNGs are deduplicated before OCR. The helper renders that specific HWND using `PrintWindow(PW_CLIENTONLY | PW_RENDERFULLCONTENT)` and sends a bounded PNG through a local process pipe. It never falls back to desktop-wide `CopyFromScreen` capture.
 3. A separate JVM process runs pinned Tess4J 5.18.0/Tesseract 5.5.2. If the native recognizer crashes or hangs, it cannot crash AITA's main JVM. OCR processing is limited to 18 seconds per frame. The helper's 22-second busy watchdog prevents broken accessibility providers from hanging indefinitely.
-4. The selected app must remain foreground at capture and delivery. The overlay uses `WS_EX_NOACTIVATE` and cannot steal source keyboard focus. A frame in flight is discarded when the in-app Pause or Stop action is used.
-5. Raw images and recognized words remain in process memory and bounded pipes. Screenshots are not saved, uploaded, added to crash diagnostics or written into logs. Fixed error codes are localized; native exception messages and screen titles are never emitted to diagnostics.
+4. The selected app must remain foreground at capture and delivery. The overlay uses `WS_EX_NOACTIVATE`, `WS_EX_TOPMOST` and nonselectable buttons. It avoids `Form.TopMost`, whose handle-creation path can activate a window in .NET Framework. A frame in flight is discarded when the in-app Pause or Stop action is used. An overlay Pause stops acquisition immediately; already-running OCR can take up to its 18-second deadline to finish.
+5. Raw images remain in process memory and bounded pipes. Screenshots are not saved, uploaded, added to crash diagnostics or written into logs. Recognized rows and their text are saved in an account/store-specific local review draft so review and partial import can resume; the existing inventory sync sends confirmed imported stock normally. Fixed error codes are localized; native exception messages and screen titles are never emitted to diagnostics. The OCR worker can report fixed processing phases and Java exception class names without exception messages or captured content.
 
 Current bounds: 6 million pixels per selected client area, 2,000 text elements per frame, 5,000 accessibility nodes per traversal, one capture in flight, nominal 1-second sampling, and 1,800 delivered frames per recording. Reviewing/importing and starting another recording supports larger inventories without unbounded memory growth. The parser/review layer separately bounds accepted rows.
 
@@ -34,7 +34,7 @@ Portable checks:
 ./gradlew :composeApp:jvmTest --tests kz.aita.StockCaptureProtocolTest
 ```
 
-Windows build machine (no screen capture):
+Windows build machine (generated images and its own synthetic windows only):
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\testing\verify-windows-stock-capture.ps1 -AppImage .\composeApp\build\compose\binaries\main\app\AITA
@@ -43,6 +43,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\testing\verify
 The Windows check compiles the C#/PowerShell helper, verifies all model hashes, checks pinned OCR jars, requires the three Microsoft runtime DLLs in the built application, and recognizes a generated bilingual PNG through the packaged launcher. The packaged OCR check is a hard gate. It then runs a bounded real-recorder probe against its own synthetic windows: actual UIA frame delivery, clipping, pause/resume, unrelated-window foreground pause, nonactivating overlay, selected-window OCR bitmap and Stop. Both Windows workflows run this gate after creating the application image and before packaging/publication.
 
 A service/session-0, locked or otherwise noninteractive desktop returns **UNSUPPORTED**, never a native-capture PASS. The gate prints that distinction and writes `build/windows-stock-capture-verification.json`, preserved with build diagnostics. A native probe failure on an interactive desktop fails the build. A skipped native probe still leaves physical capture acceptance pending; the independent packaged OCR check cannot be skipped. Linux-only C# compilation does not establish native capture behavior.
+
+The manually dispatched `Verify Windows stock recorder` workflow provides a faster native regression check. It compiles the actual production OCR worker/protocol, uses the actual word declaration, and creates a GUI launcher with the production JRE modules and pinned OCR dependencies. It does not replace the gate on the complete application classpath in the Windows packaging workflows.
+
+On 2026-11-05, [native verification run 42001761159](https://github.com/bogdandonduk/AITA/actions/runs/42001761159) passed on commit `ad671a735d81dabfffb41bb9a4b36e420d801dc0`: exact synthetic barcode and Cyrillic recognition, actual selected-window UIA, clipping, pause/resume, foreground ownership, nonactivating overlay, selected-window OCR bitmap and clean stop. The result was `packagedOcr: true`, `nativeRecorder: "passed"`, `customerScreenCaptured: false`. This was a real interactive Windows run, not an unsupported-desktop skip. It validates the synthetic fixture; each competing app's layout still needs review and a small test import before importing a real inventory.
 
 ## Primary API references
 
@@ -78,6 +82,6 @@ Then use a disposable AITA test store:
 
 The automatic `-Verify` test must run in an interactive desktop session. A service/session-0 or locked desktop can legitimately reject UI Automation/capture, and must not be reported as passing physical acceptance.
 
-The probe has a 45-second in-process watchdog and a 55-second parent-process deadline. Raw frame messages stay in its in-memory observer and are never printed to CI logs or written as screenshots. No external application is selected or captured.
+The probe has a 45-second in-process watchdog and a 55-second parent-process deadline. Raw frame messages and PNGs stay in its in-memory observer and are never printed to CI logs or written as screenshots. On failure, bounded diagnostics can include the fixture's generated cell labels/control types; this is not a production-recorder logging path. No external application is selected or captured.
 
 The expected app-local runtime DLLs are documented by [Eclipse Temurin's Windows ReDist build configuration](https://github.com/adoptium/temurin-build/wiki/Eclipse-Temurin-Windows-Visual-Studio%2C-Toolset%2C-SDK-and-ReDist-versions): `msvcp140.dll`, `vcruntime140.dll`, and `vcruntime140_1.dll`. The gate verifies their presence in the actual generated runtime; it does not depend on a developer machine's global Visual C++ installation or copy arbitrary DLLs from System32.

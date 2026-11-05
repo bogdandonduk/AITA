@@ -5073,9 +5073,16 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
     val localMode = userAccount != null && localNetwork.enabled &&
         !transportReachable && !transportUnavailable
 
-    // cloudTransportStatus is already a presentation-grade, hysteresis-controlled state. Keep the
-    // banner itself deliberately still: no crossfade, slide, size motion or color interpolation can
-    // turn a legitimate status transition into visual flicker.
+    // Keep disconnected/local/checking states visible. A confirmed connection only needs a brief
+    // acknowledgement; navigation and routine health checks must not restart that timer.
+    var showConnected by remember { mutableStateOf(true) }
+    LaunchedEffect(transportReachable) {
+        showConnected = true
+        if (transportReachable) {
+            delay(4_000L)
+            showConnected = false
+        }
+    }
     val displayedStatusKey = when {
         transportUnavailable -> "unavailable"
         transportReachable -> "connected"
@@ -5089,71 +5096,77 @@ internal fun AppConfiguration.CloudConnectionStatusBanner() {
     }
     val refreshInteractionSource = remember { MutableInteractionSource() }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 32.dp)
-            .background(backgroundColor)
-            .padding(horizontal = 12.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+    AnimatedVisibility(
+        visible = !transportReachable || showConnected || manualRefreshInProgress,
+        enter = fadeIn(tween(AITA_MOTION_FAST_MILLIS)) + expandVertically(tween(AITA_MOTION_NORMAL_MILLIS), expandFrom = Alignment.Top),
+        exit = fadeOut(tween(AITA_MOTION_FAST_MILLIS)) + shrinkVertically(tween(AITA_MOTION_NORMAL_MILLIS), shrinkTowards = Alignment.Top)
     ) {
-        Spacer(modifier = Modifier.width(28.dp))
-
-        Text(
-            modifier = Modifier.weight(1f),
-            text = when (displayedStatusKey) {
-                "connected" -> localizedStringResource(1138, "Server connected")
-                "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
-                "unavailable" -> storePeopleText("offline")
-                else -> localizedStringResource(1139, "Checking server connection…")
-            },
-            color = stateValues.AccentTextColor,
-            fontSize = stateValues.smallTextSize,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Box(
+        Row(
             modifier = Modifier
-                .padding(start = 4.dp)
-                .size(28.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .aitaClickable(
-                    enabled = !manualRefreshInProgress,
-                    interactionSource = refreshInteractionSource,
-                    indication = ripple(color = stateValues.AccentTextColor, radius = 14.dp),
-                    onClick = { refreshCloudConnectionManually() }
-                ),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .heightIn(min = 32.dp)
+                .background(backgroundColor)
+                .padding(horizontal = 12.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
-            AnimatedContent(
-                targetState = manualRefreshInProgress,
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
-                        scaleIn(initialScale = 0.72f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
-                        .togetherWith(
-                            fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
-                                scaleOut(targetScale = 0.82f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
-                        )
+            Spacer(modifier = Modifier.width(28.dp))
+
+            Text(
+                modifier = Modifier.weight(1f),
+                text = when (displayedStatusKey) {
+                    "connected" -> localizedStringResource(1138, "Server connected")
+                    "local" -> localizedStringResource(914, "Server is not connected. Branch local network mode is active.")
+                    "unavailable" -> storePeopleText("offline")
+                    else -> localizedStringResource(1139, "Checking server connection…")
                 },
-                label = "cloudConnectionRefreshState"
-            ) { refreshing ->
-                if (refreshing) {
-                    AitaBusyIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = stateValues.AccentTextColor
-                    )
-                } else {
-                    CpImage(
-                        modifier = Modifier.size(18.dp),
-                        url = stateValues.drawablePathIconRefresh,
-                        fallbackRes = refreshIconRes,
-                        contentDescription = localizedStringResource(237, "Refresh"),
-                        tintColor = stateValues.AccentTextColor
-                    )
+                color = stateValues.AccentTextColor,
+                fontSize = stateValues.smallTextSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Box(
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .aitaClickable(
+                        enabled = !manualRefreshInProgress,
+                        interactionSource = refreshInteractionSource,
+                        indication = ripple(color = stateValues.AccentTextColor, radius = 14.dp),
+                        onClick = { refreshCloudConnectionManually() }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedContent(
+                    targetState = manualRefreshInProgress,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                            scaleIn(initialScale = 0.72f, animationSpec = tween(durationMillis = AITA_MOTION_NORMAL_MILLIS)))
+                            .togetherWith(
+                                fadeOut(animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS)) +
+                                    scaleOut(targetScale = 0.82f, animationSpec = tween(durationMillis = AITA_MOTION_FAST_MILLIS))
+                            )
+                    },
+                    label = "cloudConnectionRefreshState"
+                ) { refreshing ->
+                    if (refreshing) {
+                        AitaBusyIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = stateValues.AccentTextColor
+                        )
+                    } else {
+                        CpImage(
+                            modifier = Modifier.size(18.dp),
+                            url = stateValues.drawablePathIconRefresh,
+                            fallbackRes = refreshIconRes,
+                            contentDescription = localizedStringResource(237, "Refresh"),
+                            tintColor = stateValues.AccentTextColor
+                        )
+                    }
                 }
             }
         }

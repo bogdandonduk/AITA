@@ -53,7 +53,7 @@ class OfferDetailWiring(unittest.TestCase):
         legacy = between(source, 'fun offer(user:', 'fun offerDetail(')
         self.assertIn('offersByIds(user, listOf(marketUuid(id)))', legacy)
 
-    def test_reader_is_cancellation_aware_validated_and_cannot_fall_back_or_write(self):
+    def test_reader_is_cancellation_aware_validated_and_never_mutates_server_data(self):
         source = (SHARED / 'MarketOfferDetail.kt').read_text()
         reader = between(source, 'suspend fun readOwnedMarketOfferDetail(', 'const val MARKET_OFFER_DETAIL_FRESH_MILLIS')
         self.assertEqual(1, reader.count('val response = read(id)'))
@@ -63,7 +63,10 @@ class OfferDetailWiring(unittest.TestCase):
                       'market.detail_upgrade', 'market.unavailable'):
             self.assertIn(token, reader)
         client = between((SHARED / 'MarketplaceClient.kt').read_text(), 'suspend fun loadMarketOfferDetail(', 'suspend fun loadMarketShop(')
-        self.assertIn('readOwnedMarketOfferDetail(scope, id)', client)
+        self.assertIn('marketOfferDetailCache.refresh(scope, id)', client)
+        cache = (SHARED / 'MarketOfferDetailCache.kt').read_text()
+        self.assertIn('readOwnedMarketOfferDetail(owner, id, readDetail)', cache)
+        self.assertNotIn('networkRequest', cache)
         self.assertIn('expectedSessionGeneration = scope.generation', client)
         self.assertEqual(1, client.count('networkRequest<'))
         self.assertIn('market/offers/$normalizedId/detail', client)
@@ -77,19 +80,23 @@ class OfferDetailWiring(unittest.TestCase):
                       'receivedAt = TimeSource.Monotonic.markNow()', 'receivedAt?.elapsedNow()?.inWholeMilliseconds',
                       'val detailReady = detailIsCurrent(remote)', 'val latestShopping by rememberUpdatedState(shopping)',
                       'latestShopping.contains(offerId)', 'latestShopping.canChange', 'enabled = inList || (detailReady'):
-            self.assertIn(token, source)
+            self.assertIn(re.sub(r'\s+', '', token), re.sub(r'\s+', '', source))
         self.assertEqual(3, source.count('displayedOfferIsCurrent(current)'))
         self.assertGreaterEqual(source.count('!fence.isCurrent(stamp, offerId, MarketplaceSignals.revision.value)'), 2)
         self.assertNotIn('loadMarketOffer(', source)
-        self.assertNotIn('enabled = fresh', source)
+        self.assertNotRegex(source, r'enabled\s*=\s*fresh')
         self.assertIn('catch (cancelled: CancellationException) { throw cancelled }', source)
         self.assertIn('DisposableEffect(requests) { onDispose { requests.close() } }', source)
-        self.assertIn('delay(MARKET_OFFER_DETAIL_FRESH_MILLIS); requestRefresh()', source)
+        self.assertRegex(source, r'delay\(MARKET_OFFER_DETAIL_FRESH_MILLIS\);\s*awaitClientBackgroundWork\(\);\s*requestRefresh\(\)')
+        restored = between(source, 'cachedMarketOfferDetail(owned, offerId)', 'for (ignored in requests)')
+        self.assertIn('fresh = false', restored)
+        self.assertNotIn('fresh = true', restored)
+        self.assertNotIn('TimeSource.Monotonic.markNow()', restored)
 
     def test_new_feedback_has_six_translations_and_no_unmatched_placeholders(self):
         source = (SHARED / 'messages/MarketplaceEventMessages.kt').read_text()
         quoted = r'"(?:[^"\\]|\\.)*"'
-        for key in ('market.detail_failed', 'market.detail_upgrade', 'market.detail_busy', 'market.detail_stale'):
+        for key in ('market.detail_failed', 'market.detail_upgrade', 'market.detail_busy', 'market.detail_stale', 'market.detail_cache_warning'):
             self.assertEqual(1, source.count(f'EventMessageTemplate("{key}"'))
             entry = source.split(f'EventMessageTemplate("{key}"', 1)[1].split('EventMessageTemplate(', 1)[0]
             for lang in ('ky', 'tg', 'uz'):

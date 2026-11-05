@@ -71,8 +71,14 @@ internal class MarketDeliveryRepository(private val db: Connection, private val 
         if (query("SELECT 1 FROM stores WHERE id=? AND is_active AND parent_store_id IS NOT NULL AND branch_type='INTERNET' FOR UPDATE",
                 marketUuid(input.branchStoreId)) { true }.isEmpty()) fail("forbidden", 403)
         val prior = policy(user, input.branchStoreId, true)
+        val normalized = input.copy(serviceArea = input.serviceArea.trim(), instructions = input.instructions.trim())
+        // A lost PUT response must be recoverable without discarding the merchant's form.
+        // Only the exact current content and the same/immediately preceding revision qualify;
+        // a different concurrent edit still conflicts and is never overwritten.
+        if (normalized.copy(revision = prior.revision) == prior &&
+            (input.revision == prior.revision || (prior.revision > 0 && input.revision == prior.revision - 1))) return prior
         if (prior.revision != input.revision) fail("changed", 409)
-        val next = input.copy(revision = prior.revision + 1, serviceArea = input.serviceArea.trim(), instructions = input.instructions.trim())
+        val next = normalized.copy(revision = prior.revision + 1)
         execute("""INSERT INTO market_delivery_policies(branch_store_id,revision,payload) VALUES (?,?,?::jsonb)
             ON CONFLICT(branch_store_id) DO UPDATE SET revision=EXCLUDED.revision,payload=EXCLUDED.payload""",
             marketUuid(next.branchStoreId), next.revision, jsonBase.encodeToString(next))
@@ -127,7 +133,7 @@ internal class MarketDeliveryRepository(private val db: Connection, private val 
             MarketDeliveryQueue.ATTENTION -> {
                 clauses += active
                 val roleAttention = when (view) {
-                    "seller" -> """d.status='REQUESTED' OR (d.payload#>>'{request,mode}'<>'PICKUP' AND (
+                    "seller" -> """d.status='REQUESTED' OR (d.status='READY' AND d.payload#>>'{request,mode}'='PICKUP') OR (d.payload#>>'{request,mode}'<>'PICKUP' AND (
                         d.courier_id IS NULL OR NOT coalesce((d.payload->>'courierAccepted')::boolean,false) OR d.status='READY'))"""
                     "buyer" -> "d.status='ARRIVED' OR (d.status='READY' AND d.payload#>>'{request,mode}'='PICKUP')"
                     else -> "NOT coalesce((d.payload->>'courierAccepted')::boolean,false) OR d.status IN ('READY','ARRIVED')"

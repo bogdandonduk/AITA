@@ -3,7 +3,8 @@ const {chromium}=require('playwright');
 const fs=require('fs'),http=require('http'),path=require('path');
 const dist=process.env.AITA_WEB_DIST;if(!dist)throw Error('Set AITA_WEB_DIST to the built distribution');
 const workspaceTest=process.env.AITA_DELIVERY_WORKSPACE==='1';
-const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke',workspaceTest?'delivery-workspace':'delivery');
+const recoveryTest=process.env.AITA_DELIVERY_RECOVERY==='1';
+const output=path.join(process.env.AITA_ARTIFACTS||'build/marketplace-smoke',recoveryTest?'delivery-recovery':workspaceTest?'delivery-workspace':'delivery');
 fs.mkdirSync(output,{recursive:true});
 const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0');
 const account={id:id(99),publicId:'MARKET-TEST',phoneNumber:'',email:'market@example.test',firstName:'Aida',lastName:'',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:process.env.AITA_TEST_LANGUAGE||'en',appThemeId:Number(process.env.AITA_TEST_THEME||0),appModeId:1};
@@ -18,8 +19,8 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
  const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US'});
  await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-market-token',refreshToken:'isolated-market-refresh'}));localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-market-device');localStorage.setItem('aita.key_appTheme','7');},account);
  await context.routeWebSocket('**',ws=>ws.close());const calls=[],errors=[];
- let orders=[],deliveryCommands=[],loseDeliveryReply=true,deliveryOffline=false;
- const listResponses=[];let heldListReply=null;
+ let orders=[],deliveryCommands=[],loseDeliveryReply=true,deliveryOffline=false,deliveryListOffline=false;
+ const listResponses=[];let heldListReply=null,heldRecoveryReply=null;
  let shoppingRevision=1,savedRevision=0,savedShops=[],savedOffers=[id(103)],records={};
  let lines=offers(Date.now()).slice(0,3).map((o,i)=>({offerId:o.id,storeId:o.storefront.storeId,title:o.title,shopName:o.storefront.displayName,units:i+1,basis:{gtin:null,currencyCode:o.currencyCode,unitId:o.unitId,pricedAmount:o.pricedAmount},unitName:o.unitName,updatedAtMillis:1,collected:false}));
  function shopping(now){return {userId:account.id,revision:shoppingRevision,lines:lines.map(line=>{const o=offers(now).find(x=>x.id===line.offerId);return {line,offer:o,unitPriceMinor:o.priceMinor,subtotalMinor:o.priceMinor*line.units,status:'estimated'};}),checkedAtMillis:now};}
@@ -38,7 +39,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   if(u.hostname==='aita.kz'){const response=await route.fetch({url:origin+u.pathname});return route.fulfill({response});}
   if(u.hostname==='media.example.com')return route.fulfill({contentType:'image/svg+xml',body:picture(parseInt(u.pathname.match(/\d+/)[0]))});
   const p=u.pathname.replace(/^\/api\//,'/');calls.push({path:p,query:u.search,body:route.request().postData()});
-  if(deliveryOffline&&p.startsWith('/market/delivery/'))return route.abort('internetdisconnected');
+  if((deliveryOffline&&p.startsWith('/market/delivery/'))||(deliveryListOffline&&p==='/market/delivery/orders'))return route.abort('internetdisconnected');
   let payload=[];const now=Date.now();
   if(p==='/user/get')payload=account;
   else if(p==='/user/app-mode')payload={accountId:account.id,appModeId:1};
@@ -73,6 +74,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
    if(command.action==='REQUEST'&&!order){order={id:command.commandId,buyerId:account.id,branchStoreId:shops.find(s=>s.storeId===command.request.storefrontId).branchStoreId,shopName:shops.find(s=>s.storeId===command.request.storefrontId).displayName,request:command.request,revision:0,status:'REQUESTED',createdAtMillis:now,updatedAtMillis:now,estimatedFromMillis:now+45*60000,estimatedToMillis:now+120*60000,handoverCode:'123456',events:[{action:'REQUEST',status:'REQUESTED',atMillis:now}]};orders.push(order);}
    if(command.action==='DELIVER'){order.status='DELIVERED';order.revision++;order.updatedAtMillis=now;order.handoverCode=null;order.events.push({action:'DELIVER',status:'DELIVERED',atMillis:now});}
    if(loseDeliveryReply){loseDeliveryReply=false;return route.abort('internetdisconnected');}
+   if(recoveryTest)deliveryListOffline=true;
    payload={commandId:command.commandId,order,replayed:deliveryCommands.filter(x=>x.commandId===command.commandId).length>1};
   }
   else if(p==='/market/delivery/orders'){
@@ -83,8 +85,15 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
    payload={accountId:account.id,view:u.searchParams.get('view')||'buyer',filter,orders:selected.map(o=>({...o,handoverCode:null,position:null})),checkedAtMillis:now};
    // Exercise a real overlapping transport response, not just fast filter toggles. Capture the
    // old payload now, let a newer query finish, then attempt to deliver this stale response.
+   let held=workspaceTest&&heldListReply&&!heldListReply.captured&&filter.queue==='HISTORY'&&!filter.mode&&!filter.search?heldListReply:null;
+   if(recoveryTest&&orders.length>0&&!heldRecoveryReply){
+    heldRecoveryReply={captured:false,finished:false};
+    heldRecoveryReply.wait=new Promise(resolve=>{heldRecoveryReply.release=resolve;});
+    held=heldRecoveryReply;
+    // A list snapshot captured before the command acknowledgement must not later hide it.
+    payload={...payload,orders:[]};
+   }
    const responseBody=JSON.stringify({negative:false,payload:JSON.stringify(payload)});
-   const held=workspaceTest&&heldListReply&&!heldListReply.captured&&filter.queue==='HISTORY'&&!filter.mode&&!filter.search?heldListReply:null;
    if(held){held.captured=true;held.filter=filter;await held.wait;}
    try {
     await route.fulfill({status:200,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:responseBody});
@@ -153,18 +162,55 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await button('Request delivery').last().click({force:true});await until(()=>orders.length===1,'Delivery created');await page.waitForTimeout(2400);await page.keyboard.press('Tab');await page.waitForTimeout(400);
   await shot('delivery-pending');fs.writeFileSync(path.join(output,'pending-aria.txt'),await page.locator('body').ariaSnapshot());
   // Compose accessibility can retain a disposed dialog until focus changes; exercise its visible canvas control.
-  await page.mouse.click(720,534);await until(()=>deliveryCommands.length>=2,'Same command retried');await page.waitForTimeout(1800);
+  if(recoveryTest){
+   await global.aitaGuidedStep?.('Retry the saved checkout after a lost server reply');
+   await until(()=>heldRecoveryReply?.captured,'Old order-list read is held before retry');
+   // Focus the visible empty search to retire the disposed checkout's Compose accessibility tree.
+   await page.mouse.click(450,333);await page.keyboard.press('Tab');await page.waitForTimeout(300);
+   await button('Retry').last().click({force:true});
+  }else await page.mouse.click(720,534);
+  await until(()=>deliveryCommands.length>=2,'Same command retried');await page.waitForTimeout(1800);
   assert.equal(new Set(deliveryCommands.map(c=>c.commandId)).size,1);assert.equal(orders.length,1);
   assert.equal(orders[0].request.mode,'EXPRESS');assert.equal(orders[0].request.address.address,'Almaty, Abay 42');
-  await page.mouse.click(650,540);await page.waitForTimeout(1200);
+  if(recoveryTest){
+   await global.aitaGuidedStep?.('Read the confirmed order while the order-list refresh is offline');
+   await page.getByText(/Last confirmed order · saved on this device/).first().waitFor({timeout:25000});
+   heldRecoveryReply.release();await until(()=>heldRecoveryReply.finished,'Old empty list response finishes after the acknowledgement');
+   await page.waitForTimeout(1500);
+   assert.match(await page.locator('body').ariaSnapshot(),/Last confirmed order · saved on this device/,
+    'A late empty GET must not hide the acknowledged order as a fresh empty page');
+   await shot('confirmed-order-with-list-offline');
+   await button('View order').click({force:true});
+  }else await page.mouse.click(650,540);
+  await page.waitForTimeout(1200);
   await shot('delivery-tracking');fs.writeFileSync(path.join(output,'tracking-aria.txt'),await page.locator('body').ariaSnapshot());
   assert.match(await page.locator('body').ariaSnapshot(),/123456/);
+  if(recoveryTest){
+   await global.aitaGuidedStep?.('Validate an empty cancellation locally, then abandon its draft');
+   const sent=deliveryCommands.length;
+   await button('Cancel order').click({force:true});
+   await button('Confirm').last().click({force:true});
+   await page.getByText(/Please enter a cancellation reason\./).first().waitFor();
+   assert.equal(deliveryCommands.length,sent,'Invalid cancellation must never enter the server/outbox');
+   await shot('cancellation-inline-validation');
+   const reason=page.getByRole('textbox').and(page.locator(':not(textarea):not(input)')).last();
+   await reason.click({force:true});await page.keyboard.insertText('Private discarded draft');
+   await button('Cancel').last().click({force:true});
+   assert.equal(deliveryCommands.length,sent,'Closing the draft must not cancel the order');
+  }
   orders[0]={...orders[0],status:'ARRIVED',revision:6,courierId:id(98),courierName:'Courier',courierAccepted:true,updatedAtMillis:Date.now(),position:{latitude:43.25,longitude:76.95,accuracyMeters:20,capturedAtMillis:Date.now(),receivedAtMillis:Date.now()}};
   await button('Refresh').last().click({force:true});await page.waitForTimeout(1800);
   await button('Confirm receipt').click({force:true});await button('Confirm').last().click({force:true});await until(()=>orders[0].status==='DELIVERED','Buyer confirmed receipt');await page.waitForTimeout(1200);
   await shot('delivery-completed');assert.match(await page.locator('body').ariaSnapshot(),/Received/);
+  if(recoveryTest){
+   const sent=deliveryCommands.at(-1);assert.equal(sent.action,'DELIVER');
+   assert.equal(sent.note,'','An abandoned cancellation reason must not be added to a receipt action');
+   assert.equal(sent.courierPublicId,null);assert.equal(sent.handoverCode,null);
+   assert.equal(sent.estimatedFromMillis,null);assert.equal(sent.estimatedToMillis,null);
+   await global.aitaGuidedStep?.('Order completed once; hidden draft fields were not transmitted');
+  }
   await page.keyboard.press('Escape');await page.waitForTimeout(600);await page.setViewportSize({width:390,height:844});await page.waitForTimeout(700);await shot('delivery-phone');
   assert.deepEqual(errors,[]);console.log('PASS: checkout, durable lost-reply recovery, private handover code, live status and buyer completion');
  } catch(e){await shot('failure');fs.writeFileSync(path.join(output,'failure-aria.txt'),await page.locator('body').ariaSnapshot());throw e;}
- finally{heldListReply?.release?.();fs.writeFileSync(path.join(output,'calls.json'),JSON.stringify(calls,null,2));fs.writeFileSync(path.join(output,'list-responses.json'),JSON.stringify(listResponses,null,2));await browser.close();server.close();}
+ finally{heldListReply?.release?.();heldRecoveryReply?.release?.();fs.writeFileSync(path.join(output,'calls.json'),JSON.stringify(calls,null,2));fs.writeFileSync(path.join(output,'list-responses.json'),JSON.stringify(listResponses,null,2));await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

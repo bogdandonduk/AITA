@@ -31,3 +31,9 @@
   Cache-Control: no-cache
 /install/*
   Cache-Control: no-cache
+/install/aita-install.ps1
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment; filename="aita-install.ps1"
+/install/aita-install.py
+  Content-Type: application/octet-stream
+  Content-Disposition: attachment; filename="aita-install.py"

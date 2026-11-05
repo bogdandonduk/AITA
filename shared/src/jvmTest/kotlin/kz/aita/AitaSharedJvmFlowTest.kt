@@ -26,8 +26,8 @@ import kotlin.test.*
 
 
 private const val AITA_FLOW_TEST_SERVER_URL = "http://aita.flow.test"
-private const val AITA_FLOW_TEST_USER_ID = "flow-test-user"
-private const val AITA_FLOW_SOURCE_STORE_ID = "store-main"
+private const val AITA_FLOW_TEST_USER_ID = "00000000-0000-4000-8000-000000000001"
+private const val AITA_FLOW_SOURCE_STORE_ID = "00000000-0000-4000-8000-000000000002"
 private const val AITA_FLOW_DESTINATION_STORE_ID = "store-branch"
 private const val AITA_FLOW_WORKER_USER_ID = "flow-worker-user"
 private const val AITA_FLOW_WORKER_PUBLIC_ID = "FLOW-WORKER-001"
@@ -2030,10 +2030,10 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun menuSupplierPricesOrdersReceivingAndBatchReferencesStayInSync() = runBlocking {
-        val supplier = aitaTestSupplier(id = "supplier-order-flow", name = "North farm")
-        val item = aitaTestGoodsItem(id = "supplier-order-item", name = "North farm tofu")
+        val supplier = aitaTestSupplier(id = "00000000-0000-4000-8000-000000000020", name = "North farm")
+        val item = aitaTestGoodsItem(id = "00000000-0000-4000-8000-000000000021", name = "North farm tofu")
         val existingBatch = aitaTestBatch(
-            id = "supplier-order-existing-batch",
+            id = "00000000-0000-4000-8000-000000000022",
             goodsItemId = item.id,
             quantityTotal = 4.0,
             supplierId = supplier.id,
@@ -2047,7 +2047,7 @@ class AitaSharedJvmFlowTest {
             supplyPriceValue = "500"
         )
         val order = aitaTestSupplierOrderWithLines(
-            id = "supplier-order-flow",
+            id = "00000000-0000-4000-8000-000000000020",
             supplierId = supplier.id,
             goodsItemId = item.id,
             requestedQuantity = 8.0,
@@ -2104,7 +2104,7 @@ class AitaSharedJvmFlowTest {
         assertTrue(requireAitaFlowSuccess(mySupplierSideCallback).payload.any { it.order.supplierId == supplier.id })
 
         val addedOrder = aitaTestSupplierOrderWithLines(
-            id = "supplier-order-added",
+            id = "00000000-0000-4000-8000-000000000023",
             supplierId = supplier.id,
             goodsItemId = item.id,
             requestedQuantity = 12.0,
@@ -2136,7 +2136,7 @@ class AitaSharedJvmFlowTest {
         )
         environment.nextSupplierOrderResponse = confirmedOrder
         val updateOrderCallback = CompletableDeferred<DataState<SupplierOrderWithLinesDataModel>>()
-        updateSupplierOrder(confirmedOrder) { updateOrderCallback.complete(it) }
+        updateSupplierOrder(confirmedOrder, supplierSide = true) { updateOrderCallback.complete(it) }
 
         assertEquals(SupplierOrderStatusDataModel.Confirmed, requireAitaFlowSuccess(updateOrderCallback).payload.order.status)
         waitUntilAitaFlowCondition { supplierOrdersState.payloadValue.orEmpty().first { it.id == confirmedOrder.order.id }.status == SupplierOrderStatusDataModel.Confirmed }
@@ -2144,7 +2144,7 @@ class AitaSharedJvmFlowTest {
         assertTrue(environment.requests.any { it.method == "PUT" && it.path == "supplierOrders/update" })
 
         val deliveredBatch = aitaTestBatch(
-            id = "supplier-order-delivered-batch",
+            id = "00000000-0000-4000-8000-000000000024",
             goodsItemId = item.id,
             quantityTotal = 12.0,
             supplierId = supplier.id,
@@ -2156,7 +2156,7 @@ class AitaSharedJvmFlowTest {
                 status = SupplierOrderStatusDataModel.Delivered,
                 deliveredAtMillis = 1_720_000_100_000L
             ),
-            lines = confirmedOrder.lines.map { it.copy(deliveredBatchIds = listOf(deliveredBatch.id)) }
+            lines = confirmedOrder.lines.map { it.copy(deliveredBatchIds = listOf(deliveredBatch.id), receivedQuantityTotal = 12.0) }
         )
         environment.batches = environment.batches.upsertAitaTestBatch(deliveredBatch)
         environment.nextSupplierOrderResponse = receivedOrder
@@ -3336,7 +3336,7 @@ private fun aitaTestSupplierOrderWithLines(
     status: SupplierOrderStatusDataModel = SupplierOrderStatusDataModel.Draft
 ): SupplierOrderWithLinesDataModel {
     val line = SupplierOrderLineDataModel(
-        id = "$id-line-1",
+        id = java.util.UUID.nameUUIDFromBytes("$id-line-1".toByteArray()).toString(),
         orderId = id,
         goodsItemId = goodsItemId,
         requestedQuantity = aitaTestQuantity(requestedQuantity),

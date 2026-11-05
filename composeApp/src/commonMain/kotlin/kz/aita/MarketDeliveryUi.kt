@@ -175,7 +175,7 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                         if (selected in setOf(MarketDeliveryAction.CANCEL,MarketDeliveryAction.DELAY))
                             aitaFormTextField(Modifier.fillMaxWidth(),note,{note=it.take(500)},deliveryText("note"),identityKey="delivery-note:$id",parentOwnsValue=true)
                         if (selected == MarketDeliveryAction.DELIVER && account != value.buyerId)
-                            aitaFormTextField(Modifier.fillMaxWidth(),code,{code=it.filter(Char::isDigit).take(6)},deliveryText("code"),identityKey="delivery-code:$id",keyboardType=KeyboardType.Number,sensitive=true,parentOwnsValue=true)
+                            aitaFormTextField(Modifier.fillMaxWidth(),code,{code=it.filter { digit -> digit in '0'..'9' }.take(6)},deliveryText("code"),identityKey="delivery-code:$id",keyboardType=KeyboardType.Number,sensitive=true,parentOwnsValue=true)
                         if (selected == MarketDeliveryAction.DELAY) {
                             Text(deliveryText("from_now"),color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize)
                             aitaFormTextField(Modifier.fillMaxWidth(),from,{from=it.filter(Char::isDigit).take(6)},deliveryText("minutes_min"),identityKey="delivery-from:$id",keyboardType=KeyboardType.Number,parentOwnsValue=true)
@@ -184,13 +184,14 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                         error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
                         actionButton(text=stateValues.stringConfirm,enabled=!busy,loading=busy,autoLoading=false,confirmationRequired=false,onClick={
                             if (owner != null && !busy) {
+                                val prepared=MarketDeliveryActionDraft(note,courierId,code,from,to)
+                                    .prepare(value,selected,account==value.buyerId,Uuid.random().toString(),getCurrentTimeMillis())
+                                if(prepared is MarketDeliveryActionPreparation.Invalid) {
+                                    error=eventMessage(prepared.messageKey);commandError=true
+                                } else if(prepared is MarketDeliveryActionPreparation.Ready) {
                                 actionFocus.clearFocus(force=true)
                                 mutationEpoch++;busy=true;error=null;commandError=false
-                                val time=getCurrentTimeMillis()
-                                val command=MarketDeliveryCommand(Uuid.random().toString(),selected,value.id,value.revision,courierPublicId=courierId.takeIf(String::isNotBlank),
-                                    note=note,handoverCode=code.takeIf(String::isNotBlank),
-                                    estimatedFromMillis=from.toLongOrNull()?.takeIf { it in 0..129600 }?.let { time+it*60_000 },
-                                    estimatedToMillis=to.toLongOrNull()?.takeIf { it in 0..129600 }?.let { time+it*60_000 })
+                                val command=prepared.command
                                 ui.launch { try {
                                     val result=sendMarketDeliveryCommand(owner,command)
                                     if (owner.isCurrent()) {
@@ -205,9 +206,10 @@ internal fun AppConfiguration.deliveryText(key: String) = eventMessage("delivery
                                         refresh++
                                     }
                                 } finally { busy=false } }
+                                }
                             }
                         })
-                        actionButton(text=stateValues.stringCancel,autoLoading=false,confirmationRequired=false,onClick={action=null;code=""})
+                        actionButton(text=stateValues.stringCancel,enabled=!busy,autoLoading=false,confirmationRequired=false,onClick={action=null;code=""})
                     }
                 }
             }

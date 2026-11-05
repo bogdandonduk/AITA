@@ -405,15 +405,8 @@ internal suspend fun publishMarketplaceStockChange(storeText: String?) {
     val store = storeText?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() } ?: return
     try {
         val published = newSuspendedTransaction(aitaServerIoContext) {
-        val connection = TransactionManager.current().connection.connection as Connection
-        connection.prepareStatement("""SELECT EXISTS(SELECT 1 FROM marketplace_storefronts f
-            JOIN stores s ON s.id=f.branch_store_id WHERE f.is_published AND s.branch_type='INTERNET'
-            AND (f.branch_store_id=? OR (f.share_branch_availability AND f.location_store_ids @> jsonb_build_array(?::text)))
-            AND EXISTS(SELECT 1 FROM marketplace_listings l WHERE l.store_id=f.store_id AND l.is_published))""").use { statement ->
-            statement.setObject(1,store); statement.setObject(2,store)
-            statement.executeQuery().use { rows -> rows.next(); rows.getBoolean(1) }
+            hasPublishedMarketplaceStockDependency(TransactionManager.current().connection.connection as Connection, store)
         }
-    }
         if (published) RealtimeServerBus.publish(entity="market/catalog",reason="public_inventory_changed")
     } catch (cancelled: CancellationException) { throw cancelled }
     catch (_: Exception) {
@@ -422,3 +415,18 @@ internal suspend fun publishMarketplaceStockChange(storeText: String?) {
         org.slf4j.LoggerFactory.getLogger("AITA.Marketplace").warn("Public catalogue invalidation deferred; committed business state is unchanged")
     }
 }
+
+/** A parent template can back a published branch product without exposing the parent as a pickup
+ * location. Its price, barcode and active flag still affect that public product. */
+internal fun hasPublishedMarketplaceStockDependency(connection: Connection, store: java.util.UUID): Boolean =
+    connection.prepareStatement("""SELECT EXISTS(SELECT 1 FROM marketplace_storefronts f
+        JOIN stores s ON s.id=f.branch_store_id WHERE f.is_published AND s.branch_type='INTERNET'
+        AND EXISTS(SELECT 1 FROM marketplace_listings l WHERE l.store_id=f.store_id AND l.is_published)
+        AND (f.branch_store_id=? OR
+            (f.share_branch_availability AND f.location_store_ids @> jsonb_build_array(?::text)) OR
+            EXISTS(SELECT 1 FROM marketplace_listings l JOIN stock_items i ON i.id=l.goods_item_id
+                WHERE l.store_id=f.store_id AND l.is_published AND i.store_id=?)))""").use { statement ->
+        statement.queryTimeout = 5
+        statement.setObject(1,store); statement.setObject(2,store); statement.setObject(3,store)
+        statement.executeQuery().use { rows -> rows.next(); rows.getBoolean(1) }
+    }

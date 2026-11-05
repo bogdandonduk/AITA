@@ -613,12 +613,14 @@ internal class MarketplaceRepository(private val db: Connection,
         if (itemIds.isEmpty() || storeIds.isEmpty()) return emptyList()
         return query("""SELECT DISTINCT ON (b.store_id,b.goods_item_id)
             b.id,b.goods_item_id,b.store_id,b.quantity,b.sale_price_override,b.expiration_date_millis,
-            b.discounts,b.promotions,b.shelf_priority,b.status,b.updated_at_millis
+            b.discounts,b.promotions,b.shelf_priority,b.status,b.kind,b.updated_at_millis
             FROM stock_batches b JOIN stock_items i ON i.id=b.goods_item_id
             WHERE b.is_active AND b.status IN ('Delivered','OnShelf')
             AND (b.expiration_date_millis IS NULL OR b.expiration_date_millis>?)
             AND (CASE WHEN NOT jsonb_exists(b.quantity::jsonb,'total') THEN 1
-                      WHEN jsonb_typeof(b.quantity::jsonb->'total')='number' THEN (b.quantity::jsonb->>'total')::numeric ELSE 0 END)>0
+                      WHEN jsonb_typeof(b.quantity::jsonb->'total')='number' THEN (b.quantity::jsonb->>'total')::numeric ELSE -1 END)>=0
+            AND (b.kind='UNLIMITED' OR (CASE WHEN NOT jsonb_exists(b.quantity::jsonb,'total') THEN 1
+                      WHEN jsonb_typeof(b.quantity::jsonb->'total')='number' THEN (b.quantity::jsonb->>'total')::numeric ELSE 0 END)>0)
             AND (CASE WHEN NOT jsonb_exists(b.quantity::jsonb,'pricedAmount') THEN 1
                       WHEN jsonb_typeof(b.quantity::jsonb->'pricedAmount')='number' THEN (b.quantity::jsonb->>'pricedAmount')::numeric ELSE 0 END)>0
             AND b.goods_item_id IN (${itemIds.joinToString(",") { "?" }})
@@ -631,6 +633,7 @@ internal class MarketplaceRepository(private val db: Connection,
                 expirationDateMillis=row.getLong("expiration_date_millis").let { if(row.wasNull()) null else it },
                 discounts=jsonBase.decodeFromString(row.getString("discounts")), promotions=jsonBase.decodeFromString(row.getString("promotions")),
                 shelfPriority=row.getInt("shelf_priority"), status=StockBatchStatusDataModel.valueOf(row.getString("status")),
+                kind=StockBatchKindDataModel.valueOf(row.getString("kind")), unlimitedQuantity=row.getString("kind")==StockBatchKindDataModel.UNLIMITED.name,
                 updatedAtMillis=row.getLong("updated_at_millis"))
         }
     }

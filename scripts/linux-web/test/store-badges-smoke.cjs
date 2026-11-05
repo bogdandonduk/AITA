@@ -8,7 +8,7 @@ const fs=require('fs'),http=require('http'),path=require('path'),readline=requir
 const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0'),tr=value=>[{language:'en',value}];
 (async()=>{
 const dist=process.env.AITA_WEB_DIST,out=process.env.AITA_ARTIFACTS||'build/worker-placement-smoke';if(!dist)throw Error('Set AITA_WEB_DIST');fs.mkdirSync(out,{recursive:true});
-const server=http.createServer((req,res)=>{try{const p=path.join(dist,req.url==='/'?'index.html':decodeURIComponent(req.url.split('?')[0]));res.setHeader('Content-Type',p.endsWith('.wasm')?'application/wasm':p.endsWith('.js')?'text/javascript':p.endsWith('.html')?'text/html':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream');res.end(fs.readFileSync(p));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const origin='http://127.0.0.1:'+server.address().port;
+const server=http.createServer((req,res)=>{try{const p=path.join(dist,req.url==='/'?'index.html':decodeURIComponent(req.url.split('?')[0]));if(/aita-install\.(ps1|py)$/.test(p)){res.setHeader('Content-Disposition','attachment; filename=\"'+path.basename(p)+'\"');}res.setHeader('Content-Type',p.endsWith('.wasm')?'application/wasm':p.endsWith('.js')?'text/javascript':p.endsWith('.html')?'text/html':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream');res.end(fs.readFileSync(p));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const origin='http://127.0.0.1:'+server.address().port;
 let account={id:id(99),publicId:'STORE-TEST',phoneNumber:'',email:'store@example.test',firstName:'Branch',lastName:'Tester',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:process.env.AITA_TEST_LANGUAGE||'en',appModeId:0,appFontId:'noto_sans',activeStoreId:id(scene==='parent'?30:(scene==='physical'||scene==='cart')?31:32)};
 if(employee)account={...account,id:id(98),publicId:'EMPLOYEE-A',workerAccountIds:JSON.stringify([id(900)]),firstName:'Aida',lastName:'Team'};
 const store=(n,name,parent,type)=>({id:id(n),publicId:'STORE-'+n,parentStoreId:parent? id(parent):null,userIds:[id(99)],storeTypeIds:[],name:tr(name),alias:[],description:[],companyForms:[],location:{},address:name+' address',phoneNumbers:[],emails:[],countryLocales:['kz'],createdAt:1,branchType:type,architectureVersion:2});
@@ -67,6 +67,8 @@ await context.route('**/*',async route=>{
  else if(p.includes('global')||p.includes('bootstrap'))return route.fulfill({status:503,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({negative:true,payload:null})});
  return route.fulfill({status:200,headers:{'X-AITA-Server':'AITA','content-type':'application/json'},body:JSON.stringify({message:null,negative:false,payload:JSON.stringify(payload)})});
 });
+const helperDownloads=[];
+context.on('page',opened=>opened.on('download',download=>helperDownloads.push(download)));
 const page=await context.newPage();page.on('pageerror',e=>errors.push(e.stack||e.message));page.on('crash',()=>errors.push('crash'));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
 
 const shot=async name=>{await page.screenshot({path:out+'/'+scene+'-'+name+'.png'});};
@@ -87,8 +89,29 @@ try {
   assert.ok(await page.getByRole('button',{name:(ru?'Открыть магазин':'Open store')+' · App Store',exact:true}).count());
   await shot('badge-'+platform+(ru?'-ru':'-en'));
  }
+ // Script methods remain available even with no downloadable app entry or a failing feed.
+ for(const [platform,file,command] of [
+  ['Windows','aita-install.ps1','powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\\Downloads\\aita-install.ps1"'],
+  ['Linux','aita-install.py','python3 ./aita-install.py']
+ ]) {
+  await button(platform).click({force:true});await page.waitForTimeout(500);
+  const method=button(ru?'Установить или обновить скриптом':'Install or update with a script');
+  await method.waitFor({timeout:10000});await method.click({force:true});await page.waitForTimeout(500);
+  assert.ok(await page.getByText(command,{exact:true}).count(),'Helper command visible for '+platform);
+  await shot('installer-method-'+platform+(ru?'-ru':'-en'));
+  await button(ru?'Скачать скрипт':'Download the script').click({force:true});
+  for(let i=0;i<40&&!helperDownloads.some(d=>d.suggestedFilename()===file);i++)await page.waitForTimeout(200);
+  const download=helperDownloads.find(d=>d.suggestedFilename()===file);
+  assert.ok(download,'Browser receives script file '+file);
+  assert.equal(await download.failure(),null,'Script transfer completes without an HTTP/download failure');
+  const saved=await download.path();assert.ok(saved,'Completed script download has a local file');
+  const expected=fs.readFileSync(path.join(dist,'install',file));
+  assert.ok(expected.length>1000,'Packaged helper must contain the implementation, not an empty placeholder');
+  assert.deepEqual(fs.readFileSync(saved),expected,'Downloaded helper bytes match the packaged verified-source file');
+  await button(ru?'Отмена':'Cancel').click({force:true});await page.waitForTimeout(500);
+ }
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);await shot('badges-phone');
- assert.deepEqual(errors,[]);console.log('PASS: official badges rendered at desktop and phone widths, locale '+(ru?'ru':'en'));
+ assert.deepEqual(errors,[]);console.log('PASS: official badges and script download methods rendered and actionable, locale '+(ru?'ru':'en'));
 }catch(e){await shot('failure');fs.writeFileSync(out+'/failure-aria.txt',await page.locator('body').ariaSnapshot());throw e;}
 finally {fs.writeFileSync(out+'/result.json',JSON.stringify({calls,errors},null,2));await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -5020,7 +5020,10 @@ internal fun AppConfiguration.SupplierOrderCard(
     order: SupplierOrderDataModel,
     lines: List<SupplierOrderLineDataModel>,
     goodsItem: GoodsItemDataModel,
-    onReceive: () -> Unit,
+    receiving: Boolean = false,
+    pendingReceipt: ReceiveSupplierOrderRequestDataModel? = null,
+    receiveError: String? = null,
+    onReceive: (Double) -> Unit,
     onCancel: () -> Unit
 ) {
     val supplierName = stateValues.suppliers.orEmpty()
@@ -5028,7 +5031,17 @@ internal fun AppConfiguration.SupplierOrderCard(
         ?.name
         ?.visibleLocalizedString(stateValues.appLanguage, order.supplierId)
         ?: order.supplierId
-    val primaryLine = lines.firstOrNull { it.goodsItemId == goodsItem.id }
+    val pendingLineId = pendingReceipt?.receivedLines?.firstOrNull()?.orderLineId
+    val primaryLine = lines.firstOrNull { it.id == pendingLineId }
+        ?: lines.firstOrNull { it.goodsItemId == goodsItem.id && it.remainingReceivableQuantity() > 0.0 }
+        ?: lines.firstOrNull { it.goodsItemId == goodsItem.id }
+    val savedQuantity = pendingReceipt?.receivedLines?.firstOrNull { it.orderLineId == primaryLine?.id }?.receivedQuantity
+    val receiveUnit = primaryLine?.receivableQuantity()
+    val remaining = primaryLine?.remainingReceivableQuantity() ?: 0.0
+    var receiveQuantityText by rememberSaveable(order.id, primaryLine?.id, remaining) {
+        mutableStateOf(receiveUnit?.let { stockQuantityInputTextFromAmount(remaining, it) }.orEmpty())
+    }
+    var receiveValidation by remember(order.id, remaining) { mutableStateOf("") }
     val quantityText = primaryLine?.requestedQuantity?.quantityText(stateValues.appLanguage).orEmpty()
     val acceptedQuantityText = primaryLine?.supplierAcceptedQuantity?.quantityText(stateValues.appLanguage).orEmpty()
     val priceText = primaryLine?.expectedSupplyPrice?.let { "${it.price} ${it.currency}" }.orEmpty()
@@ -5137,27 +5150,53 @@ internal fun AppConfiguration.SupplierOrderCard(
 
         Text(
             modifier = Modifier.padding(top = 6.dp),
-            text = localizedStringResource(964, "This order keeps store-side data ready for the future supplier app: supplier, quantities, expected price, delivery dates, notes and receiving batches."),
+            text = authUiText("Received quantities stay recorded even after those goods are sold. Receive only what arrived in this delivery.", "Принятое количество сохраняется в заказе и после продажи товара. Принимайте только фактически прибывшую поставку.", "Қабылданған сан тауар сатылғаннан кейін де тапсырыста сақталады. Осы жеткізілімде нақты келгенін ғана қабылдаңыз.", "Кабыл алынган сан товар сатылгандан кийин да сакталат. Ушул жеткирүүдө келгенин гана кабыл алыңыз."),
             color = stateValues.PlaceholderTextColor,
             fontSize = stateValues.smallTextSize
         )
 
-        if (!order.status.isSupplierOrderClosed()) {
+        if (!order.status.isSupplierOrderClosed() || pendingReceipt != null) {
             Spacer(modifier = Modifier.height(stateValues.marginTextField))
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
-                actionButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(979, "Receive full quantity"),
-                    iconPath = stateValues.drawablePathIconTransactionSupply,
-                    confirmationRequired = true,
-                    onClick = onReceive
-                )
+                if (primaryLine != null && receiveUnit != null && (savedQuantity != null || (remaining > 0.0000001 && order.canReceiveSupplierOrder()))) {
+                    StockCardInfoLine(authUiText("Received", "Принято", "Қабылданды", "Кабыл алынды"), receiveUnit.copy(total = primaryLine.receivedQuantityTotalValue()).quantityText(stateValues.appLanguage), stateValues.TextColor)
+                    StockCardInfoLine(authUiText("Remaining", "Осталось принять", "Қабылдау қалды", "Кабыл алуу калды"), receiveUnit.copy(total = remaining).quantityText(stateValues.appLanguage), stateValues.AccentColor)
+                    if (savedQuantity != null) {
+                        StockCardInfoLine(authUiText("Saved receipt awaiting confirmation", "Сохранённая приёмка ждёт подтверждения", "Сақталған қабылдау растауды күтуде", "Сакталган кабыл алуу ырастоону күтүүдө"), savedQuantity.quantityText(stateValues.appLanguage), stateValues.AccentColor)
+                    } else {
+                    SimpleTextInput(value = receiveQuantityText,
+                        placeholder = authUiText("Quantity received now", "Количество в этой поставке", "Осы жеткізілім саны", "Бул жеткирүүдөгү саны"),
+                        keyboardType = if (receiveUnit.roundTotal) KeyboardType.Number else KeyboardType.Decimal,
+                        onTransformValue = { sanitizeStockQuantityInput(it, receiveUnit.allowsFractionalStockQuantityInput()) },
+                        onValueChange = { receiveQuantityText = it; receiveValidation = "" })
+                    StockQuantityQuickFillButtons(quantityUnit = receiveUnit, currentText = receiveQuantityText,
+                        shortcutAmounts = (stockQuantityShortcutAmounts(receiveUnit).filter { it <= remaining } + remaining).distinct().sorted(),
+                        onAmountSelected = { receiveQuantityText = it; receiveValidation = "" })
+                    }
+                    (receiveValidation.takeIf(String::isNotBlank) ?: receiveError)?.takeIf(String::isNotBlank)?.let {
+                        Text(it, color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
+                    }
+                    actionButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = if (savedQuantity != null) authUiText("Retry saved receipt", "Повторить сохранённую приёмку", "Сақталған қабылдауды қайталау", "Сакталган кабыл алууну кайталоо") else authUiText("Receive delivery", "Принять поставку", "Жеткізілімді қабылдау", "Жеткирүүнү кабыл алуу"),
+                        iconPath = stateValues.drawablePathIconTransactionSupply,
+                        loading = receiving, enabled = !receiving, autoLoading = false,
+                        confirmationRequired = true,
+                        onClick = {
+                            if (savedQuantity != null) { onReceive(savedQuantity.total); return@actionButton }
+                            val amount = parseStockQuantityInputText(receiveQuantityText, receiveUnit)
+                            if (amount == null || !supplierReceiptQuantityValid(primaryLine, receiveUnit.copy(total = amount))) {
+                                receiveValidation = supplierProcurementProblemMessage("invalid").extractLocalizedString(stateValues.appLanguage).orEmpty()
+                            } else onReceive(amount)
+                        }
+                    )
+                }
 
-                actionButton(
+                if (!order.status.isSupplierOrderClosed()) actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(965, "Cancel order"),
                     iconPath = stateValues.drawablePathIconCancel,
