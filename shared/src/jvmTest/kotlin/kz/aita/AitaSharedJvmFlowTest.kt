@@ -1065,24 +1065,42 @@ class AitaSharedJvmFlowTest {
 
     @Test
     fun queuesTransactionLocallyWhenCloudCompletionFails() = runBlocking {
-        activeStoreIdState.emit(null)
+        // Keep the server, inventory owner and selected cart in the same operating branch.
+        // Clearing only the selected ID creates an impossible fixture scope and lets unrelated
+        // background reconciliation interrupt checkout. Offline completion returns before the
+        // online-only inventory refresh, so it does not need that old refresh suppression.
+        val store = aitaTestStore(parentStoreId = "flow-management")
+        environment.stores = listOf(store)
+        storesState.emit(DataState.Success(environment.stores))
+        waitUntilAitaFlowCondition { currentStoreModel(store.id)?.parentStoreId == store.parentStoreId }
+        ActiveStores.acceptAccount(environment.serverAccount)
+        waitUntilAitaFlowCondition { DynamicCarts.captureScope()?.storeId == store.id }
+        assertEquals(store.id, activeStoreIdState.value)
         val item = aitaTestGoodsItem(id = "offline-item", name = "Offline tea", activeShelfBatchId = "offline-batch")
         val batch = aitaTestBatch(id = "offline-batch", goodsItemId = item.id, quantityTotal = 10.0)
         val transaction = aitaTestTransaction(id = "", type = transactionServerType(0), goodsItem = item, quantity = 3.0, pricePerUnit = 100.0, paidCash = 300.0)
-        stockState.emit(DataState.Success(listOf(item)))
-        stockBatchesState.emit(DataState.Success(listOf(batch)))
+        environment.stock = listOf(item)
+        environment.batches = listOf(batch)
+        stockState.emit(DataState.Success(environment.stock))
+        stockBatchesState.emit(DataState.Success(environment.batches))
         environment.failTransactionCompletions = true
 
         val callback = CompletableDeferred<Unit>()
+        val settled = CompletableDeferred<Boolean>()
         completeTransaction(
             transaction = transaction,
             transactionTypeIndex = 0,
             clientId = 1,
             receiptSnapshot = aitaTestReceiptSnapshot(transaction, aitaTestPaymentDraft(0, 1, paidCash = 300.0)),
+            onSettled = { settled.complete(it) },
             onCompleted = { callback.complete(Unit) }
         )
 
-        withTimeout(8_000L) { callback.await() }
+        assertTrue(withTimeout(8_000L) { settled.await() },
+            "Offline checkout rejected: activeStore=${activeStoreIdState.value}, " +
+                "cartScope=${DynamicCarts.captureScope()}, subscription=${currentStoreSubscriptionGate(store.id)}, " +
+                "requests=${environment.requests.map { it.method + " " + it.path }}")
+        assertTrue(callback.isCompleted, "A durable offline completion must invoke onCompleted before settling")
         waitUntilAitaFlowCondition { localNetworkQueuedOperationsState.value.any { it.operationType == LOCAL_NETWORK_OPERATION_TRANSACTION_COMPLETE } }
         waitUntilAitaFlowCondition { transactionsState.payloadValue?.any { it.clientOperationId.isNotBlank() && it.id.startsWith("local_") } == true }
         waitUntilAitaFlowCondition { stockBatchesState.payloadValue?.firstOrNull { it.id == batch.id }?.quantity?.total == 7.0 }
