@@ -1982,6 +1982,7 @@ fun AppConfiguration.StockWarehouseScreen() {
         }
     ) {
         InventoryPendingFeedback()
+        StockScreenImportEntry()
         AnimatedVisibility(visible = sortMenuExpanded) {
             Column(
                 modifier = Modifier

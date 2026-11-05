@@ -337,6 +337,10 @@ class Run:
     def web(self):
         self.command('Build production web app', ['bash', 'scripts/linux-web/run-aita-wasm.sh', '--build-only', '--max-workers', '4'])
         dist = ROOT / 'composeApp/build/dist/wasmJs/productionExecutable'
+        helper_archive = self.folder / 'install-helpers.zip'
+        self.command('Package verified installation helpers and instructions', [sys.executable,
+            'scripts/install/package-installers.py', '--web-root', str(dist), '--zip', str(helper_archive)])
+        self.collect(helper_archive, f'AITA-{self.args.version}-{self.args.build}-install-helpers.zip', 'tools', None)
         archive = self.folder / 'web.zip'
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as package:
             for path in sorted(dist.rglob('*')):

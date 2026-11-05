@@ -57,22 +57,23 @@ try{
  await button(p,'Menu').click({force:true});await p.waitForTimeout(600);await p.getByText('Devices',{exact:true}).first().click({force:true});await p.waitForTimeout(800);
  await p.getByRole('button').filter({hasText:/^58 mm$/}).click({force:true});await p.waitForTimeout(700);
  // Real pointer input targets the canvas when its accessibility node lags after recomposition.
- await p.mouse.click(829,418);
+ await button(p,'Send test receipt').click({force:true});
  await p.getByText('Did the test print clearly?',{exact:true}).waitFor({timeout:15000});
  const html=await p.evaluate(()=>testPrintHtml);assert.match(html,/aita.kz/);assert.match(html,/-webkit-text-fill-color:black/);
  fs.writeFileSync(out+'/printed.html',html);await p.screenshot({path:out+'/confirm.png'});
  await p.getByRole('textbox').last().click({force:true});await p.keyboard.type('AP58 counter printer');
  await p.waitForTimeout(400);await p.getByRole('button').filter({hasText:/^Yes, save this setup$/}).click({force:true});await p.waitForTimeout(700);await p.keyboard.press('Tab');await p.waitForTimeout(500);
  await waitFor(async()=>await preference('browser-receipt-confirmed-name')==='AP58 counter printer','confirmed printer name saved');await p.screenshot({path:out+'/saved.png'});
- await p.mouse.click(830,534);await waitFor(async()=>await preference('browser-receipt-enabled')==='0','printer selection forgotten');await p.waitForTimeout(500);
- await p.mouse.click(830,371);await p.waitForTimeout(700);
+ await p.reload();await p.locator('canvas').first().waitFor({timeout:120000});await p.waitForTimeout(6500);await p.keyboard.press('Tab');await p.waitForTimeout(400);
+ await button(p,'Forget printer selection').click({force:true});await waitFor(async()=>await preference('browser-receipt-enabled')==='0','printer selection forgotten');await p.waitForTimeout(500);
+ await p.waitForTimeout(700);
  assert.equal(await preference('browser-receipt-confirmed-name'),null,'clear forgets confirmed printer');assert.equal(await preference('browser-receipt-enabled'),'0');
  await p.screenshot({path:out+'/forgotten.png'});
  await p.reload();await p.locator('canvas').first().waitFor({timeout:120000});await p.waitForTimeout(6500);await p.keyboard.press('Tab');await p.waitForTimeout(400);
  await button(p,'Menu').click({force:true});await p.waitForTimeout(400);await p.getByText('Devices',{exact:true}).first().click({force:true});await p.waitForTimeout(500);
  assert.equal(await preference('browser-receipt-confirmed-name'),null,'forget persists after restart');assert.equal(await preference('browser-receipt-enabled'),'0');
  await p.screenshot({path:out+'/forgotten-reloaded.png'});
- await p.mouse.click(830,526);await p.waitForTimeout(700);
+ await button(p,'How to stop printing').click({force:true});await p.waitForTimeout(700);
  assert.ok(await p.getByText(/Cancel the document in the system printer queue/).count());
  assert.deepEqual(errors,[]);console.log('PASS: printer confirmation, forget, reload, and queue-cancellation guidance');
  }else{
@@ -80,7 +81,7 @@ try{
  for(const p of [a,b])assert.equal(await button(p,'Sale').count(),1,'starts in physical branch');
  await waitFor(()=>sockets.size>=2,'two realtime connections');
  await button(a,'Menu').click({force:true});await a.waitForTimeout(600);await a.getByText('Stores',{exact:true}).first().click({force:true});await a.waitForTimeout(800);
- await button(a,'Select').first().click({force:true});await a.waitForTimeout(500);
+ await button(a,'Set active across account devices').first().click({force:true});await a.waitForTimeout(500);
  await a.screenshot({path:out+'/store-select.png'});
  if(account.activeStoreId!==parent.id){const yes=button(a,'Yes');if(await yes.count())await yes.click({force:true});}
  await waitFor(()=>account.activeStoreId===parent.id,'first client saved parent');

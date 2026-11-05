@@ -120,6 +120,11 @@ jobs:
         run: |
           ./gradlew.bat :shared:jvmTest :composeApp:jvmTest :composeApp:createDistributable --no-daemon --max-workers=2 --console=plain
           if ($LASTEXITCODE -ne 0) { throw 'Windows build/tests failed' }
+      - name: Verify packaged local stock recorder and offline OCR
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File scripts/testing/verify-windows-stock-capture.ps1 -AppImage composeApp/build/compose/binaries/main/app/AITA
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged stock capture/OCR verification failed' }
       - name: Exercise packaged native printer bridge without sending paper
         shell: pwsh
         run: |
@@ -186,5 +191,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python build/release-tools/scripts/releases/windows-draft-artifacts.py upload --diagnostics --run $env:GITHUB_RUN_ID --revision $env:AITA_RELEASE_REVISION --path shared/build/test-results/jvmTest --path composeApp/build/test-results/jvmTest --path composeApp/build/compose/logs --path build/windows-package-temp --path build/windows-installer-resources
+          python build/release-tools/scripts/releases/windows-draft-artifacts.py upload --diagnostics --run $env:GITHUB_RUN_ID --revision $env:AITA_RELEASE_REVISION --path shared/build/test-results/jvmTest --path composeApp/build/test-results/jvmTest --path composeApp/build/compose/logs --path build/windows-package-temp --path build/windows-installer-resources --path build/windows-stock-capture-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Windows diagnostic preservation failed; workflow logs are retained' }

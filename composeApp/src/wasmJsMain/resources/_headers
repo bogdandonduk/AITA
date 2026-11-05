@@ -29,3 +29,5 @@
   Cache-Control: no-cache
 /downloads-public-key.json
   Cache-Control: no-cache
+/install/*
+  Cache-Control: no-cache

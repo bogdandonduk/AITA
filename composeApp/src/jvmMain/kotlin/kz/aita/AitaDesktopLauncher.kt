@@ -5,6 +5,10 @@ package kz.aita
  * which intentionally omit java.exe. Normal startup remains the existing desktop entrypoint. */
 object AitaDesktopLauncher {
     @JvmStatic fun main(args: Array<String>) {
+        if (args.firstOrNull() == "--aita-local-ocr") {
+            StockOcrWorker.main(args.drop(1).toTypedArray())
+            return
+        }
         if (args.firstOrNull() == "--aita-native-print") {
             WindowsRawPrintProcess.main(args.drop(1).toTypedArray())
             return

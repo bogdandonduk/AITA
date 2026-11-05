@@ -1,0 +1,324 @@
+[
+  {
+    "id": "journey",
+    "title": "Register \u2192 store \u2192 stock \u2192 sale \u2192 delete",
+    "file": "journey.cjs",
+    "areas": [
+      "registration",
+      "email confirmation",
+      "stores",
+      "stock",
+      "batches",
+      "sale",
+      "account deletion"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "returns",
+    "title": "Receipt scan \u2192 linked return \u2192 Returned batch",
+    "file": "returns.cjs",
+    "areas": [
+      "returns",
+      "receipt lookup",
+      "barcodes",
+      "batches",
+      "cleanup"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "registration",
+    "title": "Registration code and existing-account recovery",
+    "file": "../linux-web/test/registration-confirmation-smoke.cjs",
+    "areas": [
+      "registration",
+      "confirmation",
+      "password recovery"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "account-security",
+    "title": "Password and second-factor confirmation",
+    "file": "../linux-web/test/profile-security-smoke.cjs",
+    "areas": [
+      "profile",
+      "authenticator",
+      "email confirmation"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "session-revocation",
+    "title": "Revoked sessions leave authenticated screens",
+    "file": "../linux-web/test/session-revocation-smoke.cjs",
+    "areas": [
+      "security",
+      "sessions"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "appearance",
+    "title": "Appearance preferences and offline restart",
+    "file": "../linux-web/test/appearance-offline-smoke.cjs",
+    "areas": [
+      "preferences",
+      "offline",
+      "navigation"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "profile-photo",
+    "title": "Profile photo selection and save",
+    "file": "../linux-web/test/profile-photo-smoke.cjs",
+    "areas": [
+      "profile",
+      "images"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "store-scope",
+    "title": "Device and account active-store choices",
+    "file": "../linux-web/test/active-store-scope-smoke.cjs",
+    "areas": [
+      "stores",
+      "preferences"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "store-architecture",
+    "title": "Parent and branch responsibilities",
+    "file": "../linux-web/test/branch-architecture-smoke.cjs",
+    "areas": [
+      "stores",
+      "branches",
+      "subscriptions"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "store-recovery",
+    "title": "Recover a stale selected store",
+    "file": "../linux-web/test/store-session-recovery-smoke.cjs",
+    "areas": [
+      "stores",
+      "sessions",
+      "offline"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "workers",
+    "title": "Move and assign parent/branch employees",
+    "file": "../linux-web/test/worker-placement-smoke.cjs",
+    "areas": [
+      "workers",
+      "branches",
+      "retry"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "stock-offline",
+    "title": "Cached inventory during connection loss",
+    "file": "../linux-web/test/inventory-offline-smoke.cjs",
+    "areas": [
+      "stock",
+      "offline",
+      "cache"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "stock-batches",
+    "title": "Prices, quantity, batch retry and analytics",
+    "file": "../linux-web/test/stock-operations-smoke.cjs",
+    "areas": [
+      "stock",
+      "batches",
+      "prices",
+      "analytics",
+      "payments"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "stock-import",
+    "title": "Quick add and parent stock import",
+    "file": "../linux-web/test/quick-stock-import-smoke.cjs",
+    "areas": [
+      "stock",
+      "barcodes",
+      "parent import"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "commerce-offline",
+    "title": "Offline stock, write-offs and buyers",
+    "file": "../linux-web/test/store-commerce-offline-smoke.cjs",
+    "areas": [
+      "offline",
+      "stock",
+      "buyers",
+      "write-offs"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "sale-receipt",
+    "title": "Sale, discounts, buyers and print retry",
+    "file": "../linux-web/test/receipt-batch-actions-smoke.cjs",
+    "areas": [
+      "sale",
+      "payments",
+      "discounts",
+      "buyers",
+      "write-offs",
+      "receipts"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "quantity",
+    "title": "Cart numeric input and quantity",
+    "file": "../linux-web/test/numeric-cart-smoke.cjs",
+    "areas": [
+      "cart",
+      "quantity"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "analytics",
+    "title": "Analytics and workshift X/Z reports",
+    "file": "../linux-web/test/analytics-shift-smoke.cjs",
+    "areas": [
+      "analytics",
+      "workshifts",
+      "reports"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
+  },
+  {
+    "id": "printers",
+    "title": "Printer selection and safe print preview",
+    "file": "../linux-web/test/store-printer-smoke.cjs",
+    "areas": [
+      "devices",
+      "receipts",
+      "printing"
+    ],
+    "kind": "fixture-ui",
+    "environment": {
+      "AITA_TEST_PRINTER": "1"
+    }
+  },
+  {
+    "id": "labels",
+    "title": "Label quantity and print-sheet actions",
+    "file": "../linux-web/test/inventory-label-actions-smoke.cjs",
+    "areas": [
+      "labels",
+      "stock",
+      "printing"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "downloads",
+    "title": "Platform download tabs and store badges",
+    "file": "../linux-web/test/store-badges-smoke.cjs",
+    "areas": [
+      "downloads",
+      "platforms"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "supplier",
+    "title": "Supplier workspace",
+    "file": "../linux-web/test/supplier-smoke.cjs",
+    "areas": [
+      "supplier",
+      "orders"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "supplier-picking",
+    "title": "Supplier order picking",
+    "file": "../linux-web/test/supplier-picking-smoke.cjs",
+    "areas": [
+      "supplier",
+      "picking",
+      "fulfilment"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "marketplace",
+    "title": "Marketplace shopping and checkout",
+    "file": "../linux-web/test/marketplace-smoke.cjs",
+    "areas": [
+      "marketplace",
+      "catalogue",
+      "checkout"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "public-marketplace",
+    "title": "Guest marketplace landing page",
+    "file": "../linux-web/test/public-marketplace-smoke.cjs",
+    "areas": [
+      "marketplace",
+      "guest"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "delivery",
+    "title": "Marketplace delivery modes",
+    "file": "../linux-web/test/market-delivery-smoke.cjs",
+    "areas": [
+      "marketplace",
+      "delivery"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "delivery-workspace",
+    "title": "Delivery workspace and dispatch",
+    "file": "../linux-web/test/market-delivery-workspace-smoke.cjs",
+    "areas": [
+      "delivery",
+      "dispatch"
+    ],
+    "kind": "fixture-ui"
+  },
+  {
+    "id": "courier-location",
+    "title": "Courier location and tracking",
+    "file": "../linux-web/test/market-courier-location-smoke.cjs",
+    "areas": [
+      "courier",
+      "location",
+      "tracking"
+    ],
+    "kind": "fixture-ui"
+  }
+]

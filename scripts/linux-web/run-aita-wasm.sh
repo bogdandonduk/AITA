@@ -113,6 +113,8 @@ if $build; then
   ((gradle_status == 0)) || aita_die "Wasm build failed. Full log: $log_file"
 fi
 
+python3 "$project_root/scripts/install/package-installers.py" --web-root "$dist_dir"
+
 for required_file in index.html composeApp.js styles.css favicon.svg favicon.ico favicon-32.png apple-touch-icon.png; do
   [[ -s "$dist_dir/$required_file" ]] || aita_die "Wasm distribution is missing: $dist_dir/$required_file"
 done

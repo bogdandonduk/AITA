@@ -93,10 +93,20 @@ try {
  const disabled=[];for(let i=0;i<28;i++){disabled.push(await button(b,'Refresh printers').first().isDisabled());await b.waitForTimeout(250);}
  assert.ok(disabled.every(x=>!x),'discovery must not cycle into a loading state without user action');
  await b.getByRole('button').filter({hasText:/^Open system devices$/}).first().click({force:true});await b.waitForTimeout(800);
- await button(b,'Browser / system print dialog').click({force:true});await b.waitForTimeout(1200);
- const report=await b.evaluate(()=>window.testPrintHtml);assert.match(report,/595.28pt/);assert.match(report,/841.89pt/);assert.doesNotMatch(report,/aita-receipt-paper/);
+ await button(b,'Choose printer').click({force:true});await b.waitForTimeout(700);
+ await button(b,'Print an A4 test page').click({force:true});await b.waitForTimeout(1200);
+ const report=await b.evaluate(()=>window.testPrintHtml);
+ const a4=report.match(/@page\{size:([\d.]+)pt\s+([\d.]+)pt/);assert.ok(a4,'explicit paper dimensions');
+ assert.ok(Math.abs(Number(a4[1])-595.28)<0.5,'A4 paper width within half a point');
+ assert.ok(Math.abs(Number(a4[2])-841.89)<0.5,'A4 paper height within half a point');
+ assert.doesNotMatch(report,/aita-receipt-paper/);
  fs.writeFileSync(out+'/a4-dialog-document.html',report);
+ const closePrint=button(b,'Cancel');if(await closePrint.count())await closePrint.last().click({force:true});await b.waitForTimeout(600);
  assert.deepEqual(errors,[]);console.log('PASS: active-store deletion, stable printer refresh and A4 print-dialog action');
+ // Refresh accessibility ownership after closing the Compose modal, then return to receipt devices.
+ await b.reload();await b.locator('canvas').first().waitFor({timeout:120000});await b.waitForTimeout(7000);await b.keyboard.press('Tab');await b.waitForTimeout(500);
+ await button(b,'Choose printer').waitFor();
+ await button(b,'Thermal receipt printer').click({force:true});await b.waitForTimeout(700);
  // A legacy session has no selection even though one parent family remains.
  account={...account,activeStoreId:null};publish('user/active-store');
  await waitFor(()=>account.activeStoreId===parent.id,'missing selection repaired on server');

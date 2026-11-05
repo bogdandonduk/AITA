@@ -1,0 +1,5 @@
+# Preserve pinned upstream recognition assets byte-for-byte on Windows checkouts.
+composeApp/src/jvmMain/resources/stock-capture/licenses/* -text -whitespace
+composeApp/src/jvmMain/resources/stock-capture/tessdata/LICENSE -text -whitespace
+composeApp/src/jvmMain/resources/stock-capture/tessdata/*.traineddata binary
+composeApp/src/jvmMain/resources/stock-capture/THIRD-PARTY-NOTICES.txt -text -whitespace

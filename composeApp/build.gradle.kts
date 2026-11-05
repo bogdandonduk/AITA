@@ -240,6 +240,8 @@ kotlin {
             }
 
             getByName("jvmMain").dependencies {
+                // Local stock-screen recognition. Models/native preflight are packaged with the desktop app.
+                implementation("net.sourceforge.tess4j:tess4j:5.18.0")
                 implementation(libs.java.keyring)
                 implementation(libs.kamel.decoder.svg.batik)
                 implementation(libs.kamel.fetcher.resources.jvm)
