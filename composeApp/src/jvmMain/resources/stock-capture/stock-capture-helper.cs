@@ -159,9 +159,19 @@ namespace Aita.StockCapture {
         }
 
     }
+    // TabStop=false only skips keyboard traversal; an ordinary Button is still
+    // selectable and WinForms may focus it when its parent becomes visible.
+    internal sealed class CaptureButton:Button {
+        internal CaptureButton(){SetStyle(ControlStyles.Selectable,false);TabStop=false;}
+        protected override void Select(bool directed,bool forward) { }
+        protected override void WndProc(ref Message m) {
+            if(m.Msg==0x21){m.Result=new IntPtr(3);return;}
+            base.WndProc(ref m);
+        }
+    }
     internal sealed class RecorderOverlay:Form {
         readonly IntPtr source; readonly uint sourcePid;
-        readonly Label caption=new Label(); readonly Button toggle=new Button(),stop=new Button();
+        readonly Label caption=new Label(); readonly Button toggle=new CaptureButton(),stop=new CaptureButton();
         readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer();
         readonly string[] labels;
         readonly Action<object> emit;
@@ -173,6 +183,7 @@ namespace Aita.StockCapture {
         internal RecorderOverlay(IntPtr window,string language,Action<object> observer=null) {
             emit=observer ?? new Action<object>(Helper.Emit);
             source=window;sourcePid=Helper.Pid(window);labels=Labels(language);
+            SetStyle(ControlStyles.Selectable,false);
             Text="AITA";TopMost=true;ShowInTaskbar=false;FormBorderStyle=FormBorderStyle.None;
             BackColor=Color.FromArgb(24,28,37);ForeColor=Color.White;ClientSize=new Size(366,66);
             StartPosition=FormStartPosition.Manual;

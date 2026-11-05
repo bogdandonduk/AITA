@@ -112,7 +112,9 @@ namespace Aita.StockCapture {
             internal void Run() {
                 try {
                     Ui(delegate {overlay=new RecorderOverlay(target,"en",Observe);overlay.Show();});
-                    if(Helper.GetForegroundWindow()!=target)throw new ProbeFailure("overlay_stole_focus");
+                    IntPtr foreground=Helper.GetForegroundWindow();
+                    if(foreground==overlay.Handle)throw new ProbeFailure("overlay_stole_focus");
+                    if(foreground!=target)throw new DesktopUnavailable();
                     Ui(delegate{overlay.Command("resume");});
                     Wait(delegate{return HasWord("4601234567893");},"uia_frame_missing");
                     Ui(delegate{overlay.Command("pause");table.Rows[0].Cells[1].Value="Paused synthetic update";});
