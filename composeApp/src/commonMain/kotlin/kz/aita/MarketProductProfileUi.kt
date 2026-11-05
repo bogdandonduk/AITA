@@ -180,18 +180,18 @@ internal fun AppConfiguration.StockMarketplaceBadge(item: GoodsItemDataModel) {
 internal fun AppConfiguration.MarketProductGallery(product: MarketProductDetails, title: String) {
     var selected by remember(product.imageUrls) { mutableStateOf(0) }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        MarketProductPhoto(product.imageUrls.getOrNull(selected),title,photoHeight=260.dp)
+        MarketProductPhoto(product.imageUrls.getOrNull(selected),title,photoHeight=if(stateValues.isNarrowScreen) 180.dp else 220.dp)
         if(product.imageUrls.size > 1) {
             androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 items(product.imageUrls.size) { index ->
                     val label=marketBrowseText("market.photo_number","number" to (index+1).toString(),"total" to product.imageUrls.size.toString())
-                    Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp))
-                        .border(if(selected==index) 2.dp else 1.dp,if(selected==index) stateValues.AccentColor else stateValues.TextColor.copy(alpha=.1f),RoundedCornerShape(12.dp))
+                    Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp))
+                        .border(if(selected==index) 2.dp else 1.dp,if(selected==index) stateValues.AccentColor else stateValues.TextColor.copy(alpha=.1f),RoundedCornerShape(10.dp))
                         .semantics { contentDescription=label }.clickable { selected=index }.padding(4.dp)) {
                         // Only the selected full photo is decoded. Loading six originals just
                         // to draw tiny previews can exhaust a tablet's native image memory.
                         Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-                            CpImage(Modifier.size(24.dp),marketIconPath(148),marketIconFallback(148),null,stateValues.TextColor.copy(alpha=.65f))
+                            CpImage(Modifier.size(16.dp),marketIconPath(148),marketIconFallback(148),null,stateValues.TextColor.copy(alpha=.65f))
                             Text((index+1).toString(),color=stateValues.TextColor,fontSize=stateValues.smallTextSize,
                                 fontWeight=if(selected==index) FontWeight.Bold else FontWeight.Normal)
                         }

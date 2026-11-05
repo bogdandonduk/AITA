@@ -353,7 +353,6 @@ internal fun AppConfiguration.SupplierOrdersCompactCard(
             .padding(stateValues.marginTextFieldGroup),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        RecordDates(order.createdAtMillis, order.updatedAtMillis)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -412,11 +411,18 @@ internal fun AppConfiguration.SupplierOrdersCompactCard(
             )
         }
 
+        if (amountText.isNotBlank()) Text(
+            text = amountText,
+            color = stateValues.TextColor,
+            fontSize = stateValues.accentTextSize,
+            fontWeight = FontWeight.Bold
+        )
+        RecordDates(order.createdAtMillis, order.updatedAtMillis)
+
         val detailChips = buildList {
             supplierIdentityTitle.trim().takeIf { it.isNotBlank() }?.let(::add)
             add("${localizedStringResource(1671, "Lines")}: ${lines.size}")
             add(dueText)
-            amountText.takeIf { it.isNotBlank() }?.let(::add)
         }
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
@@ -561,65 +567,48 @@ internal fun AppConfiguration.SupplierOrdersFilterPanel(
 }
 
 @Composable
+internal fun AppConfiguration.SupplierWorkspaceLink(
+    title: String,
+    iconPath: String,
+    iconRes: DrawableResource?,
+    onClick: () -> Unit
+) {
+    actionButton(
+        modifier = Modifier.widthIn(min = 142.dp, max = 232.dp)
+            .border(stateValues.unfocusedBorderWidth, stateValues.PlaceholderTextColor,
+                RoundedCornerShape(stateValues.cornerRadius)),
+        text = title,
+        textSize = stateValues.smallTextSize,
+        enabledColor = stateValues.BackgroundColor,
+        textColor = stateValues.TextColor,
+        iconTintColor = stateValues.AccentColor,
+        iconPath = iconPath,
+        iconRes = iconRes,
+        iconSizeOverride = 20.dp,
+        confirmationRequired = false,
+        autoLoading = false,
+        onClick = onClick
+    )
+}
+
+@Composable
 internal fun AppConfiguration.SupplierOrdersWorkflowLinks() {
-    if (stateValues.isNarrowScreen) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1338, "Catalog"),
-                textSize = stateValues.smallTextSize,
-                iconPath = stateValues.drawablePathIconSupplierCatalog,
-                iconRes = stateValues.drawableResIconSupplierCatalog.value,
-                confirmationRequired = false,
-                autoLoading = false,
-                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main) } }
-            )
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1556, "Dispatch"),
-                textSize = stateValues.smallTextSize,
-                iconPath = stateValues.drawablePathIconSupplierDispatch,
-                iconRes = stateValues.drawableResIconSupplierDispatch.value,
-                confirmationRequired = false,
-                autoLoading = false,
-                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Dispatch.Main) } }
-            )
-        }
-    } else {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1338, "Catalog"),
-                iconPath = stateValues.drawablePathIconSupplierCatalog,
-                iconRes = stateValues.drawableResIconSupplierCatalog.value,
-                confirmationRequired = false,
-                autoLoading = false,
-                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main) } }
-            )
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1556, "Dispatch"),
-                iconPath = stateValues.drawablePathIconSupplierDispatch,
-                iconRes = stateValues.drawableResIconSupplierDispatch.value,
-                confirmationRequired = false,
-                autoLoading = false,
-                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Dispatch.Main) } }
-            )
-            actionButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = localizedStringResource(1340, "Insights"),
-                iconPath = stateValues.drawablePathIconSupplierDemandRadar,
-                iconRes = stateValues.drawableResIconSupplierDemandRadar.value,
-                confirmationRequired = false,
-                autoLoading = false,
-                onClick = { coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main) } }
-            )
-        }
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+        contentPadding = PaddingValues(1.dp)
+    ) {
+        item { SupplierWorkspaceLink(localizedStringResource(1338, "Catalog"),
+            stateValues.drawablePathIconSupplierCatalog, stateValues.drawableResIconSupplierCatalog.value) {
+            coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Catalog.Main) }
+        } }
+        item { SupplierWorkspaceLink(localizedStringResource(1556, "Dispatch"),
+            stateValues.drawablePathIconSupplierDispatch, stateValues.drawableResIconSupplierDispatch.value) {
+            coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Dispatch.Main) }
+        } }
+        item { SupplierWorkspaceLink(localizedStringResource(1340, "Insights"),
+            stateValues.drawablePathIconSupplierDemandRadar, stateValues.drawableResIconSupplierDemandRadar.value) {
+            coroutineScope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Analytics.Main) }
+        } }
     }
 }

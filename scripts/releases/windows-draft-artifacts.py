@@ -5,6 +5,7 @@ Drafts are never published by this helper. The normal release coordinator checks
 platform and the package verifier receipt before publishing a customer release.
 """
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ import tempfile
 import zipfile
 
 REPO = 'bogdandonduk/AITA'
+NATIVE_CAPTURE_REPORT = 'build/windows-stock-capture-verification.json'
 
 
 def require(condition, message):
@@ -50,6 +52,31 @@ def draft_view(tag, revision):
     return value
 
 
+def diagnostic_file_allowed(path, name):
+    if path.suffix.lower() in ('.xml', '.wxs', '.wxi', '.wxl', '.log', '.txt', '.ico', '.bmp', '.rtf'):
+        return True
+    # Preserve only this bounded machine-generated receipt, never arbitrary package JSON
+    # which can contain application configuration or other unrelated private data.
+    if name != NATIVE_CAPTURE_REPORT:
+        return False
+    require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 4096,
+            'Unsafe native recorder verification receipt')
+    value = json.loads(path.read_text(encoding='utf-8-sig'))
+    fields = {'schema', 'helperCompilation', 'bundledModels', 'packagedOcr', 'nativeRecorder',
+              'nativeReason', 'customerScreenCaptured', 'generatedAt'}
+    require(isinstance(value, dict) and set(value) == fields and type(value['schema']) is int and
+            value['schema'] == 1 and value['helperCompilation'] == 'passed' and
+            value['bundledModels'] == 'passed' and type(value['packagedOcr']) is bool and
+            value['nativeRecorder'] in ('passed', 'failed', 'unsupported') and
+            isinstance(value['nativeReason'], str) and re.fullmatch('[a-z_]{0,64}', value['nativeReason']) and
+            (value['nativeRecorder'] != 'passed' or value['nativeReason'] == '') and
+            value['customerScreenCaptured'] is False and isinstance(value['generatedAt'], str) and
+            len(value['generatedAt']) <= 40, 'Invalid native recorder verification receipt')
+    require(datetime.fromisoformat(value['generatedAt'].replace('Z', '+00:00')).utcoffset() ==
+            timezone.utc.utcoffset(None), 'Native recorder verification timestamp must be UTC')
+    return True
+
+
 def upload(args):
     tag = identity(args.run, args.attempt, args.revision)
     # List drafts rather than treating an arbitrary network error as "not found".
@@ -72,8 +99,7 @@ def upload(args):
     if args.diagnostics:
         # jpackage's temporary tree also contains complete copies of the Java
         # runtime and installers. Preserve diagnostics without duplicating them.
-        files = [(p, n) for p, n in files if p.suffix.lower() in
-                 ('.xml', '.wxs', '.wxi', '.wxl', '.log', '.txt', '.ico', '.bmp', '.rtf')]
+        files = [(p, n) for p, n in files if diagnostic_file_allowed(p, n)]
     require(files, 'No Windows artifacts to preserve')
     require(all(not p.is_symlink() and not Path(n).is_absolute() and '..' not in Path(n).parts for p, n in files),
             'Unsafe Windows artifact path')

@@ -29,15 +29,14 @@ internal fun AppConfiguration.MarketHomeWelcome(onCatalogue: () -> Unit, onShops
     val shape = RoundedCornerShape(stateValues.cornerRadius)
     Column(Modifier.fillMaxWidth().clip(shape)
         .background(Brush.horizontalGradient(listOf(stateValues.AccentColor.copy(alpha = .16f), stateValues.BackgroundColor)))
-        .border(1.dp, stateValues.AccentColor.copy(alpha = .3f), shape).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        .border(1.dp, stateValues.AccentColor.copy(alpha = .3f), shape).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("AITA MARKET", color = stateValues.AccentColor, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.Bold)
-                Text(pass24Text("discover"), color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Bold)
-                Text(pass24Text("discover_note"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                Text(pass24Text("discover"), color = stateValues.TextColor, fontSize = if (stateValues.isNarrowScreen) stateValues.accentTextSize else stateValues.titleTextSize, fontWeight = FontWeight.Bold)
+                if (!stateValues.isNarrowScreen) Text(pass24Text("discover_note"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
             }
-            if (!stateValues.isNarrowScreen) MarketBagIllustration(Modifier.padding(start = 16.dp).size(112.dp))
+            if (!stateValues.isNarrowScreen) MarketBagIllustration(Modifier.padding(start = 16.dp).size(80.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.weight(1f)) { actionButton(text = pass24Text("catalogue_short"), iconPath = marketIconPath(18),
@@ -58,7 +57,7 @@ internal fun AppConfiguration.MarketHomeCatalogue(catalogue: MarketCategoryCatal
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(2.dp)) {
             items(roots, key = { it.id }) { category ->
                 val title = category.name.visibleLocalizedString(stateValues.appLanguage, "")
-                Column(Modifier.width(148.dp).heightIn(min = 112.dp).clip(RoundedCornerShape(stateValues.cornerRadius))
+                Column(Modifier.width(if (stateValues.isNarrowScreen) 138.dp else 148.dp).heightIn(min = if (stateValues.isNarrowScreen) 88.dp else 112.dp).clip(RoundedCornerShape(stateValues.cornerRadius))
                     .background(stateValues.BackgroundColor).border(1.dp, stateValues.AccentColor.copy(alpha = .35f), RoundedCornerShape(stateValues.cornerRadius))
                     .clickable(role = Role.Button) { onSelect(category.id) }.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CpImage(Modifier.size(26.dp), marketIconPath(18), marketIconFallback(18), null, stateValues.AccentColor)

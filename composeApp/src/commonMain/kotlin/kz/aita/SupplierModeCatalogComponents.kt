@@ -49,77 +49,24 @@ internal fun AppConfiguration.SupplierCatalogChip(
 
 @Composable
 internal fun AppConfiguration.SupplierCatalogWorkflowLinks() {
-    val coroutineScope = rememberCoroutineScope()
-
-    @Composable
-    fun OrdersButton(modifier: Modifier) {
-        actionButton(
-            modifier = modifier,
-            text = localizedStringResource(254, "Orders"),
-            iconPath = stateValues.drawablePathIconAppModeSupplier,
-            iconRes = stateValues.drawableResIconAppModeSupplier.value,
-            confirmationRequired = false,
-            autoLoading = false,
-            onClick = {
-                coroutineScope.launch {
-                    Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main)
-                }
-            }
-        )
-    }
-
-    @Composable
-    fun CustomersButton(modifier: Modifier) {
-        actionButton(
-            modifier = modifier,
-            text = localizedStringResource(1453, "Partner stores"),
-            iconPath = stateValues.drawablePathIconSupplierPartners,
-            iconRes = stateValues.drawableResIconSupplierPartners.value,
-            confirmationRequired = false,
-            autoLoading = false,
-            onClick = {
-                coroutineScope.launch {
-                    Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main)
-                }
-            }
-        )
-    }
-
-    @Composable
-    fun ContractsButton(modifier: Modifier) {
-        actionButton(
-            modifier = modifier,
-            text = localizedStringResource(1479, "Supplier contracts"),
-            iconPath = stateValues.drawablePathIconSupplierContracts,
-            iconRes = stateValues.drawableResIconSupplierContracts.value,
-            confirmationRequired = false,
-            autoLoading = false,
-            onClick = {
-                coroutineScope.launch {
-                    Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main)
-                }
-            }
-        )
-    }
-
-    if (stateValues.isNarrowScreen) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            OrdersButton(Modifier.fillMaxWidth())
-            CustomersButton(Modifier.fillMaxWidth())
-            ContractsButton(Modifier.fillMaxWidth())
-        }
-    } else {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
-        ) {
-            OrdersButton(Modifier.fillMaxWidth())
-            CustomersButton(Modifier.fillMaxWidth())
-            ContractsButton(Modifier.fillMaxWidth())
-        }
+    val scope = rememberCoroutineScope()
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField),
+        contentPadding = PaddingValues(1.dp)
+    ) {
+        item { SupplierWorkspaceLink(localizedStringResource(254, "Orders"),
+            stateValues.drawablePathIconAppModeSupplier, stateValues.drawableResIconAppModeSupplier.value) {
+            scope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Orders.Main) }
+        } }
+        item { SupplierWorkspaceLink(localizedStringResource(1453, "Partner stores"),
+            stateValues.drawablePathIconSupplierPartners, stateValues.drawableResIconSupplierPartners.value) {
+            scope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Customers.Main) }
+        } }
+        item { SupplierWorkspaceLink(localizedStringResource(1479, "Supplier contracts"),
+            stateValues.drawablePathIconSupplierContracts, stateValues.drawableResIconSupplierContracts.value) {
+            scope.launch { Navigation.goMain(NavigationScreenModel.Supplier.Contracts.Main) }
+        } }
     }
 }
 

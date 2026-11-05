@@ -1981,6 +1981,40 @@ class SelectableDomain(
 }
 
 @Composable
+internal fun AppConfiguration.ScreenBackButton(
+    onBack: () -> Unit,
+    textColor: Color = stateValues.TextColor,
+    cornerRadius: Dp = stateValues.cornerRadius
+) {
+    Box(
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .size(40.dp)
+            .clip(RoundedCornerShape(cornerRadius))
+            .aitaClickable(
+                interactionSource = remember {
+                    MutableInteractionSource()
+                },
+                indication = ripple(color = textColor, radius = cornerRadius),
+                onClick = onBack
+            )
+    ) {
+        val iconRes by stateValues.drawableResIconBackArrow.collectAsState()
+
+        CpImage(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(18.dp),
+            url = stateValues.drawablePathIconBackArrow,
+            fallbackRes = iconRes,
+            contentDescription = stateValues.stringBack,
+            tintColor = textColor
+        )
+    }
+
+}
+
+@Composable
 fun AppConfiguration.ScreenAppBarWidget(
     modifier: Modifier = Modifier,
     title: String,
@@ -2030,33 +2064,7 @@ fun AppConfiguration.ScreenAppBarWidget(
                 .height(48.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            onBack?.run {
-                Box(
-                    modifier = Modifier
-                        .padding(vertical = 4.dp)
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(cornerRadius))
-                        .aitaClickable(
-                            interactionSource = remember {
-                                MutableInteractionSource()
-                            },
-                            indication = ripple(color = textColor, radius = cornerRadius),
-                            onClick = this
-                        )
-                ) {
-                    val iconRes by stateValues.drawableResIconBackArrow.collectAsState()
-
-                    CpImage(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(18.dp),
-                        url = stateValues.drawablePathIconBackArrow,
-                        fallbackRes = iconRes,
-                        contentDescription = stateValues.stringBack,
-                        tintColor = textColor
-                    )
-                }
-            }
+            onBack?.let { ScreenBackButton(it, textColor, cornerRadius) }
 
             leadingContent?.invoke()
 

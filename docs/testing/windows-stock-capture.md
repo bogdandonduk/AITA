@@ -48,6 +48,8 @@ The manually dispatched `Verify Windows stock recorder` workflow provides a fast
 
 On 2026-11-05, [native verification run 42001761159](https://github.com/bogdandonduk/AITA/actions/runs/42001761159) passed on commit `ad671a735d81dabfffb41bb9a4b36e420d801dc0`: exact synthetic barcode and Cyrillic recognition, actual selected-window UIA, clipping, pause/resume, foreground ownership, nonactivating overlay, selected-window OCR bitmap and clean stop. The result was `packagedOcr: true`, `nativeRecorder: "passed"`, `customerScreenCaptured: false`. This was a real interactive Windows run, not an unsupported-desktop skip. It validates the synthetic fixture; each competing app's layout still needs review and a small test import before importing a real inventory.
 
+[Full Windows build 42005938009](https://github.com/bogdandonduk/AITA/actions/runs/42005938009), source `0453dda297345218b42bcf74afb2c5352088d69c`, subsequently passed the same packaged OCR and actual recorder gates on the complete application classpath. It also passed native printer verification and EXE/MSI package checks. The recorder gate explicitly reported the real selected-window fixture passing; it was not skipped. These were unsigned pilot artifacts retained in an internal draft, not a published customer release. That run's native report is evidenced by the job log; subsequent runs retain the bounded JSON receipt in `windows-diagnostics.zip` as well.
+
 ## Primary API references
 
 - [Microsoft UI Automation: obtaining elements](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-obtainingelements)

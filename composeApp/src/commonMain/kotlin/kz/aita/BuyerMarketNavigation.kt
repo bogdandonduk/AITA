@@ -72,6 +72,18 @@ internal class BuyerBrowseNavigation(val savedOnly: Boolean) {
         return point
     }
 
+    val canGoBack: Boolean get() = shopId.value != null || section.value != "products" ||
+        search.value.isNotBlank() || city.value.isNotBlank() || categoryId.value != null ||
+        sort.value != MARKET_DISCOVERY_RECENT || brand.value.isNotBlank() || withPhotos.value
+
+    /** Back unwinds the current child before touching the remembered parent query. */
+    fun goBack(clearFilters: Boolean = true): Boolean = when {
+        shopId.value != null -> { leaveShop(); true }
+        section.value != "products" -> { section.value = "products"; true }
+        clearFilters && canGoBack -> { this.clearFilters(); true }
+        else -> false
+    }
+
     fun clearFilters() {
         scrollRestore = null
         search.value = ""; appliedSearch.value = ""; city.value = ""; appliedCity.value = ""

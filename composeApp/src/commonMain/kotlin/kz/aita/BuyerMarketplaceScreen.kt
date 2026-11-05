@@ -91,7 +91,10 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
         if (owner?.isCurrent() != true || !browse.visitShop(shop.storeId)) return
         openedId = null; compareTo = null; browse.scrollRestore = null
     }
-    fun leaveShop() { browse.leaveShop() }
+    fun goBack() {
+        if (!browse.goBack(clearFilters = !savedOnly) && savedOnly)
+            scope.launch { if (owner?.isCurrent() == true) Navigation.goMain(NavigationScreenModel.Buyer.Main.Home) }
+    }
     DisposableEffect(data, requests) { onDispose { data.active = false; requests.close() } }
     LaunchedEffect(requests, revision, limit, dialogOwnsReads) {
         if (!dialogOwnsReads) { data.fresh = false; data.countsFresh = false; requests.trySend(Unit) }
@@ -188,7 +191,8 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                 shopId != null -> data.shop?.displayName ?: authUiText("Shop window", "Витрина", "Витрина", "Дүкөн витринасы")
                 savedOnly -> authUiText("Saved", "Сохранённое", "Сақталғандар", "Сакталган сунуштар")
                 else -> "AITA Market"
-            }, iconPath = marketIconPath(if (savedOnly && shopId == null) 140 else 139))
+            }, iconPath = marketIconPath(if (savedOnly && shopId == null) 140 else 139),
+                onBack = if (savedOnly || browse.canGoBack) ::goBack else null)
         }
     ) {
         MarketBrowseListAction(shopping, onOpen = {
@@ -215,14 +219,11 @@ internal fun AppConfiguration.BuyerMarketplaceScreen(navigation: BuyerMarketNavi
                             savedShops.error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
                             if (shop.pickupNote.isNotBlank()) Text(shop.pickupNote, color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
                         }
-                        actionButton(text = if (savedOnly) authUiText("Back to saved", "К сохранённому", "Сақталғандарға оралу", "Сакталгандарга кайтуу")
-                            else if (browseSection == "shops") authUiText("Back to shops", "К магазинам", "Дүкендерге оралу", "Дүкөндөргө кайтуу")
-                            else authUiText("Back to market", "Вернуться в маркет", "Маркетке оралу", "Маркетке кайтуу"),
-                            autoLoading = false, confirmationRequired = false, onClick = ::leaveShop)
+
                     }
                     if (shopId == null && !home) MarketExperienceHero(savedOnly)
                     if (home) MarketHomeWelcome(onCatalogue = { choosingCategory = true }, onShops = { browseSection = "shops" })
-                    MarketBrowseControls(browse, catalogue, onChooseCategory = { choosingCategory = true })
+                    MarketBrowseControls(browse, catalogue, showCategoryShortcuts = !home, onChooseCategory = { choosingCategory = true })
                     if (data.failure != null || saveFailure != null) Text((saveFailure ?: data.failure).orEmpty().visibleLocalizedString(stateValues.appLanguage, ""),
                         color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
                     MarketShoppingFeedback(shopping)

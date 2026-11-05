@@ -571,6 +571,7 @@ internal var userAuthScreenScrollFirstVisibleItemScrollOffset: Int = 0
 fun AppConfiguration.UserAuthScreen() {
     // Retain the guest entry page while Downloads temporarily replaces its content.
     var showGuestMarketplace by rememberSaveable { mutableStateOf(getPlatformName().contains("wasm", ignoreCase = true)) }
+    val publicBrowse = remember { BuyerBrowseNavigation(false) }
     val publicDestination = (if (stateValues.isNarrowScreen) stateValues.navigationScreensUserAuthLeft
         else stateValues.navigationScreensUserAuthRight).lastOrNull()
     val openPublicPage: (NavigationScreenModel.UserAuth) -> Unit = { destination ->
@@ -603,6 +604,7 @@ fun AppConfiguration.UserAuthScreen() {
     }
     if (showGuestMarketplace && stateValues.userAccount == null) {
         PublicMarketplaceHome(
+            navigation = publicBrowse,
             onLogin = { showGuestMarketplace = false; coroutineScope.launch { Navigation.UserAuth.clearLeft() } },
             onSignup = { showGuestMarketplace = false; coroutineScope.launch {
                 if (stateValues.isNarrowScreen) Navigation.UserAuth.goLeft(NavigationScreenModel.UserAuth.SignUp)
@@ -615,11 +617,8 @@ fun AppConfiguration.UserAuthScreen() {
         modifier = Modifier.fillMaxSize().imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (getPlatformName().contains("wasm", ignoreCase = true)) actionButton(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            text = pass29Text("front.back"), enabledColor = stateValues.BackgroundColor,
-            textColor = stateValues.TextColor, autoLoading = false, confirmationRequired = false,
-            onClick = { showGuestMarketplace = true })
+        if (getPlatformName().contains("wasm", ignoreCase = true)) ScreenAppBarWidget(
+            title = "AITA Market", iconPath = marketIconPath(139), onBack = { showGuestMarketplace = true })
         val authListState = rememberLazyListState(
             initialFirstVisibleItemIndex = userAuthScreenScrollFirstVisibleItemIndex.coerceAtLeast(0),
             initialFirstVisibleItemScrollOffset = userAuthScreenScrollFirstVisibleItemScrollOffset.coerceAtLeast(0)

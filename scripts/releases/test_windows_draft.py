@@ -13,6 +13,26 @@ spec.loader.exec_module(draft)
 
 
 class WindowsDraftTests(unittest.TestCase):
+    def test_only_exact_bounded_native_receipt_is_added_to_diagnostics(self):
+        report = dict(schema=1, helperCompilation='passed', bundledModels='passed', packagedOcr=True,
+                      nativeRecorder='passed', nativeReason='', customerScreenCaptured=False,
+                      generatedAt='2026-11-05T10:03:49.9224644Z')
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'windows-stock-capture-verification.json'
+            path.write_text('\ufeff' + json.dumps(report), encoding='utf8')
+            self.assertTrue(draft.diagnostic_file_allowed(path, draft.NATIVE_CAPTURE_REPORT))
+            self.assertFalse(draft.diagnostic_file_allowed(path, 'other/windows-stock-capture-verification.json'))
+            self.assertFalse(draft.diagnostic_file_allowed(path, 'build/application-settings.json'))
+            for change in (dict(schema=True), dict(packagedOcr=1), dict(customerScreenCaptured=True),
+                           dict(nativeRecorder='unknown'), dict(nativeReason='screen text 123'),
+                           dict(generatedAt='2026-11-05T10:03:49'), dict(unexpected='not retained')):
+                path.write_text(json.dumps(report | change), encoding='utf8')
+                with self.assertRaises((RuntimeError, ValueError)):
+                    draft.diagnostic_file_allowed(path, draft.NATIVE_CAPTURE_REPORT)
+            path.write_text(' ' * 4097, encoding='utf8')
+            with self.assertRaises(RuntimeError):
+                draft.diagnostic_file_allowed(path, draft.NATIVE_CAPTURE_REPORT)
+
     def test_published_wrong_source_or_tag_cannot_supply_installers(self):
         tag = draft.identity(123, 2, 'a'*40)
         good = dict(isDraft=True, tagName=tag, targetCommitish='a'*40)

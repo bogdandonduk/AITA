@@ -5163,8 +5163,24 @@ internal fun AppConfiguration.SupplierOrderCard(
                 verticalArrangement = Arrangement.spacedBy(stateValues.marginTextField)
             ) {
                 if (primaryLine != null && receiveUnit != null && (savedQuantity != null || (remaining > 0.0000001 && order.canReceiveSupplierOrder()))) {
-                    StockCardInfoLine(authUiText("Received", "Принято", "Қабылданды", "Кабыл алынды"), receiveUnit.copy(total = primaryLine.receivedQuantityTotalValue()).quantityText(stateValues.appLanguage), stateValues.TextColor)
-                    StockCardInfoLine(authUiText("Remaining", "Осталось принять", "Қабылдау қалды", "Кабыл алуу калды"), receiveUnit.copy(total = remaining).quantityText(stateValues.appLanguage), stateValues.AccentColor)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+                        Column(Modifier.weight(1f).clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(stateValues.AccentColor.copy(alpha = 0.06f)).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(authUiText("Received", "Принято", "Қабылданды", "Кабыл алынды"),
+                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            Text(receiveUnit.copy(total = primaryLine.receivedQuantityTotalValue()).quantityText(stateValues.appLanguage),
+                                color = stateValues.TextColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                        }
+                        Column(Modifier.weight(1f).clip(RoundedCornerShape(stateValues.cornerRadius))
+                            .background(stateValues.AccentColor.copy(alpha = 0.06f)).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(authUiText("Remaining", "Осталось принять", "Қабылдау қалды", "Кабыл алуу калды"),
+                                color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+                            Text(receiveUnit.copy(total = remaining).quantityText(stateValues.appLanguage),
+                                color = stateValues.AccentColor, fontSize = stateValues.accentTextSize, fontWeight = FontWeight.Bold)
+                        }
+                    }
                     if (savedQuantity != null) {
                         StockCardInfoLine(authUiText("Saved receipt awaiting confirmation", "Сохранённая приёмка ждёт подтверждения", "Сақталған қабылдау растауды күтуде", "Сакталган кабыл алуу ырастоону күтүүдө"), savedQuantity.quantityText(stateValues.appLanguage), stateValues.AccentColor)
                     } else {

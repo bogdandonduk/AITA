@@ -26,11 +26,11 @@ import kotlinx.coroutines.launch
 
 /** Guest navigation never changes the remembered account mode, workplace or authenticated stacks. */
 @Composable
-internal fun AppConfiguration.PublicMarketplaceHome(onLogin: () -> Unit, onSignup: () -> Unit, onDownloads: () -> Unit) {
-    var search by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableStateOf<String?>(null) }
-    var shop by rememberSaveable { mutableStateOf<String?>(null) }
-    var limit by rememberSaveable { mutableIntStateOf(MARKET_DISCOVERY_PAGE_SIZE) }
+internal fun AppConfiguration.PublicMarketplaceHome(navigation: BuyerBrowseNavigation, onLogin: () -> Unit, onSignup: () -> Unit, onDownloads: () -> Unit) {
+    var search by navigation.search
+    var category by navigation.categoryId
+    var shop by navigation.shopId
+    var limit by navigation.limit
     var revision by remember { mutableIntStateOf(0) }
     var catalogue by remember { mutableStateOf<MarketCategoryCatalogue?>(null) }
     var choosingCategory by remember { mutableStateOf(false) }
@@ -41,7 +41,8 @@ internal fun AppConfiguration.PublicMarketplaceHome(onLogin: () -> Unit, onSignu
     var opened by remember { mutableStateOf<MarketOffer?>(null) }
     val query = MarketDiscoveryQuery(text = search.trim(), categoryId = category, storefrontId = shop)
     val request = MarketDiscoveryRequest(query, limit)
-    val grid = rememberLazyGridState()
+    val grid = rememberBuyerBrowseGrid(navigation, resultsReady = data != null)
+    SideEffect { navigation.appliedSearch.value = search }
     val scope = rememberCoroutineScope()
     val home = search.isBlank() && category == null && shop == null
     LaunchedEffect(request, revision) {
@@ -65,13 +66,14 @@ internal fun AppConfiguration.PublicMarketplaceHome(onLogin: () -> Unit, onSignu
         catch (_: Exception) { saved = data != null; failure = eventMessage("market.refresh_failed").visibleLocalizedString(stateValues.appLanguage, "") }
         finally { loading = false }
     }
-    fun reset() { search = ""; category = null; shop = null; limit = MARKET_DISCOVERY_PAGE_SIZE; scope.launch { grid.scrollToItem(0) } }
-    fun visitShop(value: MarketStorefront) { shop = value.storeId; category = null; search = ""; limit = MARKET_DISCOVERY_PAGE_SIZE; scope.launch { grid.scrollToItem(0) } }
+    fun reset() { shop = null; navigation.returnPoint.value = null; navigation.clearFilters(); scope.launch { grid.scrollToItem(0) } }
+    fun visitShop(value: MarketStorefront) { navigation.visitShop(value.storeId) }
     val rows = data?.result?.page?.offers.orEmpty()
     AitaScreenColumn(Modifier.fillMaxSize(), maximumContentWidth = 1440.dp,
         horizontalAlignment = Alignment.CenterHorizontally, appBar = {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!home) ScreenBackButton(onBack = { navigation.goBack() })
                 Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button, onClick = ::reset).padding(4.dp)) {
                     Text("AITA", color = stateValues.TextColor, fontSize = stateValues.titleTextSize, fontWeight = FontWeight.Black)
                     Text("MARKET", color = stateValues.AccentColor, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.Bold)
@@ -98,9 +100,7 @@ internal fun AppConfiguration.PublicMarketplaceHome(onLogin: () -> Unit, onSignu
                             ?.visibleLocalizedString(stateValues.appLanguage, "") ?: pass29Text("front.catalogue"),
                             iconPath = marketIconPath(18), iconRes = marketIconFallback(18), autoLoading = false,
                             confirmationRequired = false, onClick = { choosingCategory = true }) }
-                        if (!home) Box(Modifier.weight(1f)) { actionButton(text = pass29Text("front.back"),
-                            autoLoading = false, confirmationRequired = false, enabledColor = stateValues.BackgroundColor,
-                            textColor = stateValues.TextColor, onClick = ::reset) }
+
                     }
                     if (failure != null || saved) {
                         Text(if (saved) pass29Text("front.offline") else failure.orEmpty(), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)

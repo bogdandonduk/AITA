@@ -152,6 +152,36 @@ class BuyerMarketNavigationTest {
         assertNull(navigation.market.returnPoint.value)
     }
 
+    @Test fun headerBackUnwindsShopThenDirectoryWithoutErasingParentSearch() {
+        val browse = filtered(BuyerBrowseNavigation(false))
+        browse.section.value = "shops"
+        browse.directory.text = "Neighbourhood"
+        val parent = browse.point()
+        assertTrue(browse.visitShop(shop))
+        assertTrue(browse.goBack())
+        assertEquals(parent, browse.scrollRestore)
+        assertEquals(parent.query, browse.query)
+        assertEquals("shops", browse.section.value)
+        assertTrue(browse.goBack())
+        assertEquals("products", browse.section.value)
+        assertEquals(parent.query, browse.query)
+        assertEquals("Neighbourhood", browse.directory.text)
+        assertTrue(browse.goBack())
+        assertEquals(MarketDiscoveryQuery(), browse.query)
+        assertFalse(browse.canGoBack)
+        assertFalse(browse.goBack())
+    }
+
+    @Test fun leavingSavedRootPreservesItsFiltersForNextVisit() {
+        val browse = filtered(BuyerBrowseNavigation(true))
+        val saved = browse.point()
+        assertFalse(browse.goBack(clearFilters = false))
+        assertEquals(saved, browse.point())
+        assertTrue(browse.visitShop(shop))
+        assertTrue(browse.goBack(clearFilters = false))
+        assertEquals(saved.query, browse.query)
+    }
+
     @Test fun newCopyHasExactTranslationsInEverySupportedLanguage() {
         val keys = listOf("intro", "filters", "hide_filters", "continue", "list_count")
         for (language in listOf("en", "ru", "kk", "ky", "tg", "uz")) for (key in keys) {

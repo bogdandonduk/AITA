@@ -111,7 +111,10 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
             val current=offer
             val detailReady=detailIsCurrent(remote)
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text(current?.storefront?.displayName ?: "AITA Market",Modifier.weight(1f),color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(current?.title ?: "AITA Market",color=stateValues.TextColor,fontSize=stateValues.accentTextSize,fontWeight=FontWeight.Bold)
+                    current?.storefront?.displayName?.let { Text(it,color=stateValues.PlaceholderTextColor,fontSize=stateValues.smallTextSize) }
+                }
                 actionButton(text="",iconPath=stateValues.drawablePathIconCancel,iconContentDescription=authUiText("Close","Закрыть","Жабу","Жабуу"),
                     autoLoading=false,confirmationRequired=false,enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick=onDismiss)
             }
@@ -129,7 +132,6 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                     SelectionContainer {
                         Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
                             if(current.product.brand.isNotBlank()) Text(current.product.brand,color=stateValues.TextColor.copy(alpha=.65f),fontSize=stateValues.smallTextSize)
-                            Text(current.title,color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
                             MarketPromotionPrice(current)
                             Text(marketPriceLabel(current),color=stateValues.TextColor,fontSize=stateValues.titleTextSize,fontWeight=FontWeight.Bold)
                             if(current.description.isNotBlank()) Text(current.description,color=stateValues.TextColor,fontSize=stateValues.textSize)

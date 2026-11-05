@@ -23,7 +23,8 @@ internal fun AppConfiguration.marketBrowseText(key: String, vararg arguments: Pa
 internal fun AppConfiguration.MarketBrowseControls(
     browse: BuyerBrowseNavigation,
     catalogue: MarketCategoryCatalogue?,
-    onChooseCategory: () -> Unit
+    onChooseCategory: () -> Unit,
+    showCategoryShortcuts: Boolean = true
 ) {
     val category = catalogue?.categories?.firstOrNull { it.id == browse.categoryId.value }
     val categoryLabel = category?.name?.visibleLocalizedString(stateValues.appLanguage, "")?.substringAfterLast(" / ")
@@ -47,7 +48,7 @@ internal fun AppConfiguration.MarketBrowseControls(
         }
         MarketSearchShortcuts(browse, categoryLabel)
         val roots = catalogue?.categories.orEmpty().filter { it.ancestorIds.isEmpty() }.take(8)
-        if (roots.isNotEmpty() && !browse.filtersExpanded) LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        if (showCategoryShortcuts && roots.isNotEmpty() && !browse.filtersExpanded) LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(roots,key={it.id}) { entry ->
                 val selected=browse.categoryId.value==entry.id
                 Text(entry.name.visibleLocalizedString(stateValues.appLanguage,""),

@@ -130,7 +130,13 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
         Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally,
         maximumContentWidth = 1120.dp,
         appBar = {
-            ScreenAppBarWidget(title = authUiText("Shopping list", "Список покупок", "Сатып алу тізімі", "Сатып алуу тизмеси"), iconPath = marketIconPath(143))
+            ScreenAppBarWidget(title = when (view.section) {
+                "deliveries" -> deliveryText("my_orders")
+                "courier" -> deliveryText("courier_jobs")
+                "trip" -> marketBrowseText("market.trip_title")
+                "activity" -> authUiText("Activity", "История", "Тарих", "Аракеттер")
+                else -> authUiText("Shopping list", "Список покупок", "Сатып алу тізімі", "Сатып алуу тизмеси")
+            }, iconPath = marketIconPath(143), onBack = ::continueBrowsing)
         }
     ) {
         Text(if (view.section in setOf("deliveries", "courier")) deliveryText("orders") else authUiText("Plan by shop. These are item estimates, not orders or reservations.",
@@ -138,9 +144,6 @@ internal fun AppConfiguration.BuyerShoppingListScreen(navigation: BuyerMarketNav
             "Сатып алуды дүкен бойынша жоспарлаңыз. Бұл — тауар есебі, тапсырыс не резерв емес.", "Дүкөндөр боюнча пландаңыз. Бул тапшырык же резерв эмес, товарлардын болжолдуу суммалары."),
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        actionButton(modifier = Modifier.padding(horizontal = 16.dp), text = marketBrowseText("market.browse_continue"),
-            autoLoading = false, confirmationRequired = false, enabledColor = stateValues.BackgroundColor,
-            textColor = stateValues.TextColor, onClick = ::continueBrowsing)
         val section = sectionTabsWidget("buyer-shopping:$account", listOf(
             TabContent("list", authUiText("Items", "Товары", "Тауарлар", "Товарлар")),
             TabContent("trip", marketBrowseText("market.trip_title"), icon=AitaTabIcon.Checklist),

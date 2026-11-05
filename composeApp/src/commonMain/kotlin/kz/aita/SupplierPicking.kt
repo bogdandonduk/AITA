@@ -59,6 +59,7 @@ internal fun AppConfiguration.SupplierPickingChecklist(run: SupplierDispatchWork
     val readyOrders = remember(run.bundles, run.packableOrderIds, entries) {
         supplierPickingReadyOrderIds(run.bundles, run.packableOrderIds, entries)
     }
+    var helpExpanded by remember(key, generation) { mutableStateOf(false) }
     var search by remember(key, generation) { mutableStateOf("") }
     var remaining by remember(key, generation) { mutableStateOf(false) }
     var editorKey by remember(key, generation) { mutableStateOf<String?>(null) }
@@ -115,11 +116,23 @@ internal fun AppConfiguration.SupplierPickingChecklist(run: SupplierDispatchWork
         }
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(supplierPickingText("title"), color = stateValues.TextColor, fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
-        Text(supplierPickingText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
-        Text("${directionText("checked")}: $checkedCount/$acceptedCount", color = stateValues.TextColor, fontSize = stateValues.textSize)
-        Text("${supplierPickingText("ready")}: ${readyOrders.size}/${run.packableOrderIds.size}",
-            color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+            Text(supplierPickingText("title"), modifier = Modifier.weight(1f), color = stateValues.TextColor,
+                fontWeight = FontWeight.Bold, fontSize = stateValues.accentTextSize)
+            actionButton(modifier = Modifier.size(36.dp), text = if (helpExpanded) "−" else "?",
+                textSize = stateValues.smallTextSize,
+                iconContentDescription = authUiText("Picking help", "Помощь по сборке", "Жинақтау көмегі", "Жыйноо боюнча жардам"),
+                enabledColor = stateValues.BackgroundColor, textColor = stateValues.AccentColor,
+                autoLoading = false, confirmationRequired = false, onClick = { helpExpanded = !helpExpanded })
+        }
+        if (helpExpanded) Text(supplierPickingText("help"), color = stateValues.PlaceholderTextColor, fontSize = stateValues.smallTextSize)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(stateValues.marginTextField)) {
+            Text("${directionText("checked")}: $checkedCount/$acceptedCount", modifier = Modifier.weight(1f),
+                color = stateValues.TextColor, fontSize = stateValues.smallTextSize, fontWeight = FontWeight.Bold)
+            Text("${supplierPickingText("ready")}: ${readyOrders.size}/${run.packableOrderIds.size}", modifier = Modifier.weight(1f),
+                color = stateValues.AccentColor, fontSize = stateValues.smallTextSize)
+        }
         if (!session.loaded && !session.failed) Text(supplierPickingText("loading"), color = stateValues.PlaceholderTextColor)
         if (session.failed) {
             Text(supplierPickingText("save_error"), color = stateValues.ErrorColor, fontSize = stateValues.smallTextSize)
