@@ -43,17 +43,19 @@ namespace Aita.StockCapture {
                 form.Shown+=delegate {
                     watchdog.Start();
                     var thread=new Thread(delegate() {
+                        NativeProbe probe=null;
                         try {
                             Thread.Sleep(500);
                             if(Helper.GetForegroundWindow()!=form.Handle)throw new DesktopUnavailable();
-                            var probe=new NativeProbe(form,table,toggle);
+                            probe=new NativeProbe(form,table,toggle);
                             probe.Run();
                             Helper.Emit(new {type="fixture_verified",uia=true,clipping=true,pauseResume=true,foregroundOwnership=true,
                                 selectedWindowOcrBitmap=true,overlayNoActivate=true,stop=true});
                         } catch(DesktopUnavailable) {
                             result=2;Helper.Emit(new {type="fixture_unsupported",code="foreground_unavailable"});
                         } catch(Exception error) {
-                            result=1;Helper.Emit(new {type="fixture_failed",code=error is ProbeFailure?error.Message:"native_probe_failed"});
+                            result=1;Helper.Emit(new {type="fixture_failed",code=error is ProbeFailure?error.Message:"native_probe_failed",
+                                diagnostics=probe==null?null:probe.Diagnostics()});
                         } finally {
                             try {form.BeginInvoke((Action)delegate{watchdog.Stop();form.Close();});}catch{}
                         }
@@ -77,7 +79,7 @@ namespace Aita.StockCapture {
         sealed class NativeProbe {
             readonly Form form;readonly DataGridView table;readonly CheckBox toggle;
             readonly object sync=new object();readonly IntPtr target;
-            RecorderOverlay overlay;Form other;int frameCount;string state,code,failure;string[] lastWords=new string[0];string lastOcr;
+            RecorderOverlay overlay;Form other;int frameCount,accessibleWords;string state,code,failure,lastSource;string[] lastWords=new string[0];string lastOcr;
             internal NativeProbe(Form form,DataGridView table,CheckBox toggle){this.form=form;this.table=table;this.toggle=toggle;target=form.Handle;}
             void Ui(Action action){if(form.IsDisposed)throw new ProbeFailure("probe_disposed");form.Invoke(action);}
             void Observe(object message) {
@@ -94,12 +96,18 @@ namespace Aita.StockCapture {
                             if(text.Contains("CLIPPED_")||text.Contains("OTHER_WINDOW_ONLY"))failure="unseen_text";
                         }
                         lastWords=words.ToArray();frameCount++;
-                        if(Convert.ToString(data["source"])=="OCR")lastOcr=Convert.ToString(data["png"]);
+                        lastSource=Convert.ToString(data["source"]);
+                        accessibleWords=Convert.ToInt32(data["accessibleWords"]);
+                        if(lastSource=="OCR")lastOcr=Convert.ToString(data["png"]);
                     }
                 }
                 if(type=="frame" && overlay!=null)overlay.Command("ack");
             }
             bool HasWord(string expected){lock(sync){return Array.Exists(lastWords,word=>word==expected);}}
+            internal object Diagnostics(){lock(sync){
+                var sample=new List<string>();foreach(string value in lastWords){if(sample.Count==12)break;sample.Add(value.Substring(0,Math.Min(100,value.Length)));}
+                return new {state=state,code=code,frames=frameCount,source=lastSource,accessibleWords=accessibleWords,syntheticWords=sample};
+            }}
             int Count(){lock(sync){return frameCount;}}
             void Wait(Func<bool> condition,string message,int milliseconds=8500) {
                 var watch=Stopwatch.StartNew();

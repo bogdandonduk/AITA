@@ -126,6 +126,10 @@ try {
         Write-Host 'PASS: real selected-window UIA, clipping, pause/resume, foreground ownership, nonactivating overlay, OCR bitmap and stop verified'
     } else {
         if ($observation.code -match '^[a-z_]{1,64}$') { $nativeReason = $observation.code }
+        if ($observation.diagnostics) {
+            # The fixture process owns the only source HWND; these are generated cells.
+            Write-Host ('Owned synthetic-window diagnostics: ' + ($observation.diagnostics | ConvertTo-Json -Compress -Depth 4))
+        }
         throw ('Native recorder synthetic-window verification failed: ' + $nativeReason)
     }
 } finally {

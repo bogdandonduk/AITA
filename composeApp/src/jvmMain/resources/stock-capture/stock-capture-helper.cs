@@ -273,7 +273,7 @@ namespace Aita.StockCapture {
                         if((ocr?lastOcrFingerprint:lastAccessibleFingerprint)==fingerprint){busy=false;return;}
                         if(ocr)lastOcrFingerprint=fingerprint;else lastAccessibleFingerprint=fingerprint;
                         frames++;
-                        emit(new {type="frame",id=sequence.ToString(),at=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),width=w,height=h,source=ocr?"OCR":"UI_AUTOMATION",title=Helper.Title(source),words=ocr?new List<Helper.Word>():words,png=png});
+                        emit(new {type="frame",id=sequence.ToString(),at=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),width=w,height=h,source=ocr?"OCR":"UI_AUTOMATION",title=Helper.Title(source),accessibleWords=words.Count,words=ocr?new List<Helper.Word>():words,png=png});
                         caption.Text="AITA · "+labels[5]+" · "+frames;
                     });
                 } catch { try {BeginInvoke((Action)delegate{Stop("source_unavailable");});}catch{} }
