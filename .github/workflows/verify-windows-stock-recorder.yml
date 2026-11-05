@@ -1,6 +1,15 @@
 name: Verify Windows stock recorder
 on:
   workflow_dispatch:
+  # Validate the new workflow before it is promoted to the default branch.
+  push:
+    branches: [work/035]
+    paths:
+      - '.github/workflows/verify-windows-stock-recorder.yml'
+      - 'composeApp/src/jvmMain/kotlin/kz/aita/StockOcrWorker.kt'
+      - 'composeApp/src/jvmMain/kotlin/kz/aita/StockCaptureProtocol.kt'
+      - 'composeApp/src/jvmMain/resources/stock-capture/**'
+      - 'scripts/testing/**'
 permissions:
   contents: read
 jobs:
