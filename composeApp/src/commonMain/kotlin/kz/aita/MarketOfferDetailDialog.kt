@@ -160,10 +160,15 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                 }
                 error?.let { Text(it.visibleLocalizedString(stateValues.appLanguage,""),color=stateValues.ErrorColor,fontSize=stateValues.smallTextSize) }
                 MarketShoppingFeedback(shopping)
-                actionButton(text=authUiText("Refresh","Обновить","Жаңарту","Жаңыртуу"),autoLoading=false,enabled=!loading,loading=loading,confirmationRequired=false,
-                    enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick={requestRefresh()})
             }
-            if(current!=null) {
+            // Recovery and the list action stay reachable even when product/location facts overflow.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.weight(1f)) {
+                    actionButton(text=authUiText("Refresh","Обновить","Жаңарту","Жаңыртуу"),autoLoading=false,enabled=!loading,loading=loading,confirmationRequired=false,
+                        iconPath=stateValues.drawablePathIconRefresh, iconRes=stateValues.drawableResIconRefresh.value,
+                        enabledColor=stateValues.BackgroundColor,textColor=stateValues.TextColor,onClick={requestRefresh()})
+                }
+                if(current!=null) Box(Modifier.weight(1f)) {
                 val inList=shopping.contains(offerId)
                 actionButton(text=if(inList) authUiText("Open your list","Открыть список покупок","Тізімді ашу","Тизмеңизди ачуу") else authUiText("Add to shopping list","В список покупок","Сатып алу тізіміне қосу","Сатып алуу тизмесине кошуу"),
                     iconPath=marketIconPath(143),iconRes=marketIconFallback(143),autoLoading=false,confirmationRequired=false,
@@ -174,6 +179,7 @@ internal fun AppConfiguration.MarketOfferDetailDialog(
                             latestShopping.add(offerId,1,current.shoppingBasis())
                         else requestRefresh()
                     })
+                }
             }
         }
     }
