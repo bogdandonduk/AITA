@@ -64,7 +64,12 @@ if ($AppImage) {
         if (-not $child.Start()) { throw 'Packaged OCR worker did not start' }
         $outputTask = $child.StandardOutput.ReadToEndAsync()
         $errorTask = $child.StandardError.ReadToEndAsync()
-        $child.StandardInput.WriteLine($png); $child.StandardInput.Close()
+        # Windows PowerShell's default StreamWriter can add an encoding preamble.
+        # The production JVM sends raw ASCII Base64, so exercise that exact framing.
+        $frameBytes = [Text.Encoding]::ASCII.GetBytes($png + "`n")
+        $workerInput = $child.StandardInput.BaseStream
+        $workerInput.Write($frameBytes, 0, $frameBytes.Length)
+        $workerInput.Flush(); $workerInput.Close()
         if (-not $child.WaitForExit(30000)) { $child.Kill(); throw 'Packaged OCR worker timed out' }
         $result = $outputTask.Result.Trim() | ConvertFrom-Json
         if ($result.type -eq 'error') {
