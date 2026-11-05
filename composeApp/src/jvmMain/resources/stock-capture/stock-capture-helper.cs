@@ -90,13 +90,21 @@ namespace Aita.StockCapture {
             var seen=new HashSet<string>();
             var walk=TreeWalker.ControlViewWalker;
             var root=AutomationElement.FromHandle(window);
-            var queue=new Queue<AutomationElement>();
-            queue.Enqueue(root);
+            // Reach the first visible cells before enumerating an entire virtualized
+            // grid. Breadth-first sibling collection can consume the whole time
+            // budget on row containers without reading a single cell.
+            var pending=new Stack<AutomationElement>();
+            pending.Push(root);
             var watch=Stopwatch.StartNew();
             int visited=0;
-            while(queue.Count>0 && visited++<MaxNodes && words.Count<MaxWords && watch.ElapsedMilliseconds<1300 && GetForegroundWindow()==window && (continueReading==null||continueReading())) {
-                var item=queue.Dequeue();
+            while(pending.Count>0 && visited++<MaxNodes && words.Count<MaxWords && watch.ElapsedMilliseconds<1300 && GetForegroundWindow()==window && (continueReading==null||continueReading())) {
+                var item=pending.Pop();
                 try {
+                    // Never follow a sibling of the selected root HWND.
+                    if(!Object.ReferenceEquals(item,root)) {
+                        var next=walk.GetNextSibling(item);
+                        if(next!=null&&pending.Count<MaxNodes)pending.Push(next);
+                    }
                     var current=item.Current;
                     // A password control and its entire subtree are excluded.
                     if(current.IsPassword || current.IsOffscreen) continue;
@@ -105,24 +113,21 @@ namespace Aita.StockCapture {
                     double x=bounds.X-origin.X,y=bounds.Y-origin.Y;
                     var child=walk.GetFirstChild(item);
                     if(child!=null) {
-                        int siblings=0;
-                        while(child!=null && queue.Count<MaxNodes && siblings++<MaxNodes && watch.ElapsedMilliseconds<1300) {
-                            queue.Enqueue(child); child=walk.GetNextSibling(child);
-                        }
+                        if(pending.Count<MaxNodes)pending.Push(child);
                         continue;
                     }
                     // Keep full visible cells only. Clamping a clipped cell's rectangle while
                     // retaining its complete accessible Value would import unseen text.
                     if(!FullyVisibleBounds(x,y,bounds.Width,bounds.Height,width,height)) continue;
                     var ct=current.ControlType;
-                    if(ct!=ControlType.Text && ct!=ControlType.Edit && ct!=ControlType.DataItem && ct!=ControlType.ListItem && ct!=ControlType.Document && ct!=ControlType.HeaderItem && ct!=ControlType.Custom) continue;
+                    if(ct!=ControlType.Text && ct!=ControlType.Edit && ct!=ControlType.DataItem && ct!=ControlType.ListItem && ct!=ControlType.Document && ct!=ControlType.HeaderItem && ct!=ControlType.Header && ct!=ControlType.Custom) continue;
                     string text=current.Name ?? "";
                     object value;
                     bool hasValue=item.TryGetCurrentPattern(ValuePattern.Pattern,out value);
                     if(ct==ControlType.Custom && !hasValue) continue;
                     // Grid cell Name often describes its column/row, while Value contains stock.
                     // Read-only DataItem cells expose this pattern too, not just Edit controls.
-                    if(ct!=ControlType.HeaderItem && hasValue)
+                    if(ct!=ControlType.HeaderItem && ct!=ControlType.Header && hasValue)
                         text=((ValuePattern)value).Current.Value ?? text;
                     text=text.Trim();
                     if(text.Length==0 || text.Length>512 || x<0 || y<0) continue;
