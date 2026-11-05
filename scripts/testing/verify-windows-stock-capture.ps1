@@ -67,8 +67,20 @@ if ($AppImage) {
         $child.StandardInput.WriteLine($png); $child.StandardInput.Close()
         if (-not $child.WaitForExit(30000)) { $child.Kill(); throw 'Packaged OCR worker timed out' }
         $result = $outputTask.Result.Trim() | ConvertFrom-Json
+        if ($result.type -eq 'error') {
+            $phase = if ($result.phase -match '^[a-z_]{1,32}$') { $result.phase } else { 'unknown' }
+            $classes = @($result.classes | Where-Object { $_ -cmatch '^[A-Za-z0-9.$]{1,160}$' } | Select-Object -First 4) -join ', '
+            throw ('Packaged local OCR worker failed at ' + $phase + '; exception classes: ' + $classes)
+        }
         if ($result.type -ne 'ocr' -or -not ($result.words.text -contains '4601234567893') -or -not ($result.words.text -contains $cyrillic.Split(' ')[0])) {
-            throw 'Packaged local OCR failed the synthetic barcode fixture'
+            $wordCount = @($result.words).Count
+            $hasBarcode = $result.words.text -contains '4601234567893'
+            $hasCyrillic = $result.words.text -contains $cyrillic.Split(' ')[0]
+            # This process received only the image generated above; never use this
+            # fixture diagnostic path for actual captured windows or imported files.
+            $syntheticWords = @($result.words | Select-Object -First 16 | ForEach-Object { ([string]$_.text).Substring(0, [Math]::Min(80, ([string]$_.text).Length)) })
+            Write-Host ('Synthetic fixture words only: ' + ($syntheticWords | ConvertTo-Json -Compress))
+            throw ('Packaged local OCR failed the synthetic fixture; words=' + $wordCount + '; barcode=' + $hasBarcode + '; Cyrillic=' + $hasCyrillic + '; exit=' + $child.ExitCode)
         }
         # stderr may include native errors. Never print it or save screenshots into diagnostics.
     } finally { try { if (-not $child.HasExited) { $child.Kill() } } catch { }; $child.Dispose() }

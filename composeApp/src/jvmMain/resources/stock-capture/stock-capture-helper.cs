@@ -240,7 +240,12 @@ namespace Aita.StockCapture {
                     // toolbar text contains barcode-like account or telephone numbers.
                     // Identical images are deduplicated before invoking the OCR worker.
                     bool ocr=Helper.NeedsOcr(words.Count,sequence);
-                    if(!recording||generation!=currentGeneration) { BeginInvoke((Action)delegate{busy=false;}); return; }
+                    if(!recording||generation!=currentGeneration||Helper.GetForegroundWindow()!=source) {
+                        BeginInvoke((Action)delegate{
+                            busy=false;
+                            if(recording&&generation==currentGeneration&&Helper.GetForegroundWindow()!=source)Pause("source_not_foreground");
+                        });return;
+                    }
                     string png=ocr?Helper.CapturePng(source,w,h):null;
                     string fingerprint;
                     using(var hash=SHA256.Create()) {

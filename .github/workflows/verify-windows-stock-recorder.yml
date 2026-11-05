@@ -1,0 +1,41 @@
+name: Verify Windows stock recorder
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-recorder:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compile actual production OCR worker in isolation
+        shell: pwsh
+        run: |
+          ./gradlew.bat -p scripts/testing/stock-ocr-probe probePackage --no-daemon --max-workers=2 --console=plain
+          if ($LASTEXITCODE -ne 0) { throw 'OCR probe compilation failed' }
+      - name: Create a GUI launcher with the production runtime modules
+        shell: pwsh
+        run: |
+          $modules = 'java.sql,java.logging,java.xml,java.desktop,java.datatransfer,java.prefs,java.management,java.naming,jdk.crypto.ec,jdk.charsets,jdk.unsupported'
+          jlink --add-modules $modules --output build/ocr-probe-runtime --strip-debug --no-header-files --no-man-pages
+          if ($LASTEXITCODE -ne 0) { throw 'OCR probe runtime creation failed' }
+          jpackage --type app-image --name AITA --input scripts/testing/stock-ocr-probe/build/package --main-jar aita-stock-ocr-probe.jar --main-class kz.aita.OcrProbeLauncher --runtime-image build/ocr-probe-runtime --dest build/ocr-probe-app
+          if ($LASTEXITCODE -ne 0) { throw 'OCR probe launcher creation failed' }
+      - name: Exercise local OCR and owned synthetic windows
+        shell: pwsh
+        run: |
+          powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File scripts/testing/verify-windows-stock-capture.ps1 -AppImage build/ocr-probe-app/AITA
+          if ($LASTEXITCODE -ne 0) { throw 'Local stock-recorder verification failed' }
+      - name: Print bounded verification result
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path build/windows-stock-capture-verification.json) {
+            Get-Content build/windows-stock-capture-verification.json
+          }
