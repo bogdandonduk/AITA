@@ -178,13 +178,16 @@ namespace Aita.StockCapture {
         volatile bool recording; bool started,busy,finished; volatile int generation; int frames,ticks;
         DateTime busySince; Point dragPoint; string lastAccessibleFingerprint,lastOcrFingerprint;
         protected override bool ShowWithoutActivation { get { return true; } }
-        protected override CreateParams CreateParams { get {var p=base.CreateParams;p.ExStyle|=0x08000000|0x80;return p;} }
+        // Set TOPMOST as an HWND style rather than Form.TopMost. .NET Framework
+        // re-applies that property during handle creation with SetWindowPos flags
+        // lacking SWP_NOACTIVATE, which can steal focus despite ShowWithoutActivation.
+        protected override CreateParams CreateParams { get {var p=base.CreateParams;p.ExStyle|=0x08000000|0x80|0x8;return p;} }
         protected override void WndProc(ref Message m) { if(m.Msg==0x21){m.Result=new IntPtr(3);return;}base.WndProc(ref m); }
         internal RecorderOverlay(IntPtr window,string language,Action<object> observer=null) {
             emit=observer ?? new Action<object>(Helper.Emit);
             source=window;sourcePid=Helper.Pid(window);labels=Labels(language);
             SetStyle(ControlStyles.Selectable,false);
-            Text="AITA";TopMost=true;ShowInTaskbar=false;FormBorderStyle=FormBorderStyle.None;
+            Text="AITA";ShowInTaskbar=false;FormBorderStyle=FormBorderStyle.None;
             BackColor=Color.FromArgb(24,28,37);ForeColor=Color.White;ClientSize=new Size(366,66);
             StartPosition=FormStartPosition.Manual;
             var area=Screen.FromHandle(window).WorkingArea;Location=new Point(area.Right-Width-20,area.Top+20);
