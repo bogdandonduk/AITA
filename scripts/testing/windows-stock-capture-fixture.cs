@@ -7,6 +7,7 @@ using System.Text;
 using System.Drawing;
 using System.IO;
 using System.Threading;
+using System.Windows.Automation;
 using System.Windows.Forms;
 namespace Aita.StockCapture {
     public static class SyntheticFixture {
@@ -106,8 +107,26 @@ namespace Aita.StockCapture {
             bool HasWord(string expected){lock(sync){return Array.Exists(lastWords,word=>word==expected);}}
             internal object Diagnostics(){lock(sync){
                 var sample=new List<string>();foreach(string value in lastWords){if(sample.Count==12)break;sample.Add(value.Substring(0,Math.Min(100,value.Length)));}
-                return new {state=state,code=code,frames=frameCount,source=lastSource,accessibleWords=accessibleWords,syntheticWords=sample};
+                return new {state=state,code=code,frames=frameCount,source=lastSource,accessibleWords=accessibleWords,syntheticWords=sample,
+                    syntheticAccessibility=InspectSyntheticAccessibility()};
             }}
+            object InspectSyntheticAccessibility() {
+                var result=new List<object>();var pending=new Stack<AutomationElement>();
+                var watch=Stopwatch.StartNew();
+                try {
+                    var root=AutomationElement.FromHandle(target);pending.Push(root);
+                    while(pending.Count>0&&result.Count<30&&watch.ElapsedMilliseconds<1000) {
+                        var item=pending.Pop();var info=item.Current;object value;
+                        bool valuePattern=item.TryGetCurrentPattern(ValuePattern.Pattern,out value);
+                        var rectangle=info.BoundingRectangle;string name=info.Name??"";
+                        result.Add(new {control=info.ControlType.ProgrammaticName,name=name.Substring(0,Math.Min(60,name.Length)),
+                            offscreen=info.IsOffscreen,valuePattern=valuePattern,width=rectangle.Width,height=rectangle.Height});
+                        if(item!=root) {var next=TreeWalker.ControlViewWalker.GetNextSibling(item);if(next!=null)pending.Push(next);}
+                        var child=TreeWalker.ControlViewWalker.GetFirstChild(item);if(child!=null)pending.Push(child);
+                    }
+                }catch{}
+                return result;
+            }
             int Count(){lock(sync){return frameCount;}}
             void Wait(Func<bool> condition,string message,int milliseconds=8500) {
                 var watch=Stopwatch.StartNew();
