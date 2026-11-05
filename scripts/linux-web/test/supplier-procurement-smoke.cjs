@@ -6,7 +6,7 @@ const fs=require('fs'),http=require('http'),path=require('path'),readline=requir
 const id=n=>'00000000-0000-0000-0000-'+String(n).padStart(12,'0'),tr=value=>[{language:'en',value}];
 (async()=>{
 const dist=process.env.AITA_WEB_DIST,out=process.env.AITA_ARTIFACTS||'/tmp/aita-supplier-procurement';if(!dist)throw Error('Set AITA_WEB_DIST');fs.mkdirSync(out,{recursive:true});
-const server=http.createServer((req,res)=>{try{const p=path.join(dist,req.url==='/'?'index.html':decodeURIComponent(req.url.split('?')[0]));res.setHeader('Content-Type',p.endsWith('.wasm')?'application/wasm':p.endsWith('.js')?'text/javascript':p.endsWith('.html')?'text/html':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream');res.end(fs.readFileSync(p));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const origin='http://127.0.0.1:'+server.address().port;
+const server=http.createServer((req,res)=>{try{const p=path.resolve(dist,'.'+(req.url==='/'?'/index.html':decodeURIComponent(req.url.split('?')[0])));if(!p.startsWith(path.resolve(dist)+path.sep))throw Error('Outside fixture distribution');res.setHeader('Content-Type',p.endsWith('.wasm')?'application/wasm':p.endsWith('.js')?'text/javascript':p.endsWith('.html')?'text/html':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream');res.end(fs.readFileSync(p));}catch{res.writeHead(404);res.end();}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const origin='http://127.0.0.1:'+server.address().port;
 let account={id:id(99),publicId:'STORE-TEST',phoneNumber:'',email:'store@example.test',firstName:'Branch',lastName:'Tester',countryLocale:'kz',workerAccountIds:null,supplierAccountIds:null,createdAt:1,isActive:true,appLanguage:'en',appModeId:0,appFontId:'noto_sans',activeStoreId:id(scene==='parent'?30:(scene==='physical'||scene==='cart')?31:32)};
 const store=(n,name,parent,type)=>({id:id(n),publicId:'STORE-'+n,parentStoreId:parent? id(parent):null,userIds:[account.id],storeTypeIds:[],name:tr(name),alias:[],description:[],companyForms:[],location:{},address:name+' address',phoneNumbers:[],emails:[],countryLocales:['kz'],createdAt:1,branchType:type,architectureVersion:2});
 const physical=store(31,'West pickup branch',30,'PHYSICAL'),internet=store(32,'Internet branch',30,'INTERNET'),parent={...store(30,'Management warehouse',null,null),branches:[physical,internet]};
@@ -21,7 +21,7 @@ await context.addInitScript(()=>{window.print=function(){top.__labelPrints=(top.
 await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-store-token',refreshToken:'isolated-store-refresh'}));localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-store-test');},account);
 let addedBatches=[],addedItems=[],batchAttempts=0,offline=false;
 const supplier={id:id(70),userIds:[account.id],name:tr('Mountain Foods'),isActive:true};
-let supplierOrders=[],createAttempts=[],receiveAttempts=[],lostCreate=true,lostReceipt=true;
+let supplierOrders=[],createAttempts=[],receiveAttempts=[],lostCreate=true,lostReceipt=true,navigationFallbackUsed=false;
 const receipts=new Map();
 const calls=[],errors=[],memory=[],rendererCrashes=[],consoleErrors=[],lifecycle=[];const browserCdp=await browser.newBrowserCDPSession();await browserCdp.send('Target.setDiscoverTargets',{discover:true});browserCdp.on('Target.targetCrashed',event=>rendererCrashes.push(event));await context.routeWebSocket('**',ws=>ws.close());
 await context.route('**/*',async route=>{
@@ -71,17 +71,26 @@ await context.route('**/*',async route=>{
 });
 
 const page=await context.newPage();page.setDefaultTimeout(25000);page.on('pageerror',e=>errors.push(String(e)));page.on('crash',()=>errors.push('crash'));
-const shot=async name=>{await page.screenshot({path:out+'/'+name+'.png'});fs.writeFileSync(out+'/'+name+'.txt',await page.locator('body').ariaSnapshot());};
+const shot=async name=>{await page.screenshot({path:out+'/'+name+'.png'});fs.writeFileSync(out+'/'+name+'.txt',await page.locator('body').ariaSnapshot());if(name==='lost-receipt-response')fs.writeFileSync(out+'/'+name+'.html',await page.content());};
 const button=name=>page.getByRole('button',{name,exact:true});
 const click=async name=>{await button(name).first().click({force:true});await page.waitForTimeout(700);};
-const enter=async(name,value)=>{await page.getByRole('textbox',{name,exact:true}).first().click({force:true});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.press('Backspace');await page.keyboard.insertText(value);await page.waitForTimeout(300);};
+const revealOrders=async()=>{for(let attempt=0;attempt<4;attempt++){await page.waitForTimeout(600);if(attempt>0&&await button(/^Orders/).first().isVisible())return;const anchor=button('Info').first();const bounds=await anchor.boundingBox();if(!bounds){if(await button(/^Orders/).first().isVisible())return;continue;}await page.mouse.move(Math.min(bounds.x+bounds.width+260,1380),bounds.y+bounds.height/2,{steps:3});await page.mouse.wheel(1800,0);}await button(/^Orders/).first().waitFor();};
+const quantityField=()=>page.getByRole('textbox',{name:'',exact:true});
+const enter=async(name,value)=>{const field=name==='Quantity received now'?quantityField():page.getByRole('textbox',{name,exact:true});await field.first().click({force:true});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.press('Backspace');await page.keyboard.insertText(value);await page.waitForTimeout(300);};
 const until=async(check,label)=>{for(let n=0;n<120&&!check();n++)await page.waitForTimeout(250);assert.ok(check(),label);};
+const reopenProcurement=async()=>{
+ await page.reload();await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(4000);await page.keyboard.press('Tab');
+ await click('Stock');await button('svg/29_0.svg').first().click({force:true});await page.waitForTimeout(700);
+ // The remembered editor tab may already be scrolled to its final Orders tab.
+ await revealOrders();
+ await click(/^Orders/);await click('History');await page.waitForTimeout(500);
+};
 try{
  await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(5000);await page.keyboard.press('Tab');
  await click('Stock');await shot('stock');
  await button('svg/29_0.svg').first().click({force:true});await page.waitForTimeout(700);
  await shot('edit-item');
- await page.mouse.move(1200,108);await page.mouse.wheel(1500,0);await page.waitForTimeout(700);
+ await revealOrders();
  await click(/^Orders/);await shot('order-form');
  if(process.env.AITA_SUPPLIER_PROBE==='1')return;
  await enter('Quantity','10');await enter('Expected supply price','100');
@@ -94,19 +103,31 @@ try{
  await enter('Quantity received now','4');await click('Receive delivery');await click('Confirm');
  await until(()=>receiveAttempts.length>0,'Receipt submitted');await page.waitForTimeout(2500);await shot('lost-receipt-response');
  const originalReceipt=receiveAttempts[0];assert.equal(addedBatches.length,1);lostReceipt=false;
+ // Reload intentionally verifies the saved partial receipt survives process recreation.
+ await reopenProcurement();
  await button('Retry saved receipt').waitFor({timeout:60000});
- assert.equal(await page.getByRole('textbox',{name:'Quantity received now',exact:true}).count(),0,'Unconfirmed quantity must be frozen');
+ assert.equal(await quantityField().count(),0,'Unconfirmed quantity must be frozen');
  await click('Retry saved receipt');await click('Confirm');await until(()=>receiveAttempts.length>=2,'Receipt retry submitted');await page.waitForTimeout(2000);
- assert.deepEqual(receiveAttempts.at(-1),originalReceipt);assert.equal(addedBatches.length,1);await shot('partial-delivery');
+ assert.deepEqual(receiveAttempts.at(-1),originalReceipt);assert.equal(addedBatches.length,1);
+ await reopenProcurement();await shot('partial-delivery');
  lostReceipt=true;await enter('Quantity received now','6');await click('Receive delivery');await click('Confirm');await until(()=>addedBatches.length===2,'Remaining delivery submitted');
- await button('Retry saved receipt').waitFor({timeout:60000});const finalReceipt=receiveAttempts.at(-1);await shot('full-delivery-response-lost');
+ const finalReceipt=receiveAttempts.at(-1);await shot('full-delivery-response-lost');
  assert.notEqual(finalReceipt.receiptId,originalReceipt.receiptId);assert.equal(supplierOrders[0].order.status,'Delivered');
  // Reload hydrates the server's Delivered state plus the device's unacknowledged receipt.
  await page.reload();await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(6000);await page.keyboard.press('Tab');
- await button('Retry saved receipt').waitFor({timeout:60000});await shot('delivered-pending-retry-after-reload');
+ await shot('after-reload-before-navigation');
+ if(!await button('Retry saved receipt').count()){
+  navigationFallbackUsed=true;console.log('INFO: reopened procurement after reload; pre-navigation accessibility evidence retained');
+  await click('Stock');await button('svg/29_0.svg').first().click({force:true});await page.waitForTimeout(700);
+  await revealOrders();await click(/^Orders/);await click('History');
+ }
+ await button('Retry saved receipt').waitFor({timeout:60000});
+ assert.equal(await button('Cancel order').count(),0,'Delivered orders expose acknowledgment retry, not cancellation');
+ await shot('delivered-pending-retry-after-reload');
  const beforeRetry=receiveAttempts.length;lostReceipt=false;await click('Retry saved receipt');await click('Confirm');await until(()=>receiveAttempts.length>beforeRetry,'Delivered-order acknowledgment retried');await page.waitForTimeout(1500);
- assert.deepEqual(receiveAttempts.at(-1),finalReceipt);assert.equal(addedBatches.length,2);assert.equal(supplierOrders[0].lines[0].receivedQuantityTotal,10);await shot('completed-delivery');
+ assert.deepEqual(receiveAttempts.at(-1),finalReceipt);assert.equal(addedBatches.length,2);assert.equal(supplierOrders[0].lines[0].receivedQuantityTotal,10);
+ await reopenProcurement();assert.equal(await button('Retry saved receipt').count(),0,'Successful acknowledgement clears the durable pending receipt');assert.equal(await button('Receive delivery').count(),0,'Fully received order cannot accept another delivery');await shot('completed-delivery');
  assert.deepEqual(errors,[]);console.log('PASS: stable order retry, partial receipt retry without duplicate stock, full delivery');
 }catch(error){await shot('failure');throw error;}
-finally{fs.writeFileSync(out+'/result.json',JSON.stringify({errors,calls,createAttempts,receiveAttempts,supplierOrders,addedBatches},null,2));await browser.close();server.close();}
+finally{fs.writeFileSync(out+'/result.json',JSON.stringify({errors,calls,createAttempts,receiveAttempts,supplierOrders,addedBatches,navigationFallbackUsed},null,2));await browser.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

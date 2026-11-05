@@ -79,7 +79,9 @@ for(const prototype of [BrowserContext.prototype,Page.prototype]) {
   };
 }
 Browser.prototype.newContext = async function(options={}) {
-  const context = await newContext.call(this,{...options,serviceWorkers:'block',acceptDownloads:false});
+  // Download scenarios explicitly opt in to temporary browser files so they can verify bytes.
+  // The same loopback-only network fence remains in force; no downloaded file is executed.
+  const context = await newContext.call(this,{...options,serviceWorkers:'block',acceptDownloads:options.acceptDownloads===true});
   await context.route('**/*',route=>allowed(route.request().url()) ? route.continue() : route.abort('blockedbyclient'));
   await context.routeWebSocket('**',route=>route.close());
   await context.addInitScript(()=>{

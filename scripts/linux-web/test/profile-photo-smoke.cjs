@@ -38,18 +38,23 @@ const {chromium}=require('playwright'),fs=require('fs'),http=require('http'),pat
  await page.screenshot({path:path.join(artifacts,'photo-ui-initial.png')});
  {
  jpeg=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=512;c.getContext('2d').fillRect(0,0,512,512);return c.toDataURL('image/jpeg').split(',')[1];});
- await page.mouse.move(750,185);await page.waitForTimeout(150);
- let chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),page.mouse.click(750,185,{delay:100})]).then(x=>x[0]);
+ // Resolve actual portrait controls after the connection banner settles. Their ring positions
+ // stay fixed while the accessibility bridge reuses nodes for preview/save controls.
+ const pickBox=await page.getByRole('button',{name:'Choose picture',exact:true}).boundingBox();
+ const saveBox=await page.getByRole('button',{name:'Reload picture',exact:true}).boundingBox();
+ require('assert').ok(pickBox && saveBox);
+ const choosePicture=()=>page.mouse.click(pickBox.x+pickBox.width/2,pickBox.y+pickBox.height/2,{delay:100});
+ let chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),choosePicture()]).then(x=>x[0]);
  await chooser.setFiles({name:'test.jpg',mimeType:'image/jpeg',buffer:Buffer.from(jpeg,'base64')});
  await page.waitForTimeout(1500);require('assert').equal(previews,1);
  // The browser accessibility bridge retains the old Reload label on this reused anchor.
- await page.mouse.click(814,249,{delay:100});await page.waitForTimeout(1500);require('assert').equal(saves,1);
+ await page.mouse.click(saveBox.x+saveBox.width/2,saveBox.y+saveBox.height/2,{delay:100});await page.waitForTimeout(1500);require('assert').equal(saves,1);
  await page.screenshot({path:path.join(artifacts,'photo-ui-saved.png')});
- chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),page.mouse.click(750,185,{delay:100})]).then(x=>x[0]);
+ chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),choosePicture()]).then(x=>x[0]);
  await chooser.setFiles([]);
- chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),page.mouse.click(750,185,{delay:100})]).then(x=>x[0]);
+ chooser=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),choosePicture()]).then(x=>x[0]);
  await chooser.setFiles([]);require('assert').deepEqual(errors,[]);
  console.log('PHOTO PASS: upload chooser, preview, save, change chooser and reopen after cancel');
  }
- }catch(error){await page.screenshot({path:path.join(artifacts,'photo-failure.png')});console.log('FAILURE DETAILS',JSON.stringify({errors,inputs:await page.locator('input[type=file]').count(),calls}));throw error;}finally{await browser.close();server.close();}
+ }catch(error){fs.writeFileSync(path.join(artifacts,'failure-aria.txt'),await page.locator('body').ariaSnapshot());await page.screenshot({path:path.join(artifacts,'photo-failure.png')});console.log('FAILURE DETAILS',JSON.stringify({errors,inputs:await page.locator('input[type=file]').count(),calls}));throw error;}finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

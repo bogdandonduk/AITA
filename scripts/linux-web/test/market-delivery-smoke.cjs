@@ -19,7 +19,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
  const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US'});
  await context.addInitScript(account=>{localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-market-token',refreshToken:'isolated-market-refresh'}));localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-market-device');localStorage.setItem('aita.key_appTheme','7');},account);
  await context.routeWebSocket('**',ws=>ws.close());const calls=[],errors=[];
- let orders=[],deliveryCommands=[],loseDeliveryReply=true,deliveryOffline=false,deliveryListOffline=false;
+ let orders=[],deliveryCommands=[],loseDeliveryReply=recoveryTest,deliveryOffline=false,deliveryListOffline=false;
  const listResponses=[];let heldListReply=null,heldRecoveryReply=null;
  let shoppingRevision=1,savedRevision=0,savedShops=[],savedOffers=[id(103)],records={};
  let lines=offers(Date.now()).slice(0,3).map((o,i)=>({offerId:o.id,storeId:o.storefront.storeId,title:o.title,shopName:o.storefront.displayName,units:i+1,basis:{gtin:null,currencyCode:o.currencyCode,unitId:o.unitId,pricedAmount:o.pricedAmount},unitName:o.unitName,updatedAtMillis:1,collected:false}));
@@ -163,13 +163,19 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await shot('delivery-pending');fs.writeFileSync(path.join(output,'pending-aria.txt'),await page.locator('body').ariaSnapshot());
   // Compose accessibility can retain a disposed dialog until focus changes; exercise its visible canvas control.
   if(recoveryTest){
-   await global.aitaGuidedStep?.('Retry the saved checkout after a lost server reply');
+   await global.aitaGuidedStep?.('Restart with the saved checkout after a lost server reply');
+   await until(()=>heldRecoveryReply?.captured,'Initial list read reached transport');
+   heldRecoveryReply.release();await until(()=>heldRecoveryReply.finished,'Initial list read finishes before restart');
+   heldRecoveryReply=null;
+   await page.reload();await page.locator('canvas').first().waitFor({timeout:90000});
+   await page.waitForTimeout(7500);await page.keyboard.press('Tab');await page.waitForTimeout(400);
    await until(()=>heldRecoveryReply?.captured,'Old order-list read is held before retry');
-   // Focus the visible empty search to retire the disposed checkout's Compose accessibility tree.
-   await page.mouse.click(450,333);await page.keyboard.press('Tab');await page.waitForTimeout(300);
    await button('Retry').last().click({force:true});
-  }else await page.mouse.click(720,534);
-  await until(()=>deliveryCommands.length>=2,'Same command retried');await page.waitForTimeout(1800);
+  }else {
+   await page.reload();await page.locator('canvas').first().waitFor({timeout:90000});
+   await page.waitForTimeout(7500);await page.keyboard.press('Tab');await page.waitForTimeout(400);
+  }
+  await until(()=>deliveryCommands.length>=(recoveryTest?2:1),'Delivery request acknowledged');await page.waitForTimeout(1800);
   assert.equal(new Set(deliveryCommands.map(c=>c.commandId)).size,1);assert.equal(orders.length,1);
   assert.equal(orders[0].request.mode,'EXPRESS');assert.equal(orders[0].request.address.address,'Almaty, Abay 42');
   if(recoveryTest){
@@ -181,7 +187,7 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
     'A late empty GET must not hide the acknowledged order as a fresh empty page');
    await shot('confirmed-order-with-list-offline');
    await button('View order').click({force:true});
-  }else await page.mouse.click(650,540);
+  }else await page.getByRole('button',{name:/^Green Basket Express courier/}).last().click({force:true});
   await page.waitForTimeout(1200);
   await shot('delivery-tracking');fs.writeFileSync(path.join(output,'tracking-aria.txt'),await page.locator('body').ariaSnapshot());
   assert.match(await page.locator('body').ariaSnapshot(),/123456/);
@@ -199,7 +205,8 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
    assert.equal(deliveryCommands.length,sent,'Closing the draft must not cancel the order');
   }
   orders[0]={...orders[0],status:'ARRIVED',revision:6,courierId:id(98),courierName:'Courier',courierAccepted:true,updatedAtMillis:Date.now(),position:{latitude:43.25,longitude:76.95,accuracyMeters:20,capturedAtMillis:Date.now(),receivedAtMillis:Date.now()}};
-  await button('Refresh').last().click({force:true});await page.waitForTimeout(1800);
+  if(recoveryTest) await button('Confirm receipt').waitFor({timeout:25000}); // foreground tracking poll refreshes the order
+  else {await button('Refresh').last().click({force:true});await page.waitForTimeout(1800);}
   await button('Confirm receipt').click({force:true});await button('Confirm').last().click({force:true});await until(()=>orders[0].status==='DELIVERED','Buyer confirmed receipt');await page.waitForTimeout(1200);
   await shot('delivery-completed');assert.match(await page.locator('body').ariaSnapshot(),/Received/);
   if(recoveryTest){

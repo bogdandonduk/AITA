@@ -113,6 +113,7 @@ try {
  await shot('parent-picker');fs.writeFileSync(out+'/parent-picker.txt',await page.locator('body').ariaSnapshot());
  await button('Select several').click({force:true});await page.waitForTimeout(350);
  await button('Parent store').nth(1).getByRole('button',{name:'○ Select several',exact:true}).click({force:true});await page.waitForTimeout(300);
+ await button('Add selected (1)').waitFor({state:'visible',timeout:10000});
  await button('Add selected (1)').click({force:true});await until(()=>addedItems.length===2,'Selected parent template imported');
  await page.waitForTimeout(500);
  await button('Add all parent items').click({force:true});await page.waitForTimeout(400);await button('Confirm').last().click({force:true});

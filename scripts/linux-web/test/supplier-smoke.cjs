@@ -46,7 +46,7 @@ await page.goto('https://aita.kz');await page.locator('canvas').first().waitFor(
 const until=async(check,message)=>{for(let i=0;i<100;i++){if(await check())return;await page.waitForTimeout(150);}throw Error(message);};
 const clickName=async(name,nth=0)=>{await page.getByRole('button',{name,exact:true}).nth(nth).click({force:true});await page.waitForTimeout(1200);};
 const clickText=async(text)=>{await page.getByRole('button').filter({hasText:new RegExp('^'+text+'$')}).first().click({force:true});await page.waitForTimeout(1200);};
-const openProduct=async()=>{await page.mouse.click(470,629);await page.waitForTimeout(1200);await clickName('Edit');};
+const openProduct=async()=>{await page.getByRole('list',{name:'Mountain honey',exact:true}).click({force:true});await page.waitForTimeout(1200);await clickName('Edit');};
 const draftKey='supplier-offer-draft:'+account.id+':'+profile.id+':'+stores[0].id+':'+id(401);
 const localDraft=()=>page.evaluate(key=>{for(const name of Object.keys(localStorage)){if(!name.startsWith('aita.ui_draft_'))continue;try{const value=JSON.parse(localStorage.getItem(name));const raw=value.document?.hosts?.SupplierCatalogMainNavigationScreenModelRoute?.[key];if(raw)return JSON.parse(raw);}catch{}}return null;},draftKey);
 if(malformedCache){

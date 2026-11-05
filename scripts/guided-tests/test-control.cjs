@@ -5,7 +5,9 @@ const http=require('node:http');
 let paused=false,stopped=false;
 const events=[];
 const server=http.createServer((request,response)=>{
- if(request.url==='/step') {
+ if(request.url==='/download') {
+  response.setHeader('content-type','text/plain');response.setHeader('content-disposition','attachment; filename=fixture.txt');response.end('isolated-download-fixture');
+ } else if(request.url==='/step') {
   let body='';request.on('data',chunk=>body+=chunk);request.on('end',()=>{
    events.push(JSON.parse(body));response.setHeader('content-type','application/json');response.end(JSON.stringify({paused,stopped}));
   });
@@ -26,10 +28,17 @@ const server=http.createServer((request,response)=>{
   assert.equal(await page.evaluate(()=>window.clicked||0),0,'Pause stops the next user action');
   paused=false;await clicking;
   assert.equal(await page.evaluate(()=>window.clicked),1,'Continue resumes precisely the pending action');
+  const downloads=await browser.newContext({acceptDownloads:true});
+  const downloadPage=await downloads.newPage();await downloadPage.goto(process.env.AITA_GUIDED_CONTROL);
+  await downloadPage.setContent('<a href="/download">Fixture download</a>');
+  const [download]=await Promise.all([downloadPage.waitForEvent('download'),downloadPage.getByRole('link',{name:'Fixture download'}).click()]);
+  assert.equal(await download.failure(),null);
+  assert.equal(require('node:fs').readFileSync(await download.path(),'utf8'),'isolated-download-fixture');
+  await downloads.close();
   stopped=true;
   await assert.rejects(page.getByRole('button',{name:'Example'}).click(),/stopped by user/);
   assert.equal(await page.evaluate(()=>window.clicked),1,'Stop does not perform the pending action');
   assert.ok(events.some(event=>event.label.startsWith('click')));
-  console.log('PASS: external/arbitrary-loopback fence, Pause, Continue and Stop');
+  console.log('PASS: external/arbitrary-loopback fence, explicit isolated file download, Pause, Continue and Stop');
  } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

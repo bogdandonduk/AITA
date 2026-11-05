@@ -95,7 +95,9 @@ const step=async title=>{console.log('STEP '+title);stages.push(title);await glo
   await enter(page.getByRole('textbox',{name:/^Повторите пароль$|^Repeat password$/}),password);
   await click(/^(Перейти к подтверждению email|Continue to email confirmation)$/);
   await click(/^(Отправить код подтверждения|Send confirmation code)$/);
-  await enter(page.getByRole('textbox',{name:'000000',exact:true}),code);
+  { const codeInput=page.getByRole('textbox',{name:'000000',exact:true});
+  await codeInput.waitFor({state:'visible'});await page.waitForTimeout(400);
+  await codeInput.click({force:true,delay:60});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(code);await page.waitForTimeout(250); }
   await click(/^(Подтвердить email|Confirm email)$/);
   await page.getByText(/Email confirmed|Email подтверждён/).first().waitFor();
   await click(/^(Создать аккаунт|Create account)$/);
@@ -169,7 +171,9 @@ const step=async title=>{console.log('STEP '+title);stages.push(title);await glo
   await click('User account');await page.mouse.click(1190,800);await page.keyboard.press('Tab');await page.mouse.move(800,500);await page.mouse.wheel(0,1200);await wait();await click('Delete account');await shot('17-account-delete');
   await enter(page.getByRole('textbox').first(),password);
   await click('Get email confirmation');
-  await enter(page.getByRole('textbox',{name:'000000',exact:true}),code);
+  { const codeInput=page.getByRole('textbox',{name:'000000',exact:true});
+  await codeInput.waitFor({state:'visible'});await page.waitForTimeout(400);
+  await codeInput.click({force:true,delay:60});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(code);await page.waitForTimeout(250); }
   await click('Delete account');await shot('18-delete-account-confirm');
   await click('Delete account');await until(()=>deleted,'Test account deleted through the UI');
   assert.deepEqual(fixtureErrors,[]);assert.deepEqual(browserErrors,[]);

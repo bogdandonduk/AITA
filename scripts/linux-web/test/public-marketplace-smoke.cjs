@@ -48,13 +48,19 @@ function picture(i){const colors=['#d9a961','#c3ad86','#d9705a','#caa77e','#acc5
   await page.setViewportSize({width:390,height:844});await settle();await shot('home-narrow');
   await page.setViewportSize({width:1440,height:1040});await settle();
   await button('Войти').first().click({force:true});await settle();
-  await button('Вернуться в маркетплейс').waitFor({timeout:10000});await shot('login');
+  await button('Назад').waitFor({timeout:10000});await shot('login');
   assert.equal(await page.evaluate(()=>localStorage.getItem('aita.user_account')),null,'Guest navigation never fabricates an account');
-  await button('Вернуться в маркетплейс').click({force:true});await settle();
+  await button('Назад').click({force:true});await settle();
   const field=page.getByRole('textbox').first();await field.click({force:true});await page.keyboard.type('honey');await page.waitForTimeout(1700);
   assert.ok(calls.some(c=>c.path==='/market/public/discovery'&&JSON.parse(c.body).query.text==='honey'));
   await shot('search');
-  await button('Вернуться в маркетплейс').first().click({force:true});await page.waitForTimeout(1300);
+  assert.equal(await button('Вернуться в маркетплейс').count(),0,'Back navigation uses a compact header arrow');
+  await button('Войти').first().click({force:true});await settle();
+  assert.equal(await button('Назад').count(),1,'Authentication has exactly one standard header back arrow');
+  await button('Назад').click({force:true});await page.waitForTimeout(1000);
+  assert.match(await page.locator('body').ariaSnapshot(),/honey/,'Returning from sign-in preserves guest catalogue search');
+  assert.equal(JSON.parse(calls.filter(c=>c.path==='/market/public/discovery').at(-1).body).query.text,'honey');
+  await button('Назад').first().click({force:true});await page.waitForTimeout(1300);
   await page.mouse.move(900,700);await page.mouse.wheel(0,550);await settle();await shot('offers');
   const product=page.getByRole('button').filter({hasText:/Mountain honey/}).first();
   for(let i=0;i<8;i++){const box=await product.boundingBox().catch(()=>null);if(box&&box.y>130&&box.y<900)break;await page.mouse.wheel(0,250);await settle();}

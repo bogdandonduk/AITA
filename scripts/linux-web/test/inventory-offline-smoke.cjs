@@ -72,7 +72,9 @@ const until=async(check,label)=>{for(let i=0;i<240&&!check();i++)await page.wait
 const connectedBanner=()=>page.getByText('Server connected',{exact:true});
 const offlineBanner=()=>page.getByText("Can't reach server. Offline mode",{exact:true});
 const assertOfflineBannerPersists=async label=>{
- await offlineBanner().waitFor({state:'visible',timeout:30000});
+ // Mocking failed API requests leaves navigator.onLine=true. Respect the real connection
+ // monitor's three spaced failures plus presentation hysteresis before checking persistence.
+ await offlineBanner().waitFor({state:'visible',timeout:60000});
  const appearedAt=Date.now();await page.waitForTimeout(4600);
  assert.equal(await offlineBanner().isVisible(),true,'Offline warning must remain after the connected-banner timeout');
  assert.equal(await connectedBanner().isVisible(),false,'Offline state must not also display connected acknowledgement');

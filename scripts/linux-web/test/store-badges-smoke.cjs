@@ -19,7 +19,7 @@ const batchesFor=storeId=>[1,2].map(n=>({id:id(Number(storeId.slice(-2))*100+n),
 let shop={storeId:internet.id,branchStoreId:internet.id,displayName:'Public internet shop',city:'Almaty',publicAddress:'Internet pickup counter',pickupNote:'Confirm before arrival',published:true,revision:1,shareBranchAvailability:true},selected=[physical.id];
 const locations=[{storeId:parent.id,name:parent.name,address:parent.address,warehouse:true},{storeId:physical.id,name:physical.name,address:physical.address,warehouse:false}];
 const dashboard=()=>({storefront:shop,listings:[],locationStoreIds:selected,availableLocations:locations});
-const browser=await chromium.launch({headless:true,channel:'chromium',args:['--enable-unsafe-swiftshader']});const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US'});
+const browser=await chromium.launch({headless:true,channel:'chromium',args:['--enable-unsafe-swiftshader']});const context=await browser.newContext({viewport:{width:1440,height:1040},locale:'en-US',acceptDownloads:true});
 await context.addInitScript(account=>{if(!localStorage.getItem('aita.auth_tokens'))localStorage.setItem('aita.auth_tokens',JSON.stringify({accessToken:'isolated-store-token',refreshToken:'isolated-store-refresh'}));if(!localStorage.getItem('aita.user_account'))localStorage.setItem('aita.user_account',JSON.stringify(account));localStorage.setItem('aita.installation_id','isolated-store-test');},account);
 let addedBatches=[],batchAttempts=0;
 let workers=[{id:id(900),storeId:parent.id,storePublicId:parent.publicId,storeName:parent.name,userId:id(98),userPublicId:'EMPLOYEE-A',firstName:'Aida',lastName:'Team',roleId:'standard',permissions:['stock_read'],jobTitle:'Assistant',salary:'120000',acceptedAtMillis:1,isActive:true,hasWorkshiftPassword:true},
@@ -90,10 +90,16 @@ try {
   await shot('badge-'+platform+(ru?'-ru':'-en'));
  }
  // Script methods remain available even with no downloadable app entry or a failing feed.
+ let checkedHelper=false;
  for(const [platform,file,command] of [
   ['Windows','aita-install.ps1','powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\\Downloads\\aita-install.ps1"'],
   ['Linux','aita-install.py','python3 ./aita-install.py']
  ]) {
+  if(checkedHelper) {
+   // Compose can retain the dismissed dialog's semantic tree although the canvas is correct.
+   // Reopen the persisted Downloads screen before exercising the independent platform method.
+   await page.reload();await page.locator('canvas').first().waitFor({timeout:120000});await page.waitForTimeout(6500);await page.keyboard.press('Tab');
+  }
   await button(platform).click({force:true});await page.waitForTimeout(500);
   const method=button(ru?'Установить или обновить скриптом':'Install or update with a script');
   await method.waitFor({timeout:10000});await method.click({force:true});await page.waitForTimeout(500);
@@ -108,7 +114,7 @@ try {
   const expected=fs.readFileSync(path.join(dist,'install',file));
   assert.ok(expected.length>1000,'Packaged helper must contain the implementation, not an empty placeholder');
   assert.deepEqual(fs.readFileSync(saved),expected,'Downloaded helper bytes match the packaged verified-source file');
-  await button(ru?'Отмена':'Cancel').click({force:true});await page.waitForTimeout(500);
+  await button(ru?'Отмена':'Cancel').click({force:true});await page.waitForTimeout(500);checkedHelper=true;
  }
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);await shot('badges-phone');
  assert.deepEqual(errors,[]);console.log('PASS: official badges and script download methods rendered and actionable, locale '+(ru?'ru':'en'));
