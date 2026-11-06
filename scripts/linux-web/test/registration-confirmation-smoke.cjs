@@ -28,8 +28,29 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   await page.goto(base);await page.locator('canvas').waitFor({timeout:90000});await page.keyboard.press('Tab');
   await page.getByRole('button',{name:/^(Создать аккаунт|Create account)$/}).first().click({force:true,delay:60});
   await page.getByRole('button',{name:/Перейти к подтверждению email|Continue to email confirmation/}).waitFor({timeout:60000});await page.waitForTimeout(4000);
-  async function enter(loc,text){await loc.waitFor({state:'visible',timeout:15000});await loc.click({force:true,delay:60});await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(text);await page.waitForTimeout(150);}
-  await enter(page.getByRole('textbox',{name:'',exact:true}).nth(1),'7771234567');
+  // Compose animates form height as field state changes. Its accessibility bounds can
+  // describe the preceding frame; a forced click must wait before starting the next field.
+  async function enter(loc,text){
+   await loc.waitFor({state:'visible',timeout:15000});
+   let previous=null,stable=0;
+   for(let attempt=0;attempt<40;attempt++){
+    const box=await loc.boundingBox();
+    stable=box&&previous&&['x','y','width','height'].every(k=>Math.abs(box[k]-previous[k])<0.5)?stable+1:0;
+    previous=box;if(stable>=3)break;await page.waitForTimeout(120);
+   }
+   assert(stable>=3,'The registration field must finish moving before typing');
+   await loc.click({force:true,delay:60});await page.waitForTimeout(100);
+   await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(text);
+   const label=await loc.getAttribute('aria-label')||'';
+   const expected=/пароль|password/i.test(label)?'•'.repeat(text.length):text.normalize('NFKC');
+   let entered=false;
+   for(let attempt=0;attempt<40;attempt++){
+    if(((await loc.textContent())||'').normalize('NFKC').includes(expected)){entered=true;break;}
+    await page.waitForTimeout(100);
+   }
+   assert(entered,'The registration field must contain the entered value before proceeding: '+label);
+  }
+  await enter(page.getByRole('textbox',{name:'',exact:true}).and(page.locator('div')).nth(1),'7771234567');
   await enter(page.getByRole('textbox',{name:/^Введите адрес email$|^Enter email address$/}),'probe020@example.invalid');
   await enter(page.getByRole('textbox',{name:/^Введите имя$|^Enter first name$/}),'Test');
   await enter(page.getByRole('textbox',{name:/^Введите фамилию$|^Enter last name$/}),'Registration');

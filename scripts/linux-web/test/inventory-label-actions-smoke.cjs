@@ -115,7 +115,10 @@ try {
  await button('Print item label').first().click({force:true});await page.waitForTimeout(900);
  fs.writeFileSync(out+'/label-before.txt',await page.locator('body').ariaSnapshot());await shot('label-before');
  await page.getByRole('button',{name:'5',exact:true}).click({force:true});await page.waitForTimeout(500);
- await button('Print item label').last().click({force:true});await page.waitForTimeout(2200);await page.mouse.click(350,60);await page.keyboard.press('Tab');await page.waitForTimeout(400);
+ await button('Print item label').last().click({force:true});await page.waitForTimeout(2200);
+ // Inspect print completion without clicking the stock toolbar: its Import stock
+ // action now occupies the old neutral point (350, 60).
+ await page.keyboard.press('Tab');await page.waitForTimeout(400);
  fs.writeFileSync(out+'/label-after.txt',await page.locator('body').ariaSnapshot());await shot('label-after');
  const printed=await page.evaluate(()=>({count:top.__labelPrints,text:top.__printedText}));
  assert.equal(printed.count,1);assert.equal(printed.text.split('Offline toy').length-1,5);
