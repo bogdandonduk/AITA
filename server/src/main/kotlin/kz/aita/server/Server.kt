@@ -6714,7 +6714,7 @@ private fun applyCashRegisterTransactionEventInsideTransaction(
   }
 }
 
-private fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
+internal fun ResultRow.toGoodsItemDataModel(): GoodsItemDataModel {
   val storeIdText = this[StockItems.storeId].toString()
   val legacyBarcodes = this[StockItems.barcodes]
   val cleanBarcodeModels = stockBarcodeModels()
@@ -6816,7 +6816,7 @@ private fun ResultRow.toSupplierDataModel(): SupplierDataModel {
   )
 }
 
-private fun ResultRow.toSupplierOrderDataModel(): SupplierOrderDataModel = SupplierOrderDataModel(
+internal fun ResultRow.toSupplierOrderDataModel(): SupplierOrderDataModel = SupplierOrderDataModel(
   id = this[SupplierOrders.id].toString(),
   userId = this[SupplierOrders.userId].toString(),
   storeId = this[SupplierOrders.storeId].toString(),
@@ -6840,7 +6840,7 @@ private fun ResultRow.toSupplierOrderDataModel(): SupplierOrderDataModel = Suppl
   isActive = this[SupplierOrders.isActive]
 )
 
-private fun ResultRow.toSupplierOrderLineDataModel(): SupplierOrderLineDataModel = SupplierOrderLineDataModel(
+internal fun ResultRow.toSupplierOrderLineDataModel(): SupplierOrderLineDataModel = SupplierOrderLineDataModel(
   id = this[SupplierOrderLines.id].toString(),
   orderId = this[SupplierOrderLines.orderId].toString(),
   goodsItemId = this[SupplierOrderLines.goodsItemId].toString(),
@@ -18132,7 +18132,7 @@ fun Application.module() {
 
   org.jetbrains.exposed.sql.transactions.transaction {
     if (configBoolean("app.schemaAutoRepair", "AITA_SCHEMA_AUTO_REPAIR", false)) {
-      SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StoreUsers, Transactions, TransactionReturnItems, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierPartnershipContracts, SupplierOrders, SupplierOrderLines, Debtors, UserBalances, StoreSubscriptions, StoreActivationHistory, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, StoreWorkerRoleTemplates, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories)
+      SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StoreUsers, Transactions, TransactionReturnItems, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierPartnershipContracts, SupplierOrders, SupplierOrderLines, Debtors, UserBalances, StoreSubscriptions, StoreActivationHistory, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, StoreWorkerRoleTemplates, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories, ReplenishmentReminders)
     }
     sanitizeGenericGoodsCategoryPrefixesInsideTransaction()
     seedGenericGoodsCategoriesInsideTransaction()
@@ -18145,6 +18145,7 @@ fun Application.module() {
   configureJwtAuth()
   startSubscriptionRenewalDaemon(backgroundScope)
   startNotificationRetentionDaemon(backgroundScope)
+  startPurchasingReminders(backgroundScope)
 
   intercept(ApplicationCallPipeline.Call) {
     proceed()
@@ -18167,7 +18168,7 @@ fun Application.module() {
 
       val entityPath = path.trim('/').ifBlank { "all" }
       val realtimeActorId = call.principal<JWTPrincipal>()?.subject
-      val personalMutation = entityPath.substringBefore('/').lowercase() in setOf("user", "notifications", "finance", "security", "support")
+      val personalMutation = entityPath == "analytics/replenishment/reminder" || entityPath.substringBefore('/').lowercase() in setOf("user", "notifications", "finance", "security", "support")
       // A deleted row no longer exists for the normal store audience lookup. This sanitized
       // collection invalidation lets former members remove the vanished location immediately.
       val storeCollectionMutation = entityPath.substringBefore('/').equals("stores", ignoreCase = true)
@@ -25563,6 +25564,9 @@ fun Application.module() {
 
     route("/analytics") {
       authenticate("auth-jwt") {
+        replenishmentRoute(::readReplenishment)
+        replenishmentReminderRoutes()
+
         get("/store/get") {
           val userId = call.checkPrincipal() ?: return@get
           val storeId = runCatching { UUID.fromString(call.request.header("store_id")) }.getOrNull()

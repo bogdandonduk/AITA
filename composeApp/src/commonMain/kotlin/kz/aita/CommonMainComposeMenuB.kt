@@ -2425,6 +2425,16 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
         activeExport = action
         exportScope.launch {
             try {
+                if (action == "pdf" && preferHtmlDocumentPrinting) {
+                    if (!owner.isCurrent()) return@launch
+                    // Browser PDF bytes have no native renderer. Use its real Save as PDF flow,
+                    // with the report's A4 layout, independently of the chosen receipt printer.
+                    val result = withContext(Dispatchers.ourIo) {
+                        printHtmlDocument(fileName, snapshot.buildAnalyticsReportPdfDocument().toPrintHtml(fileName))
+                    }
+                    receiptActionNotification(result, deviceWorkflowText("pdf_print_help"), owner)
+                    return@launch
+                }
                 if (action == "print") {
                     if (!owner.isCurrent()) return@launch
                     val result = withContext(Dispatchers.ourIo) { printAnalyticsReport(snapshot) }
@@ -2454,7 +2464,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
         MessageText(
             modifier = Modifier.fillMaxWidth(),
             text = localizedStringResource(1240, "Printable summary"),
-            subText = pass27Text("print_destination"),
+            subText = if (preferHtmlDocumentPrinting) deviceWorkflowText("pdf_print_help") else pass27Text("print_destination"),
             textSize = stateValues.textSize,
             subTextSize = stateValues.smallTextSize
         )
@@ -2469,7 +2479,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
             ) {
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1243, "Save report PDF"),
+                    text = if (preferHtmlDocumentPrinting) deviceWorkflowText("save_pdf_browser") else localizedStringResource(1243, "Save report PDF"),
                     iconPath = stateValues.drawablePathIconReceipt,
                     iconRes = stateValues.drawableResIconReceipt.value,
                     confirmationRequired = false,
@@ -2478,7 +2488,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     autoLoading = false,
                     onClick = { export("pdf") }
                 )
-                actionButton(
+                if (!preferHtmlDocumentPrinting) actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1244, "Share report PDF"),
                     iconPath = stateValues.drawablePathIconShare,
@@ -2499,7 +2509,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
             ) {
                 actionButton(
                     modifier = Modifier.fillMaxWidth(),
-                    text = localizedStringResource(1243, "Save report PDF"),
+                    text = if (preferHtmlDocumentPrinting) deviceWorkflowText("save_pdf_browser") else localizedStringResource(1243, "Save report PDF"),
                     iconPath = stateValues.drawablePathIconReceipt,
                     iconRes = stateValues.drawableResIconReceipt.value,
                     confirmationRequired = false,
@@ -2508,7 +2518,7 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
                     autoLoading = false,
                     onClick = { export("pdf") }
                 )
-                actionButton(
+                if (!preferHtmlDocumentPrinting) actionButton(
                     modifier = Modifier.fillMaxWidth(),
                     text = localizedStringResource(1244, "Share report PDF"),
                     iconPath = stateValues.drawablePathIconShare,
@@ -5913,6 +5923,7 @@ internal fun AppConfiguration.NotificationPopupCard(
                 overflow = TextOverflow.Ellipsis
             )
             DeviceNotificationLink(notification)
+            ReplenishmentNotificationLink(notification)
             Text(
                 text = receiptUiDateTime(notification.createdAtMillis.takeIf { it > 0L } ?: getCurrentTimeMillis()),
                 color = stateValues.TextColor,
@@ -6140,6 +6151,7 @@ internal fun AppConfiguration.localizedNotificationCategory(category: String, ty
     return when (lower) {
         "device_file" -> null
         "security" -> localizedStringResource(226, "Account security")
+        "purchasing" -> replenishmentText("title", stateValues.appLanguage)
         "positive", "положительные", "положительное", "жағымды" -> notificationTypeLabel(NotificationType.Positive)
         "negative", "отрицательные", "отрицательное", "жағымсыз" -> notificationTypeLabel(NotificationType.Negative)
         "neutral", "нейтральные", "нейтральное", "бейтарап" -> notificationTypeLabel(NotificationType.Neutral)
@@ -6223,6 +6235,7 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
         )
 
         DeviceNotificationLink(notification)
+        ReplenishmentNotificationLink(notification)
 
         Spacer(modifier = Modifier.height(6.dp))
 

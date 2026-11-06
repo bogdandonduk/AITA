@@ -54,6 +54,23 @@ class StockScreenImportModelTest {
         assertFalse(row.hasExistingBarcode(listOf(item.copy(id="other",storeId="elsewhere")),"s"))
     }
 
+    @Test fun bulkReviewIndexKeepsOwnIdentityAndStoreBoundariesInLargeWarehouses() {
+        val row = row()
+        val item = row.toStockItem("u", "s", "en", config)
+        val existing = (1..5000).map { i ->
+            item.copy(id = "stock-$i", barcodes = listOf("9000${i.toString().padStart(6, '0')}"))
+        } + item + item.copy(id = "other-store", storeId = "elsewhere") +
+            item.copy(id = "inactive", isActive = false)
+        val index = stockImportBarcodeOwners(existing, "s")
+        assertEquals(setOf(item.id), index[row.barcode.normalizedBarcodeToken()])
+        assertFalse(row.hasExistingBarcode(index))
+        for (i in 1..3000) assertTrue(
+            row.copy(barcode = "9000${i.toString().padStart(6, '0')}").hasExistingBarcode(index)
+        )
+        val duplicate = item.copy(id = "another-owner-of-the-same-barcode")
+        assertTrue(row.hasExistingBarcode(stockImportBarcodeOwners(existing + duplicate, "s")))
+    }
+
     @Test fun importCheckpointRoundTripsWithoutChangingIdsOrSubmission() {
         val row=row().copy(importStarted=true,itemSaved=true,quantity="4",resolvedNumbers=setOf("QUANTITY"))
         val draft=StockScreenImportDraft(accountId="u",storeId="s",rows=listOf(row))

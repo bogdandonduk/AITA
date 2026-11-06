@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 8,
+  "revision": 9,
   "tutorials": [
     {
       "id": "account.register",
@@ -5528,6 +5528,228 @@
           "screenshots": []
         }
       ]
+    },
+    {
+      "id": "stock.file-import",
+      "modes": [
+        "STORE"
+      ],
+      "category": "STOCK",
+      "title": {
+        "en": "Move stock from a spreadsheet",
+        "ru": "Перенести склад из таблицы",
+        "kk": "Қойманы кестеден көшіру",
+        "ky": "Кампаны таблицадан көчүрүү",
+        "tg": "Кӯчонидани анбор аз ҷадвал",
+        "uz": "Omborni jadvaldan ko‘chirish"
+      },
+      "introduction": {
+        "en": "Import a CSV, TSV or plain XLSX export into actual AITA item cards and Universal batches. Source files are read locally.",
+        "ru": "Перенесите CSV, TSV или обычный XLSX в настоящие карточки AITA и универсальные партии. Исходный файл читается на устройстве.",
+        "kk": "CSV, TSV немесе кәдімгі XLSX файлын AITA тауар карточкалары мен әмбебап партияларына импорттаңыз. Бастапқы файл құрылғыда оқылады.",
+        "ky": "CSV, TSV же кадимки XLSX файлын AITA товар карточкаларына жана универсалдуу партияларга импорттоңуз. Баштапкы файл түзмөктө окулат.",
+        "tg": "Файли CSV, TSV ё XLSX-и одиро ба кортҳои воқеии мол ва партияҳои универсалии AITA ворид кунед. Файли аслӣ дар дастгоҳ хонда мешавад.",
+        "uz": "CSV, TSV yoki oddiy XLSX faylini AITA mahsulot kartalari va universal partiyalariga import qiling. Asl fayl qurilmada o‘qiladi."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Export the stock list from the previous app. Include names, barcodes, units, quantities and sale/supply prices when available. In Excel, store barcodes as Text so leading zeros are not lost. Save formulas as values or export CSV.",
+            "ru": "Выгрузите склад из прежней программы. По возможности включите названия, штрихкоды, единицы, количества и цены продажи/поставки. В Excel храните штрихкоды как текст, чтобы не терять начальные нули. Формулы сохраните как значения или выгрузите CSV.",
+            "kk": "Бұрынғы бағдарламадан қойма тізімін экспорттаңыз. Атауларды, штрихкодтарды, өлшем бірліктерін, қалдықтарды және сату/жеткізу бағаларын қосыңыз. Excel-де бастапқы нөлдер жоғалмауы үшін штрихкодтарды мәтін ретінде сақтаңыз. Формулаларды мәндерге ауыстырыңыз немесе CSV таңдаңыз.",
+            "ky": "Мурунку программадан кампа тизмесин экспорттоңуз. Аталыштарды, штрихкоддорду, бирдиктерди, калдыктарды жана сатуу/жеткирүү бааларын кошуңуз. Excel-де башындагы нөлдөр жоголбошу үчүн штрихкоддорду текст катары сактаңыз. Формулаларды маанилерге алмаштырыңыз же CSV колдонуңуз.",
+            "tg": "Рӯйхати анборро аз барномаи пешина содир кунед. Номҳо, штрихкодҳо, воҳидҳо, миқдор ва нархҳои фурӯш/харидро илова кунед. Дар Excel штрихкодро ҳамчун матн нигоҳ доред, то сифрҳои аввал гум нашаванд. Формулаҳоро ба қиматҳо табдил диҳед ё CSV интихоб кунед.",
+            "uz": "Oldingi dasturdan ombor ro‘yxatini eksport qiling. Nom, shtrix-kod, birlik, qoldiq va sotuv/xarid narxlarini kiriting. Excel’da boshidagi nollar yo‘qolmasligi uchun shtrix-kodlarni matn sifatida saqlang. Formulalarni qiymatlarga almashtiring yoki CSV tanlang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Select the destination store, open Stock → Import stock → Choose spreadsheet. You need permission to add items, and permission to add batches when importing quantities.",
+            "ru": "Выберите магазин назначения, откройте Склад → Импорт товаров → Выбрать таблицу. Нужны права добавлять товары, а для остатков — добавлять партии.",
+            "kk": "Тауарлар қосылатын дүкенді таңдаңыз. Қойма → Тауарларды импорттау → Кестені таңдау бөлімін ашыңыз. Тауар қосу құқығы, ал қалдықтар үшін партия қосу құқығы қажет.",
+            "ky": "Товарлар кошула турган дүкөндү тандаңыз. Кампа → Товарларды импорттоо → Таблицаны тандоо бөлүмүн ачыңыз. Товар кошуу укугу, ал эми калдыктар үчүн партия кошуу укугу керек.",
+            "tg": "Мағозаи қабулкунандаро интихоб кунед. Анбор → Воридоти мол → Интихоби ҷадвалро кушоед. Барои мол ва барои бақияҳо ҳуқуқи илова кардани партия лозим аст.",
+            "uz": "Mahsulot qo‘shiladigan do‘konni tanlang. Ombor → Mahsulot importi → Jadval tanlashni oching. Mahsulot qo‘shish, qoldiqlar uchun esa partiya qo‘shish huquqi kerak."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Choose the worksheet and header row. Check every column mapping against the two sample values. For CSV, change the delimiter or encoding if necessary; UTF-8, Windows-1251 and UTF-16 are supported. Choose a currency and, only if missing in the file, a default unit.",
+            "ru": "Выберите лист и строку заголовков. Проверьте назначение каждого столбца по двум примерам значений. Для CSV при необходимости измените разделитель или кодировку: доступны UTF-8, Windows-1251 и UTF-16. Выберите валюту и, только если единиц нет в файле, общую единицу.",
+            "kk": "Парақ пен тақырып жолын таңдаңыз. Әр бағанның сәйкестігін екі мән үлгісімен тексеріңіз. CSV бөлгіші мен кодтауын қажет болса өзгертіңіз: UTF-8, Windows-1251 және UTF-16 бар. Валютаны таңдаңыз; файлда бірлік болмаса ғана жалпы өлшем бірлігін беріңіз.",
+            "ky": "Баракты жана баш аттар сабын тандаңыз. Ар мамычаны эки үлгү мааниси менен текшериңиз. CSV бөлгүчүн же коддоосун керек болсо өзгөртүңүз: UTF-8, Windows-1251 жана UTF-16 бар. Валютаны тандаңыз; файлда бирдик жок болсо гана жалпы бирдик бериңиз.",
+            "tg": "Варақ ва сатри сарлавҳаро интихоб кунед. Мувофиқати ҳар сутунро аз рӯйи ду намуна санҷед. Барои CSV ҷудокунанда ё рамзгузориро иваз кардан мумкин: UTF-8, Windows-1251 ва UTF-16. Асъорро интихоб кунед; воҳиди умумиро танҳо ҳангоми набудани воҳид дар файл таъин кунед.",
+            "uz": "Varaq va sarlavha qatorini tanlang. Har bir ustun mosligini ikki namuna orqali tekshiring. Zarur bo‘lsa CSV ajratgichi yoki kodlashini o‘zgartiring: UTF-8, Windows-1251 va UTF-16 mavjud. Valyutani tanlang; umumiy birlikni faqat faylda birlik bo‘lmasa belgilang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Tap Review these rows. Resolve highlighted prices, ambiguous numbers and unknown units/categories. Supply price is never invented: enter it or explicitly choose to use the sale price. Approve individual rows or all unambiguous rows.",
+            "ru": "Нажмите «Проверить эти строки». Исправьте выделенные цены, неоднозначные числа и неизвестные единицы/категории. Цена поставки не выдумывается: укажите её или явно выберите равенство цене продажи. Подтвердите отдельные или все однозначные строки.",
+            "kk": "«Жолдарды тексеру» түймесін басыңыз. Белгіленген бағаларды, екіұшты сандарды және белгісіз бірліктерді/санаттарды түзетіңіз. Жеткізу бағасы ойдан толтырылмайды: енгізіңіз немесе сату бағасын қолдануды анық таңдаңыз. Жеке не барлық анық жолдарды растаңыз.",
+            "ky": "«Саптарды текшерүү» баскычын басыңыз. Белгиленген бааларды, эки маанилүү сандарды жана белгисиз бирдиктерди/категорияларды оңдоңуз. Жеткирүү баасы ойдон толтурулбайт: киргизиңиз же сатуу баасын колдонууну ачык тандаңыз. Жеке же бардык так саптарды ырастап чыгыңыз.",
+            "tg": "«Санҷиши сатрҳо»-ро пахш кунед. Нархҳои ишорашуда, рақамҳои духӯра ва воҳидҳо/категорияҳои номаълумро ислоҳ кунед. Нархи харид тахмин намешавад: ворид кунед ё баробар кардани онро ба нархи фурӯш равшан интихоб кунед. Сатрҳои алоҳида ё ҳамаи сатрҳои равшанро тасдиқ кунед.",
+            "uz": "«Qatorlarni tekshirish»ni bosing. Belgilangan narxlar, noaniq sonlar va noma’lum birlik/toifalarni tuzating. Xarid narxi taxmin qilinmaydi: kiriting yoki sotuv narxiga tenglashni aniq tanlang. Alohida yoki barcha aniq qatorlarni tasdiqlang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-5",
+          "text": {
+            "en": "Import reviewed items. Positive quantity creates one Universal batch; blank or zero quantity creates only the item card. Existing matching barcodes are not overwritten. Repeated reads do not add quantities together.",
+            "ru": "Импортируйте проверенные товары. Положительное количество создаёт одну универсальную партию; пустое или нулевое — только карточку. Существующие товары с тем же штрихкодом не перезаписываются. Повторное чтение не суммирует количества.",
+            "kk": "Тексерілген тауарларды импорттаңыз. Оң қалдық бір әмбебап партия жасайды; бос не нөлдік қалдық тек карточканы жасайды. Бар штрихкодқа сәйкес тауар өзгертілмейді. Қайта оқу мөлшерлерді қоспайды.",
+            "ky": "Текшерилген товарларды импорттоңуз. Оң калдык бир универсалдуу партия түзөт; бош же нөлдүк калдык карточканы гана түзөт. Дал келген штрихкод менен бар товар өзгөртүлбөйт. Кайра окуу сандарды кошпойт.",
+            "tg": "Молҳои санҷидаро ворид кунед. Миқдори мусбат як партияи универсалӣ месозад; холӣ ё сифр танҳо корти мол месозад. Моли мавҷуда бо штрихкоди яксон навишта намешавад. Хондани такрорӣ миқдорҳоро ҷамъ намекунад.",
+            "uz": "Tekshirilgan mahsulotlarni import qiling. Musbat qoldiq bitta universal partiya yaratadi; bo‘sh yoki nol qoldiq faqat mahsulot kartasini yaratadi. Shu shtrix-kodli mavjud mahsulot o‘zgartirilmaydi. Takroriy o‘qish miqdorlarni qo‘shmaydi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-6",
+          "text": {
+            "en": "You may pause and resume. Drafts and per-row progress survive restart and app updates. Offline import uses the normal stock outbox if this workspace was already cached. Reconnect and check synchronization before deleting the source export.",
+            "ru": "Можно приостанавливать и продолжать. Черновики и прогресс строк переживают перезапуск и обновления. Офлайн используется обычная очередь склада, если доступ к магазину уже сохранён. Подключитесь и проверьте синхронизацию перед удалением исходной выгрузки.",
+            "kk": "Үзіліс жасап, жалғастыруға болады. Жоба мен әр жолдың барысы қайта іске қосқаннан және жаңартқаннан кейін сақталады. Дүкенге қолжетімділік алдын ала сақталса, офлайн импорт қойманың кәдімгі кезегіне түседі. Бастапқы файлды жоймас бұрын желіге қосылып, синхрондауды тексеріңіз.",
+            "ky": "Тыныктырып, улантууга болот. Долбоор жана ар саптын жүрүшү кайра ачкандан же жаңырткандан кийин сакталат. Дүкөнгө жеткиликтүүлүк мурда сакталса, офлайн импорт кампанын кадимки кезегине түшөт. Баштапкы файлды өчүрөрдөн мурун тармакка кошулуп, синхрондоштурууну текшериңиз.",
+            "tg": "Метавонед таваққуф карда, идома диҳед. Сиёҳнавис ва пешрафти ҳар сатр баъди бозоғозӣ ва навсозӣ мемонанд. Агар дастрасӣ ба мағоза пешакӣ сабт шуда бошад, воридоти офлайн ба навбати одии анбор меравад. Пеш аз пок кардани файли аслӣ ба шабака пайваста, ҳамоҳангсозиро санҷед.",
+            "uz": "To‘xtatib, davom ettirish mumkin. Qoralama va har qatorning jarayoni qayta ochish va yangilashdan keyin saqlanadi. Do‘konga kirish oldindan saqlangan bo‘lsa, oflayn import omborning odatiy navbatiga tushadi. Asl faylni o‘chirishdan oldin tarmoqqa ulanib, sinxronlashni tekshiring."
+          },
+          "screenshots": []
+        }
+      ],
+      "caution": {
+        "en": "Up to 8 MiB, 3,000 data rows and 64 columns per file/table. XLSX formulas, external links and damaged numeric barcodes are rejected explicitly. On a device without XLSX decompression, export UTF-8 CSV. This is reviewed data migration, not translation or automatic NTIN assignment.",
+        "ru": "До 8 МиБ, 3 000 строк данных и 64 столбцов. Формулы XLSX, внешние ссылки и повреждённые числовые штрихкоды отклоняются с объяснением. Если устройство не поддерживает распаковку XLSX, выгрузите CSV UTF-8. Это проверяемый перенос данных, без перевода и автоматического подбора НТИН.",
+        "kk": "Файл/кесте шегі: 8 МиБ, 3 000 дерек жолы, 64 баған. XLSX формулалары, сыртқы сілтемелер және дәлдігі жоғалған сандық штрихкодтар түсіндірмемен қабылданбайды. XLSX ашылмаса, UTF-8 CSV қолданыңыз. Бұл тексерілетін көшіру; аудару және НТИН автоматты тағайындау жоқ.",
+        "ky": "Файл/таблица чеги: 8 МиБ, 3 000 маалымат сабы жана 64 мамыча. XLSX формулалары, тышкы шилтемелер жана тактыгы жоголгон сандык штрихкоддор түшүндүрмө менен четке кагылат. XLSX ачылбаса UTF-8 CSV колдонуңуз. Бул текшерилүүчү көчүрүү; которуу жана НТИНди автоматтык берүү жок.",
+        "tg": "Ҳадди файл/ҷадвал: 8 МиБ, 3 000 сатри маълумот ва 64 сутун. Формулаҳои XLSX, пайвандҳои беруна ва штрихкодҳои рақамии дақиқиашон гумшуда бо шарҳ рад мешаванд. Агар XLSX кушода нашавад, CSV UTF-8 истифода баред. Ин кӯчонидани санҷидашаванда аст; тарҷума ва таъини худкори НТИН нест.",
+        "uz": "Fayl/jadval chegarasi: 8 MiB, 3 000 ma’lumot qatori va 64 ustun. XLSX formulalari, tashqi havolalar va aniqligi yo‘qolgan raqamli shtrix-kodlar izoh bilan rad etiladi. XLSX ochilmasa, UTF-8 CSV ishlating. Bu tekshiriladigan ko‘chirish; tarjima va NTINni avtomatik belgilash yo‘q."
+      }
+    },
+    {
+      "id": "stock.purchase-planning",
+      "modes": [
+        "STORE"
+      ],
+      "category": "STOCK",
+      "title": {
+        "en": "Plan regular and seasonal purchases",
+        "ru": "Спланировать обычные и сезонные закупки",
+        "kk": "Кәдімгі және маусымдық сатып алуды жоспарлау",
+        "ky": "Кадимки жана сезондук сатып алууну пландоо",
+        "tg": "Банақшагирии хариди одӣ ва мавсимӣ",
+        "uz": "Oddiy va mavsumiy xaridlarni rejalash"
+      },
+      "introduction": {
+        "en": "Use completed sales days, returns, remaining batches and confirmed incoming orders to prepare a reviewed purchasing plan for one store.",
+        "ru": "Используйте завершённые дни продаж, возвраты, остатки партий и подтверждённые поставки для проверяемого плана закупки одного магазина.",
+        "kk": "Бір дүкеннің жоспарын дайындау үшін аяқталған күндердегі сатылымдарды, қайтарымдарды, партия қалдықтарын және расталған жеткізілімдерді пайдаланыңыз.",
+        "ky": "Бир дүкөндүн планын даярдоо үчүн бүткөн күндөрдөгү сатууларды, кайтарууларды, партия калдыктарын жана ырасталган жеткирүүлөрдү колдонуңуз.",
+        "tg": "Барои нақшаи як мағоза фурӯши рӯзҳои анҷомёфта, баргардониданҳо, бақияи партияҳо ва таъминоти тасдиқшударо истифода баред.",
+        "uz": "Bir do‘kon rejasini tayyorlashda tugagan kunlar savdosi, qaytarishlar, partiya qoldiqlari va tasdiqlangan yetkazib berishlardan foydalaning."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Stock → Purchase planner. Viewing needs stock, analytics and supplier-order permissions. Sending an order also needs supplier-order management permission.",
+            "ru": "Откройте Склад → План закупок. Для просмотра нужны права на склад, аналитику и заказы поставщикам; для отправки — право управления заказами поставщикам.",
+            "kk": "Қойма → Сатып алу жоспары бөлімін ашыңыз. Қарау үшін қойма, аналитика және жеткізуші тапсырыстарына қолжетімділік қажет. Жіберуге тапсырыстарды басқару құқығы да керек.",
+            "ky": "Кампа → Сатып алуу планы бөлүмүн ачыңыз. Көрүү үчүн кампа, аналитика жана жеткирүүчүгө тапшырыктарды көрүү укугу керек. Жөнөтүү үчүн тапшырыктарды башкаруу укугу да керек.",
+            "tg": "Анбор → Нақшаи харидро кушоед. Барои дидан ҳуқуқҳои анбор, таҳлил ва фармоишҳои таъминкунанда лозиманд. Барои фиристодан ҳуқуқи идора кардани фармоишҳо ҳам лозим аст.",
+            "uz": "Ombor → Xarid rejasini oching. Ko‘rish uchun ombor, tahlil va yetkazib beruvchi buyurtmalarini ko‘rish huquqi kerak. Yuborish uchun buyurtmalarni boshqarish huquqi ham kerak."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Open Planning settings. Choose regular replenishment, New Year, Nauryz, the school season, Kurban Ait or your event. Enter the desired arrival date, delivery lead time, coverage, reserve and your expected seasonal increase. Kurban Ait dates must be confirmed locally for the chosen year.",
+            "ru": "Откройте параметры. Выберите обычное пополнение, Новый год, Наурыз, школьный сезон, Курбан айт или своё событие. Укажите дату поступления, срок поставки, запас в днях, резерв и ожидаемый сезонный рост. Дату Курбан айта подтвердите в своей стране на нужный год.",
+            "kk": "Жоспар параметрлерінен кәдімгі толықтыруды, Жаңа жылды, Наурызды, мектеп маусымын, Құрбан айт не өз оқиғаңызды таңдаңыз. Келу күнін, жеткізу мерзімін, қор күндерін, резерв пен күтілетін маусымдық өсімді беріңіз. Құрбан айт күнін өз еліңіздегі сол жылғы күнтізбеден нақтылаңыз.",
+            "ky": "Пландын жөндөөлөрүнөн кадимки толуктоону, Жаңы жылды, Ноорузду, мектеп сезонун, Курман айт же өз окуяңызды тандаңыз. Келүү күнүн, жеткирүү мөөнөтүн, запас күндөрүн, резервди жана күтүлгөн сезондук өсүштү бериңиз. Курман айт күнүн өз өлкөңүздөгү ошол жылдын календары менен тактаңыз.",
+            "tg": "Дар танзимот пуркунии одӣ, Соли нав, Наврӯз, мавсими мактаб, Иди Қурбон ё рӯйдоди худро интихоб кунед. Рӯзи расидан, муҳлати таъминот, рӯзҳои захира, резерв ва афзоиши интизории мавсимиро диҳед. Рӯзи Иди Қурбонро аз тақвими маҳаллии соли интихобшуда тасдиқ кунед.",
+            "uz": "Reja sozlamalarida oddiy to‘ldirish, Yangi yil, Navro‘z, maktab mavsumi, Qurbon hayiti yoki o‘z tadbiringizni tanlang. Kelish sanasi, yetkazish muddati, zaxira kunlari, rezerv va kutilgan mavsumiy o‘sishni kiriting. Qurbon hayiti sanasini tanlangan yil uchun mahalliy taqvimdan tekshiring."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Review each suggestion. Tap an item title to see sold/returned quantity, daily net sales, usable stock and incoming quantities. Unlimited batches and incompatible units have no automatic recommendation. New items and sparse history need manual judgment.",
+            "ru": "Проверьте предложения. Нажмите название товара, чтобы увидеть продажи, возвраты, нетто в день, годный запас и поступления. Для безлимитных партий и несовместимых единиц автоматического количества нет. Новые товары и короткая история требуют ручной оценки.",
+            "kk": "Әр ұсынысты тексеріңіз. Тауар атауын басқанда сатылған/қайтарылған мөлшер, орташа таза сатылым, жарамды қор және жеткізілімдер көрінеді. Шексіз партиялар мен үйлеспейтін бірліктер үшін автоматты ұсыныс жоқ. Жаңа тауарлар мен қысқа тарихты қолмен бағалаңыз.",
+            "ky": "Ар сунушту текшериңиз. Товардын атын басканда сатылган/кайтарылган саны, күндүк таза сатуу, жарактуу запас жана жеткирүүлөр көрүнөт. Чексиз партиялар жана шайкеш эмес бирдиктер үчүн автоматтык сунуш жок. Жаңы товарларды жана кыска тарыхты кол менен баалаңыз.",
+            "tg": "Ҳар пешниҳодро санҷед. Номи молро пахш кунед, то фурӯш/баргардонидан, фурӯши софи рӯзона, захираи коршоям ва таъминотро бинед. Партияҳои бемаҳдуд ва воҳидҳои номувофиқ тавсияи худкор надоранд. Моли нав ва таърихи кӯтоҳ арзёбии дастӣ мехоҳанд.",
+            "uz": "Har bir taklifni tekshiring. Mahsulot nomini bosib, sotilgan/qaytarilgan miqdor, kunlik sof savdo, yaroqli zaxira va yetkazishlarni ko‘ring. Cheksiz partiyalar va mos kelmagan birliklar uchun avtomatik tavsiya yo‘q. Yangi mahsulotlar va qisqa tarixni qo‘lda baholang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Use suggestions or select items individually. Change quantities with the input and quick-fill chips. Choose one supplier. View / print plan opens the normal report preview; filter or select up to 200 items for a readable report.",
+            "ru": "Выберите предложенное или отдельные товары. Измените количества полем и быстрыми подсказками. Выберите одного поставщика. «Просмотр / печать плана» открывает обычный отчёт; для удобства выберите или отфильтруйте до 200 товаров.",
+            "kk": "Ұсыныстарды қолданыңыз не тауарларды жеке таңдаңыз. Мөлшерді өріс пен жылдам толтыру нұсқаларымен түзетіңіз. Бір жеткізушіні таңдаңыз. Жоспарды қарау/басып шығару үшін 200-ге дейін тауар таңдаңыз немесе сүзгілеңіз.",
+            "ky": "Сунуштарды колдонуңуз же товарларды өзүнчө тандаңыз. Санды талаа жана тез толтуруу варианттары менен оңдоңуз. Бир жеткирүүчүнү тандаңыз. Планды көрүү/басып чыгаруу үчүн 200гө чейин товар тандаңыз же чыпкалаңыз.",
+            "tg": "Пешниҳодҳоро истифода баред ё молҳоро алоҳида интихоб кунед. Миқдорро бо майдон ва тугмаҳои пуркунии зуд иваз кунед. Як таъминкунанда интихоб кунед. Барои дидан/чопи нақша то 200 мол интихоб ё филтр кунед.",
+            "uz": "Takliflarni qo‘llang yoki mahsulotlarni alohida tanlang. Miqdorni maydon va tez to‘ldirish variantlari bilan o‘zgartiring. Bitta yetkazib beruvchini tanlang. Rejani ko‘rish/chop etish uchun 200 tagacha mahsulot tanlang yoki filtrlang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-5",
+          "text": {
+            "en": "Send only after review. The same order can be retried after a timeout with its original identity and quantities; do not create a replacement order while its result is unconfirmed. Follow confirmation and receiving in the supplier-order history of an item.",
+            "ru": "Отправляйте только после проверки. После тайм-аута повторяется тот же заказ с прежним идентификатором и количествами; не создавайте замену, пока результат неизвестен. Подтверждение и приёмка доступны в истории заказов поставщику у товара.",
+            "kk": "Тек тексергеннен кейін жіберіңіз. Жауап кешіксе, тапсырыс бұрынғы сәйкестендіргіші және мөлшерлерімен қайталанады; нәтиже белгісіз кезде жаңа алмастыру тапсырысын жасамаңыз. Растау мен қабылдау тауардың жеткізуші тапсырыстары тарихында қолжетімді.",
+            "ky": "Текшергенден кийин гана жөнөтүңүз. Жооп кечиксе, тапшырык мурунку идентификатору жана сандары менен кайталанат; жыйынтык белгисизде анын ордуна жаңы тапшырык түзбөңүз. Ырастоо жана кабыл алуу товардын жеткирүүчү тапшырыктары тарыхында бар.",
+            "tg": "Танҳо баъди санҷиш фиристед. Агар ҷавоб дер шавад, ҳамон фармоиш бо шиноса ва миқдори пешина такрор мешавад; то номаълум будани натиҷа фармоиши ивазкунанда насозед. Тасдиқ ва қабул дар таърихи фармоишҳои таъминкунандаи мол ҳастанд.",
+            "uz": "Faqat tekshirgach yuboring. Javob kechiksa, ayni buyurtma avvalgi identifikator va miqdorlar bilan takrorlanadi; natija noma’lum bo‘lsa o‘rniga yangi buyurtma yaratmang. Tasdiqlash va qabul qilish mahsulotning yetkazib beruvchi buyurtmalari tarixida mavjud."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-6",
+          "text": {
+            "en": "The draft and last loaded snapshot are saved per account/store on this device. Offline data shows its date. Refresh before sending when online because other sales or deliveries may have changed the stock.",
+            "ru": "Черновик и последний загруженный снимок сохраняются для аккаунта/магазина на устройстве. Офлайн видна дата данных. Перед отправкой при подключении обновите их: продажи и поставки могли изменить остатки.",
+            "kk": "Жоба мен соңғы деректер көшірмесі осы құрылғыда аккаунт/дүкен бойынша сақталады. Офлайн көшірменің күні көрсетіледі. Желіде жіберер алдында жаңартыңыз: сатылымдар мен жеткізілімдер қорды өзгертуі мүмкін.",
+            "ky": "Долбоор жана акыркы маалымат көчүрмөсү бул түзмөктө аккаунт/дүкөн боюнча сакталат. Офлайн көчүрмөнүн күнү көрсөтүлөт. Тармакта жөнөтөрдөн мурун жаңыртыңыз: сатуулар менен жеткирүүлөр запаска таасир этет.",
+            "tg": "Сиёҳнавис ва нусхаи охирини маълумот дар ин дастгоҳ барои ҳисоб/мағоза нигоҳ дошта мешаванд. Офлайн рӯзи нусха нишон дода мешавад. Пеш аз фиристодан дар шабака нав кунед: фурӯш ва таъминот метавонанд бақияро тағйир диҳанд.",
+            "uz": "Qoralama va oxirgi ma’lumot nusxasi shu qurilmada hisob/do‘kon bo‘yicha saqlanadi. Oflaynda nusxa sanasi ko‘rinadi. Onlayn yuborishdan oldin yangilang: savdo va yetkazishlar qoldiqni o‘zgartirishi mumkin."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-7",
+          "text": {
+            "en": "For an upcoming season, open Seasonal reminder and choose 0–30 days before the order deadline. Save it online. One personal reminder per store is held on the server and delivered to Notifications even while AITA is closed; it never places an order. Turn it off when no longer needed. On another device, Use saved plan settings restores its configuration. If AITA is closed, the notification becomes visible when you next connect.",
+            "ru": "Для будущего сезона откройте «Сезонное напоминание», выберите 0–30 дней до срока заказа и сохраните при подключении. Сервер хранит одно личное напоминание на магазин и доставляет его в уведомления, даже когда AITA закрыта; заказ не создаётся. Отключите напоминание, когда оно больше не нужно. На другом устройстве можно применить сохранённые параметры плана. Если AITA закрыта, уведомление станет видимым при следующем подключении.",
+            "kk": "Алдағы маусым үшін еске салуды ашып, тапсырыс мерзіміне дейін 0–30 күн таңдаңыз да, желіде сақтаңыз. Сервер әр дүкенге бір жеке еске салуды сақтайды және AITA жабық болса да хабарландыру жасайды; тапсырыс жіберілмейді. Қажет болмаса өшіріңіз. Басқа құрылғыда сақталған жоспар параметрлерін қолдануға болады. AITA жабық болса, хабарландыруды келесі қосылғанда көресіз.",
+            "ky": "Келечектеги сезон үчүн эскертүүнү ачып, тапшырык мөөнөтүнө чейин 0–30 күн тандап, тармакта сактаңыз. Сервер ар дүкөнгө бир жеке эскертүү сактап, AITA жабык болсо да билдирүү түзөт; тапшырык жөнөтүлбөйт. Кереги жок болсо өчүрүңүз. Башка түзмөктө сакталган план жөндөөлөрүн колдонсоңуз болот. AITA жабык болсо, билдирүүнү кийинки туташууда көрөсүз.",
+            "tg": "Барои мавсими оянда ёдрасиро кушоед, 0–30 рӯз пеш аз муҳлати фармоиш интихоб карда, дар шабака сабт кунед. Сервер барои ҳар мағоза як ёдрасии шахсӣ нигоҳ медорад ва бо AITA-и баста ҳам огоҳӣ месозад; фармоиш фиристода намешавад. Агар лозим набошад, хомӯш кунед. Дар дастгоҳи дигар танзимоти сабтшудаи нақшаро истифода баред. Агар AITA баста бошад, огоҳиро ҳангоми пайвасти навбатӣ мебинед.",
+            "uz": "Kelgusi mavsum uchun eslatmani oching, buyurtma muddatidan 0–30 kun oldin tanlang va onlayn saqlang. Server har do‘konga bir shaxsiy eslatma saqlaydi va AITA yopiq bo‘lsa ham bildirishnoma yaratadi; buyurtma yuborilmaydi. Kerak bo‘lmasa o‘chiring. Boshqa qurilmada saqlangan reja sozlamalarini qo‘llashingiz mumkin. AITA yopiq bo‘lsa, bildirishnomani keyingi ulanishda ko‘rasiz."
+          },
+          "screenshots": []
+        }
+      ],
+      "caution": {
+        "en": "This is an explainable baseline, not an AI demand guarantee or automatic purchase. Net daily sales × lead/coverage with your reserve/increase, minus usable stock and dated confirmed unreceived supply. Today’s partial day, expired/soon-expiring stock, undated/late promises and unconfirmed orders are not counted as coverage. Stockout days are not measured.",
+        "ru": "Это объяснимый ориентир, а не гарантия спроса от ИИ или автоматическая закупка. Нетто-продажи в день × срок/покрытие с вашим резервом/ростом минус годный остаток и подтверждённые неполученные поставки со сроком. Неполный текущий день, истекающие остатки, обещания без даты/с просрочкой и неподтверждённые заказы не считаются покрытием. Дни отсутствия товара не измеряются.",
+        "kk": "Бұл түсінікті есептік бағдар, ЖИ кепілдігі не автоматты сатып алу емес. Күндік таза сатылымдар × мерзім/қамту және сіздің резерв/өсіміңіз, одан жарамды қор мен мерзімі белгілі расталған жеткізілімдер шегеріледі. Бүгінгі толық емес күн, мерзімі аяқталатын қор, датасыз/кешіккен уәделер және расталмаған тапсырыстар қамтуға кірмейді. Тауар болмаған күндер өлшенбейді.",
+        "ky": "Бул түшүндүрүлүүчү эсептик багыт, ЖИ кепилдиги же автоматтык сатып алуу эмес. Күндүк таза сатуу × мөөнөт/камтуу жана сиздин резерв/өсүш, андан жарактуу запас жана датасы белгилүү ырасталган жеткирүү алынат. Бүгүнкү бүтө элек күн, мөөнөтү бүтө турган запас, датасыз/кечиккен убадалар жана ырасталбаган тапшырыктар камтууга кирбейт. Товар жок болгон күндөр өлчөнбөйт.",
+        "tg": "Ин роҳнамои ҳисобии фаҳмост, на кафолати талабот аз зеҳни сунъӣ ё хариди худкор. Фурӯши софи рӯзона × муҳлат/фарогирӣ бо резерв/афзоиши шумо, бо тарҳи захираи коршоям ва таъминоти тасдиқшудаи санааш маълум. Рӯзи нотамоми имрӯз, захираи муҳлаташ наздик, ваъдаҳои бесана/дершуда ва фармоишҳои тасдиқнашуда ҳисоб намешаванд. Рӯзҳои набудани мол чен намешаванд.",
+        "uz": "Bu tushunarli hisobiy yo‘nalish, sun’iy intellekt talabi kafolati yoki avtomatik xarid emas. Kunlik sof savdo × muddat/qamrov va siz belgilagan rezerv/o‘sish, undan yaroqli zaxira va sanasi ma’lum tasdiqlangan ta’minot ayriladi. Bugungi tugamagan kun, muddati tugayotgan zaxira, sanasiz/kechikkan va’dalar va tasdiqlanmagan buyurtmalar qamrovga kirmaydi. Mahsulot yo‘q kunlar o‘lchanmaydi."
+      }
     }
   ],
   "faqs": [

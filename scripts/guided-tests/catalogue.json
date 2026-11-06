@@ -360,5 +360,21 @@
     ],
     "kind": "fixture-ui",
     "timeout": 900
+  },
+  {
+    "id": "stock-file-planning",
+    "title": "Spreadsheet import → seasonal purchasing → reminders → printable plan",
+    "file": "../linux-web/test/stock-planning-smoke.cjs",
+    "areas": [
+      "CSV/XLSX import",
+      "stock",
+      "batches",
+      "seasonal purchasing",
+      "scheduled reminders",
+      "supplier orders",
+      "offline"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
   }
 ]

@@ -22,6 +22,7 @@ DEFAULT_TESTS = [
     'kz.aita.server.auth.AccountDeletionDatabaseTest',
     'kz.aita.server.WorkerPlacementDatabaseTest',
     'kz.aita.server.SupplierProcurementDatabaseTest',
+    'kz.aita.server.ReplenishmentDatabaseTest',
     'kz.aita.server.TransactionStockDatabaseTest',
     'kz.aita.server.StoreCommerceDatabaseTest',
     'kz.aita.server.RecordAuditDatesDatabaseTest',

@@ -42,6 +42,11 @@ internal fun ScreenStockRow.problems(configuration: GlobalAppConfigurationDataMo
     if (screenStockBarcode(barcode) == null) add("BARCODE")
     if (screenStockNumber(sale) == null) add("SALE")
     if (screenStockNumber(supply) == null) add("SUPPLY")
+    for ((field,value) in listOf("SALE" to sale,"SUPPLY" to supply)) {
+        val embeddedCurrency=screenStockCurrency(value)
+        if (embeddedCurrency.isNotBlank() && embeddedCurrency!=currency && field !in this) add(field)
+    }
+    if (description.length > 2000) add("DESCRIPTION")
     for ((field, value) in listOf("SALE" to sale, "SUPPLY" to supply, "QUANTITY" to quantity)) {
         if (screenStockNumberAmbiguous(value) && field !in resolvedNumbers && field !in this) add(field)
     }
@@ -79,9 +84,25 @@ internal fun ScreenStockRow.toStockBatch(accountId: String, storeId: String,
         kind = StockBatchKindDataModel.UNIVERSAL, status = StockBatchStatusDataModel.Delivered)
 }
 
-internal fun ScreenStockRow.hasExistingBarcode(existing: List<GoodsItemDataModel>, storeId: String): Boolean =
-    existing.any { it.isActive && it.storeId == storeId && it.id != itemId &&
-        it.allBarcodeValues().any { code -> code.normalizedBarcodeToken() == barcode.normalizedBarcodeToken() } }
+internal fun ScreenStockRow.hasExistingBarcode(existing: List<GoodsItemDataModel>, storeId: String): Boolean {
+    val token = barcode.normalizedBarcodeToken()
+    return existing.any { it.isActive && it.storeId == storeId && it.id != itemId &&
+        it.allBarcodeValues().any { code -> code.normalizedBarcodeToken() == token } }
+}
+
+/** A bulk review must not rescan and normalize the whole warehouse for every input row. */
+internal fun stockImportBarcodeOwners(existing: List<GoodsItemDataModel>, storeId: String): Map<String, Set<String>> =
+    buildMap<String, MutableSet<String>> {
+        for (item in existing) if (item.isActive && item.storeId == storeId) {
+            for (code in item.allBarcodeValues()) {
+                val token = code.normalizedBarcodeToken()
+                if (token.isNotEmpty()) getOrPut(token) { mutableSetOf() }.add(item.id)
+            }
+        }
+    }
+
+internal fun ScreenStockRow.hasExistingBarcode(owners: Map<String, Set<String>>): Boolean =
+    owners[barcode.normalizedBarcodeToken()]?.any { it != itemId } == true
 
 /** The durable outbox owns a write even when its visible stock projection failed or is still
  * hydrating. Resuming the same review row must not enqueue another command for that identity.

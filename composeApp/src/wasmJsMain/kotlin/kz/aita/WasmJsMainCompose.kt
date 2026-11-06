@@ -91,6 +91,7 @@ private fun failedBrowserEntryLoad(message: String): Unit = js("""{
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    initializeBrowserTimeZones()
     installWebRuntimeDiagnostics()
     subscribeBrowserPageActivity(::setBrowserPageActive)
     installWasmCommonPlatformBridges()

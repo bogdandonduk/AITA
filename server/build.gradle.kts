@@ -42,6 +42,8 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:${property("ktor.version")}")
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.kotlinx.serialization.json)
+    // Match shared's date/time ABI on both compile and runtime classpaths.
+    implementation(libs.kotlinx.datetime)
 
     // Useful server plugins (optional but nice)
     implementation("io.ktor:ktor-server-cors:${property("ktor.version")}")

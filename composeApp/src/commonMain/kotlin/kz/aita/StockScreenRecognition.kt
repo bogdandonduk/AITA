@@ -33,7 +33,7 @@ internal data class ScreenStockRow(
     val unitId: String = "",
 )
 
-internal enum class ScreenStockField { NAME, BARCODE, QUANTITY, UNIT, SALE, SUPPLY, CATEGORY, DESCRIPTION, IGNORE }
+internal enum class ScreenStockField { NAME, BARCODE, QUANTITY, UNIT, SALE, SUPPLY, CURRENCY, CATEGORY, DESCRIPTION, IGNORE }
 internal data class ScreenStockColumn(val field: ScreenStockField, val center: Float, val title: String)
 internal data class ScreenStockLine(val words: List<StockScreenWord>) {
     val text get() = words.joinToString(" ") { it.text.trim() }
@@ -46,8 +46,15 @@ internal data class ScreenStockRecognition(
     val truncated: Boolean = false,
 )
 
-private fun screenLabel(value: String): String = value.lowercase().replace('ё', 'е')
-    .replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
+private fun screenLabel(value: String): String = buildString {
+    var gap = false
+    for (char in value.lowercase().replace('ё', 'е')) {
+        if (char.isLetterOrDigit()) {
+            if (gap && isNotEmpty()) append(' ')
+            append(char); gap = false
+        } else gap = true
+    }
+}
 
 private val screenFieldAliases = mapOf(
     ScreenStockField.NAME to listOf("name", "product", "product name", "item name", "title", "наименование", "название", "товар", "название товара", "номенклатура", "атауы", "аталышы", "номи мол", "nomi", "mahsulot"),
@@ -56,12 +63,17 @@ private val screenFieldAliases = mapOf(
     ScreenStockField.UNIT to listOf("unit", "uom", "units", "ед", "ед изм", "единица", "единица измерения", "бірлік", "өлшем", "бирдик", "воҳид", "birlik"),
     ScreenStockField.SALE to listOf("sale price", "selling price", "retail price", "price", "цена", "цена продажи", "розничная цена", "розница", "сату бағасы", "баасы", "нархи фурӯш", "sotuv narxi"),
     ScreenStockField.SUPPLY to listOf("cost", "cost price", "purchase price", "supply price", "закупочная цена", "цена закупки", "цена поставки", "себестоимость", "закуп", "сатып алу бағасы", "нархи харид", "xarid narxi"),
+    ScreenStockField.CURRENCY to listOf("currency", "currency code", "валюта", "код валюты", "валюта коды", "асъор", "valyuta"),
     ScreenStockField.CATEGORY to listOf("category", "group", "категория", "группа", "категория товара", "санат", "категориясы", "гурӯҳ", "toifa"),
     ScreenStockField.DESCRIPTION to listOf("description", "описание", "сипаттама", "тавсиф", "tavsif"),
 )
 
+internal fun stockImportHeaderField(value: String): ScreenStockField =
+    screenFieldAliases.entries.firstOrNull { screenLabel(value) in it.value }?.key ?: ScreenStockField.IGNORE
+
 /** Preserve decimal meaning; never turn a price/weight into a barcode or repair OCR digits silently. */
 internal fun screenStockNumber(raw: String): String? {
+    if (screenStockCurrencies(raw).size > 1) return null
     var text = screenStockNumericText(raw)
     if (text.isBlank() || text.length > 40 || text.any { !it.isDigit() && it !in " .,+'-" }) return null
     if (text.startsWith('+')) text = text.drop(1)
@@ -97,17 +109,37 @@ internal fun screenStockGroupedNumber(raw: String): String? = if (screenStockNum
     screenStockNumber(screenStockNumericText(raw).replace(",", "").replace(".", "")) else null
 
 private fun screenStockNumericText(raw: String): String = raw.trim().replace('\u00a0', ' ').replace('\u202f', ' ')
-    .replace(Regex("(?i)(KZT|RUB|RUR|USD|EUR|KGS|UZS|TJS|₸|₽|\\$|€|сомонӣ|сом|сум|сўм|тг\\.?)"), "").trim()
+    .replace(Regex("(?i)(KZT|RUB|RUR|USD|EUR|KGS|UZS|TJS|₸|₽|\\$|€|сомонӣ|сом|сум|сўм|тенге|рубль|руб\\.?|тг\\.?)"), "").trim()
 
-internal fun screenStockCurrency(text: String): String = when {
-    Regex("(?i)(KZT|₸|\\bтг\\b)").containsMatchIn(text) -> "KZT"
-    Regex("(?i)(RUB|RUR|₽|руб)").containsMatchIn(text) -> "RUB"
-    Regex("(?i)(USD|\\$)").containsMatchIn(text) -> "USD"
-    Regex("(?i)(EUR|€)").containsMatchIn(text) -> "EUR"
-    Regex("(?i)(UZS|сум|сўм)").containsMatchIn(text) -> "UZS"
-    Regex("(?i)(TJS|сомонӣ)").containsMatchIn(text) -> "TJS"
-    Regex("(?i)(KGS|сом)").containsMatchIn(text) -> "KGS"
-    else -> ""
+private val stockCurrencyTokens = mapOf(
+    "KZT" to listOf("KZT", "тг", "тенге"),
+    "RUB" to listOf("RUB", "RUR", "руб", "рубль"),
+    "USD" to listOf("USD"), "EUR" to listOf("EUR"),
+    "UZS" to listOf("UZS", "сум", "сўм"),
+    "TJS" to listOf("TJS", "сомонӣ"), "KGS" to listOf("KGS", "сом")
+)
+private val stockCurrencySymbols = mapOf("₸" to "KZT", "₽" to "RUB", "$" to "USD", "€" to "EUR")
+internal fun screenStockCurrencies(text: String): Set<String> = buildSet {
+    for ((code, aliases) in stockCurrencyTokens) {
+        if (aliases.any { alias ->
+            var position = text.indexOf(alias, ignoreCase = true)
+            var found = false
+            while (position >= 0 && !found) {
+                found = text.getOrNull(position - 1)?.isLetter() != true &&
+                    text.getOrNull(position + alias.length)?.isLetter() != true
+                position = if (found) -1 else text.indexOf(alias, position + 1, ignoreCase = true)
+            }
+            found
+        }) add(code)
+    }
+    stockCurrencySymbols.forEach { (symbol, code) -> if (symbol in text) add(code) }
+}
+internal fun screenStockCurrency(text: String): String = screenStockCurrencies(text).singleOrNull().orEmpty()
+internal fun stockExplicitCurrency(text: String): String {
+    val value = text.trim().removeSuffix(".")
+    return stockCurrencySymbols[value] ?: stockCurrencyTokens.entries.firstOrNull { (_, aliases) ->
+        aliases.any { it.equals(value, true) }
+    }?.key.orEmpty()
 }
 
 internal fun screenStockBarcode(raw: String): String? {
@@ -234,7 +266,7 @@ internal class StockScreenRecognizer {
         if (sale.isBlank()) warnings += "no_price"
         val unit = screenStockUnit(cells[ScreenStockField.UNIT].orEmpty())
         if (unit.isBlank()) warnings += "no_unit"
-        val currencies = listOf(ScreenStockField.SALE, ScreenStockField.SUPPLY).map { screenStockCurrency(cells[it].orEmpty()) }.filter { it.isNotEmpty() }.distinct()
+        val currencies = listOf(ScreenStockField.SALE, ScreenStockField.SUPPLY, ScreenStockField.CURRENCY).map { screenStockCurrency(cells[it].orEmpty()) }.filter { it.isNotEmpty() }.distinct()
         if (currencies.size > 1) warnings += "currency_conflict"
         return ScreenStockRow(id = "capture-${++serial}", name = cells[ScreenStockField.NAME].orEmpty().take(300),
             barcode = rawBarcode.take(128), quantity = number(ScreenStockField.QUANTITY), unit = unit,

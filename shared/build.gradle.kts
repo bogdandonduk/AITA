@@ -217,6 +217,9 @@ kotlin {
                 dependencies {
                     implementation(libs.kotlinx.browser)
                     implementation(libs.ktor.client.js)
+                    // kotlinx-datetime 0.7.1 uses js-joda/core 3.2.0. Keep the compatible
+                    // timezone provider: otherwise browsers serialize the nonportable "SYSTEM" ID.
+                    implementation(npm("@js-joda/timezone", "2.23.0"))
                     implementation(npm("@cashapp/sqldelight-sqljs-worker", "2.1.0"))
                     implementation(npm("sql.js", "1.13.0"))
                     implementation(libs.sqlDelightWasmJsDriver)

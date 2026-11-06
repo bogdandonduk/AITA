@@ -1982,7 +1982,10 @@ fun AppConfiguration.StockWarehouseScreen() {
         }
     ) {
         InventoryPendingFeedback()
-        StockScreenImportEntry()
+        Row(Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StockScreenImportEntry(Modifier.weight(1f))
+            ReplenishmentEntry(Modifier.weight(1f))
+        }
         AnimatedVisibility(visible = sortMenuExpanded) {
             Column(
                 modifier = Modifier
@@ -3110,62 +3113,40 @@ fun AppConfiguration.StockWarehouseScreenContent(
 
 @Composable
 fun AppConfiguration.StockScreen() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (stateValues.activeStoreId == null) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                MessageText(
-                    text = stateValues.stringNoActiveStore,
-                    textSize = stateValues.titleTextSize
-                )
-
-                actionButton(
-                    autoLoading = false,
-                    text = stateValues.stringSelectInMenu
-                ) {
-                    coroutineScope.launch {
-                        Navigation.Menu.go(NavigationScreenModel.Menu.Stores)
-                        Navigation.goMain(NavigationScreenModel.Menu.Main)
-                    }
-                }
-            }
-        } else {
-            if (stateValues.isNarrowScreen) {
-                AnimatedContent(
+    StockWorkspaceTools {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (stateValues.activeStoreId == null) {
+                Column(
                     modifier = Modifier
-                        .weight(1f),
-                    targetState = stateValues.navigationScreensStockLeft,
-                    transitionSpec = aitaStackTransitionSpec(),
-                    label = "stockNavigationNarrow"
-                ) { navigationStack ->
-                    val model = navigationStack.last()
-                    when (model) {
-                        is NavigationScreenModel.Stock.Warehouse -> {
-                            StockWarehouseScreen()
+                        .fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    MessageText(
+                        text = stateValues.stringNoActiveStore,
+                        textSize = stateValues.titleTextSize
+                    )
+
+                    actionButton(
+                        autoLoading = false,
+                        text = stateValues.stringSelectInMenu
+                    ) {
+                        coroutineScope.launch {
+                            Navigation.Menu.go(NavigationScreenModel.Menu.Stores)
+                            Navigation.goMain(NavigationScreenModel.Menu.Main)
                         }
-                        is NavigationScreenModel.Stock.AddEditGoodsItem -> {
-                            StockAddEditGoodsItemScreen()
-                        }
-                        else -> { }
                     }
                 }
             } else {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                ) {
+                if (stateValues.isNarrowScreen) {
                     AnimatedContent(
                         modifier = Modifier
                             .weight(1f),
                         targetState = stateValues.navigationScreensStockLeft,
                         transitionSpec = aitaStackTransitionSpec(),
-                        label = "stockNavigationLeft"
+                        label = "stockNavigationNarrow"
                     ) { navigationStack ->
                         val model = navigationStack.last()
                         when (model) {
@@ -3178,23 +3159,47 @@ fun AppConfiguration.StockScreen() {
                             else -> { }
                         }
                     }
-
-                    AnimatedContent(
+                } else {
+                    Row(
                         modifier = Modifier
-                            .weight(1f),
-                        targetState = stateValues.navigationScreensStockRight,
-                        transitionSpec = aitaStackTransitionSpec(),
-                        label = "stockNavigationRight"
-                    ) { navigationStack ->
-                        val model = navigationStack.last()
-                        when (model) {
-                            is NavigationScreenModel.Stock.Warehouse -> {
-                                StockWarehouseScreen()
+                            .weight(1f)
+                    ) {
+                        AnimatedContent(
+                            modifier = Modifier
+                                .weight(1f),
+                            targetState = stateValues.navigationScreensStockLeft,
+                            transitionSpec = aitaStackTransitionSpec(),
+                            label = "stockNavigationLeft"
+                        ) { navigationStack ->
+                            val model = navigationStack.last()
+                            when (model) {
+                                is NavigationScreenModel.Stock.Warehouse -> {
+                                    StockWarehouseScreen()
+                                }
+                                is NavigationScreenModel.Stock.AddEditGoodsItem -> {
+                                    StockAddEditGoodsItemScreen()
+                                }
+                                else -> { }
                             }
-                            is NavigationScreenModel.Stock.AddEditGoodsItem -> {
-                                StockAddEditGoodsItemScreen()
+                        }
+
+                        AnimatedContent(
+                            modifier = Modifier
+                                .weight(1f),
+                            targetState = stateValues.navigationScreensStockRight,
+                            transitionSpec = aitaStackTransitionSpec(),
+                            label = "stockNavigationRight"
+                        ) { navigationStack ->
+                            val model = navigationStack.last()
+                            when (model) {
+                                is NavigationScreenModel.Stock.Warehouse -> {
+                                    StockWarehouseScreen()
+                                }
+                                is NavigationScreenModel.Stock.AddEditGoodsItem -> {
+                                    StockAddEditGoodsItemScreen()
+                                }
+                                else -> { }
                             }
-                            else -> { }
                         }
                     }
                 }
