@@ -407,6 +407,8 @@ class Run:
                              ['node', 'scripts/linux-web/test/receipt-batch-actions-smoke.cjs'])
                 self.command('Quick item creation, nondepleting stock and bulk parent templates',
                              ['node', 'scripts/linux-web/test/quick-stock-import-smoke.cjs'])
+                self.command('Spreadsheet import, offline recovery, purchasing plans and seasonal reminders',
+                             ['node', 'scripts/linux-web/test/stock-planning-smoke.cjs'])
                 self.command('Erasable supply price and payment amount in the browser',
                              ['node', 'scripts/linux-web/test/numeric-cart-smoke.cjs'])
                 self.command('Write-off lost-acknowledgement recovery and analytics',
