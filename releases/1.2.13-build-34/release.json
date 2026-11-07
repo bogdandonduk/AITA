@@ -1,0 +1,166 @@
+{
+  "version": "1.2.13",
+  "build": 34,
+  "revision": "a9f34487ab4796befa998d75f05e3480b0d08ebd",
+  "tag": "v1.2.13-b34",
+  "createdAt": "2026-11-07T07:38:08Z",
+  "artifacts": [
+    {
+      "name": "AITA-1.2.13-34-android.apk",
+      "sha256": "194725b3ebb91aabcc9be1d19c67abf5158f494c75f4cba3bb6c2305f09cfe15",
+      "bytes": 74370159,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-android.apk"
+    },
+    {
+      "name": "AITA-1.2.13-34-android.aab",
+      "sha256": "c17d752e5ac8051f6eff16dfa63903515b66632fa5b3023554c091574764abef",
+      "bytes": 49025756,
+      "platform": "android",
+      "signature": "cc459afa9d552e55c48b19fcca1012acb71082f980bd03f9b69657109108aed5",
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-android.aab"
+    },
+    {
+      "name": "android-client-build.json",
+      "sha256": "fbbc995e4071d37d2a6724f07ec2fb1423866b810f54aed7d808349ba625f23b",
+      "bytes": 858,
+      "platform": "android",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/android-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.13-34-linux-x64.deb",
+      "sha256": "4b7dc021dedacfe263c65c970f78bffdcdf913277630fd871f7fac64e1d70698",
+      "bytes": 161655078,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-linux-x64.deb"
+    },
+    {
+      "name": "AITA-1.2.13-34-linux-x64.rpm",
+      "sha256": "030d3c7811a6261d92c8e118566f8eb0ac1b6de20fbe254dde0513ed38108f97",
+      "bytes": 161682800,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-linux-x64.rpm"
+    },
+    {
+      "name": "linux-client-build.json",
+      "sha256": "fbbc995e4071d37d2a6724f07ec2fb1423866b810f54aed7d808349ba625f23b",
+      "bytes": 858,
+      "platform": "linux",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/linux-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.13-34-windows.exe",
+      "sha256": "695442b883d3700b323b81634d19fb78ccf70f070c1f18034d574e5d835da8d6",
+      "bytes": 183662080,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-windows.exe"
+    },
+    {
+      "name": "AITA-1.2.13-34-windows.msi",
+      "sha256": "49675f0035f920c78eddfc80b8ccb4b09c13817dfe0cd66ec5c29f28fa6f3344",
+      "bytes": 183063228,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-windows.msi"
+    },
+    {
+      "name": "windows-verification.json",
+      "sha256": "ae9ea162ee4123d583f6895ff4138543eace7e3e7f4d737cc60cab9194fc7fb7",
+      "bytes": 1731,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/windows-verification.json"
+    },
+    {
+      "name": "windows-client-build.json",
+      "sha256": "2ce36624eba7a7cbeb0ecf6070eb35888c02ecfd9568671585428324bbdfbaf2",
+      "bytes": 858,
+      "platform": "windows",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/windows-client-build.json"
+    },
+    {
+      "name": "AITA-1.2.13-34-install-helpers.zip",
+      "sha256": "d7ddfcf526e7700d82e684d9ca0f1529e70cf555a67046912b583638897a279f",
+      "bytes": 22590,
+      "platform": "tools",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-install-helpers.zip"
+    },
+    {
+      "name": "AITA-1.2.13-34-web.zip",
+      "sha256": "b0f287d51cb7ed3c4da7fda3ac6ba09e593ee4a106085e0ce6438085cb4cb265",
+      "bytes": 13921613,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/AITA-1.2.13-34-web.zip"
+    },
+    {
+      "name": "web-client-build.json",
+      "sha256": "17ac1d76fc90d14a5bc373acaf2dea3556c1df271286a9441769a3de151591d0",
+      "bytes": 858,
+      "platform": "web",
+      "signature": null,
+      "url": "https://github.com/bogdandonduk/AITA/releases/download/v1.2.13-b34/web-client-build.json"
+    }
+  ],
+  "notes": {
+    "en": "Market price comparisons by country and city, personal daily price alerts, offline saved reports and printable PDFs. Improved report permissions, notification navigation and price matching.",
+    "ru": "\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435 \u0440\u044b\u043d\u043e\u0447\u043d\u044b\u0445 \u0446\u0435\u043d \u043f\u043e \u0441\u0442\u0440\u0430\u043d\u0435 \u0438 \u0433\u043e\u0440\u043e\u0434\u0443, \u043b\u0438\u0447\u043d\u044b\u0435 \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0435 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f, \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0435 \u043e\u0444\u043b\u0430\u0439\u043d-\u043e\u0442\u0447\u0451\u0442\u044b \u0438 \u043f\u0435\u0447\u0430\u0442\u044c PDF. \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u044b \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043f\u0440\u0430\u0432, \u043f\u0435\u0440\u0435\u0445\u043e\u0434\u044b \u0438\u0437 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0439 \u0438 \u0441\u043e\u043f\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0446\u0435\u043d.",
+    "kk": "\u0415\u043b \u0436\u04d9\u043d\u0435 \u049b\u0430\u043b\u0430 \u0431\u043e\u0439\u044b\u043d\u0448\u0430 \u043d\u0430\u0440\u044b\u049b \u0431\u0430\u0493\u0430\u043b\u0430\u0440\u044b\u043d \u0441\u0430\u043b\u044b\u0441\u0442\u044b\u0440\u0443, \u043a\u04af\u043d\u0434\u0435\u043b\u0456\u043a\u0442\u0456 \u0436\u0435\u043a\u0435 \u0445\u0430\u0431\u0430\u0440\u043b\u0430\u043c\u0430\u043b\u0430\u0440, \u043e\u0444\u043b\u0430\u0439\u043d \u0435\u0441\u0435\u043f\u0442\u0435\u0440 \u0436\u04d9\u043d\u0435 PDF \u0431\u0430\u0441\u044b\u043f \u0448\u044b\u0493\u0430\u0440\u0443.",
+    "ky": "\u04e8\u043b\u043a\u04e9 \u0436\u0430\u043d\u0430 \u0448\u0430\u0430\u0440 \u0431\u043e\u044e\u043d\u0447\u0430 \u0431\u0430\u0437\u0430\u0440 \u0431\u0430\u0430\u043b\u0430\u0440\u044b\u043d \u0441\u0430\u043b\u044b\u0448\u0442\u044b\u0440\u0443\u0443, \u043a\u04af\u043d\u04af\u043c\u0434\u04af\u043a \u0436\u0435\u043a\u0435 \u0431\u0438\u043b\u0434\u0438\u0440\u04af\u04af\u043b\u04e9\u0440, \u043e\u0444\u043b\u0430\u0439\u043d \u043e\u0442\u0447\u0451\u0442\u0442\u043e\u0440 \u0436\u0430\u043d\u0430 PDF \u0431\u0430\u0441\u044b\u043f \u0447\u044b\u0433\u0430\u0440\u0443\u0443.",
+    "tg": "\u041c\u0443\u049b\u043e\u0438\u0441\u0430\u0438 \u043d\u0430\u0440\u0445\u04b3\u043e\u0438 \u0431\u043e\u0437\u043e\u0440 \u0430\u0437 \u0440\u04ef\u0438 \u043a\u0438\u0448\u0432\u0430\u0440 \u0432\u0430 \u0448\u0430\u04b3\u0440, \u043e\u0433\u043e\u04b3\u0438\u04b3\u043e\u0438 \u0448\u0430\u0445\u0441\u0438\u0438 \u04b3\u0430\u0440\u0440\u04ef\u0437\u0430, \u04b3\u0438\u0441\u043e\u0431\u043e\u0442\u04b3\u043e\u0438 \u043e\u0444\u043b\u0430\u0439\u043d \u0432\u0430 \u0447\u043e\u043f\u0438 PDF.",
+    "uz": "Mamlakat va shahar bo\u2018yicha bozor narxlarini taqqoslash, kundalik shaxsiy bildirishnomalar, oflayn hisobotlar va PDF chop etish."
+  },
+  "stages": {
+    "verification": {
+      "status": "complete",
+      "startedAt": "2026-11-07T00:52:23Z",
+      "finishedAt": "2026-11-07T00:57:05Z"
+    },
+    "android": {
+      "status": "complete",
+      "startedAt": "2026-11-07T00:57:14Z",
+      "finishedAt": "2026-11-07T01:04:54Z"
+    },
+    "linux": {
+      "status": "complete",
+      "startedAt": "2026-11-07T01:04:54Z",
+      "finishedAt": "2026-11-07T01:06:00Z"
+    },
+    "windows": {
+      "status": "complete",
+      "startedAt": "2026-11-07T01:06:00Z",
+      "finishedAt": "2026-11-07T01:14:17Z"
+    },
+    "windows-dispatch": {
+      "status": "complete",
+      "startedAt": "2026-11-07T00:57:05Z",
+      "finishedAt": "2026-11-07T00:57:14Z"
+    },
+    "server": {
+      "status": "complete",
+      "startedAt": "2026-11-07T07:15:23Z",
+      "finishedAt": "2026-11-07T07:20:27Z"
+    },
+    "web": {
+      "status": "complete",
+      "startedAt": "2026-11-07T07:20:27Z",
+      "finishedAt": "2026-11-07T07:37:23Z"
+    },
+    "updater-feed": {
+      "status": "complete",
+      "startedAt": "2026-11-07T07:37:23Z",
+      "finishedAt": "2026-11-07T07:38:07Z"
+    }
+  },
+  "visibility": "GitHub downloads follow repository visibility; the signed in-app update feed is public",
+  "windowsSigning": "unsigned pilot, explicitly authorized",
+  "updaterFeedPublished": true
+}
