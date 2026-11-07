@@ -10,7 +10,8 @@ data class AitaPdfDocument(
     val maxHeight: Float = 842f,
     val minHeight: Float = 280f,
     val margin: Float = 12f,
-    val bodySize: Float = 9f
+    val bodySize: Float = 9f,
+    val keepSectionsTogether: Boolean = false
 ) {
     fun style(role: AitaPdfRole): AitaPdfStyle = when (role) {
         AitaPdfRole.Store -> AitaPdfStyle(bodySize * 1.4f, bold = true, centered = true)
@@ -90,7 +91,43 @@ fun layoutAitaPdfDocument(
         lines = ArrayList()
         y = document.margin
     }
-    for (block in document.blocks) {
+    // Opt-in for tabular reports. A section ends at a divider; if it fits on one
+    // page, move it as a whole. Oversized sections still paginate normally.
+    // Roll-printer copies retain their established continuous-paper layout.
+    val sectionHeights = mutableMapOf<Int, Float>()
+    if (document.keepSectionsTogether && document.width >= 250f && document.minHeight > 0f) {
+        val capacity = document.maxHeight - document.margin * 2
+        var start = 0
+        var height = 0f
+        document.blocks.forEachIndexed { index, block ->
+            if (height <= capacity) {
+                val style = document.style(block.role)
+                height += when {
+                    block.barcodePayload != null -> transactionReceiptBarcodeGeometry(block.barcodePayload, .72f, 36f,
+                        vertical = transactionReceiptBarcodeModules(block.barcodePayload).size * .72f > contentWidth).height
+                    block.role == AitaPdfRole.Divider -> 12f
+                    else -> {
+                        val (ascent, descent) = metrics(style)
+                        require(ascent.isFinite() && descent.isFinite() && ascent <= 0 && descent >= 0)
+                        val step = maxOf(style.size * 1.4f, descent - ascent + 2f)
+                        val count = block.text.replace("\r\n", "\n").replace('\r', '\n').split('\n').sumOf { paragraph ->
+                            wrapAitaPdfText(paragraph.pdfCleanText(), contentWidth) { measure(it, style) }.size
+                        }
+                        step * count
+                    }
+                }
+            }
+            if (block.role == AitaPdfRole.Divider || index == document.blocks.lastIndex) {
+                if (height <= capacity) sectionHeights[start] = height
+                start = index + 1
+                height = 0f
+            }
+        }
+    }
+    for ((blockIndex, block) in document.blocks.withIndex()) {
+        sectionHeights[blockIndex]?.let { height ->
+            if (y + height > document.maxHeight - document.margin && lines.isNotEmpty()) finishPage()
+        }
         val style = document.style(block.role)
         block.barcodePayload?.let { payload ->
             val moduleWidth = 0.72f // 0.254 mm; do not squeeze bars to fit a narrow page.

@@ -18132,7 +18132,7 @@ fun Application.module() {
 
   org.jetbrains.exposed.sql.transactions.transaction {
     if (configBoolean("app.schemaAutoRepair", "AITA_SCHEMA_AUTO_REPAIR", false)) {
-      SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StoreUsers, Transactions, TransactionReturnItems, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierPartnershipContracts, SupplierOrders, SupplierOrderLines, Debtors, UserBalances, StoreSubscriptions, StoreActivationHistory, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, StoreWorkerRoleTemplates, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories, ReplenishmentReminders)
+      SchemaUtils.createMissingTablesAndColumns(Users, RefreshSessions, SecuritySessionEvents, Stores, StoreUsers, Transactions, TransactionReturnItems, StockItems, StockBatchesV2, StockBatchMovements, Suppliers, SupplierGoodsPrices, SupplierPartnershipContracts, SupplierOrders, SupplierOrderLines, Debtors, UserBalances, StoreSubscriptions, StoreActivationHistory, Notifications, SupportTickets, SupportMessages, StoreWorkerRequests, StoreWorkerMemberships, StoreWorkerRoleTemplates, Workshifts, CashRegisters, CashRegisterEvents, UserWallets, UserWalletLedgerEntries, TopUpPaymentIntents, StoreSubscriptionStates, StoreSubscriptionChargeEvents, OperationLogs, Manufacturers, GenericGoodsItems, GenericGoodsItemCandidates, GenericGoodsCategories, ReplenishmentReminders, MarketPriceWatches)
     }
     sanitizeGenericGoodsCategoryPrefixesInsideTransaction()
     seedGenericGoodsCategoriesInsideTransaction()
@@ -18146,6 +18146,7 @@ fun Application.module() {
   startSubscriptionRenewalDaemon(backgroundScope)
   startNotificationRetentionDaemon(backgroundScope)
   startPurchasingReminders(backgroundScope)
+  startMarketPriceWatches(backgroundScope)
 
   intercept(ApplicationCallPipeline.Call) {
     proceed()
@@ -25566,6 +25567,8 @@ fun Application.module() {
       authenticate("auth-jwt") {
         replenishmentRoute(::readReplenishment)
         replenishmentReminderRoutes()
+        marketPriceInsightsRoute()
+        marketPriceWatchRoutes()
 
         get("/store/get") {
           val userId = call.checkPrincipal() ?: return@get

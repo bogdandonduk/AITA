@@ -28,6 +28,18 @@ class AitaPrintDocumentTest {
         assertContains(html, "size:595.0pt 842.0pt;margin:42.0pt")
         assertContains(html, "font-weight:700;text-align:center")
     }
+    @Test fun optedInA4ReportsKeepSectionsTogetherButThermalCopiesDoNotGroupThem() {
+        val blocks = listOf(AitaPdfBlock("Store", AitaPdfRole.Store), AitaPdfBlock("", AitaPdfRole.Divider),
+            AitaPdfBlock("<Tea>"), AitaPdfBlock("Price: 100 KZT"), AitaPdfBlock("", AitaPdfRole.Divider))
+        val report = AitaPdfDocument(blocks, width = 595f, minHeight = 842f, keepSectionsTogether = true)
+        val html = report.toPrintHtml("Report")
+        assertEquals(2, Regex("<section class=\"report-section\">").findAll(html).count())
+        assertEquals(2, Regex("</section>").findAll(html).count())
+        assertContains(html, "break-inside:avoid;page-break-inside:avoid")
+        assertContains(html, "&lt;Tea&gt;")
+        assertFalse(report.forReceiptPaper(58).toPrintHtml("Report").contains("<section"))
+        assertFalse(report.copy(keepSectionsTogether = false).toPrintHtml("Report").contains("<section"))
+    }
     @Test fun newMessagesHaveAllSixLanguages() {
         listOf("device.workflow.discovery_unavailable", "device.workflow.report_failed", "device.workflow.system_print_help",
             "message.stock_is_visible_but_could_not_be_saved_on_this_device").forEach { key ->

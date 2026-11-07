@@ -376,5 +376,21 @@
     ],
     "kind": "fixture-ui",
     "timeout": 900
+  },
+  {
+    "id": "market-prices",
+    "title": "Market prices → daily alerts → offline reports → printable PDF",
+    "file": "../linux-web/test/market-price-insights-smoke.cjs",
+    "areas": [
+      "stock",
+      "marketplace",
+      "price comparison",
+      "daily price alerts",
+      "offline",
+      "permissions",
+      "PDF"
+    ],
+    "kind": "fixture-ui",
+    "timeout": 900
   }
 ]

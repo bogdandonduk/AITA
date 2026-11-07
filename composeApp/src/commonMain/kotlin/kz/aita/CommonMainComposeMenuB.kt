@@ -2539,6 +2539,8 @@ internal fun AppConfiguration.AnalyticsReportBottomSheet(snapshot: AnalyticsRepo
 @Composable
 fun AppConfiguration.MenuAnalyticsScreen() {
     var showAnalyticsReportSheet by rememberSaveable { mutableStateOf(false) }
+    var showMarketPrices by remember { mutableStateOf(false) }
+    if (showMarketPrices) MarketPriceInsightsSheet { showMarketPrices = false }
 
     AitaScreenColumn(
         modifier = Modifier.fillMaxSize(),
@@ -2674,6 +2676,7 @@ fun AppConfiguration.MenuAnalyticsScreen() {
         var analyticsSection by rememberNavigationSection("analytics:section", MenuAnalyticsTab.Sales.id)
         val filters: @Composable () -> Unit = {
             Column(Modifier.fillMaxWidth()) {
+                MarketPriceInsightsEntry(Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField, vertical = 4.dp)) { showMarketPrices = true }
         tabRowWidget(
             selectedIndexInitial = analyticsSection,
             modifier = Modifier
@@ -6152,6 +6155,7 @@ internal fun AppConfiguration.localizedNotificationCategory(category: String, ty
         "device_file" -> null
         "security" -> localizedStringResource(226, "Account security")
         "purchasing" -> replenishmentText("title", stateValues.appLanguage)
+        "market_prices" -> marketPriceText("title", stateValues.appLanguage)
         "positive", "положительные", "положительное", "жағымды" -> notificationTypeLabel(NotificationType.Positive)
         "negative", "отрицательные", "отрицательное", "жағымсыз" -> notificationTypeLabel(NotificationType.Negative)
         "neutral", "нейтральные", "нейтральное", "бейтарап" -> notificationTypeLabel(NotificationType.Neutral)
@@ -6236,6 +6240,7 @@ internal fun AppConfiguration.NotificationHistoryCard(notification: Notification
 
         DeviceNotificationLink(notification)
         ReplenishmentNotificationLink(notification)
+        MarketPriceNotificationLink(notification)
 
         Spacer(modifier = Modifier.height(6.dp))
 

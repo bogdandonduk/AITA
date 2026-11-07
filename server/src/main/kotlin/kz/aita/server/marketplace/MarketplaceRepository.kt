@@ -596,6 +596,107 @@ internal class MarketplaceRepository(private val db: Connection,
             if(branch.id in available) MARKET_AVAILABILITY_RECORDED else MARKET_AVAILABILITY_CONFIRM,now) } to (found.size>MARKET_BRANCH_MAX_LOCATIONS)
     }
 
+    /** Merchant-only report. Public projections are aggregated before leaving this transaction;
+     * costs, counterpart identities and non-published stock never enter its DTO.
+     */
+    fun priceInsights(user: UUID, store: UUID, input: MarketPriceRequest, now: Long,
+        watchedItems: Map<String, String> = emptyMap()): MarketPriceInsightsPage =
+        withComparisonReadBudget {
+            if (!readsStock(user, store)) marketFail("price_insights.access", 403)
+            val request = input.normalizedMarketPriceRequest() ?: marketFail("price_insights.invalid")
+            if (watchedItems.size > MARKET_PRICE_WATCH_MAX_ITEMS || watchedItems.any { (id, gtin) ->
+                marketDiscoveryId(id) != id || marketInsightGtin(gtin) != gtin } ||
+                (watchedItems.isNotEmpty() && (request.itemId != null || request.after != null || request.search.isNotBlank())))
+                marketFail("price_insights.invalid")
+            val root = query("SELECT coalesce(parent_store_id,id) FROM stores WHERE id=? AND is_active", store) { it.getString(1) }
+                .singleOrNull() ?: marketFail("price_insights.access", 403)
+            val conditions = mutableListOf("i.store_id=?", "i.is_active")
+            val ownArgs = mutableListOf<Any?>(store)
+            if (watchedItems.isNotEmpty()) {
+                conditions += "i.id IN (${watchedItems.keys.joinToString(",") { "?" }})"
+                ownArgs.addAll(watchedItems.keys.map(::marketUuid))
+            }
+            request.itemId?.let { conditions += "i.id=?"; ownArgs += marketUuid(it) }
+            if (request.search.isNotBlank()) {
+                val code = marketInsightGtin(request.search)
+                if (code != null) {
+                    val variants = listOf(8,12,13,14).map { code.takeLast(it) }.filter { marketCanonicalGtin(it) == code }.distinct()
+                    val marks = variants.joinToString(",") { "?" }
+                    conditions += """(EXISTS(SELECT 1 FROM jsonb_array_elements_text(i.barcodes::jsonb) bc(value) WHERE bc.value IN ($marks))
+                        OR EXISTS(SELECT 1 FROM jsonb_array_elements(i.barcode_models::jsonb) bc WHERE bc->>'value' IN ($marks)))"""
+                    ownArgs.addAll(variants); ownArgs.addAll(variants)
+                } else {
+                    conditions += """(EXISTS(SELECT 1 FROM jsonb_array_elements(i.name::jsonb) n WHERE strpos(lower(n->>'value'),lower(?))>0)
+                        OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(i.barcodes::jsonb) bc(value) WHERE strpos(bc.value,?)>0)
+                        OR EXISTS(SELECT 1 FROM jsonb_array_elements(i.barcode_models::jsonb) bc WHERE strpos(bc->>'value',?)>0))"""
+                    repeat(3) { ownArgs += request.search }
+                }
+            }
+            val total = query("SELECT count(*) FROM stock_items i WHERE ${conditions.joinToString(" AND ")}", *ownArgs.toTypedArray()) {
+                it.getLong(1).coerceAtMost(1_000_000).toInt()
+            }.single()
+            request.after?.let { conditions += "i.id>?"; ownArgs += marketUuid(it) }
+            val ownRows = query("SELECT i.id,i.name FROM stock_items i WHERE ${conditions.joinToString(" AND ")} ORDER BY i.id LIMIT ?",
+                *(ownArgs + (request.limit + 1)).toTypedArray()) { row ->
+                row.getString("id") to jsonBase.decodeFromString<List<LocalizedStringDataModel>>(row.getString("name"))
+                    .take(12).map { LocalizedStringDataModel(it.language.take(12), it.value.take(300)) }
+            }
+            val shown = ownRows.take(request.limit)
+            val ownItems = items(shown.map { marketUuid(it.first) }).associateBy { it.id }
+            val ownBatches = batches(shown.map { marketUuid(it.first) }, listOf(store), now).associateBy { it.goodsItemId }
+            val own = shown.mapNotNull { (id, name) ->
+                val item = ownItems[id] ?: return@mapNotNull null
+                val codes = item.standardBarcodeValues().mapNotNull(::marketInsightGtin).distinct().sorted().take(20)
+                val preferred = watchedItems[id] ?: request.gtin ?: marketInsightGtin(request.search)
+                val gtin = preferred?.takeIf { it in codes } ?: if (request.gtin == null && id !in watchedItems) codes.firstOrNull() else null
+                val batch = ownBatches[id]?.takeIf { it.quantity.id == item.measurementUnitId }
+                val catalogue = batch == null && item.measurementUnitId in setOf("0", "1", GRAMS_UNIT_ID)
+                val amount = batch?.quantity?.pricedAmount ?: 1.0
+                val unit = batch?.quantity?.id ?: item.measurementUnitId
+                val raw = if ((batch != null || catalogue) && item.firstViolatedPromotionRestriction(0, amount, batch, now) == null)
+                    item.promotedPriceForTransaction(0, quantityTotal = amount, batch = batch, nowMillis = now).finalPrice else null
+                val currency = raw?.currency?.trim()?.uppercase()?.takeIf { it.matches(Regex("[A-Z]{3}")) }
+                val price = raw?.price?.let(::marketPriceMinor)?.takeIf { currency != null && it in 1..MARKET_PRICE_MAX_MINOR }
+                val basis = if (gtin != null && price != null && currency != null)
+                    MarketShoppingBasis(gtin, currency, unit, amount).takeIf { it.isValidMarketBasis() } else null
+                MarketPriceInsightRow(id, name, codes, basis, batch?.quantity?.immutableUnitName.orEmpty().take(12)
+                    .map { LocalizedStringDataModel(it.language.take(12), it.value.take(120)) }, price,
+                    if (price == null) "unpriced" else if (batch == null) "catalogue" else "shelf",
+                    updatedAtMillis = maxOf(item.updatedAtMillis, batch?.updatedAtMillis ?: 0L), ownCurrencyCode = currency.takeIf { price != null })
+            }
+            val countryPredicate = "EXISTS(SELECT 1 FROM jsonb_array_elements_text(s.country_locales::jsonb) country(value) WHERE lower(country.value)=?)"
+            val cityExpression = "btrim(regexp_replace(f.city,'[[:space:] ]+',' ','g'))"
+            val cityRows = query("""SELECT min($cityExpression) AS city ${MarketplacePublicVisibility.shopJoins}
+                WHERE ${MarketplacePublicVisibility.shopPredicate} AND $countryPredicate
+                AND length($cityExpression) BETWEEN 1 AND 120 GROUP BY lower($cityExpression) ORDER BY city LIMIT 201""", now, now, request.country) { it.getString(1) }
+                .filter { it.none { c -> c.code < 32 || c.code == 127 } }
+            val gtins = own.mapNotNull { it.basis?.gtin }.distinct()
+            val groups = mutableMapOf<String, String>()
+            val byCode = if (gtins.isEmpty()) emptyMap() else {
+                val cityWhere = if (request.city.isEmpty()) "" else "AND lower($cityExpression)=lower(?)"
+                val args: List<Any?> = gtins + listOf<Any?>(now, now, request.country) +
+                    (if (request.city.isEmpty()) emptyList() else listOf(request.city)) + marketUuid(root)
+                query("""SELECT candidate.* FROM (VALUES ${gtins.joinToString(",") { "(?::text)" }}) wanted(gtin)
+                    CROSS JOIN LATERAL (SELECT l.*,p.id AS insight_group_id $publicJoins
+                      WHERE $publicPredicate AND $countryPredicate $cityWhere AND l.gtin=wanted.gtin AND p.id<>?
+                      ORDER BY p.id,l.id LIMIT ${MARKET_PRICE_CANDIDATES_PER_GTIN + 1}) candidate""", *args.toTypedArray()) { row ->
+                    val candidate = Candidate(listingRow(row), row.getLong("updated_at_millis"))
+                    groups[candidate.listing.id] = row.getString("insight_group_id")
+                    candidate
+                }.groupBy { requireNotNull(it.listing.gtin) }
+            }
+            val projected = project(null, byCode.values.flatMap { it.take(MARKET_PRICE_CANDIDATES_PER_GTIN) }, now)
+                .groupBy { it.gtin }
+            val result = own.map { row ->
+                val code = row.basis?.gtin
+                marketPriceInsight(row.copy(sampleLimited = byCode[code].orEmpty().size > MARKET_PRICE_CANDIDATES_PER_GTIN),
+                    projected[code].orEmpty().mapNotNull { offer -> groups[offer.id]?.let { MarketPriceObservation(it, offer) } }, root, now)
+            }
+            MarketPriceInsightsPage(user.toString(), store.toString(), request, result,
+                nextId = if (ownRows.size > request.limit) shown.last().first else null,
+                totalItems = total, checkedAtMillis = now, cities = cityRows.take(200), moreCities = cityRows.size > 200)
+        }
+
     private fun items(ids: List<UUID>): List<GoodsItemDataModel> {
         if(ids.isEmpty()) return emptyList()
         // Select only fields needed by retail price calculation; no costs, notes, owner, or supplier data.

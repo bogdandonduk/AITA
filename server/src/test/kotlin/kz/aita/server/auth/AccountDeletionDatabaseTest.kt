@@ -77,6 +77,7 @@ class AccountDeletionDatabaseTest {
                     exec("UPDATE stores SET owner_user_ids='[\"$other\"]' WHERE id='$store'")
                     // Deletion anonymizes the user; a foreign-key cascade alone would miss this.
                     exec("INSERT INTO replenishment_reminders(user_id,store_id,revision,enabled,settings,time_zone_id,days_before_order,updated_at_millis,request_id,request_fingerprint) VALUES ('$id','$store',1,false,'{}','Asia/Almaty',3,1,'${UUID.randomUUID()}','fixture')")
+                    exec("INSERT INTO market_price_watches(user_id,store_id,revision,enabled,settings,updated_at_millis,request_id,request_fingerprint) VALUES ('$id','$store',1,false,'{}',1,'${UUID.randomUUID()}','fixture')")
                 }
                 val login=service.passwordLogin(kz.aita.auth.AitaPasswordLoginRequestDataModel("delete-0@example.test",password),mapOf("installationId" to "first"))
                 assertNotNull(login?.tokenPair)
@@ -89,6 +90,7 @@ class AccountDeletionDatabaseTest {
                     assertEquals(0L,RefreshSessions.selectAll().where { RefreshSessions.userId eq id }.count())
                     assertEquals(0L,AuthLoginEmails.selectAll().where { AuthLoginEmails.userId eq id }.count())
                     assertEquals(0L,ReplenishmentReminders.selectAll().where { ReplenishmentReminders.userId eq id }.count())
+                    assertEquals(0L,MarketPriceWatches.selectAll().where { MarketPriceWatches.userId eq id }.count())
                 }
                 assertNull(service.passwordLogin(kz.aita.auth.AitaPasswordLoginRequestDataModel("delete-0@example.test",password),emptyMap()))
                 service.settings(factorOwner);service.settings(emailOwner)

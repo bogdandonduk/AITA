@@ -5,6 +5,7 @@ import androidx.compose.runtime.*
 internal enum class StockWorkspaceTool {
     IMPORT,
     PURCHASE_PLAN,
+    MARKET_PRICES,
 }
 
 private val LocalStockWorkspaceTool = staticCompositionLocalOf<(StockWorkspaceTool) -> Unit> { {} }
@@ -21,6 +22,7 @@ internal fun AppConfiguration.StockWorkspaceTools(content: @Composable () -> Uni
             StockScreenImportSheet(recorder) { tool = null }
         }
         StockWorkspaceTool.PURCHASE_PLAN -> ReplenishmentSheet { tool = null }
+        StockWorkspaceTool.MARKET_PRICES -> MarketPriceInsightsSheet { tool = null }
         null -> Unit
     }
 }

@@ -87,4 +87,32 @@ class AitaPdfDocumentTest {
         assertFalse(safeReceiptPdfFileName("C:\\file.pdf").contains('\\'))
         assertTrue(safeReceiptPdfFileName("a".repeat(200)).length <= 100)
     }
+
+    @Test fun reportSectionsStayTogetherWithoutLosingOrRepeatingRows() {
+        val blocks = (1..4).flatMap { item ->
+            (1..7).map { AitaPdfBlock("Item $item row $it") } + AitaPdfBlock("", AitaPdfRole.Divider)
+        }
+        val document = AitaPdfDocument(blocks, width = 595f, maxHeight = 200f, minHeight = 200f,
+            margin = 12f, bodySize = 10f, keepSectionsTogether = true)
+        val pages = layout(document)
+        assertEquals(4, pages.size)
+        assertEquals(blocks.filter { it.role != AitaPdfRole.Divider }.map { it.text },
+            pages.flatMap { it.lines }.filterNot { it.divider }.map { it.text })
+        (1..4).forEach { item ->
+            assertEquals(1, pages.count { page -> page.lines.any { it.text.startsWith("Item $item ") } })
+        }
+        pages.forEach { page -> page.lines.forEach {
+            assertTrue(it.baseline <= page.height - document.margin)
+        } }
+    }
+
+    @Test fun oversizedReportSectionsStillPaginateAndRollPrintingDoesNotChange() {
+        val blocks = (1..80).map { AitaPdfBlock("Row $it") } + AitaPdfBlock("", AitaPdfRole.Divider)
+        val report = AitaPdfDocument(blocks, width = 595f, maxHeight = 200f, minHeight = 200f,
+            margin = 12f, bodySize = 10f, keepSectionsTogether = true)
+        val pages = layout(report)
+        assertTrue(pages.size > 1)
+        assertEquals(blocks.dropLast(1).map { it.text }, pages.flatMap { it.lines }.filterNot { it.divider }.map { it.text })
+        assertEquals(layout(report.forReceiptPaper(58).copy(keepSectionsTogether = false)), layout(report.forReceiptPaper(58)))
+    }
 }

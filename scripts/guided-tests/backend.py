@@ -23,6 +23,9 @@ DEFAULT_TESTS = [
     'kz.aita.server.WorkerPlacementDatabaseTest',
     'kz.aita.server.SupplierProcurementDatabaseTest',
     'kz.aita.server.ReplenishmentDatabaseTest',
+    'kz.aita.server.MarketPricePermissionDatabaseTest',
+    'kz.aita.server.MarketPriceWatchDatabaseTest',
+    'kz.aita.server.MarketPriceEndToEndDatabaseTest',
     'kz.aita.server.TransactionStockDatabaseTest',
     'kz.aita.server.StoreCommerceDatabaseTest',
     'kz.aita.server.RecordAuditDatesDatabaseTest',
@@ -112,7 +115,10 @@ def main():
             subprocess.run([str(pg / ('pg_ctl'+exe)), '-D', str(data), '-l', str(output / 'postgres.log'), '-o', options, '-w', 'start'], env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
             for name in [database, *fixed_names.values()]:
                 subprocess.run([str(pg / ('createdb'+exe)), '-h', '127.0.0.1', '-p', str(port), '-U', username, name], env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
-        command = [str(REPO / ('gradlew.bat' if os.name == 'nt' else 'gradlew')), ':server:test', '--rerun-tasks', '--no-daemon']
+        # Every fresh cluster needs a fresh test execution. Force the test task itself,
+        # while allowing Gradle to reuse unchanged compiler outputs (source changes
+        # still rebuild normally); --rerun-tasks needlessly recompiles the entire app.
+        command = [str(REPO / ('gradlew.bat' if os.name == 'nt' else 'gradlew')), ':server:test', '--rerun', '--no-daemon']
         for name in selected: command.extend(['--tests', name])
         print('Running real schema, transaction, worker, billing and deletion assertions. See integration.log.', flush=True)
         test_started_at = time.time()

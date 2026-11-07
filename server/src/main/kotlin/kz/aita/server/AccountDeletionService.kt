@@ -38,7 +38,7 @@ internal fun eraseAccountPersonalDataInside(userId: UUID) {
         "auth_recovery_codes" to "user_id", "auth_security_profiles" to "user_id", "auth_phone_alias_challenges" to "user_id",
         "user_profile_photos" to "user_id", "user_mode_profile_photos" to "user_id", "account_app_states" to "owner_user_id",
         "buyer_saved_offers" to "user_id", "buyer_saved_shops" to "user_id", "buyer_saved_shop_states" to "user_id",
-        "buyer_shopping_lists" to "user_id", "replenishment_reminders" to "user_id", "user_notifications" to "user_id", "support_tickets" to "user_id",
+        "buyer_shopping_lists" to "user_id", "replenishment_reminders" to "user_id", "market_price_watches" to "user_id", "user_notifications" to "user_id", "support_tickets" to "user_id",
         "auth_contact_verifications" to "actor_user_id", "security_session_events" to "user_id", "refresh_sessions" to "user_id",
         "store_users" to "user_id")) tx.exec("DELETE FROM $table WHERE $column=$owner")
     tx.exec("DELETE FROM auth_contact_verifications WHERE contact_purpose='REGISTRATION' AND applied_entity_id=$owner")

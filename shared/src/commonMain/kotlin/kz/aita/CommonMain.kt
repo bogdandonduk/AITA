@@ -814,7 +814,8 @@ data class AnalyticsReportSnapshotDataModel(
     val periodText: String,
     val scopeText: String,
     val generatedAtMillis: Long,
-    val sections: List<AnalyticsReportSectionDataModel>
+    val sections: List<AnalyticsReportSectionDataModel>,
+    val keepSectionsTogether: Boolean = false
 )
 
 @kotlinx.serialization.Serializable
@@ -1992,7 +1993,9 @@ fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPlainText(): String {
 
 fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfDocument(): AitaPdfDocument =
     AitaPdfDocument(
-        blocks = buildAnalyticsReportPlainText().lines().mapIndexed { index, text ->
+        blocks = buildAnalyticsReportPlainText().lines().let { lines ->
+            if (keepSectionsTogether) lines.filter { it.isNotBlank() } else lines
+        }.mapIndexed { index, text ->
             AitaPdfBlock(text, when {
                 index == 0 -> AitaPdfRole.Store
                 index == 1 -> AitaPdfRole.Title
@@ -2000,7 +2003,8 @@ fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfDocument(): AitaPdfD
                 else -> AitaPdfRole.Body
             })
         },
-        width = 595f, maxHeight = 842f, minHeight = 842f, margin = 42f, bodySize = 10f
+        width = 595f, maxHeight = 842f, minHeight = 842f, margin = 42f, bodySize = 10f,
+        keepSectionsTogether = keepSectionsTogether
     )
 
 fun AnalyticsReportSnapshotDataModel.buildAnalyticsReportPdfBytes(): ByteArray = renderAitaPdfDocument(buildAnalyticsReportPdfDocument())
@@ -16817,6 +16821,7 @@ suspend fun finishDeletedAccountLocally(owner: String, generation: Long) {
         clearAuthenticatedSessionStorage(expectedGeneration = generation)
         runCatching { clearMarketDeliveryDeviceData(owner) }
         runCatching { clearMarketOfferDetailDeviceData(owner) }
+        runCatching { clearMarketPriceAccountCache(owner) }
         runCatching { supplierWorkspaceCache.clear(owner) }
         runCatching { clearSupplierPendingRequests(owner) }
         runCatching {

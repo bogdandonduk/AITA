@@ -127,6 +127,164 @@ class MarketplaceRepositoryDatabaseTest {
     @Test fun installationDoesNotPublishPrivateStock()=fixture{f,c->
         assertTrue(browse(f).offers.isEmpty());assertEquals("0",scalar(c,"SELECT count(*) FROM marketplace_storefronts"))
     }
+
+    private data class PricePeer(val store: UUID, val group: UUID, val item: UUID, val listing: UUID)
+    private fun pricePeer(f: Fixture, c: Connection, price: String, country: String = "kz", city: String = "Astana",
+        groupId: UUID? = null, unit: String = "piece", amount: Double = 1.0, currency: String = "KZT"): PricePeer {
+        val peer = PricePeer(UUID.randomUUID(), groupId ?: UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())
+        if (groupId == null) exec(c, "INSERT INTO stores(id,owner_user_ids) VALUES ('${peer.group}','[]')")
+        exec(c, """INSERT INTO stores(id,parent_store_id,branch_type,owner_user_ids,country_locales)
+            VALUES ('${peer.store}','${peer.group}','INTERNET','[]','["$country"]');
+            INSERT INTO store_subscription_states(store_id,owner_user_id,plan_id,status,access_kind,current_period_start_millis,auto_renew,renewal_price_minor)
+            VALUES ('${peer.store}','${f.owner}','internal_lifetime','active','lifetime',1,FALSE,0);
+            INSERT INTO stock_items(id,store_id,barcodes,measurement_unit_id,sale_prices,note)
+            VALUES ('${peer.item}','${peer.store}','["4006381333931"]','$unit','[{"price":"$price","currency":"$currency","supplierId":""}]','NEVER-PUBLIC-PEER-NOTE');
+            INSERT INTO stock_batches(id,store_id,goods_item_id,quantity) VALUES ('${UUID.randomUUID()}','${peer.store}','${peer.item}',
+            '${jsonBase.encodeToString(QuantityDataModel(unit, emptyList(), amount * 100, amount, false))}');
+            INSERT INTO marketplace_storefronts(store_id,branch_store_id,display_name,city,public_address,is_published,updated_by,updated_at_millis)
+            VALUES ('${peer.store}','${peer.store}','NEVER-PUBLIC-PEER-NAME','$city','NEVER-PUBLIC-PEER-ADDRESS',TRUE,'${f.owner}',1);
+            INSERT INTO marketplace_listings(id,store_id,goods_item_id,title,gtin,is_published,created_at_millis,updated_at_millis,updated_by)
+            VALUES ('${peer.listing}','${peer.store}','${peer.item}','Published product','04006381333931',TRUE,1,1,'${f.owner}');""")
+        return peer
+    }
+
+    @Test fun fullMerchantPageKeepsThirtyProductComparisonsSeparate() = fixture { f, c ->
+        exec(c, "UPDATE stock_items SET is_active=FALSE WHERE id='${f.item}'")
+        val expected = mutableMapOf<String, Pair<String, Long>>()
+        repeat(MARKET_PRICE_PAGE_SIZE) { index ->
+            val prefix = "400123" + index.toString().padStart(6, '0')
+            val sum = prefix.reversed().mapIndexed { i, value -> (value - '0') * if (i % 2 == 0) 3 else 1 }.sum()
+            val code = prefix + (10 - sum % 10) % 10
+            val gtin = requireNotNull(marketInsightGtin(code))
+            val item = UUID.randomUUID()
+            expected[item.toString()] = gtin to (11000L + index * 100L)
+            exec(c, """INSERT INTO stock_items(id,store_id,name,barcodes,measurement_unit_id,sale_prices)
+                VALUES ('$item','${f.parent}','[{"language":"en","value":"Product $index"}]','["$code"]','0',
+                    '[{"price":"${100 + index}","currency":"KZT","supplierId":""}]')""")
+            repeat(3) { group ->
+                val peer = pricePeer(f, c, (100 + index + group * 10).toString(), unit = "0")
+                exec(c, """UPDATE stock_items SET barcodes='["$code"]' WHERE id='${peer.item}';
+                    UPDATE marketplace_listings SET gtin='$gtin' WHERE id='${peer.listing}'""")
+            }
+        }
+        val started = System.nanoTime()
+        val page = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(city = "Astana"), 1000) }
+        println("Market price full page: 30 product identities, 90 public shops, ${((System.nanoTime() - started) / 1_000_000)}ms")
+        assertTrue(page.isValidMarketPricePage(f.owner.toString(), f.parent.toString(), page.request))
+        assertEquals(MARKET_PRICE_PAGE_SIZE, page.rows.size); assertNull(page.nextId)
+        page.rows.forEach { row ->
+            assertEquals(expected.getValue(row.goodsItemId).first, row.basis?.gtin)
+            assertEquals(expected.getValue(row.goodsItemId).second, row.statistics?.medianMinor)
+            assertEquals(3, row.compatibleGroups); assertFalse(row.sampleLimited)
+        }
+    }
+
+    @Test fun merchantPricesCountEachOtherFamilyOnceAndNeverReturnPeerIdentitiesOrPrivateStock() = fixture { f, c ->
+        published(f); batch(f, c)
+        val first = pricePeer(f, c, "100.00")
+        pricePeer(f, c, "50.00", groupId = first.group)
+        pricePeer(f, c, "200.00"); pricePeer(f, c, "300.00")
+        pricePeer(f, c, "1.00", groupId = f.management)
+        val result = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 1000) }
+        val row = result.rows.single()
+        assertEquals(19999L, row.ownPriceMinor)
+        assertEquals(MarketPriceStatistics(3, 5000, 5000, 20000, 30000, 30000), row.statistics)
+        assertTrue(result.isValidMarketPricePage(f.owner.toString(), f.parent.toString(), result.request))
+        val json = jsonBase.encodeToString(result)
+        listOf("NEVER-PUBLIC", first.group.toString(), first.store.toString(), first.item.toString(), first.listing.toString(), "supplyPrice").forEach {
+            assertFalse(json.contains(it), it)
+        }
+    }
+
+    @Test fun merchantPricesExcludeWrongCountryCurrencyPacksExpiredAccessAndUnpublishedStock() = fixture { f, c ->
+        batch(f, c)
+        repeat(3) { pricePeer(f, c, (100 + it).toString()) }
+        pricePeer(f, c, "1", country = "ru"); pricePeer(f, c, "1", currency = "RUB")
+        pricePeer(f, c, "1", amount = 2.0)
+        val expired = pricePeer(f, c, "1")
+        exec(c, "UPDATE store_subscription_states SET status='inactive' WHERE store_id='${expired.store}'")
+        val unpublished = pricePeer(f, c, "1")
+        exec(c, "UPDATE marketplace_listings SET is_published=FALSE WHERE id='${unpublished.listing}'")
+        val noStock = pricePeer(f, c, "1")
+        exec(c, "UPDATE stock_batches SET is_active=FALSE WHERE store_id='${noStock.store}'")
+        val staleIdentity = pricePeer(f, c, "1")
+        exec(c, "UPDATE stock_items SET barcodes='[\"5901234123457\"]' WHERE id='${staleIdentity.item}'")
+        val result = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 1000) }
+        assertEquals(3, result.rows.single().compatibleGroups)
+        assertEquals(10100L, result.rows.single().statistics?.medianMinor)
+    }
+
+    @Test fun merchantPricesUseExplicitCountryAndCaseInsensitiveCityWithSafeQueryParameters() = fixture { f, c ->
+        batch(f, c)
+        repeat(3) { pricePeer(f, c, (100 + it).toString(), city = "Astana") }
+        repeat(3) { pricePeer(f, c, (200 + it).toString(), city = "Almaty") }
+        repeat(3) { pricePeer(f, c, (300 + it).toString(), country = "kg", city = "Bishkek") }
+        val astana = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(city = "  aStAnA "), 1000) }
+        assertEquals(10100L, astana.rows.single().statistics?.medianMinor)
+        assertEquals(listOf("Almaty", "Astana"), astana.cities)
+        val bishkek = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(country = "kg"), 1000) }
+        assertEquals(30100L, bishkek.rows.single().statistics?.medianMinor)
+        val injected = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(city = "' OR TRUE --"), 1000) }
+        assertNull(injected.rows.single().statistics)
+    }
+
+    @Test fun merchantPricesReadCatalogueWithoutBatchesButNeverInventCustomUnitPriceBasis() = fixture { f, c ->
+        repeat(3) { pricePeer(f, c, (100 + it).toString(), unit = "0") }
+        assertNull(tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 1000) }.rows.single().basis)
+        exec(c, "UPDATE stock_items SET measurement_unit_id='0' WHERE id='${f.item}'")
+        val row = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 1000) }.rows.single()
+        assertEquals("catalogue", row.referenceKind)
+        assertEquals(10100L, row.statistics?.medianMinor)
+    }
+
+    @Test fun merchantPricesSearchCanonicalBarcodesAndPaginateWithoutRepeatingItems() = fixture { f, c ->
+        val ids = List(4) { UUID.randomUUID() }.sortedBy { it.toString() }
+        ids.forEach { id -> exec(c, "INSERT INTO stock_items(id,store_id,name) VALUES ('$id','${f.parent}','[{\"language\":\"ru\",\"value\":\"Товар\"}]')") }
+        val found = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(search = "04006381333931"), 1000) }
+        assertEquals(listOf(f.item.toString()), found.rows.map { it.goodsItemId })
+        val request = MarketPriceRequest(search = "Товар", limit = 2)
+        val first = tx(f) { it.priceInsights(f.owner, f.parent, request, 1000) }
+        val last = tx(f) { it.priceInsights(f.owner, f.parent, request.copy(after = first.nextId), 1000) }
+        assertEquals(ids.map { it.toString() }, (first.rows + last.rows).map { it.goodsItemId })
+        assertEquals(4, first.totalItems); assertNull(last.nextId)
+        assertTrue(first.isValidMarketPricePage(f.owner.toString(), f.parent.toString(), first.request))
+        assertTrue(last.isValidMarketPricePage(f.owner.toString(), f.parent.toString(), last.request))
+    }
+
+    @Test fun merchantPricesNeverGrantStockAccessToOrdinaryMarketplaceBuyers() = fixture { f, _ ->
+        assertEquals(403, assertFailsWith<MarketFailure> {
+            tx(f) { it.priceInsights(f.buyer, f.parent, MarketPriceRequest(), 1000) }
+        }.status)
+    }
+
+    @Test fun watchedPricesReadOnlySelectedOwnedItemsAndNeverSwitchTheirBarcodeSilently() = fixture { f, c ->
+        batch(f, c)
+        repeat(3) { pricePeer(f, c, (100 + it).toString()) }
+        val code = "04006381333931"
+        val selected = mapOf(f.item.toString() to code)
+        val other = UUID.randomUUID()
+        exec(c, "INSERT INTO stock_items(id,store_id,barcodes) VALUES ('$other','${f.parent}','[\"4006381333931\"]')")
+        val result = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 1000, selected) }
+        assertEquals(1, result.totalItems); assertEquals(listOf(f.item.toString()), result.rows.map { it.goodsItemId })
+        assertEquals(code, result.rows.single().basis?.gtin); assertEquals(10100L, result.rows.single().statistics?.medianMinor)
+        assertTrue(tx(f) { it.priceInsights(f.owner, f.otherParent, MarketPriceRequest(), 1000, selected) }.rows.isEmpty())
+        exec(c, "UPDATE stock_items SET barcodes='[\"5901234123457\"]' WHERE id='${f.item}'")
+        val changed = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 2000, selected) }
+        assertNull(changed.rows.single().basis, "A watch must not move to a different product barcode")
+        assertNull(changed.rows.single().statistics)
+        assertFailsWith<MarketFailure> { tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(search = "tea"), 1000, selected) } }
+        exec(c, "UPDATE stock_items SET is_active=FALSE WHERE id='${f.item}'")
+        assertTrue(tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 3000, selected) }.rows.isEmpty())
+    }
+
+    @Test fun merchantPricesFlagCandidateCapInsteadOfClaimingAWholeMarketCensus() = fixture { f, c ->
+        batch(f, c)
+        repeat(81) { pricePeer(f, c, (100 + it).toString()) }
+        val row = tx(f) { it.priceInsights(f.owner, f.parent, MarketPriceRequest(), 1000) }.rows.single()
+        assertTrue(row.sampleLimited)
+        assertEquals(80, row.compatibleGroups)
+        assertNotNull(row.statistics)
+    }
     @Test fun storefrontAndProductRequireIndependentOptIn()=fixture{f,_->
         storefront(f,false);listing(f);assertTrue(browse(f).offers.isEmpty())
         val current=tx(f){it.dashboard(f.owner,f.parent)}.storefront

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "revision": 9,
+  "revision": 10,
   "tutorials": [
     {
       "id": "account.register",
@@ -5750,6 +5750,115 @@
         "tg": "Ин роҳнамои ҳисобии фаҳмост, на кафолати талабот аз зеҳни сунъӣ ё хариди худкор. Фурӯши софи рӯзона × муҳлат/фарогирӣ бо резерв/афзоиши шумо, бо тарҳи захираи коршоям ва таъминоти тасдиқшудаи санааш маълум. Рӯзи нотамоми имрӯз, захираи муҳлаташ наздик, ваъдаҳои бесана/дершуда ва фармоишҳои тасдиқнашуда ҳисоб намешаванд. Рӯзҳои набудани мол чен намешаванд.",
         "uz": "Bu tushunarli hisobiy yo‘nalish, sun’iy intellekt talabi kafolati yoki avtomatik xarid emas. Kunlik sof savdo × muddat/qamrov va siz belgilagan rezerv/o‘sish, undan yaroqli zaxira va sanasi ma’lum tasdiqlangan ta’minot ayriladi. Bugungi tugamagan kun, muddati tugayotgan zaxira, sanasiz/kechikkan va’dalar va tasdiqlanmagan buyurtmalar qamrovga kirmaydi. Mahsulot yo‘q kunlar o‘lchanmaydi."
       }
+    },
+    {
+      "id": "stock.market-prices",
+      "modes": [
+        "STORE"
+      ],
+      "category": "STOCK",
+      "title": {
+        "en": "Compare market prices",
+        "ru": "Сравнить цены на рынке",
+        "kk": "Нарық бағаларын салыстыру",
+        "ky": "Базар бааларын салыштыруу",
+        "tg": "Муқоисаи нархҳои бозор",
+        "uz": "Bozor narxlarini solishtirish"
+      },
+      "introduction": {
+        "en": "Compare the selected store’s retail prices with public, available offers in AITA Market. The report does not change your prices.",
+        "ru": "Сравните розничные цены выбранного магазина с опубликованными доступными предложениями AITA Market. Отчёт не меняет ваши цены.",
+        "kk": "Таңдалған дүкеннің бөлшек бағаларын AITA Market-тағы жарияланған, қолжетімді ұсыныстармен салыстырыңыз. Есеп бағаларыңызды өзгертпейді.",
+        "ky": "Тандалган дүкөндүн чекене бааларын AITA Market жарыялаган жеткиликтүү сунуштар менен салыштырыңыз. Отчёт бааларыңызды өзгөртпөйт.",
+        "tg": "Нархҳои чаканаи мағозаи интихобшударо бо пешниҳодҳои дастраси нашршудаи AITA Market муқоиса кунед. Ҳисобот нархҳои шуморо тағйир намедиҳад.",
+        "uz": "Tanlangan do‘konning chakana narxlarini AITA Market’da e’lon qilingan mavjud takliflar bilan solishtiring. Hisobot narxlaringizni o‘zgartirmaydi."
+      },
+      "steps": [
+        {
+          "id": "step-1",
+          "text": {
+            "en": "Open Stock → Market prices, or open it from Analytics. You need permission to view both stock and analytics for the selected store.",
+            "ru": "Откройте Склад → Цены на рынке или тот же инструмент в Аналитике. Нужен доступ к складу и аналитике выбранного магазина.",
+            "kk": "Қойма → Нарық бағалары бөлімін немесе Талдаудағы осы құралды ашыңыз. Таңдалған дүкеннің қоймасы мен талдауын көруге рұқсат қажет.",
+            "ky": "Кампа → Базар баалары бөлүмүн же Талдоодогу ушул куралды ачыңыз. Тандалган дүкөндүн кампасын жана талдоосун көрүүгө уруксат керек.",
+            "tg": "Анбор → Нархҳои бозор ё ҳамин асбобро дар Таҳлил кушоед. Барои анбор ва таҳлили мағозаи интихобшуда иҷозат лозим аст.",
+            "uz": "Ombor → Bozor narxlari yoki Tahlildagi shu vositani oching. Tanlangan do‘kon ombori va tahlilini ko‘rish huquqi kerak."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-2",
+          "text": {
+            "en": "Choose a country and optionally a city. Search your stock by name or barcode, then press Compare prices. The page shows the place and time used for its report.",
+            "ru": "Выберите страну и при желании город. Найдите свой товар по названию или штрихкоду и нажмите Сравнить цены. Место и время проверки указаны в отчёте.",
+            "kk": "Елді және қажет болса қаланы таңдаңыз. Тауарды атауы немесе штрихкоды бойынша тауып, Бағаларды салыстыруды басыңыз. Есепте орын мен тексеру уақыты көрсетіледі.",
+            "ky": "Өлкөнү жана керек болсо шаарды тандаңыз. Товарды аты же штрихкоду менен таап, Бааларды салыштырууну басыңыз. Отчётто жер жана текшерүү убактысы көрсөтүлөт.",
+            "tg": "Кишвар ва агар хоҳед шаҳрро интихоб кунед. Молро аз рӯйи ном ё штрихкод ёфта, Муқоисаи нархҳоро пахш кунед. Ҷой ва вақти санҷиш дар ҳисобот ҳастанд.",
+            "uz": "Mamlakat va kerak bo‘lsa shaharni tanlang. Tovarni nomi yoki shtrix-kodi bo‘yicha topib, Narxlarni solishtirishni bosing. Hisobotda joy va tekshirish vaqti ko‘rsatiladi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-3",
+          "text": {
+            "en": "Compare only matching product barcodes, currency and selling quantity. One kilogram can match 1000 grams; different pack sizes are not rescaled. Internal store and weight-label codes are excluded.",
+            "ru": "Сопоставляются одинаковые товарные штрихкоды, валюта и количество продажи. 1 кг сопоставим с 1000 г; разные фасовки не пересчитываются. Внутренние и весовые коды исключены.",
+            "kk": "Тек бірдей тауар штрихкодтары, валюта және сату мөлшері салыстырылады. 1 кг 1000 г-ға тең; әртүрлі қаптамалар қайта есептелмейді. Ішкі және салмақ жапсырма кодтары кірмейді.",
+            "ky": "Бирдей товар штрихкоду, валюта жана сатуу көлөмү гана салыштырылат. 1 кг 1000 г менен салышат; ар башка таңгактар кайра эсептелбейт. Ички жана салмак этикетка коддору кирбейт.",
+            "tg": "Танҳо штрихкод, асъор ва миқдори якхелаи фурӯш муқоиса мешаванд. 1 кг ба 1000 г баробар аст; бастабандиҳои гуногун аз нав ҳисоб намешаванд. Рамзҳои дохилӣ ва тамғаҳои вазн хориҷанд.",
+            "uz": "Faqat bir xil tovar shtrix-kodi, valyuta va sotish miqdori solishtiriladi. 1 kg 1000 g ga teng; turli qadoqlar qayta hisoblanmaydi. Ichki va vazn yorlig‘i kodlari chiqarib tashlanadi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-4",
+          "text": {
+            "en": "Each other parent-store group contributes its cheapest comparable offer. Your group is excluded. At least three groups are required for a median. Details show the observed range and middle 50%; a limited sample is marked.",
+            "ru": "От каждой другой группы с одним родительским магазином берётся самое дешёвое сопоставимое предложение. Ваша группа исключается. Для медианы нужны минимум три группы. В подробностях показаны диапазон и средние 50% цен; ограниченная выборка отмечена.",
+            "kk": "Әр басқа негізгі дүкен тобынан ең арзан салыстырмалы ұсыныс алынады. Өз тобыңыз кірмейді. Медианаға кемінде үш топ қажет. Толық ақпаратта ауқым мен ортаңғы 50% көрсетіледі; шектеулі таңдама белгіленеді.",
+            "ky": "Ар башка негизги дүкөн тобунан эң арзан ылайыктуу сунуш алынат. Өз тобуңуз кирбейт. Медиана үчүн кеминде үч топ керек. Толук маалыматта аралык жана ортоңку 50% көрсөтүлөт; чектелген тандоо белгиленет.",
+            "tg": "Аз ҳар гурӯҳи дигари мағозаи асосӣ арзонтарин пешниҳоди мувофиқ гирифта мешавад. Гурӯҳи шумо хориҷ аст. Барои медиана ҳадди ақал се гурӯҳ лозим аст. Тафсилот фосила ва 50%-и миёнаро нишон медиҳад; намунаи маҳдуд қайд мешавад.",
+            "uz": "Har boshqa bosh do‘kon guruhidan eng arzon mos taklif olinadi. Sizning guruhingiz kiritilmaydi. Mediana uchun kamida uch guruh kerak. Tafsilotlarda oraliq va o‘rtadagi 50% ko‘rsatiladi; cheklangan namuna belgilanadi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-5",
+          "text": {
+            "en": "Above/below-median tabs filter this page only. Use Next page to continue through matching stock. Print / PDF exports the current page with its scope, coverage and calculation method.",
+            "ru": "Вкладки Выше/Ниже медианы фильтруют только текущую страницу. Следующая страница продолжает список товаров. Печать / PDF сохраняет текущую страницу с областью сравнения, охватом и методикой.",
+            "kk": "Медианадан жоғары/төмен қойындылары тек осы бетті сүзеді. Келесі бет тауарлар тізімін жалғастырады. Басып шығару / PDF ағымдағы бетті салыстыру аймағы, қамтуы және әдісімен сақтайды.",
+            "ky": "Медианадан жогору/төмөн өтмөктөрү ушул бетти гана чыпкалайт. Кийинки бет товарлар тизмесин улантат. Басып чыгаруу / PDF ушул бетти аймагы, камтуусу жана ыкмасы менен сактайт.",
+            "tg": "Ҷадвалҳои боло/поёни медиана танҳо ҳамин саҳифаро филтр мекунанд. Саҳифаи навбатӣ рӯйхатро идома медиҳад. Чоп / PDF саҳифаи ҷориро бо ҳудуд, фарогирӣ ва усул содир мекунад.",
+            "uz": "Medianadan yuqori/past bo‘limlari faqat joriy sahifani filtrlaydi. Keyingi sahifa tovarlar ro‘yxatini davom ettiradi. Chop etish / PDF joriy sahifani hudud, qamrov va usul bilan saqlaydi."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-6",
+          "text": {
+            "en": "Up to eight recently viewed report pages are stored on this device for this account and store. Reopen them offline; their check time stays visible. Refresh online to check current prices. Access revocation hides saved reports. Earlier observations may contain a different set of shops. Open the country/city controls and choose Saved reports to reopen a previously viewed page directly.",
+            "ru": "На устройстве сохраняются до восьми последних просмотренных страниц отчёта для этого аккаунта и магазина. Открывайте их офлайн: время проверки остаётся видимым. Обновите онлайн для проверки текущих цен. При отзыве доступа сохранённые отчёты скрываются. В предыдущем наблюдении состав магазинов мог отличаться. Раскройте настройки страны/города и выберите Сохранённые отчёты, чтобы сразу открыть ранее просмотренную страницу.",
+            "kk": "Құрылғыда осы аккаунт пен дүкен үшін соңғы сегіз есеп бетіне дейін сақталады. Оларды желісіз ашуға болады; тексеру уақыты көрсетіледі. Ағымдағы бағаларды желіде жаңартыңыз. Рұқсат қайтарылса, сақталған есептер жасырын болады. Бұрынғы бақылауда дүкендер құрамы өзгеше болуы мүмкін. Бұрынғы бетті ашу үшін ел/қала баптауларын ашып, Сақталған есептерді таңдаңыз.",
+            "ky": "Түзмөктө ушул аккаунт жана дүкөн үчүн акыркы сегиз отчёт бетине чейин сакталат. Аларды офлайн ачыңыз; текшерүү убактысы көрүнөт. Учурдагы бааларды онлайн жаңыртыңыз. Уруксат алынганда сакталган отчёттор жашырылат. Мурунку байкоодо дүкөндөрдүн курамы башка болушу мүмкүн. Мурунку бетти ачуу үчүн өлкө/шаар жөндөөлөрүн ачып, Сакталган отчётторду тандаңыз.",
+            "tg": "Дар дастгоҳ барои ин ҳисоб ва мағоза то ҳашт саҳифаи охирини ҳисобот сабт мешавад. Онҳоро офлайн кушоед; вақти санҷиш намоён мемонад. Барои нархҳои ҷорӣ онлайн нав кунед. Бо бекор шудани иҷозат ҳисоботи сабтшуда пинҳон мешавад. Дар мушоҳидаи пешина маҷмӯи мағозаҳо метавонист дигар бошад. Барои кушодани саҳифаи пешина танзими кишвар/шаҳрро кушода, Ҳисоботи сабтшударо интихоб кунед.",
+            "uz": "Qurilmada shu hisob va do‘kon uchun oxirgi sakkiztagacha hisobot sahifasi saqlanadi. Ularni oflayn oching; tekshirish vaqti ko‘rinadi. Joriy narxlarni onlayn yangilang. Ruxsat bekor qilinsa, saqlangan hisobotlar yashiriladi. Oldingi kuzatuvda do‘konlar tarkibi farq qilgan bo‘lishi mumkin. Oldingi sahifani ochish uchun mamlakat/shahar sozlamalarida Saqlangan hisobotlarni tanlang."
+          },
+          "screenshots": []
+        },
+        {
+          "id": "step-7",
+          "text": {
+            "en": "Open an item’s details and press Follow daily. Up to 10 items in one region can be followed per store. Daily price alerts lets you choose a 1–20% change threshold, refresh settings or stop following. Saving starts a fresh baseline. Notifications are personal, checked about once daily, and do not change stock prices. Limited samples and fewer than three other groups do not trigger an alert. Settings need an online confirmation.",
+            "ru": "Откройте подробности товара и нажмите Следить за ценой. Для магазина можно наблюдать за 10 товарами в одном регионе. В Ежедневных уведомлениях о ценах выберите порог изменения 1–20%, обновите настройки или отключите наблюдение. Сохранение задаёт новую точку отсчёта. Уведомления личные, проверка примерно раз в сутки, цены склада не меняются. Ограниченная выборка и менее трёх других групп не вызывают уведомлений. Настройки требуют онлайн-подтверждения.",
+            "kk": "Тауар мәліметтерін ашып, Бағаны бақылауды басыңыз. Бір дүкенде бір аймақтың 10 тауарын бақылауға болады. Күнделікті баға хабарландыруларында 1–20% өзгеріс шегін таңдаңыз, баптауларды жаңартыңыз немесе бақылауды тоқтатыңыз. Сақтау жаңа бастапқы мәнді орнатады. Жеке хабарландыру шамамен тәулігіне бір рет тексеріледі, қойма бағалары өзгермейді. Шектеулі таңдама не үштен аз басқа топ болса, хабарлама жіберілмейді. Баптаулар желіде расталуы керек.",
+            "ky": "Товардын маалыматын ачып, Бааны көзөмөлдөөнү басыңыз. Бир дүкөндө бир аймактын 10 товарын көзөмөлдөсө болот. Күнүмдүк баа билдирүүлөрүндө 1–20% өзгөрүү чегин тандап, жөндөөлөрдү жаңыртыңыз же көзөмөлдү токтотуңуз. Сактоо жаңы баштапкы маанини коёт. Жеке билдирүүлөр болжол менен күнүнө бир текшерилет, кампа баалары өзгөрбөйт. Чектелген тандоо же үчтөн аз башка топ болсо, билдирүү келбейт. Жөндөөлөр онлайн ырасталат.",
+            "tg": "Тафсилоти молро кушода, Пайгирии нархро пахш кунед. Барои ҳар мағоза то 10 молро дар як минтақа пайгирӣ кардан мумкин аст. Дар Огоҳиҳои ҳаррӯзаи нарх ҳадди тағйири 1–20%-ро интихоб кунед, танзимро нав кунед ё пайгириро қатъ кунед. Сабт нуқтаи нави ҳисобро муқаррар мекунад. Огоҳиҳо шахсӣ буда, тақрибан ҳар рӯз санҷида мешаванд; нархи анбор дигар намешавад. Интихоби маҳдуд ё камтар аз се гурӯҳи дигар огоҳӣ намефиристад. Танзим бояд онлайн тасдиқ шавад.",
+            "uz": "Tovar tafsilotlarini ochib, Narxni kuzatishni bosing. Har do‘konning bir hududida 10 tagacha tovar kuzatiladi. Kunlik narx bildirishnomalarida 1–20% o‘zgarish chegarasini tanlang, sozlamalarni yangilang yoki kuzatishni to‘xtating. Saqlash yangi boshlang‘ich qiymatni belgilaydi. Shaxsiy bildirishnomalar taxminan kuniga bir tekshiriladi, ombor narxlari o‘zgarmaydi. Namuna cheklangan yoki boshqa guruhlar uchtadan kam bo‘lsa, bildirishnoma yuborilmaydi. Sozlamalar onlayn tasdiqlanishi kerak."
+          },
+          "screenshots": []
+        }
+      ]
     }
   ],
   "faqs": [

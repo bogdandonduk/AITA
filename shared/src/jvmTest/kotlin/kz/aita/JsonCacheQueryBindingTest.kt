@@ -87,4 +87,15 @@ class JsonCacheQueryBindingTest {
         assertEquals("", queries.selectKvSlice(sliceOffset = 1L, sliceLength = 0L, cacheKey = "bounded").awaitAsOneOrNull()?.text_slice)
         assertEquals("", queries.selectKvSlice(sliceOffset = 4L, sliceLength = 32_768L, cacheKey = "bounded").awaitAsOneOrNull()?.text_slice)
     }
+    @Test fun accountCleanupRemovesVariableLengthChunkKeysWithoutMatchingOtherAccountsUrlsOrValues() = testDb { database ->
+        val q = database.app_databaseQueries
+        val prefix = "market-price-cache-v1:11111111-1111-4111-8111-111111111111:"
+        fun chunk(logical: String) = "aita-cache-chunks-v1:${logical.length}:$logical:manifest"
+        val removed = listOf(prefix + "legacy", chunk(prefix + "store:short-origin"), chunk(prefix + "store:" + "long-origin".repeat(20)))
+        val retained = listOf(chunk("other-account:store:URL:$prefix"), "not-a-chunk:$prefix", "other-account:legacy")
+        (removed + retained).forEach { q.insertKv(it, prefix + "must-not-match-a-value") }
+        q.deleteKvLogicalPrefix(prefix)
+        removed.forEach { assertNull(q.selectKvByKey(it).awaitAsOneOrNull(), it) }
+        retained.forEach { assertNotNull(q.selectKvByKey(it).awaitAsOneOrNull(), it) }
+    }
 }

@@ -5932,7 +5932,7 @@ fun AppConfiguration.actionButton(
 
     val resolvedIconRes = iconRes
     val showBusyAnimation = actionFeedback
-    val iconPresent = showBusyAnimation || icon != null || inferredIconPath != null
+    val iconPresent = showBusyAnimation || icon != null || inferredIconPath != null || resolvedIconRes != null
     val iconSize = iconSizeOverride ?: when {
         inferredIconPath == stateValues.drawablePathIconBackArrow -> 18.dp
         textPresent -> 20.dp
@@ -6025,10 +6025,10 @@ fun AppConfiguration.actionButton(
                         color = textColor,
                     )
                 } else {
-                    icon?.invoke() ?: inferredIconPath?.run {
+                    if (icon != null) icon() else if (inferredIconPath != null || resolvedIconRes != null) {
                         CpImage(
                             modifier = Modifier.size(iconSize),
-                            url = this,
+                            url = inferredIconPath.orEmpty(),
                             fallbackRes = resolvedIconRes,
                             contentDescription = iconContentDescription,
                             tintColor = iconTintColor

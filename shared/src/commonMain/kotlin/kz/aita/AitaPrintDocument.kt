@@ -62,6 +62,7 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
     require(margin.isFinite() && margin >= 0 && width - margin * 2 >= 60 && bodySize in 6f..30f)
     require(blocks.size <= 50_000 && blocks.sumOf { it.text.length.toLong() } <= 2_000_000L)
     val contentWidth = width - margin * 2
+    val grouped = keepSectionsTogether && width >= 250f && minHeight > 0f
     return buildString {
         append("<!doctype html><html><head><meta charset=\"UTF-8\"><title>")
         append(printHtmlEscape(title))
@@ -71,8 +72,10 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
         }
         append("<style>@page{size:${width}pt ${maxHeight}pt;margin:${margin}pt}")
         append("html,body{background:white;color:black;-webkit-text-fill-color:black;print-color-adjust:exact}body{margin:0;width:${contentWidth}pt;font-family:Arial,'Noto Sans',sans-serif}#aita-print-content{display:flow-root}")
-        append(".line{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;min-height:1em}.barcode{break-inside:avoid;text-align:center}svg{display:block;margin:0 auto}hr{border:0;border-top:1pt solid black;margin:6pt 0}</style></head><body><main id=\"aita-print-content\">")
+        append(".report-section{break-inside:avoid;page-break-inside:avoid}.line{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4;min-height:1em}.barcode{break-inside:avoid;text-align:center}svg{display:block;margin:0 auto}hr{border:0;border-top:1pt solid black;margin:6pt 0}</style></head><body><main id=\"aita-print-content\">")
+        var sectionOpen = false
         blocks.forEach { block ->
+            if (grouped && !sectionOpen) { append("<section class=\"report-section\">"); sectionOpen = true }
             val payload = block.barcodePayload
             when {
                 payload != null -> {
@@ -94,7 +97,9 @@ fun AitaPdfDocument.toPrintHtml(title: String): String {
                     append("</div>")
                 }
             }
+            if (grouped && block.role == AitaPdfRole.Divider) { append("</section>"); sectionOpen = false }
         }
+        if (sectionOpen) append("</section>")
         append("</main></body></html>")
     }
 }

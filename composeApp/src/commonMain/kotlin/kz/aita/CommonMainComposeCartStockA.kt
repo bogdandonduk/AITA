@@ -1982,9 +1982,10 @@ fun AppConfiguration.StockWarehouseScreen() {
         }
     ) {
         InventoryPendingFeedback()
-        Row(Modifier.fillMaxWidth().padding(horizontal = stateValues.marginTextField, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StockScreenImportEntry(Modifier.weight(1f))
-            ReplenishmentEntry(Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = stateValues.marginTextField, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StockScreenImportEntry(Modifier.widthIn(min = 160.dp, max = 230.dp))
+            ReplenishmentEntry(Modifier.widthIn(min = 160.dp, max = 230.dp))
+            MarketPriceInsightsEntry(Modifier.widthIn(min = 160.dp, max = 230.dp))
         }
         AnimatedVisibility(visible = sortMenuExpanded) {
             Column(
